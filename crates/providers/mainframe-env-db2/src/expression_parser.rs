@@ -8,6 +8,17 @@ use crate::{
     Db2UnaryOperator, lex_db2,
 };
 
+const MAX_PARSE_RECURSION: usize = 128;
+
+fn join_spans(start: Db2SourceSpan, end: Db2SourceSpan) -> Db2SourceSpan {
+    Db2SourceSpan {
+        start_byte: start.start_byte,
+        end_byte: end.end_byte,
+        start: start.start,
+        end: end.end,
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Db2ParsedExpression {
     arena: Db2ExpressionArena,
@@ -53,6 +64,7 @@ struct ExpressionParser<'a> {
     limits: Db2AstLimits,
     arena: Db2ExpressionArena,
     contains_parameter: Vec<bool>,
+    recursion_depth: usize,
 }
 
 impl<'a> ExpressionParser<'a> {
@@ -61,7 +73,7 @@ impl<'a> ExpressionParser<'a> {
             Db2SyntaxDiagnostic::new(
                 Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                 Db2SourceLocation::START,
-                problem.message,
+                &problem.message,
             )
         })?;
         Ok(Self {
@@ -70,23 +82,37 @@ impl<'a> ExpressionParser<'a> {
             limits,
             arena,
             contains_parameter: Vec::new(),
+            recursion_depth: 0,
         })
     }
 
     fn parse_precedence(&mut self, minimum: u8) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
+        self.enter_recursion()?;
+        let result = self.parse_precedence_inner(minimum);
+        self.recursion_depth -= 1;
+        result
+    }
+
+    fn parse_precedence_inner(
+        &mut self,
+        minimum: u8,
+    ) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
         let mut left = if self.take_word("NOT") {
-            let start = self.previous_start();
+            let start = self.previous_span();
             let operand = self.parse_precedence(3)?;
+            if !self.is_search_condition(operand) {
+                return Err(self.diagnostic_here(
+                    Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                    "NOT requires a Db2 predicate",
+                ));
+            }
             let parameter = self.parameter_flag(operand)?;
             self.push(
                 Db2ExpressionKind::Unary {
                     operator: Db2UnaryOperator::Not,
                     operand,
                 },
-                Db2SourceSpan {
-                    start,
-                    end: self.expression_span(operand)?.end,
-                },
+                join_spans(start, self.expression_span(operand)?),
                 parameter,
             )?
         } else {
@@ -94,7 +120,13 @@ impl<'a> ExpressionParser<'a> {
         };
         loop {
             if self.word() == Some("IS") && 3 >= minimum {
-                let start = self.expression_span(left)?.start;
+                if self.is_search_condition(left) {
+                    return Err(self.diagnostic_here(
+                        Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                        "Db2 predicate cannot be followed by another NULL predicate",
+                    ));
+                }
+                let start = self.expression_span(left)?;
                 self.position += 1;
                 let negated = self.take_word("NOT");
                 self.expect_word("NULL")?;
@@ -104,10 +136,7 @@ impl<'a> ExpressionParser<'a> {
                         "Db2 NULL predicate cannot contain a parameter marker",
                     ));
                 }
-                let span = Db2SourceSpan {
-                    start,
-                    end: self.previous_end(),
-                };
+                let span = join_spans(start, self.previous_span());
                 left = self.push(
                     Db2ExpressionKind::IsNull {
                         expression: left,
@@ -124,12 +153,15 @@ impl<'a> ExpressionParser<'a> {
             if precedence < minimum {
                 break;
             }
+            if precedence == 3 && self.is_search_condition(left) {
+                return Err(self.diagnostic_here(
+                    Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                    "Db2 comparison predicates cannot be chained",
+                ));
+            }
             self.position += 1;
             let right = self.parse_precedence(precedence + 1)?;
-            let span = Db2SourceSpan {
-                start: self.expression_span(left)?.start,
-                end: self.expression_span(right)?.end,
-            };
+            let span = join_spans(self.expression_span(left)?, self.expression_span(right)?);
             let parameter = self.parameter_flag(left)? || self.parameter_flag(right)?;
             left = self.push(
                 Db2ExpressionKind::Binary {
@@ -145,6 +177,13 @@ impl<'a> ExpressionParser<'a> {
     }
 
     fn parse_unary(&mut self) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
+        self.enter_recursion()?;
+        let result = self.parse_unary_inner();
+        self.recursion_depth -= 1;
+        result
+    }
+
+    fn parse_unary_inner(&mut self) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
         let operator = if self.take_symbol(Db2Symbol::Plus) {
             Some(Db2UnaryOperator::Positive)
         } else if self.take_symbol(Db2Symbol::Minus) {
@@ -153,15 +192,12 @@ impl<'a> ExpressionParser<'a> {
             None
         };
         if let Some(operator) = operator {
-            let start = self.previous_start();
+            let start = self.previous_span();
             let operand = self.parse_unary()?;
             let parameter = self.parameter_flag(operand)?;
             return self.push(
                 Db2ExpressionKind::Unary { operator, operand },
-                Db2SourceSpan {
-                    start,
-                    end: self.expression_span(operand)?.end,
-                },
+                join_spans(start, self.expression_span(operand)?),
                 parameter,
             );
         }
@@ -206,25 +242,17 @@ impl<'a> ExpressionParser<'a> {
             Db2TokenKind::Word {
                 value,
                 delimited: false,
-            } if value == "NULL" => {
-                self.position += 1;
-                self.push(
-                    Db2ExpressionKind::Literal(Db2Literal::Null),
-                    token.span,
-                    false,
-                )
-            }
+            } if value == "NULL" => Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                "Db2 NULL is allowed only as a CAST operand or a CASE result",
+            )),
             Db2TokenKind::Word {
                 value,
                 delimited: false,
-            } if value == "TRUE" || value == "FALSE" => {
-                self.position += 1;
-                self.push(
-                    Db2ExpressionKind::Literal(Db2Literal::Boolean(value == "TRUE")),
-                    token.span,
-                    false,
-                )
-            }
+            } if value == "TRUE" || value == "FALSE" => Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::UnsupportedStatement,
+                "Db2 Boolean constant syntax is source-pending on #350",
+            )),
             Db2TokenKind::Word {
                 value,
                 delimited: false,
@@ -233,6 +261,26 @@ impl<'a> ExpressionParser<'a> {
                 value,
                 delimited: false,
             } if value == "CAST" => self.parse_cast(),
+            Db2TokenKind::Word {
+                value,
+                delimited: false,
+            } if value == "CURRENT"
+                || value.starts_with("CURRENT_")
+                || matches!(
+                    value.as_str(),
+                    "SESSION_USER"
+                        | "USER"
+                        | "CLIENT_ACCTNG"
+                        | "CLIENT_APPLNAME"
+                        | "CLIENT_USERID"
+                        | "CLIENT_WRKSTNNAME"
+                ) =>
+            {
+                Err(self.diagnostic_here(
+                    Db2SyntaxDiagnosticCode::UnsupportedStatement,
+                    "Db2 special-register expressions are not in the recovered subset",
+                ))
+            }
             Db2TokenKind::Word { .. } => self.parse_name_or_function(),
             _ => Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::UnexpectedToken,
@@ -248,44 +296,43 @@ impl<'a> ExpressionParser<'a> {
     ) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
         self.position += 1;
         let variable = self.host_identifier(value, first_span.start)?;
-        let indicator = if self.take_word("INDICATOR") {
-            Some(self.take_host_identifier("indicator variable")?)
-        } else if matches!(
-            self.tokens.get(self.position).map(|token| &token.kind),
-            Some(Db2TokenKind::HostVariable(_))
-        ) {
+        let indicator_keyword = self.take_word("INDICATOR");
+        let indicator = if indicator_keyword
+            || matches!(
+                self.tokens.get(self.position).map(|token| &token.kind),
+                Some(Db2TokenKind::HostVariable(_))
+            ) {
             Some(self.take_host_identifier("indicator variable")?)
         } else {
             None
         };
-        let end = self
-            .position
-            .checked_sub(1)
-            .and_then(|index| self.tokens.get(index))
-            .map_or(first_span.end, |token| token.span.end);
         self.push(
             Db2ExpressionKind::HostVariable(Db2HostReference::new(variable, indicator)),
-            Db2SourceSpan {
-                start: first_span.start,
-                end,
-            },
+            join_spans(first_span, self.previous_span()),
             false,
         )
     }
 
     fn parse_name_or_function(&mut self) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
-        let start = self.current_start();
+        let start = self.current_span();
         let name = self.qualified_name()?;
         if !self.take_symbol(Db2Symbol::LeftParenthesis) {
-            let end = self.previous_end();
             return self.push(
                 Db2ExpressionKind::Column(name),
-                Db2SourceSpan { start, end },
+                join_spans(start, self.previous_span()),
                 false,
             );
         }
         let mut arguments = Vec::new();
         if self.take_symbol(Db2Symbol::Multiply) {
+            if name.parts().last().is_none_or(|part| {
+                part.is_delimited() || !matches!(part.value(), "COUNT" | "COUNT_BIG")
+            }) {
+                return Err(self.diagnostic_previous(
+                    Db2SyntaxDiagnosticCode::UnsupportedStatement,
+                    "wildcard function argument is supported only for COUNT and COUNT_BIG",
+                ));
+            }
             let wildcard_span = self.tokens[self.position - 1].span;
             arguments.push(self.push(Db2ExpressionKind::Wildcard, wildcard_span, false)?);
             self.expect_symbol(Db2Symbol::RightParenthesis)?;
@@ -313,19 +360,16 @@ impl<'a> ExpressionParser<'a> {
             .any(|flag| flag);
         self.push(
             Db2ExpressionKind::Function { name, arguments },
-            Db2SourceSpan {
-                start,
-                end: self.previous_end(),
-            },
+            join_spans(start, self.previous_span()),
             parameter,
         )
     }
 
     fn parse_cast(&mut self) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
-        let start = self.current_start();
+        let start = self.current_span();
         self.expect_word("CAST")?;
         self.expect_symbol(Db2Symbol::LeftParenthesis)?;
-        let expression = self.parse_precedence(0)?;
+        let expression = self.parse_null_or_expression()?;
         self.expect_word("AS")?;
         let data_type = self.parse_data_type()?;
         self.expect_symbol(Db2Symbol::RightParenthesis)?;
@@ -335,16 +379,24 @@ impl<'a> ExpressionParser<'a> {
                 expression,
                 data_type,
             },
-            Db2SourceSpan {
-                start,
-                end: self.previous_end(),
-            },
+            join_spans(start, self.previous_span()),
             parameter,
         )
     }
 
+    /// The pinned CAST and CASE diagrams admit a bare NULL only in these
+    /// operand and result positions; it is not a general expression operand.
+    fn parse_null_or_expression(&mut self) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
+        if self.word() == Some("NULL") {
+            let span = self.current_span();
+            self.position += 1;
+            return self.push(Db2ExpressionKind::Literal(Db2Literal::Null), span, false);
+        }
+        self.parse_precedence(0)
+    }
+
     fn parse_case(&mut self) -> Result<Db2ExpressionId, Db2SyntaxDiagnostic> {
-        let start = self.current_start();
+        let start = self.current_span();
         self.expect_word("CASE")?;
         let operand = if self.word() == Some("WHEN") {
             None
@@ -360,8 +412,14 @@ impl<'a> ExpressionParser<'a> {
                 ));
             }
             let condition = self.parse_precedence(0)?;
+            if operand.is_none() && !self.is_search_condition(condition) {
+                return Err(self.diagnostic_here(
+                    Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                    "searched CASE requires a predicate after WHEN",
+                ));
+            }
             self.expect_word("THEN")?;
-            let result = self.parse_precedence(0)?;
+            let result = self.parse_null_or_expression()?;
             branches.push((condition, result));
         }
         if branches.is_empty() {
@@ -371,11 +429,21 @@ impl<'a> ExpressionParser<'a> {
             ));
         }
         let otherwise = if self.take_word("ELSE") {
-            Some(self.parse_precedence(0)?)
+            Some(self.parse_null_or_expression()?)
         } else {
             None
         };
         self.expect_word("END")?;
+        if branches
+            .iter()
+            .all(|(_, result)| self.is_null_literal(*result))
+            && otherwise.is_none_or(|result| self.is_null_literal(result))
+        {
+            return Err(self.diagnostic_previous(
+                Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                "CASE requires at least one non-NULL result expression",
+            ));
+        }
         let mut parameter = operand
             .map(|value| self.parameter_flag(value))
             .transpose()?
@@ -392,10 +460,7 @@ impl<'a> ExpressionParser<'a> {
                 branches,
                 otherwise,
             },
-            Db2SourceSpan {
-                start,
-                end: self.previous_end(),
-            },
+            join_spans(start, self.previous_span()),
             parameter,
         )
     }
@@ -457,23 +522,26 @@ impl<'a> ExpressionParser<'a> {
                     self.expect_symbol(Db2Symbol::Comma)?;
                 }
             }
-            let with_time_zone = if self.take_word("WITH") {
+            let (with_time_zone, time_zone_clause) = if self.take_word("WITH") {
                 self.expect_word("TIME")?;
                 self.expect_word("ZONE")?;
-                true
+                (true, true)
             } else {
                 if self.take_word("WITHOUT") {
                     self.expect_word("TIME")?;
                     self.expect_word("ZONE")?;
+                    (false, true)
+                } else {
+                    (false, false)
                 }
-                false
             };
+            self.validate_cast_type(kind, &arguments, time_zone_clause)?;
             return Db2BuiltInDataType::new(kind, arguments, with_time_zone, self.limits)
                 .map(Db2DataType::BuiltIn)
                 .map_err(|problem| {
                     self.diagnostic_here(
                         Db2SyntaxDiagnosticCode::InvalidStatementOperand,
-                        problem.message,
+                        &problem.message,
                     )
                 });
         }
@@ -518,7 +586,7 @@ impl<'a> ExpressionParser<'a> {
         Db2QualifiedName::new(parts, self.limits).map_err(|problem| {
             self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::InvalidStatementOperand,
-                problem.message,
+                &problem.message,
             )
         })
     }
@@ -541,7 +609,7 @@ impl<'a> ExpressionParser<'a> {
                 Db2SyntaxDiagnostic::new(
                     Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                     token.span.start,
-                    problem.message,
+                    &problem.message,
                 )
             })?;
         self.position += 1;
@@ -578,7 +646,7 @@ impl<'a> ExpressionParser<'a> {
             Db2SyntaxDiagnostic::new(
                 Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                 location,
-                problem.message,
+                &problem.message,
             )
         })
     }
@@ -618,6 +686,70 @@ impl<'a> ExpressionParser<'a> {
         }
     }
 
+    fn is_search_condition(&self, id: Db2ExpressionId) -> bool {
+        match self.arena.get(id).map(|node| node.kind()) {
+            Some(Db2ExpressionKind::IsNull { .. }) => true,
+            Some(Db2ExpressionKind::Binary {
+                operator:
+                    Db2BinaryOperator::Equal
+                    | Db2BinaryOperator::NotEqual
+                    | Db2BinaryOperator::Less
+                    | Db2BinaryOperator::LessOrEqual
+                    | Db2BinaryOperator::Greater
+                    | Db2BinaryOperator::GreaterOrEqual,
+                ..
+            }) => true,
+            Some(Db2ExpressionKind::Binary {
+                left,
+                operator: Db2BinaryOperator::And | Db2BinaryOperator::Or,
+                right,
+            }) => self.is_search_condition(*left) && self.is_search_condition(*right),
+            Some(Db2ExpressionKind::Unary {
+                operator: Db2UnaryOperator::Not,
+                operand,
+            }) => self.is_search_condition(*operand),
+            _ => false,
+        }
+    }
+
+    fn is_null_literal(&self, id: Db2ExpressionId) -> bool {
+        matches!(
+            self.arena.get(id).map(|node| node.kind()),
+            Some(Db2ExpressionKind::Literal(Db2Literal::Null))
+        )
+    }
+
+    fn validate_cast_type(
+        &self,
+        kind: Db2BuiltInType,
+        arguments: &[u32],
+        time_zone_clause: bool,
+    ) -> Result<(), Db2SyntaxDiagnostic> {
+        let allowed = match kind {
+            Db2BuiltInType::Decimal => arguments.len() <= 2,
+            Db2BuiltInType::Float
+            | Db2BuiltInType::DecFloat
+            | Db2BuiltInType::Character
+            | Db2BuiltInType::VarChar
+            | Db2BuiltInType::Clob
+            | Db2BuiltInType::Graphic
+            | Db2BuiltInType::VarGraphic
+            | Db2BuiltInType::DbClob
+            | Db2BuiltInType::Binary
+            | Db2BuiltInType::VarBinary
+            | Db2BuiltInType::Blob
+            | Db2BuiltInType::Timestamp => arguments.len() <= 1,
+            _ => arguments.is_empty(),
+        };
+        if !allowed || (time_zone_clause && kind != Db2BuiltInType::Timestamp) {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                "Db2 CAST data type arguments or time-zone clause are not supported for this type",
+            ));
+        }
+        Ok(())
+    }
+
     fn push(
         &mut self,
         kind: Db2ExpressionKind,
@@ -628,7 +760,7 @@ impl<'a> ExpressionParser<'a> {
             Db2SyntaxDiagnostic::new(
                 Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                 span.start,
-                problem.message,
+                &problem.message,
             )
         })?;
         self.contains_parameter.push(contains_parameter);
@@ -709,10 +841,12 @@ impl<'a> ExpressionParser<'a> {
         }
     }
 
-    fn current_start(&self) -> Db2SourceLocation {
-        self.tokens
-            .get(self.position)
-            .map_or(Db2SourceLocation::START, |token| token.span.start)
+    fn current_span(&self) -> Db2SourceSpan {
+        self.tokens[self.position].span
+    }
+
+    fn previous_span(&self) -> Db2SourceSpan {
+        self.tokens[self.position - 1].span
     }
 
     fn previous_start(&self) -> Db2SourceLocation {
@@ -720,13 +854,6 @@ impl<'a> ExpressionParser<'a> {
             .checked_sub(1)
             .and_then(|index| self.tokens.get(index))
             .map_or(Db2SourceLocation::START, |token| token.span.start)
-    }
-
-    fn previous_end(&self) -> Db2SourceLocation {
-        self.position
-            .checked_sub(1)
-            .and_then(|index| self.tokens.get(index))
-            .map_or(Db2SourceLocation::START, |token| token.span.end)
     }
 
     fn diagnostic_here(
@@ -742,7 +869,7 @@ impl<'a> ExpressionParser<'a> {
             },
             |token| token.span.start,
         );
-        Db2SyntaxDiagnostic::new(code, location, message)
+        Db2SyntaxDiagnostic::new(code, location, message.as_ref())
     }
 
     fn diagnostic_previous(
@@ -750,11 +877,22 @@ impl<'a> ExpressionParser<'a> {
         code: Db2SyntaxDiagnosticCode,
         message: impl AsRef<str>,
     ) -> Db2SyntaxDiagnostic {
-        Db2SyntaxDiagnostic::new(code, self.previous_start(), message)
+        Db2SyntaxDiagnostic::new(code, self.previous_start(), message.as_ref())
     }
 
     fn at_end(&self) -> bool {
         self.position == self.tokens.len()
+    }
+
+    fn enter_recursion(&mut self) -> Result<(), Db2SyntaxDiagnostic> {
+        if self.recursion_depth >= MAX_PARSE_RECURSION {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                "Db2 expression exceeds the parser recursion limit",
+            ));
+        }
+        self.recursion_depth += 1;
+        Ok(())
     }
 }
 
@@ -871,6 +1009,32 @@ mod tests {
     }
 
     #[test]
+    fn bare_null_is_only_a_cast_operand_or_case_result() {
+        for source in [
+            "CAST(NULL AS DECIMAL)",
+            "CASE WHEN A = B THEN NULL ELSE C END",
+            "CASE A WHEN B THEN C ELSE NULL END",
+        ] {
+            assert!(parse(source).is_ok(), "{source}");
+        }
+        for source in [
+            "NULL",
+            "(NULL)",
+            "A + NULL",
+            "NULL || A",
+            "F(NULL)",
+            "A = NULL",
+            "CASE NULL WHEN A THEN B END",
+            "CASE A WHEN NULL THEN B END",
+            "CAST(NULL + 1 AS DECIMAL)",
+            "CASE WHEN A = B THEN NULL || C END",
+        ] {
+            let problem = parse(source).expect_err(source);
+            assert!(problem.location.column >= 1, "{source}");
+        }
+    }
+
+    #[test]
     fn simple_and_searched_case_are_bounded_owned_nodes() {
         for source in [
             "CASE CODE WHEN 1 THEN 'A' WHEN 2 THEN 'B' ELSE 'X' END",
@@ -897,11 +1061,21 @@ mod tests {
             "*",
             "1 + *",
             "F(*, 1)",
+            "SUM(*)",
+            "CASE WHEN A THEN B END",
+            "CASE WHEN A = B THEN NULL ELSE NULL END",
+            "CAST(A AS INTEGER(2))",
+            "CAST(A AS DATE WITH TIME ZONE)",
+            "A IS NOT NOT NULL",
+            "A IS NULL IS NULL",
+            "A = B = C",
+            "NOT A",
+            "CASE WHEN A = B THEN C ELSE D ELSE E END",
+            "CAST(A AS DECIMAL(9,2,1))",
         ] {
-            assert!(
-                parse(source).is_err(),
-                "unexpected expression success: {source}"
-            );
+            let diagnostic = parse(source).unwrap_err();
+            assert!(diagnostic.location.line > 0, "{source}");
+            assert!(diagnostic.location.column > 0, "{source}");
         }
         let limits = Db2AstLimits {
             max_list_items: 1,
@@ -912,6 +1086,146 @@ mod tests {
             max_expression_depth: 2,
             ..Db2AstLimits::default()
         };
-        assert!(parse_db2_expression("---1", Db2SyntaxLimits::default(), limits).is_err());
+        assert!(
+            parse_db2_expression("- - - 1", Db2SyntaxLimits::default(), limits)
+                .unwrap_err()
+                .message
+                .contains("depth limit")
+        );
+    }
+
+    #[test]
+    fn optional_parts_and_left_associativity_follow_the_pinned_diagrams() {
+        for source in [
+            ":HOST",
+            ":HOST :IND",
+            ":HOST INDICATOR :IND",
+            "F()",
+            "F(A, B)",
+            "COUNT(*)",
+            "COUNT_BIG(*)",
+            "CAST(NULL AS DECIMAL)",
+            "CAST(? AS DECIMAL(9,2))",
+            "CAST(A AS TIMESTAMP WITH TIME ZONE)",
+            "CAST(A AS TIMESTAMP WITHOUT TIME ZONE)",
+            "CASE A WHEN B THEN C END",
+            "CASE WHEN A IS NULL THEN B END",
+            "CASE WHEN A = B THEN C ELSE NULL END",
+            "A IS NULL",
+            "A IS NOT NULL",
+        ] {
+            assert!(
+                parse(source).is_ok(),
+                "expected expression success: {source}"
+            );
+        }
+        let parsed = parse("A - B - C").unwrap();
+        let Db2ExpressionKind::Binary { left, operator, .. } =
+            parsed.arena().get(parsed.root()).unwrap().kind()
+        else {
+            panic!("expected binary root")
+        };
+        assert_eq!(*operator, Db2BinaryOperator::Subtract);
+        assert!(matches!(
+            parsed.arena().get(*left).unwrap().kind(),
+            Db2ExpressionKind::Binary {
+                operator: Db2BinaryOperator::Subtract,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn parser_preserves_byte_and_line_spans_and_hits_all_bounds() {
+        let parsed = parse("A +\n  B").unwrap();
+        let span = parsed.arena().get(parsed.root()).unwrap().span();
+        assert_eq!((span.start_byte, span.end_byte), (0, 7));
+        assert_eq!((span.start.line, span.end.line), (1, 2));
+
+        let limits = Db2AstLimits {
+            max_expression_nodes: 2,
+            ..Db2AstLimits::default()
+        };
+        assert!(parse_db2_expression("A + B", Db2SyntaxLimits::default(), limits).is_err());
+        let limits = Db2AstLimits {
+            max_literal_bytes: 1,
+            ..Db2AstLimits::default()
+        };
+        assert!(parse_db2_expression("'AB'", Db2SyntaxLimits::default(), limits).is_err());
+        let limits = Db2AstLimits {
+            max_name_parts: 1,
+            ..Db2AstLimits::default()
+        };
+        assert!(parse_db2_expression("A.B", Db2SyntaxLimits::default(), limits).is_err());
+        let limits = Db2AstLimits {
+            max_identifier_bytes: 1,
+            ..Db2AstLimits::default()
+        };
+        assert!(parse_db2_expression("AB", Db2SyntaxLimits::default(), limits).is_err());
+        let limits = Db2AstLimits {
+            max_list_items: 1,
+            ..Db2AstLimits::default()
+        };
+        assert!(
+            parse_db2_expression(
+                "CASE A WHEN B THEN C WHEN D THEN E END",
+                Db2SyntaxLimits::default(),
+                limits
+            )
+            .is_err()
+        );
+        let deep = format!("{}A", "NOT ".repeat(MAX_PARSE_RECURSION));
+        assert!(
+            parse(&deep)
+                .unwrap_err()
+                .message
+                .contains("recursion limit")
+        );
+        let syntax = Db2SyntaxLimits {
+            max_statement_bytes: 2,
+            ..Db2SyntaxLimits::default()
+        };
+        assert!(parse_db2_expression("ABC", syntax, Db2AstLimits::default()).is_err());
+        let syntax = Db2SyntaxLimits {
+            max_tokens: 1,
+            ..Db2SyntaxLimits::default()
+        };
+        assert!(parse_db2_expression("A+B", syntax, Db2AstLimits::default()).is_err());
+        let syntax = Db2SyntaxLimits {
+            max_token_bytes: 1,
+            ..Db2SyntaxLimits::default()
+        };
+        assert!(parse_db2_expression("AB", syntax, Db2AstLimits::default()).is_err());
+        let syntax = Db2SyntaxLimits {
+            max_nesting: 1,
+            ..Db2SyntaxLimits::default()
+        };
+        assert!(parse_db2_expression("((A))", syntax, Db2AstLimits::default()).is_err());
+    }
+
+    #[test]
+    fn unsupported_special_registers_and_stale_numeric_forms_are_fenced() {
+        for source in ["CURRENT DATE", "CURRENT_DATE", "SESSION_USER", "SUM(*)"] {
+            assert_eq!(
+                parse(source).unwrap_err().code,
+                Db2SyntaxDiagnosticCode::UnsupportedStatement
+            );
+        }
+        for source in ["1E2", "1.2E3"] {
+            let diagnostic = parse(source).unwrap_err();
+            assert_eq!(
+                diagnostic.code,
+                Db2SyntaxDiagnosticCode::UnsupportedNumericConstant
+            );
+            assert!(diagnostic.message.contains("#350"));
+        }
+        for source in ["TRUE", "FALSE"] {
+            let diagnostic = parse(source).unwrap_err();
+            assert_eq!(
+                diagnostic.code,
+                Db2SyntaxDiagnosticCode::UnsupportedStatement
+            );
+            assert!(diagnostic.message.contains("#350"));
+        }
     }
 }

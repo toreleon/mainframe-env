@@ -133,7 +133,7 @@ class CicsApplicationSourcesTests(unittest.TestCase):
         )
         self.assertEqual(
             corpus["corpus_sha256"],
-            "sha256:75542331ed6f8f797baec2f6846b3a021b2187ecd6ab2df75eddc85e89a768f4",
+            "sha256:946465b9acf686e94664921a1173304b1773199d358fef217920ab3c3241f4cf",
         )
         self.assertEqual(
             corpus["topic_manifest"]["file_sha256"],
@@ -297,8 +297,8 @@ class CicsApplicationSourcesTests(unittest.TestCase):
                 "mapping_rows": 88,
                 "mapped_command_topics": 109,
                 "linked_context_topics": 63,
-                "manual_topics": 4,
-                "html_topics": 176,
+                "manual_topics": 13,
+                "html_topics": 185,
                 "mapping_source_gaps": 0,
                 "source_gaps_unresolved": 0,
                 "supplemental_topics": 0,
@@ -326,6 +326,30 @@ class CicsApplicationSourcesTests(unittest.TestCase):
                 (ROOT / sources.source_batches.source_batch(batch).map_path).read_text()
             )
             self.assertEqual(corpus["counts"], counts)
+            if batch == "b":
+                # Four general API topics plus the nine APPC/GDS row-context
+                # pins from d6039c69 and 2c9c4895 (#294, #325).
+                self.assertEqual(
+                    sorted(
+                        topic["topic_path"].rsplit("/", 1)[-1]
+                        for topic in corpus["manual_topics"]
+                    ),
+                    [
+                        "appcbasic_sl0.html",
+                        "appcbasic_sl1.html",
+                        "appcbasic_sl2.html",
+                        "appcmapped_sl0.html",
+                        "appcmapped_sl1.html",
+                        "appcmapped_sl2.html",
+                        "dfhp3c00237.html",
+                        "dfhp4_apiformat.html",
+                        "dfhp4_argumentvalues.html",
+                        "dfhp4_gdssend.html",
+                        "dfhp4_threadsafelist.html",
+                        "dfhp616.html",
+                        "dfhp625.html",
+                    ],
+                )
             self.assertEqual(
                 set(corpus["mapped_command_topics"]),
                 {

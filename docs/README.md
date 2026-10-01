@@ -47,9 +47,11 @@ explicitly names that authority as superseded.
 - [Coverage authority](architecture/COVERAGE-AUTHORITY.md)
 - [Dataset, VSAM, and AMS](architecture/DATASET-VSAM-AMS.md)
 - [JES execution](architecture/JES-EXECUTION.md)
+- [IBM MQ programming surface](architecture/MQ-PROGRAMMING-SURFACE.md)
 - [Application packages](architecture/APPLICATION-PACKAGES.md)
 - [Batch controller registry](architecture/BATCH-CONTROLLER-REGISTRY.md)
 - [CICS command routing](architecture/CICS-COMMAND-ROUTING.md)
+- [CICS terminal control](architecture/CICS-TERMINAL-CONTROL.md)
 - [Db2 application catalog](architecture/DB2-APPLICATION-CATALOG.md)
 - [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
@@ -58,6 +60,7 @@ explicitly names that authority as superseded.
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
 - [Durable retention lifecycle](contracts/RETENTION-LIFECYCLE-V1.md)
 - [Target release build type](contracts/RELEASE-BUILD-V1.md)
+- [Transaction participant contract](contracts/TRANSACTION-PARTICIPANT-V1.md)
 - [Release builder security model](architecture/RELEASE-BUILDER.md)
 
 ## Architecture decisions
@@ -73,6 +76,21 @@ explicitly names that authority as superseded.
 - [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
 - [ADR-0010: Rust module review budgets](decisions/0010-rust-module-review-budgets.md)
 - [ADR-0011: Typed language HIR and semantic IR](decisions/0011-typed-language-hir-and-semantic-ir.md)
+- [ADR-0012: Checked AMODE64 storage boundary](decisions/0012-checked-amode64-storage-boundary.md)
+- [ADR-0013: CICS web service control boundary](decisions/0013-cics-web-service-control-boundary.md)
+- [ADR-0014: Named-counter pool authority](decisions/0014-named-counter-authority.md)
+- [ADR-0015: CICS operator reply boundary](decisions/0015-cics-operator-reply-boundary.md)
+- [ADR-0016: CICS TCP/IP ingress context](decisions/0016-cics-tcpip-ingress-context.md)
+- [ADR-0017: CICS immediate START target authority](decisions/0017-cics-immediate-start-target-authority.md)
+- [ADR-0018: CICS START ATTACH lifetime](decisions/0018-cics-start-attach-lifetime.md)
+- [ADR-0019: BTS lifecycle authority](decisions/0019-bts-lifecycle-authority.md)
+- [ADR-0020: Conversation peer exchange ledger](decisions/0020-conversation-peer-exchange-ledger.md)
+- [ADR-0021: Conversation ISSUE control staging](decisions/0021-conversation-issue-control-staging.md)
+- [ADR-0022: ISSUE PASS target handoff](decisions/0022-issue-pass-target-handoff.md)
+- [ADR-0023: BTS lifecycle authority](decisions/0023-bts-lifecycle-authority.md)
+- [ADR-0024: Per-assertion oracle provenance](decisions/0024-per-assertion-oracle-provenance.md)
+- [ADR-0025: Licence and provenance policy for IBM oracle evidence](decisions/0025-licence-and-provenance-policy.md)
+- [ADR-0026: CardDemo run bundle](decisions/0026-run-bundle.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
@@ -86,6 +104,8 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Versioning and releases](delivery/VERSIONING-AND-RELEASES.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)
 - [IBM coverage release plans](delivery/coverage-versions/README.md)
+- [Db2 0.12 reuse spike](delivery/coverage-versions/0.12.0-reuse-spike.md)
+- [Db2 0.12 proposed status](delivery/coverage-versions/status/0.12.0.md)
 - [Parallel implementation plan](delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md)
 - [Implementation prompt index](prompts/coverage-versions/README.md)
 
@@ -98,6 +118,7 @@ Version-specific status files and review reports describe candidates at a point 
 - [Capacity and recovery](runbooks/CAPACITY-AND-RECOVERY.md)
 - [Local Jenkins](runbooks/JENKINS-LOCAL.md)
 - [CardDemo operator guide](runbooks/CARDDEMO-OPERATOR.md)
+- [CardDemo READACCT run bundle](runbooks/CARDDEMO-READACCT-BUNDLE.md)
 - [CICS licensed pilot](runbooks/cics-licensed-pilot.md)
 - [Conformance family rollout](runbooks/conformance-family-rollout.md)
 

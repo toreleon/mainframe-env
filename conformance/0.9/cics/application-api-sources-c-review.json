@@ -1019,7 +1019,7 @@
       "count": 0
     },
     "verified": {
-      "candidate_ids_sha256": "sha256:8a03728a99ca27271a33e4500a77d2ac4f2b0e905925e28f55b8d2aa3e0da2a5",
+      "candidate_ids_sha256": "sha256:dd4f88cd3494cc2c2ee9e8c727ebafc134b37c0fdafbcf4467c430b5d2c9f15f",
       "count": 6379
     }
   },
@@ -1041,13 +1041,13 @@
   "coverage_credit": 0,
   "differential_credit": 0,
   "execution_authority": false,
-  "independent_verification_sha256": "sha256:b1220f570c42ad15ab36c9398e52667db1a308746e3c11d13291e0637a085f4b",
+  "independent_verification_sha256": "sha256:678c6a34e1a2e259ce6e6e58be23d19a0880ab033f7cc648e3f5b26126b62270",
   "inputs": {
-    "candidate_projection_sha256": "sha256:828f942b652262830b9d2ce73604fcd9978e0767e26f021cc74f59f9fed13b33",
-    "extraction_plan_sha256": "sha256:cab0ab3b3baf1abb0b9a4c2bd07525692d3026a8e864abe1a1cdbee24d723c22",
-    "source_corpus_sha256": "sha256:85df7da9e5e6548e6cbeba4349fb84c8dcc0f6e7bfe4198301cabb0503043502",
-    "source_map_sha256": "sha256:6af1ce4e3fd7326b3240a6c5a9fdb2afca1ca4fe4daae3ac10b89f7f93f50145",
-    "topic_manifest_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc"
+    "candidate_projection_sha256": "sha256:ea9e07995de2c9700ba75ba2561513031ea94fb7aadf52fa951593a9f7326793",
+    "extraction_plan_sha256": "sha256:1e09820660e56b54c818822a848dc3fe9289ed11e62a58e601cb57046f663442",
+    "source_corpus_sha256": "sha256:d7da2e82241de042f027e47c93679ced532a71f7254af0a06803ad65f39acd30",
+    "source_map_sha256": "sha256:2b640c8f30fa55aee6429f9ade33c3ff5be13207543a761f9204cef7fd9f7b45",
+    "topic_manifest_sha256": "sha256:54957233e41377648dfff0f9a334866eb63e0cfbef1d25d329d52ec2c984228f"
   },
   "issue_dispositions": {
     "mismatch": {
@@ -1080,7 +1080,7 @@
       "version": "cics-source-auto-review-checker@2"
     },
     "independent_verifier": {
-      "file_sha256": "sha256:87bce93b7afc6a7d653d82b640789416464452415e3f08e673aee92eb740de8a",
+      "file_sha256": "sha256:c198e637ed6dc88a0715e703971f446ee66eebaa02201926ca1da7bc7210b65b",
       "path": "conformance/0.9/tools/verify_cics_application_sources.py",
       "version": "cics-source-independent-verifier@1"
     },
@@ -1089,7 +1089,7 @@
       "path": "conformance/0.9/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:b62ba10bf18685740cea2aa9e229f4e3f455a113eabb9edbb4ecd58ef112f369",
+  "review_sha256": "sha256:6b98ab5672874a19d6e30d2123087ad5d12590e43821c4316283bcba2cf3593c",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,

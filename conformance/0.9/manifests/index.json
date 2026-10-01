@@ -20,9 +20,9 @@
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-application-api-sources-b-2026-09-10",
       "manifest": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
-      "manifest_sha256": "sha256:8acb506c0e5d6084235d94f5bb015d66c37b7f792a85713bcb3c7d0fb6b563ba",
-      "topic_count": 176,
-      "topic_manifest_sha256": "sha256:f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc",
+      "manifest_sha256": "sha256:43ae443de4bbd29578ccfd482f52d40d1d1f6b28f746ba0e3450ba0de4b40bb9",
+      "topic_count": 185,
+      "topic_manifest_sha256": "sha256:0aad3b30b2606da8639600f45530f1c773b726ad06b2ad62c2d6e2a2f4a7811a",
       "semantic_authority": false,
       "coverage_credit": 0
     },
@@ -31,9 +31,9 @@
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-application-api-sources-c-2026-09-10",
       "manifest": "conformance/0.9/manifests/cics-application-api-sources-c-topics.json",
-      "manifest_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc",
+      "manifest_sha256": "sha256:54957233e41377648dfff0f9a334866eb63e0cfbef1d25d329d52ec2c984228f",
       "topic_count": 224,
-      "topic_manifest_sha256": "sha256:717396f5e8cd0e9fbc21c91c569afce84e6f7f632dfbec574d3fd62bf5a85871",
+      "topic_manifest_sha256": "sha256:01fb00ebd639d937017cb3f6565cdf38df3c25bb0ebe4393030e66db260d8bc2",
       "semantic_authority": false,
       "coverage_credit": 0
     },
@@ -67,6 +67,28 @@
       "manifest_sha256": "sha256:bcddaebb777c63db563be7ab3d22be67ba041da030d4001ad15053fef348e06b",
       "topic_count": 2,
       "topic_manifest_sha256": "sha256:8628fa60497ba97504966f9429927bf23acad1b101182ca2064c4db6c0a96d28",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-misc-tail-bridge",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-misc-tail-bridge-2026-09-23",
+      "manifest": "conformance/0.9/manifests/cics-misc-tail-bridge-topics.json",
+      "manifest_sha256": "sha256:4de3505464cb19871d719553e6519364336405147018fe9498531233ba01d966",
+      "topic_count": 4,
+      "topic_manifest_sha256": "sha256:d88613a155bfb43541df5e0973775af1d2dce2b7488d555d0858a93be2431611",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-misc-tail-cvda",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+      "manifest": "conformance/0.9/manifests/cics-misc-tail-cvda-topics.json",
+      "manifest_sha256": "sha256:526aab2c94e051182a9627123647dd32f03eaad05a5013a3d049a5098a51c152",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:5cb3be0964a59a86cecc72b625ade3ffb508d781665bd67c914684c33d17e11c",
       "semantic_authority": false,
       "coverage_credit": 0
     },

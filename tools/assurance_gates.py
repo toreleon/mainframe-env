@@ -97,8 +97,9 @@ def validate_inventory(root: Path) -> dict[str, int]:
             raise ValueError(f"fuzz target {name} has an empty corpus")
         corpus_files += len(seeds)
 
-    if names != {"cobol_parser", "ir_decoder"}:
-        raise ValueError("COBOL parser and IR decoder fuzz targets are both required")
+    required = {"cobol_parser", "ir_decoder", "cics_source_parser", "cics_plan_decoder"}
+    if names != required:
+        raise ValueError("COBOL, IR, CICS source, and CICS plan fuzz targets are required")
 
     if (
         model.get("tool") != "loom"

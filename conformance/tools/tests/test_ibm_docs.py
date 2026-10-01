@@ -1,6 +1,7 @@
 """Offline IBM cache tests using only synthetic publication bodies."""
 
 from contextlib import redirect_stderr, redirect_stdout
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
@@ -9,6 +10,7 @@ from pathlib import Path
 import sys
 import tarfile
 import tempfile
+from threading import Barrier
 import unittest
 from unittest.mock import patch
 
@@ -172,17 +174,25 @@ class CacheTests(unittest.TestCase):
             )
 
     def test_concurrent_identical_publish_is_idempotent(self):
-        counts = ibm_docs.Counter()
         target = ibm_docs.pin_target(self.pin)
+        barrier = Barrier(2)
+        original_link = os.link
 
-        def racing(destination, source):
-            del source
-            destination.write_bytes(self.body)
-            raise FileExistsError("racing writer won")
+        def racing(source, destination, *args, **kwargs):
+            barrier.wait(timeout=5)
+            return original_link(source, destination, *args, **kwargs)
 
-        with patch.object(Path, "hardlink_to", autospec=True, side_effect=racing):
+        def publish():
+            counts = ibm_docs.Counter()
             ibm_docs.publish(self.cache, target, self.body, counts)
-        self.assertEqual(counts["already_present"], 1)
+            return counts
+
+        with patch.object(os, "link", side_effect=racing), ThreadPoolExecutor(
+            max_workers=2
+        ) as workers:
+            results = list(workers.map(lambda _: publish(), range(2)))
+        self.assertEqual(sum(counts["imported"] for counts in results), 1)
+        self.assertEqual(sum(counts["already_present"] for counts in results), 1)
         self.assertEqual(ibm_docs.cached_body(self.cache, self.pin), self.body)
 
     def test_existing_oversized_target_is_rejected_without_reading_it(self):
@@ -514,19 +524,22 @@ class CacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "conflicting immutable baseline"):
                 ibm_docs.load_pins(index, registry)
 
-    def test_shipped_zero_credit_pins_include_registered_0_9_scopes(self):
+    def test_shipped_zero_credit_pins_include_all_registered_later_scopes(self):
         pins, tocs = ibm_docs.load_pins()
         scopes = {scope.scope_id for pin in [*pins, *tocs] for scope in pin.scopes}
         self.assertIn("cics-file-uow-pilot", scopes)
         self.assertIn("cics-handle-aid", scopes)
         self.assertIn("cics-task-enqueue", scopes)
         self.assertIn("cobol-numeric-move-pilot", scopes)
+        self.assertIn("ims-programming-contracts", scopes)
+        self.assertIn("ims-database-contracts", scopes)
+        self.assertIn("ims-tm-contracts", scopes)
         self.assertTrue(pins)
         self.assertTrue(tocs)
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
         self.assertEqual(
             index_digest,
-            "dce5077ed51f1cbf898436b1beab046c1ce8a1722dbcf4e7b2ab6df7caefa48f",
+            "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
         )
 
 

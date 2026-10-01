@@ -55,6 +55,7 @@ pub(in crate::service) fn allocate_terminal_input(
 #[derive(Clone)]
 pub(in crate::service) struct CurrentProgramFrame {
     pub(in crate::service) current: Option<String>,
+    pub(in crate::service) channel: Option<String>,
     pub(in crate::service) parent_execution_id: Option<ExecutionId>,
     pub(in crate::service) initial_entry: bool,
 }
@@ -66,6 +67,16 @@ pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<Str
         .strip_prefix("program:")
         .filter(|program| !program.is_empty())
         .map(str::to_ascii_uppercase)
+}
+
+pub(in crate::service) fn current_channel(invocation: &Invocation) -> Option<String> {
+    invocation
+        .bindings
+        .get("cics.channel")
+        .filter(|value| value.schema() == "mainframe-env.cics.channel@1")
+        .and_then(|value| std::str::from_utf8(value.bytes()).ok())
+        .filter(|name| super::bts_container::valid_task_channel_name(name))
+        .map(str::to_owned)
 }
 
 pub(in crate::service) fn synchronize_current_program(
@@ -81,7 +92,13 @@ pub(in crate::service) fn synchronize_current_program(
     }
     run.current_program.parent_execution_id = invocation.parent_execution_id.clone();
     run.current_program.initial_entry = initial_entry;
-    if let Some(program) = current_program(invocation) {
+    let next_program = current_program(invocation);
+    if next_program != run.current_program.current
+        || invocation.bindings.contains_key("cics.channel")
+    {
+        run.current_program.channel = current_channel(invocation);
+    }
+    if let Some(program) = next_program {
         run.current_program.current = Some(program);
     }
     Ok(true)
@@ -159,10 +176,15 @@ pub(in crate::service) fn assign(
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
         .iter()
         .any(|name| request.arguments.contains_key(*name));
-    let bdi_missing = !dpl
-        && ["DESTID", "DESTIDLENG"]
-            .iter()
-            .any(|name| request.arguments.contains_key(*name));
+    let bdi_requested = ["DESTID", "DESTIDLENG"]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
+    let bdi_destination = if !dpl && bdi_requested {
+        service.outboard_last_inbound_destination(&run.invocation.run_unit_id)?
+    } else {
+        None
+    };
+    let bdi_missing = !dpl && bdi_requested && bdi_destination.is_none();
     let bms_overflow_missing = !dpl
         && BMS_OVERFLOW_OPTIONS
             .iter()
@@ -284,6 +306,19 @@ pub(in crate::service) fn assign(
             "INPUTMSGLEN".into(),
             decimal_payload(session_input_message_length(service, run)?)?,
         );
+    }
+    if let Some(destination) = bdi_destination {
+        if request.arguments.contains_key("DESTID") {
+            let mut bytes = destination.as_bytes().to_vec();
+            bytes.resize(8, b' ');
+            response.outputs.insert("DESTID".into(), bounded(bytes)?);
+        }
+        if request.arguments.contains_key("DESTIDLENG") {
+            response.outputs.insert(
+                "DESTIDLENG".into(),
+                decimal_payload(destination.len() as i64)?,
+            );
+        }
     }
     if request.arguments.contains_key("ABOFFSET") {
         response

@@ -3,7 +3,10 @@ use super::super::{
     invocation_with_nested_origin, nested_key, nested_mutation, store_error,
 };
 use crate::retention::UowRetentionMetadata;
-use mainframe_env_execution_api::{CapabilityId, InvocationLimits};
+use mainframe_env_execution_api::{
+    CapabilityId, ExplicitSyncpoint, InvocationLimits, ParticipantContractProblem,
+    TransactionParticipantDescriptor, transaction_participant_contract_v1,
+};
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, CicsUnitOfWorkOutcome,
     DatasetRequest, DatasetResult, Db2Operation, Db2Request, EffectRequest, HostProblem,
@@ -18,7 +21,7 @@ const REMOTE_OUTCOME_BINDING: &str = "cics.syncpoint.remote-outcome";
 const REMOTE_OUTCOME_SCHEMA: &str = "mainframe-env.cics.syncpoint.remote-outcome@1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SyncpointOwner {
+enum CicsSyncpointOwner {
     Local,
     DplSynconreturn,
 }
@@ -99,6 +102,14 @@ fn syncpoint(
             _ => return Err(HostProblem::IdempotencyConflict),
         }
     } else {
+        if outcome == CicsUnitOfWorkOutcome::Committed {
+            super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref())
+                .preflight_pending_definition(
+                    run.invocation.run_unit_id.as_str(),
+                    run.invocation.execution_id.as_str(),
+                    run.invocation.principal.id().as_str(),
+                )?;
+        }
         service
             .store
             .put_provider_state(
@@ -128,6 +139,12 @@ fn syncpoint(
     syncpoint_db2(service, run, outcome)?;
     syncpoint_ims(service, run, outcome)?;
     syncpoint_mq(service, run, outcome)?;
+    super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref()).finish_run_uow(
+        run.invocation.run_unit_id.as_str(),
+        run.invocation.execution_id.as_str(),
+        run.invocation.principal.id().as_str(),
+        outcome == CicsUnitOfWorkOutcome::Committed,
+    )?;
     super::release_uow_enqueues(service, run)?;
     if outcome == CicsUnitOfWorkOutcome::RolledBack {
         rollback_run(service, run)?;
@@ -137,7 +154,8 @@ fn syncpoint(
     // A syncpoint ends every no-token file update context regardless of
     // whether the unit of work commits or rolls back.
     run.current_records.clear();
-    run.current_record_values.clear();
+    run.file_updates.current_record_values.clear();
+    run.file_updates.file_tokens.clear();
     let terminal_tick = match &service.replay_clock {
         Some(clock) => match clock.now_tick() {
             Ok(tick) if tick != 0 => Some(tick.max(uow_deadline)),
@@ -175,36 +193,58 @@ fn syncpoint(
     syncpoint_response(service, run, outcome, remote_forced_rollback)
 }
 
-fn validate_syncpoint_owner(run: &Run) -> Result<SyncpointOwner, HostProblem> {
-    let Some(context) = run.invocation.bindings.get(EXECUTION_CONTEXT_BINDING) else {
-        return Ok(SyncpointOwner::Local);
+pub(crate) fn transaction_participant_descriptor()
+-> Result<&'static TransactionParticipantDescriptor, ParticipantContractProblem> {
+    transaction_participant_contract_v1().participant("cics")
+}
+
+fn validate_syncpoint_owner(run: &Run) -> Result<CicsSyncpointOwner, HostProblem> {
+    let context_id = match run.invocation.bindings.get(EXECUTION_CONTEXT_BINDING) {
+        None => "local",
+        Some(context) if context.schema() == EXECUTION_CONTEXT_SCHEMA => {
+            std::str::from_utf8(context.bytes()).map_err(|_| HostProblem::Malformed)?
+        }
+        Some(_) => return Err(HostProblem::Malformed),
     };
-    if context.schema() != EXECUTION_CONTEXT_SCHEMA {
-        return Err(HostProblem::Malformed);
-    }
-    match context.bytes() {
-        b"local" => Ok(SyncpointOwner::Local),
-        b"dpl-synconreturn" => Ok(SyncpointOwner::DplSynconreturn),
-        // IBM topic dfhp4_syncpoint.html assigns INVREQ RESP2 200 when a DPL
-        // server does not own the syncpoint or is constrained to DPLSUBSET.
-        b"dpl-without-synconreturn" | b"dpl-executionset-subset" => Err(HostProblem::Condition {
-            name: "INVREQ".into(),
-            response: 16,
-            response2: 200,
-        }),
-        _ => Err(HostProblem::Malformed),
+    let capabilities = transaction_participant_descriptor()
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+        .capabilities
+        .as_ref()
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let context = capabilities
+        .contexts
+        .iter()
+        .find(|candidate| candidate.context_id == context_id)
+        .ok_or(HostProblem::Malformed)?;
+    match context.explicit_syncpoint {
+        ExplicitSyncpoint::Supported => match context.context_id {
+            "local" => Ok(CicsSyncpointOwner::Local),
+            "dpl-synconreturn" => Ok(CicsSyncpointOwner::DplSynconreturn),
+            _ => Err(HostProblem::InfrastructureFailure),
+        },
+        ExplicitSyncpoint::Rejected => {
+            let rejection = context
+                .rejection
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            Err(HostProblem::Condition {
+                name: rejection.condition.into(),
+                response: rejection.response,
+                response2: rejection.response2,
+            })
+        }
     }
 }
 
 fn remote_forced_rollback(
     run: &Run,
-    owner: SyncpointOwner,
+    owner: CicsSyncpointOwner,
     requested_outcome: CicsUnitOfWorkOutcome,
 ) -> Result<bool, HostProblem> {
     let Some(remote_outcome) = run.invocation.bindings.get(REMOTE_OUTCOME_BINDING) else {
         return Ok(false);
     };
-    if owner != SyncpointOwner::DplSynconreturn || remote_outcome.schema() != REMOTE_OUTCOME_SCHEMA
+    if owner != CicsSyncpointOwner::DplSynconreturn
+        || remote_outcome.schema() != REMOTE_OUTCOME_SCHEMA
     {
         return Err(HostProblem::Malformed);
     }
@@ -442,8 +482,10 @@ fn rollback_run(service: &CicsService, run: &mut Run) -> Result<(), HostProblem>
         }
     }
     run.current_records.clear();
-    run.current_record_values.clear();
-    service.clear_undo(run)
+    run.file_updates.current_record_values.clear();
+    run.file_updates.file_tokens.clear();
+    service.clear_undo(run)?;
+    super::bts_browse::rollback_task(service, run)
 }
 
 fn uow_response(

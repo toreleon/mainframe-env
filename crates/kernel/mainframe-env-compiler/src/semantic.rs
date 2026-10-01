@@ -1,3 +1,5 @@
+mod literal_helpers;
+use literal_helpers::*;
 mod functions;
 mod layout_relations;
 mod layout_utils;
@@ -5,7 +7,7 @@ mod structure;
 
 use layout_relations::{resolve_rename_range, validate_layout_relationships};
 use layout_utils::{
-    data_description_clause_boundary, hex_nibble, index_names, occurs_range,
+    data_description_clause_boundary, floating_sign_digit, hex_nibble, index_names, occurs_range,
     validate_occurs_phrase_order, values_clause,
 };
 
@@ -21,8 +23,8 @@ pub use structure::{
 use crate::syntax::{SourceOrigin, SourceSpan};
 use crate::{IntrinsicFunctionKind, SpecialRegisterKind};
 use mainframe_env_ir::{
-    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_index_name_is_valid,
-    cobol_layout_reference_matches,
+    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_floating_insertion_prefix,
+    cobol_index_name_is_valid, cobol_layout_reference_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -177,6 +179,7 @@ pub struct CobolFileBinding {
     pub select_name: String,
     pub assignment: String,
     pub record_name: Option<String>,
+    pub record_names: Vec<String>,
     pub organization: String,
     pub access_mode: String,
     pub record_key: Option<String>,
@@ -254,7 +257,14 @@ impl SemanticModel {
                 files.push(CobolFileBinding {
                     select_name: description.name.clone(),
                     assignment: description.name.clone(),
-                    record_name: record_names.get(&description.name).cloned(),
+                    record_name: record_names
+                        .get(&description.name)
+                        .and_then(|names| names.first())
+                        .cloned(),
+                    record_names: record_names
+                        .get(&description.name)
+                        .cloned()
+                        .unwrap_or_default(),
                     organization: "SORT-MERGE".into(),
                     access_mode: "SEQUENTIAL".into(),
                     record_key: None,
@@ -533,7 +543,11 @@ fn file_bindings(source: &str) -> Result<Vec<CobolFileBinding>, SemanticProblem>
             })
             .unwrap_or_else(|| "SEQUENTIAL".into());
         bindings.push(CobolFileBinding {
-            record_name: record_names.get(&select_name).cloned(),
+            record_name: record_names
+                .get(&select_name)
+                .and_then(|names| names.first())
+                .cloned(),
+            record_names: record_names.get(&select_name).cloned().unwrap_or_default(),
             select_name: select_name.clone(),
             assignment,
             organization,
@@ -604,7 +618,7 @@ fn file_descriptions(source: &str) -> BTreeMap<String, String> {
         .collect()
 }
 
-fn file_record_names(source: &str) -> BTreeMap<String, String> {
+fn file_record_names(source: &str) -> BTreeMap<String, Vec<String>> {
     let upper = source.to_ascii_uppercase();
     let Some(start) = upper.find("FILE SECTION") else {
         return BTreeMap::new();
@@ -618,7 +632,7 @@ fn file_record_names(source: &str) -> BTreeMap<String, String> {
     .filter_map(|marker| upper[start..].find(marker).map(|offset| start + offset))
     .min()
     .unwrap_or(source.len());
-    let mut current = None;
+    let mut current: Option<String> = None;
     let mut records = BTreeMap::new();
     for sentence in source[start..end].split('.') {
         let words = declaration_words(sentence);
@@ -629,11 +643,14 @@ fn file_record_names(source: &str) -> BTreeMap<String, String> {
             current = words.get(index + 1).cloned();
             continue;
         }
-        if let Some(file) = current.take()
+        if let Some(file) = current.as_ref()
             && let Some(index) = words.iter().position(|word| word == "01")
             && let Some(record) = words.get(index + 1)
         {
-            records.insert(file, record.clone());
+            records
+                .entry(file.clone())
+                .or_insert_with(Vec::new)
+                .push(record.clone());
         }
     }
     records
@@ -1155,7 +1172,8 @@ fn layout_one(
                 &value_source.words,
                 element_length,
                 picture.category,
-            )
+                picture.scale,
+            )?
             .repeat(spec.occurs_max)
         }
     } else {
@@ -2447,9 +2465,10 @@ struct PictureDetails {
     utf8: bool,
     dbcs: bool,
 }
-
 fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
     let bytes = expanded_picture_symbols(pic)?;
+    let floating_prefix = cobol_floating_insertion_prefix(&bytes);
+    let mut currency_symbols_seen = 0usize;
     let mut storage = 0usize;
     let mut digits = 0usize;
     let mut numeric = false;
@@ -2527,9 +2546,7 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
                 alphabetic = false;
                 edited = true;
                 signed = true;
-                if bytes.get(index.wrapping_sub(1)) == Some(&byte)
-                    || bytes.get(index + 1) == Some(&byte)
-                {
+                if floating_sign_digit(&bytes, index, floating_prefix) {
                     digits += 1;
                     if fractional {
                         scale += 1;
@@ -2543,7 +2560,22 @@ fn picture_details(pic: &str) -> Result<PictureDetails, SemanticProblem> {
                 fractional = true;
                 storage += repeat;
             }
-            b',' | b'$' | b'/' | b'B' | b'0' => {
+            b'$' => {
+                alphabetic = false;
+                edited = true;
+                if floating_prefix.is_some_and(|(symbol, end)| symbol == byte && index < end) {
+                    if currency_symbols_seen > 0 {
+                        numeric = true;
+                        digits += 1;
+                        if fractional {
+                            scale += 1;
+                        }
+                    }
+                    currency_symbols_seen += 1;
+                }
+                storage += repeat;
+            }
+            b',' | b'/' | b'B' | b'0' => {
                 alphabetic = false;
                 edited = true;
                 storage += repeat;
@@ -2620,7 +2652,8 @@ fn initial_value(
     words: &[String],
     length: usize,
     category: DataCategory,
-) -> Vec<u8> {
+    scale: usize,
+) -> Result<Vec<u8>, SemanticProblem> {
     let mut result = vec![
         if matches!(
             category,
@@ -2650,23 +2683,23 @@ fn initial_value(
         length
     ];
     let Some(value_index) = keyword_index(sentence, "VALUE") else {
-        return result;
+        return Ok(result);
     };
     let tail = sentence[value_index + "VALUE".len()..].trim();
     let upper_tail = tail.to_ascii_uppercase();
     if upper_tail.starts_with("SPACE") {
-        return vec![b' '; length];
+        return Ok(vec![b' '; length]);
     }
     if upper_tail.starts_with("LOW-VALUE") {
-        return vec![0; length];
+        return Ok(vec![0; length]);
     }
     if upper_tail.starts_with("HIGH-VALUE") {
-        return vec![0xff; length];
+        return Ok(vec![0xff; length]);
     }
     if let Some(hex) = hexadecimal_literal(tail) {
         let copy = hex.len().min(result.len());
         result[..copy].copy_from_slice(&hex[..copy]);
-        return result;
+        return Ok(result);
     }
     let (clean, repeat_all) = if upper_tail.starts_with("ALL ") {
         (quoted_or_word(tail[4..].trim(), words), true)
@@ -2677,122 +2710,38 @@ fn initial_value(
         for (index, byte) in result.iter_mut().enumerate() {
             *byte = clean.as_bytes()[index % clean.len()];
         }
-        return result;
+        return Ok(result);
     }
+    let numeric = matches!(
+        category,
+        DataCategory::Binary | DataCategory::PackedDecimal | DataCategory::NumericDisplay
+    );
+    let (digits, negative) = if numeric {
+        // declaration_words strips leading periods, so read the numeric token
+        // from the sentence to preserve VALUE .5.
+        numeric_value_digits(tail.split_whitespace().next().unwrap_or_default(), scale)?
+    } else {
+        (Vec::new(), false)
+    };
     match category {
-        DataCategory::PackedDecimal => packed_decimal(&clean, length),
-        DataCategory::Binary => binary_integer(&clean, length),
+        DataCategory::PackedDecimal => Ok(packed_decimal(&digits, negative, length)),
+        DataCategory::Binary => Ok(binary_integer(&digits, negative, length)),
         DataCategory::NumericDisplay => {
-            let negative = clean.trim_start().starts_with('-');
-            let digits = clean.bytes().filter(u8::is_ascii_digit).collect::<Vec<_>>();
             let copy = digits.len().min(result.len());
             let result_start = result.len() - copy;
             result[result_start..].copy_from_slice(&digits[digits.len() - copy..]);
             if negative && let Some(last) = result.last_mut() {
                 *last = negative_overpunch(*last);
             }
-            result
+            Ok(result)
         }
         _ => {
             let bytes = clean.as_bytes();
             let copy = bytes.len().min(result.len());
             result[..copy].copy_from_slice(&bytes[..copy]);
-            result
+            Ok(result)
         }
     }
-}
-
-fn hexadecimal_literal(value: &str) -> Option<Vec<u8>> {
-    let value = value.trim();
-    let bytes = value.as_bytes();
-    if bytes.len() < 3 || !matches!(bytes[0], b'X' | b'x') || !matches!(bytes[1], b'\'' | b'"') {
-        return None;
-    }
-    let quote = bytes[1];
-    let end = bytes[2..].iter().position(|byte| *byte == quote)? + 2;
-    let digits = &bytes[2..end];
-    if digits.is_empty()
-        || !digits.len().is_multiple_of(2)
-        || !digits.iter().all(u8::is_ascii_hexdigit)
-    {
-        return None;
-    }
-    digits
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|pair| {
-            let high = hex_nibble(pair[0])?;
-            let low = hex_nibble(pair[1])?;
-            Some((high << 4) | low)
-        })
-        .collect()
-}
-
-fn keyword_index(source: &str, keyword: &str) -> Option<usize> {
-    let bytes = source.as_bytes();
-    let mut index = 0usize;
-    while index < bytes.len() {
-        if bytes[index].is_ascii_alphabetic() {
-            let start = index;
-            while index < bytes.len()
-                && (bytes[index].is_ascii_alphanumeric() || bytes[index] == b'-')
-            {
-                index += 1;
-            }
-            if source[start..index].eq_ignore_ascii_case(keyword) {
-                return Some(start);
-            }
-        } else {
-            index += 1;
-        }
-    }
-    None
-}
-
-fn quoted_or_word(tail: &str, words: &[String]) -> String {
-    if let Some(quote) = tail.chars().next().filter(|ch| matches!(ch, '\'' | '"')) {
-        return tail[quote.len_utf8()..]
-            .split(quote)
-            .next()
-            .unwrap_or_default()
-            .to_string();
-    }
-    find_after_owned(words, "VALUE").unwrap_or_default()
-}
-
-fn packed_decimal(value: &str, length: usize) -> Vec<u8> {
-    let negative = value.trim_start().starts_with('-');
-    let mut nibbles = value
-        .bytes()
-        .filter(u8::is_ascii_digit)
-        .map(|byte| byte - b'0')
-        .collect::<Vec<_>>();
-    let digits = length.saturating_mul(2).saturating_sub(1);
-    if nibbles.len() > digits {
-        nibbles = nibbles[nibbles.len() - digits..].to_vec();
-    }
-    while nibbles.len() < digits {
-        nibbles.insert(0, 0);
-    }
-    nibbles.push(if negative { 0x0d } else { 0x0c });
-    nibbles
-        .chunks(2)
-        .map(|pair| (pair[0] << 4) | pair.get(1).copied().unwrap_or(0))
-        .collect()
-}
-
-fn binary_integer(value: &str, length: usize) -> Vec<u8> {
-    let parsed = value.parse::<i128>().unwrap_or(0).to_be_bytes();
-    parsed[parsed.len().saturating_sub(length)..].to_vec()
-}
-
-fn negative_overpunch(digit: u8) -> u8 {
-    const NEGATIVE: &[u8; 10] = b"}JKLMNOPQR";
-    NEGATIVE
-        .get(usize::from(digit.saturating_sub(b'0')))
-        .copied()
-        .unwrap_or(digit)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2820,6 +2769,170 @@ pub(crate) enum SemanticProblem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn packed_value_aligns_fraction_to_picture_scale() {
+        let model = SemanticModel::analyze(
+            &program("01 R PIC 9(7)V99 USAGE COMP-3 VALUE 95.8"),
+            1024,
+            32,
+        )
+        .unwrap();
+        assert_eq!(
+            model.layout("R").unwrap().initial,
+            packed_decimal(b"9580", false, 5)
+        );
+    }
+
+    #[test]
+    fn display_value_aligns_fraction_to_picture_scale() {
+        let model =
+            SemanticModel::analyze(&program("01 R PIC 9(7)V99 VALUE 95.8"), 1024, 32).unwrap();
+        assert_eq!(model.layout("R").unwrap().initial, b"000009580");
+    }
+
+    #[test]
+    fn numeric_value_aligns_fraction_to_picture_scale() {
+        for usage in ["COMP", "COMP-3", "DISPLAY"] {
+            for (picture, value, coefficient) in [
+                ("9(7)V99", "95.8", "000009580"),
+                ("9(7)V99", "95", "000009500"),
+                ("V9(4)", ".5", "5000"),
+                ("S9(5)V99", "-1.25", "0000125"),
+                ("9(7)V99", "ZERO", "000000000"),
+            ] {
+                let declaration = format!("01 R PIC {picture} USAGE {usage} VALUE {value}");
+                let model = SemanticModel::analyze(&program(&declaration), 1024, 32).unwrap();
+                let layout = model.layout("R").unwrap();
+                let negative = value.starts_with('-');
+                let expected = match usage {
+                    "COMP" => {
+                        let number = coefficient.parse::<i128>().unwrap();
+                        let number = if negative { -number } else { number };
+                        number.to_be_bytes()[16 - layout.length..].to_vec()
+                    }
+                    "COMP-3" => packed_decimal(coefficient.as_bytes(), negative, layout.length),
+                    _ => {
+                        let mut bytes = coefficient.as_bytes().to_vec();
+                        if negative {
+                            *bytes.last_mut().unwrap() = b'N';
+                        }
+                        bytes
+                    }
+                };
+                assert_eq!(layout.initial, expected, "{declaration}");
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_value_rejects_excess_fractional_digits() {
+        for usage in ["COMP", "COMP-3", "DISPLAY"] {
+            let declaration = format!("01 R PIC 9(3)V9 USAGE {usage} VALUE 1.25");
+            assert!(
+                matches!(
+                    SemanticModel::analyze(&program(&declaration), 1024, 32),
+                    Err(SemanticProblem::InvalidDeclaration(_))
+                ),
+                "{declaration}"
+            );
+        }
+    }
+
+    #[test]
+    fn scaled_binary_value_initializes_stored_coefficient_for_each_usage_and_sign() {
+        for usage in ["COMP", "COMP-4", "BINARY", "COMP-5"] {
+            for (picture, value, coefficient) in [
+                ("9(7)V9", "95.8", 958i128),
+                ("9(7)V99", "95.85", 9585),
+                ("9(7)V9(4)", "95.8125", 958125),
+            ] {
+                for signed in [false, true] {
+                    let picture = if signed {
+                        format!("S{picture}")
+                    } else {
+                        picture.to_string()
+                    };
+                    let value = if signed {
+                        format!("-{value}")
+                    } else {
+                        value.to_string()
+                    };
+                    let declaration = format!("01 R PIC {picture} USAGE {usage} VALUE {value}");
+                    let model = SemanticModel::analyze(&program(&declaration), 1024, 32).unwrap();
+                    let layout = model.layout("R").unwrap();
+                    let expected = if signed { -coefficient } else { coefficient };
+                    assert_eq!(
+                        layout.initial,
+                        expected.to_be_bytes()[16 - layout.length..],
+                        "{declaration}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn floating_currency_picture_reserves_one_insertion_position() {
+        for (picture, digits, scale) in [
+            ("$$$,$$9.99", 7, 2),
+            ("$$,$$$,$$9.99", 9, 2),
+            ("$$$.99", 4, 2),
+            ("$ZZ,ZZ9.99", 7, 2),
+        ] {
+            let details = picture_details(picture).unwrap();
+            assert_eq!(
+                (details.digits, details.scale),
+                (digits, scale),
+                "{picture}"
+            );
+            assert_eq!(details.storage, picture.len(), "{picture}");
+        }
+    }
+
+    #[test]
+    fn floating_insertion_metadata_covers_signs_decimal_and_whole_field() {
+        for (picture, digits, scale, signed) in [
+            ("$$V99", 3, 2, false),
+            ("$$$$", 3, 0, false),
+            // COBOL 6.5 rlddeief reserves the leftmost floating sign.
+            ("+++,++9.99", 7, 2, true),
+            ("----9", 4, 0, true),
+        ] {
+            let details = picture_details(picture).unwrap();
+            assert_eq!(
+                (details.digits, details.scale, details.signed),
+                (digits, scale, signed),
+                "{picture}"
+            );
+        }
+    }
+
+    #[test]
+    fn embedded_simple_insertions_keep_floating_metadata_in_sync() {
+        for (picture, storage, digits, scale, signed) in [
+            ("$$B$$9.9", 8, 5, 1, false),
+            ("$$0$$9", 6, 4, 0, false),
+            ("$$/$$9", 6, 4, 0, false),
+            // COBOL 6.5 rlddeief: the second-leftmost floating sign is the first digit.
+            ("++B++9", 6, 4, 0, true),
+            ("--,--9.99", 9, 6, 2, true),
+            ("$$$B99", 6, 4, 0, false),
+            ("+++.+++", 7, 5, 3, true),
+        ] {
+            let details = picture_details(picture).unwrap();
+            assert_eq!(
+                (
+                    details.storage,
+                    details.digits,
+                    details.scale,
+                    details.signed
+                ),
+                (storage, digits, scale, signed),
+                "{picture}"
+            );
+        }
+    }
 
     fn program(declarations: &str) -> String {
         format!(
@@ -3018,7 +3131,7 @@ mod tests {
             DataCategory::NumericEdited
         );
         assert_eq!(model.layout("D").unwrap().length, 10);
-        assert_eq!(model.layout("E").unwrap().digits, 5);
+        assert_eq!(model.layout("E").unwrap().digits, 4);
     }
 
     #[test]
@@ -3451,6 +3564,14 @@ mod tests {
         assert_eq!(model.files[0].file_status.as_deref(), Some("FILE-STATUS"));
         assert_eq!(model.files[1].organization, "RELATIVE");
         assert_eq!(model.files[1].relative_key.as_deref(), Some("REL-NUM"));
+    }
+
+    #[test]
+    fn file_binding_keeps_each_fd_record_name() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. ENVIRONMENT DIVISION. INPUT-OUTPUT SECTION. FILE-CONTROL. SELECT VBFILE ASSIGN TO VBPS ORGANIZATION IS SEQUENTIAL. DATA DIVISION. FILE SECTION. FD VBFILE RECORD IS VARYING IN SIZE FROM 10 TO 80 CHARACTERS. 01 SHORT-REC PIC X(12). 01 LONG-REC PIC X(39). PROCEDURE DIVISION. WRITE LONG-REC. STOP RUN.";
+        let model = SemanticModel::analyze(source, 1024, 32).unwrap();
+        assert_eq!(model.files[0].record_name.as_deref(), Some("SHORT-REC"));
+        assert_eq!(model.files[0].record_names, ["SHORT-REC", "LONG-REC"]);
     }
 
     #[test]

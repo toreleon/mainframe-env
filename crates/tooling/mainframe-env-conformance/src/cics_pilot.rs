@@ -49,7 +49,7 @@ EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2
 DISPLAY 'PLAIN:' RESP-X ':' RESP2-X ':' REC-X.
 EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'UPDATE1:' RESP-X ':' RESP2-X ':' REC-X.
-EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+MOVE 'AA22' TO REC-X. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'REWRITE1:' RESP-X ':' RESP2-X.
 EXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'COMMIT:' RESP-X ':' RESP2-X.
@@ -68,7 +68,7 @@ EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP
 DISPLAY 'CTXREAD:' RESP-X ':' RESP2-X ':' REC-X.
 EXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'CTXSYNC:' RESP-X ':' RESP2-X.
-EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA33') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'CTXREWRITE:' RESP-X ':' RESP2-X.
 STOP RUN.
 "#;
@@ -83,7 +83,7 @@ WORKING-STORAGE SECTION.
 PROCEDURE DIVISION.
 EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'UPDATE2:' RESP-X ':' RESP2-X ':' REC-X.
-EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA33') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+MOVE 'AA33' TO REC-X. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'REWRITE2:' RESP-X ':' RESP2-X.
 EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'PREBACKOUT:' RESP-X ':' RESP2-X ':' REC-X.
@@ -104,32 +104,8 @@ WORKING-STORAGE SECTION.
 PROCEDURE DIVISION.
 EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'INVPLAIN:' RESP-X ':' RESP2-X ':' REC-X.
-EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'INVALID:' RESP-X ':' RESP2-X.
-STOP RUN.
-"#;
-
-const WRITE_LENGTH_SOURCE: &str = r#"IDENTIFICATION DIVISION.
-PROGRAM-ID. CICSWRL.
-DATA DIVISION.
-WORKING-STORAGE SECTION.
-01 RECORD-BUFFER PIC X(8) VALUE 'ABC12345'.
-01 RECORD-KEY PIC X(3) VALUE 'ABC'.
-01 WRITE-LENGTH PIC S9(4) COMP VALUE 5.
-01 READ-LENGTH PIC S9(4) COMP VALUE 8.
-01 KEY-LENGTH PIC S9(4) COMP VALUE 3.
-01 READ-BUFFER PIC X(8) VALUE ALL 'X'.
-01 RESP-X PIC 9(3) VALUE 0.
-01 RESP2-X PIC 9(3) VALUE 0.
-PROCEDURE DIVISION.
-EXEC CICS WRITE FILE('WRITELEN') FROM(RECORD-BUFFER) RIDFLD(RECORD-KEY)
-    LENGTH(WRITE-LENGTH) KEYLENGTH(KEY-LENGTH)
-    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
-DISPLAY 'WRITE:' RESP-X ':' RESP2-X.
-EXEC CICS READ FILE('WRITELEN') INTO(READ-BUFFER) RIDFLD(RECORD-KEY)
-    LENGTH(READ-LENGTH) KEYLENGTH(KEY-LENGTH)
-    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
-DISPLAY 'READ:' RESP-X ':' RESP2-X ':' READ-BUFFER.
 STOP RUN.
 "#;
 
@@ -152,7 +128,7 @@ WORKING-STORAGE SECTION.
 01 RESP2-X PIC 9(3) VALUE 0.
 PROCEDURE DIVISION.
 EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
-EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA33') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+MOVE 'AA33' TO REC-X. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'UNREACHED'.
 STOP RUN.
 "#;
@@ -1346,7 +1322,37 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mainframe_env_cics::{CicsReplayClock, CicsUowState, describe_cics_uow_row};
+    use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore};
     use std::process::Command;
+
+    const WRITE_LENGTH_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSWRL.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 RECORD-BUFFER PIC X(8) VALUE 'ABC12345'.
+01 RECORD-KEY PIC X(3) VALUE 'ABC'.
+01 WRITE-LENGTH PIC S9(4) COMP VALUE 5.
+01 READ-LENGTH PIC S9(4) COMP VALUE 8.
+01 KEY-LENGTH PIC S9(4) COMP VALUE 3.
+01 READ-BUFFER PIC X(8) VALUE ALL 'X'.
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+EXEC CICS WRITE FILE('WRITELEN') FROM(RECORD-BUFFER) RIDFLD(RECORD-KEY)
+    LENGTH(WRITE-LENGTH) KEYLENGTH(KEY-LENGTH)
+    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'WRITE:' RESP-X ':' RESP2-X.
+EXEC CICS READ FILE('WRITELEN') INTO(READ-BUFFER) RIDFLD(RECORD-KEY)
+    LENGTH(READ-LENGTH) KEYLENGTH(KEY-LENGTH)
+    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'READ:' RESP-X ':' RESP2-X ':' READ-BUFFER.
+STOP RUN.
+"#;
+
+    const PARTICIPANT_FIXTURES: &str = include_str!(
+        "../../../../conformance/0.16/fixtures/transaction-participant-compatibility.json"
+    );
 
     const REMOTE_ROLLBACK_SOURCE: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSREMOTE.
@@ -1374,6 +1380,292 @@ EXEC CICS DEQ RESOURCE(LOCK-NAME) LENGTH(4) UOW RESP(RESP-X) RESP2(RESP2-X) END-
 DISPLAY EIBFN.
 STOP RUN.
 "#;
+
+    fn participant_source(requested: &str) -> String {
+        let rollback = if requested == "rollback" {
+            " ROLLBACK"
+        } else {
+            ""
+        };
+        format!(
+            "IDENTIFICATION DIVISION.\n\
+             PROGRAM-ID. CICSPART.\n\
+             DATA DIVISION.\n\
+             WORKING-STORAGE SECTION.\n\
+             01 RESP-X PIC 9(3) VALUE 0.\n\
+             01 RESP2-X PIC 9(3) VALUE 0.\n\
+             PROCEDURE DIVISION.\n\
+             EXEC CICS SYNCPOINT{rollback} RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\n\
+             DISPLAY 'PARTICIPANT:' RESP-X ':' RESP2-X.\n\
+             STOP RUN.\n"
+        )
+    }
+
+    fn participant_invocation(
+        case: &Value,
+        artifact: &mainframe_env_compiler_api::PublishedArtifact,
+    ) -> Invocation {
+        let limits = InvocationLimits::default();
+        let identity = case["id"].as_str().unwrap();
+        let mut invocation = pilot_invocation(artifact, "IBMUSER", identity, "CICSPART").unwrap();
+        invocation.bindings.insert(
+            "cics.execution-context".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.execution-context@1",
+                case["execution_context"]
+                    .as_str()
+                    .unwrap()
+                    .as_bytes()
+                    .to_vec(),
+                limits,
+            )
+            .unwrap(),
+        );
+        if let Some(remote_outcome) = case["remote_outcome"].as_str() {
+            invocation.bindings.insert(
+                "cics.syncpoint.remote-outcome".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.syncpoint.remote-outcome@1",
+                    remote_outcome.as_bytes().to_vec(),
+                    limits,
+                )
+                .unwrap(),
+            );
+        }
+        invocation
+    }
+
+    fn run_participant_case(
+        case: &Value,
+        provider_store: Arc<dyn ProviderStateStore>,
+        platform_store: Arc<dyn PlatformStore>,
+    ) {
+        let contract =
+            mainframe_env_execution_api::read_transaction_participant_contract(1).unwrap();
+        let cics_capabilities = contract
+            .participant("cics")
+            .unwrap()
+            .capabilities
+            .as_ref()
+            .unwrap();
+        let context = cics_capabilities
+            .contexts
+            .iter()
+            .find(|context| context.context_id == case["execution_context"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            context.mode,
+            match case["mode"].as_str().unwrap() {
+                "local" => mainframe_env_execution_api::ParticipantMode::Local,
+                "distributed-owned" => {
+                    mainframe_env_execution_api::ParticipantMode::DistributedOwned
+                }
+                "distributed-subordinate" => {
+                    mainframe_env_execution_api::ParticipantMode::DistributedSubordinate
+                }
+                other => panic!("unknown participant fixture mode {other}"),
+            }
+        );
+        assert_eq!(
+            context.syncpoint_owner,
+            if case["syncpoint_owner"] == "participant" {
+                mainframe_env_execution_api::SyncpointOwner::Participant
+            } else {
+                mainframe_env_execution_api::SyncpointOwner::UpstreamHost
+            }
+        );
+
+        let dataset =
+            DatasetService::open(provider_store.clone(), DatasetLimits::default()).unwrap();
+        let inner = pilot_inner_host(dataset).unwrap();
+        let cics = CicsService::open(inner, provider_store, CicsLimits::default()).unwrap();
+        let execution =
+            PilotExecution::new(pilot_outer_host(cics).unwrap(), platform_store.clone());
+        let artifact =
+            crate::compile(&participant_source(case["requested"].as_str().unwrap())).unwrap();
+        let invocation = participant_invocation(case, &artifact);
+        let effect_key = IdempotencyKey::new(
+            format!("{}:1", invocation.idempotency_key.as_str()),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let output = drive_artifact(&artifact, invocation.clone(), &execution).unwrap();
+        let observed = parse_command(&output, "PARTICIPANT", false).unwrap();
+        let expected = &case["expected"];
+        assert_eq!(observed.resp, expected["response"].as_u64().unwrap());
+        assert_eq!(observed.resp2, expected["response2"].as_u64().unwrap());
+
+        let effect = platform_store.effect(&effect_key).unwrap().unwrap();
+        assert_eq!(effect.state, EffectState::Completed);
+        assert_eq!(effect.digest_format, EffectDigestFormat::CanonicalHostV1);
+        assert_eq!(effect.execution_id, invocation.execution_id);
+        assert_eq!(effect.run_unit_id, invocation.run_unit_id);
+        assert_eq!(effect.sequence, 1);
+        assert!(effect.result_digest.is_some());
+
+        let uow = platform_store
+            .get_provider_state("cics-uow", effect_key.as_str())
+            .unwrap();
+        match expected["uow_state"].as_str().unwrap() {
+            "absent" => assert!(uow.is_none()),
+            state => {
+                let descriptor = describe_cics_uow_row(&uow.unwrap(), None).unwrap();
+                assert_eq!(
+                    descriptor.owner_execution.as_deref(),
+                    Some(invocation.execution_id.as_str())
+                );
+                assert_eq!(
+                    descriptor.owner_run_unit.as_deref(),
+                    Some(invocation.run_unit_id.as_str())
+                );
+                assert_eq!(
+                    descriptor.state,
+                    if state == "committed" {
+                        CicsUowState::Committed
+                    } else {
+                        CicsUowState::RolledBack
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn participant_fixtures_execute_through_coordinator_and_cics_on_memory_and_sqlite() {
+        let fixtures: Value = serde_json::from_str(PARTICIPANT_FIXTURES).unwrap();
+        for reader in fixtures["reader_cases"].as_array().unwrap() {
+            let result = mainframe_env_execution_api::read_transaction_participant_contract(
+                u16::try_from(reader["version"].as_u64().unwrap()).unwrap(),
+            );
+            assert_eq!(
+                result.is_ok(),
+                reader["expected"] == "accepted",
+                "reader fixture {}",
+                reader["id"]
+            );
+        }
+        for case in fixtures["cics_cases"].as_array().unwrap() {
+            let memory = Arc::new(MemoryStore::new(StoreLimits::default()));
+            let provider_store: Arc<dyn ProviderStateStore> = memory.clone();
+            let platform_store: Arc<dyn PlatformStore> = memory;
+            run_participant_case(case, provider_store, platform_store);
+        }
+
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-int1601-fixtures-{}-{}",
+            std::process::id(),
+            PROFILE_NONCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        for case in fixtures["cics_cases"].as_array().unwrap() {
+            let url = format!(
+                "sqlite://{}?mode=rwc",
+                directory
+                    .join(format!("{}.db", case["id"].as_str().unwrap()))
+                    .display()
+            );
+            let sqlite = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider_store: Arc<dyn ProviderStateStore> = sqlite.clone();
+            let platform_store: Arc<dyn PlatformStore> = sqlite;
+            run_participant_case(case, provider_store, platform_store);
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    struct FailingParticipantClock;
+
+    impl CicsReplayClock for FailingParticipantClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            Err(HostProblem::InfrastructureFailure)
+        }
+    }
+
+    #[test]
+    fn coordinator_preserves_cics_unknown_without_automatic_redispatch() {
+        let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let platform_store: Arc<dyn PlatformStore> = store.clone();
+        let dataset =
+            DatasetService::open(provider_store.clone(), DatasetLimits::default()).unwrap();
+        let cics = CicsService::open_with_replay_clock(
+            pilot_inner_host(dataset).unwrap(),
+            provider_store,
+            CicsLimits::default(),
+            Arc::new(FailingParticipantClock),
+        )
+        .unwrap();
+        let execution = PilotExecution::new(pilot_outer_host(cics).unwrap(), platform_store);
+        let artifact = crate::compile(&participant_source("commit")).unwrap();
+        let case: Value = serde_json::json!({
+            "id": "unknown-not-redispatched",
+            "execution_context": "local",
+            "remote_outcome": null
+        });
+        let invocation = participant_invocation(&case, &artifact);
+        let key = IdempotencyKey::new(
+            format!("{}:1", invocation.idempotency_key.as_str()),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut machine = mainframe_env_interpreter::ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let outcome = execution.coordinator().execute(
+            &mut machine,
+            &invocation,
+            mainframe_env_interpreter::ExecutionControl {
+                now_tick: 1,
+                cancellation_requested: false,
+            },
+        );
+        assert!(matches!(
+            outcome,
+            mainframe_env_execution_api::ExecutionOutcome::ProviderFailure(problem)
+                if problem.has_unknown_outcome()
+        ));
+        assert_eq!(
+            store.effect(&key).unwrap().unwrap().state,
+            EffectState::UnknownOutcome
+        );
+        let pending = store
+            .get_provider_state("cics-uow", key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(pending.version, 1);
+        assert_eq!(
+            describe_cics_uow_row(&pending, None).unwrap().state,
+            CicsUowState::CommitPending
+        );
+
+        let mut repeated = mainframe_env_interpreter::ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            execution.coordinator().execute(
+                &mut repeated,
+                &invocation,
+                mainframe_env_interpreter::ExecutionControl {
+                    now_tick: 2,
+                    cancellation_requested: false,
+                },
+            ),
+            mainframe_env_execution_api::ExecutionOutcome::InfrastructureFailure(_)
+        ));
+        let after = store
+            .get_provider_state("cics-uow", key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (after.version, after.payload),
+            (pending.version, pending.payload)
+        );
+    }
 
     #[test]
     fn cics_pilot_sources_use_only_the_typed_executable_dialects() {

@@ -1,5 +1,141 @@
 use super::*;
 
+pub(in crate::machine) fn legacy_arguments(
+    tokens: &[String],
+) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
+    let mut arguments = BTreeMap::new();
+    let command = tokens
+        .iter()
+        .position(|token| {
+            !matches!(
+                token.to_ascii_uppercase().as_str(),
+                "EXEC" | "CICS" | "END-EXEC"
+            )
+        })
+        .ok_or(MachineProblem::InvalidOperation)?;
+    let first = tokens[command].to_ascii_uppercase();
+    let mut index = command + 1;
+    if matches!(first.as_str(), "HANDLE" | "RECEIVE" | "SEND" | "WRITEQ")
+        && tokens.get(index).is_some_and(|token| {
+            matches!(
+                token.to_ascii_uppercase().as_str(),
+                "ABEND" | "CONDITION" | "MAP" | "TEXT" | "TD"
+            )
+        })
+    {
+        let subcommand = tokens[index].to_ascii_uppercase();
+        index += 1;
+        if tokens.get(index).is_some_and(|token| token == "(") {
+            let end = matching_close(tokens, index).ok_or(MachineProblem::InvalidOperation)?;
+            let raw = tokens[index + 1..end].join(" ");
+            let literal = raw.starts_with(['\'', '"']) && raw.ends_with(['\'', '"']);
+            arguments.insert(
+                subcommand,
+                payload(
+                    if literal {
+                        "mainframe-env.cics.literal@1"
+                    } else {
+                        "mainframe-env.cics.argument@1"
+                    },
+                    raw.trim_matches(['\'', '"']).as_bytes().to_vec(),
+                )?,
+            );
+            index = end + 1;
+        }
+    }
+    while index < tokens.len() {
+        let key = tokens[index].to_ascii_uppercase();
+        if key == "END-EXEC" {
+            break;
+        }
+        if tokens.get(index + 1).is_some_and(|token| token == "(") {
+            let end = matching_close(tokens, index + 1).ok_or(MachineProblem::InvalidOperation)?;
+            let raw = tokens[index + 2..end].join(" ");
+            let literal = raw.starts_with(['\'', '"']) && raw.ends_with(['\'', '"']);
+            arguments.insert(
+                key,
+                payload(
+                    if literal {
+                        "mainframe-env.cics.literal@1"
+                    } else {
+                        "mainframe-env.cics.argument@1"
+                    },
+                    raw.trim_matches(['\'', '"']).as_bytes().to_vec(),
+                )?,
+            );
+            index = end + 1;
+        } else {
+            arguments.insert(
+                format!("OPTION.{key}"),
+                payload("mainframe-env.cics.option@1", Vec::new())?,
+            );
+            index += 1;
+        }
+    }
+    Ok(arguments)
+}
+
+fn legacy_destination(arguments: &BTreeMap<String, BoundedPayload>, key: &str) -> Option<String> {
+    arguments
+        .get(key)
+        .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
+}
+
+fn legacy_numeric_operand(
+    machine: &ReferenceMachine,
+    reference_tokens: &[String],
+) -> Result<Vec<u8>, MachineProblem> {
+    if let [literal] = reference_tokens
+        && !literal.is_empty()
+        && literal.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        let value: u32 = literal.parse().map_err(|_| MachineProblem::DataException)?;
+        return Ok(value.to_string().into_bytes());
+    }
+    if let [head, of, rest @ ..] = reference_tokens
+        && head.eq_ignore_ascii_case("LENGTH")
+        && of.eq_ignore_ascii_case("OF")
+    {
+        let reference = machine.reference(rest)?;
+        return Ok(machine
+            .read_reference(&reference)?
+            .len()
+            .to_string()
+            .into_bytes());
+    }
+    let reference = machine.reference(reference_tokens)?;
+    let bytes = machine.read_reference(&reference)?;
+    let value = decode_decimal(&reference.layout, &bytes)?;
+    if value.scale != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(value.coefficient.to_string().into_bytes())
+}
+
+fn validate_legacy_assign_outputs(
+    machine: &ReferenceMachine,
+    outputs: &BTreeMap<String, CicsTarget>,
+) -> Result<(), MachineProblem> {
+    for (name, target) in outputs {
+        let CicsTarget::Legacy(target) = target else {
+            return Err(MachineProblem::InvalidOperation);
+        };
+        let tokens = target
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let reference = machine.reference(&tokens)?;
+        if name == "TASKPRIORITY"
+            && (reference.layout.category != LayoutCategory::Binary
+                || reference.length != 2
+                || reference.layout.scale != 0)
+        {
+            return Err(MachineProblem::DataException);
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn execute_legacy(
     machine: &mut ReferenceMachine,
     args: &[String],
@@ -21,7 +157,8 @@ pub(crate) fn execute_legacy(
             "MILLISECONDS",
         ],
         CicsOperation::Link => &["COMMAREA"],
-        CicsOperation::ReadNext | CicsOperation::ReadPrev => &["RIDFLD"],
+        CicsOperation::Read => &["TOKEN"],
+        CicsOperation::ReadNext | CicsOperation::ReadPrev => &["RIDFLD", "TOKEN"],
         _ => &[],
     };
     let outputs = output_names
@@ -70,12 +207,14 @@ pub(crate) fn execute_legacy(
             | CicsOperation::Rewrite
             | CicsOperation::Delete
             | CicsOperation::StartBrowse
+            | CicsOperation::ResetBrowse
+            | CicsOperation::Unlock
             | CicsOperation::ReadNext
             | CicsOperation::ReadPrev
             | CicsOperation::EndBrowse
             | CicsOperation::SendText
     ) {
-        for key in ["LENGTH", "KEYLENGTH"] {
+        for key in ["LENGTH", "KEYLENGTH", "TOKEN"] {
             let Some(argument) = arguments.get(key) else {
                 continue;
             };
@@ -120,10 +259,13 @@ pub(crate) fn execute_legacy(
         );
     }
     let condition_policy = legacy_condition_policy(args, &arguments)?;
-    let mut mutation = operation
-        .is_mutating()
-        .then(|| machine.mutation())
-        .transpose()?;
+    let mut mutation = (operation.is_mutating()
+        || matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ) && arguments.contains_key("TOKEN"))
+    .then(|| machine.mutation())
+    .transpose()?;
     if let Some(mutation) = &mut mutation {
         mutation.transaction = Some(
             machine
@@ -143,7 +285,9 @@ pub(crate) fn execute_legacy(
             mutation,
         }),
         PendingKind::Cics {
+            container: None,
             operation,
+            storage64_intent: None,
             argument_summary,
             into,
             outputs,

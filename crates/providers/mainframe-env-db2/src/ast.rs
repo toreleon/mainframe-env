@@ -35,7 +35,7 @@ impl Default for Db2AstLimits {
 }
 
 impl Db2AstLimits {
-    fn validate(self) -> Result<(), Db2AstError> {
+    pub(crate) fn validate(self) -> Result<(), Db2AstError> {
         if self.max_identifier_bytes == 0
             || self.max_identifier_bytes > MAX_IDENTIFIER_BYTES_CEILING
             || self.max_name_parts == 0
@@ -556,6 +556,8 @@ mod tests {
 
     fn span() -> Db2SourceSpan {
         Db2SourceSpan {
+            start_byte: 0,
+            end_byte: 1,
             start: Db2SourceLocation::START,
             end: Db2SourceLocation { line: 1, column: 2 },
         }
@@ -616,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn host_identifiers_preserve_host_language_spelling() {
+    fn host_identifiers_preserve_host_language_spelling_and_limits() {
         let limits = Db2AstLimits::default();
         let variable = Db2HostIdentifier::new("Cobol-Field", limits).unwrap();
         let indicator = Db2HostIdentifier::new("Cobol-Ind", limits).unwrap();
@@ -626,6 +628,16 @@ mod tests {
         assert_eq!(
             Db2HostIdentifier::new("", limits).unwrap_err().code,
             Db2AstErrorCode::InvalidIdentifier
+        );
+        assert_eq!(
+            Db2HostIdentifier::new("x\0y", limits).unwrap_err().code,
+            Db2AstErrorCode::InvalidIdentifier
+        );
+        assert_eq!(
+            Db2HostIdentifier::new("x".repeat(129), limits)
+                .unwrap_err()
+                .code,
+            Db2AstErrorCode::IdentifierTooLong
         );
     }
 

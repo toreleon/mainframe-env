@@ -2,39 +2,49 @@
 
 #![forbid(unsafe_code)]
 
+mod carddemo_base_batch_provenance;
+mod carddemo_readacct;
+mod carddemo_v09_host;
+mod changelog;
+mod cobol_differential;
 mod db2_statement_catalog;
 mod docs;
 mod evidence_seal;
+mod ims_catalog;
 mod jcl_catalog;
 mod jcl_conformance;
+mod profile_intake;
 mod racf_catalog;
 mod release_attestation;
 mod release_licenses;
 mod topic_manifests;
 mod work_package_seal;
+mod zosmf_contracts;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
     CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
-    RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, cics_pilot_runtime,
-    cobol_arithmetic_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
-    gnucobol_reference_fixture_digest, import_cics_oracle_capture, licensed_fixture_digest,
-    run_dataset_reference_simulation, run_gnucobol_reference_campaign,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
+    OracleCandidateExpectation, OracleHarnessValidationKind, RACF_ORACLE_RELATIVE_PATH,
+    RacfOracleCampaign, cics_pilot_runtime, cobol_arithmetic_pilot_runtime,
+    cobol_move_pilot_runtime, dataset_conformance_runtime, gnucobol_reference_fixture_digest,
+    import_cics_oracle_capture, licensed_fixture_digest, run_dataset_reference_simulation,
+    run_gnucobol_reference_campaign, validate_oracle_harness_receipt,
+    validate_oracle_harness_registry, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
     verify_cobol_data_runtime_fixtures, verify_cobol_exit, verify_cobol_file_runtime_fixtures,
     verify_cobol_frontend_fixtures, verify_cobol_function_boundary_runtime_fixtures,
     verify_cobol_function_fixtures, verify_cobol_function_runtime_fixtures,
@@ -87,6 +97,18 @@ struct CheckArgs {
 }
 
 #[derive(Debug, Args)]
+struct ProfileIntakeArgs {
+    #[arg(long)]
+    manifest: PathBuf,
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long)]
+    json: PathBuf,
+    #[arg(long)]
+    markdown: PathBuf,
+}
+
+#[derive(Debug, Args)]
 struct ReleaseArgs {
     #[arg(long)]
     target: String,
@@ -132,6 +154,10 @@ struct CobolReferenceArgs {
 struct CicsOracleArgs {
     #[arg(long)]
     capture: PathBuf,
+    #[arg(long, help = "Sealed family ID; omit for the existing file/UOW pilot")]
+    family: Option<String>,
+    #[arg(long, help = "Exact external environment JSON for a family capture")]
+    environment_manifest: Option<PathBuf>,
     #[arg(
         long,
         help = "Optional raw 32-byte Ed25519 public key from the protected runner"
@@ -159,7 +185,9 @@ enum EvidenceCommand {
 
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
+    ProfileIntake(ProfileIntakeArgs),
     Versions(CheckArgs),
+    Changelog(CheckArgs),
     Docs(CheckArgs),
     Architecture(CheckArgs),
     ArchitectureFast(CheckArgs),
@@ -168,6 +196,8 @@ enum XtaskCommand {
     Profiles(CheckArgs),
     Schemas(CheckArgs),
     Inventory(CheckArgs),
+    MqMqiRegistry(CheckArgs),
+    MqLicensedContract(CheckArgs),
     Evidence(EvidenceArgs),
     Coverage(CheckArgs),
     ApplicationPackages(CheckArgs),
@@ -177,6 +207,7 @@ enum XtaskCommand {
     AbiLibraries(CheckArgs),
     ProgramRegistry(CheckArgs),
     RouteRegistries(CheckArgs),
+    ZosmfContracts(CheckArgs),
     Dehardcoding(CheckArgs),
     LedgerConsistency(CheckArgs),
     MigrationRollback(CheckArgs),
@@ -195,13 +226,16 @@ enum XtaskCommand {
     DatasetOracle(CheckArgs),
     JesOracle(CheckArgs),
     JesOracleCandidate,
+    LicensedHarness(CheckArgs),
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
+    CobolDifferential(cobol_differential::Args),
     CicsOracle(CicsOracleArgs),
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
+    ImsCatalog(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
     WorkPackageSeal(WorkPackageSealArgs),
@@ -215,6 +249,8 @@ enum XtaskCommand {
     CarddemoCore(CheckArgs),
     CarddemoFileCall(CheckArgs),
     CarddemoHost(CheckArgs),
+    #[command(name = "carddemo-v09-host")]
+    CarddemoV09Host(CheckArgs),
     CarddemoPackage(CheckArgs),
     CarddemoResources(CheckArgs),
     CarddemoPrograms(CheckArgs),
@@ -230,6 +266,7 @@ enum XtaskCommand {
     CarddemoUtilities(CheckArgs),
     CarddemoBatchPrograms(CheckArgs),
     CarddemoBaseBatch(CheckArgs),
+    CarddemoReadacct(CheckArgs),
     CarddemoDb2(CheckArgs),
     CarddemoIms(CheckArgs),
     CarddemoMqAuthorization(CheckArgs),
@@ -274,11 +311,27 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         };
     }
     match command {
+        XtaskCommand::ProfileIntake(args) => {
+            ("profile-intake", false, profile_intake::run(root, &args))
+        }
         XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
+        XtaskCommand::Changelog(args) => checked!(
+            "changelog",
+            args,
+            changelog::run(root, args.check).and_then(|()| {
+                if args.check {
+                    Ok(())
+                } else {
+                    docs::run(root, false, &Cli::command())
+                }
+            })
+        ),
         XtaskCommand::Docs(args) => checked!(
             "docs",
             args,
-            check_versions(root).and_then(|()| docs::run(root, args.check, &Cli::command()))
+            check_versions(root)
+                .and_then(|()| changelog::validate(root))
+                .and_then(|()| docs::run(root, args.check, &Cli::command()))
         ),
         XtaskCommand::ArchitectureFast(args) => {
             checked!("architecture-fast", args, check_architecture_fast(root))
@@ -297,6 +350,16 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::Profiles(args) => checked!("profiles", args, check_profiles(root)),
         XtaskCommand::Schemas(args) => checked!("schemas", args, check_schemas(root)),
         XtaskCommand::Inventory(args) => checked!("inventory", args, check_inventory(root)),
+        XtaskCommand::MqMqiRegistry(args) => {
+            checked!("mq-mqi-registry", args, check_mq_mqi_registry(root))
+        }
+        XtaskCommand::MqLicensedContract(args) => {
+            checked!(
+                "mq-licensed-contract",
+                args,
+                check_mq_licensed_contract(root)
+            )
+        }
         XtaskCommand::Evidence(args) => match (args.check, args.command) {
             (check, None) => ("evidence", check, check_evidence(root)),
             (false, Some(EvidenceCommand::Seal(args))) => (
@@ -362,6 +425,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             } else {
                 generate_route_registries(root)
             }
+        ),
+        XtaskCommand::ZosmfContracts(args) => checked!(
+            "zosmf-contracts",
+            args,
+            zosmf_contracts::run(root, args.check)
         ),
         XtaskCommand::Dehardcoding(args) => {
             checked!("dehardcoding", args, check_dehardcoding(root))
@@ -431,6 +499,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             false,
             print_jes_oracle_candidate(root),
         ),
+        XtaskCommand::LicensedHarness(args) => {
+            checked!("licensed-harness", args, check_licensed_harness(root))
+        }
         XtaskCommand::CobolLanguage(args) => checked!(
             "cobol-language",
             args,
@@ -446,10 +517,21 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             args,
             check_cobol_reference(root, &args.receipt)
         ),
+        XtaskCommand::CobolDifferential(args) => (
+            "cobol-differential",
+            args.check,
+            cobol_differential::run(root, &args),
+        ),
         XtaskCommand::CicsOracle(args) => (
             "cics-oracle",
             false,
-            import_cics_oracle(root, &args.capture, args.public_key.as_deref()),
+            import_cics_oracle(
+                root,
+                &args.capture,
+                args.family.as_deref(),
+                args.environment_manifest.as_deref(),
+                args.public_key.as_deref(),
+            ),
         ),
         XtaskCommand::JclCatalog(args) => checked!(
             "jcl-catalog",
@@ -470,6 +552,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             }
         ),
         XtaskCommand::JclExit(args) => checked!("jcl-exit", args, check_jcl_exit(root)),
+        XtaskCommand::ImsCatalog(args) => checked!(
+            "ims-catalog",
+            args,
+            if args.check {
+                ims_catalog::check(root)
+            } else {
+                ims_catalog::generate(root)
+            }
+        ),
         XtaskCommand::RacfCatalog(args) => (
             "racf-catalog",
             args.check,
@@ -521,6 +612,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         }
         XtaskCommand::CarddemoHost(args) => {
             checked!("carddemo-host", args, check_carddemo_host(root))
+        }
+        XtaskCommand::CarddemoV09Host(args) => {
+            checked!("carddemo-v09-host", args, carddemo_v09_host::check(root))
         }
         XtaskCommand::CarddemoPackage(args) => {
             checked!("carddemo-package", args, check_carddemo_package(root))
@@ -574,6 +668,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         ),
         XtaskCommand::CarddemoBaseBatch(args) => {
             checked!("carddemo-base-batch", args, check_carddemo_base_batch(root))
+        }
+        XtaskCommand::CarddemoReadacct(args) => {
+            checked!(
+                "carddemo-readacct",
+                args,
+                carddemo_readacct::run(root, args.check)
+            )
         }
         XtaskCommand::CarddemoDb2(args) => {
             checked!("carddemo-db2", args, check_carddemo_db2(root))
@@ -632,6 +733,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
+    ims_catalog::check(root)?;
     racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;
@@ -674,6 +776,7 @@ fn check_spec(root: &Path) -> TaskResult {
                 "cobol-language.schema.json",
                 "cobol-gnucobol-reference-allowlist.schema.json",
                 "cobol-gnucobol-reference-receipt.schema.json",
+                "cobol-differential-receipt.schema.json",
                 "cobol-licensed-differential-adapter.schema.json",
                 "cobol-licensed-differential-receipt.schema.json",
                 "cobol-condition-fixtures.schema.json",
@@ -1444,6 +1547,8 @@ fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> Task
 fn import_cics_oracle(
     root: &Path,
     capture_path: &Path,
+    family_id: Option<&str>,
+    environment_manifest_path: Option<&Path>,
     public_key_path: Option<&Path>,
 ) -> TaskResult {
     let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
@@ -1463,14 +1568,102 @@ fn import_cics_oracle(
             "CICS oracle Ed25519 public key must contain exactly 32 raw bytes",
         )?;
     }
-    let adapter_path = root.join("conformance/0.9/oracles/cics-licensed-differential.json");
-    let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
-    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
-    let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
+    let (adapter_path, fixture_path, review_path, environment_path, family_manifest_digest) =
+        if let Some(family) = family_id {
+            require(
+                !family.is_empty()
+                    && family.len() <= 80
+                    && family.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
+                    }),
+                "CICS oracle family ID is malformed",
+            )?;
+            let adapter_path = root.join(format!(
+                "conformance/0.9/oracles/cics-licensed-family-{family}.json"
+            ));
+            let adapter = json(&adapter_path)?;
+            let schema_path = root.join("conformance/0.9/schemas/cics-licensed-family.schema.json");
+            validate_schema_instance(&json(&schema_path)?, &adapter, &adapter_path)?;
+            require(
+                adapter["family_id"].as_str() == Some(family)
+                    && adapter["capture_contract"] == "mainframe-env.cics-oracle-capture@2"
+                    && adapter["trusted_authority_id"] == "ibm-cics-protected-runner"
+                    && adapter["signature_algorithm"] == "ed25519"
+                    && adapter["public_key_source"] == "--public-key"
+                    && adapter["local_model_and_synthetic_credit"] == 0,
+                "CICS oracle family manifest identity is stale",
+            )?;
+            let environment_path = environment_manifest_path
+                .ok_or_else(|| "CICS oracle family needs --environment-manifest".to_string())?;
+            let environment_path = fs::canonicalize(environment_path)
+                .map_err(|error| format!("CICS oracle environment manifest: {error}"))?;
+            require(
+                !environment_path.starts_with(&canonical_root),
+                "CICS oracle exact environment manifest must remain outside the candidate tree",
+            )?;
+            require(
+                fs::metadata(&environment_path)
+                    .map_err(|error| format!("CICS oracle environment manifest: {error}"))?
+                    .len()
+                    <= 64 * 1024,
+                "CICS oracle exact environment manifest exceeds its byte limit",
+            )?;
+            let environment = json(&environment_path)?;
+            let fields = array(&adapter, "environment_manifest_fields", &adapter_path)?;
+            let expected_keys = fields
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .chain(std::iter::once("schema_version".to_string()))
+                .collect::<BTreeSet<_>>();
+            require(
+                environment["schema_version"] == "mainframe-env.cics-oracle-environment@1"
+                    && environment.as_object().is_some_and(|object| {
+                        object.keys().cloned().collect::<BTreeSet<_>>() == expected_keys
+                            && fields.iter().filter_map(Value::as_str).all(|field| {
+                                object[field]
+                                    .as_str()
+                                    .is_some_and(|value| !value.is_empty() && value.len() <= 4096)
+                            })
+                    }),
+                "CICS oracle exact environment manifest is incomplete or has unknown fields",
+            )?;
+            let fixture_path = root.join(text(&adapter, "fixture_path", &adapter_path)?);
+            let review_path = root.join(text(&adapter, "source_review_path", &adapter_path)?);
+            (
+                adapter_path.clone(),
+                fixture_path,
+                review_path,
+                environment_path,
+                Some(format!("sha256:{}", file_digest(&adapter_path)?)),
+            )
+        } else {
+            require(
+                environment_manifest_path.is_none(),
+                "pilot capture does not take --environment-manifest",
+            )?;
+            (
+                root.join("conformance/0.9/oracles/cics-licensed-differential.json"),
+                root.join("conformance/0.9/cics/pilot-fixtures.json"),
+                root.join("conformance/0.9/cics/pilot-rule-review.json"),
+                root.join("conformance/0.9/cics/pilot-environment.json"),
+                None,
+            )
+        };
     let adapter = json(&adapter_path)?;
     let fixture = json(&fixture_path)?;
     let review = json(&review_path)?;
-    let required_scenarios = array(&adapter, "required_scenarios", &adapter_path)?
+    let scenario_values = if family_id.is_some() {
+        array(&adapter, "observations", &adapter_path)?
+            .iter()
+            .map(|value| &value["scenario_id"])
+            .collect::<Vec<_>>()
+    } else {
+        array(&adapter, "required_scenarios", &adapter_path)?
+            .iter()
+            .collect::<Vec<_>>()
+    };
+    let required_scenarios = scenario_values
         .iter()
         .map(|value| {
             value
@@ -1479,13 +1672,98 @@ fn import_cics_oracle(
                 .ok_or_else(|| "CICS oracle required scenario is not a string".to_string())
         })
         .collect::<TaskResult<BTreeSet<_>>>()?;
+    let required_order = family_id.map(|_| {
+        scenario_values
+            .iter()
+            .filter_map(|value| value.as_str())
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+    });
+    require(
+        required_scenarios.len() == scenario_values.len(),
+        "CICS oracle family scenario IDs are duplicate",
+    )?;
+    if family_id.is_some() {
+        let rows = array(&adapter, "command_rows", &adapter_path)?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<BTreeSet<_>>();
+        require(
+            array(&adapter, "observations", &adapter_path)?
+                .iter()
+                .all(|observation| {
+                    observation["command_row"]
+                        .as_str()
+                        .is_some_and(|row| rows.contains(row))
+                })
+                && fixture["family_id"].as_str() == family_id
+                && fixture["schema_version"] == "mainframe-env.cics-oracle-family-fixtures@1"
+                && review["source_review_credit"] == 0
+                && review["licensed_execution_credit"] == 0,
+            "CICS oracle family fixture/source scope is stale",
+        )?;
+        let pins_path =
+            root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
+        let pins = json(&pins_path)?;
+        let registrations_path =
+            root.join("conformance/0.9/cics/typed-execution-registrations.json");
+        let registrations = json(&registrations_path)?;
+        let reviewed_topics = array(&review, "topics", &review_path)?;
+        require(
+            review["schema_version"] == "mainframe-env.cics-oracle-source-review@1"
+                && review["baseline"] == pins["baseline_id"]
+                && review["catalog_baseline"] == "ibm-cics-ts-6x-2026-08-31:api-commands"
+                && reviewed_topics.len() == rows.len()
+                && reviewed_topics
+                    .iter()
+                    .filter_map(|topic| topic["command_row"].as_str())
+                    .collect::<BTreeSet<_>>()
+                    .len()
+                    == rows.len()
+                && reviewed_topics.iter().all(|topic| {
+                    let Some(short_row) = topic["command_row"].as_str() else {
+                        return false;
+                    };
+                    let full_row = format!("ibm-cics-ts-6x-2026-08-31:api-commands:{short_row}");
+                    rows.contains(full_row.as_str())
+                        && pins["topics"].as_array().is_some_and(|pinned| {
+                            pinned.iter().any(|pin| {
+                                pin["topic_path"] == topic["topic_path"]
+                                    && pin["sha256"] == topic["sha256"]
+                            })
+                        })
+                })
+                && rows.iter().all(|row| {
+                    registrations["registrations"]
+                        .as_array()
+                        .is_some_and(|items| {
+                            items.iter().any(|item| {
+                                item["official_row"].as_str() == Some(*row)
+                                    && item["interface"] == "api"
+                            })
+                        })
+                }),
+            "CICS oracle family source pins or typed rows are stale",
+        )?;
+    }
     let spec = compile_shared_spec(root)?;
     let candidate = candidate_digest(root)?;
     let fixture_digest = format!("sha256:{}", file_digest(&fixture_path)?);
     let review_digest = format!("sha256:{}", file_digest(&review_path)?);
     let environment_digest = format!("sha256:{}", file_digest(&environment_path)?);
-    let comparison_policy = text(&fixture["comparison_policy"], "version", &fixture_path)?;
-    let expected_observations = fixture["licensed_expected_observations"]
+    let comparison_policy = if family_id.is_some() {
+        fixture["comparison_policy"]
+            .as_str()
+            .ok_or_else(|| "CICS oracle family comparison policy is missing".to_string())?
+    } else {
+        text(&fixture["comparison_policy"], "version", &fixture_path)?
+    };
+    let fixture_observations = if family_id.is_some() {
+        &fixture["expected_observations"]
+    } else {
+        &fixture["licensed_expected_observations"]
+    };
+    let fixture_observations = fixture_observations
         .as_array()
         .ok_or_else(|| "CICS licensed expected observations are missing".to_string())?
         .iter()
@@ -1493,11 +1771,33 @@ fn import_cics_oracle(
             serde_json::from_value::<CicsOracleObservation>(value.clone())
                 .map_err(|error| format!("CICS licensed expected observation: {error}"))
         })
-        .collect::<TaskResult<Vec<_>>>()?
+        .collect::<TaskResult<Vec<_>>>()?;
+    if let Some(order) = &required_order {
+        require(
+            fixture_observations
+                .iter()
+                .map(|observation| &observation.scenario_id)
+                .collect::<Vec<_>>()
+                == order.iter().collect::<Vec<_>>(),
+            "CICS oracle reviewed fixture order differs from its sealed family manifest",
+        )?;
+    }
+    require(
+        fixture_observations
+            .iter()
+            .map(|observation| observation.scenario_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            == fixture_observations.len(),
+        "CICS oracle reviewed fixture has duplicate observations",
+    )?;
+    let expected_observations = fixture_observations
         .into_iter()
         .map(|observation| (observation.scenario_id.clone(), observation))
         .collect::<BTreeMap<_, _>>();
     let expected = CicsOracleExpectation {
+        family_id,
+        family_manifest_digest: family_manifest_digest.as_deref(),
         candidate_digest: &candidate,
         spec_digest: spec.spec_digest(),
         fixture_digest: &fixture_digest,
@@ -1505,6 +1805,7 @@ fn import_cics_oracle(
         environment_manifest_digest: &environment_digest,
         comparison_policy,
         required_scenarios: &required_scenarios,
+        required_order,
         expected_observations: &expected_observations,
     };
     let outcome = import_cics_oracle_capture(&capture, &expected, public_key.as_deref())?;
@@ -1518,16 +1819,24 @@ fn import_cics_oracle(
             run_job_id,
             receipt_digest,
         } => {
-            require(
-                review["review_status"] == "accepted"
-                    && spec
-                        .scenarios()
-                        .any(|scenario| scenario.scenario_id().as_str() == "cics.file-uow.local"),
-                "licensed CICS capture cannot import before reviewed pilot promotion",
-            )?;
-            println!(
-                "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-pilot-only"
-            );
+            if family_id.is_none() {
+                require(
+                    review["review_status"] == "accepted"
+                        && spec.scenarios().any(|scenario| {
+                            scenario.scenario_id().as_str() == "cics.file-uow.local"
+                        }),
+                    "licensed CICS capture cannot import before reviewed pilot promotion",
+                )?;
+            }
+            if let Some(family) = family_id {
+                println!(
+                    "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-family-only family={family} differential=pending"
+                );
+            } else {
+                println!(
+                    "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-pilot-only"
+                );
+            }
         }
     }
     Ok(())
@@ -1536,6 +1845,123 @@ fn import_cics_oracle(
 #[cfg(test)]
 mod docs_driven_pipeline_tests {
     use super::*;
+
+    #[test]
+    fn cics_bif_family_local_import_binds_manifest_fixture_and_external_environment() {
+        let root = repository_root().unwrap();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let external = std::env::temp_dir().join(format!("cics-bif-oracle-test-{nonce}"));
+        fs::create_dir(&external).unwrap();
+        let environment_path = external.join("environment.json");
+        let environment = serde_json::json!({
+            "schema_version": "mainframe-env.cics-oracle-environment@1",
+            "cics_version_and_maintenance": "test-only-local",
+            "enterprise_cobol_version_and_maintenance": "test-only-local",
+            "compiler_options": "test-only-local",
+            "encoding": "CP037",
+            "cpacf_msa_availability": "test-only-local",
+            "program_and_transaction_definition": "test-only-local",
+            "principal_and_saf_configuration": "test-only-local",
+            "capture_serialization_version": "test-only-local",
+        });
+        fs::write(&environment_path, serde_json::to_vec(&environment).unwrap()).unwrap();
+        let manifest_path =
+            root.join("conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json");
+        let fixture_path = root.join("conformance/0.9/oracles/cics-bif-builtins-fixtures.json");
+        let source_path = root.join("conformance/0.9/oracles/cics-bif-builtins-source-review.json");
+        let fixture = json(&fixture_path).unwrap();
+        let observations = fixture["expected_observations"].clone();
+        let typed_observations =
+            serde_json::from_value::<Vec<CicsOracleObservation>>(observations.clone()).unwrap();
+        let capture_path = external.join("capture.json");
+        let capture = serde_json::json!({
+            "schema_version": "mainframe-env.cics-oracle-capture@2",
+            "family_id": "bif-builtins-v1",
+            "family_manifest_digest": format!("sha256:{}", file_digest(&manifest_path).unwrap()),
+            "candidate_digest": candidate_digest(&root).unwrap(),
+            "spec_digest": compile_shared_spec(&root).unwrap().spec_digest(),
+            "fixture_digest": format!("sha256:{}", file_digest(&fixture_path).unwrap()),
+            "source_review_digest": format!("sha256:{}", file_digest(&source_path).unwrap()),
+            "environment_manifest_digest": format!("sha256:{}", file_digest(&environment_path).unwrap()),
+            "comparison_policy": fixture["comparison_policy"],
+            "raw_capture_digest": format!("sha256:{:x}", Sha256::digest(serde_json::to_vec(&typed_observations).unwrap())),
+            "observations": observations,
+            "origin": {"kind": "local", "authority": "test-only-local", "run_job_id": "test-1", "signature": null},
+        });
+        fs::write(&capture_path, serde_json::to_vec(&capture).unwrap()).unwrap();
+        assert!(
+            import_cics_oracle(
+                &root,
+                &capture_path,
+                Some("bif-builtins-v1"),
+                Some(&environment_path),
+                None
+            )
+            .is_ok()
+        );
+        let mut changed_environment = environment;
+        changed_environment["encoding"] = serde_json::json!("other-test-encoding");
+        fs::write(
+            &environment_path,
+            serde_json::to_vec(&changed_environment).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            import_cics_oracle(
+                &root,
+                &capture_path,
+                Some("bif-builtins-v1"),
+                Some(&environment_path),
+                None
+            )
+            .is_err()
+        );
+        fs::remove_dir_all(external).unwrap();
+    }
+
+    #[test]
+    fn cics_file_uow_pilot_v1_still_imports_exact_twelve_local_observations() {
+        let root = repository_root().unwrap();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let external = std::env::temp_dir().join(format!("cics-pilot-oracle-test-{nonce}"));
+        fs::create_dir(&external).unwrap();
+        let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
+        let source_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+        let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
+        let fixture = json(&fixture_path).unwrap();
+        let observations = fixture["licensed_expected_observations"].clone();
+        let typed_observations =
+            serde_json::from_value::<Vec<CicsOracleObservation>>(observations.clone()).unwrap();
+        assert_eq!(typed_observations.len(), 12);
+        let capture_path = external.join("capture.json");
+        let capture = serde_json::json!({
+            "schema_version": "mainframe-env.cics-oracle-capture@1",
+            "candidate_digest": candidate_digest(&root).unwrap(),
+            "spec_digest": compile_shared_spec(&root).unwrap().spec_digest(),
+            "fixture_digest": format!("sha256:{}", file_digest(&fixture_path).unwrap()),
+            "source_review_digest": format!("sha256:{}", file_digest(&source_path).unwrap()),
+            "environment_manifest_digest": format!("sha256:{}", file_digest(&environment_path).unwrap()),
+            "comparison_policy": fixture["comparison_policy"]["version"],
+            "raw_capture_digest": format!("sha256:{:x}", Sha256::digest(serde_json::to_vec(&typed_observations).unwrap())),
+            "observations": observations,
+            "origin": {"kind": "local", "authority": "test-only-local", "run_job_id": "test-1", "signature": null},
+        });
+        fs::write(&capture_path, serde_json::to_vec(&capture).unwrap()).unwrap();
+        assert!(import_cics_oracle(&root, &capture_path, None, None, None).is_ok());
+        let mut wrong_spec = capture;
+        wrong_spec["spec_digest"] = serde_json::json!(
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+        fs::write(&capture_path, serde_json::to_vec(&wrong_spec).unwrap()).unwrap();
+        assert!(import_cics_oracle(&root, &capture_path, None, None, None).is_err());
+        fs::remove_dir_all(external).unwrap();
+    }
 
     #[test]
     fn stale_source_review_fails_the_fast_spec_gate_before_execution() {
@@ -6218,25 +6644,9 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
     )?;
 
     let versioned_path = root.join("conformance/0.8/evidence/carddemo-base-batch.json");
-    let expected = if versioned_path.is_file() {
-        let versioned = json(&versioned_path)?;
-        require(
-            versioned["schema_version"]
-                == Value::String("mainframe-env.carddemo-base-batch-version-evidence@1".into())
-                && versioned["target_version"] == Value::String("0.8.0".into())
-                && versioned["supersedes"]
-                    == Value::String("conformance/0.1.1/evidence/issues/CD-023.json".into())
-                && versioned["historical_receipt_rewritten"] == Value::Bool(false),
-            "0.8 CardDemo base-batch evidence header is invalid",
-        )?;
-        let expected = versioned["receipt"]
-            .as_object()
-            .ok_or("0.8 CardDemo base-batch receipt is malformed")?;
-        let expected_digest = canonical_evidence_digest(expected)?;
-        require(
-            versioned["evidence_digest"].as_str() == Some(expected_digest.as_str()),
-            "0.8 CardDemo base-batch evidence digest differs",
-        )?;
+    let (expected, credit) =
+        carddemo_base_batch_provenance::read_carddemo_evidence(root, historical_receipt)?;
+    if versioned_path.is_file() {
         for field in [
             "schema_version",
             "status",
@@ -6255,10 +6665,7 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
                 &format!("0.8 CardDemo compatibility projection changed {field}"),
             )?;
         }
-        Value::Object(expected.clone())
-    } else {
-        Value::Object(historical_receipt.clone())
-    };
+    }
     require(
         expected == receipt_value,
         "CardDemo base-batch receipt is stale",
@@ -6268,6 +6675,7 @@ fn check_carddemo_base_batch(root: &Path) -> TaskResult {
             || evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
         "CD-023 evidence digest differs",
     )?;
+    credit.print();
     Ok(())
 }
 
@@ -7041,6 +7449,122 @@ fn validate_public_version_truth(
     state_label: &str,
 ) -> TaskResult {
     let readme = read(&root.join("README.md"))?;
+    let status = readme
+        .split_once("## Project status")
+        .and_then(|(_, rest)| rest.split("\n## ").next())
+        .ok_or("README Project status section is missing")?;
+    let row = |name: &str| -> TaskResult<&str> {
+        status
+            .lines()
+            .find_map(|line| line.strip_prefix(&format!("| {name} | ")))
+            .and_then(|value| value.strip_suffix(" |"))
+            .ok_or_else(|| format!("README Project status: {name} row is missing"))
+    };
+    let local_version = product_version(root)?;
+    let cargo: toml::Value = read(&root.join("Cargo.toml"))?
+        .parse()
+        .map_err(|error| format!("Cargo.toml: {error}"))?;
+    let cargo_version = cargo["workspace"]["package"]["version"]
+        .as_str()
+        .ok_or("workspace.package.version is missing")?;
+    require(
+        local_version == current
+            && cargo_version == current
+            && row("Current workspace version")? == format!("`{current}` ({state_label})"),
+        "README Project status: workspace version disagrees with VERSION or Cargo.toml",
+    )?;
+    let tags = command_text(root, "git", &["tag", "--list", "mainframe-env-v*"])?;
+    let highest = tags
+        .lines()
+        .filter_map(|tag| {
+            let version = tag.strip_prefix("mainframe-env-v")?;
+            stable_zero_version(version)
+                .ok()
+                .map(|parts| (parts, version))
+        })
+        .max_by_key(|(parts, _)| *parts)
+        .map(|(_, version)| version)
+        .ok_or("README Project status: no local stable release tag")?;
+    require(
+        highest == released,
+        "README Project status: latest release disagrees with highest local stable tag",
+    )?;
+    let source_record = root.join(format!("release/{released}/source-distribution.json"));
+    let release_kind = if source_record.exists() {
+        let record: Value = serde_json::from_str(&read(&source_record)?)
+            .map_err(|error| format!("{}: {error}", source_record.display()))?;
+        require(
+            record["version"].as_str() == Some(released)
+                && record["tag"].as_str() == Some(format!("mainframe-env-v{released}").as_str())
+                && record["published_assets"]["kind"].as_str()
+                    == Some("locked-cargo-vendor-source-bundle")
+                && record["published_assets"]["native_binaries"].as_bool() == Some(false),
+            "README Project status: source release record is inconsistent",
+        )?;
+        "source bundle only"
+    } else {
+        let manifest = root.join(format!(
+            "release/{released}/targets/x86_64-unknown-linux-gnu/manifest.json"
+        ));
+        let record: Value = serde_json::from_str(&read(&manifest)?)
+            .map_err(|error| format!("{}: {error}", manifest.display()))?;
+        require(
+            record["version"].as_str() == Some(released)
+                && record["tag"].as_str() == Some(format!("mainframe-env-v{released}").as_str()),
+            "README Project status: binary release record is inconsistent",
+        )?;
+        "native binaries"
+    };
+    require(
+        row("Latest published release")?
+            == format!(
+                "[{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), {release_kind}"
+            ),
+        "README Project status: latest release or release kind disagrees with local record",
+    )?;
+    require(
+        row("Development baseline")?.contains(&format!("`{current}`"))
+            && row("Development baseline")?.contains(&format!("{released} tag")),
+        "README Project status: development baseline disagrees with local versions",
+    )?;
+    let dossier = read(&root.join("docs/delivery/coverage-versions/0.9.0.md"))?;
+    require(
+        row("Next planned minor")?.contains(
+            "[0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md)",
+        ) && dossier.contains("Status: **Proposed**"),
+        "README Project status: next planned minor disagrees with 0.9 dossier",
+    )?;
+    require(
+        row("Production readiness")? == "Not claimed"
+            && row("Licensed differential status")?
+                == "Required campaigns remain pending where the release notes say so"
+            && dossier.contains("licensed campaigns remain pending"),
+        "README Project status: readiness or licensed status is unsupported",
+    )?;
+    let acceptance_path = "docs/delivery/coverage-versions/status/0.9.0.md";
+    let acceptance = read(&root.join(acceptance_path))?;
+    if acceptance.contains("Last integrated acceptance review: 2026-09-09")
+        && acceptance.contains("RUN_MODE=full, SUCCESS, 2026-09-09")
+    {
+        require(
+            status.contains("original no-go")
+                && status.contains("2026-09-09")
+                && status.contains("entry gate accepted")
+                && status.contains(acceptance_path)
+                && !status.contains("current pre-0.9 assessment is a **no-go"),
+            "README Project status: pre-0.9 entry decision disagrees with accepted status record (docs/delivery/coverage-versions/status/0.9.0.md)",
+        )?;
+        let review = read(&root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"))?;
+        require(
+            review.contains("Disposition at review")
+                && review.contains(
+                    "Status: **Complete review; broad 0.9.0 implementation was blocked at review**",
+                )
+                && review.contains("2026-09-09")
+                && review.contains("../delivery/coverage-versions/status/0.9.0.md"),
+            "pre-0.9 review: finding index must identify review-time disposition after accepted entry gate",
+        )?;
+    }
     require(
         readme.contains(&format!("| Latest published release | [{released}]"))
             && readme.contains(&format!(
@@ -7337,6 +7861,79 @@ fn check_architecture(root: &Path) -> TaskResult {
     check_runtime_unit_gates(root)
 }
 
+fn check_mq_mqi_registry(root: &Path) -> TaskResult {
+    let generator = root.join("tools/generate_mq_mqi_registry.py");
+    require(
+        generator.is_file(),
+        "MQ MQI call-registry generator is missing",
+    )?;
+    let source_list = root.join("conformance/0.15/mq/source-call-list.json");
+    let source_list_schema = root.join("conformance/0.15/schemas/mq-source-call-list.schema.json");
+    validate_schema_instance(
+        &json(&source_list_schema)?,
+        &json(&source_list)?,
+        &source_list,
+    )?;
+    let contract_catalog = root.join("conformance/0.15/mq/structure-status-catalog.json");
+    let contract_schema =
+        root.join("conformance/0.15/schemas/mq-structure-status-catalog.schema.json");
+    validate_schema_instance(
+        &json(&contract_schema)?,
+        &json(&contract_catalog)?,
+        &contract_catalog,
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&generator)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("MQ MQI call-registry freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "MQ MQI call-registry freshness guard failed",
+    )
+}
+
+fn check_mq_licensed_contract(root: &Path) -> TaskResult {
+    let adapter = root.join("conformance/0.15/oracles/mq-licensed-differential.json");
+    let adapter_schema =
+        root.join("conformance/0.15/schemas/mq-licensed-differential-adapter.schema.json");
+    validate_schema_instance(&json(&adapter_schema)?, &json(&adapter)?, &adapter)?;
+
+    let fixtures = root.join("conformance/0.15/fixtures/mq-licensed-differential-cases.json");
+    let fixture_schema =
+        root.join("conformance/0.15/schemas/mq-licensed-differential-fixtures.schema.json");
+    validate_schema_instance(&json(&fixture_schema)?, &json(&fixtures)?, &fixtures)?;
+
+    let receipt_schema =
+        root.join("conformance/0.15/schemas/mq-licensed-differential-receipt.schema.json");
+    compile_draft_2020_12_schema(&json(&receipt_schema)?, &receipt_schema)?;
+
+    for (label, tool, arguments) in [
+        (
+            "MQ licensed fixture freshness guard",
+            "conformance/0.15/tools/generate_mq_licensed_fixtures.py",
+            ["--check"].as_slice(),
+        ),
+        (
+            "MQ licensed receipt verifier",
+            "conformance/0.15/tools/verify_mq_licensed_differential.py",
+            ["--check"].as_slice(),
+        ),
+    ] {
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(root.join(tool))
+            .args(arguments)
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("{label}: {error}"))?;
+        require(status.success(), &format!("{label} failed"))?;
+    }
+    Ok(())
+}
+
 /// Static dependency/ownership/route checks; no release build or runtime campaign.
 fn check_architecture_fast(root: &Path) -> TaskResult {
     let mut manifests = Vec::new();
@@ -7367,6 +7964,54 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
     }
     check_declared_dependency_graph(root)?;
     check_common_execution_route(root)?;
+    let participant_contract = root.join("conformance/0.16/contracts/transaction-participant.json");
+    let participant_schema =
+        root.join("conformance/0.16/schemas/transaction-participant.schema.json");
+    validate_schema_instance(
+        &json(&participant_schema)?,
+        &json(&participant_contract)?,
+        &participant_contract,
+    )?;
+    let participant_fixtures =
+        root.join("conformance/0.16/fixtures/transaction-participant-compatibility.json");
+    let participant_fixture_schema =
+        root.join("conformance/0.16/schemas/transaction-participant-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&participant_fixture_schema)?,
+        &json(&participant_fixtures)?,
+        &participant_fixtures,
+    )?;
+    let participant_generator = root.join("tools/generate_transaction_participant.py");
+    require(
+        participant_generator.is_file(),
+        "transaction participant generator is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&participant_generator)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("transaction participant freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "transaction participant freshness guard failed",
+    )?;
+    let participant_bindings = root.join("tools/check_transaction_participant.py");
+    require(
+        participant_bindings.is_file(),
+        "transaction participant binding guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&participant_bindings)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("transaction participant binding guard: {error}"))?;
+    require(
+        status.success(),
+        "transaction participant binding guard failed",
+    )?;
     check_dehardcoding(root)?;
     if root
         .join("crates/contracts/mainframe-env-host-api/src/canonical.rs")
@@ -7448,6 +8093,7 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "durable retention lifecycle architecture guard failed",
     )?;
+    check_mq_mqi_registry(root)?;
     let cics_descriptors = root.join("tools/generate_cics_descriptors.py");
     require(
         cics_descriptors.is_file(),
@@ -8058,6 +8704,7 @@ fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
         }
     }
     files.sort();
+    files.retain(|file| !file.components().any(|part| part.as_os_str() == "vendor"));
     Ok(files)
 }
 
@@ -8081,7 +8728,84 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
         compile_draft_2020_12_schema(&value, file)?;
     }
+    let family_path =
+        root.join("conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json");
+    let family_schema = root.join("conformance/0.9/schemas/cics-licensed-family.schema.json");
+    let family = json(&family_path)?;
+    validate_schema_instance(&json(&family_schema)?, &family, &family_path)?;
+    let fixture_path = root.join(text(&family, "fixture_path", &family_path)?);
+    let fixture = json(&fixture_path)?;
+    require(
+        fixture["family_id"] == family["family_id"]
+            && fixture["schema_version"] == "mainframe-env.cics-oracle-family-fixtures@1"
+            && family["observations"].as_array().is_some_and(|scenarios| {
+                fixture["expected_observations"]
+                    .as_array()
+                    .is_some_and(|expected| {
+                        scenarios.len() == expected.len()
+                            && scenarios
+                                .iter()
+                                .zip(expected)
+                                .all(|(scenario, observation)| {
+                                    scenario["scenario_id"] == observation["scenario_id"]
+                                        && serde_json::from_value::<CicsOracleObservation>(
+                                            observation.clone(),
+                                        )
+                                        .is_ok()
+                                })
+                    })
+            }),
+        "CICS BIF oracle family manifest/fixture closure drifted",
+    )?;
     validate_0_2_schema_artifacts(root)?;
+    let zosmf_normalization_path = root.join("conformance/0.11/catalogs/zosmf-normalization.json");
+    let zosmf_normalization_schema =
+        root.join("conformance/0.11/schemas/zosmf-normalization.schema.json");
+    validate_schema_instance(
+        &json(&zosmf_normalization_schema)?,
+        &json(&zosmf_normalization_path)?,
+        &zosmf_normalization_path,
+    )?;
+    for (artifact, schema) in [
+        (
+            "conformance/0.11/generated/zosmf-contracts.json",
+            "conformance/0.11/schemas/zosmf-generated-contracts.schema.json",
+        ),
+        (
+            "conformance/0.11/generated/zosmf-collision-report.json",
+            "conformance/0.11/schemas/zosmf-collision-report.schema.json",
+        ),
+        (
+            "conformance/0.11/generated/zosmf-closure-report.json",
+            "conformance/0.11/schemas/zosmf-closure-report.schema.json",
+        ),
+    ] {
+        let artifact_path = root.join(artifact);
+        validate_schema_instance(
+            &json(&root.join(schema))?,
+            &json(&artifact_path)?,
+            &artifact_path,
+        )?;
+    }
+    let spi_fepi_source_authority =
+        root.join("conformance/0.10/cics/spi-fepi-source-authority.json");
+    let spi_fepi_source_schema =
+        root.join("conformance/0.10/schemas/cics-spi-fepi-source-authority.schema.json");
+    validate_schema_instance(
+        &json(&spi_fepi_source_schema)?,
+        &json(&spi_fepi_source_authority)?,
+        &spi_fepi_source_authority,
+    )?;
+    let spi_fepi_identity_catalog =
+        root.join("conformance/0.10/generated/cics-spi-fepi-identity-catalog.json");
+    let spi_fepi_identity_schema =
+        root.join("conformance/0.10/schemas/cics-spi-fepi-identity-catalog.schema.json");
+    validate_schema_instance(
+        &json(&spi_fepi_identity_schema)?,
+        &json(&spi_fepi_identity_catalog)?,
+        &spi_fepi_identity_catalog,
+    )?;
+    check_licensed_environment_requirements(root)?;
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(
@@ -8184,6 +8908,14 @@ fn check_schemas(root: &Path) -> TaskResult {
             "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json",
         ),
         (
+            "conformance/0.8/evidence/carddemo-base-batch@2.json",
+            "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json",
+        ),
+        (
+            "conformance/0.8/oracles/carddemo-tranrept-reference@1.json",
+            "conformance/0.8/schemas/carddemo-tranrept-reference.schema.json",
+        ),
+        (
             "conformance/0.8/inventory/jes-dd-surface.json",
             "conformance/0.8/schemas/jes-dd-surface.schema.json",
         ),
@@ -8235,6 +8967,18 @@ fn check_schemas(root: &Path) -> TaskResult {
         validate_schema_instance(&jes_evidence_schema, &evidence, &path)?;
         let rows = array(&evidence, "rows", &path)?;
         unique_rows(rows, "id", &path)?;
+        if work_package == "JES-805" {
+            require(
+                rows.iter().any(|row| {
+                    row["id"] == Value::String("registered-control-declarations".into())
+                        && row["result"] == Value::String("pass".into())
+                        && row["evidence"].as_str().is_some_and(|evidence| {
+                            evidence.contains("every_registered_handler_rejects_undeclared_control")
+                        })
+                }),
+                "JES-805 requires the registered control declaration gate",
+            )?;
+        }
         let pending = rows
             .iter()
             .filter(|row| row["result"] == Value::String("pending".into()))
@@ -8303,6 +9047,211 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&surface_audit)?,
         &surface_audit,
     )
+}
+
+fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
+    let environment_requirements = root.join("conformance/0.17/environment/requirements.json");
+    let environment_requirements_schema =
+        root.join("conformance/0.17/schemas/licensed-environment-requirements.schema.json");
+    let environment_requirements_value = json(&environment_requirements)?;
+    validate_schema_instance(
+        &json(&environment_requirements_schema)?,
+        &environment_requirements_value,
+        &environment_requirements,
+    )?;
+    let slots = array(
+        &environment_requirements_value,
+        "slots",
+        &environment_requirements,
+    )?;
+    unique_rows(slots, "slot_id", &environment_requirements)?;
+    require(
+        slots.iter().all(|slot| {
+            slot["environment_status"] == "pending"
+                && slot["differential_status"] == "pending"
+                && slot["recorded_pending"]["numerator"] == 0
+        }),
+        "CER-1701 environment slots must remain pending with zero licensed credit",
+    )?;
+    for (slot_id, denominator) in [
+        ("cobol", 153),
+        ("racf-saf", 48),
+        ("dataset-vsam-ams", 36),
+        ("jes2", 16),
+    ] {
+        require(
+            slots.iter().any(|slot| {
+                slot["slot_id"] == slot_id && slot["recorded_pending"]["denominator"] == denominator
+            }),
+            &format!("CER-1701 changed the historical {slot_id} pending denominator"),
+        )?;
+    }
+    let source_index_path = root.join("conformance/0.2/catalogs/index.json");
+    let source_index = json(&source_index_path)?;
+    let baselines = array(&source_index, "baselines", &source_index_path)?;
+    for slot in slots {
+        for required in array(slot, "required_baselines", &environment_requirements)? {
+            let baseline_id = text(required, "baseline_id", &environment_requirements)?;
+            let baseline = baselines
+                .iter()
+                .find(|baseline| baseline["id"] == baseline_id)
+                .ok_or_else(|| format!("CER-1701 names unknown baseline {baseline_id}"))?;
+            require(
+                required["topic_manifest_sha256"] == baseline["source"]["sha256"]
+                    && required["catalog_sha256"] == baseline["catalog_sha256"],
+                &format!("CER-1701 source identity drifted for {baseline_id}"),
+            )?;
+        }
+    }
+
+    let harness_path = root.join("conformance/0.17/oracles/harnesses.json");
+    let harness_schema_path =
+        root.join("conformance/0.17/schemas/oracle-harness-registry.schema.json");
+    let harness_value = json(&harness_path)?;
+    validate_schema_instance(&json(&harness_schema_path)?, &harness_value, &harness_path)?;
+    let harness_bytes =
+        fs::read(&harness_path).map_err(|error| format!("{}: {error}", harness_path.display()))?;
+    let harness = validate_oracle_harness_registry(&harness_bytes)?;
+    let harness_slots = array(&harness_value, "slots", &harness_path)?;
+    unique_rows(harness_slots, "slot_id", &harness_path)?;
+    require(
+        harness.slot_ids().collect::<BTreeSet<_>>()
+            == slots
+                .iter()
+                .filter_map(|slot| slot["slot_id"].as_str())
+                .collect::<BTreeSet<_>>(),
+        "CER-1701 environment and harness slot sets differ",
+    )?;
+    for harness_slot in harness_slots {
+        let slot_id = text(harness_slot, "slot_id", &harness_path)?;
+        let requirement = slots
+            .iter()
+            .find(|slot| slot["slot_id"] == slot_id)
+            .ok_or_else(|| format!("CER-1701 harness slot {slot_id} has no requirement"))?;
+        let harness_baselines = array(harness_slot, "required_baselines", &harness_path)?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<BTreeSet<_>>();
+        let requirement_baselines =
+            array(requirement, "required_baselines", &environment_requirements)?
+                .iter()
+                .filter_map(|baseline| baseline["baseline_id"].as_str())
+                .collect::<BTreeSet<_>>();
+        require(
+            harness_baselines == requirement_baselines,
+            &format!("CER-1701 harness baseline set drifted for {slot_id}"),
+        )?;
+        if let Some(policy_path) = harness_slot["adapter"]["policy_path"].as_str() {
+            require(
+                root.join(policy_path).is_file(),
+                &format!("CER-1701 adapter policy is missing for {slot_id}"),
+            )?;
+        }
+        match harness_slot["fixture"]["digest_rule"].as_str() {
+            Some("cobol-four-fixture-length-prefix-sha256") => require(
+                harness_slot["fixture"]["digest"] == licensed_fixture_digest(),
+                "CER-1701 COBOL independent fixture digest drifted",
+            )?,
+            Some("file-bytes-sha256") => {
+                let fixture_path = harness_slot["fixture"]["path"]
+                    .as_str()
+                    .ok_or_else(|| format!("CER-1701 fixture path is missing for {slot_id}"))?;
+                let actual = format!("sha256:{}", file_digest(&root.join(fixture_path))?);
+                require(
+                    harness_slot["fixture"]["digest"].as_str() == Some(actual.as_str()),
+                    &format!("CER-1701 independent fixture digest drifted for {slot_id}"),
+                )?;
+            }
+            Some("pending") => require(
+                harness_slot["fixture"]["path"].is_null()
+                    && harness_slot["fixture"]["digest"].is_null(),
+                &format!("CER-1701 pending fixture has an identity for {slot_id}"),
+            )?,
+            _ => {
+                return Err(format!(
+                    "CER-1701 fixture digest rule is unknown for {slot_id}"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_licensed_harness(root: &Path) -> TaskResult {
+    check_licensed_environment_requirements(root)?;
+    let registry_path = root.join("conformance/0.17/oracles/harnesses.json");
+    let environment_path = root.join("conformance/0.17/fixtures/synthetic-environment.json");
+    let receipt_path = root.join("conformance/0.17/fixtures/synthetic-receipt.json");
+    let legacy_path = root.join("conformance/0.17/fixtures/synthetic-cics-capture.json");
+    let registry = fs::read(&registry_path)
+        .map_err(|error| format!("{}: {error}", registry_path.display()))?;
+    let environment = fs::read(&environment_path)
+        .map_err(|error| format!("{}: {error}", environment_path.display()))?;
+    let receipt =
+        fs::read(&receipt_path).map_err(|error| format!("{}: {error}", receipt_path.display()))?;
+    let legacy =
+        fs::read(&legacy_path).map_err(|error| format!("{}: {error}", legacy_path.display()))?;
+    let expectation = OracleCandidateExpectation {
+        slot_id: "cics".into(),
+        source_commit: "5ab706b1dd069e26db7cb9a2b66e921c9001fc39".into(),
+        source_tree_digest:
+            "sha256:c4e5c4d7d40d6c5618ae4cde2e478d18a531f690f4eebacf44cf16959f70c984".into(),
+        artifacts: BTreeMap::from([(
+            "synthetic-candidate-artifact".into(),
+            "sha256:6a1c9843c16282e72cc4acfd454948e3c2ca56898510d21e12fb0c52e5e34a04".into(),
+        )]),
+        catalogs: BTreeMap::from([(
+            "ibm-cics-ts-6x-2026-08-31".into(),
+            format!(
+                "sha256:{}",
+                file_digest(&root.join("conformance/0.2/catalogs/cics.json"))?
+            ),
+        )]),
+        conformance_spec_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/spec/v1/spec.json"))?
+        ),
+        fixture_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/cics/pilot-fixtures.json"))?
+        ),
+        oracle_adapter_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/oracles/cics-licensed-differential.json"))?
+        ),
+        normalization_policy_digest:
+            "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9".into(),
+    };
+    let validation =
+        validate_oracle_harness_receipt(&receipt, &environment, &registry, &legacy, &expectation)?;
+    require(
+        validation.kind() == OracleHarnessValidationKind::PlumbingOnly
+            && validation.licensed_differential_credit() == 0,
+        "CER-1701 synthetic fixture attempted to claim licensed differential credit",
+    )?;
+    println!(
+        "licensed-harness slot={} receipt={} plumbing=pass licensed-credit=0 differential=pending",
+        validation.slot_id(),
+        validation.receipt_digest()
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod licensed_environment_schema_tests {
+    use super::*;
+
+    #[test]
+    fn cer_1701_environment_requirements_are_schema_valid_and_pending() {
+        let root = repository_root().expect("repository root");
+        check_licensed_environment_requirements(&root).expect("CER-1701 environment authority");
+    }
+
+    #[test]
+    fn cer_1701_synthetic_harness_is_zero_credit() {
+        let root = repository_root().expect("repository root");
+        check_licensed_harness(&root).expect("CER-1701 synthetic harness");
+    }
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
@@ -10394,11 +11343,21 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     ];
     let mut hits = Vec::new();
     for rust_file in rust_files {
-        if rust_file.starts_with(&conformance) {
+        if rust_file.starts_with(&conformance)
+            || rust_file.file_name() == Some(OsStr::new("tests.rs"))
+            || rust_file
+                .components()
+                .any(|part| part.as_os_str() == OsStr::new("tests"))
+        {
             continue;
         }
         let source = read(&rust_file)?;
-        let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
+        let production_end = ["#[cfg(test)]", "#![cfg(test)]"]
+            .iter()
+            .filter_map(|marker| source.find(marker))
+            .min()
+            .unwrap_or(source.len());
+        let production = &source[..production_end];
         let upper = production.to_ascii_uppercase();
         for identity in forbidden_application_identities {
             if upper.contains(identity) {
@@ -14655,6 +15614,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn current_cics_application_contract_satisfies_its_schema() {
+        let root = repository_root().expect("repository root");
+        for (catalog, schema) in [
+            (
+                "conformance/0.9/generated/cics-application-command-contracts.json",
+                "conformance/0.9/schemas/cics-application-command-contracts.schema.json",
+            ),
+            (
+                "conformance/0.9/cics/command-descriptors.json",
+                "conformance/0.9/schemas/cics-command-descriptors.schema.json",
+            ),
+            (
+                "conformance/0.9/cics/typed-execution-registrations.json",
+                "conformance/0.9/schemas/cics-typed-execution-registrations.schema.json",
+            ),
+        ] {
+            let catalog = root.join(catalog);
+            let schema = root.join(schema);
+            validate_schema_instance(&json(&schema).unwrap(), &json(&catalog).unwrap(), &catalog)
+                .unwrap();
+        }
+    }
+
+    #[test]
     fn dataset_reference_simulation_cannot_satisfy_the_licensed_receipt_gate() {
         let root = repository_root().expect("repository root");
         let pending = check_dataset_oracle_receipt(&root, None)
@@ -15196,13 +16179,37 @@ mod tests {
 
     fn write_public_version_fixtures(root: &Path, current: &str, released: &str) {
         fs::create_dir_all(root.join("docs/delivery/coverage-versions")).unwrap();
+        fs::create_dir_all(root.join("docs/delivery/coverage-versions/status")).unwrap();
+        fs::create_dir_all(root.join("docs/reviews")).unwrap();
+        fs::create_dir_all(root.join(format!("release/{released}"))).unwrap();
+        fs::write(root.join("VERSION"), format!("{current}\n")).unwrap();
+        fs::write(
+            root.join("Cargo.toml"),
+            format!("[workspace.package]\nversion = \"{current}\"\n"),
+        )
+        .unwrap();
+        fs::write(
+            root.join(format!("release/{released}/source-distribution.json")),
+            format!("{{\"version\":\"{released}\",\"tag\":\"mainframe-env-v{released}\",\"published_assets\":{{\"kind\":\"locked-cargo-vendor-source-bundle\",\"native_binaries\":false}}}}"),
+        ).unwrap();
         fs::write(
             root.join("README.md"),
             format!(
-                "| Latest published release | [{released}](release) |\n| Current workspace version | `{current}` (development) |\n"
+                "## Project status\n\n| Item | Status |\n|---|---|\n| Latest published release | [{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), source bundle only |\n| Current workspace version | `{current}` (development) |\n| Development baseline | `{current}` after the {released} tag |\n| Next planned minor | [0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md) |\n| Production readiness | Not claimed |\n| Licensed differential status | Required campaigns remain pending where the release notes say so |\n\nThe original no-go was resolved on 2026-09-09; the entry gate accepted (docs/delivery/coverage-versions/status/0.9.0.md).\n"
             ),
         )
         .unwrap();
+        fs::write(
+            root.join("docs/delivery/coverage-versions/0.9.0.md"),
+            "Status: **Proposed**\nlicensed campaigns remain pending\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs/delivery/coverage-versions/status/0.9.0.md"),
+            "Last integrated acceptance review: 2026-09-09\nRUN_MODE=full, SUCCESS, 2026-09-09\n",
+        )
+        .unwrap();
+        fs::write(root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"), "Status: **Complete review; broad 0.9.0 implementation was blocked at review**\n\n| Disposition at review |\n\n2026-09-09: [fix mapping](../delivery/coverage-versions/status/0.9.0.md).\n").unwrap();
         fs::write(
             root.join("docs/delivery/coverage-versions/README.md"),
             format!(
@@ -15259,6 +16266,76 @@ mod tests {
         );
         assert!(validate_unreleased_identity(&root, "0.8.3", "0.8.2", false).is_err());
         validate_unreleased_identity(&root, "0.8.3", "0.8.2", true).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn public_status_truth_rejects_stale_claims() {
+        let root = temporary_git_repository("public-status-truth");
+        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
+        commit_all(&root, "fixture");
+        assert!(
+            Command::new("git")
+                .args(["tag", "mainframe-env-v0.8.2"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let check = || validate_public_version_truth(&root, "0.8.3", "0.8.2", "development");
+        check().unwrap();
+
+        let readme_path = root.join("README.md");
+        let good_readme = read(&readme_path).unwrap();
+        fs::write(
+            &readme_path,
+            good_readme.replace("`0.8.3` (development)", "`0.8.2` (development)"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("workspace version"));
+        fs::write(&readme_path, &good_readme).unwrap();
+
+        assert!(
+            Command::new("git")
+                .args(["tag", "mainframe-env-v0.8.4"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(check().unwrap_err().contains("highest local stable tag"));
+        assert!(
+            Command::new("git")
+                .args(["tag", "-d", "mainframe-env-v0.8.4"])
+                .current_dir(&root)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+
+        fs::write(
+            &readme_path,
+            good_readme.replace("source bundle only", "native binaries"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("release kind"));
+        fs::write(
+            &readme_path,
+            good_readme.replace("entry gate accepted", "entry gate pending"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("entry decision"));
+        fs::write(&readme_path, &good_readme).unwrap();
+
+        let review_path = root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md");
+        let review = read(&review_path).unwrap();
+        fs::write(
+            &review_path,
+            review.replace("Disposition at review", "Disposition"),
+        )
+        .unwrap();
+        assert!(check().unwrap_err().contains("review-time disposition"));
         fs::remove_dir_all(root).unwrap();
     }
 

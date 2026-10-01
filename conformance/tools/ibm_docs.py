@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
@@ -27,6 +28,9 @@ import docs_api
 
 INDEX = docs_api.REPOSITORY / "conformance/0.2/catalogs/index.json"
 REGISTRY = docs_api.REPOSITORY / "conformance/0.9/manifests/index.json"
+ADDITIONAL_REGISTRIES = (
+    docs_api.REPOSITORY / "conformance/0.14/manifests/index.json",
+)
 CONTENT_TEMPLATE = docs_api.CONTENT_URL
 MAX_FILE = 64 * 1024 * 1024
 MAX_IMPORT = 512 * 1024 * 1024
@@ -273,9 +277,11 @@ def registered_sources(
 ) -> list[tuple[Scope, dict, list[dict], str, str]]:
     document = read_json(registry)
     entries = document.get("manifests")
+    target_version = document.get("target_version")
     if (
         document.get("schema_version") != "mainframe-env.topic-manifest-registry@1"
-        or document.get("target_version") != "0.9.0"
+        or not isinstance(target_version, str)
+        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", target_version) is None
         or document.get("semantic_authority") is not False
         or document.get("coverage_credit") != 0
         or not isinstance(entries, list)
@@ -285,6 +291,7 @@ def registered_sources(
     result = []
     scope_ids: set[str] = set()
     paths: set[str] = set()
+    prefix = str(registry.parent.relative_to(docs_api.REPOSITORY)) + "/"
     for entry in entries:
         scope_id = entry.get("scope_id")
         subsystem = entry.get("subsystem")
@@ -300,7 +307,7 @@ def registered_sources(
         ):
             raise ValueError(f"invalid or duplicate scope in {registry}")
         relative = safe_relative_manifest(
-            entry.get("manifest"), "conformance/0.9/manifests/", str(registry)
+            entry.get("manifest"), prefix, str(registry)
         )
         if relative.endswith("/index.json") or relative in paths:
             raise ValueError(f"invalid or duplicate manifest in {registry}")
@@ -312,7 +319,7 @@ def registered_sources(
         topics, toc_url, toc_sha256 = validate_manifest(
             manifest,
             path,
-            target_version="0.9.0",
+            target_version=target_version,
             baseline=baseline,
             subsystem=subsystem,
         )
@@ -326,7 +333,7 @@ def registered_sources(
             or entry.get("semantic_authority") is not False
         ):
             raise ValueError(f"registry entry disagrees with manifest: {scope_id}")
-        scope = Scope(scope_id, subsystem, baseline, "0.9.0", relative)
+        scope = Scope(scope_id, subsystem, baseline, target_version, relative)
         result.append((scope, manifest, topics, toc_url, toc_sha256))
     present = {
         str(path.relative_to(docs_api.REPOSITORY))
@@ -334,7 +341,7 @@ def registered_sources(
         if path.name != "index.json"
     }
     if present != paths:
-        raise ValueError("0.9 topic manifests are unregistered or missing")
+        raise ValueError(f"{target_version} topic manifests are unregistered or missing")
     return result
 
 
@@ -342,7 +349,12 @@ def load_pins(
     index: Path = INDEX, registry: Path = REGISTRY
 ) -> tuple[list[Pin], list[TocPin]]:
     """Load, coalesce, and collision-check every explicitly owned source pin."""
-    sources = baseline_sources(index) + registered_sources(registry)
+    registries = [registry]
+    if registry == REGISTRY:
+        registries.extend(ADDITIONAL_REGISTRIES)
+    sources = baseline_sources(index)
+    for later_registry in registries:
+        sources.extend(registered_sources(later_registry))
     scope_ids: set[str] = set()
     baseline_signatures: dict[str, tuple] = {}
     for scope, manifest, topics, toc_url, toc_sha256 in sources:
@@ -486,7 +498,7 @@ def publish(cache: Path, target: CacheTarget, body: bytes, counts: Counter[str])
     with tempfile.TemporaryDirectory(prefix=".import-", dir=cache) as staging:
         staged = docs_api.write_retrieved(Path(staging) / target.key, body)
         try:
-            destination.hardlink_to(staged)
+            os.link(staged, destination)
         except FileExistsError:
             if existing_matches(destination, target, body):
                 counts["already_present"] += 1

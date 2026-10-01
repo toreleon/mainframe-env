@@ -1,7 +1,8 @@
 use super::{Db2Statement, Db2StatementKind, StatementParser};
 use crate::{
-    Db2AstLimits, Db2HostIdentifier, Db2HostReference, Db2StatementId, Db2Symbol,
-    Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2TokenKind, lex_db2,
+    Db2AstLimits, Db2HostIdentifier, Db2HostReference, Db2SourceLocation, Db2SourceSpan,
+    Db2StatementId, Db2Symbol, Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits,
+    Db2TokenKind, lex_db2,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -106,38 +107,60 @@ pub fn parse_db2_dynamic_statement(
     ast_limits: Db2AstLimits,
 ) -> Result<Db2Statement, Db2SyntaxDiagnostic> {
     let lexed = lex_db2(source, syntax_limits)?;
-    let mut parser = StatementParser::new(lexed.tokens(), ast_limits);
-    let first = parser.word_at(0).map(str::to_owned).ok_or_else(|| {
-        parser.diagnostic_here(
+    ast_limits.validate().map_err(|problem| {
+        Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::InvalidLimits,
+            Db2SourceLocation::START,
+            &problem.message,
+        )
+    })?;
+    let mut parser = StatementParser::new(lexed.cursor(), ast_limits);
+    let words = lexed.tokens();
+    let first = words.first().ok_or_else(|| {
+        Db2SyntaxDiagnostic::new(
             Db2SyntaxDiagnosticCode::UnsupportedStatement,
+            Db2SourceLocation::START,
             "Db2 dynamic statement must begin with PREPARE or EXECUTE",
         )
     })?;
-    let (id, kind) = match first.as_str() {
-        "PREPARE" => (
+    let (id, kind) = if parser.peek_word("PREPARE") {
+        (
             Db2StatementId::SqlPrepare,
             Db2StatementKind::Prepare(parser.parse_prepare()?),
-        ),
-        "EXECUTE" if parser.word_at(1) == Some("IMMEDIATE") => (
+        )
+    } else if parser.peek_word("EXECUTE")
+        && matches!(
+            words.get(1).map(|token| &token.kind),
+            Some(Db2TokenKind::Word { value, delimited: false }) if value == "IMMEDIATE"
+        )
+    {
+        (
             Db2StatementId::SqlExecuteImmediate,
             Db2StatementKind::ExecuteImmediate(parser.parse_execute_immediate()?),
-        ),
-        "EXECUTE" => (
+        )
+    } else if parser.peek_word("EXECUTE") {
+        (
             Db2StatementId::SqlExecute,
             Db2StatementKind::Execute(parser.parse_execute()?),
-        ),
-        _ => {
-            return Err(parser.diagnostic_here(
-                Db2SyntaxDiagnosticCode::UnsupportedStatement,
-                "statement is outside the Db2 dynamic SQL syntax family",
-            ));
-        }
+        )
+    } else {
+        return Err(Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::UnsupportedStatement,
+            first.span.start,
+            "statement is outside the Db2 dynamic SQL syntax family",
+        ));
     };
     parser.finish()?;
+    let last = &words[words.len() - 1].span;
     Ok(Db2Statement {
         id,
         kind,
-        span: parser.statement_span(),
+        span: Db2SourceSpan {
+            start_byte: first.span.start_byte,
+            end_byte: last.end_byte,
+            start: first.span.start,
+            end: last.end,
+        },
     })
 }
 
@@ -180,7 +203,7 @@ impl StatementParser<'_> {
         self.expect_word("FROM")?;
         let source = self.host_identifier("PREPARE source host variable")?;
         if matches!(
-            self.tokens.get(self.position).map(|token| &token.kind),
+            self.cursor.peek().map(|token| &token.kind),
             Some(Db2TokenKind::HostVariable(_))
         ) || self.take_word("INDICATOR")
         {
@@ -232,7 +255,7 @@ impl StatementParser<'_> {
         self.expect_word("IMMEDIATE")?;
         let source = self.host_identifier("EXECUTE IMMEDIATE source host variable")?;
         if matches!(
-            self.tokens.get(self.position).map(|token| &token.kind),
+            self.cursor.peek().map(|token| &token.kind),
             Some(Db2TokenKind::HostVariable(_))
         ) || self.take_word("INDICATOR")
         {
@@ -389,5 +412,99 @@ mod tests {
             parse("EXECUTE S; PREPARE X FROM :T").unwrap_err().code,
             Db2SyntaxDiagnosticCode::UnexpectedToken
         );
+    }
+
+    #[test]
+    fn prepare_diagram_options_are_independent_and_ordered() {
+        for (source, mode) in [
+            ("PREPARE S INTO :D FROM :T", Db2DescriptorNameMode::Names),
+            (
+                "PREPARE S INTO :D USING NAMES FROM :T",
+                Db2DescriptorNameMode::Names,
+            ),
+            (
+                "PREPARE S INTO :D USING LABELS FROM :T",
+                Db2DescriptorNameMode::Labels,
+            ),
+            (
+                "PREPARE S INTO :D USING ANY FROM :T",
+                Db2DescriptorNameMode::Any,
+            ),
+            (
+                "PREPARE S INTO :D USING BOTH FROM :T",
+                Db2DescriptorNameMode::Both,
+            ),
+        ] {
+            let statement = parse(source).unwrap();
+            let Db2StatementKind::Prepare(prepare) = statement.kind() else {
+                panic!("expected PREPARE AST")
+            };
+            assert_eq!(prepare.descriptor().unwrap().mode(), mode);
+            assert!(prepare.attributes().is_none());
+        }
+        let statement = parse("PREPARE S ATTRIBUTES :A FROM :T").unwrap();
+        let Db2StatementKind::Prepare(prepare) = statement.kind() else {
+            panic!("expected PREPARE AST")
+        };
+        assert!(prepare.descriptor().is_none());
+        assert!(prepare.attributes().unwrap().indicator().is_none());
+
+        let statement = parse("PREPARE S INTO :D ATTRIBUTES :A :I FROM :T").unwrap();
+        let Db2StatementKind::Prepare(prepare) = statement.kind() else {
+            panic!("expected PREPARE AST")
+        };
+        assert_eq!(
+            prepare.attributes().unwrap().indicator().unwrap().value(),
+            "I"
+        );
+    }
+
+    #[test]
+    fn execute_diagram_options_allow_single_and_non_indicated_variables() {
+        let statement = parse("EXECUTE S USING :A").unwrap();
+        let Db2StatementKind::Execute(execute) = statement.kind() else {
+            panic!("expected EXECUTE AST")
+        };
+        let Db2ExecuteUsing::Variables(variables) = execute.using() else {
+            panic!("expected variables")
+        };
+        assert_eq!(variables.len(), 1);
+        assert!(variables[0].indicator().is_none());
+        assert!(parse("EXECUTE S USING DESCRIPTOR :D").is_ok());
+        assert!(parse("EXECUTE S").is_ok());
+    }
+
+    #[test]
+    fn misplaced_duplicate_and_unsupported_dynamic_forms_fail_locally() {
+        for source in [
+            "PREPARE S INTO :D INTO :E FROM :T",
+            "PREPARE S INTO :D USING BOTH USING NAMES FROM :T",
+            "PREPARE S ATTRIBUTES :A ATTRIBUTES :B FROM :T",
+            "PREPARE S ATTRIBUTES :A INTO :D FROM :T",
+            "PREPARE S FROM :T ATTRIBUTES :A",
+            "PREPARE S INTO :D :I FROM :T",
+            "PREPARE S INTO :D INDICATOR :I FROM :T",
+            "PREPARE S FROM SQL_TEXT",
+            "PREPARE S FROM STRING_EXPR || OTHER_EXPR",
+            "PREPARE S FROM :T FOR MULTIPLE ROWS",
+            "EXECUTE S USING :A USING :B",
+            "EXECUTE S USING DESCRIPTOR :D :I",
+            "EXECUTE S USING :A[1]",
+            "EXECUTE S USING SQL_VAR",
+            "EXECUTE S FOR 2 ROWS",
+            "EXECUTE IMMEDIATE SQL_TEXT",
+            "EXECUTE IMMEDIATE :T FOR 2 ROWS",
+            "EXECUTE IMMEDIATE :T; EXECUTE S",
+        ] {
+            let problem = parse(source).expect_err(source);
+            assert!(problem.location.line >= 1, "{source}");
+            assert!(problem.location.column >= 1, "{source}");
+        }
+        let problem = parse("PREPARE S FROM :T :I").unwrap_err();
+        assert_eq!(
+            problem.code,
+            Db2SyntaxDiagnosticCode::InvalidStatementOperand
+        );
+        assert_eq!(problem.location.column, 19);
     }
 }

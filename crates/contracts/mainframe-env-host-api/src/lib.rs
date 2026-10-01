@@ -14,6 +14,12 @@ mod cics_catalog;
 mod clock;
 mod dataset;
 mod enterprise;
+mod ims;
+mod ims_pcb;
+mod ims_status;
+mod mq_catalog;
+mod mq_context;
+mod mq_contract;
 mod names;
 mod registry;
 mod request;
@@ -41,6 +47,43 @@ pub use dataset::{
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
 pub use enterprise::{EnterpriseAuthorizer, EnterpriseResource, EnterpriseResourceClass};
+pub use ims::{
+    IMS_SSA_BOOLEAN_CONNECTORS, IMS_SSA_COMMAND_CODES, IMS_SSA_FIELD_NAME_BYTES,
+    IMS_SSA_RELATIONAL_OPERATOR_BYTES, IMS_SSA_RELATIONAL_OPERATORS, IMS_SSA_RULES_SHA256,
+    IMS_SSA_SEGMENT_NAME_BYTES, IMS_SSA_TOPIC_MANIFEST_SHA256, ImsSsa, ImsSsaBoolean,
+    ImsSsaBooleanDescriptor, ImsSsaCommand, ImsSsaCommandCodeDescriptor, ImsSsaField,
+    ImsSsaFieldResolver, ImsSsaLimits, ImsSsaPredicate, ImsSsaProblem, ImsSsaRelation,
+    ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
+    parse_ims_ssa,
+};
+pub use ims_pcb::{
+    IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
+    IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,
+    ImsPcbFieldWidth, ImsPcbKind, ImsPcbLayout, ImsPcbLimits, ImsPcbMaskDescriptor, ImsPcbProblem,
+    ImsPcbSemanticValue, ims_pcb_layout, ims_pcb_mask, ims_pcb_masks,
+};
+pub use ims_status::{
+    IMS_STATUS_CONTEXT_MEMBERSHIPS, IMS_STATUS_CONTEXTS, IMS_STATUS_DISTINCT_CODE_COUNT,
+    ImsStatusCategory, ImsStatusCode, ImsStatusContext, ImsStatusContextDescriptor,
+    ImsStatusDescriptor, ImsStatusProblem, ims_status, ims_status_context, ims_status_contexts,
+    resolve_ims_status,
+};
+pub use mq_catalog::{
+    MQ_MQI_CALL_COUNT, MQ_MQI_CALL_IDENTITY_SET_SHA256, MQ_MQI_SOURCE_ROW_COUNT,
+    MqMqiCallIdentityDescriptor, mq_mqi_call_identities, mq_mqi_call_identity,
+    mq_mqi_call_identity_by_label,
+};
+pub use mq_context::{
+    MQCC_FAILED, MQRC_ENVIRONMENT_ERROR, MqContextDisposition, MqHostEnvironment, MqSyncpointCall,
+    MqSyncpointOwner, mq_syncpoint_context_disposition,
+};
+pub use mq_contract::{
+    MQ_MQI_CONTRACT_CATALOG_SHA256, MQ_MQI_CONTRACT_COUNT, MQ_MQI_CONTRACT_SET_SHA256,
+    MQ_MQI_PARAMETER_COUNT, MQ_MQI_PENDING_SIGNATURE_COUNT, MQ_MQI_VERIFIED_SIGNATURE_COUNT,
+    MqMqiContractDescriptor, MqMqiHandleAction, MqMqiHandleRole, MqMqiParameterDescriptor,
+    MqMqiParameterDirection, MqMqiParameterRole, MqMqiSignatureStatus, MqMqiSourceSpellingAnomaly,
+    MqMqiSourceStatus, mq_mqi_contract, mq_mqi_contract_by_label, mq_mqi_contracts,
+};
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
     ResourceName, RuntimeServiceName, SessionId,
@@ -57,7 +100,7 @@ pub use request::{
     DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
     EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
     ImsRequest, ImsResult, ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation,
-    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
+    ProgramLinkSelection, ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
     SPOOL_REQUEST_CONTRACT, SPOOL_RESULT_CONTRACT, SecretRef, SecurityDecision, SecurityRequest,
     SpoolFileSummary, SpoolRequest, SpoolResult, StateRequest, TerminalField, TerminalRequest,
 };

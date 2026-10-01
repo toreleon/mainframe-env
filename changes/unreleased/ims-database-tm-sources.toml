@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Pin separate zero-credit IMS 15.6 database and TM source corpora for offline contract review."

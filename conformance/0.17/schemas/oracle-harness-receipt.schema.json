@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/oracle-harness-receipt@1",
+  "title": "CER-1701 candidate-bound oracle-harness receipt envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "slot_id", "receipt_state", "origin", "credit", "bindings", "compatibility", "execution", "normalization", "redaction", "review", "replay"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.oracle-harness-receipt@1"},
+    "receipt_id": {"$ref": "#/$defs/id"},
+    "slot_id": {"$ref": "#/$defs/slot"},
+    "receipt_state": {"enum": ["plumbing-valid", "campaign-captured"]},
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority_id", "run_job_id", "protected_attestation_digest"],
+      "properties": {
+        "kind": {"enum": ["licensed-ibm", "local", "synthetic"]},
+        "authority_id": {"$ref": "#/$defs/id"},
+        "run_job_id": {"$ref": "#/$defs/id"},
+        "protected_attestation_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+      }
+    },
+    "credit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["licensed_differential_credit", "accepted_for_final_differential", "authority"],
+      "properties": {
+        "licensed_differential_credit": {"const": 0},
+        "accepted_for_final_differential": {"const": false},
+        "authority": {"const": "cer1701-plumbing-only"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "source_commit", "source_tree_digest", "artifacts", "catalogs", "conformance_spec_digest", "fixture_digest", "oracle_adapter_digest", "normalization_policy_digest", "environment_manifest_digest", "harness_registry_digest"],
+      "properties": {
+        "contract": {"const": "mainframe-env.oracle-candidate-binding@1"},
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "source_tree_digest": {"$ref": "#/$defs/digest"},
+        "artifacts": {"$ref": "#/$defs/named_digests"},
+        "catalogs": {"$ref": "#/$defs/named_digests"},
+        "conformance_spec_digest": {"$ref": "#/$defs/digest"},
+        "fixture_digest": {"$ref": "#/$defs/digest"},
+        "oracle_adapter_digest": {"$ref": "#/$defs/digest"},
+        "normalization_policy_digest": {"$ref": "#/$defs/digest"},
+        "environment_manifest_digest": {"$ref": "#/$defs/digest"},
+        "harness_registry_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legacy_schema_version", "legacy_receipt_digest", "read_rule", "subsystem_validator_status"],
+      "properties": {
+        "legacy_schema_version": {"$ref": "#/$defs/id"},
+        "legacy_receipt_digest": {"$ref": "#/$defs/digest"},
+        "read_rule": {"const": "exact-v1-plus-cer1701-envelope"},
+        "subsystem_validator_status": {"enum": ["pass", "synthetic-fixture-pass"]}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "expected_cases", "observed_cases", "raw_capture_digest", "normalized_capture_digest", "started_at", "finished_at"],
+      "properties": {
+        "status": {"enum": ["pass", "fail"]},
+        "expected_cases": {"type": "integer", "minimum": 1, "maximum": 100000},
+        "observed_cases": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "raw_capture_digest": {"$ref": "#/$defs/digest"},
+        "normalized_capture_digest": {"$ref": "#/$defs/digest"},
+        "started_at": {"type": "string", "format": "date-time", "maxLength": 64},
+        "finished_at": {"type": "string", "format": "date-time", "maxLength": 64}
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "rules_applied", "all_other_fields_exact"],
+      "properties": {
+        "policy_id": {"$ref": "#/$defs/id"},
+        "rules_applied": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "all_other_fields_exact": {"const": true}
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "scan_status", "contains_secrets_or_customer_data", "raw_outputs_retained_outside_git"],
+      "properties": {
+        "policy_id": {"$ref": "#/$defs/id"},
+        "scan_status": {"const": "pass"},
+        "contains_secrets_or_customer_data": {"const": false},
+        "raw_outputs_retained_outside_git": {"const": true}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_independence", "environment", "normalizer", "receipt"],
+      "properties": {
+        "fixture_independence": {"enum": ["accepted", "synthetic-only"]},
+        "environment": {"enum": ["accepted", "synthetic-only"]},
+        "normalizer": {"enum": ["accepted", "synthetic-only"]},
+        "receipt": {"enum": ["accepted", "synthetic-only"]}
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program", "arguments", "required_environment_variables", "working_tree_commit"],
+      "properties": {
+        "program": {"$ref": "#/$defs/id"},
+        "arguments": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "required_environment_variables": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}},
+        "working_tree_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"origin": {"properties": {"kind": {"const": "licensed-ibm"}}}}},
+      "then": {
+        "properties": {
+          "receipt_state": {"const": "campaign-captured"},
+          "origin": {"properties": {"protected_attestation_digest": {"$ref": "#/$defs/digest"}}},
+          "compatibility": {"properties": {"subsystem_validator_status": {"const": "pass"}}},
+          "review": {"properties": {"fixture_independence": {"const": "accepted"}, "environment": {"const": "accepted"}, "normalizer": {"const": "accepted"}, "receipt": {"const": "accepted"}}}
+        }
+      },
+      "else": {
+        "properties": {
+          "receipt_state": {"const": "plumbing-valid"},
+          "origin": {"properties": {"protected_attestation_digest": {"type": "null"}}},
+          "compatibility": {"properties": {"subsystem_validator_status": {"const": "synthetic-fixture-pass"}}},
+          "review": {"properties": {"fixture_independence": {"const": "synthetic-only"}, "environment": {"const": "synthetic-only"}, "normalizer": {"const": "synthetic-only"}, "receipt": {"const": "synthetic-only"}}}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.:/@+-]+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "slot": {"enum": ["cobol", "racf-saf", "dataset-vsam-ams", "jes2", "cics", "db2", "ims", "mq", "zosmf", "cross-resource"]},
+    "named_digests": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "digest"],
+        "properties": {"id": {"$ref": "#/$defs/id"}, "digest": {"$ref": "#/$defs/digest"}}
+      }
+    }
+  }
+}

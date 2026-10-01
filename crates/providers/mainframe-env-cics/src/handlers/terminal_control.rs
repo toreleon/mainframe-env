@@ -1,7 +1,7 @@
 use super::super::{
-    CicsService, Run, argument_bytes, argument_optional, argument_text, bounded, decimal_payload,
-    decode_map_payload, encode_symbolic_map_output, field, normalize_bms_input,
-    symbolic_map_modified, symbolic_map_protection, symbolic_map_values,
+    BmsMapDefinition, CicsService, Run, Session, argument_bytes, argument_optional, argument_text,
+    bounded, decimal_payload, decode_map_payload, encode_symbolic_map_output, field,
+    normalize_bms_input, symbolic_map_modified, symbolic_map_protection, symbolic_map_values,
 };
 use super::bms_map::map_fits_terminal;
 use mainframe_env_host_api::{
@@ -9,11 +9,28 @@ use mainframe_env_host_api::{
 };
 use std::collections::BTreeMap;
 
+mod bms;
+mod outboard;
+mod partition_set;
+pub use bms::CicsBmsControlSnapshot;
+pub(in crate::service) use bms::release_task as release_bms_message_for_task;
+pub(in crate::service) use outboard::release_task as release_outboard_task;
+pub use outboard::{
+    CicsOutboardDestinationDefinition, CicsOutboardKind, CicsOutboardRecord, CicsOutboardSnapshot,
+};
+pub(in crate::service) use partition_set::release_task as release_partition_set_for_task;
+pub use partition_set::{CicsPartitionDefinition, CicsPartitionSetDefinition};
+
 #[derive(Clone, Debug, Default)]
 pub(in crate::service) struct TerminalInput {
     pub(in crate::service) payload: Option<Vec<u8>>,
     pub(in crate::service) message_length: u32,
     pub(in crate::service) terminal_id: Option<String>,
+}
+
+struct DataOnlyAttributes {
+    protection: BTreeMap<String, bool>,
+    modified: BTreeMap<String, bool>,
 }
 
 impl TerminalInput {
@@ -48,37 +65,48 @@ pub(in crate::service) const fn valid_aid(aid: u8) -> bool {
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    if run.invocation.bindings.contains_key("cics.bridge-request")
+        && matches!(
+            request.operation,
+            CicsOperation::SendMap | CicsOperation::SendText | CicsOperation::ReceiveMap
+        )
+    {
+        return super::bridge_terminal::invoke(service, run, request);
+    }
     match request.operation {
+        CicsOperation::SendPartnset => partition_set::invoke(service, run, request),
+        CicsOperation::ReceivePartn => partition_set::invoke_receive(service, run, request),
+        CicsOperation::SendControl => bms::invoke_control(service, run, request),
+        CicsOperation::SendPage => bms::invoke_page(service, run, request),
+        CicsOperation::IssueEraseAup => bms::issue_eraseaup(service, run, request),
+        CicsOperation::IssueCopy => bms::issue_copy(service, run, request),
+        CicsOperation::Route => bms::invoke_route(service, run, request),
+        CicsOperation::IssueAbort
+        | CicsOperation::IssueAdd
+        | CicsOperation::IssueEnd
+        | CicsOperation::IssueErase
+        | CicsOperation::IssueNote
+        | CicsOperation::IssueQuery
+        | CicsOperation::IssueReceive
+        | CicsOperation::IssueReplace
+        | CicsOperation::IssueSend
+        | CicsOperation::IssueWait => outboard::invoke(service, run, request),
+        CicsOperation::IssueEndfile
+        | CicsOperation::IssueEndoutput
+        | CicsOperation::IssueEods
+        | CicsOperation::IssueLoad
+        | CicsOperation::IssuePass
+        | CicsOperation::IssuePrint
+        | CicsOperation::IssueDisconnect
+        | CicsOperation::IssueReset => super::issue_device::invoke(service, run, request),
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
-        CicsOperation::PurgeMessage => purge_message(service, run, request),
+        CicsOperation::PurgeMessage => bms::purge(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
-}
-
-fn purge_message(
-    service: &CicsService,
-    run: &Run,
-    request: &CicsRequest,
-) -> Result<CicsResponse, HostProblem> {
-    validate_purge_message_request(request)?;
-    validate_purge_message_context(run)?;
-    // The local runtime exposes no ACCUM/page-building route, so its reachable
-    // logical-message state is empty. Purging that state is deliberately
-    // idempotent and must not erase the already displayed terminal image.
-    service.response(
-        run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        Vec::new(),
-    )
 }
 
 fn validate_purge_message_request(request: &CicsRequest) -> Result<(), HostProblem> {
@@ -120,28 +148,35 @@ fn validate_purge_message_context(run: &Run) -> Result<(), HostProblem> {
     }
 }
 
-fn send(
+pub(super) fn send(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_send_request(request)?;
     let map_names = (request.operation == CicsOperation::SendMap)
         .then(|| map_names(request))
         .transpose()?;
-    let mut state = service.lock()?;
     let mut payload = argument_bytes(request, "FROM")
         .or_else(|| argument_bytes(request, "DATA"))
         .unwrap_or_default();
     if let Some(length) = argument_optional(request, "LENGTH") {
         let length = length
             .trim()
-            .parse::<usize>()
+            .parse::<i64>()
             .map_err(|_| HostProblem::Malformed)?;
+        let length = usize::try_from(length).map_err(|_| length_problem(request.operation))?;
         if length > payload.len() {
-            return Err(HostProblem::Malformed);
+            return Err(length_problem(request.operation));
         }
         payload.truncate(length);
     }
+    let mut state = service.lock()?;
+    let current = state
+        .sessions
+        .get(&run.session)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
     let mut field_protection = None;
     let mut field_modified = None;
     let mut field_values = None;
@@ -151,9 +186,15 @@ fn send(
             .maps
             .get(&(mapset.clone(), map.clone()))
             .ok_or(HostProblem::NotFound)?;
-        field_protection = Some(symbolic_map_protection(definition, &payload));
-        field_modified = Some(symbolic_map_modified(definition, &payload));
-        if payload.is_empty() {
+        if request.arguments.contains_key("OPTION.DATAONLY") {
+            let attributes = data_only_attributes(definition, &payload, &current, mapset, map)?;
+            field_protection = Some(attributes.protection);
+            field_modified = Some(attributes.modified);
+            field_values = Some(symbolic_map_values(definition, &payload)?);
+            payload = encode_symbolic_map_output(definition, &payload)?;
+        } else if payload.is_empty() {
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             let mut values = BTreeMap::new();
             for item in &definition.fields {
                 field(&mut payload, item.name.as_bytes())?;
@@ -166,22 +207,21 @@ fn send(
             .iter()
             .all(|field| field.output_offset.is_some())
         {
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             field_values = Some(symbolic_map_values(definition, &payload)?);
             payload = encode_symbolic_map_output(definition, &payload)?;
         } else if definition.fields.iter().any(|field| field.secret) {
             return Err(HostProblem::Unsupported);
         } else {
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             field_values = Some(decode_map_payload(&payload, service.limits)?);
         }
     }
     if payload.len() > service.limits.max_screen_bytes {
         return Err(HostProblem::ResourceExhausted);
     }
-    let current = state
-        .sessions
-        .get(&run.session)
-        .cloned()
-        .ok_or(HostProblem::NotFound)?;
     let mut next = current.clone();
     if request.operation == CicsOperation::SendMap {
         let (mapset, map) = map_names.as_ref().expect("SEND MAP names");
@@ -207,7 +247,7 @@ fn send(
         next.field_modified = field_modified.unwrap_or_default();
         next.field_values = field_values.unwrap_or_default();
     }
-    service.persist_session(&run.session, &next, Some(current.version))?;
+    partition_set::persist_send(service, run, &current, &next)?;
     state.sessions.insert(run.session.clone(), next);
     service.response(
         run,
@@ -221,17 +261,147 @@ fn send(
     )
 }
 
-fn receive(
+fn data_only_attributes(
+    map: &BmsMapDefinition,
+    symbolic: &[u8],
+    current: &Session,
+    mapset: &str,
+    map_name: &str,
+) -> Result<DataOnlyAttributes, HostProblem> {
+    let same_map =
+        current.mapset.as_deref() == Some(mapset) && current.map.as_deref() == Some(map_name);
+    let mut protection = BTreeMap::new();
+    let mut modified = BTreeMap::new();
+    for field in &map.fields {
+        let offset = usize::try_from(field.attribute_offset.ok_or(HostProblem::Unsupported)?)
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+        let attribute = symbolic
+            .get(offset)
+            .copied()
+            .ok_or(HostProblem::Malformed)?;
+        let name = field.name.to_ascii_uppercase();
+        let (is_protected, is_modified) = match attribute {
+            0 => (
+                same_map
+                    && current
+                        .field_protection
+                        .get(&name)
+                        .copied()
+                        .unwrap_or(false),
+                same_map && current.field_modified.get(&name).copied().unwrap_or(false),
+            ),
+            0xc0 | 0xc1 | 0xc8 | 0xcc => (false, attribute & 0x01 != 0),
+            0xf0 | 0xf1 | 0xf8 => (true, attribute & 0x01 != 0),
+            _ => return Err(HostProblem::Malformed),
+        };
+        protection.insert(name.clone(), is_protected);
+        modified.insert(name, is_modified);
+    }
+    Ok(DataOnlyAttributes {
+        protection,
+        modified,
+    })
+}
+
+fn length_problem(operation: CicsOperation) -> HostProblem {
+    if operation == CicsOperation::SendText {
+        HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: 0,
+        }
+    } else {
+        HostProblem::Malformed
+    }
+}
+
+pub(super) fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const SEND_MAP_ALLOWED: &[&str] = &[
+        "FROM",
+        "LENGTH",
+        "MAP",
+        "MAPSET",
+        "OPTION.CURSOR",
+        "OPTION.DATAONLY",
+        "OPTION.ERASE",
+        "OPTION.FREEKB",
+        "OPTION.MAPONLY",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    const SEND_TEXT_ALLOWED: &[&str] = &[
+        "FROM",
+        "LENGTH",
+        "OPTION.ERASE",
+        "OPTION.FREEKB",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    let allowed = match request.operation {
+        CicsOperation::SendMap => SEND_MAP_ALLOWED,
+        CicsOperation::SendText => SEND_TEXT_ALLOWED,
+        _ => return Err(HostProblem::Malformed),
+    };
+    let required = match request.operation {
+        CicsOperation::SendMap => "MAP",
+        CicsOperation::SendText => "FROM",
+        _ => return Err(HostProblem::Malformed),
+    };
+    if request.mutation.is_none()
+        || !request.arguments.contains_key(required)
+        || request.operation == CicsOperation::SendMap
+            && request.arguments.contains_key("LENGTH")
+            && !request.arguments.contains_key("FROM")
+        || request.operation == CicsOperation::SendMap
+            && request.arguments.contains_key("OPTION.MAPONLY")
+            && (request.arguments.contains_key("FROM") || request.arguments.contains_key("LENGTH"))
+        || request.operation == CicsOperation::SendMap
+            && request.arguments.contains_key("OPTION.DATAONLY")
+            && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("OPTION.DATAONLY")
+            && request.arguments.contains_key("OPTION.MAPONLY")
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request.arguments.iter().any(|(name, value)| {
+            !allowed.contains(&name.as_str())
+                || match name.as_str() {
+                    "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                    "OPTION.CURSOR" | "OPTION.DATAONLY" | "OPTION.ERASE" | "OPTION.FREEKB"
+                    | "OPTION.MAPONLY" | "OPTION.NOHANDLE" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                    "FROM" | "MAP" | "MAPSET" => !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.argument@1"
+                            | "mainframe-env.cics.literal@1"
+                            | "mainframe-env.cics.storage-value@1"
+                    ),
+                    _ => true,
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+pub(super) fn receive(
     service: &CicsService,
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_receive_request(request)?;
+    let supplied_input = receive_from(request)?;
     let mut state = service.lock()?;
     let current = state
         .sessions
         .get(&run.session)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
+    partition_set::require_intervening_send(service, run)?;
     let requested_names = if request.arguments.contains_key("MAP") {
         Some(map_names(request)?)
     } else {
@@ -254,32 +424,41 @@ fn receive(
             response2: 0,
         });
     }
-    let mut next = current.clone();
-    next.version += 1;
-    let (disposition, target, payload, fields) = if let Some(input) = next.input.payload.take() {
+    let (disposition, target, payload, fields, next) = if let Some(input) = supplied_input {
         let fields = decode_map_payload(&input, service.limits)?;
-        let target = aid_handler_target(&run.aid_handlers, current.aid);
-        (
-            if target.is_some() {
-                CicsDisposition::Handler
-            } else {
-                CicsDisposition::Complete
-            },
-            target,
-            input,
-            fields,
-        )
+        (CicsDisposition::Complete, None, input, fields, None)
     } else {
-        next.suspended = true;
-        (
-            CicsDisposition::Suspended,
-            None,
-            Vec::new(),
-            BTreeMap::new(),
-        )
+        let mut next = current.clone();
+        next.version += 1;
+        let (disposition, target, payload, fields) = if let Some(input) = next.input.payload.take()
+        {
+            let fields = decode_map_payload(&input, service.limits)?;
+            let target = aid_handler_target(&run.aid_handlers, current.aid);
+            (
+                if target.is_some() {
+                    CicsDisposition::Handler
+                } else {
+                    CicsDisposition::Complete
+                },
+                target,
+                input,
+                fields,
+            )
+        } else {
+            next.suspended = true;
+            (
+                CicsDisposition::Suspended,
+                None,
+                Vec::new(),
+                BTreeMap::new(),
+            )
+        };
+        (disposition, target, payload, fields, Some(next))
     };
-    service.persist_session(&run.session, &next, Some(current.version))?;
-    state.sessions.insert(run.session.clone(), next);
+    if let Some(next) = next {
+        service.persist_session(&run.session, &next, Some(current.version))?;
+        state.sessions.insert(run.session.clone(), next);
+    }
     let mut response = service.response(run, disposition, "NORMAL", 0, 0, target, None, payload)?;
     response.aid = current.aid;
     for (name, value) in fields {
@@ -306,7 +485,64 @@ fn receive(
     Ok(response)
 }
 
-fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
+pub(super) fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const ALLOWED: &[&str] = &[
+        "FROM",
+        "INTO",
+        "LENGTH",
+        "MAP",
+        "MAPSET",
+        "OPTION.NOHANDLE",
+        "OPTION.TERMINAL",
+        "RESP",
+        "RESP2",
+    ];
+    if request.arguments.contains_key("LENGTH") && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("OPTION.TERMINAL")
+            && request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || match name.as_str() {
+                    "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                    "OPTION.NOHANDLE" | "OPTION.TERMINAL" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    "INTO" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                    "FROM" | "MAP" | "MAPSET" => !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.argument@1"
+                            | "mainframe-env.cics.literal@1"
+                            | "mainframe-env.cics.storage-value@1"
+                    ),
+                    _ => true,
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn receive_from(request: &CicsRequest) -> Result<Option<Vec<u8>>, HostProblem> {
+    let Some(mut input) = argument_bytes(request, "FROM") else {
+        return Ok(None);
+    };
+    if let Some(length) = argument_optional(request, "LENGTH") {
+        let length = length
+            .trim()
+            .parse::<i64>()
+            .ok()
+            .and_then(|length| usize::try_from(length).ok())
+            .filter(|length| *length <= input.len())
+            .ok_or(HostProblem::Malformed)?;
+        input.truncate(length);
+    }
+    Ok(Some(input))
+}
+
+pub(super) fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
     let map = argument_text(request, "MAP")?
         .trim_end()
         .to_ascii_uppercase();

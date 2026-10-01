@@ -9,14 +9,14 @@
   "differential_credit": 0,
   "mapping": {
     "path": "conformance/0.9/cics/application-api-sources-c-map.json",
-    "sha256": "sha256:a5f85561c9958e03353938ddb850c8f0614e19d225a91046ac83fb37038463a0"
+    "sha256": "sha256:ed3aab2c000638e10fb29fef6a99962946e3bfa921092ab374a4f24a2bc7da13"
   },
   "topic_manifest": {
     "path": "conformance/0.9/manifests/cics-application-api-sources-c-topics.json",
-    "file_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc",
-    "topic_manifest_sha256": "sha256:717396f5e8cd0e9fbc21c91c569afce84e6f7f632dfbec574d3fd62bf5a85871",
+    "file_sha256": "sha256:54957233e41377648dfff0f9a334866eb63e0cfbef1d25d329d52ec2c984228f",
+    "topic_manifest_sha256": "sha256:01fb00ebd639d937017cb3f6565cdf38df3c25bb0ebe4393030e66db260d8bc2",
     "topic_count": 224,
-    "total_bytes": 6018940
+    "total_bytes": 6070596
   },
   "counts": {
     "mapping_rows": 87,
@@ -751,5 +751,5 @@
     }
   ],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, supplemental topics, and source resolutions",
-  "corpus_sha256": "sha256:c09c47d893b35e66938c6a43ec2b71674b2f3b0191838037db48d2ecbfc4f757"
+  "corpus_sha256": "sha256:c112f0b28743478d2b0ea8ea167cd8a76f05a60e6ef11230a1168a907a0847bf"
 }

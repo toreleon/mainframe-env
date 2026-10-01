@@ -1,0 +1,50 @@
+{
+  "schema_version": "mainframe-env.mq-source-call-list@1",
+  "target_version": "0.15.0",
+  "work_package": "MQ-1501.call-denominator",
+  "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
+  "official_catalog": {
+    "path": "conformance/0.2/catalogs/mq.json",
+    "sha256": "62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7",
+    "unit": "mqi-calls-unique"
+  },
+  "source": {
+    "topic_path": "SSFKSJ_9.4.0/refdev/q101650_.html",
+    "sha256": "24025a9f40dfc613b8243fef16f902a94794a9fbe517730ae1b6c489a338009f",
+    "first_line": 4,
+    "last_line": 30
+  },
+  "source_row_count": 27,
+  "unique_call_count": 26,
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "rows": [
+    {"source_position": 1, "label": "MQBACK", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001", "duplicate_of_source_position": null},
+    {"source_position": 2, "label": "MQBEGIN", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0002", "duplicate_of_source_position": null},
+    {"source_position": 3, "label": "MQBUFMH", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0003", "duplicate_of_source_position": null},
+    {"source_position": 4, "label": "MQCB", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0004", "duplicate_of_source_position": null},
+    {"source_position": 5, "label": "MQCB_FUNCTION", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0005", "duplicate_of_source_position": null},
+    {"source_position": 6, "label": "MQCLOSE", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006", "duplicate_of_source_position": null},
+    {"source_position": 7, "label": "MQCMIT", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007", "duplicate_of_source_position": null},
+    {"source_position": 8, "label": "MQCONN", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008", "duplicate_of_source_position": null},
+    {"source_position": 9, "label": "MQCONNX", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009", "duplicate_of_source_position": null},
+    {"source_position": 10, "label": "MQCRTMH", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0010", "duplicate_of_source_position": null},
+    {"source_position": 11, "label": "MQCTL", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0011", "duplicate_of_source_position": null},
+    {"source_position": 12, "label": "MQDISC", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012", "duplicate_of_source_position": null},
+    {"source_position": 13, "label": "MQDLTMH", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0013", "duplicate_of_source_position": null},
+    {"source_position": 14, "label": "MQDLTMP", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0014", "duplicate_of_source_position": null},
+    {"source_position": 15, "label": "MQGET", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015", "duplicate_of_source_position": null},
+    {"source_position": 16, "label": "MQINQ", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0016", "duplicate_of_source_position": null},
+    {"source_position": 17, "label": "MQINQMP", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0017", "duplicate_of_source_position": null},
+    {"source_position": 18, "label": "MQMHBUF", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0018", "duplicate_of_source_position": null},
+    {"source_position": 19, "label": "MQOPEN", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019", "duplicate_of_source_position": null},
+    {"source_position": 20, "label": "MQPUT", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020", "duplicate_of_source_position": null},
+    {"source_position": 21, "label": "MQPUT1", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0021", "duplicate_of_source_position": null},
+    {"source_position": 22, "label": "MQSET", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0022", "duplicate_of_source_position": null},
+    {"source_position": 23, "label": "MQSETMP", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0023", "duplicate_of_source_position": null},
+    {"source_position": 24, "label": "MQSTAT", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0024", "duplicate_of_source_position": null},
+    {"source_position": 25, "label": "MQMHBUF", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0018", "duplicate_of_source_position": 18},
+    {"source_position": 26, "label": "MQSUB", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0025", "duplicate_of_source_position": null},
+    {"source_position": 27, "label": "MQSUBRQ", "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0026", "duplicate_of_source_position": null}
+  ]
+}

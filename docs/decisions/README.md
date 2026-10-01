@@ -15,6 +15,21 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0009](0009-current-package-topology.md) | current 26-package topology and change governance | Accepted |
 | [0010](0010-rust-module-review-budgets.md) | hard Rust module budgets, facade ratchet, and CICS family layout | Accepted |
 | [0011](0011-typed-language-hir-and-semantic-ir.md) | language-specific HIR, semantic IR dialects, and typed host effects | Accepted |
+| [0012](0012-checked-amode64-storage-boundary.md) | checked AMODE(64) virtual storage and checkpoint boundary | Proposed |
+| [0013](0013-cics-web-service-control-boundary.md) | bounded CICS web service control and durable channel replay | Proposed |
+| [0014](0014-named-counter-authority.md) | versioned named-counter pool authority and bounded typed routing | Proposed |
+| [0015](0015-cics-operator-reply-boundary.md) | durable CICS operator reply and console ingress boundary | Proposed |
+| [0016](0016-cics-tcpip-ingress-context.md) | trusted TCP/IP and client-certificate task context | Proposed |
+| [0017](0017-cics-immediate-start-target-authority.md) | durable local target admission for immediate CICS START | Proposed |
+| [0018](0018-cics-start-attach-lifetime.md) | noncancelable START ATTACH state and live-address boundary | Proposed |
+| [0019](0019-bts-lifecycle-authority.md) | shared versioned BTS process/activity state and UOW acquisition | Proposed |
+| [0020](0020-conversation-peer-exchange-ledger.md) | shared APPC/MRO ledger and explicit durable peer frames | Proposed |
+| [0021](0021-conversation-issue-control-staging.md) | staged ISSUE controls and confirmed partner transitions in the shared ledger | Proposed |
+| [0022](0022-issue-pass-target-handoff.md) | replayable ISSUE PASS target claim and CICS logon data handoff | Proposed |
+| [0023](0023-bts-lifecycle-authority.md) | shared versioned BTS process/activity state and UOW acquisition | Proposed |
+| [0024](0024-per-assertion-oracle-provenance.md) | per-assertion CardDemo base-batch oracle provenance and derived credit | Proposed |
+| [0025](0025-licence-and-provenance-policy.md) | licence and provenance policy for IBM oracle evidence | Proposed |
+| [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

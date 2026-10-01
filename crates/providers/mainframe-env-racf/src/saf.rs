@@ -1,3 +1,5 @@
+mod credential;
+mod request_shape;
 use crate::RacfService;
 use crate::command::{RacrouteRequestType, racroute_descriptors};
 use crate::model::{
@@ -9,12 +11,13 @@ use crate::model::{
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
+pub use credential::{CredentialDetails, CredentialFailure, CredentialKind, IssuedPassTicket};
+use credential::{build_mfa_proof, verify_credential};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::{HostProblem, SecretRef};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SafRequestContext {
     caller: PrincipalId,
@@ -85,7 +88,6 @@ impl SafRequestContext {
         self.tick
     }
 }
-
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AccessEnvironment {
     pub terminal: Option<String>,
@@ -120,6 +122,37 @@ pub enum SafExtractKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RacrouteRequest {
+    VerifyCredential {
+        user: PrincipalId,
+        credential_reference: SecretRef,
+        kind: CredentialKind,
+        group: Option<String>,
+        binding_digest: [u8; 32],
+    },
+    /// Change one CICS password or phrase in the same audited SAF transition.
+    /// The scoped reference resolves to one length-framed old/new secret pair.
+    /// The binding digest ties both clear inputs to the outer CICS request.
+    /// A replay reads the durable terminal result without resolving the secret.
+    /// No clear credential appears in the transaction or audit record.
+    ChangeCredential {
+        user: PrincipalId,
+        credential_reference: SecretRef,
+        kind: CredentialKind,
+        group: Option<String>,
+        binding_digest: [u8; 32],
+    },
+    /// Generate a bounded one-time PassTicket for the issuing principal and application.
+    IssuePassTicket {
+        application: String,
+        binding_digest: [u8; 32],
+    },
+    /// Consume one previously issued ticket for its named user and application.
+    RedeemPassTicket {
+        user: PrincipalId,
+        application: String,
+        ticket_reference: SecretRef,
+        binding_digest: [u8; 32],
+    },
     Audit {
         action: String,
         resource_digest: String,
@@ -213,6 +246,12 @@ impl RacrouteRequest {
             Self::Tokenmap { .. } => RacrouteRequestType::Tokenmap,
             Self::Tokenxtr { .. } => RacrouteRequestType::Tokenxtr,
             Self::Verify { .. } => RacrouteRequestType::Verify,
+            Self::VerifyCredential { .. } | Self::ChangeCredential { .. } => {
+                RacrouteRequestType::Verify
+            }
+            Self::IssuePassTicket { .. } | Self::RedeemPassTicket { .. } => {
+                RacrouteRequestType::Verify
+            }
             Self::Verifyx { .. } => RacrouteRequestType::Verifyx,
         }
     }
@@ -286,6 +325,24 @@ pub enum ExtractedSecurityRecord {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "result_kind", content = "result")]
 pub enum RacrouteResult {
+    /// Issuance result; the clear ticket is omitted from durable replay rows.
+    PassTicketIssued {
+        decision: SafDecision,
+        origin_denied: bool,
+        #[serde(skip)]
+        ticket: Option<IssuedPassTicket>,
+    },
+    /// One-use ticket redemption outcome and authenticated user ID.
+    PassTicketRedeemed {
+        decision: SafDecision,
+        failure: Option<CredentialFailure>,
+        user: String,
+    },
+    CredentialVerified {
+        decision: SafDecision,
+        failure: Option<CredentialFailure>,
+        details: Option<CredentialDetails>,
+    },
     Audit {
         audit_id: String,
     },
@@ -311,6 +368,7 @@ pub enum RacrouteResult {
     TokenBuilt(TokenMetadata),
     TokenMapped {
         token_id: String,
+        kind: TokenKind,
         acee: AceeSummary,
     },
     TokenExtracted(TokenMetadata),
@@ -352,44 +410,6 @@ struct MfaProof {
     valid: bool,
 }
 
-fn build_mfa_proof(
-    service: &RacfService,
-    user: &str,
-    supplied_reference: Option<&SecretRef>,
-) -> Result<Option<MfaProof>, HostProblem> {
-    let snapshot = service.database.read()?;
-    let Some(factor) = snapshot
-        .mfa_factors
-        .values()
-        .find(|factor| factor.owner == user && factor.active)
-        .cloned()
-    else {
-        return Ok(None);
-    };
-    let valid = supplied_reference.is_some_and(|supplied_reference| {
-        let expected_reference = SecretRef::new(&factor.secret_reference, Default::default());
-        expected_reference.is_ok_and(|expected_reference| {
-            service
-                .secrets
-                .resolve(&expected_reference)
-                .ok()
-                .zip(service.secrets.resolve(supplied_reference).ok())
-                .is_some_and(|(expected, supplied)| {
-                    let expected_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &expected);
-                    let supplied_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &supplied);
-                    let supplied_tag = ring::hmac::sign(&supplied_key, b"racf-mfa-proof");
-                    ring::hmac::verify(&expected_key, b"racf-mfa-proof", supplied_tag.as_ref())
-                        .is_ok()
-                })
-        })
-    });
-    Ok(Some(MfaProof {
-        factor_id: factor.id,
-        factor_reference: factor.secret_reference,
-        valid,
-    }))
-}
-
 pub(crate) fn execute(
     service: &RacfService,
     context: &SafRequestContext,
@@ -404,7 +424,7 @@ pub(crate) fn execute(
     let initial = service.database.read()?;
     let mut preflight = validate_request_shape(&request).err();
     if preflight.is_none()
-        && is_authentication_request(&request)
+        && credential::is_authentication_request(&request)
         && (!initial.subsystem.running || !initial.database_status.active)
     {
         return reject_unavailable_authentication(
@@ -440,6 +460,18 @@ pub(crate) fn execute(
             }
             | RacrouteRequest::Verify {
                 credential_reference,
+                ..
+            }
+            | RacrouteRequest::VerifyCredential {
+                credential_reference,
+                ..
+            }
+            | RacrouteRequest::ChangeCredential {
+                credential_reference,
+                ..
+            }
+            | RacrouteRequest::RedeemPassTicket {
+                ticket_reference: credential_reference,
                 ..
             }
             | RacrouteRequest::Verifyx {
@@ -519,7 +551,7 @@ pub(crate) fn execute(
                 status,
                 &request_digest,
             )?;
-            let mut result = normalized_preflight_result(&request, reason);
+            let mut result = request_shape::normalized_preflight_result(&request, reason);
             if let Some(result) = &mut result {
                 attach_audit(result, audit_id);
             }
@@ -552,6 +584,7 @@ pub(crate) fn execute(
         }
         let mut staged = snapshot.clone();
         let applied = apply_request(
+            service,
             &mut staged,
             context,
             &request,
@@ -718,15 +751,6 @@ pub(crate) fn reconcile_legacy_replay(
         .map(|_| ())
 }
 
-fn is_authentication_request(request: &RacrouteRequest) -> bool {
-    matches!(
-        request,
-        RacrouteRequest::Signon { .. }
-            | RacrouteRequest::Verify { .. }
-            | RacrouteRequest::Verifyx { .. }
-    )
-}
-
 fn reject_unavailable_authentication(
     service: &RacfService,
     context: &SafRequestContext,
@@ -737,7 +761,8 @@ fn reject_unavailable_authentication(
     let status = status_for_reason(DecisionReason::PolicyUnavailable);
     let (result, generation) = service.database.mutate_retry(|snapshot| {
         let audit_id = append_audit(snapshot, context, keyword, status, request_digest)?;
-        let mut result = normalized_preflight_result(request, DecisionReason::PolicyUnavailable);
+        let mut result =
+            request_shape::normalized_preflight_result(request, DecisionReason::PolicyUnavailable);
         if let Some(result) = &mut result {
             attach_audit(result, audit_id);
         }
@@ -897,7 +922,7 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
         } => {
             normalized_class(class)?;
             normalized_profile(resource)?;
-            validate_environment(environment)?;
+            request_shape::validate_environment(environment)?;
         }
         RacrouteRequest::Define {
             class,
@@ -959,6 +984,16 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
                 normalized_id(acee_id.clone(), 246).map_err(DecisionReason::from)?;
             }
         }
+        RacrouteRequest::VerifyCredential { group, .. }
+        | RacrouteRequest::ChangeCredential { group, .. } => {
+            if let Some(group) = group {
+                normalized_principal(group)?;
+            }
+        }
+        RacrouteRequest::IssuePassTicket { application, .. }
+        | RacrouteRequest::RedeemPassTicket { application, .. } => {
+            normalized_profile(application)?;
+        }
         RacrouteRequest::Verifyx {
             acee_id,
             parent_acee,
@@ -972,43 +1007,8 @@ fn validate_request_shape(request: &RacrouteRequest) -> Result<(), DecisionReaso
     Ok(())
 }
 
-fn normalized_preflight_result(
-    request: &RacrouteRequest,
-    reason: DecisionReason,
-) -> Option<RacrouteResult> {
-    if !matches!(
-        reason,
-        DecisionReason::CredentialInvalid | DecisionReason::PolicyUnavailable
-    ) || !matches!(
-        request,
-        RacrouteRequest::Signon { .. }
-            | RacrouteRequest::Verify { .. }
-            | RacrouteRequest::Verifyx { .. }
-    ) {
-        return None;
-    }
-    Some(RacrouteResult::Verified {
-        decision: decision(reason, AccessLevel::None, None, None),
-        acee: None,
-    })
-}
-
-fn validate_environment(environment: &AccessEnvironment) -> Result<(), DecisionReason> {
-    for value in [
-        &environment.terminal,
-        &environment.console,
-        &environment.system,
-        &environment.application,
-    ]
-    .into_iter()
-    .flatten()
-    {
-        normalized_text(value, 246)?;
-    }
-    Ok(())
-}
-
 fn apply_request(
+    service: &RacfService,
     snapshot: &mut SecurityDatabaseSnapshot,
     context: &SafRequestContext,
     request: &RacrouteRequest,
@@ -1337,6 +1337,7 @@ fn apply_request(
                 status_for_reason(DecisionReason::Granted),
                 RacrouteResult::TokenMapped {
                     token_id: token.id,
+                    kind: token.kind,
                     acee: acee_summary(&acee),
                 },
             ))
@@ -1373,6 +1374,26 @@ fn apply_request(
             states,
             false,
         ),
+        RacrouteRequest::VerifyCredential {
+            user, kind, group, ..
+        } => credential::verify_cics_request(
+            snapshot,
+            context,
+            user,
+            secret,
+            *kind,
+            group.as_deref(),
+            states,
+        ),
+        RacrouteRequest::ChangeCredential { .. } => {
+            credential::apply_change_request(service, snapshot, context, request, secret, states)
+        }
+        RacrouteRequest::IssuePassTicket { application, .. } => {
+            credential::issue_passticket(snapshot, context, application, states)
+        }
+        RacrouteRequest::RedeemPassTicket {
+            user, application, ..
+        } => credential::redeem_passticket(snapshot, context, user, application, secret, states),
         RacrouteRequest::Verifyx {
             user,
             action,
@@ -1506,35 +1527,6 @@ fn verify_request(
         }
     };
     Ok((decision.status, result))
-}
-
-fn verify_credential(
-    snapshot: &SecurityDatabaseSnapshot,
-    user: &str,
-    secret: &[u8],
-) -> Result<DecisionReason, DecisionReason> {
-    let Some(principal) = snapshot.principals.get(user) else {
-        return Ok(DecisionReason::CredentialInvalid);
-    };
-    match principal.state {
-        PrincipalState::Active => {}
-        PrincipalState::PasswordExpired
-        | PrincipalState::Revoked
-        | PrincipalState::Suspended
-        | PrincipalState::Locked => return Ok(DecisionReason::PrincipalInactive),
-    }
-    let Some(credential) = &principal.credential else {
-        return Ok(DecisionReason::CredentialInvalid);
-    };
-    let parsed = PasswordHash::new(&credential.encoded_verifier)
-        .map_err(|_| DecisionReason::PolicyUnavailable)?;
-    Ok(
-        if Argon2::default().verify_password(secret, &parsed).is_ok() {
-            DecisionReason::Granted
-        } else {
-            DecisionReason::CredentialInvalid
-        },
-    )
 }
 
 fn create_acee(
@@ -1976,9 +1968,11 @@ fn append_audit(
 
 fn attach_audit(result: &mut RacrouteResult, audit_id: String) {
     match result {
-        RacrouteResult::Decision(decision) | RacrouteResult::Verified { decision, .. } => {
-            decision.audit_id = Some(audit_id)
-        }
+        RacrouteResult::Decision(decision)
+        | RacrouteResult::Verified { decision, .. }
+        | RacrouteResult::CredentialVerified { decision, .. }
+        | RacrouteResult::PassTicketIssued { decision, .. }
+        | RacrouteResult::PassTicketRedeemed { decision, .. } => decision.audit_id = Some(audit_id),
         _ => {}
     }
 }
@@ -2227,6 +2221,12 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
             digest_saf_tag(&mut digest, verify_action_tag(*action));
             digest_saf_optional(&mut digest, acee_id.as_deref());
         }
+        RacrouteRequest::VerifyCredential { .. }
+        | RacrouteRequest::ChangeCredential { .. }
+        | RacrouteRequest::IssuePassTicket { .. }
+        | RacrouteRequest::RedeemPassTicket { .. } => {
+            credential::digest_cics_request(&mut digest, request);
+        }
         RacrouteRequest::Verifyx {
             user,
             credential_reference,
@@ -2471,6 +2471,7 @@ mod tests {
     use super::*;
     use crate::{CommandContext, MemorySecretResolver};
     use mainframe_env_execution_api::InvocationLimits;
+    use mainframe_env_host_api::AccessIntent;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use mainframe_env_store_api::ProviderStateStore;
     use std::sync::Arc;
@@ -2576,6 +2577,584 @@ mod tests {
                 acee: None,
             })
         ));
+    }
+
+    #[test]
+    fn cics_credential_verify_replays_once_and_preserves_distinct_phrase_slot() {
+        let (service, resolver, admin) = setup();
+        resolver.insert("secret:cics-password", b"PASSWORD".to_vec());
+        resolver.insert("secret:cics-wrong", b"WRONG123".to_vec());
+        service
+            .add_user(
+                "IBMUSER",
+                &SecretRef::new("secret:cics-password", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let user = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let valid = RacrouteRequest::VerifyCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:cics-password", Default::default())
+                .unwrap(),
+            kind: CredentialKind::Password,
+            group: None,
+            binding_digest: [1; 32],
+        };
+        let result = service
+            .racroute(
+                &saf_context(&admin, None, "CICS-VERIFY-1", 5),
+                valid.clone(),
+            )
+            .unwrap();
+        assert_eq!(result.status.reason, DecisionReason::Granted);
+        assert!(matches!(
+            result.result,
+            Some(RacrouteResult::CredentialVerified {
+                failure: None,
+                details: Some(CredentialDetails {
+                    invalid_count: 255,
+                    last_use_tick: 0,
+                    ..
+                }),
+                ..
+            })
+        ));
+        let wrong = RacrouteRequest::VerifyCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:cics-wrong", Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            group: None,
+            binding_digest: [2; 32],
+        };
+        let context = saf_context(&admin, None, "CICS-VERIFY-2", 6);
+        let denied = service.racroute(&context, wrong.clone()).unwrap();
+        assert_eq!(denied.status.reason, DecisionReason::CredentialInvalid);
+        assert!(matches!(
+            denied.result.as_ref(),
+            Some(RacrouteResult::CredentialVerified {
+                failure: Some(CredentialFailure::InvalidCredential),
+                details: None,
+                ..
+            })
+        ));
+        let before = service.database.read().unwrap();
+        assert_eq!(before.principals["IBMUSER"].invalid_count, Some(1));
+        assert_eq!(service.racroute(&context, wrong.clone()).unwrap(), denied);
+        assert_eq!(
+            service.database.read().unwrap().audits.len(),
+            before.audits.len()
+        );
+        let changed = RacrouteRequest::VerifyCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:cics-wrong", Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            group: None,
+            binding_digest: [3; 32],
+        };
+        assert_eq!(
+            service.racroute(&context, changed),
+            Err(HostProblem::IdempotencyConflict)
+        );
+
+        let phrase = b"LONG-PHRASE-1234";
+        service
+            .database
+            .mutate(|snapshot| {
+                let verifier = service
+                    .credential_from_bytes(&snapshot.policy, "IBMUSER", None, phrase, true, 7)
+                    .map_err(|_| HostProblem::Malformed)?;
+                snapshot
+                    .principals
+                    .get_mut("IBMUSER")
+                    .unwrap()
+                    .phrase_credential = Some(verifier);
+                Ok(())
+            })
+            .unwrap();
+        resolver.insert("secret:cics-phrase", phrase.to_vec());
+        let phrase_result = service
+            .racroute(
+                &saf_context(&admin, None, "CICS-VERIFY-3", 8),
+                RacrouteRequest::VerifyCredential {
+                    user,
+                    credential_reference: SecretRef::new("secret:cics-phrase", Default::default())
+                        .unwrap(),
+                    kind: CredentialKind::Phrase,
+                    group: None,
+                    binding_digest: [4; 32],
+                },
+            )
+            .unwrap();
+        assert_eq!(phrase_result.status.reason, DecisionReason::Granted);
+        assert!(
+            service.database.read().unwrap().principals["IBMUSER"]
+                .credential
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn cics_credential_change_checks_old_secret_and_replays_without_reapplying() {
+        let (service, resolver, admin) = setup();
+        resolver.insert("secret:change-old", b"PASSWORD".to_vec());
+        service
+            .add_user(
+                "CHANGE1",
+                &SecretRef::new("secret:change-old", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let user = PrincipalId::new("CHANGE1", InvocationLimits::default()).unwrap();
+        let packet = |old: &[u8], new: &[u8]| {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&(old.len() as u16).to_be_bytes());
+            bytes.extend_from_slice(&(new.len() as u16).to_be_bytes());
+            bytes.extend_from_slice(old);
+            bytes.extend_from_slice(new);
+            bytes
+        };
+        resolver.insert("secret:change-wrong", packet(b"WRONG123", b"NEWPASS1"));
+        resolver.insert("secret:change-valid", packet(b"PASSWORD", b"NEWPASS1"));
+        let request = |reference: &str, binding_digest| RacrouteRequest::ChangeCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new(reference, Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            group: None,
+            binding_digest,
+        };
+        let wrong = service
+            .racroute(
+                &saf_context(&admin, None, "CICS-CHANGE-WRONG", 5),
+                request("secret:change-wrong", [1; 32]),
+            )
+            .unwrap();
+        assert!(matches!(
+            wrong.result,
+            Some(RacrouteResult::CredentialVerified {
+                failure: Some(CredentialFailure::InvalidCredential),
+                ..
+            })
+        ));
+        assert_eq!(
+            service.database.read().unwrap().principals["CHANGE1"].invalid_count,
+            Some(1)
+        );
+        let context = saf_context(&admin, None, "CICS-CHANGE-VALID", 6);
+        let valid = service
+            .racroute(&context, request("secret:change-valid", [2; 32]))
+            .unwrap();
+        assert_eq!(valid.status.reason, DecisionReason::Granted);
+        let before = service.database.read().unwrap();
+        assert_eq!(before.principals["CHANGE1"].invalid_count, Some(0));
+        assert_eq!(
+            service
+                .racroute(&context, request("secret:change-valid", [2; 32]))
+                .unwrap(),
+            valid
+        );
+        assert_eq!(
+            service.database.read().unwrap().audits.len(),
+            before.audits.len()
+        );
+        assert_eq!(
+            service.racroute(&context, request("secret:change-valid", [3; 32])),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        resolver.insert("secret:changed", b"NEWPASS1".to_vec());
+        let verified = service
+            .racroute(
+                &saf_context(&admin, None, "CICS-CHANGE-VERIFY", 7),
+                RacrouteRequest::VerifyCredential {
+                    user,
+                    credential_reference: SecretRef::new("secret:changed", Default::default())
+                        .unwrap(),
+                    kind: CredentialKind::Password,
+                    group: None,
+                    binding_digest: [4; 32],
+                },
+            )
+            .unwrap();
+        assert_eq!(verified.status.reason, DecisionReason::Granted);
+    }
+
+    #[test]
+    fn cics_expired_credential_change_checks_group_before_replacing_verifier() {
+        let (service, resolver, admin) = setup();
+        resolver.insert("secret:expired-old", b"PASSWORD".to_vec());
+        service
+            .add_user(
+                "CHANGE1",
+                &SecretRef::new("secret:expired-old", Default::default()).unwrap(),
+            )
+            .unwrap();
+        service
+            .set_user_state("CHANGE1", true, false, false)
+            .unwrap();
+        let before = service.database.read().unwrap().principals["CHANGE1"]
+            .credential
+            .as_ref()
+            .unwrap()
+            .encoded_verifier
+            .clone();
+        let mut packet = Vec::from([0, 8, 0, 8]);
+        packet.extend_from_slice(b"PASSWORD");
+        packet.extend_from_slice(b"NEWPASS1");
+        resolver.insert("secret:expired-change", packet);
+        let user = PrincipalId::new("CHANGE1", InvocationLimits::default()).unwrap();
+        let request = |group: Option<&str>, binding_digest| RacrouteRequest::ChangeCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:expired-change", Default::default())
+                .unwrap(),
+            kind: CredentialKind::Password,
+            group: group.map(str::to_string),
+            binding_digest,
+        };
+        let denied = service
+            .racroute(
+                &saf_context(&admin, None, "CHANGE-EXPIRED-BAD-GROUP", 6),
+                request(Some("NOGROUP"), [1; 32]),
+            )
+            .unwrap();
+        assert!(matches!(
+            denied.result,
+            Some(RacrouteResult::CredentialVerified {
+                failure: Some(CredentialFailure::UnknownGroup),
+                ..
+            })
+        ));
+        assert_eq!(
+            service.database.read().unwrap().principals["CHANGE1"]
+                .credential
+                .as_ref()
+                .unwrap()
+                .encoded_verifier,
+            before
+        );
+        let changed = service
+            .racroute(
+                &saf_context(&admin, None, "CHANGE-EXPIRED-VALID", 7),
+                request(None, [2; 32]),
+            )
+            .unwrap();
+        assert_eq!(changed.status.reason, DecisionReason::Granted);
+        assert_eq!(
+            service.database.read().unwrap().principals["CHANGE1"].state,
+            PrincipalState::Active
+        );
+    }
+
+    #[test]
+    fn cics_passticket_requires_policy_and_is_one_use_with_redacted_replay() {
+        let (service, resolver, admin) = setup();
+        service
+            .define_profile(
+                "FACILITY",
+                "IRR.RCVTPTGN",
+                "RACFADM",
+                Some(AccessIntent::Read),
+            )
+            .unwrap();
+        service
+            .define_profile("PTKTDATA", "APP1", "RACFADM", Some(AccessIntent::Read))
+            .unwrap();
+        let issue = RacrouteRequest::IssuePassTicket {
+            application: "APP1".into(),
+            binding_digest: [1; 32],
+        };
+        let inactive = service
+            .racroute(
+                &saf_context(&admin, None, "ISSUE-INACTIVE", 3),
+                issue.clone(),
+            )
+            .unwrap();
+        assert_ne!(inactive.status.reason, DecisionReason::Granted);
+        assert!(service.database.read().unwrap().tokens.is_empty());
+        service
+            .execute_command(
+                &command_context(&admin, "ACTIVATE-PTKT", 4),
+                "SETROPTS CLASSACT(PTKTDATA)",
+            )
+            .unwrap();
+        let context = saf_context(&admin, None, "ISSUE-TICKET", 5);
+        let issued = service.racroute(&context, issue.clone()).unwrap();
+        assert_eq!(issued.status.reason, DecisionReason::Granted);
+        let ticket = match issued.result.as_ref() {
+            Some(RacrouteResult::PassTicketIssued {
+                ticket: Some(ticket),
+                ..
+            }) => ticket.bytes().to_vec(),
+            other => panic!("expected ticket: {other:?}"),
+        };
+        assert!(ticket.iter().all(u8::is_ascii_alphanumeric));
+        assert_eq!(service.database.read().unwrap().tokens.len(), 1);
+        let before = service.database.read().unwrap().audits.len();
+        let replay = service.racroute(&context, issue.clone()).unwrap();
+        assert!(matches!(
+            replay.result,
+            Some(RacrouteResult::PassTicketIssued { ticket: None, .. })
+        ));
+        assert_eq!(service.database.read().unwrap().audits.len(), before);
+        assert_eq!(service.database.read().unwrap().tokens.len(), 1);
+        assert_eq!(
+            service.racroute(
+                &context,
+                RacrouteRequest::IssuePassTicket {
+                    application: "APP1".into(),
+                    binding_digest: [2; 32],
+                }
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        resolver.insert("secret:ticket", ticket.clone());
+        let redeem = RacrouteRequest::RedeemPassTicket {
+            user: admin.clone(),
+            application: "APP1".into(),
+            ticket_reference: SecretRef::new("secret:ticket", Default::default()).unwrap(),
+            binding_digest: [3; 32],
+        };
+        let redeemed = service
+            .racroute(
+                &saf_context(&admin, None, "REDEEM-TICKET", 6),
+                redeem.clone(),
+            )
+            .unwrap();
+        assert_eq!(redeemed.status.reason, DecisionReason::Granted);
+        assert!(matches!(
+            redeemed.result,
+            Some(RacrouteResult::PassTicketRedeemed { failure: None, .. })
+        ));
+        let denied = service
+            .racroute(&saf_context(&admin, None, "REDEEM-AGAIN", 7), redeem)
+            .unwrap();
+        assert_eq!(denied.status.reason, DecisionReason::CredentialInvalid);
+        assert!(matches!(
+            denied.result,
+            Some(RacrouteResult::PassTicketRedeemed {
+                failure: Some(CredentialFailure::InvalidCredential),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_passticket_redemption_without_clear_ticket_row() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-ticket-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("racf.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let issue = RacrouteRequest::IssuePassTicket {
+            application: "APP1".into(),
+            binding_digest: [5; 32],
+        };
+        let context = saf_context(&admin, None, "ISSUE-SQLITE-TICKET", 5);
+        let ticket = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            service
+                .bootstrap_administrator(
+                    "RACFADM",
+                    &SecretRef::new("secret:admin", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service
+                .define_profile(
+                    "FACILITY",
+                    "IRR.RCVTPTGN",
+                    "RACFADM",
+                    Some(AccessIntent::Read),
+                )
+                .unwrap();
+            service
+                .define_profile("PTKTDATA", "APP1", "RACFADM", Some(AccessIntent::Read))
+                .unwrap();
+            service
+                .execute_command(
+                    &command_context(&admin, "ACTIVATE-SQLITE-TICKET", 4),
+                    "SETROPTS CLASSACT(PTKTDATA)",
+                )
+                .unwrap();
+            let result = service.racroute(&context, issue.clone()).unwrap();
+            match result.result {
+                Some(RacrouteResult::PassTicketIssued {
+                    ticket: Some(ticket),
+                    ..
+                }) => ticket.bytes().to_vec(),
+                other => panic!("ticket missing: {other:?}"),
+            }
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            let replay = service.racroute(&context, issue).unwrap();
+            assert!(matches!(
+                replay.result,
+                Some(RacrouteResult::PassTicketIssued { ticket: None, .. })
+            ));
+            let serialized =
+                serde_json::to_string(&service.database.read().unwrap().transactions).unwrap();
+            assert!(!serialized.contains(std::str::from_utf8(&ticket).unwrap()));
+            resolver.insert("secret:sqlite-ticket", ticket.clone());
+            let redeemed = service
+                .racroute(
+                    &saf_context(&admin, None, "REDEEM-SQLITE-TICKET", 6),
+                    RacrouteRequest::RedeemPassTicket {
+                        user: admin.clone(),
+                        application: "APP1".into(),
+                        ticket_reference: SecretRef::new(
+                            "secret:sqlite-ticket",
+                            Default::default(),
+                        )
+                        .unwrap(),
+                        binding_digest: [6; 32],
+                    },
+                )
+                .unwrap();
+            assert_eq!(redeemed.status.reason, DecisionReason::Granted);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_cics_credential_change_and_replay() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-change-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("racf.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        resolver.insert("secret:old", b"PASSWORD".to_vec());
+        let mut packet = Vec::from([0, 8, 0, 8]);
+        packet.extend_from_slice(b"PASSWORD");
+        packet.extend_from_slice(b"NEWPASS1");
+        resolver.insert("secret:change", packet);
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let user = PrincipalId::new("CHANGE1", InvocationLimits::default()).unwrap();
+        let context = saf_context(&admin, None, "CICS-CHANGE-SQLITE", 9);
+        let request = RacrouteRequest::ChangeCredential {
+            user: user.clone(),
+            credential_reference: SecretRef::new("secret:change", Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            group: None,
+            binding_digest: [7; 32],
+        };
+        let first = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            service
+                .bootstrap_administrator(
+                    "RACFADM",
+                    &SecretRef::new("secret:admin", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service
+                .add_user(
+                    "CHANGE1",
+                    &SecretRef::new("secret:old", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service.racroute(&context, request.clone()).unwrap()
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            let before = service.database.read().unwrap();
+            assert_eq!(service.racroute(&context, request.clone()).unwrap(), first);
+            assert_eq!(
+                service.database.read().unwrap().audits.len(),
+                before.audits.len()
+            );
+            resolver.insert("secret:new", b"NEWPASS1".to_vec());
+            let verified = service
+                .racroute(
+                    &saf_context(&admin, None, "CICS-CHANGE-SQLITE-VERIFY", 10),
+                    RacrouteRequest::VerifyCredential {
+                        user,
+                        credential_reference: SecretRef::new("secret:new", Default::default())
+                            .unwrap(),
+                        kind: CredentialKind::Password,
+                        group: None,
+                        binding_digest: [8; 32],
+                    },
+                )
+                .unwrap();
+            assert_eq!(verified.status.reason, DecisionReason::Granted);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_cics_verify_failure_and_replay_binding() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-verify-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("racf.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        resolver.insert("secret:user", b"PASSWORD".to_vec());
+        resolver.insert("secret:wrong", b"WRONG123".to_vec());
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let user = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = saf_context(&admin, None, "CICS-VERIFY-SQLITE", 9);
+        let request = RacrouteRequest::VerifyCredential {
+            user,
+            credential_reference: SecretRef::new("secret:wrong", Default::default()).unwrap(),
+            kind: CredentialKind::Password,
+            group: None,
+            binding_digest: [9; 32],
+        };
+        let first = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
+            service
+                .bootstrap_administrator(
+                    "RACFADM",
+                    &SecretRef::new("secret:admin", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service
+                .add_user(
+                    "IBMUSER",
+                    &SecretRef::new("secret:user", Default::default()).unwrap(),
+                )
+                .unwrap();
+            service.racroute(&context, request.clone()).unwrap()
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver, Default::default()).unwrap();
+            assert_eq!(
+                service.database.read().unwrap().principals["IBMUSER"].invalid_count,
+                Some(1)
+            );
+            assert_eq!(service.racroute(&context, request).unwrap(), first);
+            assert_eq!(
+                service.database.read().unwrap().principals["IBMUSER"].invalid_count,
+                Some(1)
+            );
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
     }
 
     #[test]

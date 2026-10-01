@@ -1,0 +1,754 @@
+{
+  "schema_version": "mainframe-env.carddemo-base-batch-version-evidence@2",
+  "target_version": "0.8.0",
+  "supersedes": "conformance/0.8/evidence/carddemo-base-batch.json",
+  "historical_receipt_rewritten": false,
+  "transition_justification": [
+    "Historical v1 is unchanged. Refreshed v2 values come from the merged CardDemo xtask run; changed leaves cite v2 unless the JCL-derived reference matches.",
+    "DATASET:AWS.M2.CARDDEMO.STATEMNT.HTML: #266: HTML statement record 916 now prints interest TRAN-ID 2022071800000037 from the PARM date.",
+    "DATASET:AWS.M2.CARDDEMO.STATEMNT.PS: #266: text statement record 174 now prints interest TRAN-ID 2022071800000037 from the PARM date.",
+    "DATASET:AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00: #266: 50 interest TRAN-IDs gain 20220718; matching the 312 records by bytes after the ID shows all payloads unchanged.",
+    "DATASET:AWS.M2.CARDDEMO.TRANREPT.G0001V00: #287: report record 72 zero amount changed from CP037 4b f0 f0 (.00) to 40 40 40 (spaces) at bytes 110-112; the other 518 records are unchanged. The independent GnuCOBOL report now matches all 519 records.",
+    "DATASET:AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00: #266/#267: selected records include dated interest IDs; DCB=(*.SORTIN) now gives FB/350. JCL-derived reference digest matches.",
+    "DATASET:AWS.M2.CARDDEMO.TRXFL.SEQ: #266: the 350-byte cross-reference records include dated interest TRAN-IDs after the 16-byte card key; record 44 contains 2022071800000037.",
+    "DATASET:AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX: #266: the alternate index contains the 312 transaction records with the 50 corrected interest IDs; records share the KSDS payload.",
+    "DATASET:AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS: #266: the cross-reference KSDS contains dated interest TRAN-IDs; record 44 carries 2022071800000037 after its card key.",
+    "DATASET:AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00: #266: combined transaction records carry the 50 dated interest IDs; the 312 records equal the refreshed backup generation.",
+    "DATASET:AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH: #266: the alternate-index PATH reads the same 312 transaction records as the refreshed AIX, including the dated interest IDs.",
+    "DATASET:AWS.M2.CARDDEMO.SYSTRAN.G0001V00: #266: all 50 generated interest records now start with a 20220718 TRAN-ID; the first is 2022071800000001.",
+    "DATASET:AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS: #266: the transaction KSDS has 50 corrected interest IDs; the first source record is 2022071800000001.",
+    "SPOOL:TRANREPT: #266/#277: STEP10R SYSPRINT shows dated interest TRAN-IDs and the literal labels TRAN-AMT and WS-PAGE-TOTAL.",
+    "journey_shape_sha256: #287: recomputed from the TRANREPT dataset digest after report record 72 bytes 110-112 changed from CP037 4b f0 f0 (.00) to 40 40 40 (spaces); all other counts, dataset digests, and spool digests are unchanged."
+  ],
+  "evidence_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+  "receipt": {
+    "schema_version": "mainframe-env.carddemo-base-batch-receipt@1",
+    "status": "pass",
+    "corpus_commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
+    "business_date": "2022-07-06",
+    "journeys_passed": 3,
+    "initialization_jobs": 12,
+    "operational_jobs": 9,
+    "cics_file_controls": 2,
+    "internal_submissions": 1,
+    "warm_restart_controls": 1,
+    "rollback_controls": 1,
+    "cancellation_controls": 1,
+    "tranrept_selected_records": 312,
+    "tranrept_report_records": 519,
+    "dataset_sha256": {
+      "@CATALOG": "4b80e7ab4a6e55add8347fbaf7d763494a8ab27b3c26bb6a9119012ed9aefdd0",
+      "AWS.M2.CARDDEMO.ACCDATA.PS": "bbcee4c589669c2283c2dbcd9b59b5cacd3aafc4b04d18328de1ecb6b2716fed",
+      "AWS.M2.CARDDEMO.ACCTDATA.PS": "bbcee4c589669c2283c2dbcd9b59b5cacd3aafc4b04d18328de1ecb6b2716fed",
+      "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS": "51649f2918fd59f8c9b083032b47473928699801890c35133704ed31f1781099",
+      "AWS.M2.CARDDEMO.CARDDATA.PS": "f37418a6090a8331b382278b37948ebc8cb9eb7987f71b6df93944a297440ba5",
+      "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX": "ca39a7d373b7882b361a48615b4eb9dd5df6f882a6c886ffd7fcdc750d943d3c",
+      "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH": "ca39a7d373b7882b361a48615b4eb9dd5df6f882a6c886ffd7fcdc750d943d3c",
+      "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS": "114b16c5227a23d899732f01849e08e514c7f573844541e582f420b52316a594",
+      "AWS.M2.CARDDEMO.CARDXREF.PS": "2bf88b6e435b8a99ffc4c6dafa34ae4e26fba8f74bb59899454d892791d8482d",
+      "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX": "11688df25fbff146c10822df3de59d681a596d9c9d368b9dfee8c2e28d280196",
+      "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH": "11688df25fbff146c10822df3de59d681a596d9c9d368b9dfee8c2e28d280196",
+      "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS": "839fd74d35f9e9cd38781944a28f6c21af31cb34eed16a773a46a30e1562217e",
+      "AWS.M2.CARDDEMO.CNTL": "dff0f470efc597f8613bb9ee9bde4d35be8e2db1d4dc4472de0fb76b432d9230",
+      "AWS.M2.CARDDEMO.CUSTDATA.PS": "676e7bf5d7709e76e19fe189da06552012a026759474bb11d9abe52bcad0263a",
+      "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS": "415f9a0167fcf9f87756d4a6d3877ffbb62dc2ea2388829c3ab1901489a36a24",
+      "AWS.M2.CARDDEMO.DALYREJS.G0001V00": "f99a3824b273c4d72801ad80d45acc823d3d5a737829a7fd12266c05ae06995d",
+      "AWS.M2.CARDDEMO.DALYTRAN.PS": "7bdaa0677a93ae1a99b232f0946f8b5db810455a17649a13a6eff04dad5c2b0b",
+      "AWS.M2.CARDDEMO.DALYTRAN.PS.INIT": "4c3285b48ce6eb31489722bb98a8a23ccae13a84ea157555b50128bfb5dd93f0",
+      "AWS.M2.CARDDEMO.DATEPARM": "8501153b24b5f2e04080d72940c0a1d78e444f232e32f40fa86088e9749bc758",
+      "AWS.M2.CARDDEMO.DISCGRP.PS": "18ab8f261a0fc7aeaf2f91ed0c89c884e17894f86a1f10e0ddfb3e3feafbc28f",
+      "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS": "9c03f1f350e1a93e82eee45249268528ed0438f32a742401a2c9b456afacceb6",
+      "AWS.M2.CARDDEMO.EXPORT.DATA": "78e84f1c1090572dcc94fd10804e1c94ce6e753bf62e96738b9aa756b8ab8c9f",
+      "AWS.M2.CARDDEMO.EXPORT.DATA.PS": "fb07527b373b3504d82fb6e4e0908f71ae0c563382ebb775d8ba437511bcdbd0",
+      "AWS.M2.CARDDEMO.JCL": "fb6221a5d19e90cea2418e802b77845445fb716cdb67be9da7db491323221c48",
+      "AWS.M2.CARDDEMO.PROC": "f3cfeb78a3e3d7fbaf379486a201b86bb7d98cbe577f66f3d34154cc5ce8329a",
+      "AWS.M2.CARDDEMO.STATEMNT.HTML": "c0065e75a02c1ca42ce83d22d51ba585168b7d6295a0f45ed4eba82312d3002f",
+      "AWS.M2.CARDDEMO.STATEMNT.PS": "6a6b1c2ab19f818db0fa1a92254322dda256cd4014f4eaef6ee4525f9a964f89",
+      "AWS.M2.CARDDEMO.SYSTRAN.G0001V00": "d767568b9eb92ad14a230fac8371fa74ccc2f1dc2c879346f8e35f648859582a",
+      "AWS.M2.CARDDEMO.TCATBALF.BKUP.G0001V00": "2692a03d440129fa14723b33d5b62f23d8b6f4a09c9bba520241b3ded363d791",
+      "AWS.M2.CARDDEMO.TCATBALF.PS": "6d89451b8b46349bbc5bbbb5ddfe32a8a73bf8d834b2b10db065226f1f41240e",
+      "AWS.M2.CARDDEMO.TCATBALF.REPT": "b59e145ae008500151003b229fb39a7291dbf2a5c6f1843ee5db24d56b1babd3",
+      "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS": "ffac4bd1dc8f3503e9aa42ad11e5b81c35fe863f2937759b2b7aaf643f6c45fb",
+      "AWS.M2.CARDDEMO.TRANCATG.PS": "69101981f70d9d11ab80015eba27817424613b0e806e00d28a369ea4a69b2052",
+      "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS": "0351ebae75a4ddd4fb923d186a12f37af1222efc5b46c0f5e572cfb5c446c7b1",
+      "AWS.M2.CARDDEMO.TRANREPT.G0001V00": "9cf4e88ced43311304825bbb0aebd36fd48c9cf3c773638087c012b17895bc54",
+      "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0001V00": "d38678af10080154b14d42be6d80a0ec4fac9509b3357e15962d0602b6b79208",
+      "AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00": "cfece72872a702e7bce009fbb8cd4c445a5bdbce9221a06bd41fba97e224a773",
+      "AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00": "cfece72872a702e7bce009fbb8cd4c445a5bdbce9221a06bd41fba97e224a773",
+      "AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00": "4933862be4b71641aad870d760059454350f680b62397d59a2a96fe00c80dd15",
+      "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX": "20a3a703b9c8ae68fcfc7d4e0bdfa2555a948e2c945344c5a9197de03b0dc385",
+      "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH": "20a3a703b9c8ae68fcfc7d4e0bdfa2555a948e2c945344c5a9197de03b0dc385",
+      "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS": "5b44ea244e86c4fdba0da2896a3a2fbd0775a745541aa63825e5467779700cc3",
+      "AWS.M2.CARDDEMO.TRANTYPE.PS": "052c8db40a6c83eeee8edae673eb849775abc237fbdf2974531b1c0d4fa56ffe",
+      "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS": "2a6c7ba88748e4068dc0c5bf9cb97f87531f62e3abe891cbd840a3aaf0d7717f",
+      "AWS.M2.CARDDEMO.TRXFL.SEQ": "5d68a4a2c82c6680926d4f54baf5fe1b00040d379d6d627935dd3955bed30ff0",
+      "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS": "d995671147ebd1e27cc9132e16affc5a85eceb438441ca3e8b8f1484ac70d7a0",
+      "AWS.M2.CARDDEMO.USRSEC.PS": "d9161cc69bac7f93acfbb389389f98237a32f4730c27cbf79703e3dbf1d9c249",
+      "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS": "9024a0fc54ea9b89bb86aa090e5b190fe77cb59e88df484b103182219fde5bd1",
+      "AWS.M2.CARDEMO.FTP.TEST": "f8a1aa1f82f78f6884994fe3c62233d04dfd4d8b6e2d1af5c4264982ce3ffcf2",
+      "AWS.M2.CARDEMO.FTP.TEST.BKUP": "f8a1aa1f82f78f6884994fe3c62233d04dfd4d8b6e2d1af5c4264982ce3ffcf2",
+      "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR": "f8a1aa1f82f78f6884994fe3c62233d04dfd4d8b6e2d1af5c4264982ce3ffcf2"
+    },
+    "spool_sha256": {
+      "ACCTFILE": "bc863fbecda3b1f21fc23ee99e52d4b245cf855c94d8ea4afcb1ea002ddbb313",
+      "CANCEL-CONTROL": "e7dcbd54d6b4c350ec3a3adb482778109b49dfbca3fe89b4fb1d98e41d8b6f2e",
+      "CARDFILE": "445764ea70724e59fe3c15c5a59c5b171ab668dff289bc27f1b7c8f5715a4e77",
+      "CLOSEFIL": "2661e060dd32ef2728bf036898a6371c5d4c037e67953d6f3f81364e3cfbbf1f",
+      "COMBTRAN": "1cade989cc0d03a0df2465022327f913a364971080ccca9e6b4ea321fc73b35d",
+      "CREASTMT": "638de2e1848ec31ca17a14ee3e23ea0295881f2f7e619c0b385b9426b5b0e566",
+      "CUSTFILE": "a1543816acdd809ee9a63842b0363c36954dfffe827e9ee6826be8a6f2c13fcf",
+      "DALYREJS": "6ef5899fa11c61de457e2220d198cb5168fc4247056d8324ab1d36eb150b529b",
+      "DEFGDGB": "fc18baf8d479157ba16f422fa2c91ca12da7664d3fd2eb8e1c6b7f7c5ae64a67",
+      "DISCGRP": "12ba6f087b5405d43cad136bcc5e2a6036e8f096baa2002d2d424b9116b36fc6",
+      "DUSRSECJ": "d0371b264b2d43588ba0482e6853f07c151736cf381beb6e3ed8965b935e4097",
+      "INTCALC": "a1f5d991f3bfec1fbcc49d357e1701e1f113d5859456afca823cff378f43d424",
+      "INTRDRJ1": "d9dccfe965f6ba51c3ff2e0a470bd380f3309dc9837e0a9d3ba0a648a335281c",
+      "INTRDRJ2": "46602aa81211339c30a47b0bc0781d1c3b4975b98b96b545c01d684cbfc4d334",
+      "OPENFIL": "affa4af38b1aeb82ba4001c51263495420683e94f180742a52fd97c3d55438bc",
+      "POSTTRAN": "b0fe185a2cc26b00984d28a66c5e4b6490b714ae547c25e60a907239f6c65458",
+      "PRTCATBL": "7629f4fddaaa02131fa9922db84ca30e4f267799149d03091d2a55fccfb9b3a9",
+      "ROLLBACK-CONTROL": "080b1275f620523ae145c0358aa85b5ab1a60d917c6e133d478b38043ed00e0f",
+      "TCATBALF": "f893c0aef976a31c9add72b9f5c163800c0a6951ea02dfe06b4b18530a95c987",
+      "TRANBKP": "e024dbff1b21072ef9cbe1cb7cb278fe58e922710a99233ac664e1fe31cca3a9",
+      "TRANCATG": "7433cf19e02a6d873bbbba66ece01bc8a4c1d26212b2e6a69a9f8c6452537774",
+      "TRANFILE": "dce17a79520f33babb02ad49ecd61d881de3bd3c3cb4992f1b8318d5d240af4d",
+      "TRANIDX": "9e0f7a1cf0fa7d32f993dcaebd7035387fec556435ba6ac9704e0510c314b1b2",
+      "TRANREPT": "f31ed1371c7ba26b1fcf3c62212b9259184128307b5d8b192f1b9675fc71b8c2",
+      "TRANTYPE": "03ebeb9f7b0abe1d24cd392ac3b0d7943b3d6d16823fccbc192ec527e88759d2",
+      "XREFFILE": "e9ec102ea373bbc5816628b21dc069b6a520c33ce6831308df461f003d769845"
+    },
+    "journey_shape_sha256": "77bf7c02b34eb73c7c20dcda5341bb78cf5b3dd78eceacf211d9668624921baa"
+  },
+  "expected_value_provenance": [
+    {
+      "assertion_path": "/status",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/status"
+    },
+    {
+      "assertion_path": "/business_date",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/business_date"
+    },
+    {
+      "assertion_path": "/journeys_passed",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/journeys_passed"
+    },
+    {
+      "assertion_path": "/initialization_jobs",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/initialization_jobs"
+    },
+    {
+      "assertion_path": "/operational_jobs",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/operational_jobs"
+    },
+    {
+      "assertion_path": "/cics_file_controls",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/cics_file_controls"
+    },
+    {
+      "assertion_path": "/internal_submissions",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/internal_submissions"
+    },
+    {
+      "assertion_path": "/warm_restart_controls",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/warm_restart_controls"
+    },
+    {
+      "assertion_path": "/rollback_controls",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/rollback_controls"
+    },
+    {
+      "assertion_path": "/cancellation_controls",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/cancellation_controls"
+    },
+    {
+      "assertion_path": "/tranrept_selected_records",
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:a3885c5b0920084a898a8b0b423449dd4353ccd4a5020ae6d22e9ec4de73632e",
+      "source_locator": "/results/tranrept_selected_records"
+    },
+    {
+      "assertion_path": "/tranrept_report_records",
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:a3885c5b0920084a898a8b0b423449dd4353ccd4a5020ae6d22e9ec4de73632e",
+      "source_locator": "/results/tranrept_report_records"
+    },
+    {
+      "assertion_path": "/dataset_sha256/@CATALOG",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/@CATALOG"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.ACCDATA.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.ACCDATA.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.ACCTDATA.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.ACCTDATA.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CNTL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CNTL"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CUSTDATA.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CUSTDATA.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.DALYREJS.G0001V00",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.DALYREJS.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.DALYTRAN.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.DALYTRAN.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.DALYTRAN.PS.INIT",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.DALYTRAN.PS.INIT"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.DATEPARM",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.DATEPARM"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.DISCGRP.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.DISCGRP.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.EXPORT.DATA",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.EXPORT.DATA"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.EXPORT.DATA.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.EXPORT.DATA.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.JCL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.JCL"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.PROC",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.PROC"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.HTML",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.HTML"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.STATEMNT.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.SYSTRAN.G0001V00",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.SYSTRAN.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.BKUP.G0001V00",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.BKUP.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.REPT",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.REPT"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANCATG.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANCATG.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00",
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:a3885c5b0920084a898a8b0b423449dd4353ccd4a5020ae6d22e9ec4de73632e",
+      "source_locator": "/results/dataset_sha256/AWS.M2.CARDDEMO.TRANREPT.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0001V00",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.BKUP.G0002V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.COMBINED.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00",
+      "source": "independent-reference",
+      "source_id": "conformance/0.8/oracles/carddemo-tranrept-reference@1.json#mainframe-env.carddemo-tranrept-reference@1",
+      "source_digest": "sha256:a3885c5b0920084a898a8b0b423449dd4353ccd4a5020ae6d22e9ec4de73632e",
+      "source_locator": "/results/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.DALY.G0001V00"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANTYPE.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANTYPE.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.SEQ",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.SEQ"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.USRSEC.PS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.USRSEC.PS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDEMO.FTP.TEST",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDEMO.FTP.TEST"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDEMO.FTP.TEST.BKUP",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDEMO.FTP.TEST.BKUP"
+    },
+    {
+      "assertion_path": "/dataset_sha256/AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/dataset_sha256/AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR"
+    },
+    {
+      "assertion_path": "/spool_sha256/ACCTFILE",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/ACCTFILE"
+    },
+    {
+      "assertion_path": "/spool_sha256/CANCEL-CONTROL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/CANCEL-CONTROL"
+    },
+    {
+      "assertion_path": "/spool_sha256/CARDFILE",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/CARDFILE"
+    },
+    {
+      "assertion_path": "/spool_sha256/CLOSEFIL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/CLOSEFIL"
+    },
+    {
+      "assertion_path": "/spool_sha256/COMBTRAN",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/COMBTRAN"
+    },
+    {
+      "assertion_path": "/spool_sha256/CREASTMT",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/CREASTMT"
+    },
+    {
+      "assertion_path": "/spool_sha256/CUSTFILE",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/CUSTFILE"
+    },
+    {
+      "assertion_path": "/spool_sha256/DALYREJS",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/DALYREJS"
+    },
+    {
+      "assertion_path": "/spool_sha256/DEFGDGB",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/DEFGDGB"
+    },
+    {
+      "assertion_path": "/spool_sha256/DISCGRP",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/DISCGRP"
+    },
+    {
+      "assertion_path": "/spool_sha256/DUSRSECJ",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/DUSRSECJ"
+    },
+    {
+      "assertion_path": "/spool_sha256/INTCALC",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/INTCALC"
+    },
+    {
+      "assertion_path": "/spool_sha256/INTRDRJ1",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/INTRDRJ1"
+    },
+    {
+      "assertion_path": "/spool_sha256/INTRDRJ2",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/INTRDRJ2"
+    },
+    {
+      "assertion_path": "/spool_sha256/OPENFIL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/OPENFIL"
+    },
+    {
+      "assertion_path": "/spool_sha256/POSTTRAN",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/POSTTRAN"
+    },
+    {
+      "assertion_path": "/spool_sha256/PRTCATBL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/PRTCATBL"
+    },
+    {
+      "assertion_path": "/spool_sha256/ROLLBACK-CONTROL",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/ROLLBACK-CONTROL"
+    },
+    {
+      "assertion_path": "/spool_sha256/TCATBALF",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/TCATBALF"
+    },
+    {
+      "assertion_path": "/spool_sha256/TRANBKP",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/TRANBKP"
+    },
+    {
+      "assertion_path": "/spool_sha256/TRANCATG",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/TRANCATG"
+    },
+    {
+      "assertion_path": "/spool_sha256/TRANFILE",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/TRANFILE"
+    },
+    {
+      "assertion_path": "/spool_sha256/TRANIDX",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/TRANIDX"
+    },
+    {
+      "assertion_path": "/spool_sha256/TRANREPT",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/spool_sha256/TRANREPT"
+    },
+    {
+      "assertion_path": "/spool_sha256/TRANTYPE",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/TRANTYPE"
+    },
+    {
+      "assertion_path": "/spool_sha256/XREFFILE",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch.json#sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_digest": "sha256:289db8dad875aabcb1117d05e7d26ea673133b9b8aac5af992237a73d83e059a",
+      "source_locator": "/receipt/spool_sha256/XREFFILE"
+    },
+    {
+      "assertion_path": "/journey_shape_sha256",
+      "source": "self-recorded",
+      "source_id": "conformance/0.8/evidence/carddemo-base-batch@2.json#sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_digest": "sha256:c842a4b98950efd8e640d8b5aa1db9d893b9a7d5350bc12c70792f3f783d95bf",
+      "source_locator": "/receipt/journey_shape_sha256"
+    }
+  ]
+}

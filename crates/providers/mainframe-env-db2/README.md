@@ -33,53 +33,64 @@ package/plan, and distributed portfolio assigned to later versions. Verify with
 `cargo xtask db2-statement-catalog --check`, and the pinned CardDemo Db2 and
 authorization gates.
 
-The 0.12 syntax path begins with a bounded private `sqlparser-rs` tokenizer.
-It immediately converts into owned Db2 tokens, source spans and diagnostics;
-third-party AST, errors, catalogs and types are not public or durable state.
-The lexer is not an execution route and grants no statement recognition credit
-until later owned parser and Conformance IR slices bind complete syntax.
+The proposed 0.12 lexer is a separate owned, bounded token stream for later
+parser slices. It exposes token kinds, byte and line/column spans, diagnostics,
+and a peekable cursor; it does not route SQL to execution. Float and decfloat
+constant forms fail with a source-pending diagnostic under issue #350.
 
-Owned AST primitives normalize ordinary identifiers while preserving delimited
-identifiers, retain qualified names, host variables and indicator variables,
-represent built-in/distinct type syntax, and store expressions in a bounded
-append-only arena. Arena nodes can reference only prior nodes, so cycles,
-forward references, excessive depth, lists, literals and node counts fail before
-an AST can be published. Type compatibility and name resolution remain binder
-responsibilities rather than parser guesses.
+The proposed 0.12 AST primitives own normalized and delimited identifiers,
+qualified names, host and indicator references, built-in and distinct type
+syntax, literals, operators, and an append-only expression arena. Constructors
+bound names, type arguments, literals, lists, nodes, references, and depth.
+Expressions retain D2 source spans. Name resolution remains pending.
 
-Statement parsing is added only in complete source-reviewed families. The first
-family owns typed COMMIT, ROLLBACK and SAVEPOINT AST, including WORK,
-named/unnamed savepoint rollback, UNIQUE, and retain-clause structure. It
-rejects other statement families and extra tokens; parsing alone is not an
-execution or transaction-authority path.
+The proposed 0.12 transaction parser owns typed COMMIT, ROLLBACK, and SAVEPOINT
+syntax, including optional WORK, named or unnamed rollback targets, UNIQUE,
+and both retain clauses. It rejects unsupported families, duplicate or
+malformed clauses, invalid savepoint names, and extra statements with bounded
+located diagnostics. Parsing does not route SQL to execution.
 
-SQL identifiers and host identifiers remain distinct. SQL names apply Db2
-ordinary/delimited rules; host identifiers preserve host-language spelling,
-including COBOL hyphens, for the host binder to resolve with its own ABI rules.
+Host identifiers remain distinct from SQL identifiers. The lexer preserves
+host-language spelling, including COBOL hyphens. The bounded host-reference
+parser accepts a variable alone or with an indicator, with optional
+`INDICATOR` before the indicator variable, and rejects misplaced parts.
+Host structures and host-language binding remain pending. Parsing has no
+execution route.
 
-The common dynamic-SQL parser owns static-host PREPARE, EXECUTE, and EXECUTE
-IMMEDIATE structure, including SQLDA naming modes, attribute indicators, USING
-lists and descriptors. It rejects PL/I string expressions, SQL PL array
-elements, multi-row source buffers, and forbidden source indicators until their
-separate obligations land; this partial family support grants no whole-row
-recognition credit.
+The proposed common dynamic-SQL parser owns static-host PREPARE, EXECUTE, and
+EXECUTE IMMEDIATE structure, including SQLDA naming modes, attribute indicators,
+USING lists, and descriptors. It rejects PL/I string expressions, SQL PL
+variables and array elements, multi-row source buffers, and forbidden source
+indicators. This partial family support grants no whole-row recognition credit
+and has no execution route.
 
-The public SELECT-core syntax surface owns one bounded subselect with
-quantifiers, expression/wildcard items, named sources, WHERE, GROUP BY, HAVING,
-ORDER BY, OFFSET, and FETCH. It accumulates expression-node limits across the
-statement and rejects joins, aliases, CTEs, set operations, subqueries, SELECT
-INTO, and undeclared outer clauses. It is not a binder, plan, or execution path.
+The proposed prepared DECLARE CURSOR parser owns scrollability and sensitivity,
+holdability, returnability, and rowset positioning. It preserves omitted
+keywords as typed defaults, rejects duplicate or misplaced clauses with
+locations, and fences inline queries until full select-statement syntax is
+available. It has no cursor
+execution route or whole-row recognition credit.
 
-The public common CREATE TABLE syntax surface owns named columns, built-in or
-distinct type syntax, NOT NULL, constant/NULL defaults, and table PRIMARY KEY,
-UNIQUE, and FOREIGN KEY constraints with the declared ON DELETE actions. The
-public prepared DECLARE CURSOR surface preserves explicit/default scroll,
-sensitivity, holdability, returnability, target, and rowset positioning. Both
-fail closed outside their recorded subsets and grant no whole-row credit.
+The proposed SELECT core parser owns a bounded subselect with select items,
+named table sources, WHERE, GROUP BY, HAVING, ORDER BY, OFFSET, and FETCH.
+It reuses the owned expression parser and rejects joins, aliases, set operators,
+subqueries, SELECT INTO, and outer SELECT clauses with located diagnostics.
+Fullselect and inline cursor integration remain pending. This syntax has no
+execution route or whole-row recognition credit.
 
-The public common type boundary resolves parser syntax into validated numeric,
-character, graphic, binary, and datetime shapes while preserving precision,
-scale, length, time zone, and nullability. Its assignment and comparison
-classifications are deterministic but perform no conversion. Distinct types,
-LOBs, ROWID, XML, arrays, explicit CCSID/collation and context-sensitive
-datetime strings remain explicit binder/catalog obligations.
+The proposed common CREATE TABLE parser owns one named-table definition with
+bounded columns, built-in or distinct type syntax, NOT NULL, constant or NULL
+defaults, and table PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints with the
+recorded ON DELETE actions. It rejects unsupported column and physical-table
+clauses, including CHECK, before binding or execution. The public syntax is
+disconnected from the SQL execution route and earns no whole-row recognition
+or conformance credit.
+
+The proposed common type boundary resolves the owned AST's built-in type syntax
+to bounded numeric, character, graphic, binary, and datetime shapes. It exposes
+directional assignment and symmetric comparison classifications, preserving
+nullability and timestamp time-zone distinctions. Distinct types, LOBs, ROWID,
+XML, explicit CCSID/collation, and context-sensitive datetime strings remain
+explicitly rejected or deferred. This pure boundary performs no conversion or
+execution. Float and decfloat *type shapes* use the pinned data-type topic;
+float, decfloat, and Boolean *constants* remain fenced on #350.

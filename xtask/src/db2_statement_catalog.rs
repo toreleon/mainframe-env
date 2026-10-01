@@ -1,6 +1,7 @@
 use super::*;
 
 const SOURCE_PATH: &str = "conformance/0.2/catalogs/db2.json";
+const TOPICS_PATH: &str = "conformance/0.2/manifests/db2-topics.json";
 const GENERATED_PATH: &str =
     "crates/providers/mainframe-env-db2/src/generated_statement_catalog.rs";
 const BASELINE: &str = "ibm-db2-for-zos-13-2026-08-13";
@@ -16,6 +17,7 @@ struct Entry {
     row_id: String,
     label: String,
     source_locator: String,
+    topic_sha256: String,
     variant: String,
     semantic_id: String,
 }
@@ -47,6 +49,22 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
         "pinned Db2 catalog identity or denominator drifted",
     )?;
     let units = array(&source, "units", &source_path)?;
+    let topics_path = root.join(TOPICS_PATH);
+    let topics = json(&topics_path)?;
+    require(
+        topics["baseline_id"] == Value::String(BASELINE.into())
+            && topics["product"] == Value::String("SSEPEK_13.0.0".into()),
+        "pinned Db2 topic manifest identity drifted",
+    )?;
+    let topic_hashes = array(&topics, "topics", &topics_path)?
+        .iter()
+        .map(|topic| {
+            Ok((
+                text(topic, "topic_path", &topics_path)?.to_string(),
+                text(topic, "sha256", &topics_path)?.to_string(),
+            ))
+        })
+        .collect::<TaskResult<BTreeMap<_, _>>>()?;
     require(
         units.len() == FAMILIES.len(),
         "pinned Db2 catalog must contain exactly two units",
@@ -72,6 +90,15 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
             let row_id = text(row, "id", &source_path)?.to_string();
             let label = text(row, "label", &source_path)?.to_string();
             let source_locator = text(row, "source_locator", &source_path)?.to_string();
+            let topic_path = source_locator
+                .split(';')
+                .next()
+                .unwrap_or_default()
+                .strip_prefix("topic:")
+                .unwrap_or_default();
+            let topic_sha256 = topic_hashes.get(topic_path).ok_or_else(|| {
+                format!("Db2 catalog row has no pinned topic: {row_id}: {topic_path}")
+            })?;
             let words = normalized_words(&label)?;
             let variant = format!("{prefix}{}", pascal_case(&words));
             let semantic_id = format!("{semantic_prefix}.{}", words.join("-"));
@@ -90,6 +117,7 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
                 row_id,
                 label,
                 source_locator,
+                topic_sha256: topic_sha256.clone(),
                 variant,
                 semantic_id,
             });
@@ -162,6 +190,7 @@ fn render_rust(entries: &[Entry], source_digest: &str) -> String {
     output.push_str("    pub label: &'static str,\n");
     output.push_str("    pub official_row: &'static str,\n");
     output.push_str("    pub source_locator: &'static str,\n");
+    output.push_str("    pub topic_sha256: &'static str,\n");
     output.push_str("}\n\n");
     output.push_str(&format!(
         "#[rustfmt::skip]\npub const DB2_OFFICIAL_STATEMENT_CATALOG_SHA256: &str = {};\n\n",
@@ -171,13 +200,14 @@ fn render_rust(entries: &[Entry], source_digest: &str) -> String {
     output.push_str("pub static DB2_STATEMENT_DESCRIPTORS: &[Db2StatementDescriptor] = &[\n");
     for entry in entries {
         output.push_str(&format!(
-            "    Db2StatementDescriptor {{ id: Db2StatementId::{}, unit: Db2StatementUnit::{}, ordinal: {}, label: {}, official_row: {}, source_locator: {} }},\n",
+            "    Db2StatementDescriptor {{ id: Db2StatementId::{}, unit: Db2StatementUnit::{}, ordinal: {}, label: {}, official_row: {}, source_locator: {}, topic_sha256: {} }},\n",
             entry.variant,
             entry.unit,
             entry.ordinal,
             rust_string(&entry.label),
             rust_string(&entry.row_id),
             rust_string(&entry.source_locator),
+            rust_string(&entry.topic_sha256),
         ));
     }
     output.push_str(
@@ -250,6 +280,9 @@ mod tests {
         let target = root.join(SOURCE_PATH);
         fs::create_dir_all(target.parent().unwrap()).unwrap();
         fs::copy(repository_root().unwrap().join(SOURCE_PATH), target).unwrap();
+        let topics_target = root.join(TOPICS_PATH);
+        fs::create_dir_all(topics_target.parent().unwrap()).unwrap();
+        fs::copy(repository_root().unwrap().join(TOPICS_PATH), topics_target).unwrap();
         root
     }
 
@@ -276,6 +309,7 @@ mod tests {
         assert!(rendered.contains("pub enum Db2StatementId"));
         assert!(rendered.contains("SqlSelect"));
         assert!(rendered.contains("SqlPlCompoundStatement"));
+        assert!(rendered.contains("topic_sha256"));
     }
 
     #[test]

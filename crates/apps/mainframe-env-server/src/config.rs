@@ -109,6 +109,9 @@ pub struct ServerConfig {
     pub tls: TlsConfig,
     #[serde(default)]
     pub bootstrap: BootstrapConfig,
+    /// In-process COBOL business date; omitted from deployment configuration.
+    #[serde(skip)]
+    pub cobol_current_date: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -133,6 +136,7 @@ impl Default for ServerConfig {
                 private_key_reference: None,
             },
             bootstrap: BootstrapConfig::default(),
+            cobol_current_date: None,
         }
     }
 }
@@ -321,6 +325,13 @@ impl ServerConfig {
             || self.max_concurrency == 0
             || self.timeout_millis == 0
             || self.shutdown_millis == 0
+            || self.cobol_current_date.as_ref().is_some_and(|value| {
+                let bytes = value.as_bytes();
+                bytes.len() != 21
+                    || !bytes[..16].iter().all(u8::is_ascii_digit)
+                    || !matches!(bytes[16], b'+' | b'-')
+                    || !bytes[17..].iter().all(u8::is_ascii_digit)
+            })
             || self.retention.policy().is_err()
             || (self.artifact_profile == ArtifactProfile::Local
                 && self.artifact_root.as_os_str().is_empty())

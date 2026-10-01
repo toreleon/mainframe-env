@@ -1,35 +1,237 @@
 //! Typed CICS host request and result boundary.
 
-use super::Mutation;
+use super::{HostLimits, HostProblem, Mutation};
 use mainframe_env_execution_api::BoundedPayload;
 use std::collections::BTreeMap;
 
+mod parse;
+
+/// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    BtsEndBrowseContainer,
+    BtsGetNextContainer,
+    BtsInquireContainer,
+    BtsStartBrowseContainer,
+    BtsEndBrowseEvent,
+    BtsGetNextEvent,
+    BtsInquireEvent,
+    BtsStartBrowseEvent,
+    BtsEndBrowseTimer,
+    BtsInquireTimer,
+    BtsStartBrowseTimer,
+    BtsStartBrowseActivity,
+    BtsGetNextActivity,
+    BtsEndBrowseActivity,
+    BtsInquireActivity,
+    BtsStartBrowseProcess,
+    BtsGetNextProcess,
+    BtsEndBrowseProcess,
+    BtsInquireProcess,
+    AcquireActivityId,
+    AcquireProcess,
+    CancelAcqActivity,
+    CancelAcqProcess,
+    CancelActivity,
+    CheckAcqActivity,
+    CheckAcqProcess,
+    CheckActivity,
+    DefineActivity,
+    DefineProcess,
+    DeleteActivity,
+    ResetAcqProcess,
+    ResetActivity,
+    ResumeAcqActivity,
+    ResumeAcqProcess,
+    ResumeActivity,
+    RunAcqActivity,
+    RunAcqProcess,
+    RunActivity,
+    RunTransId,
+    DeleteChannel,
+    DeleteContainer,
+    GetContainer,
+    GetContainer64,
+    MoveContainer,
+    PutContainer,
+    PutContainer64,
+    QueryChannel,
+    SuspendAcqActivity,
+    SuspendAcqProcess,
+    SuspendActivity,
+    /// Allocate one task-owned mapped APPC or MRO conversation.
+    AllocateConversation,
+    /// Allocate one task-owned APPC basic conversation with GDS return codes.
+    GdsAllocateConversation,
+    /// Read this task's principal APPC basic facility with GDS return codes.
+    GdsAssignConversation,
+    /// Build one task-owned MRO attach control block for a later send.
+    BuildAttach,
+    /// Initiate one task-owned mapped APPC process conversation.
+    ConnectProcess,
+    /// Initiate one APPC basic process conversation with GDS return codes.
+    GdsConnectProcess,
+    /// Return one mapped APPC or MRO facility to the session group.
+    FreeConversation,
+    /// Return one completed APPC basic facility with GDS return codes.
+    GdsFreeConversation,
+    /// Send and receive one explicit mapped APPC or MRO peer frame.
+    Converse,
+    /// Consume one task-owned mapped APPC or MRO peer frame.
+    ReceiveConversation,
+    /// Receive APPC basic data and indicators with a six-byte GDS RETCODE.
+    GdsReceiveConversation,
+    /// Stage mapped APPC or MRO data for carrier-confirmed transmission.
+    SendConversation,
+    /// Confirm accumulated mapped APPC process and SEND transmission.
+    WaitConvid,
+    /// Confirm APPC basic accumulated output with a six-byte GDS RETCODE.
+    GdsWaitConversation,
+    /// Confirm terminal output and observe one peer EOC or SIGNAL indicator.
+    WaitTerminal,
     Abend,
+    /// Fetch the next completed child token owned by this parent task.
+    FetchAny,
+    /// Fetch the completion of one parent-owned child token.
+    FetchChild,
+    /// Free a child token and its unfetched reply resources.
+    FreeChild,
+    /// Synchronously activate the acquired BTS activity.
+    LinkAcqActivity,
+    /// Synchronously activate the acquired BTS process root.
+    LinkAcqProcess,
+    /// Synchronously activate one named child activity.
+    LinkActivity,
+    /// Read the task's LUTYPE6.1 or MRO attach-header fields.
+    ExtractAttach,
+    /// Read mapped APPC or MRO conversation state.
+    ExtractAttributes,
+    /// Read APPC basic state and its GDS return code.
+    GdsExtractAttributes,
+    /// Consume the task's one-shot terminal logon message.
+    ExtractLogonMsg,
+    /// Read the principal mapped APPC attach process.
+    ExtractProcess,
+    /// Read the principal APPC basic attach process.
+    GdsExtractProcess,
+    /// Resolve an LUTYPE6.1 network name to local system/terminal names.
+    ExtractTct,
+    /// Position the task on an owned LUTYPE6.1 or MRO facility.
+    Point,
+    /// Add one atomic event to an activity-owned composite predicate.
+    AddSubevent,
+    /// Return checked virtual addresses for task storage areas.
+    Address,
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
+    /// Remove editing characters from one numeric field in place.
+    BifDeedit,
+    /// Calculate a bounded SHA-1 digest of caller supplied data.
+    BifDigest,
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
     /// Cancel one unhonored local interval-control START request.
     Cancel,
+    /// Change a standard RACF password after verifying its current value.
+    ChangePassword,
+    /// Change a length-selected RACF password or phrase after verification.
+    ChangePhrase,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
     /// Complete the source-defined zero-delay interval-control boundary.
     Delay,
+    /// Define a named signed fullword counter in a selected pool.
+    DefineCounter,
+    /// Define a named unsigned doubleword counter in a selected pool.
+    DefineDCounter,
+    /// Execute IBM DELETE against a signed fullword named counter.
+    DeleteCounter,
+    /// Execute IBM DELETE against an unsigned doubleword named counter.
+    DeleteDCounter,
+    /// Execute IBM GET against a signed fullword named counter.
+    GetCounter,
+    /// Execute IBM GET against an unsigned doubleword named counter.
+    GetDCounter,
+    /// Execute IBM QUERY against a signed fullword named counter.
+    QueryCounter,
+    /// Execute IBM QUERY against an unsigned doubleword named counter.
+    QueryDCounter,
+    /// Execute IBM REWIND against a signed fullword named counter.
+    RewindCounter,
+    /// Execute IBM REWIND against an unsigned doubleword named counter.
+    RewindDCounter,
+    /// Execute IBM UPDATE against a signed fullword named counter.
+    UpdateCounter,
+    /// Execute IBM UPDATE against an unsigned doubleword named counter.
+    UpdateDCounter,
+    /// Arm one task-owned timer-event control area.
+    Post,
+    /// Write one system-console message and optionally await its reply.
+    WriteOperator,
+    /// Return fields from the accepted client certificate of this TCP/IP task.
+    ExtractCertificate,
+    /// Return selected fields of the accepted TCP/IP connection.
+    ExtractTcpip,
     /// Release one matching task enqueue ownership level.
     Deq,
+    /// Delete the current file record.
     Delete,
+    /// Define one activity-owned BTS input event.
+    DefineInputEvent,
+    /// Define an AND or OR predicate over activity-owned atomic events.
+    DefineCompositeEvent,
+    /// Delete one input or composite event from the current activity.
+    DeleteEvent,
+    /// BTS timer state command.
+    CheckTimer,
+    /// BTS timer state command.
+    DefineTimer,
+    /// BTS timer state command.
+    DeleteTimer,
+    /// BTS event retrieval or status command.
+    RetrieveReattachEvent,
+    /// BTS event retrieval or status command.
+    RetrieveSubevent,
+    /// BTS event retrieval or status command.
+    TestEvent,
+    /// Emit matching business events from an application capture point.
+    SignalEvent,
+    /// BTS timer state command.
+    ForceTimer,
+    /// Create one bounded transaction-owned document.
+    DocumentCreate,
+    /// Delete one transaction-owned document and release its storage.
+    DocumentDelete,
+    /// Insert content or bookmarks into one transaction-owned document.
+    DocumentInsert,
+    /// Copy one transaction-owned document into an application buffer.
+    DocumentRetrieve,
+    /// Add or replace symbols in one transaction-owned document.
+    DocumentSet,
     /// Delete every record from one local transient-data queue.
     DeleteTransientData,
+    /// Delete every item from one local temporary-storage queue.
+    DeleteTemporaryStorage,
+    /// Read one item from one local temporary-storage queue.
+    ReadTemporaryStorage,
+    /// Append or replace one item in one local temporary-storage queue.
+    WriteTemporaryStorage,
     /// Acquire or wait for one task enqueue resource.
     Enq,
     EndBrowse,
     FormatTime,
+    /// Convert a 64-byte architected date-time string to packed absolute time.
+    ConvertTime,
+    /// Release one task-local virtual storage area acquired by GETMAIN.
+    Freemain,
+    /// Release one checked AMODE(64) virtual allocation.
+    Freemain64,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
+    /// Admit a checked non-LE AMODE(64) virtual allocation request.
+    Getmain64,
     HandleAbend,
     /// Install or deactivate one bounded set of terminal AID handlers.
     HandleAid,
@@ -38,6 +240,12 @@ pub enum CicsOperation {
     /// Ignore one bounded set of reviewed EIBRESP conditions for this program level.
     IgnoreCondition,
     Inquire,
+    /// Select and invoke one installed application operation.
+    InvokeApplication,
+    /// Load one immutable installed program generation for the issuing task.
+    Load,
+    /// Release one prior program LOAD ownership level.
+    Release,
     Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
@@ -45,24 +253,194 @@ pub enum CicsOperation {
     PushHandle,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
+    /// Query a task or surrogate user's SAF resource access levels.
+    QuerySecurity,
+    /// Request one bounded RACF PassTicket for the current task principal.
+    RequestPassTicket,
+    /// Issue an encrypted PassTicket using the current task's VERIFY TOKEN key.
+    RequestEncryptPassTicket,
+    /// Associate a verified user with the current terminal for subsequent tasks.
+    Signon,
+    /// Restore the terminal default identity without changing this task principal.
+    Signoff,
     Read,
     ReadNext,
     ReadPrev,
+    /// Reposition an active file browse without replacing its cursor.
+    ResetBrowse,
+    /// Read and consume one record from a local transient-data queue.
+    ReadTransientData,
+    /// Remove one atomic child without deleting or resetting it.
+    RemoveSubevent,
     ReceiveMap,
+    /// Receive one 8775 partition input message and identify its partition.
+    ReceivePartn,
     Retrieve,
     Return,
     Rewrite,
     SendText,
     SendMap,
+    /// Send BMS device controls, directly or into a logical message.
+    SendControl,
+    /// Abort and deselect one outboard stream.
+    IssueAbort,
+    /// Append or place bounded records in an outboard data set.
+    IssueAdd,
+    /// End and deselect one outboard stream.
+    IssueEnd,
+    /// Erase selected records in a direct outboard data set.
+    IssueErase,
+    /// Return the next relative record number.
+    IssueNote,
+    /// Request a sequential outboard input stream.
+    IssueQuery,
+    /// Consume one record from an outboard input stream.
+    IssueReceive,
+    /// Replace selected direct outboard records.
+    IssueReplace,
+    /// Transmit one bounded outboard record or media message.
+    IssueSend,
+    /// Route one full-BMS logical message to eligible terminal recipients.
+    Route,
+    /// Complete one pending outboard send.
+    IssueWait,
+    /// APPC mapped ISSUE ABEND conversation flow.
+    IssueAbend,
+    /// APPC basic GDS ISSUE ABEND conversation flow.
+    GdsIssueAbend,
+    IssueConfirmation,
+    GdsIssueConfirmation,
+    IssueError,
+    GdsIssueError,
+    IssuePrepare,
+    GdsIssuePrepare,
+    GdsIssueSignal,
+    IssueSignal,
+    IssueCopy,
+    IssueDisconnect,
+    IssueEndfile,
+    IssueEndoutput,
+    IssueEods,
+    IssueEraseAup,
+    IssueLoad,
+    IssuePass,
+    IssuePrint,
+    IssueReset,
+    /// Complete and dispatch the active BMS logical message.
+    SendPage,
+    /// Associate a registered partition set or return the terminal to base state.
+    SendPartnset,
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
     SetFileStatus,
+    /// Close one task-owned CICS spool report.
+    SpoolClose,
+    /// Open one matching CICS spool report for input.
+    SpoolOpenInput,
+    /// Create one CICS spool report for output.
+    SpoolOpenOutput,
+    /// Read the next record of one open input spool report.
+    SpoolRead,
+    /// Append one record to an open output spool report.
+    SpoolWrite,
+    /// Write a bounded user trace entry by numeric trace identifier.
+    EnterTraceNum,
+    /// Record a configured user event monitoring point.
+    Monitor,
+    /// Capture a bounded local transaction diagnostic dump.
+    DumpTransaction,
+    /// Capture a bounded local CICS diagnostic dump.
+    Dump,
+    /// Change the bounded local diagnostic trace switches.
+    Trace,
+    /// Retain a bounded named user trace and local monitoring event.
+    EnterTraceId,
     /// Schedule one interval-control START record.
     Start,
+    /// Start one noncancelable local task immediately without copied data.
+    StartAttach,
+    /// Start one local transaction under a selected 3270 bridge exit.
+    StartBrexit,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
+    /// Wait for one timer-event control area to be posted.
+    WaitEvent,
+    /// Wait for standard MVS posting of one ECB in a bounded external list.
+    WaitExternal,
+    /// Wait on one or more MVS-format ECBs, including hand-posted events.
+    WaitCics,
+    /// Suspend the principal supported logical unit until a SIGNAL arrives.
+    WaitSignal,
     Syncpoint,
+    /// Typed CICS web-service-control command InvokeService.
+    InvokeService,
+    /// Typed CICS web-service-control command SoapFaultAdd.
+    SoapFaultAdd,
+    /// Typed CICS web-service-control command SoapFaultCreate.
+    SoapFaultCreate,
+    /// Typed CICS web-service-control command SoapFaultDelete.
+    SoapFaultDelete,
+    /// Typed CICS web-service-control command WsaContextBuild.
+    WsaContextBuild,
+    /// Typed CICS web-service-control command WsaContextDelete.
+    WsaContextDelete,
+    /// Typed CICS web-service-control command WsaContextGet.
+    WsaContextGet,
+    /// Typed CICS web-service-control command WsaEprCreate.
+    WsaEprCreate,
+    /// Convert one BIT-mode application-data container to canonical JSON.
+    TransformDataToJson,
+    /// Convert one BIT-mode application-data container to deterministic XML.
+    TransformDataToXml,
+    /// Convert JSON from a channel container to application data.
+    TransformJsonToData,
+    /// Query XML metadata or convert an XML container to application data.
+    TransformXmlToData,
+    /// Split a bounded URL into its scheme, host, port, path, and query components.
+    WebParseUrl,
+    /// Establish one task-owned HTTP client session and return its token.
+    WebOpen,
+    /// Release one task-owned client connection and invalidate its token.
+    WebClose,
+    /// Extract metadata from the current inbound request or an open client session.
+    WebExtract,
+    /// EXTRACT WEB spelling of the checked Web metadata command.
+    ExtractWeb,
+    /// Read one HTTP header, query parameter, or form field by name.
+    WebRead,
+    /// Start one task-owned Web header, query, or form browse.
+    WebStartBrowse,
+    /// Read the next name and value from a task-owned Web browse.
+    WebReadNext,
+    /// End one task-owned Web browse and release its snapshot.
+    WebEndBrowse,
+    /// Stage one HTTP header for a client request or server response.
+    WebWrite,
+    /// Send a checked HTTP client request or stage a server response.
+    WebSend,
+    /// Retrieve the document token from the last pending server WEB SEND.
+    WebRetrieve,
+    /// Consume an inbound request body or a retained client HTTP response body.
+    WebReceive,
+    /// Send one HTTP client request and receive its response in one command.
+    WebConverse,
+    /// Synchronize this task with output for one named journal.
+    WaitJournalName,
+    /// Synchronize this task with output for one numbered journal.
+    WaitJournalNum,
+    /// Create one named journal record with synchronous or deferred output.
+    WriteJournalName,
+    /// Create one numbered journal record with synchronous or deferred output.
+    WriteJournalNum,
+    /// Invalidate one task-owned file update context.
+    Unlock,
+    /// Verify one standard password with the installed SAF authority.
+    VerifyPassword,
+    /// Verify a length-selected password or phrase with the installed SAF authority.
+    VerifyPhrase,
+    /// Verify a bounded BasicAuth, JWT, or registered Kerberos token through SAF.
+    VerifyToken,
     Write,
     WriteTransientData,
     Xctl,
@@ -73,144 +451,526 @@ impl CicsOperation {
     #[must_use]
     pub const fn runtime_name(self) -> &'static str {
         match self {
+            Self::BtsEndBrowseContainer => "BtsEndBrowseContainer",
+            Self::BtsGetNextContainer => "BtsGetNextContainer",
+            Self::BtsInquireContainer => "BtsInquireContainer",
+            Self::BtsStartBrowseContainer => "BtsStartBrowseContainer",
+            Self::BtsEndBrowseEvent => "BtsEndBrowseEvent",
+            Self::BtsGetNextEvent => "BtsGetNextEvent",
+            Self::BtsInquireEvent => "BtsInquireEvent",
+            Self::BtsStartBrowseEvent => "BtsStartBrowseEvent",
+            Self::BtsEndBrowseTimer => "BtsEndBrowseTimer",
+            Self::BtsInquireTimer => "BtsInquireTimer",
+            Self::BtsStartBrowseTimer => "BtsStartBrowseTimer",
+            Self::BtsStartBrowseActivity => "BtsStartBrowseActivity",
+            Self::BtsGetNextActivity => "BtsGetNextActivity",
+            Self::BtsEndBrowseActivity => "BtsEndBrowseActivity",
+            Self::BtsInquireActivity => "BtsInquireActivity",
+            Self::BtsStartBrowseProcess => "BtsStartBrowseProcess",
+            Self::BtsGetNextProcess => "BtsGetNextProcess",
+            Self::BtsEndBrowseProcess => "BtsEndBrowseProcess",
+            Self::BtsInquireProcess => "BtsInquireProcess",
+            Self::AcquireActivityId => "AcquireActivityId",
+            Self::AcquireProcess => "AcquireProcess",
+            Self::CancelAcqActivity => "CancelAcqActivity",
+            Self::CancelAcqProcess => "CancelAcqProcess",
+            Self::CancelActivity => "CancelActivity",
+            Self::CheckAcqActivity => "CheckAcqActivity",
+            Self::CheckAcqProcess => "CheckAcqProcess",
+            Self::CheckActivity => "CheckActivity",
+            Self::DefineActivity => "DefineActivity",
+            Self::DefineProcess => "DefineProcess",
+            Self::DeleteActivity => "DeleteActivity",
+            Self::ResetAcqProcess => "ResetAcqProcess",
+            Self::ResetActivity => "ResetActivity",
+            Self::ResumeAcqActivity => "ResumeAcqActivity",
+            Self::ResumeAcqProcess => "ResumeAcqProcess",
+            Self::ResumeActivity => "ResumeActivity",
+            Self::RunAcqActivity => "RunAcqActivity",
+            Self::RunAcqProcess => "RunAcqProcess",
+            Self::RunActivity => "RunActivity",
+            Self::RunTransId => "RunTransId",
+            Self::DeleteChannel => "DeleteChannel",
+            Self::DeleteContainer => "DeleteContainer",
+            Self::GetContainer => "GetContainer",
+            Self::GetContainer64 => "GetContainer64",
+            Self::MoveContainer => "MoveContainer",
+            Self::PutContainer => "PutContainer",
+            Self::PutContainer64 => "PutContainer64",
+            Self::QueryChannel => "QueryChannel",
+            Self::SuspendAcqActivity => "SuspendAcqActivity",
+            Self::SuspendAcqProcess => "SuspendAcqProcess",
+            Self::SuspendActivity => "SuspendActivity",
+            Self::AllocateConversation => "AllocateConversation",
+            Self::GdsAllocateConversation => "GdsAllocateConversation",
+            Self::GdsAssignConversation => "GdsAssignConversation",
+            Self::BuildAttach => "BuildAttach",
+            Self::ConnectProcess => "ConnectProcess",
+            Self::GdsConnectProcess => "GdsConnectProcess",
+            Self::FreeConversation => "FreeConversation",
+            Self::GdsFreeConversation => "GdsFreeConversation",
+            Self::Converse => "Converse",
+            Self::ReceiveConversation => "ReceiveConversation",
+            Self::GdsReceiveConversation => "GdsReceiveConversation",
+            Self::SendConversation => "SendConversation",
+            Self::WaitConvid => "WaitConvid",
+            Self::GdsWaitConversation => "GdsWaitConversation",
+            Self::WaitTerminal => "WaitTerminal",
             Self::Abend => "Abend",
+            Self::FetchAny => "FetchAny",
+            Self::FetchChild => "FetchChild",
+            Self::FreeChild => "FreeChild",
+            Self::LinkAcqActivity => "LinkAcqActivity",
+            Self::LinkAcqProcess => "LinkAcqProcess",
+            Self::LinkActivity => "LinkActivity",
+            Self::ExtractAttach => "ExtractAttach",
+            Self::ExtractAttributes => "ExtractAttributes",
+            Self::GdsExtractAttributes => "GdsExtractAttributes",
+            Self::ExtractLogonMsg => "ExtractLogonMsg",
+            Self::ExtractProcess => "ExtractProcess",
+            Self::GdsExtractProcess => "GdsExtractProcess",
+            Self::ExtractTct => "ExtractTct",
+            Self::Point => "Point",
+            Self::AddSubevent => "AddSubevent",
+            Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
+            Self::BifDeedit => "BifDeedit",
+            Self::BifDigest => "BifDigest",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
+            Self::ChangePassword => "ChangePassword",
+            Self::ChangePhrase => "ChangePhrase",
             Self::ChangeTask => "ChangeTask",
             Self::Delay => "Delay",
+            Self::DefineCounter => "DefineCounter",
+            Self::DefineDCounter => "DefineDCounter",
+            Self::DeleteCounter => "DeleteCounter",
+            Self::DeleteDCounter => "DeleteDCounter",
+            Self::GetCounter => "GetCounter",
+            Self::GetDCounter => "GetDCounter",
+            Self::QueryCounter => "QueryCounter",
+            Self::QueryDCounter => "QueryDCounter",
+            Self::RewindCounter => "RewindCounter",
+            Self::RewindDCounter => "RewindDCounter",
+            Self::UpdateCounter => "UpdateCounter",
+            Self::UpdateDCounter => "UpdateDCounter",
+            Self::Post => "Post",
+            Self::WriteOperator => "WriteOperator",
+            Self::ExtractCertificate => "ExtractCertificate",
+            Self::ExtractTcpip => "ExtractTcpip",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
+            Self::DefineInputEvent => "DefineInputEvent",
+            Self::DefineCompositeEvent => "DefineCompositeEvent",
+            Self::DeleteEvent => "DeleteEvent",
+            Self::CheckTimer => "CheckTimer",
+            Self::DefineTimer => "DefineTimer",
+            Self::DeleteTimer => "DeleteTimer",
+            Self::RetrieveReattachEvent => "RetrieveReattachEvent",
+            Self::RetrieveSubevent => "RetrieveSubevent",
+            Self::TestEvent => "TestEvent",
+            Self::SignalEvent => "SignalEvent",
+            Self::ForceTimer => "ForceTimer",
+            Self::DocumentCreate => "DocumentCreate",
+            Self::DocumentDelete => "DocumentDelete",
+            Self::DocumentInsert => "DocumentInsert",
+            Self::DocumentRetrieve => "DocumentRetrieve",
+            Self::DocumentSet => "DocumentSet",
             Self::DeleteTransientData => "DeleteTransientData",
+            Self::DeleteTemporaryStorage => "DeleteTemporaryStorage",
+            Self::ReadTemporaryStorage => "ReadTemporaryStorage",
+            Self::WriteTemporaryStorage => "WriteTemporaryStorage",
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::ConvertTime => "ConvertTime",
+            Self::Freemain => "Freemain",
+            Self::Freemain64 => "Freemain64",
             Self::Getmain => "Getmain",
+            Self::Getmain64 => "Getmain64",
             Self::HandleAbend => "HandleAbend",
             Self::HandleAid => "HandleAid",
             Self::HandleCondition => "HandleCondition",
             Self::IgnoreCondition => "IgnoreCondition",
             Self::Inquire => "Inquire",
+            Self::InvokeApplication => "InvokeApplication",
+            Self::Load => "Load",
+            Self::Release => "Release",
             Self::Link => "Link",
             Self::PopHandle => "PopHandle",
             Self::PushHandle => "PushHandle",
             Self::PurgeMessage => "PurgeMessage",
+            Self::QuerySecurity => "QuerySecurity",
+            Self::RequestPassTicket => "RequestPassTicket",
+            Self::RequestEncryptPassTicket => "RequestEncryptPassTicket",
+            Self::Signon => "Signon",
+            Self::Signoff => "Signoff",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
+            Self::ResetBrowse => "ResetBrowse",
+            Self::ReadTransientData => "ReadTransientData",
+            Self::RemoveSubevent => "RemoveSubevent",
             Self::ReceiveMap => "ReceiveMap",
+            Self::ReceivePartn => "ReceivePartn",
             Self::Retrieve => "Retrieve",
             Self::Return => "Return",
             Self::Rewrite => "Rewrite",
             Self::SendText => "SendText",
             Self::SendMap => "SendMap",
+            Self::SendControl => "SendControl",
+            Self::IssueAbort => "IssueAbort",
+            Self::IssueAdd => "IssueAdd",
+            Self::IssueEnd => "IssueEnd",
+            Self::IssueErase => "IssueErase",
+            Self::IssueNote => "IssueNote",
+            Self::IssueQuery => "IssueQuery",
+            Self::IssueReceive => "IssueReceive",
+            Self::IssueReplace => "IssueReplace",
+            Self::IssueSend => "IssueSend",
+            Self::Route => "Route",
+            Self::IssueWait => "IssueWait",
+            Self::IssueAbend => "IssueAbend",
+            Self::GdsIssueAbend => "GdsIssueAbend",
+            Self::IssueConfirmation => "IssueConfirmation",
+            Self::GdsIssueConfirmation => "GdsIssueConfirmation",
+            Self::IssueError => "IssueError",
+            Self::GdsIssueError => "GdsIssueError",
+            Self::IssuePrepare => "IssuePrepare",
+            Self::GdsIssuePrepare => "GdsIssuePrepare",
+            Self::GdsIssueSignal => "GdsIssueSignal",
+            Self::IssueSignal => "IssueSignal",
+            Self::IssueCopy => "IssueCopy",
+            Self::IssueDisconnect => "IssueDisconnect",
+            Self::IssueEndfile => "IssueEndfile",
+            Self::IssueEndoutput => "IssueEndoutput",
+            Self::IssueEods => "IssueEods",
+            Self::IssueEraseAup => "IssueEraseAup",
+            Self::IssueLoad => "IssueLoad",
+            Self::IssuePass => "IssuePass",
+            Self::IssuePrint => "IssuePrint",
+            Self::IssueReset => "IssueReset",
+            Self::SendPage => "SendPage",
+            Self::SendPartnset => "SendPartnset",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
             Self::SetFileStatus => "SetFileStatus",
+            Self::SpoolClose => "SpoolClose",
+            Self::SpoolOpenInput => "SpoolOpenInput",
+            Self::SpoolOpenOutput => "SpoolOpenOutput",
+            Self::SpoolRead => "SpoolRead",
+            Self::SpoolWrite => "SpoolWrite",
+            Self::EnterTraceNum => "EnterTraceNum",
+            Self::Monitor => "Monitor",
+            Self::DumpTransaction => "DumpTransaction",
+            Self::Dump => "Dump",
+            Self::Trace => "Trace",
+            Self::EnterTraceId => "EnterTraceId",
             Self::Start => "Start",
+            Self::StartAttach => "StartAttach",
+            Self::StartBrexit => "StartBrexit",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
+            Self::WaitEvent => "WaitEvent",
+            Self::WaitExternal => "WaitExternal",
+            Self::WaitCics => "WaitCics",
+            Self::WaitSignal => "WaitSignal",
             Self::Syncpoint => "Syncpoint",
+            Self::InvokeService => "InvokeService",
+            Self::SoapFaultAdd => "SoapFaultAdd",
+            Self::SoapFaultCreate => "SoapFaultCreate",
+            Self::SoapFaultDelete => "SoapFaultDelete",
+            Self::WsaContextBuild => "WsaContextBuild",
+            Self::WsaContextDelete => "WsaContextDelete",
+            Self::WsaContextGet => "WsaContextGet",
+            Self::WsaEprCreate => "WsaEprCreate",
+            Self::TransformDataToJson => "TransformDataToJson",
+            Self::TransformDataToXml => "TransformDataToXml",
+            Self::TransformJsonToData => "TransformJsonToData",
+            Self::TransformXmlToData => "TransformXmlToData",
+            Self::WebParseUrl => "WebParseUrl",
+            Self::WebOpen => "WebOpen",
+            Self::WebClose => "WebClose",
+            Self::WebExtract => "WebExtract",
+            Self::ExtractWeb => "ExtractWeb",
+            Self::WebRead => "WebRead",
+            Self::WebStartBrowse => "WebStartBrowse",
+            Self::WebReadNext => "WebReadNext",
+            Self::WebEndBrowse => "WebEndBrowse",
+            Self::WebWrite => "WebWrite",
+            Self::WebSend => "WebSend",
+            Self::WebRetrieve => "WebRetrieve",
+            Self::WebReceive => "WebReceive",
+            Self::WebConverse => "WebConverse",
+            Self::WaitJournalName => "WaitJournalName",
+            Self::WaitJournalNum => "WaitJournalNum",
+            Self::WriteJournalName => "WriteJournalName",
+            Self::WriteJournalNum => "WriteJournalNum",
+            Self::Unlock => "Unlock",
+            Self::VerifyPassword => "VerifyPassword",
+            Self::VerifyPhrase => "VerifyPhrase",
+            Self::VerifyToken => "VerifyToken",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
         }
     }
 
+    /// Whether this operation belongs to the named-counter family.
+    #[must_use]
+    pub const fn is_counter(self) -> bool {
+        matches!(
+            self,
+            Self::DefineCounter
+                | Self::DefineDCounter
+                | Self::DeleteCounter
+                | Self::DeleteDCounter
+                | Self::GetCounter
+                | Self::GetDCounter
+                | Self::QueryCounter
+                | Self::QueryDCounter
+                | Self::RewindCounter
+                | Self::RewindDCounter
+                | Self::UpdateCounter
+                | Self::UpdateDCounter
+        )
+    }
+
+    /// Whether the operation may change durable or task-local state.
     #[must_use]
     pub const fn is_mutating(self) -> bool {
         matches!(
             self,
-            Self::Delete
+            Self::BtsEndBrowseContainer
+                | Self::BtsGetNextContainer
+                | Self::BtsStartBrowseContainer
+                | Self::BtsEndBrowseEvent
+                | Self::BtsGetNextEvent
+                | Self::BtsStartBrowseEvent
+                | Self::BtsEndBrowseTimer
+                | Self::BtsStartBrowseTimer
+                | Self::BtsStartBrowseActivity
+                | Self::BtsGetNextActivity
+                | Self::BtsEndBrowseActivity
+                | Self::BtsStartBrowseProcess
+                | Self::BtsGetNextProcess
+                | Self::BtsEndBrowseProcess
+                | Self::AcquireActivityId
+                | Self::AcquireProcess
+                | Self::CancelAcqActivity
+                | Self::CancelAcqProcess
+                | Self::CancelActivity
+                | Self::CheckActivity
+                | Self::DefineActivity
+                | Self::DefineProcess
+                | Self::DeleteActivity
+                | Self::ResetAcqProcess
+                | Self::ResetActivity
+                | Self::ResumeAcqActivity
+                | Self::ResumeAcqProcess
+                | Self::ResumeActivity
+                | Self::RunAcqActivity
+                | Self::RunAcqProcess
+                | Self::RunActivity
+                | Self::RunTransId
+                | Self::DeleteChannel
+                | Self::DeleteContainer
+                | Self::MoveContainer
+                | Self::PutContainer
+                | Self::PutContainer64
+                | Self::SuspendAcqActivity
+                | Self::SuspendAcqProcess
+                | Self::SuspendActivity
+                | Self::FetchAny
+                | Self::FetchChild
+                | Self::FreeChild
+                | Self::LinkAcqActivity
+                | Self::LinkAcqProcess
+                | Self::LinkActivity
+                | Self::ExtractLogonMsg
+                | Self::Point
+                | Self::AllocateConversation
+                | Self::GdsAllocateConversation
+                | Self::BuildAttach
+                | Self::ConnectProcess
+                | Self::GdsConnectProcess
+                | Self::FreeConversation
+                | Self::GdsFreeConversation
+                | Self::Converse
+                | Self::ReceiveConversation
+                | Self::GdsReceiveConversation
+                | Self::SendConversation
+                | Self::WaitConvid
+                | Self::GdsWaitConversation
+                | Self::WaitTerminal
+                | Self::ChangePassword
+                | Self::ChangePhrase
+                | Self::RequestPassTicket
+                | Self::RequestEncryptPassTicket
+                | Self::Signoff
+                | Self::Signon
+                | Self::VerifyPassword
+                | Self::VerifyPhrase
+                | Self::VerifyToken
+                | Self::Delete
+                | Self::AddSubevent
+                | Self::DefineInputEvent
+                | Self::DefineCompositeEvent
+                | Self::DeleteEvent
+                | Self::CheckTimer
+                | Self::DefineTimer
+                | Self::DeleteTimer
+                | Self::RetrieveReattachEvent
+                | Self::RetrieveSubevent
+                | Self::TestEvent
+                | Self::SignalEvent
+                | Self::ForceTimer
+                | Self::DocumentCreate
+                | Self::DocumentDelete
+                | Self::DocumentInsert
+                | Self::DocumentSet
+                | Self::WebOpen
+                | Self::WebClose
+                | Self::WebStartBrowse
+                | Self::WebReadNext
+                | Self::WebEndBrowse
+                | Self::WebWrite
+                | Self::WebSend
+                | Self::WebReceive
+                | Self::WebConverse
+                | Self::ResetBrowse
                 | Self::DeleteTransientData
+                | Self::DeleteTemporaryStorage
+                | Self::ReadTemporaryStorage
+                | Self::WriteTemporaryStorage
                 | Self::Cancel
                 | Self::Delay
+                | Self::DefineCounter
+                | Self::DefineDCounter
+                | Self::DeleteCounter
+                | Self::DeleteDCounter
+                | Self::GetCounter
+                | Self::GetDCounter
+                | Self::RewindCounter
+                | Self::RewindDCounter
+                | Self::UpdateCounter
+                | Self::UpdateDCounter
+                | Self::Post
+                | Self::WriteOperator
                 | Self::Deq
                 | Self::Enq
+                | Self::Freemain
+                | Self::Freemain64
                 | Self::Getmain
+                | Self::Getmain64
                 | Self::Rewrite
                 | Self::Write
+                | Self::WriteJournalName
+                | Self::WriteJournalNum
                 | Self::WriteTransientData
                 | Self::Link
+                | Self::InvokeApplication
+                | Self::InvokeService
+                | Self::SoapFaultAdd
+                | Self::SoapFaultCreate
+                | Self::SoapFaultDelete
+                | Self::WsaContextBuild
+                | Self::WsaContextDelete
+                | Self::WsaEprCreate
+                | Self::Load
+                | Self::Release
                 | Self::ReceiveMap
+                | Self::ReceivePartn
+                | Self::ReadTransientData
+                | Self::RemoveSubevent
                 | Self::PurgeMessage
                 | Self::SendMap
+                | Self::SendControl
+                | Self::IssueAbort
+                | Self::IssueAdd
+                | Self::IssueEnd
+                | Self::IssueErase
+                | Self::IssueNote
+                | Self::IssueQuery
+                | Self::IssueReceive
+                | Self::IssueReplace
+                | Self::IssueSend
+                | Self::Route
+                | Self::IssueWait
+                | Self::IssueAbend
+                | Self::GdsIssueAbend
+                | Self::IssueConfirmation
+                | Self::GdsIssueConfirmation
+                | Self::IssueError
+                | Self::GdsIssueError
+                | Self::IssuePrepare
+                | Self::GdsIssuePrepare
+                | Self::GdsIssueSignal
+                | Self::IssueSignal
+                | Self::IssueCopy
+                | Self::IssueDisconnect
+                | Self::IssueEndfile
+                | Self::IssueEndoutput
+                | Self::IssueEods
+                | Self::IssueEraseAup
+                | Self::IssueLoad
+                | Self::IssuePass
+                | Self::IssuePrint
+                | Self::IssueReset
+                | Self::SendPage
                 | Self::SendText
+                | Self::SendPartnset
                 | Self::SetAssociationUserCorrData
                 | Self::Xctl
                 | Self::Return
                 | Self::Abend
                 | Self::Syncpoint
+                | Self::TransformDataToJson
+                | Self::TransformDataToXml
+                | Self::TransformJsonToData
+                | Self::TransformXmlToData
+                | Self::Unlock
                 | Self::SetFileStatus
+                | Self::SpoolClose
+                | Self::SpoolOpenInput
+                | Self::SpoolOpenOutput
+                | Self::SpoolRead
+                | Self::SpoolWrite
+                | Self::EnterTraceNum
+                | Self::Monitor
+                | Self::DumpTransaction
+                | Self::Dump
+                | Self::Trace
+                | Self::EnterTraceId
                 | Self::Start
+                | Self::StartAttach
+                | Self::StartBrexit
                 | Self::Retrieve
+                | Self::WaitEvent
+                | Self::WaitExternal
+                | Self::WaitCics
+                | Self::WaitSignal
+        )
+    }
+
+    /// Whether a file-control operation checks read authority on the bound dataset.
+    #[must_use]
+    pub const fn is_file_read(self) -> bool {
+        matches!(
+            self,
+            Self::Read
+                | Self::ReadNext
+                | Self::ReadPrev
+                | Self::StartBrowse
+                | Self::ResetBrowse
+                | Self::EndBrowse
         )
     }
 
     #[must_use]
-    pub fn from_tokens(tokens: &[String]) -> Option<Self> {
-        let words: Vec<String> = tokens
-            .iter()
-            .map(|token| token.to_ascii_uppercase())
-            .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
-            .collect();
-        let first = words.first()?.as_str();
-        Some(match (first, words.get(1).map(String::as_str)) {
-            ("ABEND", _) => Self::Abend,
-            ("ADDRESS", Some("SET")) => Self::AddressSet,
-            ("ASKTIME", _)
-                if words
-                    .iter()
-                    .any(|word| word == "ABSTIME" || word.starts_with("ABSTIME(")) =>
-            {
-                Self::Asktime
-            }
-            ("ASKTIME", _) => Self::AsktimeEib,
-            ("ASSIGN", _) => Self::Assign,
-            ("CANCEL", _) => Self::Cancel,
-            ("CHANGE", Some("TASK")) => Self::ChangeTask,
-            ("DELAY", _) => Self::Delay,
-            ("DEQ", _) => Self::Deq,
-            ("DELETE", _) => Self::Delete,
-            ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
-            ("ENQ", _) => Self::Enq,
-            ("ENDBR", _) => Self::EndBrowse,
-            ("FORMATTIME", _) => Self::FormatTime,
-            ("GETMAIN", _) => Self::Getmain,
-            ("HANDLE", Some("ABEND")) => Self::HandleAbend,
-            ("HANDLE", Some("AID")) => Self::HandleAid,
-            ("HANDLE", Some("CONDITION")) => Self::HandleCondition,
-            ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
-            ("INQUIRE", _) => Self::Inquire,
-            ("LINK", _) => Self::Link,
-            ("POP", Some("HANDLE")) => Self::PopHandle,
-            ("PUSH", Some("HANDLE")) => Self::PushHandle,
-            ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
-            ("READ", _) => Self::Read,
-            ("READNEXT", _) => Self::ReadNext,
-            ("READPREV", _) => Self::ReadPrev,
-            ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
-            ("RETRIEVE", _) => Self::Retrieve,
-            ("RETURN", _) => Self::Return,
-            ("REWRITE", _) => Self::Rewrite,
-            ("SEND", Some("MAP")) => Self::SendMap,
-            ("SEND", _) => Self::SendText,
-            ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
-            ("START", _) => Self::Start,
-            ("STARTBR", _) => Self::StartBrowse,
-            ("SUSPEND", _) => Self::Suspend,
-            ("SYNCPOINT", _) => Self::Syncpoint,
-            ("WRITE", _) => Self::Write,
-            ("WRITEQ", Some("TD")) => Self::WriteTransientData,
-            ("XCTL", _) => Self::Xctl,
-            _ => return None,
-        })
-    }
-
-    #[must_use]
     pub const fn supported(self) -> bool {
-        true
+        !matches!(self, Self::IssueCopy)
     }
 }
 
@@ -230,6 +990,31 @@ pub struct CicsRequest {
     pub arguments: BTreeMap<String, BoundedPayload>,
     pub condition_policy: CicsConditionPolicy,
     pub mutation: Option<Mutation>,
+}
+
+impl CicsRequest {
+    pub(super) fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        if self.arguments.len() > limits.max_fields {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        if self.is_mutating() {
+            self.mutation
+                .as_ref()
+                .ok_or(HostProblem::MissingIdempotency)?
+                .validate(limits)?;
+        }
+        Ok(())
+    }
+
+    /// A token-producing update read changes task state and needs outer replay.
+    #[must_use]
+    pub fn is_mutating(&self) -> bool {
+        self.operation.is_mutating()
+            || matches!(
+                self.operation,
+                CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+            ) && self.arguments.contains_key("TOKEN")
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -265,4 +1050,79 @@ pub struct CicsResponse {
     pub payload: BoundedPayload,
     pub outputs: BTreeMap<String, BoundedPayload>,
     pub unit_of_work: Option<CicsUnitOfWorkOutcome>,
+}
+
+#[cfg(test)]
+mod issue_tests {
+    use super::CicsOperation;
+
+    #[test]
+    fn exact_issue_heads_are_distinct_with_19_executable_rows() {
+        let heads = [
+            ("ISSUE ABEND", CicsOperation::IssueAbend),
+            ("GDS ISSUE ABEND", CicsOperation::GdsIssueAbend),
+            ("ISSUE CONFIRMATION", CicsOperation::IssueConfirmation),
+            (
+                "GDS ISSUE CONFIRMATION",
+                CicsOperation::GdsIssueConfirmation,
+            ),
+            ("ISSUE COPY", CicsOperation::IssueCopy),
+            ("ISSUE DISCONNECT", CicsOperation::IssueDisconnect),
+            ("ISSUE ENDFILE", CicsOperation::IssueEndfile),
+            ("ISSUE ENDOUTPUT", CicsOperation::IssueEndoutput),
+            ("ISSUE EODS", CicsOperation::IssueEods),
+            ("ISSUE ERASEAUP", CicsOperation::IssueEraseAup),
+            ("ISSUE ERROR", CicsOperation::IssueError),
+            ("GDS ISSUE ERROR", CicsOperation::GdsIssueError),
+            ("ISSUE LOAD", CicsOperation::IssueLoad),
+            ("ISSUE PASS", CicsOperation::IssuePass),
+            ("ISSUE PREPARE", CicsOperation::IssuePrepare),
+            ("GDS ISSUE PREPARE", CicsOperation::GdsIssuePrepare),
+            ("ISSUE PRINT", CicsOperation::IssuePrint),
+            ("ISSUE RESET", CicsOperation::IssueReset),
+            ("GDS ISSUE SIGNAL", CicsOperation::GdsIssueSignal),
+            ("ISSUE SIGNAL", CicsOperation::IssueSignal),
+        ];
+        for (head, expected) in heads {
+            let tokens = head
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            assert_eq!(CicsOperation::from_tokens(&tokens), Some(expected));
+            assert_eq!(
+                expected.supported(),
+                matches!(
+                    expected,
+                    CicsOperation::IssueEndfile
+                        | CicsOperation::IssueAbend
+                        | CicsOperation::IssueConfirmation
+                        | CicsOperation::IssueError
+                        | CicsOperation::IssuePrepare
+                        | CicsOperation::IssueSignal
+                        | CicsOperation::GdsIssueAbend
+                        | CicsOperation::GdsIssueConfirmation
+                        | CicsOperation::GdsIssueError
+                        | CicsOperation::GdsIssuePrepare
+                        | CicsOperation::GdsIssueSignal
+                        | CicsOperation::IssueEndoutput
+                        | CicsOperation::IssueEods
+                        | CicsOperation::IssueLoad
+                        | CicsOperation::IssueEraseAup
+                        | CicsOperation::IssueDisconnect
+                        | CicsOperation::IssueReset
+                        | CicsOperation::IssuePrint
+                        | CicsOperation::IssuePass
+                )
+            );
+            assert!(expected.is_mutating());
+        }
+        assert_eq!(
+            CicsOperation::from_tokens(&["ISSUE".into(), "ABORT".into()]),
+            Some(CicsOperation::IssueAbort)
+        );
+        assert_eq!(
+            CicsOperation::from_tokens(&["GDS".into(), "ISSUE".into(), "COPY".into()]),
+            None
+        );
+    }
 }

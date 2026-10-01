@@ -40,7 +40,6 @@ repository = "https://github.com/toreleon/mainframe-env"
 serde = { version = "1", default-features = false, features = ["derive", "rc", "std"] }
 serde_json = "1"
 sha2 = "0.10"
-sqlparser = { version = "=0.63.0", default-features = false, features = ["std", "recursive-protection"] }
 toml = "0.8"
 proptest = "1"
 loom = "=0.7.2"

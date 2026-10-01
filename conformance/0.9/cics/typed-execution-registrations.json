@@ -4,11 +4,130 @@
   "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
   "registrations": [
     {
+      "operation": "AddSubevent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0004"
+    },
+    {
+      "operation": "Address",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0005"
+    },
+    {
       "operation": "AddressSet",
       "interface": "api",
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0006"
+    },
+    {
+      "operation": "AllocateConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0007"
+    },
+    {
+      "operation": "GdsAllocateConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0008"
+    },
+    {
+      "operation": "GdsAssignConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012"
+    },
+    {
+      "operation": "BuildAttach",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0015"
+    },
+    {
+      "operation": "ConnectProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0028"
+    },
+    {
+      "operation": "GdsConnectProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0029"
+    },
+    {
+      "operation": "FreeConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0081"
+    },
+    {
+      "operation": "GdsFreeConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0082"
+    },
+    {
+      "operation": "Converse",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0030"
+    },
+    {
+      "operation": "ReceiveConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0161"
+    },
+    {
+      "operation": "GdsReceiveConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0162"
+    },
+    {
+      "operation": "SendConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0187"
+    },
+    {
+      "operation": "GdsWaitConversation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0231"
+    },
+    {
+      "operation": "WaitConvid",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0232"
+    },
+    {
+      "operation": "WaitTerminal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0238"
     },
     {
       "operation": "AsktimeEib",
@@ -18,11 +137,39 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
     },
     {
+      "operation": "BifDeedit",
+      "interface": "api",
+      "family": "builtin-function-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0013"
+    },
+    {
+      "operation": "BifDigest",
+      "interface": "api",
+      "family": "builtin-function-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014"
+    },
+    {
       "operation": "Cancel",
       "interface": "api",
       "family": "interval-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0016"
+    },
+    {
+      "operation": "ChangePassword",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0020"
+    },
+    {
+      "operation": "ChangePhrase",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0021"
     },
     {
       "operation": "ChangeTask",
@@ -32,11 +179,109 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0022"
     },
     {
+      "operation": "ConvertTime",
+      "interface": "api",
+      "family": "time",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0031"
+    },
+    {
       "operation": "Delay",
       "interface": "api",
       "family": "interval-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0039"
+    },
+    {
+      "operation": "DefineCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0034"
+    },
+    {
+      "operation": "DefineDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0035"
+    },
+    {
+      "operation": "DeleteCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0044"
+    },
+    {
+      "operation": "DeleteDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0045"
+    },
+    {
+      "operation": "GetCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0087"
+    },
+    {
+      "operation": "GetDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0088"
+    },
+    {
+      "operation": "QueryCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0153"
+    },
+    {
+      "operation": "QueryDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0154"
+    },
+    {
+      "operation": "RewindCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0179"
+    },
+    {
+      "operation": "RewindDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0180"
+    },
+    {
+      "operation": "UpdateCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0226"
+    },
+    {
+      "operation": "UpdateDCounter",
+      "interface": "api",
+      "family": "counter-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0227"
+    },
+    {
+      "operation": "DeleteTemporaryStorage",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0049"
     },
     {
       "operation": "DeleteTransientData",
@@ -53,6 +298,69 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0050"
     },
     {
+      "operation": "DefineCompositeEvent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0033"
+    },
+    {
+      "operation": "DefineInputEvent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0036"
+    },
+    {
+      "operation": "DocumentCreate",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0051"
+    },
+    {
+      "operation": "DocumentDelete",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0052"
+    },
+    {
+      "operation": "DocumentInsert",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0053"
+    },
+    {
+      "operation": "DocumentRetrieve",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0054"
+    },
+    {
+      "operation": "DocumentSet",
+      "interface": "api",
+      "family": "document-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0055"
+    },
+    {
+      "operation": "Dump",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0056"
+    },
+    {
+      "operation": "DumpTransaction",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0057"
+    },
+    {
       "operation": "Enq",
       "interface": "api",
       "family": "task-control",
@@ -60,11 +368,116 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
     },
     {
+      "operation": "EnterTraceId",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+    },
+    {
+      "operation": "EnterTraceNum",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0066"
+    },
+    {
+      "operation": "ExtractAttach",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0067"
+    },
+    {
+      "operation": "ExtractAttributes",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0068"
+    },
+    {
+      "operation": "GdsExtractAttributes",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0069"
+    },
+    {
+      "operation": "ExtractLogonMsg",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0071"
+    },
+    {
+      "operation": "ExtractProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0072"
+    },
+    {
+      "operation": "GdsExtractProcess",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0073"
+    },
+    {
+      "operation": "ExtractTct",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0075"
+    },
+    {
+      "operation": "ExtractWeb",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0076"
+    },
+    {
+      "operation": "ExtractCertificate",
+      "interface": "api",
+      "family": "network-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0070"
+    },
+    {
+      "operation": "ExtractTcpip",
+      "interface": "api",
+      "family": "network-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0074"
+    },
+    {
+      "operation": "Freemain",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0084"
+    },
+    {
+      "operation": "Freemain64",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0085"
+    },
+    {
       "operation": "Getmain",
       "interface": "api",
       "family": "storage-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0094"
+    },
+    {
+      "operation": "Getmain64",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0095"
     },
     {
       "operation": "HandleAid",
@@ -81,11 +494,256 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0100"
     },
     {
+      "operation": "InvokeApplication",
+      "interface": "api",
+      "family": "program-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0106"
+    },
+    {
+      "operation": "InvokeService",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0107"
+    },
+    {
+      "operation": "IssueAbend",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0108"
+    },
+    {
+      "operation": "GdsIssueAbend",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0109"
+    },
+    {
+      "operation": "IssueAbort",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0110"
+    },
+    {
+      "operation": "IssueAdd",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0111"
+    },
+    {
+      "operation": "IssueConfirmation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0112"
+    },
+    {
+      "operation": "GdsIssueConfirmation",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0113"
+    },
+    {
+      "operation": "IssueDisconnect",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0115"
+    },
+    {
+      "operation": "IssueEnd",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0116"
+    },
+    {
+      "operation": "IssueEndfile",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0117"
+    },
+    {
+      "operation": "IssueEndoutput",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0118"
+    },
+    {
+      "operation": "IssueEods",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0119"
+    },
+    {
+      "operation": "IssueErase",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0120"
+    },
+    {
+      "operation": "IssueEraseAup",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0121"
+    },
+    {
+      "operation": "IssueError",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0122"
+    },
+    {
+      "operation": "GdsIssueError",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0123"
+    },
+    {
+      "operation": "IssueLoad",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0124"
+    },
+    {
+      "operation": "IssueNote",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0125"
+    },
+    {
+      "operation": "IssuePass",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0126"
+    },
+    {
+      "operation": "IssuePrepare",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0127"
+    },
+    {
+      "operation": "GdsIssuePrepare",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0128"
+    },
+    {
+      "operation": "IssuePrint",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0129"
+    },
+    {
+      "operation": "IssueQuery",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0130"
+    },
+    {
+      "operation": "IssueReceive",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0131"
+    },
+    {
+      "operation": "IssueReplace",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0132"
+    },
+    {
+      "operation": "IssueReset",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0133"
+    },
+    {
+      "operation": "IssueSend",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0134"
+    },
+    {
+      "operation": "IssueSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0136"
+    },
+    {
+      "operation": "GdsIssueSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0135"
+    },
+    {
+      "operation": "IssueWait",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0137"
+    },
+    {
+      "operation": "Load",
+      "interface": "api",
+      "family": "program-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0142"
+    },
+    {
+      "operation": "Monitor",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0143"
+    },
+    {
+      "operation": "Point",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0145"
+    },
+    {
       "operation": "PopHandle",
       "interface": "api",
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0146"
+    },
+    {
+      "operation": "Post",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0147"
     },
     {
       "operation": "PurgeMessage",
@@ -102,11 +760,172 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0149"
     },
     {
+      "operation": "QuerySecurity",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0155"
+    },
+    {
+      "operation": "ReadTemporaryStorage",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0160"
+    },
+    {
+      "operation": "RequestPassTicket",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0168"
+    },
+    {
+      "operation": "RequestEncryptPassTicket",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0167"
+    },
+    {
+      "operation": "ReadTransientData",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0159"
+    },
+    {
+      "operation": "ReceivePartn",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0164"
+    },
+    {
+      "operation": "Release",
+      "interface": "api",
+      "family": "program-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0165"
+    },
+    {
+      "operation": "RemoveSubevent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0166"
+    },
+    {
+      "operation": "ResetBrowse",
+      "interface": "api",
+      "family": "file-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0171"
+    },
+    {
+      "operation": "Route",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0182"
+    },
+    {
+      "operation": "SendControl",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0188"
+    },
+    {
+      "operation": "SendPage",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0190"
+    },
+    {
+      "operation": "SendPartnset",
+      "interface": "api",
+      "family": "terminal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0191"
+    },
+    {
       "operation": "SetAssociationUserCorrData",
       "interface": "api",
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0193"
+    },
+    {
+      "operation": "Signoff",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0195"
+    },
+    {
+      "operation": "Signon",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0196"
+    },
+    {
+      "operation": "SoapFaultAdd",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0197"
+    },
+    {
+      "operation": "SoapFaultCreate",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0198"
+    },
+    {
+      "operation": "SoapFaultDelete",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0199"
+    },
+    {
+      "operation": "SpoolClose",
+      "interface": "api",
+      "family": "spool-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0200"
+    },
+    {
+      "operation": "SpoolOpenInput",
+      "interface": "api",
+      "family": "spool-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0201"
+    },
+    {
+      "operation": "SpoolOpenOutput",
+      "interface": "api",
+      "family": "spool-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0202"
+    },
+    {
+      "operation": "SpoolRead",
+      "interface": "api",
+      "family": "spool-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0203"
+    },
+    {
+      "operation": "SpoolWrite",
+      "interface": "api",
+      "family": "spool-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0204"
     },
     {
       "operation": "Start",
@@ -116,11 +935,732 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0205"
     },
     {
+      "operation": "StartAttach",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0206"
+    },
+    {
+      "operation": "StartBrexit",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0207"
+    },
+    {
       "operation": "Suspend",
       "interface": "api",
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
+    },
+    {
+      "operation": "Trace",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0220"
+    },
+    {
+      "operation": "TransformDataToJson",
+      "interface": "api",
+      "family": "transform-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0221"
+    },
+    {
+      "operation": "TransformDataToXml",
+      "interface": "api",
+      "family": "transform-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0222"
+    },
+    {
+      "operation": "TransformJsonToData",
+      "interface": "api",
+      "family": "transform-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0223"
+    },
+    {
+      "operation": "TransformXmlToData",
+      "interface": "api",
+      "family": "transform-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0224"
+    },
+    {
+      "operation": "Unlock",
+      "interface": "api",
+      "family": "file-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0225"
+    },
+    {
+      "operation": "VerifyPassword",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0228"
+    },
+    {
+      "operation": "VerifyPhrase",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0229"
+    },
+    {
+      "operation": "VerifyToken",
+      "interface": "api",
+      "family": "security-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0230"
+    },
+    {
+      "operation": "WaitEvent",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0233"
+    },
+    {
+      "operation": "WaitExternal",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0234"
+    },
+    {
+      "operation": "WaitSignal",
+      "interface": "api",
+      "family": "conversation-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0237"
+    },
+    {
+      "operation": "WaitJournalName",
+      "interface": "api",
+      "family": "journal-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0235"
+    },
+    {
+      "operation": "WaitJournalNum",
+      "interface": "api",
+      "family": "journal-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0236"
+    },
+    {
+      "operation": "WebClose",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0240"
+    },
+    {
+      "operation": "WebConverse",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0241"
+    },
+    {
+      "operation": "WebEndBrowse",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0242"
+    },
+    {
+      "operation": "WebExtract",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0243"
+    },
+    {
+      "operation": "WebOpen",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0244"
+    },
+    {
+      "operation": "WebParseUrl",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0245"
+    },
+    {
+      "operation": "WebRead",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0246"
+    },
+    {
+      "operation": "WebReadNext",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0247"
+    },
+    {
+      "operation": "WebReceive",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0248"
+    },
+    {
+      "operation": "WebRetrieve",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0249"
+    },
+    {
+      "operation": "WebSend",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0250"
+    },
+    {
+      "operation": "WebStartBrowse",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0251"
+    },
+    {
+      "operation": "WebWrite",
+      "interface": "api",
+      "family": "web-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0252"
+    },
+    {
+      "operation": "WaitCics",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0239"
+    },
+    {
+      "operation": "WriteJournalName",
+      "interface": "api",
+      "family": "journal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0254"
+    },
+    {
+      "operation": "WriteJournalNum",
+      "interface": "api",
+      "family": "journal-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0255"
+    },
+    {
+      "operation": "WriteOperator",
+      "interface": "api",
+      "family": "operator-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0256"
+    },
+    {
+      "operation": "WriteTemporaryStorage",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0258"
+    },
+    {
+      "operation": "WsaContextBuild",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0259"
+    },
+    {
+      "operation": "WsaContextDelete",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0260"
+    },
+    {
+      "operation": "WsaContextGet",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0261"
+    },
+    {
+      "operation": "WsaEprCreate",
+      "interface": "api",
+      "family": "web-service-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0262"
+    },
+    {
+      "operation": "DeleteEvent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0046"
+    },
+    {
+      "operation": "CheckTimer",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0026"
+    },
+    {
+      "operation": "DefineTimer",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0038"
+    },
+    {
+      "operation": "DeleteTimer",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0047"
+    },
+    {
+      "operation": "ForceTimer",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0079"
+    },
+    {
+      "operation": "RetrieveReattachEvent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0176"
+    },
+    {
+      "operation": "RetrieveSubevent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0177"
+    },
+    {
+      "operation": "TestEvent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0219"
+    },
+    {
+      "operation": "SignalEvent",
+      "interface": "api",
+      "family": "event-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
+    },
+    {
+      "operation": "AcquireActivityId",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0002"
+    },
+    {
+      "operation": "AcquireProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0003"
+    },
+    {
+      "operation": "CancelAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0017"
+    },
+    {
+      "operation": "CancelAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0018"
+    },
+    {
+      "operation": "CancelActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0019"
+    },
+    {
+      "operation": "CheckAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0023"
+    },
+    {
+      "operation": "CheckAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0024"
+    },
+    {
+      "operation": "CheckActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0025"
+    },
+    {
+      "operation": "DefineActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0032"
+    },
+    {
+      "operation": "DefineProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0037"
+    },
+    {
+      "operation": "DeleteActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0041"
+    },
+    {
+      "operation": "DeleteChannel",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0042"
+    },
+    {
+      "operation": "DeleteContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0043"
+    },
+    {
+      "operation": "GetContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0086"
+    },
+    {
+      "operation": "GetContainer64",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0096"
+    },
+    {
+      "operation": "MoveContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0144"
+    },
+    {
+      "operation": "PutContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0150"
+    },
+    {
+      "operation": "PutContainer64",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0151"
+    },
+    {
+      "operation": "QueryChannel",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0152"
+    },
+    {
+      "operation": "ResetAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0169"
+    },
+    {
+      "operation": "ResetActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0170"
+    },
+    {
+      "operation": "ResumeAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0172"
+    },
+    {
+      "operation": "ResumeAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0173"
+    },
+    {
+      "operation": "ResumeActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0174"
+    },
+    {
+      "operation": "RunAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0183"
+    },
+    {
+      "operation": "RunAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0184"
+    },
+    {
+      "operation": "RunActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0185"
+    },
+    {
+      "operation": "RunTransId",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0186"
+    },
+    {
+      "operation": "SuspendAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0215"
+    },
+    {
+      "operation": "SuspendAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0216"
+    },
+    {
+      "operation": "SuspendActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
+    },
+    {
+      "operation": "BtsEndBrowseContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0060"
+    },
+    {
+      "operation": "BtsGetNextContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0090"
+    },
+    {
+      "operation": "BtsInquireContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0102"
+    },
+    {
+      "operation": "BtsStartBrowseContainer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0210"
+    },
+    {
+      "operation": "BtsEndBrowseEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0061"
+    },
+    {
+      "operation": "BtsGetNextEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0091"
+    },
+    {
+      "operation": "BtsInquireEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0103"
+    },
+    {
+      "operation": "BtsStartBrowseEvent",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0211"
+    },
+    {
+      "operation": "BtsEndBrowseTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0063"
+    },
+    {
+      "operation": "BtsInquireTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0105"
+    },
+    {
+      "operation": "BtsStartBrowseTimer",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0213"
+    },
+    {
+      "operation": "BtsEndBrowseActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0059"
+    },
+    {
+      "operation": "BtsGetNextActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0089"
+    },
+    {
+      "operation": "BtsInquireActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0101"
+    },
+    {
+      "operation": "BtsStartBrowseActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0209"
+    },
+    {
+      "operation": "BtsEndBrowseProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0062"
+    },
+    {
+      "operation": "BtsGetNextProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0092"
+    },
+    {
+      "operation": "BtsInquireProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0104"
+    },
+    {
+      "operation": "BtsStartBrowseProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0212"
+    },
+    {
+      "operation": "FetchAny",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0077"
+    },
+    {
+      "operation": "FetchChild",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0078"
+    },
+    {
+      "operation": "FreeChild",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0083"
+    },
+    {
+      "operation": "LinkAcqActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0139"
+    },
+    {
+      "operation": "LinkAcqProcess",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0140"
+    },
+    {
+      "operation": "LinkActivity",
+      "interface": "api",
+      "family": "bts-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0141"
     }
   ]
 }

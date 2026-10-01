@@ -291,7 +291,7 @@ def check_dedicated_authorities(root: Path) -> None:
             "observation_bytes: u64",
             "logical_tick: u64",
             "impl RetentionStore for MemoryStore",
-            "let mut staged = state.clone()",
+            "let mut staged = self.snapshot(&state)",
             "insert_memory_archive(&mut staged",
             "*state = staged",
             "if next > max && !result.is_empty()",
@@ -313,14 +313,24 @@ def check_dedicated_authorities(root: Path) -> None:
                 "pub(crate) fn commit_retention_observation(",
                 "pub(crate) fn commit_retention_archive(",
                 "fn commit_provider_retention_replacement(",
-                "fn commit_provider_retention_deletion(",
+                "mod container_retention;",
                 "pub(crate) fn load_retention_archives(",
                 "pub(crate) fn delete_retention_archives(",
             ),
             production=True,
         )
         reader = root / f"crates/stores/mainframe-env-store/src/{backend}/retention_read.rs"
-        archive_source = source
+        container_archive = require(
+            root / f"crates/stores/mainframe-env-store/src/{backend}/container_retention.rs",
+            (
+                "fn commit_provider_retention_deletion(",
+                "validate_provider_deletion(",
+                "outer_receipts",
+                "UPDATE provider_state SET version=",
+            ),
+            production=True,
+        )
+        archive_source = source + container_archive
         if reader.is_file():
             archive_source += read(reader, production=True)
         if "if next_rows > max && selected_rows != 0" not in archive_source:

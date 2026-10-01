@@ -1,16 +1,37 @@
-//! Owned Db2 statement AST and source-reviewed family parsers.
+//! Owned transaction-statement syntax; parsing has no execution side effects.
 
+mod create_table;
+mod cursor;
 mod dynamic;
+mod query;
+
+pub use cursor::{
+    Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget, Db2CursorReturnability,
+    Db2CursorRowsetPositioning, Db2CursorSensitivity, Db2DeclareCursorPreparedStatement,
+    Db2SensitiveCursorKind, parse_db2_cursor_statement, parse_db2_declare_cursor_prepared,
+};
+
+pub use create_table::{
+    Db2ColumnDefault, Db2CreateTableColumn, Db2CreateTableConstraint, Db2CreateTableStatement,
+    Db2DefaultSpelling, Db2ForeignKeyConstraint, Db2OnDeleteAction, Db2TableConstraintKind,
+    parse_db2_create_table_statement,
+};
 
 pub use dynamic::{
     Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement, Db2ExecuteUsing,
     Db2PrepareDescriptor, Db2PrepareStatement, parse_db2_dynamic_statement,
 };
 
+pub use query::{
+    Db2FetchClause, Db2FetchPosition, Db2NamedTableSource, Db2OffsetClause, Db2OrderByItem,
+    Db2OrderDirection, Db2OrderKey, Db2QueryExpression, Db2SelectCore, Db2SelectItem,
+    Db2SelectQuantifier, parse_db2_select_core,
+};
+
 use crate::{
     Db2AstLimits, Db2HostIdentifier, Db2HostReference, Db2Identifier, Db2SourceLocation,
     Db2SourceSpan, Db2StatementId, Db2Symbol, Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode,
-    Db2SyntaxLimits, Db2Token, Db2TokenKind, lex_db2,
+    Db2SyntaxLimits, Db2Token, Db2TokenCursor, Db2TokenKind, lex_db2,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,6 +61,7 @@ impl Db2Statement {
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Db2StatementKind {
+    DeclareCursorPrepared(Db2DeclareCursorPreparedStatement),
     Commit(Db2CommitStatement),
     Rollback(Db2RollbackStatement),
     Savepoint(Db2SavepointStatement),
@@ -114,58 +136,68 @@ impl Db2SavepointStatement {
     }
 }
 
-/// Parse one transaction-control statement. This source-reviewed family parser
-/// intentionally rejects every other statement instead of returning a raw or
-/// generic-success node.
+/// Parse exactly one source-reviewed COMMIT, ROLLBACK, or SAVEPOINT statement.
 pub fn parse_db2_transaction_statement(
     source: &str,
     syntax_limits: Db2SyntaxLimits,
     ast_limits: Db2AstLimits,
 ) -> Result<Db2Statement, Db2SyntaxDiagnostic> {
     let lexed = lex_db2(source, syntax_limits)?;
-    let mut parser = StatementParser::new(lexed.tokens(), ast_limits);
-    let first = parser.word_at(0).map(str::to_owned).ok_or_else(|| {
-        parser.diagnostic_here(
-            Db2SyntaxDiagnosticCode::UnsupportedStatement,
-            "Db2 transaction statement must begin with COMMIT, ROLLBACK, or SAVEPOINT",
+    ast_limits.validate().map_err(|problem| {
+        Db2SyntaxDiagnostic::new(
+            Db2SyntaxDiagnosticCode::InvalidLimits,
+            Db2SourceLocation::START,
+            &problem.message,
         )
     })?;
-    let (id, kind) = match first.as_str() {
-        "COMMIT" => (
+    let mut parser = StatementParser::new(lexed.cursor(), ast_limits);
+    let (id, kind) = if parser.peek_word("COMMIT") {
+        (
             Db2StatementId::SqlCommit,
             Db2StatementKind::Commit(parser.parse_commit()?),
-        ),
-        "ROLLBACK" => (
+        )
+    } else if parser.peek_word("ROLLBACK") {
+        (
             Db2StatementId::SqlRollback,
             Db2StatementKind::Rollback(parser.parse_rollback()?),
-        ),
-        "SAVEPOINT" => (
+        )
+    } else if parser.peek_word("SAVEPOINT") {
+        (
             Db2StatementId::SqlSavepoint,
             Db2StatementKind::Savepoint(parser.parse_savepoint()?),
-        ),
-        _ => {
-            return Err(parser.diagnostic_here(
-                Db2SyntaxDiagnosticCode::UnsupportedStatement,
-                "statement is outside the Db2 transaction syntax family",
-            ));
-        }
+        )
+    } else {
+        return Err(parser.diagnostic_here(
+            Db2SyntaxDiagnosticCode::UnsupportedStatement,
+            "statement is outside the Db2 transaction syntax family",
+        ));
     };
     parser.finish()?;
-    let span = parser.statement_span();
-    Ok(Db2Statement { id, kind, span })
+    let first = &lexed.tokens()[0].span;
+    let last = &lexed.tokens()[lexed.tokens().len() - 1].span;
+    Ok(Db2Statement {
+        id,
+        kind,
+        span: Db2SourceSpan {
+            start_byte: first.start_byte,
+            end_byte: last.end_byte,
+            start: first.start,
+            end: last.end,
+        },
+    })
 }
 
 struct StatementParser<'a> {
-    tokens: &'a [Db2Token],
-    position: usize,
+    cursor: Db2TokenCursor<'a>,
+    previous: Option<&'a Db2Token>,
     ast_limits: Db2AstLimits,
 }
 
 impl<'a> StatementParser<'a> {
-    fn new(tokens: &'a [Db2Token], ast_limits: Db2AstLimits) -> Self {
+    fn new(cursor: Db2TokenCursor<'a>, ast_limits: Db2AstLimits) -> Self {
         Self {
-            tokens,
-            position: 0,
+            cursor,
+            previous: None,
             ast_limits,
         }
     }
@@ -206,19 +238,26 @@ impl<'a> StatementParser<'a> {
                 "Db2 savepoint name must not begin with SYS",
             ));
         }
-        let mut unique = false;
+        // db2z_sql_savepoint: UNIQUE may only follow the name; ON ROLLBACK
+        // RETAIN CURSORS is required; RETAIN LOCKS is optional; the two ON
+        // ROLLBACK clauses may appear in either order.
+        let unique = self.take_word("UNIQUE");
         let mut retain_cursors = false;
         let mut retain_locks = false;
         while !self.at_end_or_semicolon() {
             if self.take_word("UNIQUE") {
-                if unique {
-                    return Err(self.diagnostic_previous(
-                        Db2SyntaxDiagnosticCode::DuplicateClause,
-                        "SAVEPOINT UNIQUE is specified more than once",
-                    ));
-                }
-                unique = true;
-                continue;
+                return Err(self.diagnostic_previous(
+                    if unique {
+                        Db2SyntaxDiagnosticCode::DuplicateClause
+                    } else {
+                        Db2SyntaxDiagnosticCode::UnexpectedToken
+                    },
+                    if unique {
+                        "SAVEPOINT UNIQUE is specified more than once"
+                    } else {
+                        "SAVEPOINT UNIQUE must follow the savepoint name"
+                    },
+                ));
             }
             self.expect_word("ON")?;
             self.expect_word("ROLLBACK")?;
@@ -246,6 +285,12 @@ impl<'a> StatementParser<'a> {
                 ));
             }
         }
+        if !retain_cursors {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::MissingToken,
+                "SAVEPOINT requires ON ROLLBACK RETAIN CURSORS",
+            ));
+        }
         Ok(Db2SavepointStatement {
             name,
             unique,
@@ -254,47 +299,17 @@ impl<'a> StatementParser<'a> {
         })
     }
 
-    fn expect_word(&mut self, expected: &str) -> Result<(), Db2SyntaxDiagnostic> {
-        if self.take_word(expected) {
-            Ok(())
-        } else {
-            Err(self.diagnostic_here(
-                Db2SyntaxDiagnosticCode::MissingToken,
-                format!("expected Db2 keyword {expected}"),
-            ))
-        }
-    }
-
-    fn take_word(&mut self, expected: &str) -> bool {
-        if self.word_at(self.position) == Some(expected) {
-            self.position += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn word_at(&self, position: usize) -> Option<&str> {
-        match self.tokens.get(position).map(|token| &token.kind) {
-            Some(Db2TokenKind::Word {
-                value,
-                delimited: false,
-            }) => Some(value),
-            _ => None,
-        }
-    }
-
     fn identifier(&mut self, label: &str) -> Result<Db2Identifier, Db2SyntaxDiagnostic> {
-        let Some(token) = self.tokens.get(self.position) else {
+        let Some(token) = self.cursor.peek() else {
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::MissingToken,
-                format!("missing Db2 {label}"),
+                &format!("missing Db2 {label}"),
             ));
         };
         let Db2TokenKind::Word { value, delimited } = &token.kind else {
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::UnexpectedToken,
-                format!("Db2 {label} must be an identifier"),
+                &format!("Db2 {label} must be an identifier"),
             ));
         };
         let identifier =
@@ -302,24 +317,24 @@ impl<'a> StatementParser<'a> {
                 Db2SyntaxDiagnostic::new(
                     Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                     token.span.start,
-                    problem.message,
+                    &problem.message,
                 )
             })?;
-        self.position += 1;
+        self.advance();
         Ok(identifier)
     }
 
     fn host_identifier(&mut self, label: &str) -> Result<Db2HostIdentifier, Db2SyntaxDiagnostic> {
-        let Some(token) = self.tokens.get(self.position) else {
+        let Some(token) = self.cursor.peek() else {
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::MissingToken,
-                format!("missing Db2 {label}"),
+                &format!("missing Db2 {label}"),
             ));
         };
         let Db2TokenKind::HostVariable(value) = &token.kind else {
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::UnexpectedToken,
-                format!("Db2 {label} must be a host identifier preceded by colon"),
+                &format!("Db2 {label} must be a colon-prefixed host identifier"),
             ));
         };
         let identifier =
@@ -327,21 +342,21 @@ impl<'a> StatementParser<'a> {
                 Db2SyntaxDiagnostic::new(
                     Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                     token.span.start,
-                    problem.message,
+                    &problem.message,
                 )
             })?;
-        self.position += 1;
+        self.advance();
         Ok(identifier)
     }
 
     fn host_reference(&mut self, label: &str) -> Result<Db2HostReference, Db2SyntaxDiagnostic> {
         let variable = self.host_identifier(label)?;
-        let indicator = if self.take_word("INDICATOR") {
-            Some(self.host_identifier("indicator variable")?)
-        } else if matches!(
-            self.tokens.get(self.position).map(|token| &token.kind),
-            Some(Db2TokenKind::HostVariable(_))
-        ) {
+        let indicator_keyword = self.take_word("INDICATOR");
+        let indicator = if indicator_keyword
+            || matches!(
+                self.cursor.peek().map(|token| &token.kind),
+                Some(Db2TokenKind::HostVariable(_))
+            ) {
             Some(self.host_identifier("indicator variable")?)
         } else {
             None
@@ -349,68 +364,77 @@ impl<'a> StatementParser<'a> {
         Ok(Db2HostReference::new(variable, indicator))
     }
 
-    fn finish(&mut self) -> Result<(), Db2SyntaxDiagnostic> {
-        if self.take_symbol(Db2Symbol::Semicolon) && !self.at_end() {
-            return Err(self.diagnostic_here(
-                Db2SyntaxDiagnosticCode::UnexpectedToken,
-                "only one Db2 statement is allowed",
-            ));
+    fn expect_word(&mut self, expected: &str) -> Result<(), Db2SyntaxDiagnostic> {
+        if self.take_word(expected) {
+            Ok(())
+        } else {
+            Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::MissingToken,
+                &format!("expected Db2 keyword {expected}"),
+            ))
         }
-        if !self.at_end() {
-            return Err(self.diagnostic_here(
-                Db2SyntaxDiagnosticCode::UnexpectedToken,
-                "unexpected token after Db2 transaction statement",
-            ));
-        }
-        Ok(())
     }
 
-    fn take_symbol(&mut self, expected: Db2Symbol) -> bool {
-        if matches!(
-            self.tokens.get(self.position).map(|token| &token.kind),
-            Some(Db2TokenKind::Symbol(symbol)) if *symbol == expected
-        ) {
-            self.position += 1;
+    fn peek_word(&self, expected: &str) -> bool {
+        matches!(
+            self.cursor.peek().map(|token| &token.kind),
+            Some(Db2TokenKind::Word { value, delimited: false }) if value == expected
+        )
+    }
+
+    fn take_word(&mut self, expected: &str) -> bool {
+        if self.peek_word(expected) {
+            self.advance();
             true
         } else {
             false
         }
     }
 
+    fn take_symbol(&mut self, expected: Db2Symbol) -> bool {
+        if matches!(
+            self.cursor.peek().map(|token| &token.kind),
+            Some(Db2TokenKind::Symbol(symbol)) if *symbol == expected
+        ) {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn advance(&mut self) {
+        self.previous = self.cursor.next();
+    }
+
     fn at_end_or_semicolon(&self) -> bool {
-        self.at_end()
+        self.cursor.peek().is_none()
             || matches!(
-                self.tokens.get(self.position).map(|token| &token.kind),
+                self.cursor.peek().map(|token| &token.kind),
                 Some(Db2TokenKind::Symbol(Db2Symbol::Semicolon))
             )
     }
 
-    fn at_end(&self) -> bool {
-        self.position == self.tokens.len()
-    }
-
-    fn statement_span(&self) -> Db2SourceSpan {
-        Db2SourceSpan {
-            start: self
-                .tokens
-                .first()
-                .map_or(Db2SourceLocation::START, |token| token.span.start),
-            end: self
-                .tokens
-                .last()
-                .map_or(Db2SourceLocation::START, |token| token.span.end),
+    fn finish(&mut self) -> Result<(), Db2SyntaxDiagnostic> {
+        if self.take_symbol(Db2Symbol::Semicolon) && self.cursor.peek().is_some() {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::UnexpectedToken,
+                "only one Db2 statement is allowed",
+            ));
         }
+        if self.cursor.peek().is_some() {
+            return Err(self.diagnostic_here(
+                Db2SyntaxDiagnosticCode::UnexpectedToken,
+                "unexpected token after Db2 statement",
+            ));
+        }
+        Ok(())
     }
 
-    fn diagnostic_here(
-        &self,
-        code: Db2SyntaxDiagnosticCode,
-        message: impl AsRef<str>,
-    ) -> Db2SyntaxDiagnostic {
-        let location = self.tokens.get(self.position).map_or_else(
+    fn diagnostic_here(&self, code: Db2SyntaxDiagnosticCode, message: &str) -> Db2SyntaxDiagnostic {
+        let location = self.cursor.peek().map_or_else(
             || {
-                self.tokens
-                    .last()
+                self.previous
                     .map_or(Db2SourceLocation::START, |token| token.span.end)
             },
             |token| token.span.start,
@@ -421,129 +445,11 @@ impl<'a> StatementParser<'a> {
     fn diagnostic_previous(
         &self,
         code: Db2SyntaxDiagnosticCode,
-        message: impl AsRef<str>,
+        message: &str,
     ) -> Db2SyntaxDiagnostic {
         let location = self
-            .position
-            .checked_sub(1)
-            .and_then(|index| self.tokens.get(index))
+            .previous
             .map_or(Db2SourceLocation::START, |token| token.span.start);
         Db2SyntaxDiagnostic::new(code, location, message)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parse(source: &str) -> Result<Db2Statement, Db2SyntaxDiagnostic> {
-        parse_db2_transaction_statement(source, Db2SyntaxLimits::default(), Db2AstLimits::default())
-    }
-
-    #[test]
-    fn commit_forms_are_exact() {
-        for (source, work) in [("COMMIT", false), ("commit work;", true)] {
-            let statement = parse(source).unwrap();
-            assert_eq!(statement.id(), Db2StatementId::SqlCommit);
-            let Db2StatementKind::Commit(commit) = statement.kind() else {
-                panic!("expected COMMIT AST")
-            };
-            assert_eq!(commit.has_work_keyword(), work);
-        }
-        assert_eq!(
-            parse("COMMIT WORK WORK").unwrap_err().code,
-            Db2SyntaxDiagnosticCode::UnexpectedToken
-        );
-        assert_eq!(
-            parse("COMMIT WORK WORK").unwrap_err().location,
-            Db2SourceLocation {
-                line: 1,
-                column: 13
-            }
-        );
-    }
-
-    #[test]
-    fn rollback_unit_and_savepoint_forms_are_exact() {
-        for source in ["ROLLBACK", "ROLLBACK WORK"] {
-            let statement = parse(source).unwrap();
-            assert_eq!(statement.id(), Db2StatementId::SqlRollback);
-            let Db2StatementKind::Rollback(rollback) = statement.kind() else {
-                panic!("expected ROLLBACK AST")
-            };
-            assert_eq!(rollback.has_work_keyword(), source.ends_with("WORK"));
-            assert_eq!(rollback.target(), &Db2RollbackTarget::UnitOfWork);
-        }
-        let unnamed = parse("ROLLBACK TO SAVEPOINT").unwrap();
-        let Db2StatementKind::Rollback(rollback) = unnamed.kind() else {
-            panic!("expected ROLLBACK AST")
-        };
-        assert_eq!(rollback.target(), &Db2RollbackTarget::Savepoint(None));
-        let named = parse("ROLLBACK WORK TO SAVEPOINT S1").unwrap();
-        let Db2StatementKind::Rollback(rollback) = named.kind() else {
-            panic!("expected ROLLBACK AST")
-        };
-        let Db2RollbackTarget::Savepoint(Some(name)) = rollback.target() else {
-            panic!("expected named savepoint")
-        };
-        assert_eq!(name.value(), "S1");
-        assert_eq!(
-            parse("ROLLBACK TO OTHER").unwrap_err().code,
-            Db2SyntaxDiagnosticCode::MissingToken
-        );
-    }
-
-    #[test]
-    fn savepoint_clauses_accept_either_order_and_reject_duplicates() {
-        for source in [
-            "SAVEPOINT S1 UNIQUE ON ROLLBACK RETAIN CURSORS ON ROLLBACK RETAIN LOCKS",
-            "SAVEPOINT S1 ON ROLLBACK RETAIN LOCKS ON ROLLBACK RETAIN CURSORS UNIQUE",
-        ] {
-            let statement = parse(source).unwrap();
-            assert_eq!(statement.id(), Db2StatementId::SqlSavepoint);
-            let Db2StatementKind::Savepoint(savepoint) = statement.kind() else {
-                panic!("expected SAVEPOINT AST")
-            };
-            assert_eq!(savepoint.name().value(), "S1");
-            assert!(savepoint.is_unique());
-            assert!(savepoint.retains_cursors());
-            assert!(savepoint.retains_locks());
-        }
-        for source in [
-            "SAVEPOINT S1 UNIQUE UNIQUE",
-            "SAVEPOINT S1 ON ROLLBACK RETAIN CURSORS ON ROLLBACK RETAIN CURSORS",
-            "SAVEPOINT S1 ON ROLLBACK RETAIN LOCKS ON ROLLBACK RETAIN LOCKS",
-        ] {
-            assert_eq!(
-                parse(source).unwrap_err().code,
-                Db2SyntaxDiagnosticCode::DuplicateClause
-            );
-        }
-    }
-
-    #[test]
-    fn transaction_syntax_rejects_invalid_names_clauses_and_multiple_statements() {
-        assert_eq!(
-            parse("SAVEPOINT SYSPOINT").unwrap_err().code,
-            Db2SyntaxDiagnosticCode::InvalidStatementOperand
-        );
-        assert_eq!(
-            parse("SAVEPOINT S1 ON ROLLBACK RETAIN ROWS")
-                .unwrap_err()
-                .code,
-            Db2SyntaxDiagnosticCode::MissingToken
-        );
-        assert_eq!(
-            parse("SAVEPOINT").unwrap_err().code,
-            Db2SyntaxDiagnosticCode::MissingToken
-        );
-        assert_eq!(
-            parse("COMMIT; ROLLBACK").unwrap_err().code,
-            Db2SyntaxDiagnosticCode::UnexpectedToken
-        );
-        assert_eq!(
-            parse("SELECT 1").unwrap_err().code,
-            Db2SyntaxDiagnosticCode::UnsupportedStatement
-        );
     }
 }

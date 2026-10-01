@@ -2,51 +2,80 @@
 use super::{
     HirCicsConditionPolicy, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation,
     HirCicsOption, HirCicsOutputBinding, HirCicsOutputName, HirCicsStatement, HirCicsValue,
-    HirDataReference, Resolution, ResolutionFailure, data_reference_at, numeric_literal,
-    require_numeric, require_writable,
+    Resolution, ResolutionFailure, numeric_literal, require_numeric, require_writable,
 };
 use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
-    CICS_APPLICATION_AID_NAMES, CICS_APPLICATION_CONDITION_NAMES,
     CicsApplicationCobolApplicability, CicsApplicationConditionLabelOperand,
     CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
     CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
     cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
-
 type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
+mod address;
 mod assign_validation;
+mod bts_browse;
+mod bts_child_link;
+mod bts_lifecycle;
+mod builtin_function;
+mod candidate_validation;
+mod certificate_control;
+mod channel_container;
+mod clause_parser;
+mod command_recognition;
+use command_recognition::{is_aid_name, is_single_condition_label};
+mod conversation_control;
+mod conversation_data;
+mod conversation_open;
+mod convert_time;
+mod counter_control;
+mod diagnostics;
+mod document_control;
+mod event_control;
 mod file_operands;
 mod format_time;
 mod handle_abend;
 mod interval_control;
+mod issue_control;
+mod journal_control;
 mod legacy_compatibility;
 mod numeric_value;
 mod operation;
+mod outboard;
+use operation::is_condition_name;
+mod operator_control;
 mod output_bindings;
 mod program_control;
 mod program_name;
 mod queue_control;
+mod route;
+mod security_control;
+mod shape;
+mod spool_control;
 mod storage_control;
+mod task_wait;
 mod terminal_control;
 mod transaction_name;
-
+mod transform_control;
+mod value;
+mod web_control;
+mod web_service_control;
+use candidate_validation::{keep_best_failure, validate_candidate};
+use clause_parser::{clauses, matching_close};
 use numeric_value::{cics_cvda_value, cics_integer_value};
-
+use value::{cics_address_value, cics_value, complete_data_reference, output};
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
     clauses: Clauses,
     options: Vec<String>,
     head_len: usize,
 }
-
 struct CandidateFailure {
     score: (usize, usize, usize),
     detail: String,
 }
-
 pub(super) fn validated_command(
     body: &[String],
     semantic: &SemanticModel,
@@ -55,19 +84,32 @@ pub(super) fn validated_command(
     Clauses,
     Vec<String>,
 )> {
-    let candidates = cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
-    if candidates.is_empty() {
+    let syntax_candidates =
+        cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
+    let selected_candidates = syntax_candidates
+        .iter()
+        .copied()
+        .filter(|candidate| bts_browse::selector_matches(candidate.descriptor, body))
+        .collect::<Vec<_>>();
+    if syntax_candidates.is_empty() {
         return Err(ResolutionFailure::Invalid(format!(
             "unknown CICS application command: {}",
             body.first().map_or("<empty>", String::as_str)
         )));
     }
-
+    // A selector can follow another option. If no selector matches in the
+    // canonical position, let the catalog validators resolve or diagnose it.
+    let candidates = if selected_candidates.is_empty() {
+        syntax_candidates
+    } else {
+        selected_candidates
+    };
     let mut valid = BTreeMap::<&'static str, ValidatedCandidate>::new();
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {
-        let tokens = clause_tokens(body, candidate.head_tokens, candidate.descriptor);
-        let (clauses, options) = match clauses(&tokens, Some(candidate.descriptor)) {
+        let tokens =
+            command_recognition::clause_tokens(body, candidate.head_tokens, candidate.descriptor);
+        let (clauses, mut options) = match clauses(&tokens, Some(candidate.descriptor)) {
             Ok(parsed) => parsed,
             Err(ResolutionFailure::Invalid(detail)) => {
                 keep_best_failure(
@@ -81,6 +123,30 @@ pub(super) fn validated_command(
             }
             Err(ResolutionFailure::Unsupported) => unreachable!("clause parser is fail-closed"),
         };
+        if candidate.descriptor.label_tokens.first() == Some(&"ISSUE")
+            && let Some(suffix) = candidate
+                .head_tokens
+                .get(candidate.descriptor.label_tokens.len()..)
+        {
+            for token in suffix {
+                if candidate.descriptor.options.iter().any(|option| {
+                    option.name == *token
+                        && option.value_shape == CicsApplicationOptionValueShape::Flag
+                }) && !options.iter().any(|option| option == token)
+                {
+                    options.push((*token).into());
+                }
+            }
+        }
+        if candidate.descriptor.label_tokens == ["WEB", "STARTBROWSE"]
+            && candidate.head_tokens.len() == 3
+            && let Some(kind) = candidate.head_tokens.last()
+            && *kind != "HTTPHEADER"
+            && !clauses.contains_key(*kind)
+            && !options.iter().any(|option| option == *kind)
+        {
+            options.push((*kind).into());
+        }
         let present = clauses
             .keys()
             .chain(options.iter())
@@ -129,6 +195,17 @@ pub(super) fn validated_command(
             continue;
         }
 
+        if candidate.descriptor.label_tokens == ["WEB", "STARTBROWSE"]
+            && candidate.head_tokens.last() == Some(&"HTTPHEADER")
+        {
+            options.push("HTTPHEADER".into());
+        }
+        if candidate.descriptor.label_tokens == ["WEB", "ENDBROWSE"]
+            && candidate.head_tokens.len() == 3
+            && let Some(kind) = candidate.head_tokens.last()
+        {
+            options.push((*kind).into());
+        }
         let validated = ValidatedCandidate {
             descriptor: candidate.descriptor,
             clauses,
@@ -142,7 +219,6 @@ pub(super) fn validated_command(
             }
         }
     }
-
     match valid.len() {
         1 => {
             let candidate = valid.into_values().next().expect("one validated candidate");
@@ -163,318 +239,10 @@ pub(super) fn validated_command(
     }
 }
 
-fn keep_best_failure(best: &mut Option<CandidateFailure>, candidate: CandidateFailure) {
-    if best
-        .as_ref()
-        .is_none_or(|current| candidate.score > current.score)
-    {
-        *best = Some(candidate);
-    }
-}
-
-fn clause_tokens(
-    body: &[String],
-    head: &[&str],
-    descriptor: &CicsApplicationRegistryDescriptor,
-) -> Vec<String> {
-    let remainder = &body[head.len()..];
-    let mut tokens = Vec::with_capacity(remainder.len() + 1);
-    if remainder.first().is_some_and(|token| token == "(")
-        && let Some(last) = head.last()
-        && descriptor.options.iter().any(|option| option.name == *last)
-    {
-        tokens.push((*last).into());
-    }
-    tokens.extend_from_slice(remainder);
-    tokens
-}
-
-fn validate_candidate(
-    descriptor: &CicsApplicationRegistryDescriptor,
-    clauses: &Clauses,
-    options: &[String],
-    present: &BTreeSet<&str>,
-    semantic: &SemanticModel,
-) -> Result<(), String> {
-    if descriptor.recognition_status == CicsApplicationConstraintStatus::Pending
-        || descriptor.constraint_status == CicsApplicationConstraintStatus::Pending
-    {
-        return Err(format!(
-            "CICS {} has an unfrozen source contract",
-            command_label(descriptor)
-        ));
-    }
-
-    let mut canonical_spellings = BTreeMap::<&str, &str>::new();
-    for name in present {
-        let canonical = compatibility_alias_target(descriptor, name).unwrap_or(name);
-        if let Some(existing) = canonical_spellings.insert(canonical, name) {
-            return Err(format!(
-                "CICS {} options {existing} and {name} are aliases and mutually exclusive",
-                command_label(descriptor)
-            ));
-        }
-    }
-
-    let mut condition_clause_count = 0usize;
-    let mut aid_clause_count = 0usize;
-    for name in present {
-        let Some(shape) = option_value_shape(descriptor, name) else {
-            if let Some(condition_clauses) = descriptor.condition_clauses
-                && is_condition_name(name)
-            {
-                condition_clause_count += 1;
-                let value = clauses.get(*name);
-                match (condition_clauses.label_operand, value) {
-                    (CicsApplicationConditionLabelOperand::Optional, Some(tokens))
-                        if !is_single_condition_label(tokens) =>
-                    {
-                        return Err(format!(
-                            "CICS {} condition {name} requires one label operand",
-                            command_label(descriptor)
-                        ));
-                    }
-                    (CicsApplicationConditionLabelOperand::Optional, _) => {}
-                    (CicsApplicationConditionLabelOperand::Forbidden, Some(_)) => {
-                        return Err(format!(
-                            "CICS {} condition {name} forbids a label operand",
-                            command_label(descriptor)
-                        ));
-                    }
-                    (CicsApplicationConditionLabelOperand::Forbidden, None) => {}
-                }
-                continue;
-            }
-            if descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name) {
-                aid_clause_count += 1;
-                if clauses
-                    .get(*name)
-                    .is_some_and(|tokens| !is_single_condition_label(tokens))
-                {
-                    return Err(format!(
-                        "CICS HANDLE AID option {name} requires one label operand"
-                    ));
-                }
-                continue;
-            }
-            return Err(format!(
-                "CICS {} has unknown or unreviewed top-level option {name}",
-                command_label(descriptor)
-            ));
-        };
-        let has_value = clauses.contains_key(*name);
-        match (shape, has_value) {
-            (CicsApplicationOptionValueShape::Flag, true) => {
-                return Err(format!(
-                    "CICS {} option {name} is a flag and rejects a parenthesized operand",
-                    command_label(descriptor)
-                ));
-            }
-            (CicsApplicationOptionValueShape::Value, false) => {
-                return Err(format!(
-                    "CICS {} option {name} requires a parenthesized operand",
-                    command_label(descriptor)
-                ));
-            }
-            (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
-                return Err(format!(
-                    "CICS {} option {name} has a source-bounded operand shape",
-                    command_label(descriptor)
-                ));
-            }
-            _ => {}
-        }
-    }
-    if let Some(condition_clauses) = descriptor.condition_clauses
-        && !(condition_clauses.minimum_occurrences..=condition_clauses.maximum_occurrences)
-            .contains(&condition_clause_count)
-    {
-        return Err(format!(
-            "CICS {} requires {}..={} EIBRESP condition clauses, found {condition_clause_count}",
-            command_label(descriptor),
-            condition_clauses.minimum_occurrences,
-            condition_clauses.maximum_occurrences,
-        ));
-    }
-    if descriptor.label_tokens == ["HANDLE", "AID"] && aid_clause_count > 16 {
-        return Err(format!(
-            "CICS HANDLE AID permits at most 16 AID clauses, found {aid_clause_count}"
-        ));
-    }
-
-    if !descriptor
-        .required_discriminator_options
-        .iter()
-        .all(|name| option_is_present(descriptor, present, name))
-    {
-        return Err(format!(
-            "CICS {} is missing a required command discriminator",
-            command_label(descriptor)
-        ));
-    }
-    if let Some(name) = descriptor
-        .forbidden_discriminator_options
-        .iter()
-        .find(|name| option_is_present(descriptor, present, name))
-    {
-        return Err(format!(
-            "CICS {} forbids discriminator {name}",
-            command_label(descriptor)
-        ));
-    }
-    if descriptor.required_discriminator_options.is_empty()
-        && descriptor.forbidden_discriminator_options.is_empty()
-        && !descriptor.discriminator_options.is_empty()
-        && !descriptor
-            .discriminator_options
-            .iter()
-            .any(|name| option_is_present(descriptor, present, name))
-    {
-        return Err(format!(
-            "CICS {} is missing a source-reviewed command discriminator",
-            command_label(descriptor)
-        ));
-    }
-
-    match descriptor.cobol_applicability {
-        CicsApplicationCobolApplicability::Allowed => {}
-        CicsApplicationCobolApplicability::NotApplicable => {
-            return Err(format!(
-                "CICS {} is not applicable to COBOL",
-                command_label(descriptor)
-            ));
-        }
-        CicsApplicationCobolApplicability::Conditional
-        | CicsApplicationCobolApplicability::BoundedAmbiguity => {
-            return Err(format!(
-                "CICS {} has no unconditional source-reviewed COBOL form",
-                command_label(descriptor)
-            ));
-        }
-    }
-
-    if descriptor.runtime_operation == Some("Assign") {
-        assign_validation::validate(clauses, present, semantic)?;
-    }
-
-    if let Some(name) = descriptor
-        .required_options
-        .iter()
-        .find(|name| !option_is_present(descriptor, present, name))
-    {
-        return Err(format!(
-            "CICS {} requires option {name}",
-            command_label(descriptor)
-        ));
-    }
-    for alternative in descriptor.alternative_groups {
-        let count = alternative
-            .members
-            .iter()
-            .filter(|name| option_is_present(descriptor, present, name))
-            .count();
-        if alternative.required && count == 0 {
-            return Err(format!(
-                "CICS {} requires one of {}",
-                command_label(descriptor),
-                alternative.members.join(", ")
-            ));
-        }
-    }
-    for dependency in descriptor.dependencies {
-        if option_is_present(descriptor, present, dependency.option)
-            && let Some(required) = dependency
-                .requires
-                .iter()
-                .find(|required| !option_is_present(descriptor, present, required))
-        {
-            return Err(format!(
-                "CICS {} option {} requires {required}",
-                command_label(descriptor),
-                dependency.option
-            ));
-        }
-    }
-    for group in descriptor.mutual_exclusion_groups {
-        let selected = group
-            .iter()
-            .filter(|name| option_is_present(descriptor, present, name))
-            .copied()
-            .collect::<Vec<_>>();
-        if selected.len() > 1 {
-            return Err(format!(
-                "CICS {} options {} are mutually exclusive",
-                command_label(descriptor),
-                selected.join(", ")
-            ));
-        }
-    }
-
-    for (name, value) in clauses {
-        let Some(limit) = descriptor
-            .options
-            .iter()
-            .find(|option| option.name == name)
-            .and_then(|option| option.source_max_value_bytes)
-        else {
-            continue;
-        };
-        if let Some(bytes) = statically_known_value_bytes(value, semantic)
-            && bytes > limit
-        {
-            return Err(format!(
-                "CICS {} option {name} exceeds its source maximum of {limit} bytes",
-                command_label(descriptor)
-            ));
-        }
-    }
-
-    // Parsing keeps valued and flag options separate; use both here so future
-    // callers cannot accidentally validate only one representation.
-    debug_assert_eq!(present.len(), clauses.len() + options.len());
-    Ok(())
-}
-
 fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -> bool {
-    option_value_shape(descriptor, name).is_some()
+    command_recognition::option_value_shape(descriptor, name).is_some()
         || (descriptor.condition_clauses.is_some() && is_condition_name(name))
         || (descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name))
-}
-
-fn is_condition_name(name: &str) -> bool {
-    CICS_APPLICATION_CONDITION_NAMES
-        .binary_search(&name)
-        .is_ok()
-}
-
-fn is_aid_name(name: &str) -> bool {
-    CICS_APPLICATION_AID_NAMES.binary_search(&name).is_ok()
-}
-
-fn is_single_condition_label(tokens: &[String]) -> bool {
-    matches!(tokens, [label] if !label.is_empty() && label.chars().all(|character| {
-        character.is_ascii_alphanumeric() || character == '-'
-    }))
-}
-
-fn option_value_shape(
-    descriptor: &CicsApplicationRegistryDescriptor,
-    name: &str,
-) -> Option<CicsApplicationOptionValueShape> {
-    descriptor
-        .options
-        .iter()
-        .find(|option| option.name == name)
-        .map(|option| option.value_shape)
-        .or_else(|| {
-            compatibility_alias_target(descriptor, name).and_then(|canonical| {
-                descriptor
-                    .options
-                    .iter()
-                    .find(|option| option.name == canonical)
-                    .map(|option| option.value_shape)
-            })
-        })
 }
 
 fn compatibility_alias_target(
@@ -512,7 +280,7 @@ fn validate_legacy_execution_subset(
     if descriptor.legacy_execution_options.is_empty() {
         return Err(format!(
             "CICS {} has no frozen legacy execution option subset",
-            command_label(descriptor)
+            operation::command_label(descriptor)
         ));
     }
     let unready = present
@@ -527,107 +295,11 @@ fn validate_legacy_execution_subset(
     if !unready.is_empty() {
         return Err(format!(
             "CICS {} is catalog-known but legacy execution is unready for {}",
-            command_label(descriptor),
+            operation::command_label(descriptor),
             unready.join(", ")
         ));
     }
     Ok(())
-}
-
-fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
-    descriptor.label_tokens.join(" ")
-}
-
-fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> Option<usize> {
-    if let [literal] = tokens
-        && literal.len() >= 2
-        && let Some(quote) = literal.chars().next()
-        && matches!(quote, '\'' | '"')
-        && literal.ends_with(quote)
-    {
-        let contents = &literal[quote.len_utf8()..literal.len() - quote.len_utf8()];
-        let escaped = format!("{quote}{quote}");
-        return Some(contents.replace(&escaped, &quote.to_string()).len());
-    }
-    semantic
-        .resolve(&tokens.join(" "))
-        .ok()
-        .map(|layout| layout.length)
-}
-
-fn clauses(
-    tokens: &[String],
-    descriptor: Option<&CicsApplicationRegistryDescriptor>,
-) -> Resolution<(Clauses, Vec<String>)> {
-    let mut clauses = BTreeMap::new();
-    let mut options = Vec::new();
-    let mut seen = BTreeSet::new();
-    let mut position = 0;
-    while position < tokens.len() {
-        let name = tokens[position].to_ascii_uppercase();
-        if name.is_empty()
-            || !name
-                .chars()
-                .all(|character| character.is_ascii_alphanumeric() || character == '-')
-        {
-            return Err(ResolutionFailure::Invalid(
-                "CICS top-level clause is malformed".into(),
-            ));
-        }
-        let has_operand = tokens.get(position + 1).is_some_and(|token| token == "(");
-        if !seen.insert(name.clone()) {
-            let exact_bare_flag_repeat = !has_operand
-                && !clauses.contains_key(&name)
-                && descriptor.is_some_and(|descriptor| {
-                    matches!(
-                        option_value_shape(descriptor, &name),
-                        Some(CicsApplicationOptionValueShape::Flag)
-                    )
-                });
-            if exact_bare_flag_repeat {
-                position += 1;
-                continue;
-            }
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS top-level option {name} is duplicated"
-            )));
-        }
-        if has_operand {
-            let close = matching_close(tokens, position + 1)?;
-            if close == position + 2 {
-                return Err(ResolutionFailure::Invalid(
-                    "CICS operand clause is empty".into(),
-                ));
-            }
-            clauses.insert(name, tokens[position + 2..close].to_vec());
-            position = close + 1;
-        } else {
-            options.push(name);
-            position += 1;
-        }
-    }
-    Ok((clauses, options))
-}
-
-fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
-    let mut depth = 0usize;
-    for (index, token) in tokens.iter().enumerate().skip(open) {
-        match token.as_str() {
-            "(" => depth += 1,
-            ")" => {
-                depth = depth.checked_sub(1).ok_or_else(|| {
-                    ResolutionFailure::Invalid("CICS clause parentheses are malformed".into())
-                })?;
-                if depth == 0 {
-                    return Ok(index);
-                }
-            }
-            _ => {}
-        }
-    }
-    Err(ResolutionFailure::Invalid(
-        "CICS clause parentheses are malformed".into(),
-    ))
 }
 
 pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {
@@ -661,8 +333,20 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     }
     let operation = operation::resolve(descriptor)?;
+    let transform_shape = transform_control::shape(operation);
+    let web_shape = web_service_control::shape(operation);
+    let event_shape = event_control::shape(operation);
+    let bts_shape = bts_child_link::shape(operation);
+    let browse_shape = bts_browse::shape(operation);
+    let command_shape = transform_shape
+        .as_ref()
+        .or(event_shape.as_ref())
+        .or(bts_shape.as_ref())
+        .or(browse_shape.as_ref());
     let allowed_clauses: &[&str] = match operation {
+        op if conversation_control::is_operation(op) => conversation_control::allowed_clauses(op),
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
+        HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
         HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
@@ -680,6 +364,16 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "YYMMDD",
             "YYYYMMDD",
         ],
+        HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME", "RESP", "RESP2"],
+        HirCicsOperation::BifDeedit => &["FIELD", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::BifDigest => &[
+            "RECORD",
+            "RECORDLEN",
+            "DIGESTTYPE",
+            "RESULT",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -690,6 +384,20 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
+        HirCicsOperation::InvokeApplication => program_control::INVOKE_CLAUSES,
+        op @ (HirCicsOperation::InvokeService
+        | HirCicsOperation::SoapFaultAdd
+        | HirCicsOperation::SoapFaultCreate
+        | HirCicsOperation::SoapFaultDelete
+        | HirCicsOperation::WsaContextBuild
+        | HirCicsOperation::WsaContextDelete
+        | HirCicsOperation::WsaContextGet
+        | HirCicsOperation::WsaEprCreate) => {
+            web_service_control::shape(op).expect("web shape").clauses
+        }
+        HirCicsOperation::Route => route::ALLOWED_CLAUSES,
+        HirCicsOperation::Load => program_control::LOAD_CLAUSES,
+        HirCicsOperation::Release => program_control::RELEASE_CLAUSES,
         HirCicsOperation::Link | HirCicsOperation::Xctl => &[
             "PROGRAM",
             "COMMAREA",
@@ -699,83 +407,142 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::Return => &["TRANSID", "COMMAREA", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::StartBrowse => &[
-            "FILE",
-            "DATASET",
-            "RIDFLD",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
+        op @ (HirCicsOperation::StartBrowse
+        | HirCicsOperation::ResetBrowse
+        | HirCicsOperation::ReadNext
+        | HirCicsOperation::ReadPrev
+        | HirCicsOperation::EndBrowse
+        | HirCicsOperation::Delete
+        | HirCicsOperation::Unlock
+        | HirCicsOperation::Write
+        | HirCicsOperation::Read
+        | HirCicsOperation::Rewrite) => file_operands::allowed_clauses(op),
+        HirCicsOperation::WriteTransientData => {
+            &["QUEUE", "FROM", "LENGTH", "SYSID", "RESP", "RESP2"]
+        }
+        HirCicsOperation::ReadTransientData => {
+            &["QUEUE", "INTO", "SET", "LENGTH", "SYSID", "RESP", "RESP2"]
+        }
+        HirCicsOperation::DeleteTransientData => &["QUEUE", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::DeleteTemporaryStorage => &["QNAME", "QUEUE", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::ReadTemporaryStorage => &[
+            "QNAME", "QUEUE", "INTO", "SET", "LENGTH", "NUMITEMS", "ITEM", "SYSID", "RESP", "RESP2",
         ],
-        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &[
-            "FILE",
-            "DATASET",
-            "INTO",
-            "RIDFLD",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
+        HirCicsOperation::WriteTemporaryStorage => &[
+            "QNAME", "QUEUE", "FROM", "LENGTH", "NUMITEMS", "ITEM", "SYSID", "RESP", "RESP2",
         ],
-        HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
-        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
-        HirCicsOperation::Write => &[
-            "FILE",
-            "DATASET",
-            "FROM",
-            "RIDFLD",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
-        ],
-        HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::DeleteTransientData => &["QUEUE", "RESP", "RESP2"],
-        HirCicsOperation::Getmain => &["FLENGTH", "INITIMG", "SET", "RESP", "RESP2"],
-        HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
-        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::DocumentCreate => document_control::ALLOWED_CLAUSES,
+        HirCicsOperation::DocumentDelete => document_control::DELETE_CLAUSES,
+        HirCicsOperation::DocumentInsert => document_control::INSERT_CLAUSES,
+        HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_CLAUSES,
+        HirCicsOperation::DocumentSet => document_control::SET_CLAUSES,
+        HirCicsOperation::WebParseUrl => web_control::PARSE_URL_CLAUSES,
+        HirCicsOperation::WebOpen => web_control::OPEN_CLAUSES,
+        HirCicsOperation::WebClose => web_control::CLOSE_CLAUSES,
+        HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => web_control::EXTRACT_CLAUSES,
+        HirCicsOperation::WebRead => web_control::READ_CLAUSES,
+        HirCicsOperation::WebStartBrowse => web_control::START_BROWSE_CLAUSES,
+        HirCicsOperation::WebReadNext => web_control::READ_NEXT_CLAUSES,
+        HirCicsOperation::WebEndBrowse => web_control::END_BROWSE_CLAUSES,
+        HirCicsOperation::WebWrite => web_control::WRITE_CLAUSES,
+        HirCicsOperation::WebSend => web_control::SEND_CLAUSES,
+        HirCicsOperation::WebRetrieve => web_control::RETRIEVE_CLAUSES,
+        HirCicsOperation::WebReceive => web_control::RECEIVE_CLAUSES,
+        HirCicsOperation::WebConverse => web_control::CONVERSE_CLAUSES,
+        operation if conversation_open::is_conversation(operation) => {
+            conversation_open::allowed_clauses(operation)
+        }
+        operation if conversation_data::is_data_wait(operation) => {
+            conversation_data::allowed_clauses(operation)
+        }
+        HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
+        HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
+        HirCicsOperation::ReceiveMap => {
+            &["MAP", "MAPSET", "FROM", "INTO", "LENGTH", "RESP", "RESP2"]
+        }
+        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::SendPartnset => &["PARTNSET", "RESP", "RESP2"],
+        HirCicsOperation::ReceivePartn => &["PARTN", "INTO", "SET", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::SendControl => &[
+            "CURSOR", "MSR", "OUTPARTN", "ACTPARTN", "LDC", "REQID", "SET", "RESP", "RESP2",
+        ],
+        HirCicsOperation::SendPage => &["TRANSID", "TRAILER", "SET", "FMHPARM", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
-        HirCicsOperation::Delay => &[
-            "INTERVAL",
-            "TIME",
-            "HOURS",
-            "MINUTES",
-            "SECONDS",
-            "MILLISECS",
-            "REQID",
-            "RESP",
-            "RESP2",
+        HirCicsOperation::Delay => interval_control::DELAY_CLAUSES,
+        HirCicsOperation::Post => &[
+            "INTERVAL", "TIME", "HOURS", "MINUTES", "SECONDS", "SET", "REQID", "RESP", "RESP2",
         ],
+        HirCicsOperation::WriteOperator => operator_control::ALLOWED_CLAUSES,
+        HirCicsOperation::ExtractCertificate => certificate_control::ALLOWED_CLAUSES,
+        HirCicsOperation::ExtractTcpip => certificate_control::tcpip_control::ALLOWED_CLAUSES,
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
-        HirCicsOperation::Read => &[
-            "FILE",
-            "DATASET",
-            "RIDFLD",
-            "INTO",
-            "LENGTH",
-            "KEYLENGTH",
-            "RESP",
-            "RESP2",
-        ],
-        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::QuerySecurity => security_control::QUERY_CLAUSES,
+        HirCicsOperation::VerifyPassword => security_control::VERIFY_PASSWORD_CLAUSES,
+        HirCicsOperation::ChangePassword => security_control::CHANGE_PASSWORD_CLAUSES,
+        HirCicsOperation::ChangePhrase => security_control::CHANGE_PHRASE_CLAUSES,
+        HirCicsOperation::RequestPassTicket => security_control::PASSTICKET_CLAUSES,
+        HirCicsOperation::RequestEncryptPassTicket => security_control::ENCRYPTPTKT_CLAUSES,
+        HirCicsOperation::VerifyToken => security_control::VERIFY_TOKEN_CLAUSES,
+        HirCicsOperation::Signon => security_control::SIGNON_CLAUSES,
+        HirCicsOperation::Signoff => &["RESP", "RESP2"],
+        HirCicsOperation::VerifyPhrase => security_control::VERIFY_PHRASE_CLAUSES,
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
-        HirCicsOperation::Start => &[
-            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
-            "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
-        ],
-        HirCicsOperation::Retrieve => &[
-            "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
-        ],
+        op @ (HirCicsOperation::WaitEvent
+        | HirCicsOperation::WaitExternal
+        | HirCicsOperation::WaitCics) => task_wait::names(op),
+        HirCicsOperation::Start => interval_control::START_CLAUSES,
+        HirCicsOperation::StartAttach => &["TRANSID", "RESP", "RESP2"],
+        HirCicsOperation::StartBrexit => interval_control::BREXIT_CLAUSES,
+        HirCicsOperation::Retrieve => interval_control::RETRIEVE_CLAUSES,
+        HirCicsOperation::WaitJournalName
+        | HirCicsOperation::WaitJournalNum
+        | HirCicsOperation::WriteJournalName
+        | HirCicsOperation::WriteJournalNum => journal_control::allowed_clauses(operation),
+        op if counter_control::is_counter(op) => counter_control::allowed_clauses(op),
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_clauses(operation),
+        op if channel_container::is_channel_container(op) => channel_container::allowed_clauses(op),
+        op if outboard::is_issue(op) => outboard::allowed_clauses(op),
+        op if issue_control::is_issue(op) => issue_control::allowed_clauses(op),
+        HirCicsOperation::SpoolClose
+        | HirCicsOperation::SpoolOpenInput
+        | HirCicsOperation::SpoolOpenOutput
+        | HirCicsOperation::SpoolRead
+        | HirCicsOperation::SpoolWrite => spool_control::allowed_clauses(operation),
+        HirCicsOperation::EnterTraceNum => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::Monitor => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::DumpTransaction => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::Dump => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::Trace => diagnostics::allowed_clauses(operation),
+        HirCicsOperation::EnterTraceId => diagnostics::allowed_clauses(operation),
+        _ => {
+            command_shape
+                .as_ref()
+                .ok_or(ResolutionFailure::Unsupported)?
+                .clauses
+        }
     };
     let allowed_options: &[&str] = match operation {
+        op if conversation_control::is_operation(op) => &["NOHANDLE"],
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
-        HirCicsOperation::AddressSet
+        HirCicsOperation::InvokeApplication => &["EXACTMATCH", "MINIMUM", "NOHANDLE"],
+        HirCicsOperation::InvokeService
+        | HirCicsOperation::SoapFaultAdd
+        | HirCicsOperation::SoapFaultCreate
+        | HirCicsOperation::SoapFaultDelete
+        | HirCicsOperation::WsaContextBuild
+        | HirCicsOperation::WsaContextDelete
+        | HirCicsOperation::WsaContextGet
+        | HirCicsOperation::WsaEprCreate => &["NOHANDLE"],
+        HirCicsOperation::Route => route::ALLOWED_OPTIONS,
+        HirCicsOperation::Load => &["HOLD", "NOHANDLE"],
+        HirCicsOperation::Release => &["NOHANDLE"],
+        HirCicsOperation::Address
+        | HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -789,30 +556,118 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
         | HirCicsOperation::Delete
+        | HirCicsOperation::Unlock
         | HirCicsOperation::Write
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
-        | HirCicsOperation::ReceiveMap
+        | HirCicsOperation::DeleteTemporaryStorage
+        | HirCicsOperation::DocumentDelete
+        | HirCicsOperation::DocumentInsert
+        | HirCicsOperation::Freemain
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
+        | HirCicsOperation::QuerySecurity
+        | HirCicsOperation::VerifyPassword
+        | HirCicsOperation::ChangePassword
+        | HirCicsOperation::ChangePhrase
+        | HirCicsOperation::RequestPassTicket
+        | HirCicsOperation::RequestEncryptPassTicket
+        | HirCicsOperation::Signon
+        | HirCicsOperation::Signoff
+        | HirCicsOperation::VerifyPhrase
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
-        | HirCicsOperation::Suspend => &["NOHANDLE"],
+        | HirCicsOperation::Suspend
+        | HirCicsOperation::WaitEvent => &["NOHANDLE"],
+        HirCicsOperation::VerifyToken => &["NOHANDLE"],
+        HirCicsOperation::WaitExternal | HirCicsOperation::WaitCics => {
+            task_wait::WAIT_EXTERNAL_OPTIONS
+        }
+        HirCicsOperation::ReadTemporaryStorage => &["NEXT", "NOHANDLE"],
+        HirCicsOperation::WriteTemporaryStorage => {
+            &["AUXILIARY", "MAIN", "NOSUSPEND", "REWRITE", "NOHANDLE"]
+        }
+        HirCicsOperation::DocumentCreate => document_control::ALLOWED_OPTIONS,
+        HirCicsOperation::DocumentRetrieve => document_control::RETRIEVE_OPTIONS,
+        HirCicsOperation::DocumentSet => document_control::ALLOWED_OPTIONS,
+        HirCicsOperation::WebParseUrl => &["NOHANDLE"],
+        HirCicsOperation::WebOpen => &["NOHANDLE"],
+        HirCicsOperation::WebClose => &["NOHANDLE"],
+        HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &["NOHANDLE"],
+        HirCicsOperation::WebRead => &["NOHANDLE"],
+        HirCicsOperation::WebStartBrowse => web_control::START_BROWSE_OPTIONS,
+        HirCicsOperation::WebReadNext => &["NOHANDLE"],
+        HirCicsOperation::WebEndBrowse => web_control::END_BROWSE_OPTIONS,
+        HirCicsOperation::WebWrite => &["NOHANDLE"],
+        HirCicsOperation::WebSend => &["NOHANDLE"],
+        HirCicsOperation::WebRetrieve => &["NOHANDLE"],
+        HirCicsOperation::WebReceive => &["NOTRUNCATE", "NOHANDLE"],
+        HirCicsOperation::WebConverse => &["NOTRUNCATE", "NOHANDLE"],
+        operation if conversation_open::is_conversation(operation) => {
+            conversation_open::allowed_options(operation)
+        }
+        operation if conversation_data::is_data_wait(operation) => {
+            conversation_data::allowed_options(operation)
+        }
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
+        HirCicsOperation::StartAttach => &["NOHANDLE"],
+        HirCicsOperation::StartBrexit => &["BREXIT", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
+        HirCicsOperation::Post => &["AFTER", "AT", "NOHANDLE"],
+        HirCicsOperation::WriteOperator => &["IMMEDIATE", "EVENTUAL", "CRITICAL", "NOHANDLE"],
+        HirCicsOperation::ExtractCertificate => &["OWNER", "ISSUER", "NOHANDLE"],
+        HirCicsOperation::ExtractTcpip => &["NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
-        HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::ConvertTime => &["NOHANDLE"],
+        HirCicsOperation::BifDeedit => &["NOHANDLE"],
+        HirCicsOperation::BifDigest => &["HEX", "BINARY", "BASE64", "NOHANDLE"],
+        HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
+        HirCicsOperation::SendMap => &[
+            "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
+        ],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
-        HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
+        HirCicsOperation::SendPartnset => &["NOHANDLE"],
+        HirCicsOperation::ReceivePartn => &["ASIS", "NOHANDLE"],
+        HirCicsOperation::SendControl => terminal_control::SEND_CONTROL_OPTIONS,
+        HirCicsOperation::SendPage => terminal_control::SEND_PAGE_OPTIONS,
+        HirCicsOperation::StartBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
+        HirCicsOperation::ResetBrowse => &["EQUAL", "GENERIC", "GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],
-        HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
+        HirCicsOperation::Read => &["EQUAL", "GENERIC", "GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
+        HirCicsOperation::WaitJournalName
+        | HirCicsOperation::WaitJournalNum
+        | HirCicsOperation::WriteJournalName
+        | HirCicsOperation::WriteJournalNum => journal_control::allowed_options(operation),
+        op if counter_control::is_counter(op) => counter_control::allowed_options(op),
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::allowed_options(operation),
+        op if channel_container::is_channel_container(op) => channel_container::allowed_options(op),
+        op if outboard::is_issue(op) => outboard::allowed_options(op),
+        op if issue_control::is_issue(op) => issue_control::allowed_options(op),
+        HirCicsOperation::SpoolClose
+        | HirCicsOperation::SpoolOpenInput
+        | HirCicsOperation::SpoolOpenOutput
+        | HirCicsOperation::SpoolRead
+        | HirCicsOperation::SpoolWrite => spool_control::allowed_options(operation),
+        HirCicsOperation::EnterTraceNum => diagnostics::allowed_options(operation),
+        HirCicsOperation::Monitor => diagnostics::allowed_options(operation),
+        HirCicsOperation::DumpTransaction => diagnostics::allowed_options(operation),
+        HirCicsOperation::Dump => diagnostics::allowed_options(operation),
+        HirCicsOperation::Trace => diagnostics::allowed_options(operation),
+        HirCicsOperation::EnterTraceId => diagnostics::allowed_options(operation),
+        _ => {
+            command_shape
+                .as_ref()
+                .ok_or(ResolutionFailure::Unsupported)?
+                .options
+        }
     };
     let unready_clauses = clauses
         .keys()
@@ -848,16 +703,38 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             descriptor.label_tokens.join(" ")
         )));
     }
-    program_control::validate_constraints(operation, &clauses)?;
-    file_operands::validate_constraints(&clauses, operation)?;
-    queue_control::validate_constraints(&clauses, operation)?;
+    program_control::validate(operation, &clauses, &raw_options)?;
+    conversation_open::validate(&clauses, &raw_options, operation)?;
+    conversation_data::validate(&clauses, &raw_options, operation)?;
+    file_operands::validate_constraints(&clauses, &raw_options, operation)?;
+    queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
-    terminal_control::validate_constraints(&clauses, operation)?;
+    route::validate_constraints(&clauses, &raw_options, operation)?;
+    bts_lifecycle::validate_constraints(operation, &clauses, &raw_options)?;
+    channel_container::validate(&clauses, &raw_options, operation)?;
+    security_control::validate(&clauses, operation, semantic)?;
+    conversation_control::validate(&clauses, operation)?;
+    outboard::validate_constraints(&clauses, &raw_options, operation)?;
+    issue_control::validate(&clauses, &raw_options, operation)?;
+    terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
+    document_control::validate_constraints(&clauses, &raw_options, operation, semantic)?;
+    web_control::validate(&clauses, &raw_options, operation, semantic)?;
+    let mut operands = task_wait::resolve(&clauses, &raw_options, operation, semantic)?;
+    transform_control::validate_constraints(&clauses, operation)?;
+    event_control::validate_constraints(operation, &raw_options)?;
+    bts_child_link::validate(&clauses, &raw_options, operation)?;
+    bts_browse::validate(&clauses, &raw_options, operation)?;
+    web_service_control::validate(&clauses, operation)?;
     for required in match operation {
+        op if conversation_control::is_operation(op) => &[][..],
+        HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
+        HirCicsOperation::ConvertTime => &["DATESTRING", "ABSTIME"][..],
+        HirCicsOperation::BifDeedit => &["FIELD"][..],
+        HirCicsOperation::BifDigest => &["RECORD", "RECORDLEN", "RESULT"][..],
         HirCicsOperation::Abend
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -869,30 +746,137 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Return
         | HirCicsOperation::StartBrowse
+        | HirCicsOperation::ResetBrowse
         | HirCicsOperation::ReadNext
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
         | HirCicsOperation::Delete
+        | HirCicsOperation::Unlock
         | HirCicsOperation::Write
         | HirCicsOperation::Read
         | HirCicsOperation::Rewrite
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
+        | HirCicsOperation::DeleteTemporaryStorage
+        | HirCicsOperation::ReadTemporaryStorage
+        | HirCicsOperation::WriteTemporaryStorage
+        | HirCicsOperation::Freemain
         | HirCicsOperation::Getmain
         | HirCicsOperation::ReceiveMap
         | HirCicsOperation::SendMap
         | HirCicsOperation::SendText
+        | HirCicsOperation::SendPartnset
+        | HirCicsOperation::ReceivePartn
+        | HirCicsOperation::SendControl
+        | HirCicsOperation::SendPage
         | HirCicsOperation::Assign
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
-        | HirCicsOperation::Suspend => &[][..],
+        | HirCicsOperation::QuerySecurity
+        | HirCicsOperation::Suspend
+        | HirCicsOperation::InvokeApplication
+        | HirCicsOperation::IssueAbort
+        | HirCicsOperation::IssueAdd
+        | HirCicsOperation::IssueEnd
+        | HirCicsOperation::IssueErase
+        | HirCicsOperation::IssueNote
+        | HirCicsOperation::IssueQuery
+        | HirCicsOperation::IssueReceive
+        | HirCicsOperation::IssueReplace
+        | HirCicsOperation::IssueSend
+        | HirCicsOperation::IssueWait
+        | HirCicsOperation::Route => &[][..],
+        HirCicsOperation::WaitEvent
+        | HirCicsOperation::WaitExternal
+        | HirCicsOperation::WaitCics => &[][..],
+        HirCicsOperation::InvokeService
+        | HirCicsOperation::SoapFaultAdd
+        | HirCicsOperation::SoapFaultCreate
+        | HirCicsOperation::SoapFaultDelete
+        | HirCicsOperation::WsaContextBuild
+        | HirCicsOperation::WsaContextDelete
+        | HirCicsOperation::WsaContextGet
+        | HirCicsOperation::WsaEprCreate => web_shape.as_ref().expect("web shape").required,
+        HirCicsOperation::Load => &["PROGRAM"][..],
+        HirCicsOperation::Release => &["PROGRAM"][..],
+        HirCicsOperation::DocumentCreate => &["DOCTOKEN"][..],
+        HirCicsOperation::DocumentDelete => &["DOCTOKEN"][..],
+        HirCicsOperation::DocumentInsert => &["DOCTOKEN"][..],
+        HirCicsOperation::DocumentRetrieve => &["DOCTOKEN", "INTO", "LENGTH"][..],
+        HirCicsOperation::DocumentSet => &["DOCTOKEN", "LENGTH"][..],
+        HirCicsOperation::WebParseUrl => &["URL", "URLLENGTH"][..],
+        HirCicsOperation::WebOpen => &["SESSTOKEN"][..],
+        HirCicsOperation::WebClose => &["SESSTOKEN"][..],
+        HirCicsOperation::WebExtract | HirCicsOperation::ExtractWeb => &[][..],
+        HirCicsOperation::WebRead => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
+        HirCicsOperation::WebStartBrowse => &[][..],
+        HirCicsOperation::WebReadNext => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
+        HirCicsOperation::WebEndBrowse => &[][..],
+        HirCicsOperation::WebWrite => &["HTTPHEADER", "NAMELENGTH", "VALUE", "VALUELENGTH"][..],
+        HirCicsOperation::WebSend => &[][..],
+        HirCicsOperation::WebRetrieve => &["DOCTOKEN"][..],
+        HirCicsOperation::WebReceive => &["INTO", "LENGTH", "MAXLENGTH"][..],
+        HirCicsOperation::WebConverse => {
+            &["SESSTOKEN", "METHOD", "INTO", "TOLENGTH", "MAXLENGTH"][..]
+        }
         HirCicsOperation::Cancel => &["REQID"][..],
-        HirCicsOperation::Start => &["TRANSID"][..],
-        HirCicsOperation::Retrieve => &["LENGTH"][..],
+        HirCicsOperation::Start | HirCicsOperation::StartAttach | HirCicsOperation::StartBrexit => {
+            &["TRANSID"][..]
+        }
+        HirCicsOperation::Post => &["SET"][..],
+        HirCicsOperation::WriteOperator => &["TEXT"][..],
+        HirCicsOperation::ExtractCertificate => &["CERTIFICATE"][..],
+        HirCicsOperation::ExtractTcpip => &[][..],
+        HirCicsOperation::Retrieve => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
+        HirCicsOperation::VerifyPassword => &["PASSWORD", "USERID"][..],
+        HirCicsOperation::ChangePassword => &["PASSWORD", "NEWPASSWORD", "USERID"][..],
+        HirCicsOperation::ChangePhrase => {
+            &["PHRASE", "PHRASELEN", "NEWPHRASE", "NEWPHRASELEN", "USERID"][..]
+        }
+        HirCicsOperation::RequestPassTicket => &["PASSTICKET", "ESMAPPNAME"][..],
+        HirCicsOperation::RequestEncryptPassTicket => {
+            &["ENCRYPTKEY", "ENCRYPTPTKT", "FLENGTH", "ESMAPPNAME"][..]
+        }
+        HirCicsOperation::VerifyToken => &["TOKEN", "TOKENLEN"][..],
+        HirCicsOperation::Signon => &["USERID"][..],
+        HirCicsOperation::Signoff => &[][..],
+        operation if conversation_open::is_conversation(operation) => {
+            conversation_open::required_clauses(operation)
+        }
+        operation if conversation_data::is_data_wait(operation) => {
+            conversation_data::required_clauses(operation)
+        }
+        operation if issue_control::is_issue(operation) => &[][..],
+        HirCicsOperation::VerifyPhrase => &["PHRASE", "PHRASELEN", "USERID"][..],
         HirCicsOperation::Syncpoint => &[][..],
+        HirCicsOperation::WaitJournalName
+        | HirCicsOperation::WaitJournalNum
+        | HirCicsOperation::WriteJournalName
+        | HirCicsOperation::WriteJournalNum => journal_control::required_clauses(operation),
+        operation if counter_control::is_counter(operation) => counter_control::required(operation),
+        operation if bts_lifecycle::is_bts(operation) => bts_lifecycle::required(operation),
+        op if channel_container::is_channel_container(op) => channel_container::required(op),
+        HirCicsOperation::SpoolClose
+        | HirCicsOperation::SpoolOpenInput
+        | HirCicsOperation::SpoolOpenOutput
+        | HirCicsOperation::SpoolRead
+        | HirCicsOperation::SpoolWrite => spool_control::required(operation),
+        HirCicsOperation::EnterTraceNum => diagnostics::required(operation),
+        HirCicsOperation::Monitor => diagnostics::required(operation),
+        HirCicsOperation::DumpTransaction => diagnostics::required(operation),
+        HirCicsOperation::Dump => diagnostics::required(operation),
+        HirCicsOperation::Trace => diagnostics::required(operation),
+        HirCicsOperation::EnterTraceId => diagnostics::required(operation),
+        _ => {
+            command_shape
+                .as_ref()
+                .ok_or(ResolutionFailure::Unsupported)?
+                .required
+        }
     } {
         if !clauses.contains_key(*required) {
             return Err(ResolutionFailure::Invalid(format!(
@@ -900,7 +884,18 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             )));
         }
     }
-    let mut operands = Vec::new();
+    operands.extend(spool_control::operands(
+        &clauses,
+        &raw_options,
+        operation,
+        semantic,
+    )?);
+    operands.extend(diagnostics::operands(
+        &clauses,
+        &raw_options,
+        operation,
+        semantic,
+    )?);
     if operation == HirCicsOperation::Abend
         && let Some(operand) = abend::operand(&clauses, semantic)?
     {
@@ -910,6 +905,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
     }
     operands.extend(program_control::operands(operation, &clauses, semantic)?);
+    if operation == HirCicsOperation::Address {
+        operands.extend(address::operands(&clauses, semantic)?);
+    }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
         let (using_is_address, using) = cics_address_value(&clauses["USING"], semantic)?;
@@ -1003,8 +1001,34 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
+    operands.extend(route::operands(&clauses, operation, semantic)?);
+    operands.extend(outboard::operands(&clauses, operation, semantic)?);
+    operands.extend(issue_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
+    if operation == HirCicsOperation::WriteOperator {
+        operator_control::validate(&clauses, &raw_options)?;
+        operands.extend(operator_control::operands(&clauses, semantic)?);
+    }
+    operands.extend(document_control::operands(&clauses, operation, semantic)?);
+    operands.extend(transform_control::operands(&clauses, operation, semantic)?);
+    operands.extend(event_control::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_child_link::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_browse::operands(&clauses, operation, semantic)?);
+    operands.extend(web_service_control::operands(
+        &clauses, operation, semantic,
+    )?);
+    operands.extend(journal_control::operands(&clauses, operation, semantic)?);
+    operands.extend(counter_control::operands(&clauses, operation, semantic)?);
+    operands.extend(bts_lifecycle::operands(&clauses, operation, semantic)?);
+    operands.extend(channel_container::operands(&clauses, operation, semantic)?);
+    operands.extend(web_control::operands(&clauses, operation, semantic)?);
+    operands.extend(conversation_control::operands(
+        &clauses, operation, semantic,
+    )?);
+    operands.extend(conversation_data::operands(&clauses, operation, semantic)?);
+    operands.extend(security_control::operands(&clauses, operation, semantic)?);
+    operands.extend(conversation_open::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -1041,28 +1065,49 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::FormatTime {
         operands.extend(format_time::operands(&clauses, semantic)?);
     }
-    let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
-    if operation == HirCicsOperation::Retrieve {
-        let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
-        require_writable(&target)?;
-        outputs.push(HirCicsOutputBinding {
-            name: HirCicsOutputName::Length,
-            target,
-        });
-    } else if operation == HirCicsOperation::Read
-        && let Some(HirCicsNamedOperand {
-            value: HirCicsValue::Data(target),
-            ..
-        }) = operands
-            .iter()
-            .find(|operand| operand.name == HirCicsOperandName::Length)
-    {
-        require_writable(target)?;
-        outputs.push(HirCicsOutputBinding {
-            name: HirCicsOutputName::Length,
-            target: target.clone(),
-        });
+    if operation == HirCicsOperation::ConvertTime {
+        operands.extend(convert_time::operands(&clauses, semantic)?);
     }
+    if operation == HirCicsOperation::BifDeedit {
+        operands.extend(builtin_function::deedit_operands(&clauses, semantic)?);
+    }
+    if operation == HirCicsOperation::BifDigest {
+        operands.extend(builtin_function::digest_operands(&clauses, semantic)?);
+    }
+    let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
+    if operation == HirCicsOperation::BifDeedit {
+        outputs.push(builtin_function::deedit_output(&clauses, semantic)?);
+    }
+    if operation == HirCicsOperation::BifDigest {
+        outputs.push(builtin_function::digest_output(
+            &clauses,
+            &raw_options,
+            semantic,
+        )?);
+    }
+    outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
+    if operation == HirCicsOperation::WriteOperator {
+        outputs.extend(operator_control::outputs(&clauses, semantic)?);
+    }
+    outputs.extend(certificate_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(document_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(transform_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(web_service_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(counter_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_lifecycle::outputs(&clauses, operation, semantic)?);
+    outputs.extend(channel_container::outputs(&clauses, operation, semantic)?);
+    outputs.extend(diagnostics::outputs(&clauses, operation, semantic)?);
+    outputs.extend(web_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(conversation_control::outputs(
+        &clauses, operation, semantic,
+    )?);
+    outputs.extend(conversation_data::outputs(&clauses, operation, semantic)?);
+    outputs.extend(security_control::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_child_link::outputs(&clauses, operation, semantic)?);
+    outputs.extend(bts_browse::outputs(&clauses, operation, semantic)?);
+    outputs.extend(conversation_open::outputs(&clauses, operation, semantic)?);
+    outputs.extend(issue_control::outputs(&clauses, operation, semantic)?);
+    output_bindings::append_inout_length(&mut outputs, &clauses, &operands, operation, semantic)?;
     let mut options = raw_options
         .iter()
         .filter(|option| {
@@ -1071,34 +1116,60 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
             ) && is_condition_name(option))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
+                && !(operation == HirCicsOperation::StartBrexit && option.as_str() == "BREXIT")
         })
-        .map(|option| match option.as_str() {
-            "CANCEL" => HirCicsOption::Cancel,
-            "NODUMP" => HirCicsOption::NoDump,
-            "RESET" => HirCicsOption::Reset,
-            "UPDATE" => HirCicsOption::Update,
-            "ROLLBACK" => HirCicsOption::Rollback,
-            "NOHANDLE" => HirCicsOption::NoHandle,
-            "TASK" => HirCicsOption::Task,
-            "UOW" => HirCicsOption::Uow,
-            "NOSUSPEND" => HirCicsOption::NoSuspend,
-            "ERASE" => HirCicsOption::Erase,
-            "CURSOR" => HirCicsOption::Cursor,
-            "DATESEP" => HirCicsOption::DateSep,
-            "TIMESEP" => HirCicsOption::TimeSep,
-            "FREEKB" => HirCicsOption::FreeKb,
-            "GTEQ" => HirCicsOption::Gteq,
-            "FMH" => HirCicsOption::Fmh,
-            "PROTECT" => HirCicsOption::Protect,
-            "WAIT" => HirCicsOption::Wait,
-            "AFTER" => HirCicsOption::After,
-            "AT" => HirCicsOption::At,
-            "FOR" => HirCicsOption::For,
-            "UNTIL" => HirCicsOption::Until,
-            "NOCHECK" => HirCicsOption::NoCheck,
-            _ => unreachable!("allowed CICS option"),
+        .map(|option| {
+            conversation_open::option(operation, option)
+                .or_else(|| conversation_data::option(operation, option))
+                .or_else(|| bts_child_link::option(operation, option))
+                .or_else(|| bts_lifecycle::option(operation, option))
+                .or_else(|| channel_container::option(operation, option))
+                .or_else(|| counter_control::option(operation, option))
+                .or_else(|| event_control::option(operation, option))
+                .or_else(|| diagnostics::option(operation, option))
+                .or_else(|| {
+                    matches!(
+                        operation,
+                        HirCicsOperation::SpoolClose
+                            | HirCicsOperation::SpoolOpenInput
+                            | HirCicsOperation::SpoolOpenOutput
+                            | HirCicsOperation::SpoolRead
+                            | HirCicsOperation::SpoolWrite
+                    )
+                    .then(|| spool_control::option(option))
+                    .flatten()
+                })
+                .unwrap_or_else(|| operation::resolve_option(option, operation))
         })
         .collect::<BTreeSet<_>>();
+    if matches!(
+        operation,
+        HirCicsOperation::WebReceive | HirCicsOperation::WebConverse
+    ) {
+        options.extend(web_control::receive_options(&clauses)?);
+    }
+    if matches!(
+        operation,
+        HirCicsOperation::WebStartBrowse | HirCicsOperation::WebReadNext
+    ) {
+        if operation == HirCicsOperation::WebReadNext && clauses.contains_key("HTTPHEADER") {
+            options.insert(HirCicsOption::WebBrowseHttpHeader);
+        }
+        if clauses.contains_key("FORMFIELD") {
+            options.insert(HirCicsOption::WebBrowseFormField);
+        }
+        if clauses.contains_key("QUERYPARM") {
+            options.insert(HirCicsOption::WebBrowseQueryParm);
+        }
+    }
+    if operation == HirCicsOperation::VerifyToken {
+        let token_type = security_control::token_cvda(&clauses, "TOKENTYPE")?;
+        options.insert(operation::resolve_option(&token_type, operation));
+        if clauses.contains_key("DATATYPE") {
+            let datatype = security_control::token_cvda(&clauses, "DATATYPE")?;
+            options.insert(operation::resolve_option(&datatype, operation));
+        }
+    }
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();
     let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();
     if response.is_none() && response2.is_some() {
@@ -1126,51 +1197,4 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         outputs,
         condition_policy,
     })
-}
-
-fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
-    if let [value] = tokens
-        && value.len() >= 2
-        && value.starts_with(['\'', '"'])
-        && value.as_bytes().first() == value.as_bytes().last()
-    {
-        return Ok(HirCicsValue::Literal(value[1..value.len() - 1].into()));
-    }
-    if matches!(tokens, [value] if numeric_literal(value).is_some()) {
-        return Err(ResolutionFailure::Unsupported);
-    }
-    complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
-}
-
-fn cics_address_value(
-    tokens: &[String],
-    semantic: &SemanticModel,
-) -> Resolution<(bool, HirDataReference)> {
-    if tokens.len() > 2
-        && tokens[0].eq_ignore_ascii_case("ADDRESS")
-        && tokens[1].eq_ignore_ascii_case("OF")
-    {
-        complete_data_reference(&tokens[2..], semantic).map(|reference| (true, reference))
-    } else {
-        complete_data_reference(tokens, semantic).map(|reference| (false, reference))
-    }
-}
-
-fn complete_data_reference(
-    tokens: &[String],
-    semantic: &SemanticModel,
-) -> Resolution<HirDataReference> {
-    let (reference, end) = data_reference_at(tokens, 0, semantic)?;
-    if end == tokens.len() {
-        Ok(reference)
-    } else {
-        Err(ResolutionFailure::Unsupported)
-    }
-}
-
-fn output(outputs: &[HirCicsOutputBinding], name: HirCicsOutputName) -> Option<&HirDataReference> {
-    outputs
-        .iter()
-        .find(|output| output.name == name)
-        .map(|output| &output.target)
 }

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Recover bounded Db2 host identifiers and host-variable references with optional indicator syntax."

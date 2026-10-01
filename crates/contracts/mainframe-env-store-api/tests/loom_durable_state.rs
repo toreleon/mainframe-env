@@ -125,3 +125,117 @@ fn loom_finds_the_deliberately_unfenced_lost_update() {
     });
     assert!(detected.is_err(), "Loom did not reject the unfenced mutant");
 }
+
+#[derive(Clone, Copy, Debug)]
+struct CicsSyncpointModel {
+    owner_epoch: u64,
+    version: u64,
+    effect: EffectState,
+    cancellation_requested: bool,
+    committed_mutations: u8,
+}
+
+fn cics_commit(shared: &Mutex<CicsSyncpointModel>, owner_epoch: u64, version: u64) -> bool {
+    let mut row = shared.lock().expect("modeled CICS syncpoint mutex");
+    if row.owner_epoch != owner_epoch
+        || row.version != version
+        || row.effect != EffectState::Intent
+        || row.cancellation_requested
+    {
+        return false;
+    }
+    row.effect = EffectState::Completed;
+    row.committed_mutations += 1;
+    row.version += 1;
+    true
+}
+
+fn cics_restart_claim(shared: &Mutex<CicsSyncpointModel>, version: u64) -> bool {
+    let mut row = shared.lock().expect("modeled CICS syncpoint mutex");
+    if row.version != version || row.effect != EffectState::Intent {
+        return false;
+    }
+    row.owner_epoch += 1;
+    row.version += 1;
+    true
+}
+
+#[test]
+fn cics_restart_claim_fences_stale_syncpoint_owner_and_replays_once() {
+    loom::model(|| {
+        let shared = Arc::new(Mutex::new(CicsSyncpointModel {
+            owner_epoch: 1,
+            version: 1,
+            effect: EffectState::Intent,
+            cancellation_requested: false,
+            committed_mutations: 0,
+        }));
+        let old_owner = {
+            let shared = shared.clone();
+            loom::thread::spawn(move || cics_commit(&shared, 1, 1))
+        };
+        let restart = {
+            let shared = shared.clone();
+            loom::thread::spawn(move || cics_restart_claim(&shared, 1))
+        };
+        let old_committed = old_owner.join().expect("old owner thread");
+        let reclaimed = restart.join().expect("restart thread");
+        assert_ne!(old_committed, reclaimed);
+        if reclaimed {
+            assert!(
+                !cics_commit(&shared, 1, 1),
+                "stale owner crossed the epoch fence"
+            );
+            assert!(cics_commit(&shared, 2, 2), "recovery owner completes once");
+        }
+        assert!(
+            !cics_commit(&shared, 2, 2),
+            "replayed syncpoint cannot commit twice"
+        );
+        let row = *shared.lock().expect("modeled CICS syncpoint mutex");
+        assert_eq!(row.effect, EffectState::Completed);
+        assert_eq!(row.committed_mutations, 1);
+    });
+}
+
+#[test]
+fn cics_cancel_racing_syncpoint_never_reopens_a_terminal_effect() {
+    loom::model(|| {
+        let shared = Arc::new(Mutex::new(CicsSyncpointModel {
+            owner_epoch: 1,
+            version: 1,
+            effect: EffectState::Intent,
+            cancellation_requested: false,
+            committed_mutations: 0,
+        }));
+        let commit = {
+            let shared = shared.clone();
+            loom::thread::spawn(move || cics_commit(&shared, 1, 1))
+        };
+        let cancel = {
+            let shared = shared.clone();
+            loom::thread::spawn(move || {
+                let mut row = shared.lock().expect("modeled CICS syncpoint mutex");
+                row.cancellation_requested = true;
+                if row.effect == EffectState::Intent {
+                    row.effect = EffectState::Failed;
+                    row.version += 1;
+                }
+            })
+        };
+        let committed = commit.join().expect("commit thread");
+        cancel.join().expect("cancel thread");
+        let row = *shared.lock().expect("modeled CICS syncpoint mutex");
+        assert_eq!(row.committed_mutations, u8::from(committed));
+        assert_eq!(
+            row.effect,
+            if committed {
+                EffectState::Completed
+            } else {
+                EffectState::Failed
+            }
+        );
+        assert!(!cics_restart_claim(&shared, row.version));
+        assert!(!cics_commit(&shared, row.owner_epoch, row.version));
+    });
+}

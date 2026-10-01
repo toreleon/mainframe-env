@@ -16,6 +16,82 @@ SPEC.loader.exec_module(cics_descriptors)
 
 
 class CicsDescriptorTests(unittest.TestCase):
+    def test_paired_issue_end_markers_are_valueless_flags(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        for label, companion in (
+            ("ISSUE ENDFILE", "ENDOUTPUT"),
+            ("ISSUE ENDOUTPUT", "ENDFILE"),
+        ):
+            command = next(
+                row
+                for batch in contracts["batches"]
+                for row in batch["commands"]
+                if row["label"] == label
+            )
+            registry = cics_descriptors._registry_row_material(
+                command, command["source_dimensions"], command["contract"]
+            )
+            option = next(
+                entry for entry in registry["options"] if entry["name"] == companion
+            )
+            self.assertEqual(
+                (option["value_shape"], option["direction"], option["source_max_value_bytes"]),
+                ("flag", "none", None),
+            )
+
+    def test_mapped_issue_session_alias_is_limited_to_source_defined_rows(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        rows = {
+            row["label"]: cics_descriptors._registry_row_material(
+                row, row["source_dimensions"], row["contract"]
+            )
+            for batch in contracts["batches"]
+            for row in batch["commands"]
+            if row["label"].startswith("ISSUE ")
+        }
+        for label in (
+            "ISSUE ABEND",
+            "ISSUE CONFIRMATION",
+            "ISSUE ERROR",
+            "ISSUE PREPARE",
+        ):
+            session = next(
+                option for option in rows[label]["options"]
+                if option["name"] == "SESSION"
+            )
+            self.assertEqual(
+                (
+                    session["value_shape"],
+                    session["direction"],
+                    session["source_max_value_bytes"],
+                ),
+                ("value", "input", 4),
+            )
+        self.assertIn(
+            "SESSION", [option["name"] for option in rows["ISSUE SIGNAL"]["options"]]
+        )
+        self.assertNotIn(
+            "SESSION", [option["name"] for option in rows["ISSUE COPY"]["options"]]
+        )
+
+    def test_spoolwrite_page_choice_uses_verified_syntax(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        row = next(
+            command
+            for batch in contracts["batches"]
+            for command in batch["commands"]
+            if command["label"] == "SPOOLWRITE"
+        )
+        options = row["contract"]["options"]
+        self.assertIn("PAGE", [entry["name"] for entry in options["entries"]])
+        self.assertIn(
+            {"members": ["LINE", "PAGE"], "required": False},
+            options["constraints"]["alternatives"],
+        )
+        self.assertIn(
+            ["LINE", "PAGE"], options["constraints"]["mutual_exclusions"]
+        )
+
     def fixture(self, root: Path) -> None:
         for relative in [
             cics_descriptors.CATALOG_PATH,
@@ -118,17 +194,23 @@ class CicsDescriptorTests(unittest.TestCase):
         cics_descriptors.check(ROOT)
         catalog = cics_descriptors.load_catalog(ROOT)
         provider = cics_descriptors.render_provider(ROOT)
+        provider_tail = cics_descriptors.render_provider_tail(ROOT)
+        lookup = cics_descriptors.render_provider_lookup(ROOT)
         host = cics_descriptors.render_host(ROOT)
         compiler_spi = cics_descriptors.render_compiler_spi_compatibility(ROOT)
         contracts = cics_descriptors.build_contracts(ROOT)
         ir_registry = cics_descriptors.render_ir_registry(ROOT, contracts)
-        self.assertEqual(provider.count("CicsOperation::"), 80)
+        self.assertEqual(
+            provider.count("CicsOperation::") + provider_tail.count("CicsOperation::"), 262
+        )
+        self.assertEqual(lookup.count("CicsOperation::"), 262)
         self.assertIn("pub(crate) const CICS_CONDITION_NAMES", provider)
         self.assertIn('"PGMIDERR"', provider)
-        self.assertIn("CicsCommandFamily::TaskControl", provider)
-        self.assertIn("CicsCommandFamily::Recovery", provider)
+        self.assertIn("CicsCommandFamily::TaskControl", provider + provider_tail)
+        self.assertIn("CicsCommandFamily::Recovery", provider + provider_tail)
+        self.assertIn("CicsCommandFamily::JournalControl", provider + provider_tail)
         self.assertEqual(len(catalog["_application_commands"]), 263)
-        self.assertEqual(len(catalog["_runtime_operations"]), 40)
+        self.assertEqual(len(catalog["_runtime_operations"]), 262)
         self.assertEqual(host.count("official_row:"), 263)
         self.assertIn(
             'official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"',
@@ -150,10 +232,10 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertFalse(contracts["execution_authority"])
         self.assertEqual(contracts["coverage_credit"], 0)
         self.assertEqual(contracts["semantic_credit"], 0)
-        self.assertEqual(contracts["counts"]["runtime_backed_commands"], 38)
-        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 38)
+        self.assertEqual(contracts["counts"]["runtime_backed_commands"], 260)
+        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 260)
         self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 0)
-        self.assertEqual(contracts["counts"]["advertised_commands"], 38)
+        self.assertEqual(contracts["counts"]["advertised_commands"], 260)
         contract_rows = [
             command for batch in contracts["batches"] for command in batch["commands"]
         ]
@@ -172,12 +254,20 @@ class CicsDescriptorTests(unittest.TestCase):
             if row["implementation_status"] != "unimplemented"
         }
         self.assertEqual(observed_runtime, expected_runtime)
-        self.assertEqual(len(observed_runtime), 38)
+        self.assertEqual(len(observed_runtime), 260)
         self.assertEqual(
             sum(row["implementation_status"] == "unimplemented" for row in contract_rows),
-            225,
+            3,
         )
         rows_by_label = {row["label"]: row for row in contract_rows}
+        composite_options = {
+            option["name"]: option
+            for option in rows_by_label["DEFINE COMPOSITE EVENT"]["contract"]["options"]["entries"]
+        }
+        for index in range(1, 9):
+            option = composite_options[f"SUBEVENT{index}"]
+            self.assertEqual(option["value_shape"], "value")
+            self.assertEqual(option["directions"], ["input"])
         self.assertEqual(rows_by_label["ABEND"]["registration_status"], "typed-runtime")
         self.assertEqual(rows_by_label["ABEND"]["existing_runtime_operation"], "Abend")
         self.assertEqual(
@@ -202,6 +292,7 @@ class CicsDescriptorTests(unittest.TestCase):
             ("DELAY", "Delay"),
             ("WRITE FILE", "Write"),
             ("WRITEQ TD", "WriteTransientData"),
+            ("WRITEQ TS", "WriteTemporaryStorage"),
             ("RECEIVE MAP", "ReceiveMap"),
             ("SEND MAP", "SendMap"),
             ("SEND TEXT", "SendText"),
@@ -209,7 +300,20 @@ class CicsDescriptorTests(unittest.TestCase):
             ("CANCEL", "Cancel"),
             ("PURGE MESSAGE", "PurgeMessage"),
             ("START", "Start"),
+            ("START ATTACH", "StartAttach"),
+            ("POST", "Post"),
+            ("WRITE OPERATOR", "WriteOperator"),
+            ("EXTRACT CERTIFICATE", "ExtractCertificate"),
+            ("EXTRACT TCPIP", "ExtractTcpip"),
             ("RETRIEVE", "Retrieve"),
+            ("WAIT EVENT", "WaitEvent"),
+            ("WAIT EXTERNAL", "WaitExternal"),
+            ("WAITCICS", "WaitCics"),
+            ("SPOOLCLOSE", "SpoolClose"),
+            ("SPOOLOPEN INPUT", "SpoolOpenInput"),
+            ("SPOOLOPEN OUTPUT", "SpoolOpenOutput"),
+            ("SPOOLREAD", "SpoolRead"),
+            ("SPOOLWRITE", "SpoolWrite"),
         ]:
             self.assertEqual(rows_by_label[label]["registration_status"], "typed-runtime")
             self.assertEqual(rows_by_label[label]["existing_runtime_operation"], operation)
@@ -239,10 +343,10 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
         self.assertIn("CICS_APPLICATION_REGISTRY_SHA256", ir_registry)
         self.assertEqual(contracts["registry"]["shape_commands"], 263)
-        self.assertEqual(contracts["registry"]["typed_handlers"], 38)
+        self.assertEqual(contracts["registry"]["typed_handlers"], 260)
         self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 0)
-        self.assertEqual(contracts["registry"]["advertised_commands"], 38)
-        self.assertEqual(contracts["registry"]["unready_handlers"], 225)
+        self.assertEqual(contracts["registry"]["advertised_commands"], 260)
+        self.assertEqual(contracts["registry"]["unready_handlers"], 3)
         self.assertIsNone(contracts["registry"]["default_handler"])
         self.assertEqual(contracts["participant_contract"]["status"], "bounded-ambiguity")
         self.assertEqual(contracts["participant_contract"]["execution_credit"], 0)
@@ -262,7 +366,7 @@ class CicsDescriptorTests(unittest.TestCase):
         )
         self.assertEqual(
             sum(row["contract"]["registry"]["advertised"] for row in contract_rows),
-            38,
+            260,
         )
         self.assertTrue(
             all(
@@ -342,15 +446,15 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertIn("reject_unknown_options: true", compiler_legacy)
         self.assertNotIn("SetFileStatus", compiler_legacy)
         self.assertNotIn("SET FILE", compiler_legacy)
-        # Row 0187 itself remains Unready and unadvertised; this route does
-        # not touch the 263-row application registry.
+        # The SEND TEXT compatibility alias remains bound to row 0192 while
+        # row 0187 independently advertises the mapped APPC/MRO SEND route.
         ir_registry = cics_descriptors.render_ir_registry(ROOT)
         row_start = ir_registry.find('official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0187"')
         self.assertNotEqual(row_start, -1)
         row_end = ir_registry.find("CicsApplicationRegistryDescriptor {", row_start)
         row_text = ir_registry[row_start:row_end]
-        self.assertIn("readiness: CicsApplicationHandlerReadiness::Unready", row_text)
-        self.assertIn("advertised: false", row_text)
+        self.assertIn("readiness: CicsApplicationHandlerReadiness::TypedRuntime", row_text)
+        self.assertIn("advertised: true", row_text)
 
     def test_compiler_legacy_compatibility_cross_check_rejects_unbound_runtime_operation(self):
         catalog = cics_descriptors.load_catalog(ROOT)
@@ -585,12 +689,12 @@ class CicsDescriptorTests(unittest.TestCase):
                 ):
                     cics_descriptors.load_catalog(root)
 
-    def test_runtime_operations_remain_exactly_38_api_and_2_spi(self):
+    def test_runtime_operations_match_registered_api_and_spi(self):
         catalog = cics_descriptors.load_catalog(ROOT)
         counts = {"api": 0, "spi-compatibility": 0}
         for operation in catalog["_runtime_operations"]:
             counts[operation["interface"]] += 1
-        self.assertEqual(counts, {"api": 38, "spi-compatibility": 2})
+        self.assertEqual(counts, {"api": 260, "spi-compatibility": 2})
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -702,20 +806,20 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertTrue(all(":api-commands:" in row["official_row"] for row in rows))
         self.assertFalse(any(":spi-" in row["official_row"] for row in rows))
         self.assertFalse(any(":fepi-" in row["official_row"] for row in rows))
-        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 38)
+        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 260)
         self.assertEqual(
             sum(row["readiness"] == "legacy-compatibility" for row in registry), 0
         )
-        self.assertEqual(sum(row["advertised"] for row in registry), 38)
-        self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 225)
+        self.assertEqual(sum(row["advertised"] for row in registry), 260)
+        self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 3)
         self.assertFalse(contracts["automatic_registration"])
         self.assertIsNone(contracts["registry"]["default_handler"])
         self.assertEqual(
             contracts["participant_contract"]["mutating_rows"],
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
-        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 20)
-        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 225)
+        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 207)
+        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 4)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(
             contracts["participant_contract"]["unknown_outcome"]["automatic_redispatch"]
@@ -803,17 +907,28 @@ class CicsDescriptorTests(unittest.TestCase):
                 self.assertEqual(grammar["status"], "bounded-ambiguity")
                 self.assertEqual(grammar["variants"], [])
 
-        for label in (
-            "GET CONTAINER",
-            "WEB READ",
-            "WAIT JOURNALNAME",
-            "GDS EXTRACT ATTRIBUTES",
-            "DOCUMENT RETRIEVE",
-        ):
+        for label in ("GET CONTAINER",):
             with self.subTest(label=label):
                 effect = rows[label]["contract"]["effect"]
                 self.assertEqual(effect["status"], "bounded-ambiguity")
                 self.assertIsNone(effect["mutating"])
+        self.assertEqual(
+            rows["GDS EXTRACT ATTRIBUTES"]["contract"]["effect"]["status"],
+            "resolved",
+        )
+        self.assertFalse(
+            rows["GDS EXTRACT ATTRIBUTES"]["contract"]["effect"]["mutating"]
+        )
+        self.assertEqual(rows["WEB READ"]["contract"]["effect"]["status"], "resolved")
+        self.assertFalse(rows["WEB READ"]["contract"]["effect"]["mutating"])
+        self.assertEqual(rows["WAIT JOURNALNAME"]["contract"]["effect"]["status"], "resolved")
+        self.assertFalse(rows["WAIT JOURNALNAME"]["contract"]["effect"]["mutating"])
+        self.assertEqual(rows["WAIT JOURNALNUM"]["contract"]["effect"]["status"], "resolved")
+        self.assertFalse(rows["WAIT JOURNALNUM"]["contract"]["effect"]["mutating"])
+        self.assertEqual(rows["WRITE JOURNALNAME"]["contract"]["effect"]["status"], "resolved")
+        self.assertTrue(rows["WRITE JOURNALNAME"]["contract"]["effect"]["mutating"])
+        self.assertEqual(rows["WRITE JOURNALNUM"]["contract"]["effect"]["status"], "resolved")
+        self.assertTrue(rows["WRITE JOURNALNUM"]["contract"]["effect"]["mutating"])
 
         abend = copy.deepcopy(rows["ABEND"])
         self.assertEqual(abend["contract"]["options"]["bounds_status"], "bounded-ambiguity")
@@ -853,6 +968,13 @@ class CicsDescriptorTests(unittest.TestCase):
             "HANDLE ABEND": {"memory-read", "memory-write", "condition"},
             "HANDLE AID": {"memory-read", "memory-write", "condition"},
             "LINK": {
+                "memory-read",
+                "memory-write",
+                "program-control",
+                "condition",
+                "transaction",
+            },
+            "RELEASE": {
                 "memory-read",
                 "memory-write",
                 "program-control",
@@ -902,6 +1024,24 @@ class CicsDescriptorTests(unittest.TestCase):
                 "transaction",
             },
             "WRITEQ TD": {
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "DELETEQ TD": {
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "FREEMAIN": {
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "GETMAIN": {
                 "memory-read",
                 "memory-write",
                 "condition",
@@ -971,11 +1111,11 @@ class CicsDescriptorTests(unittest.TestCase):
         ]
         self.assertEqual(
             sum("memory-read" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            29,
+            247,
         )
         self.assertEqual(
             sum("memory-write" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            38,
+            260,
         )
 
     def test_resource_selectors_are_family_scoped_and_input_only(self):
@@ -1095,44 +1235,266 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(
             typed,
             {
+                "ENDBROWSE CONTAINER",
+                "GETNEXT CONTAINER",
+                "INQUIRE CONTAINER",
+                "STARTBROWSE CONTAINER",
+                "ENDBROWSE ACTIVITY",
+                "ENDBROWSE EVENT",
+                "ENDBROWSE PROCESS",
+                "ENDBROWSE TIMER",
+                "GETNEXT ACTIVITY",
+                "GETNEXT EVENT",
+                "GETNEXT PROCESS",
+                "INQUIRE ACTIVITYID",
+                "INQUIRE EVENT",
+                "INQUIRE PROCESS",
+                "INQUIRE TIMER",
+                "STARTBROWSE ACTIVITY",
+                "STARTBROWSE EVENT",
+                "STARTBROWSE PROCESS",
+                "STARTBROWSE TIMER",
+                "ACQUIRE ACTIVITYID",
+                "ACQUIRE PROCESS",
+                "CANCEL ACQACTIVITY",
+                "CANCEL ACQPROCESS",
+                "CANCEL ACTIVITY",
+                "CHECK ACQACTIVITY",
+                "CHECK ACQPROCESS",
+                "CHECK ACTIVITY",
+                "DEFINE ACTIVITY",
+                "DEFINE PROCESS",
+                "DELETE CHANNEL",
+                "DELETE CONTAINER",
+                "DELETE ACTIVITY",
+                "GET CONTAINER",
+                "GET64 CONTAINER",
+                "MOVE CONTAINER",
+                "PUT CONTAINER",
+                "PUT64 CONTAINER",
+                "QUERY CHANNEL",
+                "RESET ACQPROCESS",
+                "RESET ACTIVITY",
+                "RESUME ACQACTIVITY",
+                "RESUME ACQPROCESS",
+                "RESUME ACTIVITY",
+                "RUN ACQACTIVITY",
+                "RUN ACQPROCESS",
+                "RUN ACTIVITY",
+                "RUN TRANSID",
+                "SUSPEND ACQACTIVITY",
+                "SUSPEND ACQPROCESS",
+                "SUSPEND ACTIVITY",
+                "FETCH ANY",
+                "FETCH CHILD",
+                "FREE CHILD",
+                "LINK ACQACTIVITY",
+                "LINK ACQPROCESS",
+                "LINK ACTIVITY",
                 "ABEND",
+                "ADD SUBEVENT",
+                "ADDRESS",
                 "ADDRESS SET",
+                "ALLOCATE",
+                "GDS ALLOCATE",
+                "GDS ASSIGN",
+                "BUILD ATTACH",
+                "CONNECT PROCESS",
+                "GDS CONNECT PROCESS",
+                "FREE",
+                "GDS FREE",
+                "CONVERSE",
+                "RECEIVE",
+                "GDS RECEIVE",
+                "SEND",
+                "WAIT",
+                "WAIT CONVID",
+                "WAIT SIGNAL",
+                "WAIT TERMINAL",
                 "ASKTIME",
                 "ASKTIME ABSTIME",
+                "BIF DEEDIT",
+                "BIF DIGEST",
+                "CONVERTTIME",
                 "CHANGE TASK",
+                "DEFINE COUNTER",
+                "DEFINE DCOUNTER",
+                "DELETE COUNTER",
+                "DELETE DCOUNTER",
+                "GET COUNTER",
+                "GET DCOUNTER",
+                "QUERY COUNTER",
+                "QUERY DCOUNTER",
+                "REWIND COUNTER",
+                "REWIND DCOUNTER",
+                "UPDATE COUNTER",
+                "UPDATE DCOUNTER",
                 "DEQ",
+                "DEFINE COMPOSITE EVENT",
+                "DEFINE INPUT EVENT",
+                "CHECK TIMER",
+                "DEFINE TIMER",
+                "DELETE TIMER",
+                "FORCE TIMER",
+                "RETRIEVE REATTACH EVENT",
+                "RETRIEVE SUBEVENT",
+                "TEST EVENT",
+                "SIGNAL EVENT",
+                "DOCUMENT CREATE",
+                "DOCUMENT DELETE",
+                "DOCUMENT INSERT",
+                "DOCUMENT RETRIEVE",
+                "DOCUMENT SET",
+                "DUMP",
+                "DUMP TRANSACTION",
                 "ENQ",
+                "ENTER TRACEID",
+                "ENTER TRACENUM",
+                "EXTRACT CERTIFICATE",
+                "EXTRACT TCPIP",
+                "EXTRACT ATTACH",
+                "EXTRACT ATTRIBUTES",
+                "GDS EXTRACT ATTRIBUTES",
+                "EXTRACT LOGONMSG",
+                "EXTRACT PROCESS",
+                "GDS EXTRACT PROCESS",
+                "EXTRACT TCT",
+                "POINT",
                 "FORMATTIME",
                 "HANDLE ABEND",
                 "HANDLE AID",
                 "HANDLE CONDITION",
                 "IGNORE CONDITION",
+                "INVOKE APPLICATION",
+                "INVOKE SERVICE",
+                "ISSUE ABORT",
+                "ISSUE ABEND",
+                "GDS ISSUE ABEND",
+                "GDS ISSUE CONFIRMATION",
+                "GDS ISSUE ERROR",
+                "ISSUE ADD",
+                "ISSUE CONFIRMATION",
+                "ISSUE DISCONNECT",
+                "ISSUE END",
+                "ISSUE ENDFILE",
+                "ISSUE ENDOUTPUT",
+                "ISSUE EODS",
+                "ISSUE ERASE",
+                "ISSUE ERASEAUP",
+                "ISSUE ERROR",
+                "ISSUE LOAD",
+                "ISSUE NOTE",
+                "ISSUE PASS",
+                "ISSUE PREPARE",
+                "GDS ISSUE PREPARE",
+                "ISSUE PRINT",
+                "ISSUE QUERY",
+                "ISSUE RECEIVE",
+                "ISSUE REPLACE",
+                "ISSUE RESET",
+                "ISSUE SEND",
+                "ISSUE SIGNAL",
+                "GDS ISSUE SIGNAL",
+                "ISSUE WAIT",
+                "ROUTE",
                 "LINK",
+                "LOAD",
+                "MONITOR",
+                "RELEASE",
                 "POP HANDLE",
+                "POST",
                 "PUSH HANDLE",
                 "READ",
+                "READQ TS",
+                "REMOVE SUBEVENT",
                 "REWRITE",
                 "SET ASSOCIATION USERCORRDATA",
+                "SOAPFAULT ADD",
+                "SOAPFAULT CREATE",
+                "SOAPFAULT DELETE",
+                "SPOOLCLOSE",
+                "SPOOLOPEN INPUT",
+                "SPOOLOPEN OUTPUT",
+                "SPOOLREAD",
+                "SPOOLWRITE",
                 "SUSPEND",
+                "TRACE",
+                "WAIT EVENT",
+                "WAIT EXTERNAL",
+                "WAITCICS",
                 "SYNCPOINT",
+                "TRANSFORM DATATOJSON",
+                "TRANSFORM DATATOXML",
+                "TRANSFORM JSONTODATA",
+                "TRANSFORM XMLTODATA",
                 "XCTL",
                 "RETURN",
                 "STARTBR",
+                "RESETBR",
+                "UNLOCK",
                 "READNEXT",
                 "READPREV",
+                "READQ TD",
                 "ENDBR",
                 "DELETE",
+                "DELETE EVENT",
+                "DELETEQ TD",
+                "DELETEQ TS",
                 "DELAY",
+                "FREEMAIN",
+                "FREEMAIN64",
+                "GETMAIN",
+                "GETMAIN64",
                 "WRITE FILE",
+                "WRITE OPERATOR",
                 "WRITEQ TD",
+                "WRITEQ TS",
                 "RECEIVE MAP",
+                "RECEIVE PARTN",
                 "SEND MAP",
+                "SEND PARTNSET",
+                "SEND CONTROL",
+                "SEND PAGE",
                 "SEND TEXT",
                 "ASSIGN",
                 "CANCEL",
                 "PURGE MESSAGE",
+                "QUERY SECURITY",
+                "REQUEST PASSTICKET",
+                "REQUEST ENCRYPTPTKT",
+                "SIGNOFF",
+                "SIGNON",
+                "CHANGE PASSWORD",
+                "CHANGE PHRASE",
+                "VERIFY PASSWORD",
+                "VERIFY PHRASE",
+                "VERIFY TOKEN",
                 "RETRIEVE",
                 "START",
+                "START ATTACH",
+                "START BREXIT",
+                "WAIT JOURNALNAME",
+                "WAIT JOURNALNUM",
+                "WEB CLOSE",
+                "WEB CONVERSE",
+                "WEB ENDBROWSE",
+                "EXTRACT WEB",
+                "WEB EXTRACT",
+                "WEB OPEN",
+                "WEB PARSE URL",
+                "WEB READ",
+                "WEB READNEXT",
+                "WEB RECEIVE",
+                "WEB RETRIEVE",
+                "WEB SEND",
+                "WEB STARTBROWSE",
+                "WEB WRITE",
+                "WRITE JOURNALNAME",
+                "WRITE JOURNALNUM",
+                "WSACONTEXT BUILD",
+                "WSACONTEXT DELETE",
+                "WSACONTEXT GET",
+                "WSAEPR CREATE",
             },
         )
         self.assertEqual(

@@ -7,7 +7,7 @@
   "target_product": "0.1.1",
   "current_product": "0.1.0-alpha.0",
   "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of batch_program_receipt, with no trailing newline, followed by SHA-256",
-  "evidence_digest": "sha256:110244e9ba24d1468498439f0937c28836719b1acae8bf1c289969dc0143a142",
+  "evidence_digest": "sha256:3b1d7c700f5ee99592279341cd87acbd8c421e223f2d799fd10b3ba03b2a5dbd",
   "batch_program_receipt": {
     "schema_version": "mainframe-env.carddemo-batch-program-receipt@1",
     "status": "pass",
@@ -45,7 +45,7 @@
     "cancellation_controls": 1,
     "timeout_controls": 1,
     "restart_routes": 1,
-    "program_shape_sha256": "7dd75342ed24841c3579f830152b3d95a5e9cc12a6d4e1d548f1c38a92122500"
+    "program_shape_sha256": "2779f10019939bfd89a12a39ef72634ae199301fbdc50994ab5cbbb4400d9c98"
   },
   "acceptance_observations": [
     "All 11 source-backed base PGM entries, including the CBSTM03A entry recovered from the sole accepted-unsupported JCL file, compile into legal reference artifacts. CBSTM03B is derived from reached CALL targets, compiled with them, and all 12 artifacts install through the bounded content-addressed batch catalog with deterministic replay.",
@@ -112,5 +112,8 @@
     }
   ],
   "absolute_local_paths_present": false,
-  "native_or_legacy_fallback_present": false
+  "native_or_legacy_fallback_present": false,
+  "transition_justification": [
+    "Commit 229077a3 changed COBOL lowering to typed HIR and emitted IR payloads; batch artifact content IDs and the CD-022 program-shape digest changed. The pinned corpus and all other receipt fields remain unchanged."
+  ]
 }

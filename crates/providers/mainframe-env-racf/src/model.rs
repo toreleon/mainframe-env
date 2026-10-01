@@ -1,4 +1,7 @@
+mod credential;
 use argon2::password_hash::phc::PasswordHash;
+pub(crate) use credential::CredentialVerifier;
+use credential::{default_password_maximum, default_password_minimum};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -138,18 +141,6 @@ pub enum PrincipalState {
 
 #[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct CredentialVerifier {
-    pub algorithm: String,
-    pub encoded_verifier: String,
-    pub changed_tick: u64,
-    #[serde(default)]
-    pub history_digests: Vec<String>,
-    #[serde(default)]
-    pub history_verifiers: Vec<String>,
-}
-
-#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct PrincipalProfile {
     pub id: String,
     pub kind: PrincipalKind,
@@ -157,6 +148,12 @@ pub struct PrincipalProfile {
     pub default_group: Option<String>,
     pub state: PrincipalState,
     pub(crate) credential: Option<CredentialVerifier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) phrase_credential: Option<CredentialVerifier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) invalid_count: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) last_use_tick: Option<u64>,
     #[serde(default)]
     pub profile_template: Option<String>,
     #[serde(default)]
@@ -171,7 +168,7 @@ pub struct PrincipalProfile {
 impl PrincipalProfile {
     #[must_use]
     pub const fn has_credential(&self) -> bool {
-        self.credential.is_some()
+        self.credential.is_some() || self.phrase_credential.is_some()
     }
 }
 
@@ -1047,7 +1044,18 @@ impl SecurityDatabaseSnapshot {
             {
                 return Err(SecuritySchemaProblem::MissingReference);
             }
-            if let Some(credential) = &principal.credential {
+            if principal
+                .phrase_credential
+                .as_ref()
+                .is_some_and(|credential| !credential.is_phrase)
+            {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
+            for credential in principal
+                .credential
+                .iter()
+                .chain(principal.phrase_credential.iter())
+            {
                 bounded(&credential.algorithm, 64)?;
                 bounded(&credential.encoded_verifier, limits.max_value_bytes)?;
                 if credential
@@ -1595,14 +1603,6 @@ const fn is_zero(value: &u64) -> bool {
     *value == 0
 }
 
-const fn default_password_minimum() -> usize {
-    8
-}
-
-const fn default_password_maximum() -> usize {
-    100
-}
-
 const fn default_phrase_minimum() -> usize {
     14
 }
@@ -1765,6 +1765,9 @@ mod tests {
             default_group: None,
             state: PrincipalState::Active,
             credential: None,
+            phrase_credential: None,
+            invalid_count: None,
+            last_use_tick: None,
             profile_template: None,
             segments: BTreeMap::new(),
             security_level: 0,

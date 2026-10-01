@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Admit bounded GET64 NODATA, NOCONVERT, and same-CCSID reads and PUT64 raw BIT/CHAR data while retaining conversion and PREPEND fences."

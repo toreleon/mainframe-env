@@ -11,6 +11,7 @@ mod cobol_assurance;
 mod cobol_clauses;
 mod cobol_conditions;
 mod cobol_data;
+mod cobol_differential;
 mod cobol_exit;
 mod cobol_files;
 mod cobol_frontend;
@@ -30,9 +31,15 @@ mod dataset_reference;
 mod decimal_adapter;
 mod framework;
 mod jcl;
+mod licensed_harness;
+pub mod profile_intake;
 mod racf;
 mod racf_oracle;
 mod racf_reference;
 
 pub use decimal_adapter::{DecimalAdapterReceipt, LEDGER_FORMULA_CONTRACT, verify_decimal_adapter};
 pub use framework::*;
+pub use licensed_harness::{
+    OracleCandidateExpectation, OracleHarnessRegistry, OracleHarnessValidation,
+    OracleHarnessValidationKind, validate_oracle_harness_receipt, validate_oracle_harness_registry,
+};

@@ -4,8 +4,8 @@ use crate::dataset::*;
 use crate::names::*;
 use crate::request::*;
 use mainframe_env_execution_api::{
-    AuditResourceDigest, AuditResourceDigestFormat, BoundedPayload, CapabilityId, IdempotencyKey,
-    PrincipalId, RunUnitId,
+    ArtifactRef, AuditResourceDigest, AuditResourceDigestFormat, BoundedPayload, CapabilityId,
+    IdempotencyKey, PrincipalId, RunUnitId,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -219,7 +219,8 @@ named!(
     CapabilityId,
     PrincipalId,
     RunUnitId,
-    IdempotencyKey
+    IdempotencyKey,
+    ArtifactRef
 );
 impl Canonical for BoundedPayload {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
@@ -230,6 +231,41 @@ impl Canonical for BoundedPayload {
         self.schema().encode(out)
     }
 }
+
+impl Canonical for ProgramLinkSelection {
+    fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
+        out.object("ProgramLinkSelection", 3)?;
+        out.text("artifact")?;
+        self.artifact.encode(out)?;
+        out.text("content_identity")?;
+        self.content_identity.encode(out)?;
+        out.text("generation")?;
+        self.generation.encode(out)
+    }
+}
+
+fn encode_program_link(
+    out: &mut Encoder<'_>,
+    payload: &BoundedPayload,
+    program: &ProgramName,
+    selection: Option<&ProgramLinkSelection>,
+) -> Result<(), HostProblem> {
+    out.variant(
+        "ProgramRequest",
+        "Link",
+        2 + usize::from(selection.is_some()),
+    )?;
+    out.text("payload")?;
+    payload.encode(out)?;
+    out.text("program")?;
+    program.encode(out)?;
+    if let Some(selection) = selection {
+        out.text("selection")?;
+        selection.encode(out)?;
+    }
+    Ok(())
+}
+
 fn encode<T: Canonical + ?Sized>(
     value: &T,
     domain: &[u8],
@@ -309,6 +345,7 @@ pub fn canonical_result_size(
     encode(value, RESULT_DIGEST_DOMAIN, limit, &mut |_| {})
 }
 
+mod browse;
 mod cics;
 mod generated;
 mod security_request;

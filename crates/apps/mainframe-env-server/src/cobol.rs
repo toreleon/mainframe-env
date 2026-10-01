@@ -1,5 +1,6 @@
+mod runtime_calls;
 use mainframe_env_batch::{
-    Program, ProgramInput, ProgramOutput, ProgramRouter, SystemServiceProgram,
+    Program, ProgramInput, ProgramOutput, ProgramRouter, ProgramTermination, SystemServiceProgram,
     system_service_program,
 };
 use mainframe_env_cics::cics_abi_library;
@@ -30,6 +31,7 @@ use mainframe_env_source::{
 use mainframe_env_store_api::{
     ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateWrite,
 };
+use runtime_calls::*;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -37,6 +39,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod artifact;
 mod runtime;
+mod selected_link;
 use artifact::{AdmittedProgram, admit_published_artifact};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
@@ -102,7 +105,6 @@ impl DefaultProgramRouter {
             .map_err(|_| HostProblem::IdempotencyConflict)
     }
 }
-
 impl HostProvider for DefaultProgramRouter {
     fn descriptor(&self) -> &CapabilityDescriptor {
         self.router.descriptor()
@@ -141,7 +143,7 @@ impl HostProvider for DefaultProgramRouter {
                 sequence: effect.sequence,
                 outcome: self
                     .cobol
-                    .execute_installed_effect(invocation, &effect, program.as_str(), payload)
+                    .execute_installed_effect(invocation, &effect, program.as_str(), payload, None)
                     .map(HostResult::Program),
             };
         }
@@ -160,11 +162,11 @@ impl HostProvider for DefaultProgramRouter {
                 sequence: effect.sequence,
                 outcome: self
                     .cobol
-                    .execute_installed_effect(invocation, &effect, program.as_str(), payload)
+                    .execute_installed_effect(invocation, &effect, program.as_str(), payload, None)
                     .map(HostResult::Program),
             };
         }
-        self.router.invoke(invocation, effect)
+        selected_link::dispatch(self, invocation, effect)
     }
 }
 
@@ -475,6 +477,10 @@ impl CobolProgram {
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
         replay::bind_protocol_owner(parent, &mut bindings)?;
+        bindings.insert(
+            "cobol.call.arguments".into(),
+            batch_main_call_arguments(input.parameter.as_deref())?,
+        );
         for dd in &input.dds {
             if let Some(dataset) = &dd.dataset {
                 bindings.insert(
@@ -569,16 +575,27 @@ impl CobolProgram {
                     .map(<[u8]>::to_vec)
                     .collect(),
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             }),
             ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
                 return_code: condition.response,
                 records: vec![condition.name.into_bytes()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             }),
-            ExecutionOutcome::Abend(abend) => Err(HostProblem::Condition {
-                name: format!("ABEND:{}", abend.code),
-                response: -1,
-                response2: 0,
+            ExecutionOutcome::Abend(abend) => Ok(ProgramOutput {
+                return_code: -1,
+                records: machine
+                    .output()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|record| !record.is_empty())
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+                dd_outputs: BTreeMap::new(),
+                termination: Some(ProgramTermination::Abend {
+                    code: abend.code,
+                    condition_name: None,
+                }),
             }),
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
@@ -698,7 +715,14 @@ impl Program for CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             parent.attempt,
             parent.limits,
-            parent.bindings.clone(),
+            {
+                let mut bindings = parent.bindings.clone();
+                bindings.insert(
+                    "cobol.call.arguments".into(),
+                    batch_main_call_arguments(input.parameter.as_deref())?,
+                );
+                bindings
+            },
             limits,
         )
         .and_then(|invocation| {
@@ -738,17 +762,28 @@ impl Program for CobolProgram {
                         .map(<[u8]>::to_vec)
                         .collect(),
                     dd_outputs: BTreeMap::new(),
+                    termination: None,
                 })
             }
             ExecutionOutcome::Condition(condition) => Ok(ProgramOutput {
                 return_code: condition.response,
                 records: vec![condition.name.into_bytes()],
                 dd_outputs: BTreeMap::new(),
+                termination: None,
             }),
-            ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
-                name: "ABEND".into(),
-                response: -1,
-                response2: 0,
+            ExecutionOutcome::Abend(abend) => Ok(ProgramOutput {
+                return_code: -1,
+                records: machine
+                    .output()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|record| !record.is_empty())
+                    .map(<[u8]>::to_vec)
+                    .collect(),
+                dd_outputs: BTreeMap::new(),
+                termination: Some(ProgramTermination::Abend {
+                    code: abend.code,
+                    condition_name: Some("ABEND".into()),
+                }),
             }),
             ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
             ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
@@ -786,202 +821,6 @@ fn install_batch_environment(
             }
             _ => HostProblem::Malformed,
         })
-}
-
-fn decode_cobol_call_values(payload: &BoundedPayload) -> Result<Vec<Vec<u8>>, HostProblem> {
-    if payload.schema() != "mainframe-env.cobol.call@1" {
-        return Err(HostProblem::Malformed);
-    }
-    let bytes = payload.bytes();
-    let mut at = 0usize;
-    let take = |at: &mut usize, amount: usize| -> Result<&[u8], HostProblem> {
-        let end = at
-            .checked_add(amount)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        let value = bytes.get(*at..end).ok_or(HostProblem::Malformed)?;
-        *at = end;
-        Ok(value)
-    };
-    let count = usize::try_from(u32::from_be_bytes(
-        take(&mut at, 4)?
-            .try_into()
-            .map_err(|_| HostProblem::Malformed)?,
-    ))
-    .map_err(|_| HostProblem::ResourceExhausted)?;
-    if count > InvocationLimits::default().max_bindings {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut values = Vec::with_capacity(count);
-    for _ in 0..count {
-        let name_length = usize::try_from(u64::from_be_bytes(
-            take(&mut at, 8)?
-                .try_into()
-                .map_err(|_| HostProblem::Malformed)?,
-        ))
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-        let _name = take(&mut at, name_length)?;
-        if take(&mut at, 1)? != [1] {
-            return Err(HostProblem::Malformed);
-        }
-        let value_length = usize::try_from(u64::from_be_bytes(
-            take(&mut at, 8)?
-                .try_into()
-                .map_err(|_| HostProblem::Malformed)?,
-        ))
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-        values.push(take(&mut at, value_length)?.to_vec());
-    }
-    if at != bytes.len() {
-        return Err(HostProblem::Malformed);
-    }
-    Ok(values)
-}
-
-fn execute_ceedays(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
-    let mut values = decode_cobol_call_values(payload)?;
-    if values.len() != 4 {
-        return Err(HostProblem::Malformed);
-    }
-    let date = cee_vstring(&values[0]).ok_or(HostProblem::Malformed)?;
-    let picture = cee_vstring(&values[1]).ok_or(HostProblem::Malformed)?;
-    let parsed = parse_ceedays_date(date, picture);
-    values[2].fill(0);
-    values[3].fill(0);
-    if let Some((year, month, day)) = parsed {
-        let lilian = civil_day(year, month, day) - civil_day(1582, 10, 14);
-        let lilian = i32::try_from(lilian).map_err(|_| HostProblem::ResourceExhausted)?;
-        if values[2].len() != 4 {
-            return Err(HostProblem::Malformed);
-        }
-        values[2].copy_from_slice(&lilian.to_be_bytes());
-    } else {
-        if values[3].len() < 8 {
-            return Err(HostProblem::Malformed);
-        }
-        values[3][1] = 3;
-        values[3][3] = 1;
-    }
-    encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
-}
-
-fn execute_mvswait(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
-    let values = decode_cobol_call_values(payload)?;
-    if values.len() != 1 || values[0].len() != 4 {
-        return Err(HostProblem::Malformed);
-    }
-    encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
-}
-
-fn execute_cobdatft(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
-    let mut values = decode_cobol_call_values(payload)?;
-    if values.len() != 1 || values[0].len() < 80 {
-        return Err(HostProblem::Malformed);
-    }
-    let record = &mut values[0];
-    let input = record[1..21].to_vec();
-    let valid = match (record[0], record[21]) {
-        (b'1', b'1') if input.get(4) != Some(&b'-') => {
-            record[22..26].copy_from_slice(&input[..4]);
-            record[26] = b'-';
-            record[27..29].copy_from_slice(&input[4..6]);
-            record[29] = b'-';
-            record[30..32].copy_from_slice(&input[6..8]);
-            true
-        }
-        (b'2', b'2') => {
-            record[22..26].copy_from_slice(&input[..4]);
-            record[26..28].copy_from_slice(&input[5..7]);
-            record[28..30].copy_from_slice(&input[8..10]);
-            true
-        }
-        _ => false,
-    };
-    if !valid {
-        record[42..55].copy_from_slice(b"INVALID INPUT");
-    }
-    encode_cobol_call_result(&values).map_err(|_| HostProblem::ProviderFailure)
-}
-
-fn execute_cee3abd(payload: &BoundedPayload) -> Result<BoundedPayload, HostProblem> {
-    let values = decode_cobol_call_values(payload)?;
-    if values.len() > 2 || values.iter().any(|value| value.len() != 4) {
-        return Err(HostProblem::Malformed);
-    }
-    let code = values.first().map_or(999, |value| {
-        i32::from_be_bytes(value.as_slice().try_into().unwrap_or(999i32.to_be_bytes()))
-    });
-    BoundedPayload::new(
-        "mainframe-env.program.abend@1",
-        format!("U{:04}", code.unsigned_abs().min(9999)).into_bytes(),
-        InvocationLimits::default(),
-    )
-    .map_err(|_| HostProblem::ResourceExhausted)
-}
-
-fn cee_vstring(value: &[u8]) -> Option<&[u8]> {
-    let length = usize::try_from(i16::from_be_bytes(value.get(..2)?.try_into().ok()?)).ok()?;
-    value.get(2..2usize.checked_add(length)?)
-}
-
-#[cfg(test)]
-fn valid_ceedays_date(value: &[u8], picture: &[u8]) -> bool {
-    parse_ceedays_date(value, picture).is_some()
-}
-
-fn parse_ceedays_date(value: &[u8], picture: &[u8]) -> Option<(u32, u32, u32)> {
-    let value = trim_ascii(value);
-    let picture = trim_ascii(picture);
-    let (year, month, day) = match picture {
-        b"YYYY-MM-DD"
-            if value.len() == 10 && value.get(4) == Some(&b'-') && value.get(7) == Some(&b'-') =>
-        {
-            (&value[..4], &value[5..7], &value[8..])
-        }
-        b"YYYYMMDD" if value.len() == 8 => (&value[..4], &value[4..6], &value[6..]),
-        _ => return None,
-    };
-    let number = |bytes: &[u8]| -> Option<u32> {
-        bytes.iter().try_fold(0u32, |value, byte| {
-            byte.is_ascii_digit()
-                .then(|| value * 10 + u32::from(*byte - b'0'))
-        })
-    };
-    let year = number(year)?;
-    let month = number(month)?;
-    let day = number(day)?;
-    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
-    let days = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if leap => 29,
-        2 => 28,
-        _ => return None,
-    };
-    (year <= 9999 && (year, month, day) >= (1582, 10, 15) && day >= 1 && day <= days)
-        .then_some((year, month, day))
-}
-
-fn civil_day(year: u32, month: u32, day: u32) -> i64 {
-    let mut year = i64::from(year);
-    let month = i64::from(month);
-    let day = i64::from(day);
-    year -= i64::from(month <= 2);
-    let era = year.div_euclid(400);
-    let year_of_era = year - era * 400;
-    let shifted_month = month + if month > 2 { -3 } else { 9 };
-    let day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    era * 146_097 + day_of_era
-}
-
-fn trim_ascii(mut value: &[u8]) -> &[u8] {
-    while value.first().is_some_and(|byte| matches!(*byte, 0 | b' ')) {
-        value = &value[1..];
-    }
-    while value.last().is_some_and(|byte| matches!(*byte, 0 | b' ')) {
-        value = &value[..value.len() - 1];
-    }
-    value
 }
 
 fn source_bundle(input: &ProgramInput) -> Result<SourceBundle, HostProblem> {
@@ -1072,11 +911,19 @@ fn source_bundle(input: &ProgramInput) -> Result<SourceBundle, HostProblem> {
 }
 
 #[cfg(test)]
+mod hardening;
+
+mod replay;
+#[allow(dead_code, reason = "R-11 product integration seam")]
+pub(crate) mod retention;
+
+mod instance;
+#[cfg(test)]
 mod tests {
     use super::*;
     use mainframe_env_batch::DdPlan;
     use mainframe_env_execution_api::{PrincipalId, ResourceLimits, ServiceClass};
-    use mainframe_env_host_api::{HostLimits, RegistrySnapshot};
+    use mainframe_env_host_api::{HostLimits, HostProvider, RegistrySnapshot};
     use mainframe_env_store::MemoryStore;
     use mainframe_env_store_api::{ExecutionState, PlatformStore};
     use std::collections::BTreeSet;
@@ -1216,8 +1063,7 @@ mod tests {
     #[test]
     fn default_cobol_program_compiles_and_runs_reference_machine() {
         let program = CobolProgram::new();
-        let output = program
-            .execute(&parent(), &ProgramInput {
+        let input = ProgramInput {
                 parameter: None,
                 dds: vec![DdPlan {
                     name: "SYSIN".into(),
@@ -1239,10 +1085,140 @@ mod tests {
                 }],
                 dd_records: BTreeMap::new(),
                 execution: None,
-            })
-            .unwrap();
+            };
+        let output = program.execute(&parent(), &input).unwrap();
         assert_eq!(output.return_code, 0);
         assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+        let mut with_parm = input;
+        with_parm.parameter = Some("IGNORED".into());
+        let output = program.execute(&parent(), &with_parm).unwrap();
+        assert_eq!(output.records, vec![b"BATCH COBOL".to_vec()]);
+    }
+
+    #[test]
+    fn batch_main_receives_exec_parm_length_and_ebcdic_text() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PARMTEST.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DISPLAY-LENGTH PIC 9(4).\nLINKAGE SECTION.\n01 PARM-AREA.\n  05 PARM-LENGTH PIC S9(4) COMP.\n  05 PARM-DATE PIC X(10).\nPROCEDURE DIVISION USING PARM-AREA.\nMOVE PARM-LENGTH TO DISPLAY-LENGTH.\nDISPLAY DISPLAY-LENGTH.\nDISPLAY PARM-DATE.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=PARMTEST,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records[0], b"0010");
+        assert_eq!(output.records[1], b"2022071800");
+        let mut absent = input;
+        absent.parameter = None;
+        let output = CobolProgram::new().execute(&parent(), &absent).unwrap();
+        assert_eq!(output.records[0], b"0000");
+    }
+
+    #[test]
+    fn batch_main_parm_skips_unused_preceding_linkage() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PARMORD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DISPLAY-LENGTH PIC 9(4).\nLINKAGE SECTION.\n01 UNUSED-AREA PIC X(12).\n01 PARM-AREA.\n  05 PARM-LENGTH PIC S9(4) COMP.\n  05 PARM-DATE PIC X(10).\nPROCEDURE DIVISION USING PARM-AREA.\nMOVE PARM-LENGTH TO DISPLAY-LENGTH.\nDISPLAY DISPLAY-LENGTH.\nDISPLAY PARM-DATE.\nDISPLAY UNUSED-AREA.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=PARMORD,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(
+            output.records,
+            vec![b"0010".to_vec(), b"2022071800".to_vec(), vec![0; 12]]
+        );
+    }
+
+    #[test]
+    fn batch_main_with_linkage_but_no_using_ignores_parm() {
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. NOUSING.\nDATA DIVISION.\nLINKAGE SECTION.\n01 UNUSED-AREA PIC X(12).\nPROCEDURE DIVISION.\nDISPLAY UNUSED-AREA.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=NOUSING,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let mut input = ProgramInput {
+            parameter: Some("2022071800".into()),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records, vec![vec![0; 12]]);
+        input.parameter = None;
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records, vec![vec![0; 12]]);
+    }
+
+    #[test]
+    fn batch_main_parm_text_concatenates_with_native_storage() {
+        // CardDemo CBACT01C builds TRAN-ID with STRING PARM-DATE, WS-TRANID-SUFFIX (#266):
+        // the PARM text must be in the runtime's native storage encoding, not raw CP037.
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PARMSTR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-SUFFIX PIC 9(6) VALUE 1.\n01 TRAN-ID PIC X(16).\nLINKAGE SECTION.\n01 PARM-AREA.\n  05 PARM-LENGTH PIC S9(4) COMP.\n  05 PARM-DATE PIC X(10).\nPROCEDURE DIVISION USING PARM-AREA.\nSTRING PARM-DATE WS-SUFFIX DELIMITED BY SIZE INTO TRAN-ID.\nDISPLAY TRAN-ID.\nSTOP RUN.\n";
+        let plan = mainframe_env_batch::parse_jcl(
+            &mainframe_env_batch::JclBundle {
+                primary:
+                    "//J JOB\n//S EXEC PGM=PARMSTR,PARM='2022071800'\n//SYSIN DD *\nSOURCE\n/*\n"
+                        .into(),
+                ..Default::default()
+            },
+            mainframe_env_batch::JclLimits::default(),
+        )
+        .unwrap();
+        let mut dd = plan.steps[0].dds[0].clone();
+        dd.inline_data = source.to_vec();
+        let input = ProgramInput {
+            parameter: plan.steps[0].parameter.clone(),
+            dds: vec![dd],
+            dd_records: BTreeMap::new(),
+            execution: None,
+        };
+        let output = CobolProgram::new().execute(&parent(), &input).unwrap();
+        assert_eq!(output.records[0], b"2022071800000001");
+    }
+
+    #[test]
+    fn batch_main_invocation_contains_halfword_length_and_native_text() {
+        let payload = batch_main_call_arguments(Some("2022071800")).unwrap();
+        assert_eq!(
+            decode_cobol_call_values(&payload).unwrap(),
+            vec![[&[0u8, 10][..], b"2022071800"].concat()]
+        );
+        assert_eq!(
+            decode_cobol_call_values(&batch_main_call_arguments(None).unwrap()).unwrap(),
+            vec![vec![0, 0]]
+        );
     }
 
     #[test]
@@ -1441,12 +1417,3 @@ mod tests {
         assert_eq!(store.pending_notifications(16).unwrap().len(), 5);
     }
 }
-
-#[cfg(test)]
-mod hardening;
-
-mod replay;
-#[allow(dead_code, reason = "R-11 product integration seam")]
-pub(crate) mod retention;
-
-mod instance;

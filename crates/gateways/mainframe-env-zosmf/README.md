@@ -8,3 +8,10 @@ application-service boundary.
 The 23 official method/path bindings are generated from the frozen owned route
 catalog. Seven custom CICS session methods are generated from a separate
 `/mainframe-env/*` namespace inventory; official and custom IDs cannot overlap.
+
+ZMF-1101 adds a generated, non-advertising view of the pinned z/OSMF 3.2
+normalization authority. It exposes family/backend and legacy-route/operation
+metadata without registering any of the 352 candidate route variants. Missing,
+partial, or unresolved backends and identity-only payload schemas remain
+publication blockers; the existing 23 official routes and seven custom routes
+are unchanged.

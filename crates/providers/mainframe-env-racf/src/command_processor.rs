@@ -1,3 +1,4 @@
+mod normalization;
 use crate::RacfService;
 use crate::authority::{CredentialPolicyProblem, trim_credential_history};
 use crate::command::{
@@ -20,6 +21,7 @@ use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
 use mainframe_env_execution_api::PrincipalId;
 use mainframe_env_host_api::HostProblem;
+use normalization::{checked_version, contains_generic};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -542,6 +544,9 @@ fn apply_query(
     }
 }
 
+// Keep the legacy text-command credential route separate from the CICS
+// secret-reference route so its accepted parser and replay identity remain
+// stable while typed CICS commands gain their own bounded authority.
 fn password(
     service: &RacfService,
     snapshot: &mut SecurityDatabaseSnapshot,
@@ -1605,6 +1610,9 @@ fn add_user(
                 )
             })
             .transpose()?,
+        phrase_credential: None,
+        invalid_count: None,
+        last_use_tick: None,
         profile_template: None,
         segments: BTreeMap::new(),
         security_level: 0,
@@ -3278,14 +3286,6 @@ fn bounded_upper(value: &str, max: usize, generic: bool) -> Result<String, Seman
     } else {
         Ok(value)
     }
-}
-
-fn contains_generic(value: &str) -> bool {
-    value.bytes().any(|byte| matches!(byte, b'*' | b'%'))
-}
-
-fn checked_version(version: u64) -> Result<u64, SemanticProblem> {
-    version.checked_add(1).ok_or(SemanticProblem::Exhausted)
 }
 
 fn reason_for_problem(problem: &SemanticProblem) -> DecisionReason {

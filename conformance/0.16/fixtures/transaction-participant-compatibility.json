@@ -1,0 +1,113 @@
+{
+  "schema_version": "mainframe-env.transaction-participant-fixtures@1",
+  "contract_version": 1,
+  "reader_cases": [
+    {
+      "id": "read-v1",
+      "version": 1,
+      "expected": "accepted"
+    },
+    {
+      "id": "reject-v0",
+      "version": 0,
+      "expected": "incompatible-version"
+    },
+    {
+      "id": "reject-v2",
+      "version": 2,
+      "expected": "incompatible-version"
+    }
+  ],
+  "cics_cases": [
+    {
+      "id": "local-commit",
+      "execution_context": "local",
+      "remote_outcome": null,
+      "requested": "commit",
+      "mode": "local",
+      "syncpoint_owner": "participant",
+      "expected": {
+        "condition": "NORMAL",
+        "response": 0,
+        "response2": 0,
+        "outcome": "committed",
+        "uow_state": "committed"
+      }
+    },
+    {
+      "id": "local-rollback",
+      "execution_context": "local",
+      "remote_outcome": null,
+      "requested": "rollback",
+      "mode": "local",
+      "syncpoint_owner": "participant",
+      "expected": {
+        "condition": "NORMAL",
+        "response": 0,
+        "response2": 0,
+        "outcome": "rolled-back",
+        "uow_state": "rolled-back"
+      }
+    },
+    {
+      "id": "owned-dpl-commit",
+      "execution_context": "dpl-synconreturn",
+      "remote_outcome": "commit-capable",
+      "requested": "commit",
+      "mode": "distributed-owned",
+      "syncpoint_owner": "participant",
+      "expected": {
+        "condition": "NORMAL",
+        "response": 0,
+        "response2": 0,
+        "outcome": "committed",
+        "uow_state": "committed"
+      }
+    },
+    {
+      "id": "owned-dpl-forced-rollback",
+      "execution_context": "dpl-synconreturn",
+      "remote_outcome": "unable-to-commit",
+      "requested": "commit",
+      "mode": "distributed-owned",
+      "syncpoint_owner": "participant",
+      "expected": {
+        "condition": "ROLLEDBACK",
+        "response": 82,
+        "response2": 0,
+        "outcome": "rolled-back",
+        "uow_state": "rolled-back"
+      }
+    },
+    {
+      "id": "subordinate-dpl-rejected",
+      "execution_context": "dpl-without-synconreturn",
+      "remote_outcome": null,
+      "requested": "commit",
+      "mode": "distributed-subordinate",
+      "syncpoint_owner": "upstream-host",
+      "expected": {
+        "condition": "INVREQ",
+        "response": 16,
+        "response2": 200,
+        "outcome": null,
+        "uow_state": "absent"
+      }
+    },
+    {
+      "id": "dplsubset-rejected",
+      "execution_context": "dpl-executionset-subset",
+      "remote_outcome": null,
+      "requested": "rollback",
+      "mode": "distributed-subordinate",
+      "syncpoint_owner": "upstream-host",
+      "expected": {
+        "condition": "INVREQ",
+        "response": 16,
+        "response2": 200,
+        "outcome": null,
+        "uow_state": "absent"
+      }
+    }
+  ]
+}

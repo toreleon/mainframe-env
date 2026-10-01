@@ -20,6 +20,13 @@ TYPED_EXECUTION_REGISTRATIONS_PATH = Path(
     "conformance/0.9/cics/typed-execution-registrations.json"
 )
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
+LOOKUP_OUTPUT_PATH = Path(
+    "crates/providers/mainframe-env-cics/src/generated/command_descriptors/lookup.rs"
+)
+PROVIDER_TAIL_OUTPUT_PATH = Path(
+    "crates/providers/mainframe-env-cics/src/generated/command_descriptors/tail.rs"
+)
+PROVIDER_INLINE_OPERATIONS = 147
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
@@ -29,6 +36,9 @@ IR_REGISTRY_OUTPUT_PATH = Path(
 CONTRACT_OUTPUT_PATH = Path(
     "conformance/0.9/generated/cics-application-command-contracts.json"
 )
+CONTRACT_SCHEMA_PATH = Path(
+    "conformance/0.9/schemas/cics-application-command-contracts.schema.json"
+)
 COMPILER_SPI_COMPAT_OUTPUT_PATH = Path(
     "crates/kernel/mainframe-env-compiler/src/hir/typed/"
     "generated_cics_spi_compatibility.rs"
@@ -37,6 +47,8 @@ SCHEMA_VERSION = "mainframe-env.cics-command-descriptors@2"
 CONTRACT_SCHEMA_VERSION = "mainframe-env.cics-application-command-contracts@2"
 OFFICIAL_SCHEMA_VERSION = "mainframe-env.official-catalog@1"
 OFFICIAL_BASELINE = "ibm-cics-ts-6x-2026-08-31"
+SPOOLWRITE_ROW = f"{OFFICIAL_BASELINE}:api-commands:0204"
+SPOOLWRITE_PAGE_STRUCTURE = "sha256:2770d1e356ff9eeccec9be06cccd5bc70d2d060ebba7bde2938751cdba6a9d30"
 OFFICIAL_CATALOG_DIGEST = (
     "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"
 )
@@ -88,16 +100,88 @@ EXPECTED_FAMILIES = {
     "interval-control": "IntervalControl",
     "storage-control": "StorageControl",
 }
+TYPED_EXECUTION_FAMILIES = {
+    "transform-control": "TransformControl",
+    "spool-control": "SpoolControl",
+    "bts-control": "BtsControl",
+    "conversation-control": "ConversationControl",
+    "security-control": "SecurityControl",
+    "diagnostics": "Diagnostics",
+    "builtin-function-control": "BuiltinFunctionControl",
+    "document-control": "DocumentControl",
+    "event-control": "EventControl",
+    "journal-control": "JournalControl",
+    "web-service-control": "WebServiceControl",
+    "counter-control": "CounterControl",
+    "web-control": "WebControl",
+    "operator-control": "OperatorControl",
+    "network-control": "NetworkControl",
+}
+# CIC-901's runtime descriptor remains a frozen 25-operation source input.
+# Later typed registrations live in a separate catalog and must not change
+# source-map identities merely by entering the runtime operation list below.
+FROZEN_RUNTIME_OPERATION_NAMES = frozenset({
+    "Abend", "Asktime", "Assign", "Delete", "EndBrowse", "FormatTime",
+    "HandleAbend", "HandleCondition", "Inquire", "Link", "Read", "ReadNext",
+    "ReadPrev", "ReceiveMap", "Retrieve", "Return", "Rewrite", "SendMap",
+    "SendText", "SetFileStatus", "StartBrowse", "Syncpoint", "Write",
+    "WriteTransientData", "Xctl",
+})
+
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
+    ("AddSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0004"),
+    ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
+    ("AllocateConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0007"),
+    ("GdsAllocateConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0008"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
+    ("BifDeedit", "api", "builtin-function-control", False, f"{OFFICIAL_BASELINE}:api-commands:0013"),
+    ("BifDigest", "api", "builtin-function-control", False, f"{OFFICIAL_BASELINE}:api-commands:0014"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
+    ("GdsAssignConversation", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0012"),
+    ("BuildAttach", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0015"),
+    ("ConnectProcess", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0028"),
+    ("GdsConnectProcess", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0029"),
+    ("FreeConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0081"),
+    ("GdsFreeConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0082"),
+    ("Converse", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0030"),
+    ("ReceiveConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0161"),
+    ("GdsReceiveConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0162"),
+    ("SendConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0187"),
+    ("GdsWaitConversation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0231"),
+    ("WaitConvid", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0232"),
+    ("WaitSignal", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0237"),
+    ("WaitTerminal", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0238"),
     ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
+    ("CheckTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0026"),
+    ("DefineTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0038"),
+    ("DeleteTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0047"),
+    ("ForceTimer", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0079"),
+    ("RetrieveReattachEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0176"),
+    ("RetrieveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0177"),
+    ("TestEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0219"),
+    ("SignalEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0194"),
+    ("DefineCompositeEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0033"),
+    ("DefineInputEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0036"),
+    ("ConvertTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0031"),
     ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
+    ("DefineCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0034"),
+    ("DefineDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0035"),
+    ("DeleteCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0044"),
+    ("DeleteDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0045"),
+    ("GetCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0087"),
+    ("GetDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0088"),
+    ("QueryCounter", "api", "counter-control", False, f"{OFFICIAL_BASELINE}:api-commands:0153"),
+    ("QueryDCounter", "api", "counter-control", False, f"{OFFICIAL_BASELINE}:api-commands:0154"),
+    ("RewindCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0179"),
+    ("RewindDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0180"),
+    ("UpdateCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0226"),
+    ("UpdateDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0227"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
+    ("DeleteEvent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0046"),
     (
         "DeleteTransientData",
         "api",
@@ -105,15 +189,107 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0048",
     ),
+    (
+        "DeleteTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0049",
+    ),
     ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
+    (
+        "DocumentCreate",
+        "api",
+        "document-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0051",
+    ),
+    (
+        "DocumentDelete",
+        "api",
+        "document-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0052",
+    ),
+    (
+        "DocumentInsert",
+        "api",
+        "document-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0053",
+    ),
+    (
+        "DocumentRetrieve",
+        "api",
+        "document-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0054",
+    ),
+    (
+        "DocumentSet",
+        "api",
+        "document-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0055",
+    ),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
+    ("ExtractAttach", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0067"),
+    ("ExtractAttributes", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0068"),
+    ("GdsExtractAttributes", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0069"),
+    ("ExtractLogonMsg", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0071"),
+    ("ExtractProcess", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0072"),
+    ("GdsExtractProcess", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0073"),
+    ("ExtractTct", "api", "conversation-control", False, f"{OFFICIAL_BASELINE}:api-commands:0075"),
+    ("ExtractWeb", "api", "web-control", False, f"{OFFICIAL_BASELINE}:api-commands:0076"),
+    ("ExtractCertificate", "api", "network-control", False, f"{OFFICIAL_BASELINE}:api-commands:0070"),
+    ("ExtractTcpip", "api", "network-control", False, f"{OFFICIAL_BASELINE}:api-commands:0074"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
+    ("Freemain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0084"),
+    ("Freemain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0085"),
     ("Getmain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0094"),
+    ("Getmain64", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0095"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
     ("HandleAid", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0098"),
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
     ("IgnoreCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0100"),
+    (
+        "InvokeApplication",
+        "api",
+        "program-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0106",
+    ),
+    ("InvokeService", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0107"),
+    ("IssueAbend", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0108"),
+    ("GdsIssueAbend", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0109"),
+    ("IssueAbort", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0110"),
+    ("IssueAdd", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0111"),
+    ("IssueConfirmation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0112"),
+    ("GdsIssueConfirmation", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0113"),
+    ("IssueDisconnect", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0115"),
+    ("IssueEnd", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0116"),
+    ("IssueEndfile", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0117"),
+    ("IssueEndoutput", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0118"),
+    ("IssueEods", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0119"),
+    ("IssueErase", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0120"),
+    ("IssueEraseAup", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0121"),
+    ("IssueError", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0122"),
+    ("GdsIssueError", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0123"),
+    ("IssueLoad", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0124"),
+    ("IssueNote", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0125"),
+    ("IssuePass", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0126"),
+    ("IssuePrepare", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0127"),
+    ("GdsIssuePrepare", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0128"),
+    ("IssuePrint", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0129"),
+    ("IssueQuery", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0130"),
+    ("IssueReceive", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0131"),
+    ("IssueReplace", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0132"),
+    ("IssueReset", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0133"),
+    ("IssueSend", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0134"),
+    ("IssueSignal", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0136"),
+    ("GdsIssueSignal", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0135"),
+    ("IssueWait", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0137"),
     (
         "Inquire",
         "spi-compatibility",
@@ -122,7 +298,10 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
     ),
     ("Link", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0138"),
+    ("Load", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0142"),
+    ("Point", "api", "conversation-control", True, f"{OFFICIAL_BASELINE}:api-commands:0145"),
     ("PopHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0146"),
+    ("Post", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0147"),
     (
         "PurgeMessage",
         "api",
@@ -131,14 +310,36 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:api-commands:0148",
     ),
     ("PushHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0149"),
+    ("QuerySecurity", "api", "security-control", False, f"{OFFICIAL_BASELINE}:api-commands:0155"),
     ("Read", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0156"),
     ("ReadNext", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0157"),
     ("ReadPrev", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0158"),
+    (
+        "ReadTransientData",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0159",
+    ),
+    (
+        "ReadTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0160",
+    ),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
+    ("ReceivePartn", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0164"),
+    ("Release", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0165"),
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
+    ("ResetBrowse", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0171"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
+    ("Route", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0182"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
+    ("SendControl", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0188"),
+    ("SendPage", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0190"),
+    ("SendPartnset", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0191"),
     ("SendText", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0192"),
     (
         "SetAssociationUserCorrData",
@@ -147,6 +348,33 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0193",
     ),
+    ("SoapFaultAdd", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0197"),
+    ("SoapFaultCreate", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0198"),
+    ("SoapFaultDelete", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0199"),
+    ("SpoolClose", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0200"),
+    (
+        "SpoolOpenInput",
+        "api",
+        "spool-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0201",
+    ),
+    (
+        "SpoolOpenOutput",
+        "api",
+        "spool-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0202",
+    ),
+    ("SpoolRead", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0203"),
+    ("SpoolWrite", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0204"),
+    ("RemoveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0166"),
+    ("EnterTraceNum", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0066"),
+    ("Monitor", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0143"),
+    ("DumpTransaction", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0057"),
+    ("Dump", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0056"),
+    ("Trace", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0220"),
+    ("EnterTraceId", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0065"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -155,10 +383,178 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
     ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
+    ("StartAttach", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0206"),
+    ("StartBrexit", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0207"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
+    ("Unlock", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0225"),
+    ("ChangePassword", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0020"),
+    ("ChangePhrase", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0021"),
+    ("VerifyPassword", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0228"),
+    ("VerifyPhrase", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0229"),
+    ("RequestPassTicket", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0168"),
+    ("RequestEncryptPassTicket", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0167"),
+    ("VerifyToken", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0230"),
+    ("Signon", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0196"),
+    ("Signoff", "api", "security-control", True, f"{OFFICIAL_BASELINE}:api-commands:0195"),
+    ("WsaContextBuild", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0259"),
+    ("WsaContextDelete", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0260"),
+    ("WsaContextGet", "api", "web-service-control", False, f"{OFFICIAL_BASELINE}:api-commands:0261"),
+    ("WsaEprCreate", "api", "web-service-control", True, f"{OFFICIAL_BASELINE}:api-commands:0262"),
+
+    ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
+    ("WaitExternal", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0234"),
+    ("WaitCics", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0239"),
+    ("WriteOperator", "api", "operator-control", True, f"{OFFICIAL_BASELINE}:api-commands:0256"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
+    (
+        "TransformDataToJson",
+        "api",
+        "transform-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0221",
+    ),
+    (
+        "TransformDataToXml",
+        "api",
+        "transform-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0222",
+    ),
+    (
+        "TransformJsonToData",
+        "api",
+        "transform-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0223",
+    ),
+    (
+        "TransformXmlToData",
+        "api",
+        "transform-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0224",
+    ),
+    (
+        "WaitJournalName",
+        "api",
+        "journal-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0235",
+    ),
+    (
+        "WaitJournalNum",
+        "api",
+        "journal-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0236",
+    ),
+    (
+        "WebClose",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0240",
+    ),
+    (
+        "WebConverse",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0241",
+    ),
+    (
+        "WebEndBrowse",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0242",
+    ),
+    (
+        "WebExtract",
+        "api",
+        "web-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0243",
+    ),
+    (
+        "WebOpen",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0244",
+    ),
+    (
+        "WebParseUrl",
+        "api",
+        "web-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0245",
+    ),
+    (
+        "WebRead",
+        "api",
+        "web-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0246",
+    ),
+    (
+        "WebReadNext",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0247",
+    ),
+    (
+        "WebReceive",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0248",
+    ),
+    (
+        "WebRetrieve",
+        "api",
+        "web-control",
+        False,
+        f"{OFFICIAL_BASELINE}:api-commands:0249",
+    ),
+    (
+        "WebSend",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0250",
+    ),
+    (
+        "WebStartBrowse",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0251",
+    ),
+    (
+        "WebWrite",
+        "api",
+        "web-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0252",
+    ),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
+    (
+        "WriteJournalName",
+        "api",
+        "journal-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0254",
+    ),
+    (
+        "WriteJournalNum",
+        "api",
+        "journal-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0255",
+    ),
     (
         "WriteTransientData",
         "api",
@@ -166,7 +562,70 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0257",
     ),
+    (
+        "WriteTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0258",
+    ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
+    ("AcquireActivityId", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0002"),
+    ("AcquireProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0003"),
+    ("CancelAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0017"),
+    ("CancelAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0018"),
+    ("CancelActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0019"),
+    ("CheckAcqActivity", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0023"),
+    ("CheckAcqProcess", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0024"),
+    ("CheckActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0025"),
+    ("DefineActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0032"),
+    ("DefineProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0037"),
+    ("DeleteActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0041"),
+    ("DeleteChannel", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0042"),
+    ("DeleteContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0043"),
+    ("GetContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0086"),
+    ("GetContainer64", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0096"),
+    ("MoveContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0144"),
+    ("PutContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0150"),
+    ("PutContainer64", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0151"),
+    ("QueryChannel", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0152"),
+    ("ResetAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0169"),
+    ("ResetActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0170"),
+    ("ResumeAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0172"),
+    ("ResumeAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0173"),
+    ("ResumeActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0174"),
+    ("RunAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0183"),
+    ("RunAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0184"),
+    ("RunActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0185"),
+    ("RunTransId", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0186"),
+    ("SuspendAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0215"),
+    ("SuspendAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0216"),
+    ("SuspendActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0217"),
+    ("FetchAny", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0077"),
+    ("FetchChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0078"),
+    ("FreeChild", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0083"),
+    ("LinkAcqActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0139"),
+    ("LinkAcqProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0140"),
+    ("LinkActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0141"),
+    ("BtsEndBrowseContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0060"),
+    ("BtsGetNextContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0090"),
+    ("BtsInquireContainer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0102"),
+    ("BtsStartBrowseContainer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0210"),
+    ("BtsEndBrowseEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0061"),
+    ("BtsGetNextEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0091"),
+    ("BtsInquireEvent", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0103"),
+    ("BtsStartBrowseEvent", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0211"),
+    ("BtsEndBrowseTimer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0063"),
+    ("BtsInquireTimer", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0105"),
+    ("BtsStartBrowseTimer", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0213"),
+    ("BtsEndBrowseActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0059"),
+    ("BtsGetNextActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0089"),
+    ("BtsInquireActivity", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0101"),
+    ("BtsStartBrowseActivity", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0209"),
+    ("BtsEndBrowseProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0062"),
+    ("BtsGetNextProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0092"),
+    ("BtsInquireProcess", "api", "bts-control", False, f"{OFFICIAL_BASELINE}:api-commands:0104"),
+    ("BtsStartBrowseProcess", "api", "bts-control", True, f"{OFFICIAL_BASELINE}:api-commands:0212"),
 ]
 
 CONTRACT_BATCHES = (
@@ -371,46 +830,246 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "BtsEndBrowseEvent", "BtsGetNextEvent", "BtsInquireEvent", "BtsStartBrowseEvent", "BtsEndBrowseTimer", "BtsInquireTimer", "BtsStartBrowseTimer",
+        "BtsEndBrowseContainer", "BtsGetNextContainer", "BtsInquireContainer", "BtsStartBrowseContainer",
+        "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsInquireActivity", "BtsStartBrowseActivity",
+        "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsInquireProcess", "BtsStartBrowseProcess",
+        "AcquireActivityId",
+        "AcquireProcess",
+        "CancelAcqActivity",
+        "CancelAcqProcess",
+        "CancelActivity",
+        "CheckAcqActivity",
+        "CheckAcqProcess",
+        "CheckActivity",
+        "DefineActivity",
+        "DefineProcess",
+        "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "GetContainer64",
+        "MoveContainer",
+        "PutContainer",
+        "PutContainer64",
+        "QueryChannel",
+        "ResetAcqProcess",
+        "ResetActivity",
+        "ResumeAcqActivity",
+        "ResumeAcqProcess",
+        "ResumeActivity",
+        "RunAcqActivity",
+        "RunAcqProcess",
+        "RunActivity",
+        "RunTransId",
+        "SuspendAcqActivity",
+        "SuspendAcqProcess",
+        "SuspendActivity",
+        "FetchAny", "FetchChild", "FreeChild", "LinkAcqActivity", "LinkAcqProcess", "LinkActivity",
         "Abend",
+        "AddSubevent",
+        "Address",
         "Cancel",
         "ChangeTask",
+        "DefineCompositeEvent",
+        "DefineInputEvent",
+        "ConvertTime",
         "Delay",
+        "DefineCounter",
+        "DefineDCounter",
+        "DeleteCounter",
+        "DeleteDCounter",
+        "GetCounter",
+        "GetDCounter",
+        "QueryCounter",
+        "QueryDCounter",
+        "RewindCounter",
+        "RewindDCounter",
+        "UpdateCounter",
+        "UpdateDCounter",
         "AddressSet",
+        "AllocateConversation",
+        "GdsAllocateConversation",
+        "GdsAssignConversation",
+        "BuildAttach",
+        "ConnectProcess",
+        "GdsConnectProcess",
+        "FreeConversation",
+        "GdsFreeConversation",
+        "Converse",
+        "ReceiveConversation",
+        "GdsReceiveConversation",
+        "SendConversation",
+        "GdsWaitConversation",
+        "WaitConvid",
+        "WaitSignal",
+        "WaitTerminal",
         "Asktime",
         "AsktimeEib",
+        "BifDeedit",
+        "BifDigest",
         "Deq",
         "Enq",
+        "ExtractAttach",
+        "ExtractAttributes",
+        "GdsExtractAttributes",
+        "ExtractLogonMsg",
+        "ExtractProcess",
+        "GdsExtractProcess",
+        "ExtractTct",
+        "Point",
+        "ExtractWeb",
+        "ExtractCertificate",
+        "ExtractTcpip",
         "FormatTime",
+        "Freemain",
+        "Freemain64",
         "Getmain",
+        "Getmain64",
         "HandleAbend",
         "HandleAid",
         "HandleCondition",
         "IgnoreCondition",
+        "InvokeApplication",
+        "InvokeService",
+        "IssueAbend",
+        "GdsIssueAbend",
+        "IssueAbort",
+        "IssueAdd",
+        "IssueConfirmation",
+        "GdsIssueConfirmation",
+        "IssueDisconnect",
+        "IssueEnd",
+        "IssueEndfile",
+        "IssueEndoutput",
+        "IssueEods",
+        "IssueErase",
+        "IssueEraseAup",
+        "IssueError",
+        "GdsIssueError",
+        "IssueLoad",
+        "IssueNote",
+        "IssuePass",
+        "IssuePrepare",
+        "GdsIssuePrepare",
+        "IssuePrint",
+        "IssueQuery",
+        "IssueReceive",
+        "IssueReplace",
+        "IssueReset",
+        "IssueSend",
+        "IssueSignal",
+        "GdsIssueSignal",
+        "IssueWait",
+        "Load",
+        "Release",
+        "Route",
         "Link",
         "Xctl",
         "Return",
         "StartBrowse",
+        "ResetBrowse",
         "ReadNext",
         "ReadPrev",
+        "ReadTransientData",
         "EndBrowse",
         "Delete",
+        "DeleteEvent",
+        "CheckTimer",
+        "DefineTimer",
+        "DeleteTimer",
+        "ForceTimer",
+        "RetrieveReattachEvent",
+        "RetrieveSubevent",
+        "TestEvent",
+        "SignalEvent",
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
+        "DeleteTemporaryStorage",
+        "ReadTemporaryStorage",
+        "RemoveSubevent",
+        "WriteTemporaryStorage",
+        "DocumentCreate",
+        "DocumentDelete",
+        "DocumentInsert",
+        "DocumentRetrieve",
+        "DocumentSet",
         "ReceiveMap",
+        "ReceivePartn",
         "SendMap",
+        "SendControl",
+        "SendPage",
+        "SendPartnset",
         "SendText",
         "Assign",
         "PurgeMessage",
+        "QuerySecurity",
         "PopHandle",
+        "Post",
+        "WriteOperator",
         "PushHandle",
         "Read",
         "Rewrite",
         "SetAssociationUserCorrData",
+        "SoapFaultAdd",
+        "SoapFaultCreate",
+        "SoapFaultDelete",
+        "SpoolClose",
+        "SpoolOpenInput",
+        "SpoolOpenOutput",
+        "SpoolRead",
+        "SpoolWrite",
+        "EnterTraceNum",
+        "EnterTraceId",
+        "Monitor",
+        "DumpTransaction",
+        "Dump",
         "Suspend",
+        "Trace",
+        "WaitEvent",
+        "WaitExternal",
+        "WaitCics",
         "Syncpoint",
+        "Unlock",
+        "VerifyPassword",
+        "ChangePassword",
+        "ChangePhrase",
+        "VerifyPhrase",
+        "RequestPassTicket",
+        "RequestEncryptPassTicket",
+        "VerifyToken",
+        "Signon",
+        "Signoff",
         "Start",
+        "StartAttach",
+        "StartBrexit",
         "Retrieve",
+        "TransformDataToJson",
+        "TransformDataToXml",
+        "TransformJsonToData",
+        "TransformXmlToData",
+        "WaitJournalName",
+        "WaitJournalNum",
+        "WebClose",
+        "WebConverse",
+        "WebEndBrowse",
+        "WebExtract",
+        "WebOpen",
+        "WebParseUrl",
+        "WebRead",
+        "WebReadNext",
+        "WebReceive",
+        "WebRetrieve",
+        "WebSend",
+        "WebStartBrowse",
+        "WebWrite",
+        "WriteJournalName",
+        "WriteJournalNum",
+        "WsaContextBuild",
+        "WsaContextDelete",
+        "WsaContextGet",
+        "WsaEprCreate",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -419,6 +1078,28 @@ ENQUEUE_COMMAND_ROWS = frozenset(
         f"{OFFICIAL_BASELINE}:api-commands:0064",
     }
 )
+WAIT_EXTERNAL_COMMAND_ROWS = frozenset(
+    {f"{OFFICIAL_BASELINE}:api-commands:0234"}
+)
+SEND_PARTNSET_ROW = f"{OFFICIAL_BASELINE}:api-commands:0191"
+RECEIVE_PARTN_ROW = f"{OFFICIAL_BASELINE}:api-commands:0164"
+RECEIVE_PARTN_HEAD_STRUCTURE_SHA256 = (
+    "sha256:e0c7180753c5ec1c2076218faca36b07464078527efbfe6508358935a6459cff"
+)
+RECEIVE_PARTN_CONTINUATION_STRUCTURE_SHA256 = (
+    "sha256:168098de33942ef816b8bcff47871cf8dc5037bdc52841894d08e4161fd2e829"
+)
+SEND_PARTNSET_STRUCTURE_SHA256 = (
+    "sha256:2830db8cb3ee405ffbac97f1b5b5d6572ab46b52c5b89b9f004c676b0f0689e9"
+)
+COMPOSITE_SUBEVENT_ROW = f"{OFFICIAL_BASELINE}:api-commands:0033"
+COMPOSITE_SUBEVENT_OPTIONS = tuple(f"SUBEVENT{index}" for index in range(1, 9))
+CHECK_TIMER_ROW = f"{OFFICIAL_BASELINE}:api-commands:0026"
+EVENT_RETRIEVAL_OUTPUTS = {
+    f"{OFFICIAL_BASELINE}:api-commands:0176": ("EVENT", "EVENTTYPE"),
+    f"{OFFICIAL_BASELINE}:api-commands:0177": ("SUBEVENT", "EVENTTYPE"),
+    f"{OFFICIAL_BASELINE}:api-commands:0219": ("FIRESTATUS",),
+}
 # Each profile is a reviewed compiler-only route to a pre-existing runtime
 # operation. It does not change application-registry readiness or counts.
 COMPILER_SPI_COMPATIBILITY = {
@@ -455,6 +1136,37 @@ COMPILER_SEND_COMPATIBILITY = {
 }
 COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
+    "FetchAny": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FetchChild": frozenset({"memory-read", "memory-write", "suspension", "condition", "transaction"}),
+    "FreeChild": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "LinkAcqActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkAcqProcess": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "LinkActivity": frozenset({"memory-read", "memory-write", "program-control", "condition", "transaction"}),
+    "ExtractAttach": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "ExtractAttributes": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "GdsExtractAttributes": frozenset({"memory-read", "memory-write", "transaction"}),
+    "ExtractLogonMsg": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "ExtractProcess": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "GdsExtractProcess": frozenset({"memory-read", "memory-write", "transaction"}),
+    "ExtractTct": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "Point": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "SignalEvent": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "RetrieveReattachEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "RetrieveSubevent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "TestEvent": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "CheckTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "DefineTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "DeleteTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "ForceTimer": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "DeleteEvent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "AddSubevent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "RemoveSubevent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Abend": frozenset(
         {
             "memory-read",
@@ -465,11 +1177,31 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "AllocateConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsAllocateConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsAssignConversation": frozenset({"memory-write", "terminal-read", "security", "audit"}),
+    "BuildAttach": frozenset({"memory-read", "memory-write", "security", "audit", "transaction"}),
+    "ConnectProcess": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsConnectProcess": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "transaction"}),
+    "FreeConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "condition", "transaction"}),
+    "GdsFreeConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "transaction"}),
+    "Converse": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "ReceiveConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsReceiveConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "SendConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "GdsWaitConversation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "WaitConvid": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "WaitSignal": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "WaitTerminal": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "condition", "transaction"}),
+    "Address": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
+    "BifDeedit": frozenset({"memory-read", "memory-write", "condition"}),
+    "BifDigest": frozenset({"memory-read", "memory-write", "condition"}),
     "ChangeTask": frozenset(
         {"memory-read", "memory-write", "suspension", "condition"}
     ),
+    "ConvertTime": frozenset({"memory-read", "memory-write", "condition"}),
     "Deq": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Enq": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -479,6 +1211,70 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "HandleAid": frozenset({"memory-read", "memory-write", "condition"}),
     "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
+    "InvokeApplication": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "InvokeService": frozenset({"memory-read", "memory-write", "condition", "transaction", "program-control"}),
+    "SoapFaultAdd": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "SoapFaultCreate": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "SoapFaultDelete": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaContextBuild": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaContextDelete": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaContextGet": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "WsaEprCreate": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "IssueAbend": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssueAbend": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "IssueConfirmation": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssueConfirmation": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "IssueError": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssueError": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "IssuePrepare": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssuePrepare": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "IssueSignal": frozenset({"condition", "memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "GdsIssueSignal": frozenset({"memory-read", "memory-write", "terminal-read", "terminal-write", "security", "audit", "suspension", "transaction"}),
+    "IssueAbort": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueAdd": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueEnd": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueEndfile": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueEndoutput": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueEods": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueLoad": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueEraseAup": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueDisconnect": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueReset": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssuePrint": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssuePass": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueErase": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueNote": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-read', 'transaction'}),
+    "IssueQuery": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-read', 'transaction'}),
+    "IssueReceive": frozenset({'condition', 'memory-read', 'memory-write', 'suspension', 'terminal-read', 'transaction'}),
+    "IssueReplace": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueSend": frozenset({'condition', 'memory-read', 'memory-write', 'terminal-write', 'transaction'}),
+    "IssueWait": frozenset({'condition', 'memory-read', 'memory-write', 'suspension', 'terminal-write', 'transaction'}),
+    "Load": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "Release": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
     "Link": frozenset(
         {
             "memory-read",
@@ -509,11 +1305,68 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "StartBrowse": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
+    "ResetBrowse": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Unlock": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
     "ReadNext": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReadPrev": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReadTransientData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DefineCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "DefineDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "DeleteCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "DeleteDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "GetCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "GetDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "QueryCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition"}
+    ),
+    "QueryDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition"}
+    ),
+    "RewindCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "RewindDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "UpdateCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "UpdateDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WaitJournalName": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WaitJournalNum": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WriteJournalName": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WriteJournalNum": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "EndBrowse": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -530,7 +1383,46 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "DeleteTransientData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "DeleteTemporaryStorage": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReadTemporaryStorage": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WriteTemporaryStorage": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "DocumentCreate": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DocumentDelete": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DocumentInsert": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DocumentRetrieve": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DocumentSet": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DefineInputEvent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DefineCompositeEvent": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Getmain": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Getmain64": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Freemain": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Freemain64": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReceiveMap": frozenset(
@@ -543,17 +1435,64 @@ TYPED_RUNTIME_IR_EFFECTS = {
             "transaction",
         }
     ),
+    "ReceivePartn": frozenset(
+        {"memory-read", "memory-write", "terminal-read", "suspension", "condition", "transaction"}
+    ),
+    "Route": frozenset({"clock", "memory-read", "memory-write", "terminal-write", "suspension", "condition", "transaction"}),
     "SendMap": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendPartnset": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendControl": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendPage": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
     "SendText": frozenset(
         {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
     "Assign": frozenset({"memory-write", "condition", "transaction"}),
+    "ExtractCertificate": frozenset({"memory-write", "condition", "transaction"}),
+    "ExtractTcpip": frozenset({"memory-write", "condition", "transaction"}),
     "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
+    "QuerySecurity": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "VerifyPassword": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "ChangePassword": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "ChangePhrase": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "RequestPassTicket": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "RequestEncryptPassTicket": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "VerifyToken": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "Signon": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "Signoff": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "VerifyPhrase": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
     "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
+    "Post": frozenset({"memory-read", "memory-write", "clock", "condition", "transaction"}),
+    "WriteOperator": frozenset({"memory-read", "memory-write", "terminal-write", "clock", "condition", "transaction"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -565,12 +1504,157 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "SetAssociationUserCorrData": frozenset(
         {"memory-read", "memory-write", "condition"}
     ),
+    "SpoolClose": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "SpoolOpenInput": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "SpoolOpenOutput": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "SpoolRead": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "SpoolWrite": frozenset(
+        {"spool", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "EnterTraceNum": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Monitor": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
+    "DumpTransaction": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Dump": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "Trace": frozenset({"memory-write", "condition", "transaction"}),
+    "EnterTraceId": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
+    "WaitEvent": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WaitExternal": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WaitCics": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "Start": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
+    "StartAttach": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
+    "StartBrexit": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
     "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
+    "TransformDataToJson": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "TransformDataToXml": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "TransformJsonToData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "TransformXmlToData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WebParseUrl": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WebClose": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebExtract": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ExtractWeb": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WebRead": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WebReadNext": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebStartBrowse": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebEndBrowse": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebWrite": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebSend": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebRetrieve": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WebReceive": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebConverse": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "WebOpen": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
 }
+
+
+_BTS_READ_EFFECTS = frozenset({"memory-read", "memory-write", "condition"})
+_BTS_MUTATE_EFFECTS = _BTS_READ_EFFECTS | {"transaction"}
+_BTS_RUN_EFFECTS = _BTS_MUTATE_EFFECTS | {"program-control", "suspension"}
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_READ_EFFECTS
+        for name in ("BtsInquireContainer", "BtsInquireActivity", "BtsInquireProcess", "BtsInquireEvent", "BtsInquireTimer")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_MUTATE_EFFECTS
+        for name in (
+            "BtsEndBrowseEvent", "BtsGetNextEvent", "BtsStartBrowseEvent", "BtsEndBrowseTimer", "BtsStartBrowseTimer",
+            "BtsEndBrowseContainer", "BtsGetNextContainer", "BtsStartBrowseContainer",
+            "BtsEndBrowseActivity", "BtsGetNextActivity", "BtsStartBrowseActivity",
+            "BtsEndBrowseProcess", "BtsGetNextProcess", "BtsStartBrowseProcess",
+        )
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_READ_EFFECTS
+        for name in ("CheckAcqActivity", "CheckAcqProcess", "GetContainer", "GetContainer64", "QueryChannel")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_RUN_EFFECTS
+        for name in ("RunAcqActivity", "RunAcqProcess", "RunActivity", "RunTransId")
+    }
+)
+TYPED_RUNTIME_IR_EFFECTS.update(
+    {
+        name: _BTS_MUTATE_EFFECTS
+        for name in (
+            "AcquireActivityId", "AcquireProcess", "CancelAcqActivity", "CancelAcqProcess",
+            "CancelActivity", "CheckActivity", "DefineActivity", "DefineProcess",
+            "DeleteActivity", "ResetAcqProcess", "ResetActivity", "ResumeAcqActivity",
+            "ResumeAcqProcess", "ResumeActivity", "SuspendAcqActivity",
+            "SuspendAcqProcess", "SuspendActivity",
+            "DeleteChannel", "DeleteContainer", "MoveContainer", "PutContainer", "PutContainer64",
+        )
+    }
+)
 
 
 class DescriptorError(ValueError):
@@ -739,7 +1823,7 @@ def _load_typed_execution_registrations(
             )
             != expected
             or IDENTIFIER.fullmatch(name) is None
-            or family not in families
+            or family not in families and family not in TYPED_EXECUTION_FAMILIES
             or command is None
             or name in existing_names
             or official_row in existing_rows
@@ -758,23 +1842,243 @@ def _load_typed_execution_registrations(
             }
         )
     if [row["operation"] for row in normalized] != [
+        "AddSubevent",
+        "Address",
         "AddressSet",
+        "AllocateConversation",
+        "GdsAllocateConversation",
+        "GdsAssignConversation",
+        "BuildAttach",
+        "ConnectProcess",
+        "GdsConnectProcess",
+        "FreeConversation",
+        "GdsFreeConversation",
+        "Converse",
+        "ReceiveConversation",
+        "GdsReceiveConversation",
+        "SendConversation",
+        "GdsWaitConversation",
+        "WaitConvid",
+        "WaitTerminal",
         "AsktimeEib",
+        "BifDeedit",
+        "BifDigest",
         "Cancel",
+        "ChangePassword",
+        "ChangePhrase",
         "ChangeTask",
+        "ConvertTime",
         "Delay",
+        "DefineCounter",
+        "DefineDCounter",
+        "DeleteCounter",
+        "DeleteDCounter",
+        "GetCounter",
+        "GetDCounter",
+        "QueryCounter",
+        "QueryDCounter",
+        "RewindCounter",
+        "RewindDCounter",
+        "UpdateCounter",
+        "UpdateDCounter",
+        "DeleteTemporaryStorage",
         "DeleteTransientData",
         "Deq",
+        "DefineCompositeEvent",
+        "DefineInputEvent",
+        "DocumentCreate",
+        "DocumentDelete",
+        "DocumentInsert",
+        "DocumentRetrieve",
+        "DocumentSet",
+        "Dump",
+        "DumpTransaction",
         "Enq",
+        "EnterTraceId",
+        "EnterTraceNum",
+        "ExtractAttach",
+        "ExtractAttributes",
+        "GdsExtractAttributes",
+        "ExtractLogonMsg",
+        "ExtractProcess",
+        "GdsExtractProcess",
+        "ExtractTct",
+        "ExtractWeb",
+        "ExtractCertificate",
+        "ExtractTcpip",
+        "Freemain",
+        "Freemain64",
         "Getmain",
+        "Getmain64",
         "HandleAid",
         "IgnoreCondition",
+        "InvokeApplication",
+        "InvokeService",
+        "IssueAbend",
+        "GdsIssueAbend",
+        "IssueAbort",
+        "IssueAdd",
+        "IssueConfirmation",
+        "GdsIssueConfirmation",
+        "IssueDisconnect",
+        "IssueEnd",
+        "IssueEndfile",
+        "IssueEndoutput",
+        "IssueEods",
+        "IssueErase",
+        "IssueEraseAup",
+        "IssueError",
+        "GdsIssueError",
+        "IssueLoad",
+        "IssueNote",
+        "IssuePass",
+        "IssuePrepare",
+        "GdsIssuePrepare",
+        "IssuePrint",
+        "IssueQuery",
+        "IssueReceive",
+        "IssueReplace",
+        "IssueReset",
+        "IssueSend",
+        "IssueSignal",
+        "GdsIssueSignal",
+        "IssueWait",
+        "Load",
+        "Monitor",
+        "Point",
         "PopHandle",
+        "Post",
         "PurgeMessage",
         "PushHandle",
+        "QuerySecurity",
+        "ReadTemporaryStorage",
+        "RequestPassTicket",
+        "RequestEncryptPassTicket",
+        "ReadTransientData",
+        "ReceivePartn",
+        "Release",
+        "RemoveSubevent",
+        "ResetBrowse",
+        "Route",
+        "SendControl",
+        "SendPage",
+        "SendPartnset",
         "SetAssociationUserCorrData",
+        "Signoff",
+        "Signon",
+        "SoapFaultAdd",
+        "SoapFaultCreate",
+        "SoapFaultDelete",
+        "SpoolClose",
+        "SpoolOpenInput",
+        "SpoolOpenOutput",
+        "SpoolRead",
+        "SpoolWrite",
         "Start",
+        "StartAttach",
+        "StartBrexit",
         "Suspend",
+        "Trace",
+        "TransformDataToJson",
+        "TransformDataToXml",
+        "TransformJsonToData",
+        "TransformXmlToData",
+        "Unlock",
+        "VerifyPassword",
+        "VerifyPhrase",
+        "VerifyToken",
+        "WaitEvent",
+        "WaitExternal",
+        "WaitSignal",
+        "WaitJournalName",
+        "WaitJournalNum",
+        "WebClose",
+        "WebConverse",
+        "WebEndBrowse",
+        "WebExtract",
+        "WebOpen",
+        "WebParseUrl",
+        "WebRead",
+        "WebReadNext",
+        "WebReceive",
+        "WebRetrieve",
+        "WebSend",
+        "WebStartBrowse",
+        "WebWrite",
+        "WaitCics",
+        "WriteJournalName",
+        "WriteJournalNum",
+        "WriteOperator",
+        "WriteTemporaryStorage",
+        "WsaContextBuild",
+        "WsaContextDelete",
+        "WsaContextGet",
+        "WsaEprCreate",
+        "DeleteEvent",
+        "CheckTimer",
+        "DefineTimer",
+        "DeleteTimer",
+        "ForceTimer",
+        "RetrieveReattachEvent",
+        "RetrieveSubevent",
+        "TestEvent",
+        "SignalEvent",
+        "AcquireActivityId",
+        "AcquireProcess",
+        "CancelAcqActivity",
+        "CancelAcqProcess",
+        "CancelActivity",
+        "CheckAcqActivity",
+        "CheckAcqProcess",
+        "CheckActivity",
+        "DefineActivity",
+        "DefineProcess",
+        "DeleteActivity",
+        "DeleteChannel",
+        "DeleteContainer",
+        "GetContainer",
+        "GetContainer64",
+        "MoveContainer",
+        "PutContainer",
+        "PutContainer64",
+        "QueryChannel",
+        "ResetAcqProcess",
+        "ResetActivity",
+        "ResumeAcqActivity",
+        "ResumeAcqProcess",
+        "ResumeActivity",
+        "RunAcqActivity",
+        "RunAcqProcess",
+        "RunActivity",
+        "RunTransId",
+        "SuspendAcqActivity",
+        "SuspendAcqProcess",
+        "SuspendActivity",
+        "BtsEndBrowseContainer",
+        "BtsGetNextContainer",
+        "BtsInquireContainer",
+        "BtsStartBrowseContainer",
+        "BtsEndBrowseEvent",
+        "BtsGetNextEvent",
+        "BtsInquireEvent",
+        "BtsStartBrowseEvent",
+        "BtsEndBrowseTimer",
+        "BtsInquireTimer",
+        "BtsStartBrowseTimer",
+        "BtsEndBrowseActivity",
+        "BtsGetNextActivity",
+        "BtsInquireActivity",
+        "BtsStartBrowseActivity",
+        "BtsEndBrowseProcess",
+        "BtsGetNextProcess",
+        "BtsInquireProcess",
+        "BtsStartBrowseProcess",
+        "FetchAny",
+        "FetchChild",
+        "FreeChild",
+        "LinkAcqActivity",
+        "LinkAcqProcess",
+        "LinkActivity",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -1030,6 +2334,7 @@ def load_catalog(
     if interface_counts != {"api": 23, "spi-compatibility": 2}:
         raise DescriptorError(f"CICS runtime interface split drifted: {interface_counts}")
     if include_runtime_admission:
+        families = {**families, **TYPED_EXECUTION_FAMILIES}
         normalized_operations.extend(
             _load_typed_execution_registrations(
                 root, normalized_commands, families, normalized_operations
@@ -1060,26 +2365,8 @@ def load_catalog(
         EXPECTED_RUNTIME_OPERATIONS
         if include_runtime_admission
         else [
-            row
-            for row in EXPECTED_RUNTIME_OPERATIONS
-            if row[0]
-            not in {
-                "ChangeTask",
-                "AddressSet",
-                "AsktimeEib",
-                "Cancel",
-                "Delay",
-                "Deq",
-                "Enq",
-                "HandleAid",
-                "IgnoreCondition",
-                "PopHandle",
-                "PurgeMessage",
-                "PushHandle",
-                "SetAssociationUserCorrData",
-                "Start",
-                "Suspend",
-            }
+            row for row in EXPECTED_RUNTIME_OPERATIONS
+            if row[0] in FROZEN_RUNTIME_OPERATION_NAMES
         ]
     )
     if observed_runtime != expected_runtime:
@@ -1357,7 +2644,7 @@ def _load_source_batch(
             f"{batch_id} source projection must cover exactly rows {start:04d}-{end:04d}"
         )
     rows_by_id: dict[str, dict[str, Any]] = {}
-    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands, strict=True), start):
+    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands), start):
         row = _object(raw_row, f"{batch_id} source row {offset:04d}")
         identity = {
             "official_row": row.get("official_row"),
@@ -1560,6 +2847,34 @@ def _source_contract_status(dimension: dict[str, Any]) -> str:
     return "pending"
 
 
+def _spoolwrite_page_choice(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> bool:
+    if command["official_row"] != SPOOLWRITE_ROW:
+        return False
+    if _source_dimension(dimensions, "grammar")["verification_status"] != "verified":
+        return False
+    grammar = _grammar_contract(dimensions)
+    variants = [
+        value
+        for value in grammar["variants"]
+        if value.get("type") == "syntax" and value.get("syntax_head") == "SPOOLWRITE"
+    ]
+    if len(variants) != 1 or variants[0].get("structure_sha256") != SPOOLWRITE_PAGE_STRUCTURE:
+        raise DescriptorError("SPOOLWRITE PAGE source syntax identity changed")
+    tokens = [
+        token
+        for token in variants[0]["tokens"]
+        if token.get("kind") == "keyword"
+        and token.get("value") in {"LINE", "PAGE"}
+        and token.get("relation") == "optional"
+        and token.get("group_path") == "groupchoice[5]"
+    ]
+    if {token["value"] for token in tokens} != {"LINE", "PAGE"} or len(tokens) != 2:
+        raise DescriptorError("SPOOLWRITE LINE/PAGE source choice changed")
+    return True
+
+
 def _top_level_source_option_names(
     command: dict[str, Any], dimensions: list[dict[str, Any]]
 ) -> list[str]:
@@ -1578,7 +2893,56 @@ def _top_level_source_option_names(
         and dimension["source_projection_state"] == "projected"
     ):
         names.update({"TASK", "UOW"})
+    if command["official_row"] in WAIT_EXTERNAL_COMMAND_ROWS:
+        names.update({"PURGEABLE", "NOTPURGEABLE"})
+    if command["official_row"] == COMPOSITE_SUBEVENT_ROW:
+        names.update(COMPOSITE_SUBEVENT_OPTIONS)
+    if _spoolwrite_page_choice(command, dimensions):
+        names.add("PAGE")
+    if _send_partnset_heading_operand(command, dimensions):
+        names.add("PARTNSET")
     return sorted(names)
+
+
+def _send_partnset_heading_operand(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> bool:
+    """Keep the optional operand attached to the reviewed SEND PARTNSET head."""
+    if command["official_row"] != SEND_PARTNSET_ROW:
+        return False
+    grammar = _grammar_contract(dimensions)
+    variants = grammar["variants"]
+    return (
+        len(variants) == 1
+        and variants[0].get("syntax_head") == "SEND PARTNSET"
+        and variants[0].get("structure_sha256") == SEND_PARTNSET_STRUCTURE_SHA256
+        and [(token.get("kind"), token.get("value")) for token in variants[0]["tokens"]]
+        == [
+            ("keyword", "SEND PARTNSET"),
+            ("delimiter", "("),
+            ("variable", "name"),
+            ("delimiter", ")"),
+        ]
+    )
+
+
+def _receive_partn_reviewed_grammar(
+    command: dict[str, Any], grammar: dict[str, Any]
+) -> bool:
+    if command["official_row"] != RECEIVE_PARTN_ROW:
+        return False
+    variants = grammar["variants"]
+    return (
+        len(variants) == 2
+        and {
+            (variant.get("panel", {}).get("role"), variant.get("structure_sha256"))
+            for variant in variants
+        }
+        == {
+            ("command-head", RECEIVE_PARTN_HEAD_STRUCTURE_SHA256),
+            ("continuation", RECEIVE_PARTN_CONTINUATION_STRUCTURE_SHA256),
+        }
+    )
 
 
 def _host_option_value_limit(markers: set[str]) -> int:
@@ -1915,6 +3279,79 @@ def _option_contract(
         entry["markers"].add(marker)
         entry["directions"].add(direction)
 
+    if command["official_row"] in WAIT_EXTERNAL_COMMAND_ROWS:
+        for name in ("PURGEABLE", "NOTPURGEABLE"):
+            entry = options.setdefault(
+                name,
+                {
+                    "markers": set(),
+                    "directions": set(),
+                    "stacks": set(),
+                    "authorities": set(),
+                    "source_bounds": set(),
+                    "legalities": set(),
+                },
+            )
+            entry["markers"].add("none")
+            entry["directions"].add("none")
+            entry["authorities"].add("command-source")
+            entry["legalities"].add("structural")
+
+    if command["official_row"] == COMPOSITE_SUBEVENT_ROW:
+        # The pinned 6.x DEFINE COMPOSITE EVENT topic names SUBEVENT1..8, while
+        # the bounded source projection retains only its unnumbered diagram
+        # summary. Keep this row-specific overlay tied to catalog 0033 and the
+        # verified topic SHA-256 6cb693cbb57d78f7a5b2fbb6f9bba40442924bffdac6de3d077c7be89e465b04.
+        for name in COMPOSITE_SUBEVENT_OPTIONS:
+            if name in options:
+                raise DescriptorError(f"duplicate composite subevent option {name}")
+            options[name] = {
+                "markers": {"data-value"},
+                "directions": {"input"},
+                "stacks": {(name,)},
+                "authorities": {"command-source"},
+                "source_bounds": set(),
+                "legalities": {"structural"},
+            }
+
+    if command["official_row"] == CHECK_TIMER_ROW:
+        # The pinned CHECK TIMER topic explicitly defines STATUS(cvda) as an
+        # output. The projected diagram retained an ambiguous marker. Catalog
+        # 0026, SHA-256 5b886a524054e10063175d128fe4b41b420fdc2485fdb8d79feb3a3b7957f188.
+        options["STATUS"] = {
+            "markers": {"cvda"},
+            "directions": {"output"},
+            "stacks": {("STATUS",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
+
+    for name in EVENT_RETRIEVAL_OUTPUTS.get(command["official_row"], ()):
+        # The verified 6.x topics mark these as output areas/CVDAs, while the
+        # bounded diagram projection left their direction or marker ambiguous.
+        # Catalog rows 0176/0177/0219 are pinned in the v0.9 status table.
+        options[name] = {
+            "markers": {"cvda" if name in ("EVENTTYPE", "FIRESTATUS") else "data-area"},
+            "directions": {"output"},
+            "stacks": {(name,)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
+
+    if _send_partnset_heading_operand(command, dimensions):
+        if "PARTNSET" in options:
+            raise DescriptorError("SEND PARTNSET heading operand duplicates source option")
+        options["PARTNSET"] = {
+            "markers": {"name"},
+            "directions": {"input"},
+            "stacks": {("PARTNSET",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
+
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():
             entry = options.setdefault(
@@ -1933,6 +3370,17 @@ def _option_contract(
             entry["authorities"].add("global-command-format")
 
     grammar = _grammar_contract(dimensions)
+    if _spoolwrite_page_choice(command, dimensions):
+        if "PAGE" in options:
+            raise DescriptorError("SPOOLWRITE PAGE is now duplicated in option projection")
+        options["PAGE"] = {
+            "markers": {"none"},
+            "directions": {"none"},
+            "stacks": {("PAGE",)},
+            "authorities": {"command-source"},
+            "source_bounds": set(),
+            "legalities": {"structural"},
+        }
     detachable_operand_options = _detachable_operand_options(grammar["variants"])
 
     entries = []
@@ -1974,6 +3422,19 @@ def _option_contract(
                 "host_max_value_bytes": _host_option_value_limit(markers),
             }
         )
+        if command["official_row"] == f"{OFFICIAL_BASELINE}:api-commands:0230":
+            # Pinned VERIFY TOKEN syntax has DATATYPE(cvda) and TOKENTYPE(cvda).
+            # Flattened diagram tokens must retain their parenthesized shape.
+            if name in {"DATATYPE", "TOKENTYPE"}:
+                entries[-1]["value_shape"] = "value"
+                entries[-1]["directions"] = ["input"]
+                entries[-1]["direction_status"] = "resolved"
+            elif name == "TOKEN":
+                entries[-1]["directions"] = ["input"]
+                entries[-1]["direction_status"] = "resolved"
+            elif name == "ENCRYPTKEY":
+                entries[-1]["directions"] = ["output"]
+                entries[-1]["direction_status"] = "resolved"
     source_direction_status = _source_contract_status(direction_dimension)
     if not applicable:
         direction_status = "not-applicable"
@@ -2023,6 +3484,35 @@ def _option_contract(
         raise DescriptorError("dynamic condition clause facts conflict")
     condition_clauses = next(iter(condition_clause_material.values()), None)
     constraints = _option_constraints(grammar, top_level_options, applicable, option_status)
+    if _send_partnset_heading_operand(command, dimensions):
+        # PARTNSET identifies the command head even when its parenthesized
+        # resource name is omitted to restore the base partition state.
+        constraints["required"] = [
+            name for name in constraints["required"] if name != "PARTNSET"
+        ]
+    if command["official_row"] == f"{OFFICIAL_BASELINE}:api-commands:0125":
+        # ISSUE NOTE's pinned option prose describes VOLUME as the optional
+        # diskette containing the selected destination. The projected single
+        # diagram incorrectly places it in the required path.
+        constraints["required"] = [
+            name for name in constraints["required"] if name != "VOLUME"
+        ]
+    if _receive_partn_reviewed_grammar(command, grammar):
+        constraints["dependencies"] = [
+            *constraints["dependencies"],
+            {"option": "INTO", "requires": ["LENGTH"]},
+        ]
+        constraints["mutual_exclusions"] = [
+            *constraints["mutual_exclusions"],
+            ["INTO", "SET"],
+        ]
+    if _spoolwrite_page_choice(command, dimensions):
+        choice = {"members": ["LINE", "PAGE"], "required": False}
+        constraints["alternatives"] = [*constraints["alternatives"], choice]
+        constraints["mutual_exclusions"] = [
+            *constraints["mutual_exclusions"],
+            choice["members"],
+        ]
     if enqueue_source_projected:
         constraints["required"] = ["RESOURCE"]
         lifetime = {"members": ["MAXLIFETIME", "TASK", "UOW"], "required": False}
@@ -2436,7 +3926,7 @@ def _resource_scope(family: str) -> str:
     }.get(family, "cics-transaction")
 
 
-def _capabilities(family: str, mutating: bool | None) -> list[str]:
+def _capabilities(family: str, mutating: bool | None, label: str) -> list[str]:
     dependencies = {"host.cics.execute", "host.security.authorize", "host.audit"}
     if family == "file-control":
         if mutating is not True:
@@ -2452,7 +3942,7 @@ def _capabilities(family: str, mutating: bool | None) -> list[str]:
             dependencies.add("host.spool.read")
         if mutating is not False:
             dependencies.add("host.spool.write")
-    elif family in {"time", "interval-control"}:
+    elif family in {"time", "interval-control"} or label == "MONITOR":
         dependencies.add("host.clock")
     return sorted(dependencies)
 
@@ -2489,6 +3979,8 @@ def _ir_effects(
     elif family == "spool-control":
         effects.add("spool")
     elif family in {"time", "interval-control"}:
+        effects.add("clock")
+    elif label == "MONITOR":
         effects.add("clock")
     effects.update(_resolved_memory_effects(options))
     if label.startswith(("DELAY", "SUSPEND", "WAIT")):
@@ -2770,7 +4262,7 @@ def _semantic_contract(
         capability = {
             "status": "bounded-ambiguity",
             "route": "host.cics.execute",
-            "required": _capabilities(family, None),
+            "required": _capabilities(family, None, command["label"]),
         }
         effect = {
             "status": "bounded-ambiguity",
@@ -2815,11 +4307,11 @@ def _semantic_contract(
             raise DescriptorError(
                 f"{command['official_row']} typed IR effects omit resolved memory flow"
             )
-        option_sensitive = operation == "Read"
+        option_sensitive = operation in {"Read", "GetContainer"}
         capability = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",
             "route": "host.cics.execute",
-            "required": _capabilities(family, None if option_sensitive else mutating),
+            "required": _capabilities(family, None if option_sensitive else mutating, command["label"]),
         }
         effect = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",
@@ -3218,6 +4710,14 @@ def _recognition_contract(
         discriminators.update(catalog_discriminators)
     if command["label"] == "HANDLE AID":
         heads = {("HANDLE", "AID")}
+    if command["official_row"] == SEND_PARTNSET_ROW:
+        heads = {("SEND", "PARTNSET")}
+        discriminators.clear()
+        required_discriminators.clear()
+    if _receive_partn_reviewed_grammar(command, grammar):
+        heads = {("RECEIVE", "PARTN")}
+        discriminators.clear()
+        required_discriminators.clear()
     if grammar["status"] == "pending":
         status = "pending"
     elif grammar["status"] == "not-applicable":
@@ -3225,6 +4725,8 @@ def _recognition_contract(
     elif grammar["status"] == "bounded-ambiguity" or not source_heads:
         status = "bounded-ambiguity"
     else:
+        status = "resolved"
+    if _receive_partn_reviewed_grammar(command, grammar):
         status = "resolved"
     return {
         "recognition_status": status,
@@ -3250,6 +4752,68 @@ def _registry_row_material(
             f"{command['official_row']} registry options lack shapes {sorted(missing)}"
         )
     recognition = _recognition_contract(command, semantic["grammar"], top_level_names)
+    if command["official_row"] == f"{OFFICIAL_BASELINE}:api-commands:0241":
+        # The bounded syntax projection retains "SESSTOKEN(" in the head and
+        # omits the following WEB CONVERSE options. The exact reviewed 6.x
+        # dfhp4_webconverse.html pin is sha256:326c6b1e2859591c8ab86ed252ba01d3ee57f2a109afacdf7bc7468ee1f9e658.
+        # Bind only the selected buffer form; the semantic source projection
+        # remains bounded and receives no coverage credit from this registry.
+        selected_values = {
+            "SESSTOKEN", "METHOD", "PATH", "PATHLENGTH", "URIMAP",
+            "QUERYSTRING", "QUERYSTRLEN", "FROM", "FROMLENGTH", "DOCTOKEN",
+            "MEDIATYPE", "CLOSESTATUS", "INTO", "TOLENGTH", "MAXLENGTH",
+            "STATUSCODE", "STATUSTEXT", "STATUSLEN", "BODYCHARSET", "CLIENTCONV",
+        }
+        for name in selected_values | {"NOTRUNCATE"}:
+            option_entries.setdefault(name, {
+                "name": name,
+                "value_shape": "flag" if name == "NOTRUNCATE" else "value",
+                "directions": ["none"] if name == "NOTRUNCATE" else ["input", "output"],
+                "direction_status": "bounded-ambiguity",
+                "source_max_value_bytes": None,
+            })
+        top_level_names.update(selected_values | {"NOTRUNCATE"})
+        recognition["recognition_heads"] = [["WEB", "CONVERSE"]]
+    paired_end_flag = {
+        f"{OFFICIAL_BASELINE}:api-commands:0117": "ENDOUTPUT",
+        f"{OFFICIAL_BASELINE}:api-commands:0118": "ENDFILE",
+    }.get(command["official_row"])
+    if paired_end_flag is not None:
+        # The source-b syntax projection binds the companion as a head token
+        # but loses its flag shape. The selected CICS TS 6.x HTML pins are
+        # dfhp4_issueendfile.html sha256:2d173fcd208f67e81db2eb208524d7c3143f741d84bdd97ca59c99b01b19e224
+        # and dfhp4_issueendoutput.html sha256:34a567cd30e7f4b816c8186a837b7f5af707949aa0f32bc1014deaab4b84ef56.
+        # This registry-only correction adds no source or execution credit.
+        option_entries[paired_end_flag] = {
+            "name": paired_end_flag,
+            "value_shape": "flag",
+            "directions": ["none"],
+            "direction_status": "resolved",
+            "source_max_value_bytes": None,
+        }
+        top_level_names.add(paired_end_flag)
+    mapped_issue_session_alias = command["official_row"] in {
+        f"{OFFICIAL_BASELINE}:api-commands:0108",
+        f"{OFFICIAL_BASELINE}:api-commands:0112",
+        f"{OFFICIAL_BASELINE}:api-commands:0122",
+        f"{OFFICIAL_BASELINE}:api-commands:0127",
+    }
+    if mapped_issue_session_alias:
+        # The verified APPC mapped topics explicitly accept SESSION as a
+        # compatibility synonym for CONVID although the syntax diagrams show
+        # only CONVID. Pins: ABEND 10103ed20eb91c32428d3df3f68549f3eb3130945ac963255a6265401105a025;
+        # CONFIRMATION 0f5198ab73872d2df8bb881133d595efa765e002e35b27f7eaf3dcf675e30be6;
+        # ERROR 8853c7ca2c430e58b70372fc952f9bb0f01b0d87a64cbe4d4a33da2c76fd829a;
+        # PREPARE c8249eedcf48c0dfe8569da500889418578d8a84cdd1ccd47bd449129dd9886b.
+        # This registry-only correction adds no execution credit.
+        option_entries["SESSION"] = {
+            "name": "SESSION",
+            "value_shape": "value",
+            "directions": ["input"],
+            "direction_status": "resolved",
+            "source_max_value_bytes": 4,
+        }
+        top_level_names.add("SESSION")
     if (
         not recognition["recognition_heads"]
         or len({tuple(head) for head in recognition["recognition_heads"]})
@@ -3382,8 +4946,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 40:
-        raise DescriptorError("CICS application runtime set must remain exactly 40 rows")
+    if len(existing_runtime) != len(TYPED_RUNTIME_OPERATIONS):
+        raise DescriptorError("CICS application runtime set differs from typed operations")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3453,8 +5017,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
                 source_status = "not-projected"
             else:
                 projected_commands += 1
+                if len(source_row["dimensions"]) != len(SOURCE_DIMENSIONS):
+                    raise DescriptorError(
+                        f"{command['official_row']} source dimension count differs"
+                    )
                 for raw_dimension, (source_name, contract_name, candidate_kind) in zip(
-                    source_row["dimensions"], SOURCE_DIMENSIONS, strict=True
+                    source_row["dimensions"], SOURCE_DIMENSIONS
                 ):
                     dimension = _object(raw_dimension, f"{command['official_row']} {source_name}")
                     projection_state = _text(
@@ -3637,12 +5205,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 40
+        or len(typed_rows) != len(TYPED_RUNTIME_OPERATIONS)
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 40
-        or len(unready_rows) != 223
+        or len(advertised_rows) != len(TYPED_RUNTIME_OPERATIONS)
+        or len(unready_rows) != 263 - len(TYPED_RUNTIME_OPERATIONS)
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)
@@ -3747,6 +5315,41 @@ def _rust_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=True)
 
 
+def _render_provider_entries(
+    operations: list[dict[str, Any]], family_variants: dict[str, str]
+) -> list[str]:
+    lines = []
+    for operation in operations:
+        lines.extend(
+            [
+                "    CicsCommandDescriptor {",
+                f"        operation: CicsOperation::{operation['operation']},",
+                f"        syntax: {_rust_string(operation['label'])},",
+                f"        official_row: {_rust_string(operation['official_row'])},",
+                f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
+                f"        mutating: {str(operation['mutating']).lower()},",
+                "    },",
+            ]
+        )
+    return lines
+
+
+def render_provider_tail(root: Path = ROOT) -> str:
+    catalog = load_catalog(root)
+    family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
+    operations = catalog["_runtime_operations"][PROVIDER_INLINE_OPERATIONS:]
+    lines = [
+        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
+        "",
+        "use super::*;",
+        "",
+        f"pub(super) const CICS_COMMAND_DESCRIPTOR_TAIL: [CicsCommandDescriptor; {len(operations)}] = [",
+    ]
+    lines.extend(_render_provider_entries(operations, family_variants))
+    lines.extend(["];", ""])
+    return "\n".join(lines)
+
+
 def render_provider(
     root: Path = ROOT, contracts: dict[str, Any] | None = None
 ) -> str:
@@ -3754,8 +5357,7 @@ def render_provider(
     contracts = contracts or build_contracts(root)
     condition_authority = contracts.get("condition_name_authority") or {}
     condition_names = condition_authority.get("allowed_names", [])
-    family_variants = catalog["_families"]
-    families = catalog["runtime"]["families"]
+    family_variants = {**catalog["_families"], **TYPED_EXECUTION_FAMILIES}
     operations = catalog["_runtime_operations"]
     lines = [
         "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
@@ -3773,7 +5375,7 @@ def render_provider(
         "#[derive(Clone, Copy, Debug, Eq, PartialEq)]",
         "pub(crate) enum CicsCommandFamily {",
     ]
-    lines.extend(f"    {row['rust_variant']}," for row in families)
+    lines.extend(f"    {variant}," for variant in family_variants.values())
     lines.extend(
         [
             "}",
@@ -3790,31 +5392,31 @@ def render_provider(
             "pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[",
         ]
     )
-    for operation in operations:
-        lines.extend(
-            [
-                "    CicsCommandDescriptor {",
-                f"        operation: CicsOperation::{operation['operation']},",
-                f"        syntax: {_rust_string(operation['label'])},",
-                f"        official_row: {_rust_string(operation['official_row'])},",
-                f"        family: CicsCommandFamily::{family_variants[operation['family']]},",
-                f"        mutating: {str(operation['mutating']).lower()},",
-                "    },",
-            ]
-        )
-    lines.extend(
-        [
-            "];",
-            "",
-            "pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static CicsCommandDescriptor {",
-            "    match operation {",
-        ]
-    )
+    lines.extend(_render_provider_entries(operations[:PROVIDER_INLINE_OPERATIONS], family_variants))
+    for index in range(PROVIDER_INLINE_OPERATIONS, len(operations)):
+        lines.append(f"    tail::CICS_COMMAND_DESCRIPTOR_TAIL[{index - PROVIDER_INLINE_OPERATIONS}],")
+    lines.extend(["];", "", "mod lookup;", "mod tail;", "pub(crate) use lookup::command_descriptor;", ""])
+    return "\n".join(lines)
+
+
+def render_provider_lookup(root: Path = ROOT) -> str:
+    """Keep the generated operation lookup in a bounded child module."""
+    operations = load_catalog(root)["_runtime_operations"]
+    lines = [
+        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
+        "",
+        "use super::*;",
+        "",
+        "pub(crate) const fn command_descriptor(",
+        "    operation: CicsOperation,",
+        ") -> Option<&'static CicsCommandDescriptor> {",
+        "    match operation {",
+    ]
     for index, operation in enumerate(operations):
         lines.append(
-            f"        CicsOperation::{operation['operation']} => &CICS_COMMAND_DESCRIPTORS[{index}],"
+            f"        CicsOperation::{operation['operation']} => Some(&CICS_COMMAND_DESCRIPTORS[{index}]),"
         )
-    lines.extend(["    }", "}", ""])
+    lines.extend(["        _ => None,", "    }", "}", ""])
     return "\n".join(lines)
 
 
@@ -4183,14 +5785,34 @@ def render(root: Path = ROOT) -> str:
     return render_provider(root)
 
 
+def render_contract_schema(root: Path, contracts: dict[str, Any]) -> str:
+    schema_path = root / CONTRACT_SCHEMA_PATH
+    if not schema_path.exists():
+        schema_path = ROOT / CONTRACT_SCHEMA_PATH
+    schema = json.loads(schema_path.read_text())
+    registry_properties = schema["$defs"]["registry-summary"]["properties"]
+    count_properties = schema["$defs"]["counts"]["properties"]
+    for name in ("typed_handlers", "advertised_commands", "unready_handlers"):
+        registry_properties[name]["const"] = contracts["registry"][name]
+    for name in (
+        "runtime_backed_commands", "typed_runtime_commands",
+        "advertised_commands", "unready_commands",
+    ):
+        count_properties[name]["const"] = contracts["counts"][name]
+    return json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
+
+
 def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     contracts = build_contracts(root)
     return {
         OUTPUT_PATH: render_provider(root, contracts),
+        LOOKUP_OUTPUT_PATH: render_provider_lookup(root),
+        PROVIDER_TAIL_OUTPUT_PATH: render_provider_tail(root),
         HOST_OUTPUT_PATH: render_host(root),
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),
         IR_REGISTRY_OUTPUT_PATH: render_ir_registry(root, contracts),
         CONTRACT_OUTPUT_PATH: json.dumps(contracts, indent=2, ensure_ascii=False) + "\n",
+        CONTRACT_SCHEMA_PATH: render_contract_schema(root, contracts),
     }
 
 
@@ -4225,7 +5847,7 @@ def main() -> None:
         generate()
         print(
             "cics-command-descriptors: generated "
-            f"{OUTPUT_PATH}, {HOST_OUTPUT_PATH}, {COMPILER_SPI_COMPAT_OUTPUT_PATH}, "
+            f"{OUTPUT_PATH}, {LOOKUP_OUTPUT_PATH}, {PROVIDER_TAIL_OUTPUT_PATH}, {HOST_OUTPUT_PATH}, {COMPILER_SPI_COMPAT_OUTPUT_PATH}, "
             f"{IR_REGISTRY_OUTPUT_PATH}, and {CONTRACT_OUTPUT_PATH}"
         )
 

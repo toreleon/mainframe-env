@@ -609,6 +609,36 @@ mod tests {
     use super::*;
 
     #[test]
+    fn exec_parm_preserves_text_and_absence_for_main_program() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary: "//J JOB\n//WITH EXEC PGM=PARMTEST,PARM='2022071800'\n//WITHOUT EXEC PGM=PARMTEST\n".into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.steps[0].parameter.as_deref(), Some("2022071800"));
+        assert_eq!(plan.steps[1].parameter.as_deref(), None);
+    }
+
+    #[test]
+    fn exec_parm_unquotes_doubled_apostrophes_and_accepts_empty() {
+        let plan = parse_jcl(
+            &JclBundle {
+                primary:
+                    "//J JOB\n//Q EXEC PGM=PARMTEST,PARM='A''B'\n//E EXEC PGM=PARMTEST,PARM=''\n"
+                        .into(),
+                ..Default::default()
+            },
+            JclLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.steps[0].parameter.as_deref(), Some("A'B"));
+        assert_eq!(plan.steps[1].parameter.as_deref(), Some(""));
+    }
+
+    #[test]
     fn compatibility_adapter_uses_the_new_converter_plan() {
         let plan = parse_jcl(
             &JclBundle {
@@ -660,5 +690,31 @@ mod tests {
             plan.steps[1].dds[0].disposition,
             vec![Disposition::Old, Disposition::Delete, Disposition::Delete]
         );
+    }
+
+    #[test]
+    fn dcb_referback_to_unknown_or_forward_dd_fails_jcl_conversion() {
+        for source in [
+            "//J JOB\n//S EXEC PGM=IEFBR14\n//OUT DD DSN=USER.OUT,DISP=NEW,DCB=*.MISSING\n",
+            "//J JOB\n//S EXEC PGM=IEFBR14\n//OUT DD DSN=USER.OUT,DISP=NEW,DCB=*.MISSING.IN\n",
+            "//J JOB\n//S EXEC PGM=IEFBR14\n//OUT DD DSN=USER.OUT,DISP=NEW,DCB=*.LATER\n//LATER DD DSN=USER.IN,DISP=SHR\n",
+        ] {
+            let bundle = JclBundle {
+                primary: source.into(),
+                ..JclBundle::default()
+            };
+            let conversion = convert_jcl(&bundle, JclConversionLimits::default()).unwrap();
+            assert!(conversion.plan().is_none());
+            assert!(
+                conversion
+                    .diagnostics()
+                    .iter()
+                    .any(|diagnostic| diagnostic.code().as_str() == "MEJCL0738")
+            );
+            assert_eq!(
+                parse_jcl(&bundle, JclLimits::default()),
+                Err(HostProblem::Malformed)
+            );
+        }
     }
 }

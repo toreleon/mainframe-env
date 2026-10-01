@@ -59,8 +59,10 @@ pub(in crate::service) fn new_run_with_state(
     sysid: &str,
     seed: RunSeed,
 ) -> Run {
+    let current_channel = super::task_context::current_channel(&invocation);
     let current_program = super::CurrentProgramFrame {
         current: super::task_context::current_program(&invocation),
+        channel: current_channel,
         parent_execution_id: invocation.parent_execution_id.clone(),
         initial_entry: false,
     };
@@ -92,7 +94,7 @@ pub(in crate::service) fn new_run_with_state(
         latest_abend,
         retrieve: seed.retrieve,
         current_records: BTreeMap::new(),
-        current_record_values: BTreeMap::new(),
+        file_updates: Default::default(),
         undo: seed.undo,
         undo_version: seed.undo_version,
         browses: BTreeMap::new(),
@@ -124,7 +126,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECSB".to_vec();
+    let mut out = b"MECSC".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -200,6 +202,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
             .unwrap_or("")
             .as_bytes(),
     )?;
+    super::encode_terminal_identity(&mut out, &session.terminal_identity)?;
     Ok(out)
 }
 
@@ -240,13 +243,17 @@ pub(in crate::service) fn invoke(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::Address => address(service, run, request),
         CicsOperation::AddressSet => address_set(service, run, request),
         CicsOperation::ChangeTask => change_task(service, run, request),
         CicsOperation::Deq | CicsOperation::Enq => {
             super::task_enqueue::invoke(service, run, request, retention_tick)
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
+        CicsOperation::Freemain => super::storage_control::invoke(service, run, request),
+        CicsOperation::Freemain64 => super::storage_control::invoke(service, run, request),
         CicsOperation::Getmain => super::storage_control::invoke(service, run, request),
+        CicsOperation::Getmain64 => super::storage_control::invoke(service, run, request),
         CicsOperation::HandleAid => handle_aid(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
         CicsOperation::IgnoreCondition => ignore_condition(service, run, request),
@@ -259,9 +266,46 @@ pub(in crate::service) fn invoke(
             set_association_user_corr_data(service, run, request)
         }
         CicsOperation::Suspend => suspend(service, run, request),
+        CicsOperation::WaitEvent | CicsOperation::WaitExternal | CicsOperation::WaitCics => {
+            super::task_wait::invoke(service, run, request)
+        }
         CicsOperation::Abend => abend(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn address(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "COMMAREA" => value.schema() != "mainframe-env.cics.storage-target@1",
+                "USING.ADDRESS" => value.schema() != "mainframe-env.cics.storage-identity@1",
+                "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+        || !request.arguments.contains_key("COMMAREA")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
 }
 
 fn address_set(

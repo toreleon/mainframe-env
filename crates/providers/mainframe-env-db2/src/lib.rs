@@ -6,14 +6,11 @@ mod abi;
 mod ast;
 mod catalog;
 mod create_index_syntax;
-mod create_table_syntax;
 mod create_view_syntax;
-mod cursor_syntax;
 mod expression_parser;
 mod generated_statement_catalog;
 mod insert_syntax;
 mod name_resolution;
-mod query_syntax;
 mod retention;
 mod service;
 mod statement;
@@ -33,25 +30,10 @@ pub use catalog::{
     Db2ExtractLayout, Db2ForeignKeyDefinition, Db2ResultEncoding, Db2SeedRow, Db2TableDefinition,
     decode_table_definitions_bounded,
 };
-pub use create_table_syntax::{
-    Db2ColumnDefault, Db2CreateTableColumn, Db2CreateTableConstraint, Db2CreateTableStatement,
-    Db2DefaultSpelling, Db2ForeignKeyConstraint, Db2OnDeleteAction, Db2TableConstraintKind,
-    parse_db2_create_table_statement,
-};
-pub use cursor_syntax::{
-    Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget, Db2CursorReturnability,
-    Db2CursorRowsetPositioning, Db2CursorSensitivity, Db2DeclareCursorPreparedStatement,
-    Db2SensitiveCursorKind, parse_db2_declare_cursor_prepared,
-};
 pub use expression_parser::{Db2ParsedExpression, parse_db2_expression};
 pub use generated_statement_catalog::{
     DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
     Db2StatementId, Db2StatementUnit, db2_statement_descriptor, db2_statement_descriptor_by_row,
-};
-pub use query_syntax::{
-    Db2FetchClause, Db2FetchPosition, Db2NamedTableSource, Db2OffsetClause, Db2OrderByItem,
-    Db2OrderDirection, Db2OrderKey, Db2QueryExpression, Db2SelectCore, Db2SelectItem,
-    Db2SelectQuantifier, parse_db2_select_core,
 };
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -61,14 +43,24 @@ pub use retention::{
 };
 pub use service::{Db2Limits, Db2ReplayClock, Db2Service, db2_providers};
 pub use statement::{
-    Db2CommitStatement, Db2DescriptorNameMode, Db2ExecuteImmediateStatement, Db2ExecuteStatement,
-    Db2ExecuteUsing, Db2PrepareDescriptor, Db2PrepareStatement, Db2RollbackStatement,
-    Db2RollbackTarget, Db2SavepointStatement, Db2Statement, Db2StatementKind,
-    parse_db2_dynamic_statement, parse_db2_transaction_statement,
+    Db2ColumnDefault, Db2CommitStatement, Db2CreateTableColumn, Db2CreateTableConstraint,
+    Db2CreateTableStatement, Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget,
+    Db2CursorReturnability, Db2CursorRowsetPositioning, Db2CursorSensitivity,
+    Db2DeclareCursorPreparedStatement, Db2DefaultSpelling, Db2DescriptorNameMode,
+    Db2ExecuteImmediateStatement, Db2ExecuteStatement, Db2ExecuteUsing, Db2FetchClause,
+    Db2FetchPosition, Db2ForeignKeyConstraint, Db2NamedTableSource, Db2OffsetClause,
+    Db2OnDeleteAction, Db2OrderByItem, Db2OrderDirection, Db2OrderKey, Db2PrepareDescriptor,
+    Db2PrepareStatement, Db2QueryExpression, Db2RollbackStatement, Db2RollbackTarget,
+    Db2SavepointStatement, Db2SelectCore, Db2SelectItem, Db2SelectQuantifier,
+    Db2SensitiveCursorKind, Db2Statement, Db2StatementKind, Db2TableConstraintKind,
+    parse_db2_create_table_statement, parse_db2_cursor_statement,
+    parse_db2_declare_cursor_prepared, parse_db2_dynamic_statement, parse_db2_select_core,
+    parse_db2_transaction_statement,
 };
 pub use syntax::{
     Db2LexedStatement, Db2SourceLocation, Db2SourceSpan, Db2StringKind, Db2Symbol,
-    Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenKind, lex_db2,
+    Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenCursor,
+    Db2TokenKind, lex_db2, parse_db2_host_reference,
 };
 pub use type_system::{
     Db2AssignmentCompatibility, Db2AssignmentContext, Db2AssignmentNullability,

@@ -50,7 +50,7 @@ PRODUCT = "SSJL4D_6.x"
 SNAPSHOT_DATE = "2026-09-10"
 TOC_URL = "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en"
 TOC_SHA256 = "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
-MAP_SHA256 = "sha256:e3e453846334aa92235f21f0028e9c77f084fc4e872d9f592b7af227decac863"
+MAP_SHA256 = "sha256:c535f2cac1072e16a0f3e252045cac975934c5e24d405a560a4e0ad14e0de726"
 SUMMARY_PATH = source_map.SUMMARY_PATH
 CORPUS_DOMAIN = b"mainframe-env.cics-source-corpus@1\0"
 BROWSER_RECEIPT_DOMAIN = b"mainframe-env.cics-browser-source-verification@1\0"
@@ -173,6 +173,78 @@ COMMON_APPLICABILITY_TOPICS = (
         "applies_to": "all-batch-rows",
         "reason": "threadsafe-command-list",
     },
+)
+
+B_GDS_RESPONSE_TOPICS = (
+    {
+        "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp616.html",
+        "role": "execution-context-candidate",
+        "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+        ],
+        "reason": "appc-mapped-state-transitions",
+    },
+    *(
+        {
+            "topic_path": (
+                "SSJL4D_6.x/applications/developing/connections/"
+                f"appcmapped_sl{level}.html"
+            ),
+            "role": "execution-context-candidate",
+            "applies_to_rows": [
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+            ],
+            "reason": "appc-mapped-state-transitions",
+        }
+        for level in (0, 1, 2)
+    ),
+    {
+        "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdssend.html",
+        "role": "execution-context-candidate",
+        "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        ],
+        "reason": "gds-send-response-contract",
+    },
+    {
+        "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp625.html",
+        "role": "execution-context-candidate",
+        "applies_to_rows": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
+        ],
+        "reason": "appc-basic-state-transitions",
+    },
+    *(
+        {
+            "topic_path": (
+                "SSJL4D_6.x/applications/developing/connections/"
+                f"appcbasic_sl{level}.html"
+            ),
+            "role": "execution-context-candidate",
+            "applies_to_rows": [
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+                "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
+            ],
+            "reason": "appc-basic-state-transitions",
+        }
+        for level in (0, 1, 2)
+    ),
 )
 
 ROW_ASSOCIATION = "ibm-cics-ts-6x-2026-08-31:api-commands:0193"
@@ -324,7 +396,7 @@ class LaterCorpusConfig:
 LATER_BATCHES = {
     "b": LaterCorpusConfig(
         source_batches.source_batch("b"),
-        tuple(dict(topic) for topic in COMMON_APPLICABILITY_TOPICS),
+        tuple(dict(topic) for topic in (*COMMON_APPLICABILITY_TOPICS, *B_GDS_RESPONSE_TOPICS)),
     ),
     "c": LaterCorpusConfig(
         source_batches.source_batch("c"),
