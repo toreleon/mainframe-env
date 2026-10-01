@@ -69,6 +69,223 @@ fn known_child_abend() -> Result<HostResult, HostProblem> {
     })
 }
 
+fn unmatched_pop(
+    service: &CicsService,
+    run: &mut Run,
+    policy: CicsConditionPolicy,
+) -> CicsResponse {
+    super::super::task_control::invoke(
+        service,
+        run,
+        &CicsRequest {
+            operation: CicsOperation::PopHandle,
+            arguments: BTreeMap::new(),
+            condition_policy: policy,
+            mutation: None,
+        },
+        100,
+    )
+    .unwrap()
+}
+
+#[test]
+fn logical_frame_default_pop_preserves_current_level_condition_precedence() {
+    for case in 0..7 {
+        let (service, root) = fixture();
+        let mut caller = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+        caller.abend_handler = Some(AbendExit::Label("ROOT-EXIT".into()));
+        let actor = child(&root, 1);
+        let loan =
+            ProgramLease::acquire(&service, &mut caller, "CHILD", Some(actor.artifact.clone()))
+                .unwrap();
+        service.ensure_run(&actor).unwrap();
+        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+        let policy = match case {
+            0 => CicsConditionPolicy::NoHandle,
+            1 => CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: None,
+            },
+            2 => {
+                command.ignored_conditions.insert("INVREQ".into());
+                CicsConditionPolicy::Default
+            }
+            3 => {
+                command.handlers.insert("INVREQ".into(), "COND-EXIT".into());
+                CicsConditionPolicy::Default
+            }
+            4 => {
+                command.handlers.insert("ERROR".into(), "COND-EXIT".into());
+                CicsConditionPolicy::Default
+            }
+            5 => {
+                command.abend_handler = Some(AbendExit::Label("LOCAL-EXIT".into()));
+                CicsConditionPolicy::Default
+            }
+            _ => {
+                command.ignored_conditions.insert("ERROR".into());
+                CicsConditionPolicy::Default
+            }
+        };
+        let response = unmatched_pop(&service, &mut command, policy);
+        assert_eq!(response.condition, "INVREQ");
+        assert_eq!(response.response, 16);
+        assert!(command.program_abend.is_none());
+        assert!(!response.outputs.contains_key("ABEND.DEFAULT"));
+        assert_eq!(
+            response.disposition,
+            match case {
+                0 | 1 => CicsDisposition::Complete,
+                2 | 6 => CicsDisposition::Ignored,
+                _ => CicsDisposition::Handler,
+            }
+        );
+        if case == 5 {
+            assert_eq!(response.target.as_deref(), Some("LOCAL-EXIT"));
+            assert!(command.abend_handler.is_none());
+            assert_eq!(
+                command.cancelled_abend_handler,
+                Some(AbendExit::Label("LOCAL-EXIT".into()))
+            );
+        }
+        command.finish().unwrap();
+        loan.finish().unwrap();
+        assert_eq!(
+            caller.abend_handler,
+            Some(AbendExit::Label("ROOT-EXIT".into()))
+        );
+        caller.finish().unwrap();
+    }
+}
+
+#[test]
+fn logical_frame_default_pop_requires_known_result_and_valid_replay_origin() {
+    let (service, root) = fixture();
+    let mut caller = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+    caller.abend_handler = Some(AbendExit::Label("ROOT-EXIT".into()));
+    let actor = child(&root, 1);
+    let loan = ProgramLease::acquire(&service, &mut caller, "CHILD", Some(actor.artifact.clone()))
+        .unwrap();
+    service.ensure_run(&actor).unwrap();
+    let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+    let default = unmatched_pop(&service, &mut command, CicsConditionPolicy::Default);
+    assert_eq!(default.disposition, CicsDisposition::Abended);
+    assert_eq!(default.outputs["ABEND.DEFAULT"].bytes(), b"POP-HANDLE");
+    assert!(command.latest_abend.is_none());
+    assert!(command.program_abend.is_some());
+    command.finish().unwrap();
+    loan.finish().unwrap();
+    let before = HandleState::from_run(&caller);
+    for problem in [
+        HostProblem::UnknownOutcome,
+        HostProblem::Cancelled,
+        HostProblem::TimedOut,
+        HostProblem::Condition {
+            name: "OTHER-FAILURE".into(),
+            response: -1,
+            response2: 0,
+        },
+    ] {
+        assert!(matches!(
+            super::super::program_abend::unwind(&service, &mut caller, &Err(problem)),
+            Err(HostProblem::UnknownOutcome)
+        ));
+        assert!(caller.program_abend.is_some());
+        assert_eq!(HandleState::from_run(&caller), before);
+    }
+    let original = caller.program_abend.clone().unwrap();
+    for case in 0..6 {
+        let mut invalid = original.clone();
+        match case {
+            0 => {
+                invalid.response.outputs.remove("ABEND.DEFAULT");
+            }
+            1 => invalid.cancel_exits = true,
+            2 => invalid.response.target = Some("FORGED".into()),
+            3 => invalid.response.disposition = CicsDisposition::Handler,
+            4 => invalid.response.response2 = 1,
+            _ => invalid.response.payload = bounded(b"U777".to_vec()).unwrap(),
+        }
+        caller.program_abend = Some(invalid);
+        assert!(matches!(
+            super::super::program_abend::unwind(&service, &mut caller, &known_child_abend()),
+            Err(HostProblem::UnknownOutcome)
+        ));
+        assert_eq!(HandleState::from_run(&caller), before);
+    }
+    caller.program_abend = Some(original);
+    let response = super::super::program_abend::unwind(&service, &mut caller, &known_child_abend())
+        .unwrap()
+        .unwrap();
+    assert_eq!(response.target.as_deref(), Some("ROOT-EXIT"));
+    assert!(response.outputs["ABEND.CODE"].bytes().is_empty());
+    assert!(!response.outputs.contains_key("ABEND.DUMP"));
+    assert_eq!(
+        super::super::program_abend::validate_replay(&response),
+        Ok(true)
+    );
+    for case in 0..12 {
+        let mut invalid = response.clone();
+        match case {
+            0 => invalid.condition = "ERROR".into(),
+            1 => invalid.response = 27,
+            2 => invalid.response2 = 1,
+            3 => invalid.disposition = CicsDisposition::Complete,
+            4 => invalid.target = None,
+            5 => invalid.target = Some("X".repeat(129)),
+            6 => {
+                invalid.outputs.remove("ABEND.CODE");
+            }
+            7 => {
+                invalid.outputs.insert(
+                    "ABEND.CODE".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.abend-code@1",
+                        b"U777".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                );
+            }
+            8 => {
+                invalid.outputs.insert(
+                    "ABEND.DEFAULT".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.default-abend@1",
+                        b"OTHER".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                );
+            }
+            9 => {
+                invalid.outputs.insert(
+                    "ABEND.DEFAULT".into(),
+                    bounded(b"POP-HANDLE".to_vec()).unwrap(),
+                );
+            }
+            10 => {
+                invalid.outputs.insert(
+                    "ABEND.DUMP".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.abend-dump@1",
+                        b"suppressed".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                );
+            }
+            _ => invalid.payload = bounded(b"unexpected".to_vec()).unwrap(),
+        }
+        assert_eq!(
+            super::super::program_abend::validate_replay(&invalid),
+            Err(HostProblem::ProviderFailure),
+            "case {case}"
+        );
+    }
+    caller.finish().unwrap();
+}
+
 #[test]
 fn logical_frame_ancestor_abend_retains_task_enqueue_but_cancel_releases_it() {
     for cancel in [false, true] {

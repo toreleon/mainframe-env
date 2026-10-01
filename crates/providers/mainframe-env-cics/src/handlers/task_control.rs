@@ -1,3 +1,5 @@
+mod default_pop;
+
 use super::super::{
     CicsLimits, CicsService, DatasetUndo, Reader, Run, Session, argument_bytes, argument_text,
     field,
@@ -1090,7 +1092,7 @@ fn pop_handle(
     validate_handle_stack_request(request)?;
     let previous = HandleState::from_run(run);
     let Some(frame) = run.handle_stack.pop() else {
-        return pop_handle_invreq(service, run, request);
+        return default_pop::invoke(service, run, request);
     };
     run.handlers = frame.handlers;
     run.aid_handlers = frame.aid_handlers;
@@ -1120,53 +1122,4 @@ fn validate_handle_stack_request(request: &CicsRequest) -> Result<(), HostProble
     } else {
         Ok(())
     }
-}
-
-fn pop_handle_invreq(
-    service: &CicsService,
-    run: &mut Run,
-    request: &CicsRequest,
-) -> Result<CicsResponse, HostProblem> {
-    let previous = HandleState::from_run(run);
-    let (disposition, target, payload) = match &request.condition_policy {
-        CicsConditionPolicy::NoHandle | CicsConditionPolicy::Respond { .. } => {
-            (CicsDisposition::Complete, None, Vec::new())
-        }
-        CicsConditionPolicy::Default if run.ignored_conditions.contains("INVREQ") => {
-            (CicsDisposition::Ignored, None, Vec::new())
-        }
-        CicsConditionPolicy::Default if run.handlers.contains_key("INVREQ") => (
-            CicsDisposition::Handler,
-            run.handlers.get("INVREQ").cloned(),
-            Vec::new(),
-        ),
-        CicsConditionPolicy::Default if run.ignored_conditions.contains("ERROR") => {
-            (CicsDisposition::Ignored, None, Vec::new())
-        }
-        CicsConditionPolicy::Default if run.handlers.contains_key("ERROR") => (
-            CicsDisposition::Handler,
-            run.handlers.get("ERROR").cloned(),
-            Vec::new(),
-        ),
-        CicsConditionPolicy::Default if run.abend_handler.is_some() => {
-            let exit = run
-                .abend_handler
-                .take()
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            run.cancelled_abend_handler = Some(exit.clone());
-            match exit {
-                AbendExit::Label(target) => (CicsDisposition::Handler, Some(target), Vec::new()),
-                AbendExit::Program(target) => (
-                    CicsDisposition::Transfer,
-                    Some(target),
-                    run.retrieve.clone(),
-                ),
-            }
-        }
-        CicsConditionPolicy::Default => (CicsDisposition::Abended, None, Vec::new()),
-    };
-    if HandleState::from_run(run) != previous {
-        persist_handle_state(service, run, previous)?;
-    }
-    service.response(run, disposition, "INVREQ", 16, 0, target, None, payload)
 }

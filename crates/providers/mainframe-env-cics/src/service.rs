@@ -22578,6 +22578,72 @@ mod tests {
     }
 
     #[test]
+    fn default_pop_abend_discards_protected_start_but_resp_preserves_it() {
+        for respond in [false, true] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (issuer, _) = registered(&service);
+            service
+                .lock()
+                .unwrap()
+                .runs
+                .get_mut(&issuer.run_unit_id)
+                .unwrap()
+                .abend_handler = Some(AbendExit::Label("RECOVERY".into()));
+            let start = request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(b"POPSTART")),
+                    ("INTERVAL".into(), cics_decimal(0)),
+                    ("OPTION.PROTECT".into(), cics_option()),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+                .unwrap();
+            let mut pop = request(CicsOperation::PopHandle, BTreeMap::new(), 2);
+            if respond {
+                pop.condition_policy = CicsConditionPolicy::Respond {
+                    response_field: "RESP-X".into(),
+                    response2_field: None,
+                };
+            }
+            let response = service
+                .invoke(&effect(&issuer.run_unit_id, pop.clone(), 2), pop)
+                .unwrap();
+            assert_eq!(
+                response.disposition,
+                if respond {
+                    CicsDisposition::Complete
+                } else {
+                    CicsDisposition::Handler
+                }
+            );
+            assert_eq!(
+                response.target.as_deref(),
+                if respond { None } else { Some("RECOVERY") }
+            );
+            assert_eq!(
+                store
+                    .get_provider_state("cics-interval-start-v1", "POPSTART")
+                    .unwrap()
+                    .is_some(),
+                respond
+            );
+            assert!(store.get_work("cics-start:POPSTART").unwrap().is_none());
+        }
+    }
+
+    #[test]
     fn task_end_commits_protected_start_while_known_abort_discards_it() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

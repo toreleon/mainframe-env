@@ -134,7 +134,33 @@ reservation remains protected by the existing recovery/retention fence. Older
 interpreters do not honor this additive code on LINK, so downgrade requires
 draining affected writers and retaining a compatible reader or restoring a
 verified pre-change backup, not silently rewriting replies. General/default
-condition ABEND and ancestor PROGRAM exit execution remain unaccepted.
+condition ABEND and ancestor PROGRAM exit execution remain unaccepted, except
+for the bounded unmatched POP HANDLE recovery below.
+
+### Source-defined unmatched POP HANDLE default recovery
+
+Sources-B POP HANDLE row 0146 defines INVREQ/default abnormal termination when
+no PUSH exists at the current link level. With no current RESP/NOHANDLE,
+IGNORE or condition handler, propagate through the existing program loans to
+the nearest active ABEND exit; parent LINK RESP cannot turn the child abend
+into an ordinary return. A current-level exit deactivates normally. Cancel
+still-protected START requests even when recovery retains task resources.
+
+The volatile pending response and outer LINK reply carry `ABEND.DEFAULT`,
+schema `mainframe-env.cics.default-abend@1`, exact bytes `POP-HANDLE`. Validate
+INVREQ 16/0, disposition/target/payload and origin before selecting an exit or
+replaying. Only the matching known child executor Abend result can unwind.
+Outer replies additionally carry empty `ABEND.CODE` with the existing schema;
+this means no attested IBM code, not a guessed ABCODE. No dump decision is
+invented, and prior explicit ABEND metadata is not reused. This is not a generic
+default-condition or machine-check recovery table.
+
+No durable namespace, protocol generation, dependency graph or completed CALL
+reservation is introduced. Pending calls and exact known-Abend instance proof
+remain fenced/protected. Old readers reject these marked outer replies because
+they do not satisfy the explicit ERROR/code/dump contract. Downgrade requires
+drained writers and a compatible reader or verified pre-change backup; never
+strip the origin marker, invent a code or relabel pending calls as completed.
 
 ### Known-ABEND installed-instance disposition
 

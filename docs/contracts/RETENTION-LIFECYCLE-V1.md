@@ -151,6 +151,12 @@ The provider families have these codec-owned boundaries:
   legacy busy instances are not upgraded on read. Old readers reject schema 2;
   downgrade requires drained writers and resolved frames with a compatible
   reader or verified backup, never proof removal or schema relabeling.
+  source-defined unmatched POP HANDLE recovery uses the same pending-call and
+  known-Abend fences. Its additive `ABEND.DEFAULT` origin in the existing CICS
+  replay reply adds no retention owner/namespace or completed CALL receipt;
+  empty `ABEND.CODE` attests no IBM code. Old readers reject this default reply.
+  Drain affected writers and retain a compatible reader or verified backup on
+  downgrade; never remove the origin marker or manufacture completion.
   Fresh call protocols use JSON schema 3 in the existing protocol namespace;
   valid schema 2 remains readable. Schema 3 binds its unchanged owner/run-state,
   deadline and end-tick fields under the `protocol-metadata@3` digest domain.

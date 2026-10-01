@@ -1,4 +1,4 @@
-//! Explicit application ABEND unwinding in the existing synchronous program lease owner.
+//! Explicit/default ABEND unwinding in the existing synchronous program lease owner.
 use super::super::{CicsService, Run, bounded};
 use super::handle_state::{AbendExit, AbendRecord, HandleState, persist_handle_state};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
@@ -11,7 +11,7 @@ pub(in crate::service) struct PendingProgramAbend {
     pub(in crate::service) cancel_exits: bool,
 }
 
-/// Only an observed explicit child ABEND and the matching known executor result
+/// Only an observed source-backed child ABEND and the matching known executor result
 /// can unwind. A reserved/unknown installed call never supplies handler success.
 pub(in crate::service) fn unwind(
     service: &CicsService,
@@ -28,9 +28,7 @@ pub(in crate::service) fn unwind(
         // into a known ABEND/handler disposition.
         return Err(HostProblem::UnknownOutcome);
     }
-    if pending.response.payload.bytes().len() > 4
-        || std::str::from_utf8(pending.response.payload.bytes()).is_err()
-    {
+    if validate_pending(&pending).is_err() {
         return Err(HostProblem::UnknownOutcome);
     }
     let previous = HandleState::from_run(run);
@@ -90,9 +88,45 @@ pub(in crate::service) fn unwind(
     Ok(Some(response))
 }
 
+fn validate_pending(pending: &PendingProgramAbend) -> Result<(), HostProblem> {
+    let response = &pending.response;
+    if response.disposition != CicsDisposition::Abended
+        || response.target.is_some()
+        || response.payload.schema() != "mainframe-env.cics.payload@1"
+        || response.payload.bytes().len() > 4
+        || std::str::from_utf8(response.payload.bytes()).is_err()
+        || response.outputs.contains_key("COMMAREA")
+    {
+        return Err(HostProblem::UnknownOutcome);
+    }
+    if response.outputs.contains_key("ABEND.DEFAULT") {
+        validate_default_pop(response)?;
+        if pending.record.is_some() || pending.cancel_exits {
+            return Err(HostProblem::UnknownOutcome);
+        }
+    } else if response.condition != "ERROR"
+        || response.response != 27
+        || response.response2 != 0
+        || response.outputs.get("ABEND.DUMP").is_none_or(|dump| {
+            dump.schema() != "mainframe-env.cics.abend-dump@1"
+                || !matches!(dump.bytes(), b"requested" | b"suppressed")
+        })
+    {
+        return Err(HostProblem::UnknownOutcome);
+    }
+    Ok(())
+}
+
 /// Validate the additive control metadata before treating a retained LINK reply
 /// as an ABEND unwind rather than an ordinary condition/COMMAREA result.
 pub(super) fn validate_replay(response: &CicsResponse) -> Result<bool, HostProblem> {
+    if response.outputs.contains_key("ABEND.DEFAULT") {
+        validate_default_pop(response)?;
+        if response.outputs.get("ABEND.CODE").is_none() {
+            return Err(HostProblem::ProviderFailure);
+        }
+        return Ok(true);
+    }
     let Some(code) = response.outputs.get("ABEND.CODE") else {
         return Ok(false);
     };
@@ -128,4 +162,42 @@ pub(super) fn validate_replay(response: &CicsResponse) -> Result<bool, HostProbl
         return Err(HostProblem::ProviderFailure);
     }
     Ok(true)
+}
+
+/// One reviewed default transition, not a generic guessed condition/abend table.
+fn validate_default_pop(response: &CicsResponse) -> Result<(), HostProblem> {
+    let origin = response
+        .outputs
+        .get("ABEND.DEFAULT")
+        .ok_or(HostProblem::ProviderFailure)?;
+    let has_target = matches!(
+        response.disposition,
+        CicsDisposition::Handler | CicsDisposition::Transfer
+    );
+    if origin.schema() != "mainframe-env.cics.default-abend@1"
+        || origin.bytes() != b"POP-HANDLE"
+        || response.condition != "INVREQ"
+        || response.response != 16
+        || response.response2 != 0
+        || !matches!(
+            response.disposition,
+            CicsDisposition::Handler | CicsDisposition::Transfer | CicsDisposition::Abended
+        )
+        || has_target != response.target.is_some()
+        || response
+            .target
+            .as_ref()
+            .is_some_and(|target| target.is_empty() || target.len() > 128)
+        || response.outputs.contains_key("ABEND.DUMP")
+        || response.outputs.contains_key("COMMAREA")
+        || response.outputs.get("ABEND.CODE").is_some_and(|code| {
+            code.schema() != "mainframe-env.cics.abend-code@1" || !code.bytes().is_empty()
+        })
+        || response.payload.schema() != "mainframe-env.cics.payload@1"
+        || response.disposition != CicsDisposition::Transfer && !response.payload.bytes().is_empty()
+        || response.payload.bytes().len() > 32_763
+    {
+        return Err(HostProblem::ProviderFailure);
+    }
+    Ok(())
 }

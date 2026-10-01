@@ -6788,6 +6788,9 @@ mod tests {
     #[path = "program_abend_exit.rs"]
     mod program_abend_exit;
 
+    #[path = "program_default_abend.rs"]
+    mod program_default_abend;
+
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn postgres_compiled_local_link_handle_frames_recovers_after_restart() {
