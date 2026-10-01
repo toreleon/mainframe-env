@@ -5044,6 +5044,7 @@ fn install_carddemo_db2_package(
             sql_rows: Vec::new(),
             ims_definitions: Vec::new(),
             ims_rows: Vec::new(),
+            ims_metadata: None,
             mq_resources: Vec::new(),
             batch_controllers,
             security_resources: Vec::new(),

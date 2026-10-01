@@ -5,11 +5,14 @@
 pub mod database;
 mod metadata;
 pub mod recovery;
+mod metadata_publication;
 mod retention;
 mod service;
 mod tm;
 
-pub use metadata::{
+pub use metadata_publication::{ImsMetadataGeneration, ImsMetadataPublicationReceipt};
+
+pub use mainframe_env_host_api::{
     IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,
     ImsDbLevel, ImsFieldMetadata, ImsLogicalRelationshipMetadata, ImsMetadataCatalog,
     ImsMetadataIdentity, ImsMetadataLimits, ImsMetadataProblem, ImsPcbMetadata, ImsPsbMetadata,

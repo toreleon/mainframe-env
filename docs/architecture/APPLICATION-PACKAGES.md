@@ -12,8 +12,9 @@ an injected trust authority. Signature bytes and key IDs are carried by the
 package; trust keys and secrets are not.
 
 The typed sections are host ABI libraries, SQL tables and seed rows, IMS
-definitions and seed rows, MQ resources, batch controllers, and security
-resources. ABI members reference package blobs that must also be fully
+definitions and seed rows, optional versioned IMS DBD/PSB metadata, MQ
+resources, batch controllers, and security resources. ABI members reference
+package blobs that must also be fully
 validated manifest entries; no subsystem reference can reach bytes outside the
 signed content closure. SQL rows reference declared
 tables and columns. IMS rows reference declared definitions and segments. Batch
@@ -39,13 +40,20 @@ stale, or unverified generations cannot become selected. Rollback selects a
 retained ready generation and does not reconstruct it from mutable source
 paths.
 
-`ProductServer` publishes controller and Db2 sections through one serialized
+`ProductServer` publishes controller, Db2, and IMS metadata sections through one serialized
 `mainframe-env.application-publication@1` state machine. The prepared record is
 bound to the expected package generation and identity. Each applicable section
 is durably `pending`, `applying`, `applied`, or `failed`; restart retries
 idempotent provider operations from explicit partial state. Selection becomes
 complete only after all applicable sections are durable. This is recovery over
 separate provider transactions, not a cross-provider exactly-once claim.
+
+IMS metadata publication uses the shared `mainframe-env.ims-metadata@1` DTO and
+validator. The provider atomically retains the package-bound generation and
+advances its selected-generation row through `ProviderStateStore`; rollback
+selects the exact retained generation. A package without the optional field
+keeps the historical package identity and publishes an explicit no-metadata
+selection, so a later generation cannot accidentally inherit stale IMS state.
 
 `ProductServer` owns the v2 installer. Its production constructor receives a
 verification-only keyed HMAC-SHA256 authority assembled from

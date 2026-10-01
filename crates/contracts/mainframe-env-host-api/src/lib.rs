@@ -15,6 +15,7 @@ mod clock;
 mod dataset;
 mod enterprise;
 mod ims;
+mod ims_metadata;
 mod ims_pcb;
 mod ims_status;
 mod mq_catalog;
@@ -59,6 +60,13 @@ pub use ims::{
     ImsSsaFieldResolver, ImsSsaLimits, ImsSsaPredicate, ImsSsaProblem, ImsSsaRelation,
     ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
     parse_ims_ssa,
+};
+pub use ims_metadata::{
+    IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,
+    ImsDbLevel, ImsFieldMetadata, ImsLogicalRelationshipMetadata, ImsMetadataCatalog,
+    ImsMetadataIdentity, ImsMetadataLimits, ImsMetadataProblem, ImsPcbMetadata, ImsPsbMetadata,
+    ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
+    ImsTerminalPcbMetadata, validate_ims_metadata,
 };
 pub use ims_pcb::{
     IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,

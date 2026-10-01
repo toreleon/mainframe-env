@@ -286,7 +286,7 @@ pub trait ImsReplayClock: Send + Sync {
 }
 
 pub struct ImsService {
-    store: Arc<dyn ProviderStateStore>,
+    pub(crate) store: Arc<dyn ProviderStateStore>,
     limits: ImsLimits,
     durable: Mutex<DurableState>,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,

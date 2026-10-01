@@ -43,6 +43,12 @@ protected transitions. `ImsMetadataCatalog` and
 contract, described by the Draft 2020-12
 [`metadata schema`](../../../conformance/0.14/schemas/ims-metadata.schema.json).
 
+Package publication retains at most 64 validated metadata generations per
+application in provider-owned versioned rows and atomically advances a separate
+selected-generation row. Repeated publication is idempotent, conflicts fail
+closed, and selecting a retained rollback generation uses the verified package
+identity and catalog.
+
 The `database` module exports the recovered in-memory engine foundation. It
 validates bounded hierarchy, field and index definitions, and owns deterministic
 GU/GN/GNP-style selection, caller-owned position and holds, insert, replace,

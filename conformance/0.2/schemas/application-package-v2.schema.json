@@ -20,6 +20,21 @@
         "sql_rows": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/record"}},
         "ims_definitions": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/ims_definition"}},
         "ims_rows": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/record"}},
+        "ims_metadata": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["schema_version", "databases", "psbs"],
+              "properties": {
+                "schema_version": {"const": "mainframe-env.ims-metadata@1"},
+                "databases": {"type": "array", "minItems": 1, "maxItems": 64},
+                "psbs": {"type": "array", "maxItems": 256}
+              }
+            }
+          ]
+        },
         "mq_resources": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/named"}},
         "batch_controllers": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/controller"}},
         "security_resources": {"type": "array", "maxItems": 16384, "items": {"type": "object", "maxProperties": 3}}

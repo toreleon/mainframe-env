@@ -184,6 +184,7 @@ pub struct ApplicationPublicationReceipt {
     pub identity: String,
     pub controllers: usize,
     pub db2_catalog: bool,
+    pub ims_metadata: bool,
     pub replayed: bool,
 }
 
@@ -213,7 +214,13 @@ struct ApplicationPublicationState {
     action: PublicationAction,
     controllers: PublicationSectionState,
     db2: PublicationSectionState,
+    #[serde(default = "publication_not_applicable")]
+    ims: PublicationSectionState,
     complete: bool,
+}
+
+const fn publication_not_applicable() -> PublicationSectionState {
+    PublicationSectionState::NotApplicable
 }
 
 struct DurableApplicationPublication {
@@ -1292,6 +1299,7 @@ impl ProductServer {
                 identity: expected.identity.clone(),
                 controllers: package.sections.batch_controllers.len(),
                 db2_catalog: db2_applicable,
+                ims_metadata: package.sections.ims_metadata.is_some(),
                 replayed: true,
             });
         }
@@ -1327,6 +1335,18 @@ impl ProductServer {
             self.persist_application_publication(&mut durable)?;
         }
 
+        if durable.state.ims != PublicationSectionState::Applied {
+            durable.state.ims = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self.apply_application_ims_metadata(&selected) {
+                durable.state.ims = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.ims = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
+
         self.commit_application_generation(&package)?;
         durable.state.complete = true;
         self.persist_application_publication(&mut durable)?;
@@ -1336,6 +1356,7 @@ impl ProductServer {
             identity: expected.identity.clone(),
             controllers,
             db2_catalog: db2_applicable,
+            ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
         })
     }
@@ -1402,6 +1423,7 @@ impl ProductServer {
                 identity: expected.identity.clone(),
                 controllers: package.sections.batch_controllers.len(),
                 db2_catalog: db2_applicable,
+                ims_metadata: package.sections.ims_metadata.is_some(),
                 replayed: true,
             });
         }
@@ -1435,6 +1457,17 @@ impl ProductServer {
             durable.state.db2 = PublicationSectionState::Applied;
             self.persist_application_publication(&mut durable)?;
         }
+        if durable.state.ims != PublicationSectionState::Applied {
+            durable.state.ims = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self.apply_application_ims_metadata(&selected) {
+                durable.state.ims = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.ims = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
         self.select_application_generation(&package.base.manifest.name, package.generation)?;
         durable.state.complete = true;
         self.persist_application_publication(&mut durable)?;
@@ -1444,6 +1477,7 @@ impl ProductServer {
             identity: expected.identity.clone(),
             controllers: package.sections.batch_controllers.len(),
             db2_catalog: db2_applicable,
+            ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
         })
     }
@@ -1466,6 +1500,20 @@ impl ProductServer {
             identity: selected.record().identity.clone(),
             controllers,
         })
+    }
+
+    fn apply_application_ims_metadata(
+        &self,
+        selected: &SelectedApplicationGeneration,
+    ) -> Result<(), HostProblem> {
+        let package = selected.package();
+        self.ims.publish_metadata_generation(
+            &package.base.manifest.name,
+            package.generation,
+            &selected.record().identity,
+            package.sections.ims_metadata.as_ref(),
+        )?;
+        Ok(())
     }
 
     fn apply_application_db2_catalog(
@@ -1721,7 +1769,8 @@ impl ProductServer {
                     }
                 }
             } else {
-                self.selected_application_v2(&expected)?;
+                let selected = self.selected_application_v2(&expected)?;
+                self.apply_application_ims_metadata(&selected)?;
             }
         }
         Ok(())
@@ -6177,6 +6226,7 @@ fn rollback_publication_state(
         } else {
             PublicationSectionState::NotApplicable
         },
+        ims: PublicationSectionState::Pending,
         complete: false,
     }
 }
@@ -6198,6 +6248,7 @@ fn install_publication_state(
         } else {
             PublicationSectionState::NotApplicable
         },
+        ims: PublicationSectionState::Pending,
         complete: false,
     }
 }
@@ -6206,6 +6257,8 @@ fn install_publication_state(
 mod tests {
     include!("product/bts_browse.rs");
     use super::*;
+    #[path = "ims_package_tests.rs"]
+    mod ims_package_tests;
     use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
@@ -9897,6 +9950,7 @@ mod tests {
                 sql_rows: Vec::new(),
                 ims_definitions: Vec::new(),
                 ims_rows: Vec::new(),
+                ims_metadata: None,
                 mq_resources: Vec::new(),
                 batch_controllers: vec![BatchController {
                     name: "TRUSTED-CONTROLLER".into(),
@@ -10139,6 +10193,7 @@ mod tests {
                         action: PublicationAction::Install,
                         controllers: PublicationSectionState::Applied,
                         db2: PublicationSectionState::Applying,
+                        ims: PublicationSectionState::NotApplicable,
                         complete: false,
                     })
                     .unwrap(),

@@ -1410,8 +1410,10 @@ dependencies = [
 name = "mainframe-env-host-api"
 version = "0.8.3"
 dependencies = [
+ "jsonschema",
  "mainframe-env-execution-api",
  "serde",
+ "serde_json",
  "sha2 0.10.9",
 ]
 
