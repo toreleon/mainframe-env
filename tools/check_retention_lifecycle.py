@@ -174,12 +174,8 @@ def check_store_contract(root: Path) -> None:
             "pub(crate) fn capacity_health(",
             "RetentionTarget::ALL",
             "pub(crate) fn validate_provider_replacement(",
-            "pub(crate) fn validate_provider_deletion(",
-            "ProviderRetentionDependency::CoreEffect",
-            "ProviderRetentionDependency::CicsNested",
-            "ProviderRetentionDependency::ProviderGraph",
-            "required_executions.len() <= 32",
-            "ProviderRetentionDependency::DirectProduct",
+            "mod provider_deletion;",
+            "pub(crate) use provider_deletion::validate_provider_deletion;",
             "pub(crate) fn target_watermark(",
             "pub(crate) const fn target_window_open(",
             'b"mainframe-env.retention-archive@1\\0"',
@@ -192,6 +188,7 @@ def check_store_contract(root: Path) -> None:
     )
     if "retention-archive-v1" in source:
         raise ValueError("retention regressed to a live provider-state archive singleton")
+    check_provider_deletion(root)
 
     watermark = normalized(rust_block(source, "pub(crate) fn target_watermark"))
     for fragment in (
@@ -227,6 +224,22 @@ def check_store_contract(root: Path) -> None:
     )
     if "SystemTime" in observation or "UNIX_EPOCH" in observation:
         raise ValueError("retention observations regressed to process wall-clock time")
+
+
+def check_provider_deletion(root: Path) -> None:
+    require(
+        root / "crates/stores/mainframe-env-store/src/retention/provider_deletion.rs",
+        (
+            "pub(crate) fn validate_provider_deletion(",
+            "ProviderRetentionDependency::CoreEffect",
+            "ProviderRetentionDependency::CicsNested",
+            "ProviderRetentionDependency::ProviderGraph",
+            "required_executions.len() > 32",
+            "required_executions.len() <= 32",
+            "ProviderRetentionDependency::DirectProduct",
+        ),
+        production=True,
+    )
 
 
 def check_dedicated_authorities(root: Path) -> None:

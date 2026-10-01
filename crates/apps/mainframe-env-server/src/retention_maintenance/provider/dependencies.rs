@@ -646,6 +646,9 @@ impl RetentionPlanner {
                         owner.as_ref().map(ExecutionId::as_str),
                         &mut unowned,
                     );
+                    if let Some(task_owner) = &descriptor.task_owner_execution {
+                        Self::add_owner(&mut executions, Some(task_owner), &mut unowned);
+                    }
                     if let Some(run) = descriptor.owner_run_unit.clone().or_else(|| {
                         legacy_effect
                             .as_ref()

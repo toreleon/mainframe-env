@@ -107,10 +107,18 @@ The provider families have these codec-owned boundaries:
   exact nested outer-effect key, and request/result/binding digests. `MEDR1`
   and transitional `MEDR2` rows are protected unless an owning validator can
   attest them without redispatch.
-- CICS outer replay uses `MECER003`; CICS UOW uses exactly the supported
-  pending/terminal `MECU2` versions; undo rows are fully decoded. Legacy
+- CICS outer replay uses `MECER003`; CICS UOW uses the supported
+  pending/terminal `MECU2` and logical-frame `MECU3` versions; undo rows are fully decoded. Legacy
   `MECER001`/`MECER002` and `MECU1`, an unobserved terminal row, a pending UOW,
   or any live undo authority stay protected.
+  `MECU3` preserves the actual SYNCPOINT effect execution and adds one bounded,
+  distinct root task execution on the same run. BTS settlement uses the root;
+  core effect provenance uses the actor. Both executions remain core-retention
+  dependencies. Root writes retain byte-compatible `MECU2`, and reads do not
+  rewrite earlier generations. Partial, equal-owner, trailing or mislabeled V3
+  metadata fails closed. Older readers reject V3: downgrade requires drained
+  writers and a verified pre-V3 backup, or a retained compatible reader. Never
+  strip the task owner to pretend a V3 row is V2.
 - Installed COBOL validates `cobol-call-replay@1`,
   `cobol-call-protocol@2`, `cobol-run-state@1`, `cobol-cancel@1`, and every
   bounded `cobol-instance@1:` namespace. Its descriptor enumerates both owner
@@ -148,6 +156,11 @@ the store to recheck atomically:
   canonical Completed outer `host.cics.execute` effect, and absence fences for
   same-key core-effect and UOW undo recovery. Its safe age is the
   maximum of child resolution, UOW finalization, and outer-effect resolution.
+  Its bounded `required_executions` list (at most 32) includes any distinct root
+  task owner supplied by V3 provenance. Planning and all backend archive
+  transactions require each additional execution to be terminal on the exact
+  same run, with no checkpoint or intent/unknown effect. A planner observation
+  alone cannot authorize archival after a root recovery dependency appears.
 - `ProviderGraph` supplies bounded exact provider rows and additional terminal
   execution owners which must outlive an owned row, including the complete
   installed-COBOL parent/child lifecycle graph.

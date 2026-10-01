@@ -6892,7 +6892,10 @@ mod tests {
 
     #[test]
     fn compiled_installed_local_link_recovers_after_sqlite_restart() {
-        compiled_installed_program_commarea_recovers_after_restart(None, false, false);
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::Link,
+        );
     }
 
     #[test]
@@ -6900,14 +6903,16 @@ mod tests {
     fn postgres_compiled_installed_local_link_recovers_after_restart() {
         compiled_installed_program_commarea_recovers_after_restart(
             Some(required_postgres_route_url()),
-            false,
-            false,
+            ProgramCommareaRoute::Link,
         );
     }
 
     #[test]
     fn compiled_invoke_application_commarea_recovers_after_sqlite_restart() {
-        compiled_installed_program_commarea_recovers_after_restart(None, true, false);
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::Application,
+        );
     }
 
     #[test]
@@ -6915,14 +6920,16 @@ mod tests {
     fn postgres_compiled_invoke_application_commarea_recovers_after_restart() {
         compiled_installed_program_commarea_recovers_after_restart(
             Some(required_postgres_route_url()),
-            true,
-            false,
+            ProgramCommareaRoute::Application,
         );
     }
 
     #[test]
     fn compiled_local_link_coordinator_replay_recovers_after_sqlite_restart() {
-        compiled_installed_program_commarea_recovers_after_restart(None, false, true);
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::CoordinatorReplay,
+        );
     }
 
     #[test]
@@ -6930,20 +6937,183 @@ mod tests {
     fn postgres_compiled_local_link_coordinator_replay_recovers_after_restart() {
         compiled_installed_program_commarea_recovers_after_restart(
             Some(required_postgres_route_url()),
-            false,
-            true,
+            ProgramCommareaRoute::CoordinatorReplay,
         );
+    }
+
+    #[test]
+    fn compiled_local_link_handle_frames_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::LinkedFrames,
+        );
+    }
+
+    #[test]
+    fn compiled_invoke_application_handle_frames_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::ApplicationFrames,
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_invoke_application_handle_frames_recovers_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            ProgramCommareaRoute::ApplicationFrames,
+        );
+    }
+
+    #[test]
+    fn compiled_local_link_return_frame_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::LinkedReturnFrames,
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_local_link_handle_frames_recovers_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            ProgramCommareaRoute::LinkedFrames,
+        );
+    }
+
+    #[test]
+    fn compiled_local_link_file_frame_commit_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::LinkedFileCommit,
+        );
+    }
+
+    #[test]
+    fn compiled_local_link_file_frame_rollback_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::LinkedFileRollback,
+        );
+    }
+
+    #[test]
+    fn compiled_local_link_child_syncpoint_binds_effect_owner_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::LinkedChildSyncpoint,
+        );
+    }
+
+    #[test]
+    fn compiled_local_link_child_rollback_binds_effect_owner_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            None,
+            ProgramCommareaRoute::LinkedChildRollback,
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_local_link_child_syncpoint_binds_effect_owner_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            ProgramCommareaRoute::LinkedChildSyncpoint,
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_local_link_child_rollback_binds_effect_owner_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            ProgramCommareaRoute::LinkedChildRollback,
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_local_link_file_frame_commit_recovers_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            ProgramCommareaRoute::LinkedFileCommit,
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_local_link_file_frame_rollback_recovers_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            ProgramCommareaRoute::LinkedFileRollback,
+        );
+    }
+
+    #[derive(Clone, Copy)]
+    enum ProgramCommareaRoute {
+        Link,
+        Application,
+        ApplicationFrames,
+        CoordinatorReplay,
+        LinkedFrames,
+        LinkedReturnFrames,
+        LinkedFileCommit,
+        LinkedFileRollback,
+        LinkedChildSyncpoint,
+        LinkedChildRollback,
     }
 
     fn compiled_installed_program_commarea_recovers_after_restart(
         postgres_url: Option<String>,
-        application: bool,
-        coordinator_replay: bool,
+        route: ProgramCommareaRoute,
     ) {
         use mainframe_env_cics::{
             CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition,
         };
         use mainframe_env_execution_api::{MachineDrive, MachineResume, Quantum};
+        let application = matches!(
+            route,
+            ProgramCommareaRoute::Application | ProgramCommareaRoute::ApplicationFrames
+        );
+        let coordinator_replay = matches!(
+            route,
+            ProgramCommareaRoute::CoordinatorReplay
+                | ProgramCommareaRoute::ApplicationFrames
+                | ProgramCommareaRoute::LinkedFrames
+                | ProgramCommareaRoute::LinkedReturnFrames
+                | ProgramCommareaRoute::LinkedFileCommit
+                | ProgramCommareaRoute::LinkedFileRollback
+                | ProgramCommareaRoute::LinkedChildSyncpoint
+                | ProgramCommareaRoute::LinkedChildRollback
+        );
+        let linked_frames = matches!(
+            route,
+            ProgramCommareaRoute::LinkedFrames
+                | ProgramCommareaRoute::ApplicationFrames
+                | ProgramCommareaRoute::LinkedReturnFrames
+                | ProgramCommareaRoute::LinkedFileCommit
+                | ProgramCommareaRoute::LinkedFileRollback
+                | ProgramCommareaRoute::LinkedChildSyncpoint
+                | ProgramCommareaRoute::LinkedChildRollback
+        );
+        let file_frames = matches!(
+            route,
+            ProgramCommareaRoute::LinkedFileCommit
+                | ProgramCommareaRoute::LinkedFileRollback
+                | ProgramCommareaRoute::LinkedChildSyncpoint
+                | ProgramCommareaRoute::LinkedChildRollback
+        );
+        let child_syncpoint = matches!(
+            route,
+            ProgramCommareaRoute::LinkedChildSyncpoint | ProgramCommareaRoute::LinkedChildRollback
+        );
+        let expected_area: &[u8] = if linked_frames {
+            b"\0\x04\0\x10zzzz"
+        } else {
+            b"\0\x04OKzzzz"
+        };
         let operation = if application {
             CicsOperation::InvokeApplication
         } else {
@@ -6954,22 +7124,88 @@ mod tests {
         } else {
             "EXEC CICS LINK PROGRAM('LNKCHLD') COMMAREA(AREA-X) LENGTH(4) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. "
         };
+        let before_link = if linked_frames {
+            "EXEC CICS PUSH HANDLE END-EXEC."
+        } else {
+            ""
+        };
+        let after_link = if matches!(route, ProgramCommareaRoute::LinkedFileCommit) {
+            "EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(7) RESP(FILE-RESP) END-EXEC. \
+             EXEC CICS SYNCPOINT RESP(UOW-RESP) END-EXEC. \
+             EXEC CICS POP HANDLE RESP(PARENT-POP) END-EXEC."
+        } else if matches!(route, ProgramCommareaRoute::LinkedFileRollback) {
+            "EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(7) RESP(FILE-RESP) END-EXEC. \
+             EXEC CICS SYNCPOINT ROLLBACK RESP(UOW-RESP) END-EXEC. \
+             EXEC CICS POP HANDLE RESP(PARENT-POP) END-EXEC."
+        } else if linked_frames {
+            "EXEC CICS POP HANDLE RESP(PARENT-POP) END-EXEC."
+        } else {
+            ""
+        };
         let source = format!(
             "IDENTIFICATION DIVISION. PROGRAM-ID. LNKMAIN. DATA DIVISION. WORKING-STORAGE SECTION. \
              01 AREA-X PIC X(8) VALUE 'AAAAzzzz'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. \
-             01 FN-X PIC X(2). PROCEDURE DIVISION. {command} \
-             MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN."
+             01 FN-X PIC X(2). 01 PARENT-POP PIC S9(9) COMP VALUE -1. \
+             01 RECORD-X PIC X(7) VALUE '003EDIT'. 01 FILE-RESP PIC S9(9) COMP VALUE -1. \
+             01 UOW-RESP PIC S9(9) COMP VALUE -1. \
+             PROCEDURE DIVISION. {before_link} {command} \
+             MOVE EIBFN TO FN-X. {after_link} EXEC CICS SUSPEND END-EXEC. STOP RUN."
         );
         let parent = published_source_fixture("LNKMAIN", &source);
-        let child = published_source_fixture(
-            "LNKCHLD",
+        let child_source = if linked_frames {
+            format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LNKCHLD. DATA DIVISION. \
+                 WORKING-STORAGE SECTION. 01 CHILD-POP PIC S9(9) COMP. \
+                 01 CHILD-LEVEL PIC S9(4) COMP. 01 ASSIGN-RESP PIC S9(9) COMP. \
+                 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(7). \
+                 01 READ-RESP PIC S9(9) COMP. \
+                 01 CALLER-NAME PIC X(8). 01 RETURN-NAME PIC X(8). LINKAGE SECTION. \
+                 01 DFHCOMMAREA. 05 CHILD-LEN PIC S9(4) COMP. 05 CHILD-EMPTY PIC S9(4) COMP. \
+                 05 CHILD-TAIL PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. \
+                 EXEC CICS POP HANDLE RESP(CHILD-POP) END-EXEC. \
+                 EXEC CICS ASSIGN LINKLEVEL(CHILD-LEVEL) INVOKINGPROG(CALLER-NAME) \
+                 RETURNPROG(RETURN-NAME) RESP(ASSIGN-RESP) END-EXEC. \
+                 IF CHILD-LEVEL NOT = 2 OR ASSIGN-RESP NOT = 0 OR \
+                 CALLER-NAME NOT = 'LNKMAIN ' OR RETURN-NAME NOT = 'LNKMAIN ' \
+                 MOVE 99 TO CHILD-POP END-IF. \
+                 {} MOVE EIBCALEN TO CHILD-LEN. MOVE CHILD-POP TO CHILD-EMPTY. {}",
+                if matches!(route, ProgramCommareaRoute::LinkedChildRollback) {
+                    "EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) UPDATE \
+                     RESP(READ-RESP) END-EXEC. IF READ-RESP NOT = 0 MOVE 98 TO CHILD-POP END-IF. \
+                     MOVE '003EDIT' TO RECORD-X. \
+                     EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(7) \
+                     RESP(READ-RESP) END-EXEC. IF READ-RESP NOT = 0 MOVE 97 TO CHILD-POP END-IF. \
+                     EXEC CICS SYNCPOINT ROLLBACK RESP(READ-RESP) END-EXEC. \
+                     IF READ-RESP NOT = 0 MOVE 96 TO CHILD-POP END-IF."
+                } else if child_syncpoint {
+                    "EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) UPDATE \
+                     RESP(READ-RESP) END-EXEC. IF READ-RESP NOT = 0 MOVE 98 TO CHILD-POP END-IF. \
+                     MOVE '003EDIT' TO RECORD-X. \
+                     EXEC CICS REWRITE FILE('ACCTDAT') FROM(RECORD-X) LENGTH(7) \
+                     RESP(READ-RESP) END-EXEC. IF READ-RESP NOT = 0 MOVE 97 TO CHILD-POP END-IF. \
+                     EXEC CICS SYNCPOINT RESP(READ-RESP) END-EXEC. \
+                     IF READ-RESP NOT = 0 MOVE 96 TO CHILD-POP END-IF."
+                } else if file_frames {
+                    "EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) UPDATE \
+                     RESP(READ-RESP) END-EXEC. IF READ-RESP NOT = 0 MOVE 98 TO CHILD-POP END-IF."
+                } else {
+                    ""
+                },
+                if matches!(route, ProgramCommareaRoute::LinkedReturnFrames) || file_frames {
+                    "EXEC CICS RETURN END-EXEC."
+                } else {
+                    "GOBACK."
+                }
+            )
+        } else {
             concat!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. LNKCHLD. DATA DIVISION. LINKAGE SECTION. ",
                 "01 DFHCOMMAREA. 05 CHILD-LEN PIC S9(4) COMP. 05 CHILD-TEXT PIC X(2). ",
                 "05 CHILD-TAIL PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. ",
                 "MOVE EIBCALEN TO CHILD-LEN. MOVE 'OK' TO CHILD-TEXT. MOVE 'NOPE' TO CHILD-TAIL. GOBACK."
-            ),
-        );
+            ).into()
+        };
+        let child = published_source_fixture("LNKCHLD", &child_source);
         let reference = |artifact: &PublishedArtifact| {
             ArtifactRef::new(
                 artifact.content_id().to_reference(),
@@ -7007,6 +7243,39 @@ mod tests {
         {
             let (server, store) = backend.open_server(settings.clone(), secrets.clone());
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            if file_frames {
+                let authentication = || Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                };
+                server
+                    .handle(
+                        authentication(),
+                        GatewayRequest::DatasetCreate {
+                            dataset: "IBMUSER.ACCTDAT".into(),
+                            attributes: json!({"dsorg":"KSDS", "recfm":"V", "lrecl":16,
+                        "key_offset":0, "key_length":3}),
+                        },
+                    )
+                    .unwrap();
+                server
+                    .handle(
+                        authentication(),
+                        GatewayRequest::DatasetWrite {
+                            dataset: "IBMUSER.ACCTDAT".into(),
+                            member: None,
+                            bytes: b"003DATA".to_vec(),
+                        },
+                    )
+                    .unwrap();
+                server
+                    .cics
+                    .register_file_aliases(&BTreeMap::from([(
+                        "ACCTDAT".into(),
+                        DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+                    )]))
+                    .unwrap();
+            }
             server
                 .racf
                 .define_profile("FACILITY", "CICS.PROGRAM.LNKCHLD", "IBMUSER", None)
@@ -7070,9 +7339,23 @@ mod tests {
                     }])
                     .unwrap();
             }
-            invocation = server
+            let mut launch = server
                 .cics_invocation("IBMUSER", "LK01", Some(parent_ref.clone()))
                 .unwrap();
+            if linked_frames {
+                launch.selector =
+                    Selector::new("program:LNKMAIN", InvocationLimits::default()).unwrap();
+                launch.bindings.insert(
+                    "cics.session".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.session@1",
+                        session.as_str().as_bytes().to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                );
+            }
+            invocation = launch;
             server
                 .cics
                 .launch_terminal(
@@ -7115,32 +7398,99 @@ mod tests {
                     }),
                     ExecutionOutcome::Suspended(_)
                 ));
-                assert_eq!(fresh.variable("AREA-X").unwrap().bytes(), b"\0\x04OKzzzz");
+                assert_eq!(fresh.variable("AREA-X").unwrap().bytes(), expected_area);
+                if file_frames && !child_syncpoint {
+                    for name in ["FILE-RESP", "UOW-RESP"] {
+                        assert_eq!(
+                            fresh.variable(name).unwrap().bytes(),
+                            &0_i32.to_be_bytes(),
+                            "{name}"
+                        );
+                    }
+                    assert_linked_frame_record(&server, route);
+                }
+                if child_syncpoint {
+                    assert_linked_frame_record(&server, route);
+                    let rows = store.list_provider_state("cics-uow", 8).unwrap();
+                    assert_eq!(rows.len(), 1);
+                    let descriptor =
+                        mainframe_env_cics::describe_cics_uow_row(&rows[0], None).unwrap();
+                    let key =
+                        IdempotencyKey::new(&rows[0].key, InvocationLimits::default()).unwrap();
+                    let effect = store.effect(&key).unwrap().unwrap();
+                    assert_ne!(
+                        effect.execution_id, replay.execution_id,
+                        "SYNCPOINT must belong to the selected child frame"
+                    );
+                    assert_eq!(
+                        descriptor.owner_execution.as_deref(),
+                        Some(effect.execution_id.as_str()),
+                        "UOW provenance must bind the actual SYNCPOINT effect actor"
+                    );
+                    assert_eq!(
+                        descriptor.task_owner_execution.as_deref(),
+                        Some(replay.execution_id.as_str()),
+                        "the root task/BTS owner must remain stable"
+                    );
+                }
+                if linked_frames {
+                    assert_eq!(
+                        fresh.variable("PARENT-POP").unwrap().bytes(),
+                        &0_i32.to_be_bytes(),
+                        "the caller's PUSH must survive the child POP"
+                    );
+                    assert_eq!(
+                        store.list_provider_state("cics-session", 8).unwrap().len(),
+                        1
+                    );
+                }
                 let mut probe = ReferenceMachine::from_binary(
                     parent.payload(),
                     replay.clone(),
                     CodecLimits::default(),
                 )
                 .unwrap();
-                let MachineDrive::HostCall(first_effect) = probe.drive(
+                let MachineDrive::HostCall(mut first_effect) = probe.drive(
                     MachineResume::Start,
                     Quantum::new(10_000, 16 * 1024 * 1024).unwrap(),
                 ) else {
                     panic!("expected compiled LINK")
                 };
+                if linked_frames {
+                    let HostRequest::Cics(request) = &first_effect.request else {
+                        panic!("expected compiled PUSH HANDLE")
+                    };
+                    assert_eq!(request.operation, CicsOperation::PushHandle);
+                    let response = server.cics.invoke(&first_effect, request.clone()).unwrap();
+                    let MachineDrive::HostCall(link_effect) = probe.drive(
+                        MachineResume::HostResult(mainframe_env_host_api::EffectResult {
+                            sequence: first_effect.sequence,
+                            outcome: Ok(HostResult::Cics(response)),
+                        }),
+                        Quantum::new(10_000, 16 * 1024 * 1024).unwrap(),
+                    ) else {
+                        panic!("expected compiled LINK after PUSH HANDLE")
+                    };
+                    first_effect = link_effect;
+                }
                 let key = first_effect.idempotency_key.as_ref().unwrap();
                 assert_eq!(probe.variable("AREA-X").unwrap().bytes(), b"AAAAzzzz");
                 let core_before = store.effect(key).unwrap().unwrap();
                 assert_eq!(core_before.state, EffectState::Completed);
                 let private_before = store
-                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .list_provider_state("cics-effect-replay-v1", 32)
                     .unwrap();
                 let calls_before = store.list_provider_state("cobol-call-replay@1", 8).unwrap();
+                let uow_before = store.list_provider_state("cics-uow", 8).unwrap();
                 assert_eq!(calls_before.len(), 1);
                 drop(coordinator);
                 drop(server);
                 drop(store);
                 let (server, store) = backend.open_server(settings.clone(), secrets.clone());
+                assert_eq!(
+                    store.list_provider_state("cics-uow", 8).unwrap(),
+                    uow_before
+                );
                 server
                     .cics
                     .restore_terminal_run(replay.clone(), &session, "LK01", Vec::new(), 3)
@@ -7162,15 +7512,39 @@ mod tests {
                     }),
                     ExecutionOutcome::Suspended(_)
                 ));
+                assert_eq!(recovered.variable("AREA-X").unwrap().bytes(), expected_area);
+                if file_frames && !child_syncpoint {
+                    for name in ["FILE-RESP", "UOW-RESP"] {
+                        assert_eq!(
+                            recovered.variable(name).unwrap().bytes(),
+                            &0_i32.to_be_bytes(),
+                            "{name}"
+                        );
+                    }
+                    assert_linked_frame_record(&server, route);
+                }
+                if linked_frames {
+                    assert_eq!(
+                        recovered.variable("PARENT-POP").unwrap().bytes(),
+                        &0_i32.to_be_bytes()
+                    );
+                }
                 assert_eq!(
-                    recovered.variable("AREA-X").unwrap().bytes(),
-                    b"\0\x04OKzzzz"
+                    recovered.variable("FN-X").unwrap().bytes(),
+                    if application {
+                        &[0x0e, 0x10]
+                    } else {
+                        &[0x0e, 0x02]
+                    }
                 );
-                assert_eq!(recovered.variable("FN-X").unwrap().bytes(), &[0x0e, 0x02]);
                 assert_eq!(store.effect(key).unwrap(), Some(core_before));
                 assert_eq!(
+                    store.list_provider_state("cics-uow", 8).unwrap(),
+                    uow_before
+                );
+                assert_eq!(
                     store
-                        .list_provider_state("cics-effect-replay-v1", 8)
+                        .list_provider_state("cics-effect-replay-v1", 32)
                         .unwrap(),
                     private_before
                 );
@@ -7185,7 +7559,8 @@ mod tests {
                         .iter()
                         .filter(|event| matches!(
                             event.kind,
-                            LifecycleEventKind::EffectResult { sequence: 1 }
+                            LifecycleEventKind::EffectResult { sequence }
+                                if sequence == first_effect.sequence
                         ))
                         .count()
                         >= 2
@@ -7276,7 +7651,7 @@ mod tests {
                 ReferenceMachine::from_binary(parent.payload(), invocation, CodecLimits::default())
                     .unwrap();
             machine.restore_checkpoint(&saved.checkpoint).unwrap();
-            assert_eq!(machine.variable("AREA-X").unwrap().bytes(), b"\0\x04OKzzzz");
+            assert_eq!(machine.variable("AREA-X").unwrap().bytes(), expected_area);
             assert_eq!(
                 machine.variable("RESP-X").unwrap().bytes(),
                 &0_i32.to_be_bytes()
@@ -7308,7 +7683,7 @@ mod tests {
                 .invoke(&original_effect, request.clone())
                 .unwrap();
             assert_eq!((replayed.response, replayed.response2), (0, 0));
-            assert_eq!(replayed.outputs["COMMAREA"].bytes(), b"\0\x04OK");
+            assert_eq!(replayed.outputs["COMMAREA"].bytes(), &expected_area[..4]);
             assert_eq!(
                 store
                     .list_provider_state("cics-effect-replay-v1", 8)
@@ -7348,6 +7723,31 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn assert_linked_frame_record(server: &ProductServer, route: ProgramCommareaRoute) {
+        let DatasetResult::Records { records, .. } = server
+            .dataset
+            .invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+                member: None,
+                key: Some(b"003".to_vec()),
+                max_records: 1,
+                control: Default::default(),
+            })
+            .unwrap()
+        else {
+            panic!("expected shared frame record")
+        };
+        let expected = if matches!(
+            route,
+            ProgramCommareaRoute::LinkedFileRollback | ProgramCommareaRoute::LinkedChildRollback
+        ) {
+            b"003DATA"
+        } else {
+            b"003EDIT"
+        };
+        assert_eq!(records, [expected.to_vec()]);
     }
 
     #[derive(Clone)]

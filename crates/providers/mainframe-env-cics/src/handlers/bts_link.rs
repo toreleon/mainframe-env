@@ -154,7 +154,12 @@ fn push_frame(
         return Err(HostProblem::ResourceExhausted);
     }
     stack.push(LinkFrame {
-        owner_execution: run.invocation.execution_id.as_str().into(),
+        owner_execution: run
+            .current_program
+            .effect_invocation
+            .execution_id
+            .as_str()
+            .into(),
         owner_principal: run.invocation.principal.id().as_str().into(),
         process_type: target.process_type.clone(),
         process_name: target.process_name.clone(),
@@ -185,7 +190,7 @@ fn pop_frame(service: &CicsService, run: &Run, target: &Target) -> Result<(), Ho
     let Some(last) = stack.last() else {
         return Ok(());
     };
-    if last.owner_execution != run.invocation.execution_id.as_str()
+    if last.owner_execution != run.current_program.effect_invocation.execution_id.as_str()
         || last.owner_principal != run.invocation.principal.id().as_str()
         || last.activity_id != target.activity_id
     {
@@ -220,7 +225,12 @@ pub(super) fn nested_activity_scope(
     service: &CicsService,
     run: &Run,
 ) -> Result<Option<String>, HostProblem> {
-    let Some(parent) = run.invocation.parent_execution_id.as_ref() else {
+    let Some(parent) = run
+        .current_program
+        .effect_invocation
+        .parent_execution_id
+        .as_ref()
+    else {
         return Ok(None);
     };
     let (stack, _) = frames(service, run.invocation.run_unit_id.as_str())?;

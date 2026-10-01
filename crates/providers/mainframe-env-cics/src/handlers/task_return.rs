@@ -12,6 +12,14 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
     validate_context(run)?;
+    let lower_level = run.current_program.logical_level > 1;
+    if lower_level && request.arguments.contains_key("COMMAREA") {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 2,
+        });
+    }
     let mut state = service.lock()?;
     let next_transaction =
         argument_optional(request, "TRANSID").map(|value| value.trim().to_ascii_uppercase());
@@ -74,7 +82,8 @@ pub(in crate::service) fn invoke(
                 .map_err(mutation_problem)?;
             state.continuations.insert(run.session.clone(), next);
         }
-    } else if let Some(current) = state.continuations.get(&run.session).cloned()
+    } else if !lower_level
+        && let Some(current) = state.continuations.get(&run.session).cloned()
         && current.claimed_by.as_deref() == Some(run.invocation.run_unit_id.as_str())
     {
         service
@@ -85,12 +94,14 @@ pub(in crate::service) fn invoke(
         state.continuations.remove(&run.session);
     }
     drop(state);
-    super::interval_control::finish_protected_starts(
-        service,
-        run,
-        CicsUnitOfWorkOutcome::Committed,
-    )?;
-    super::release_task_state(service, run)?;
+    if !lower_level {
+        super::interval_control::finish_protected_starts(
+            service,
+            run,
+            CicsUnitOfWorkOutcome::Committed,
+        )?;
+        super::release_task_state(service, run)?;
+    }
     service.response(
         run,
         CicsDisposition::Returned,

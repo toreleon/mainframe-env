@@ -335,6 +335,14 @@ impl RetentionPlanner {
         Ok(Some((
             ProviderRetentionDependency::CicsNested {
                 provenance,
+                required_executions: descriptor
+                    .task_owner_execution
+                    .as_deref()
+                    .map(|owner| ExecutionId::new(owner, InvocationLimits::default()))
+                    .transpose()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?
+                    .into_iter()
+                    .collect(),
                 absent: vec![
                     ProviderStateIdentity {
                         namespace: "cics-uow-undo".into(),
@@ -408,6 +416,26 @@ impl RetentionPlanner {
         let Some(owner) = owner else {
             return Ok(None);
         };
+        let task_owner = descriptor
+            .task_owner_execution
+            .as_deref()
+            .map(|owner| ExecutionId::new(owner, InvocationLimits::default()))
+            .transpose()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if let Some(task_owner) = &task_owner {
+            let Some(task) = self
+                .store
+                .get_execution(task_owner)
+                .map_err(store_problem)?
+            else {
+                return Ok(None);
+            };
+            if !task.state.terminal()
+                || descriptor.owner_run_unit.as_deref() != Some(task.run_unit_id.as_str())
+            {
+                return Ok(None);
+            }
+        }
         let Some(effect) = self.terminal_cics_effect(&row.key, Some(&owner))? else {
             return Ok(None);
         };
@@ -466,7 +494,7 @@ impl RetentionPlanner {
             observation,
             dependency: ProviderRetentionDependency::ProviderGraph {
                 required_rows: Vec::new(),
-                required_executions: Vec::new(),
+                required_executions: task_owner.into_iter().collect(),
             },
         }))
     }

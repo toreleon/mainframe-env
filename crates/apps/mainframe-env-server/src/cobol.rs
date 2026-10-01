@@ -331,6 +331,7 @@ impl CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
+        invocation.cancellation_probe = parent.cancellation_probe.clone();
         let mut machine = ReferenceMachine::from_binary(
             executable.payload(),
             invocation.clone(),

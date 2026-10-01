@@ -77,9 +77,17 @@ impl CicsService {
         clear_handle_state: bool,
     ) -> Result<Vec<CicsTraceEntry>, HostProblem> {
         let current = self.public_session(session, principal, None, now_tick)?;
+        let _cleanup = handlers::SessionCleanupLease::acquire(self, session.as_str())?;
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut state = self.lock()?;
+        if state
+            .sessions
+            .get(session.as_str())
+            .is_none_or(|value| value.version != current.version)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         let trace = match state.runs.get(&run_id) {
             Some(run)
                 if run.session == session.as_str()
@@ -141,14 +149,24 @@ impl CicsService {
         outcome: Option<CicsUnitOfWorkOutcome>,
     ) -> Result<(), HostProblem> {
         let current = self.public_session(session, principal, None, now_tick)?;
+        let _cleanup = handlers::SessionCleanupLease::acquire(self, session.as_str())?;
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let run = self
-            .lock()?
-            .runs
-            .get(&run_id)
-            .cloned()
-            .ok_or(HostProblem::NotFound)?;
+        let run = {
+            let state = self.lock()?;
+            if state
+                .sessions
+                .get(session.as_str())
+                .is_none_or(|value| value.version != current.version)
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            state
+                .runs
+                .get(&run_id)
+                .cloned()
+                .ok_or(HostProblem::NotFound)?
+        };
         if run.session != session.as_str() || run.invocation.principal.id() != principal {
             return Err(HostProblem::Unauthorized);
         }

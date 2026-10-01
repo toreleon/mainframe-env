@@ -61,6 +61,10 @@ pub(in crate::service) fn new_run_with_state(
 ) -> Run {
     let current_channel = super::task_context::current_channel(&invocation);
     let current_program = super::CurrentProgramFrame {
+        effect_invocation: invocation.clone(),
+        logical_level: 1,
+        invoking_program: None,
+        return_program: None,
         current: super::task_context::current_program(&invocation),
         channel: current_channel,
         parent_execution_id: invocation.parent_execution_id.clone(),

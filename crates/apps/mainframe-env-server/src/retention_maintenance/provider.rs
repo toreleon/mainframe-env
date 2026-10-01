@@ -768,8 +768,7 @@ impl RetentionPlanner {
             ProviderRetentionDependency::None | ProviderRetentionDependency::DirectProduct => {
                 Ok(true)
             }
-            ProviderRetentionDependency::CoreEffect { .. }
-            | ProviderRetentionDependency::CicsNested { .. } => {
+            ProviderRetentionDependency::CoreEffect { .. } => {
                 let (Some(owner), Some(run)) = (
                     candidate.owner_execution.as_ref(),
                     candidate.owner_run_unit.as_ref(),
@@ -777,6 +776,23 @@ impl RetentionPlanner {
                     return Ok(false);
                 };
                 self.provider_execution_is_clear(owner, Some(run), safety)
+            }
+            ProviderRetentionDependency::CicsNested {
+                required_executions,
+                ..
+            } => {
+                let (Some(owner), Some(run)) = (
+                    candidate.owner_execution.as_ref(),
+                    candidate.owner_run_unit.as_ref(),
+                ) else {
+                    return Ok(false);
+                };
+                for required in std::iter::once(owner).chain(required_executions) {
+                    if !self.provider_execution_is_clear(required, Some(run), safety)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
             }
             ProviderRetentionDependency::ProviderGraph {
                 required_executions,

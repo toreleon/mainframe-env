@@ -60,6 +60,7 @@
     "docs/decisions/0024-per-assertion-oracle-provenance.md",
     "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
+    "docs/decisions/0027-cics-logical-program-frames.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -127,6 +128,7 @@
         {"label": "ADR-0024: Per-assertion oracle provenance", "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"},
         {"label": "ADR-0025: Licence and provenance policy for IBM oracle evidence", "path": "docs/decisions/0025-licence-and-provenance-policy.md"},
         {"label": "ADR-0026: CardDemo run bundle", "path": "docs/decisions/0026-run-bundle.md"},
+        {"label": "ADR-0027: CICS task ownership across logical program frames", "path": "docs/decisions/0027-cics-logical-program-frames.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

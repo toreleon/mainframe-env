@@ -906,6 +906,8 @@ pub enum ProviderRetentionDependency {
         provenance: ProviderStateRecord,
         /// Recovery rows that must remain absent (undo/continuation authorities).
         absent: Vec<ProviderStateIdentity>,
+        /// Additional task executions in the same run, with terminal/checkpoint/recovery fences.
+        required_executions: Vec<ExecutionId>,
     },
     /// A terminal execution plus exact provider rows that must outlive this row.
     ProviderGraph {

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 221,
+    "markdown_documents": 222,
     "navigation_groups": 5,
-    "normative_documents": 57,
+    "normative_documents": 58,
     "xtask_commands": 208
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 95,
-      "sha256": "sha256:84656413b6d4fc01b4c90722eafc7246d82341ed3bb456303158d5509d20c3f1",
+      "relative_links": 96,
+      "sha256": "sha256:7b2eff2df6159dd42345f00ae5834ed931f8ca65837c4ef53c57375f904a751e",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -621,7 +621,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:201cf7656f941ead6975c21971513049cfceda1e549ab9da8853a2e6eaf80608",
+      "sha256": "sha256:e92d12f1b0f73ab35e4d9663c5397fd15befda95c409b7b2fbcf9ea681619f98",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -951,10 +951,22 @@
       "xtask_commands": 1
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and selected execution maintainers",
+      "path": "docs/decisions/0027-cics-logical-program-frames.md",
+      "relative_links": 0,
+      "scope": "local LINK and INVOKE APPLICATION on an existing task",
+      "sha256": "sha256:a4994be42a7e79fa10420ced44830b5b3817c80071b768ee3dbc2627a9f2b1df",
+      "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
+      "title": "ADR-0027: CICS task ownership across logical program frames",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 26,
-      "sha256": "sha256:7814b7dc1e8622f600c88a43c8b3ebb3c44bdb94be49c4528b801078005e28b5",
+      "relative_links": 27,
+      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1390,7 +1402,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:e0ca31e0ebac822108d50ed9b50ce13b0b1a327b5fbde24779ae227426280e49",
+      "sha256": "sha256:6526a5f680fc097bd99a726c7574adb80d41bcd2bf1df363ceca2dd48d03fdc9",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },
@@ -2220,6 +2232,10 @@
           "path": "docs/decisions/0026-run-bundle.md"
         },
         {
+          "label": "ADR-0027: CICS task ownership across logical program frames",
+          "path": "docs/decisions/0027-cics-logical-program-frames.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2395,7 +2411,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:1bc898d0d807e0b4d782e834f7e290811797f0db4623f2b6d05cca3a7dc9cad1",
+  "registry_sha256": "sha256:0893d4e764711670f73b1121d1379876101de1b2869a877c985ef129e351dd09",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

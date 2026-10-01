@@ -1,5 +1,5 @@
 use super::super::{CicsService, Run, Session, bounded, decimal_payload};
-use mainframe_env_execution_api::{ExecutionId, Invocation, RunUnitId};
+use mainframe_env_execution_api::{ExecutionId, Invocation};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -54,6 +54,10 @@ pub(in crate::service) fn allocate_terminal_input(
 
 #[derive(Clone)]
 pub(in crate::service) struct CurrentProgramFrame {
+    pub(in crate::service) effect_invocation: Invocation,
+    pub(in crate::service) logical_level: u32,
+    pub(in crate::service) invoking_program: Option<String>,
+    pub(in crate::service) return_program: Option<String>,
     pub(in crate::service) current: Option<String>,
     pub(in crate::service) channel: Option<String>,
     pub(in crate::service) parent_execution_id: Option<ExecutionId>,
@@ -80,18 +84,20 @@ pub(in crate::service) fn current_channel(invocation: &Invocation) -> Option<Str
 }
 
 pub(in crate::service) fn synchronize_current_program(
-    runs: &mut BTreeMap<RunUnitId, Run>,
+    state: &mut super::super::State,
     invocation: &Invocation,
 ) -> Result<bool, HostProblem> {
     let initial_entry = initial_program_entry(invocation)?;
-    let Some(run) = runs.get_mut(&invocation.run_unit_id) else {
+    super::host_boundary::admit_frame(state, invocation)?;
+    let Some(run) = state.runs.get_mut(&invocation.run_unit_id) else {
         return Ok(false);
     };
     if run.invocation.principal.id() != invocation.principal.id() {
         return Err(HostProblem::Unauthorized);
     }
     run.current_program.parent_execution_id = invocation.parent_execution_id.clone();
-    run.current_program.initial_entry = initial_entry;
+    run.current_program.initial_entry = initial_entry && run.current_program.logical_level == 1;
+    run.current_program.effect_invocation = invocation.clone();
     let next_program = current_program(invocation);
     if next_program != run.current_program.current
         || invocation.bindings.contains_key("cics.channel")
@@ -454,11 +460,20 @@ pub(in crate::service) fn assign(
             .outputs
             .insert("PROGRAM".into(), bounded(program.as_bytes().to_vec())?);
     }
-    for name in ["INVOKINGPROG", "RETURNPROG"] {
+    for (name, program) in [
+        (
+            "INVOKINGPROG",
+            run.current_program.invoking_program.as_deref(),
+        ),
+        ("RETURNPROG", run.current_program.return_program.as_deref()),
+    ] {
         if request.arguments.contains_key(name) {
-            response
-                .outputs
-                .insert(name.into(), bounded(vec![b' '; 8])?);
+            let mut value = program.unwrap_or("").as_bytes().to_vec();
+            if value.len() > 8 {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            value.resize(8, b' ');
+            response.outputs.insert(name.into(), bounded(value)?);
         }
     }
     for (name, length) in [
@@ -629,7 +644,9 @@ fn terminal_identity(service: &CicsService, run: &Run) -> Result<Option<String>,
 }
 
 fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
-    if dpl {
+    if run.current_program.logical_level > 1 {
+        Ok(i64::from(run.current_program.logical_level) + i64::from(dpl))
+    } else if dpl {
         Ok(2)
     } else if run.invocation.parent_execution_id.is_none() {
         Ok(1)
@@ -639,6 +656,9 @@ fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
 }
 
 fn validate_initial_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
+    if run.current_program.logical_level > 1 && run.current_program.invoking_program.is_some() {
+        return Ok(());
+    }
     if dpl
         || run.current_program.parent_execution_id.is_some()
         || !run.current_program.initial_entry
@@ -649,6 +669,9 @@ fn validate_initial_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
 }
 
 fn validate_top_level_return_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
+    if run.current_program.logical_level > 1 && run.current_program.return_program.is_some() {
+        return Ok(());
+    }
     if dpl || run.current_program.parent_execution_id.is_some() {
         return Err(HostProblem::InfrastructureFailure);
     }

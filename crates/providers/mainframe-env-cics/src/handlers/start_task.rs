@@ -131,7 +131,7 @@ impl CicsService {
                 Err(HostProblem::IdempotencyConflict)
             };
         }
-        if state.runs.len() >= self.limits.max_runs {
+        if state.runs.len() + state.task_dispatch.absent_runs(&state.runs) >= self.limits.max_runs {
             return Err(HostProblem::ResourceExhausted);
         }
         let new_session = existing.is_none();
@@ -225,7 +225,7 @@ impl CicsService {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        if state.runs.len() >= self.limits.max_runs {
+        if state.runs.len() + state.task_dispatch.absent_runs(&state.runs) >= self.limits.max_runs {
             return Err(HostProblem::ResourceExhausted);
         }
         let retained = current.run_unit == invocation.run_unit_id.as_str()
