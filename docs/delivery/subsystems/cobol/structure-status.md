@@ -1,0 +1,110 @@
+# COBOL — Grammar and types progress
+
+Subsystem: **cobol**
+Phase: **structure**
+Target release: **0.3.0**
+
+Status: **CB-306 complete; full-minor acceptance next**
+
+The implementation line starts from `0186231` and includes controller fix
+`eb46db4` as local cherry-pick `2ff53eb`. The accepted 0.2.0 catalog,
+generation, package, coverage, source-provenance, and handler-identity
+authorities remain frozen; no 0.2 evidence was regenerated or rewritten.
+
+## Work packages
+
+| Work package | State | Next boundary |
+|---|---|---|
+| CI-300 | pass | Accepted at repair commit `7d50310381a44878c23c51c38aed841e3a70347f` |
+| CB-301 | pass | Completion commit `895feede8b8ab7c3536c5c182039e709ab0aa77e` |
+| CB-302 | pass | 10/10 FD and 17/17 data-clause rows recognized and validated |
+| CB-303 | pass | 44/44 procedure-statement rows recognized and validated |
+| CB-304 | pass | Complete bounded data classes, USAGE, layout, aliases, types, and tables |
+| CB-305 | pass | 82/82 intrinsic rows and 28 special-register identities generated and typed |
+| CB-306 | pass | Malformed, limit, recovery, compatibility, binding, verdict, shard, and ledger exit suites pass |
+
+CI-300 extends the accepted `mainframe-env-coverage` authority with the one
+product-neutral Conformance IR v1. It contains typed row specifications,
+mandatory obligations, bounded typed registries, exact executable bindings,
+canonical replayable verdicts, verdict-derived ledgers, deterministic shards
+and cache identities, and fast spec/focused-runner interfaces. It contains no
+COBOL grammar or product semantics and claims zero new official numerator.
+
+Controller review 1 is closed in a focused repair: indexed catalog files are
+verified before compilation; ledger derivation revalidates every verdict
+against its case, catalog row, runner context, shard, and recomputed cache
+identity; aggregate CI enforces the fast spec gate; the bounded `ScenarioSpec`
+boundary is frozen; representative semantic/validation/mutation/encoding
+mutants are killed; and duplicate shard batches fail before union.
+
+## Decisions and risks
+
+- The existing coverage contract crate owns the shared IR so the repository
+  does not gain a second coverage authority or subsystem-local harness.
+- Drivers receive only typed fixture references; product behavior never sees
+  row or obligation IDs.
+- CB-301 adds the first executable claims to the shared v1 spec: all 15
+  compiler-directing statement rows and all five compiler-directive group rows
+  have `valid-forms/recognized` and `invalid-forms/validated` bindings. The
+  focused runner derives 20/20 recognized and 20/20 validated from 40 passing
+  verdict events; later gates remain pending.
+- CB-302 adds generated identities and typed semantic nodes for all 27 pinned
+  file/data description clauses, divisions, sections, nested program/function/
+  class/method scopes, ordered TYPEDEF visibility, and declaration provenance.
+  The shared runner now derives 47/47 COBOL rows recognized and 47/47 validated
+  from 94 explicit bindings.
+- CB-303 generates all 44 procedure-statement identities from the pinned
+  catalog, attaches typed option and source-provenance nodes, validates operand
+  and option legality, and keeps seven unsupported execution families
+  non-executable. The shared runner now derives 91/91 COBOL rows recognized and
+  91/91 validated from 182 explicit bindings.
+- CB-304 extends the existing semantic owner with canonical USAGE and data-class
+  identities, NATIONAL/UTF-8/DBCS and pointer/object/floating layouts,
+  LP-sensitive sizes, synchronized slack and alignment, GROUP-USAGE inheritance,
+  non-allocating TYPEDEF templates, expanded TYPE instances, table/ODO and alias
+  validation, file-layout checks, initialization bytes, and bounded provenance.
+  The 27 clause bindings retain the same official denominator while their
+  digest-bound fixtures now require 46 reviewed valid layouts and 42 invalid
+  semantic classes; the focused ledger remains 91/91 recognized and validated.
+- CB-305 generates exact signature metadata for all 82 intrinsic functions and
+  type/length/write/operand metadata for 28 special registers. Semantic analysis
+  records typed calls and references with bounded provenance, validates arity,
+  classes, homogeneous/variadic overloads, format-literal context and register
+  restrictions, infers result types/fixed lengths, and blocks publication when
+  no 0.3 runtime route exists. The shared runner now derives 173/173 COBOL rows
+  recognized and 173/173 validated from 346 passing verdict events.
+- CB-306 adds one fast `cargo xtask cobol-exit --check` acceptance entry point.
+  It closes all 173 official COBOL rows, 346 exact recognition/validation
+  bindings, and 179 selected shards against the real focused runner and derived
+  ledger; verifies unique cache identities and exact replay commands; and kills
+  an omitted-shard mutant. Six malformed-input classes, four independent
+  resource limits, four recovery or execution-incomplete publication blockers,
+  the existing bounded parser property test, and representative registry and
+  artifact mutants provide the complete compiler/source/IR diagnostic floor.
+- The compatibility fixture is the canonical 955-byte HELLO artifact produced
+  by immutable tag `mainframe-env-v0.1.1` at commit
+  `44f3081eb2fdf22d09e1a97725f5a4163431ca70`. CB-306 verifies the tag commit and
+  tree, accepted artifact contract inventory, exact payload digest, binary
+  decode/re-encode, and successful execution with `HELLO WORLD!` output.
+- Full-workspace preflight found and repaired compatibility gaps before the
+  unchanged-candidate acceptance run. Host-dialect operands no longer become
+  COBOL statement options; `ACCEPT FROM` and both official and legacy XML PARSE
+  forms remain valid; level-88 conditions may describe a redefining item; and a
+  special register nested in reference modification is not mistaken for the
+  receiving item. Legacy table execution fixtures now use valid subordinate
+  OCCURS entries without weakening the 0.3 invalid-form boundary.
+- Execution, recovery, and differential gates remain pending. Licensed oracle
+  execution is not part of this checkpoint.
+
+CB-301 freezes generated COBOL directing/directive identities, exact fixed,
+free, variable, UTF-8, and CP037 token/source provenance, extended BASIS deck
+processing, ordered COPY library selection, COPY/REPLACE text substitution,
+compiler options, and conditional/Java/data/inline/call-interface directives.
+The independently reviewed fixture catalog is digest-bound into Conformance IR
+and every binding has deterministic replay.
+
+Blockers: none.
+
+Next executable step: run the tier-3 affected-scope repository validation once
+on the unchanged CB-306 completion candidate, then perform the normal full-minor
+push and pull-request handoff.

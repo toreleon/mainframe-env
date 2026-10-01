@@ -1,0 +1,138 @@
+# CICS — SPI and FEPI progress
+
+Subsystem: **cics**
+Phase: **system-api**
+Target release: **0.10.0**
+
+Status: **SPI-1001 identity foundation sealed; semantic source dependency
+blocked; SPI-1001 and 0.10.0 remain Proposed**
+
+- Branch: `codex/parallel-v0.10-spi1001`
+- Dependency candidate: `5ab706b1dd069e26db7cb9a2b66e921c9001fc39`
+- Dependency disposition: 0.9.0 remains Proposed. Its shared CICS authorities are
+  available for private 0.10 catalog/code-generation preparation, but no 0.10
+  runtime integration or public route is permitted.
+- Official baseline: `ibm-cics-ts-6x-2026-08-31`
+- Official catalog SHA-256:
+  `fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba`
+- IBM topic: `SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html`
+- IBM topic SHA-256:
+  `78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25`
+- IBM TOC SHA-256:
+  `f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a`
+
+## Objective and boundary
+
+Seal the dependency-safe SPI-1001 identity foundation for all 269 unique SPI
+and 39 FEPI command identities. This slice may establish source identity,
+deduplication, schemas, generated catalogs, and a non-routing Rust registry.
+It must not infer grammar or behavior from command labels or EIBFN values,
+register handlers, advertise routes, mutate CICS state, or claim SPI-1001 or
+0.10.0 complete.
+
+The 0.9 application registry, dynamic EIBRESP condition-name authority,
+resource/security policies, canonical effects, durable coordinator,
+persistence, storage, response mapping, and recovery ownership remain the only
+accepted shared authorities. The 0.10 foundation references those authorities;
+it does not copy or replace them.
+
+## Stable slices
+
+| Slice | State | Dependency | Acceptance boundary |
+|---|---|---|---|
+| `SPI-1001.source-authority` | Pass (`e514061dc320566b735490be7a54c8d11d821ef8`) | Frozen 0.2 CICS catalog; exact retained IBM EIBFN topic and TOC | Verified topic/TOC bytes; preserves 273-to-269 SPI label deduplication, all alternate EIBFN identities, 39 FEPI rows, and the exact source normalization; every unproved semantic dimension is blocked with zero coverage credit |
+| `SPI-1001.catalog` | Pass (`789c6079c02a6581533431ceaac2e16c74396a76`) | `SPI-1001.source-authority` | Generated exactly 269 SPI and 39 FEPI identity records from the frozen catalog and reviewed source disposition; schema, freshness, malformed/foreign/duplicate/mutation checks pass; no handlers or routes |
+| `SPI-1001.generated-registry` | Pass | `SPI-1001.catalog` | Generated and compiled a typed non-routing registry; exact denominator and digest checks pass; every entry is identity-only, unadvertised, unregistered, and zero-credit; the 0.9 registry/runtime surface is unchanged |
+
+The parent `SPI-1001` remains pending. Its required grammar, options, resource
+schemas, condition mappings, lifecycle/context matrix, authorized intent,
+audit effects, concurrency, lock order, syncpoint, quiesce/drain, restart, and
+recovery bindings cannot be closed from the EIBFN inventory table.
+
+## Source review
+
+Offline `ibm_docs.py search` and `read` verified the pinned topic and TOC. The
+topic states that EIBFN identifies the most recently issued command and that
+Table 3 lists SPI command names/function codes while Table 4 lists FEPI command
+names/function codes. The retained HTML at
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/78/78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25.html`
+is 265,761 bytes and matches the committed SHA-256. The retained TOC at
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json`
+also matches its committed SHA-256.
+
+Table 3 has 273 raw rows and 269 unique normalized command labels. The four
+duplicate labels retain both source EIBFN identities: `INQUIRE NETNAME`
+(`5216`, `5206`), `INQUIRE SYSTEM` (`5402`, `5412`), `INQUIRE TERMINAL`
+(`5202`, `5212`), and `SET TERMINAL` (`5204`, `5214`). The frozen denominator
+uses the first table occurrence as its canonical row. Source row
+`spi-commands-unique:0192` prints `70 32`; the accepted catalog normalization
+removes only that embedded whitespace to retain `7032`. Table 4 has 39 raw and
+39 unique command labels. Shared EIBFN values in FEPI remain distinct official
+command identities and are never deduplicated by code.
+
+## Source gaps and blockers
+
+No reviewed 0.10 SPI or FEPI row-to-command-topic map or digest-pinned
+command-body manifest exists. Consequently there is no exact command-body
+`topic_path` or SHA-256 authority to read for any of the 269 SPI or 39 FEPI
+rows. These are exact unresolved-locator gaps, recorded as
+`SPI-1001.source-gap.spi-command-bodies` and
+`SPI-1001.source-gap.fepi-command-bodies` in the versioned source authority.
+All dependent semantics remain fail-closed.
+
+The next external/source action is to review complete SPI and FEPI command-topic
+maps, register exact paths and SHA-256 identities, and reproduce matching
+retained HTML offline. Network refresh, Browser Control, PDFs, substituted
+bodies, and EIBFN-derived semantics are outside this work.
+
+## Results
+
+`SPI-1001.source-authority` is complete at its identity-only boundary. The
+focused Python suite passes 7/7 positive, negative, and mutation tests. The
+cache-backed verifier passes against the exact retained HTML and TOC paths
+above. `cargo xtask schemas --check` compiled the new Draft 2020-12 schema and
+accepted the mapped authority instance.
+
+`SPI-1001.catalog` is complete at its identity-only boundary. Its deterministic
+generator emits 308 ordered rows with logical identity digest
+`sha256:5f4867c8a3973c9344e62288ced4c0be6d45356bcc506638e0a6822fdfc333da`;
+the generated JSON file SHA-256 is
+`d9045ff97496e2eac27ba0706ab186382e4186d60afb5650d62ffdf12bd2da4d`.
+The combined focused source/catalog suite passes 15/15 positive, negative, and
+mutation tests. `cargo xtask schemas --check` compiled both new Draft 2020-12
+schemas and accepted both mapped instances, then stopped later on the unchanged
+0.8 `carddemo-base-batch.json` note exceeding its existing 256-character schema
+cap. This is an inherited, unrelated gate failure and is not relabeled as a
+pass.
+
+`SPI-1001.generated-registry` is complete at its non-routing boundary. The
+generated Rust registry carries the same logical identity digest
+`sha256:5f4867c8a3973c9344e62288ced4c0be6d45356bcc506638e0a6822fdfc333da`;
+its file SHA-256 is
+`7980237b5e2a7a11953d3fc43e247ddb493113194803fe0ea7f450b44488f133`.
+It exposes official-row and ambiguous EIBFN lookup only; there is no label-token
+dispatcher, handler identity, runtime operation, advertisement, automatic
+registration, or public route. The complete `mainframe-env-ir` suite passes
+54/54, including the three new registry tests and the unchanged 0.9 application
+registry closure. Package Clippy passes with warnings denied. The combined
+source/catalog generator suite passes 17/17, including an advertisement
+mutation that the Rust generator rejects.
+
+The broader architecture checks expose three inherited candidate failures in
+files untouched by SPI-1001: the production hardcode scan finds `CARDDEMO` in
+`crates/providers/mainframe-env-dataset/src/replay_index.rs`; the module budget
+records 1,321 lines for the now-1,345-line
+`crates/tooling/mainframe-env-conformance/src/cics_pilot.rs`; and the public API
+documentation ratchet records 1,129 undocumented host-API items while the
+candidate emits 1,130. The schema gate's inherited 0.8 receipt-length failure
+is recorded above. These unchanged failures are not retried or relabeled as
+SPI-1001 passes.
+
+Coverage, semantic, execution, condition, recovery, and differential credit
+remain **0/269 SPI and 0/39 FEPI**. The 0.9 public/runtime surface is unchanged.
+
+## Next executable step
+
+Stop at the verified external source dependency. The next executable semantic
+step requires reviewed SPI and FEPI row-to-topic mappings plus exact registered
+command-body hashes; no runtime work is authorized from the identity table.

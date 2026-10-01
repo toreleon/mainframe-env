@@ -11,7 +11,7 @@ IBM CICS TS 6.x CONVERSE sends application data and receives a partner
 response. Its length, truncation, EOC, FMH, SIGNAL, and STATE results depend on
 the actual peer frame. Successful local delivery or an MQ acknowledgement
 cannot establish those results. The source baseline, rows, topic paths and
-SHA-256 identities are recorded in the [0.9 status ledger](../delivery/coverage-versions/status/0.9.0.md).
+SHA-256 identities are recorded in the [0.9 status ledger](../delivery/subsystems/cics/application-api-status.md).
 
 ## Decision
 

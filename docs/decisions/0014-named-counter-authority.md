@@ -12,7 +12,7 @@ IBM CICS TS 6.x application-command rows 0034/0035, 0044/0045, 0087/0088,
 UPDATE must advance or compare a value atomically across workers. QUERY must
 observe the same current value, including the one-past-maximum limit state.
 The exact offline source baseline, catalog rows, topics, and SHA-256 values
-are recorded in the [0.9 status ledger](../delivery/coverage-versions/status/0.9.0.md).
+are recorded in the [0.9 status ledger](../delivery/subsystems/cics/application-api-status.md).
 
 The integrated CICS service, product, and interpreter roots have frozen
 production-line budgets. Growing any of those roots to hold counter state or

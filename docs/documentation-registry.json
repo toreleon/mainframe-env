@@ -71,107 +71,629 @@
     {
       "heading": "Architecture and contracts",
       "entries": [
-        {"label": "Project charter", "path": "docs/CHARTER.md"},
-        {"label": "Architecture overview", "path": "docs/architecture/OVERVIEW.md"},
-        {"label": "Package map", "path": "docs/architecture/PACKAGE-MAP.md"},
-        {"label": "Compiler and IR", "path": "docs/architecture/COMPILER-AND-IR.md"},
-        {"label": "COBOL runtime semantics", "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md"},
-        {"label": "Execution and durability", "path": "docs/architecture/EXECUTION-AND-DURABILITY.md"},
-        {"label": "Security and capabilities", "path": "docs/architecture/PLUGIN-AND-SECURITY.md"},
-        {"label": "Conformance IR", "path": "docs/architecture/CONFORMANCE-IR.md"},
-        {"label": "Coverage authority", "path": "docs/architecture/COVERAGE-AUTHORITY.md"},
-        {"label": "Dataset, VSAM, and AMS", "path": "docs/architecture/DATASET-VSAM-AMS.md"},
-        {"label": "JES execution", "path": "docs/architecture/JES-EXECUTION.md"},
-        {"label": "IBM MQ programming surface", "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"},
-        {"label": "Application packages", "path": "docs/architecture/APPLICATION-PACKAGES.md"},
-        {"label": "Batch controller registry", "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md"},
-        {"label": "CICS command routing", "path": "docs/architecture/CICS-COMMAND-ROUTING.md"},
-        {"label": "CICS terminal control", "path": "docs/architecture/CICS-TERMINAL-CONTROL.md"},
-        {"label": "Db2 application catalog", "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"},
-        {"label": "Host ABI source libraries", "path": "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md"},
-        {"label": "Program and route registries", "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"},
-        {"label": "Durable storage profile", "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md"},
-        {"label": "Canonical effect encoding", "path": "docs/contracts/EFFECT-CANONICAL-V1.md"},
-        {"label": "Provider object-row persistence", "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"},
-        {"label": "Durable retention lifecycle", "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md"},
-        {"label": "Target release build type", "path": "docs/contracts/RELEASE-BUILD-V1.md"},
-        {"label": "Transaction participant contract", "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md"},
-        {"label": "Release builder security model", "path": "docs/architecture/RELEASE-BUILDER.md"}
+        {
+          "label": "Project charter",
+          "path": "docs/CHARTER.md"
+        },
+        {
+          "label": "Architecture overview",
+          "path": "docs/architecture/OVERVIEW.md"
+        },
+        {
+          "label": "Package map",
+          "path": "docs/architecture/PACKAGE-MAP.md"
+        },
+        {
+          "label": "Compiler and IR",
+          "path": "docs/architecture/COMPILER-AND-IR.md"
+        },
+        {
+          "label": "COBOL runtime semantics",
+          "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md"
+        },
+        {
+          "label": "Execution and durability",
+          "path": "docs/architecture/EXECUTION-AND-DURABILITY.md"
+        },
+        {
+          "label": "Security and capabilities",
+          "path": "docs/architecture/PLUGIN-AND-SECURITY.md"
+        },
+        {
+          "label": "Conformance IR",
+          "path": "docs/architecture/CONFORMANCE-IR.md"
+        },
+        {
+          "label": "Coverage authority",
+          "path": "docs/architecture/COVERAGE-AUTHORITY.md"
+        },
+        {
+          "label": "Dataset, VSAM, and AMS",
+          "path": "docs/architecture/DATASET-VSAM-AMS.md"
+        },
+        {
+          "label": "JES execution",
+          "path": "docs/architecture/JES-EXECUTION.md"
+        },
+        {
+          "label": "IBM MQ programming surface",
+          "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
+        },
+        {
+          "label": "Application packages",
+          "path": "docs/architecture/APPLICATION-PACKAGES.md"
+        },
+        {
+          "label": "Batch controller registry",
+          "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md"
+        },
+        {
+          "label": "CICS command routing",
+          "path": "docs/architecture/CICS-COMMAND-ROUTING.md"
+        },
+        {
+          "label": "CICS terminal control",
+          "path": "docs/architecture/CICS-TERMINAL-CONTROL.md"
+        },
+        {
+          "label": "Db2 application catalog",
+          "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"
+        },
+        {
+          "label": "Host ABI source libraries",
+          "path": "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md"
+        },
+        {
+          "label": "Program and route registries",
+          "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"
+        },
+        {
+          "label": "Durable storage profile",
+          "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md"
+        },
+        {
+          "label": "Canonical effect encoding",
+          "path": "docs/contracts/EFFECT-CANONICAL-V1.md"
+        },
+        {
+          "label": "Provider object-row persistence",
+          "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"
+        },
+        {
+          "label": "Durable retention lifecycle",
+          "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md"
+        },
+        {
+          "label": "Target release build type",
+          "path": "docs/contracts/RELEASE-BUILD-V1.md"
+        },
+        {
+          "label": "Transaction participant contract",
+          "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md"
+        },
+        {
+          "label": "Release builder security model",
+          "path": "docs/architecture/RELEASE-BUILDER.md"
+        }
       ]
     },
     {
       "heading": "Architecture decisions",
       "entries": [
-        {"label": "ADR-0001: Technology stack", "path": "docs/decisions/0001-technology-stack.md"},
-        {"label": "ADR-0002: Deterministic core", "path": "docs/decisions/0002-deterministic-core.md"},
-        {"label": "ADR-0003: Contract serialization", "path": "docs/decisions/0003-contract-serialization.md"},
-        {"label": "ADR-0004: Versioning and release policy", "path": "docs/decisions/0004-versioning-release-policy.md"},
-        {"label": "ADR-0005: Historical package consolidation", "path": "docs/decisions/0005-package-consolidation.md"},
-        {"label": "ADR-0006: CardDemo 0.1.1 profile", "path": "docs/decisions/0006-carddemo-0.1.1-profile.md"},
-        {"label": "ADR-0007: CardDemo 0.1.1 release", "path": "docs/decisions/0007-carddemo-0.1.1-release.md"},
-        {"label": "ADR-0008: ICU license compliance", "path": "docs/decisions/0008-icu-license-compliance.md"},
-        {"label": "ADR-0009: Current package topology", "path": "docs/decisions/0009-current-package-topology.md"},
-        {"label": "ADR-0010: Rust module review budgets", "path": "docs/decisions/0010-rust-module-review-budgets.md"},
-        {"label": "ADR-0011: Typed language HIR and semantic IR", "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md"},
-        {"label": "ADR-0012: Checked AMODE64 storage boundary", "path": "docs/decisions/0012-checked-amode64-storage-boundary.md"},
-        {"label": "ADR-0013: CICS web service control boundary", "path": "docs/decisions/0013-cics-web-service-control-boundary.md"},
-        {"label": "ADR-0014: Named-counter pool authority", "path": "docs/decisions/0014-named-counter-authority.md"},
-        {"label": "ADR-0015: CICS operator reply boundary", "path": "docs/decisions/0015-cics-operator-reply-boundary.md"},
-        {"label": "ADR-0016: CICS TCP/IP ingress context", "path": "docs/decisions/0016-cics-tcpip-ingress-context.md"},
-        {"label": "ADR-0017: CICS immediate START target authority", "path": "docs/decisions/0017-cics-immediate-start-target-authority.md"},
-        {"label": "ADR-0018: CICS START ATTACH lifetime", "path": "docs/decisions/0018-cics-start-attach-lifetime.md"},
-        {"label": "ADR-0019: BTS lifecycle authority", "path": "docs/decisions/0019-bts-lifecycle-authority.md"},
-        {"label": "ADR-0020: Conversation peer exchange ledger", "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md"},
-        {"label": "ADR-0021: Conversation ISSUE control staging", "path": "docs/decisions/0021-conversation-issue-control-staging.md"},
-        {"label": "ADR-0022: ISSUE PASS target handoff", "path": "docs/decisions/0022-issue-pass-target-handoff.md"},
-        {"label": "ADR-0023: BTS lifecycle authority", "path": "docs/decisions/0023-bts-lifecycle-authority.md"},
-        {"label": "ADR-0024: Per-assertion oracle provenance", "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"},
-        {"label": "ADR-0025: Licence and provenance policy for IBM oracle evidence", "path": "docs/decisions/0025-licence-and-provenance-policy.md"},
-        {"label": "ADR-0026: CardDemo run bundle", "path": "docs/decisions/0026-run-bundle.md"},
-        {"label": "ADR-0027: CICS task ownership across logical program frames", "path": "docs/decisions/0027-cics-logical-program-frames.md"},
-        {"label": "Decision index and template", "path": "docs/decisions/README.md"}
+        {
+          "label": "ADR-0001: Technology stack",
+          "path": "docs/decisions/0001-technology-stack.md"
+        },
+        {
+          "label": "ADR-0002: Deterministic core",
+          "path": "docs/decisions/0002-deterministic-core.md"
+        },
+        {
+          "label": "ADR-0003: Contract serialization",
+          "path": "docs/decisions/0003-contract-serialization.md"
+        },
+        {
+          "label": "ADR-0004: Versioning and release policy",
+          "path": "docs/decisions/0004-versioning-release-policy.md"
+        },
+        {
+          "label": "ADR-0005: Historical package consolidation",
+          "path": "docs/decisions/0005-package-consolidation.md"
+        },
+        {
+          "label": "ADR-0006: CardDemo 0.1.1 profile",
+          "path": "docs/decisions/0006-carddemo-0.1.1-profile.md"
+        },
+        {
+          "label": "ADR-0007: CardDemo 0.1.1 release",
+          "path": "docs/decisions/0007-carddemo-0.1.1-release.md"
+        },
+        {
+          "label": "ADR-0008: ICU license compliance",
+          "path": "docs/decisions/0008-icu-license-compliance.md"
+        },
+        {
+          "label": "ADR-0009: Current package topology",
+          "path": "docs/decisions/0009-current-package-topology.md"
+        },
+        {
+          "label": "ADR-0010: Rust module review budgets",
+          "path": "docs/decisions/0010-rust-module-review-budgets.md"
+        },
+        {
+          "label": "ADR-0011: Typed language HIR and semantic IR",
+          "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md"
+        },
+        {
+          "label": "ADR-0012: Checked AMODE64 storage boundary",
+          "path": "docs/decisions/0012-checked-amode64-storage-boundary.md"
+        },
+        {
+          "label": "ADR-0013: CICS web service control boundary",
+          "path": "docs/decisions/0013-cics-web-service-control-boundary.md"
+        },
+        {
+          "label": "ADR-0014: Named-counter pool authority",
+          "path": "docs/decisions/0014-named-counter-authority.md"
+        },
+        {
+          "label": "ADR-0015: CICS operator reply boundary",
+          "path": "docs/decisions/0015-cics-operator-reply-boundary.md"
+        },
+        {
+          "label": "ADR-0016: CICS TCP/IP ingress context",
+          "path": "docs/decisions/0016-cics-tcpip-ingress-context.md"
+        },
+        {
+          "label": "ADR-0017: CICS immediate START target authority",
+          "path": "docs/decisions/0017-cics-immediate-start-target-authority.md"
+        },
+        {
+          "label": "ADR-0018: CICS START ATTACH lifetime",
+          "path": "docs/decisions/0018-cics-start-attach-lifetime.md"
+        },
+        {
+          "label": "ADR-0019: BTS lifecycle authority",
+          "path": "docs/decisions/0019-bts-lifecycle-authority.md"
+        },
+        {
+          "label": "ADR-0020: Conversation peer exchange ledger",
+          "path": "docs/decisions/0020-conversation-peer-exchange-ledger.md"
+        },
+        {
+          "label": "ADR-0021: Conversation ISSUE control staging",
+          "path": "docs/decisions/0021-conversation-issue-control-staging.md"
+        },
+        {
+          "label": "ADR-0022: ISSUE PASS target handoff",
+          "path": "docs/decisions/0022-issue-pass-target-handoff.md"
+        },
+        {
+          "label": "ADR-0023: BTS lifecycle authority",
+          "path": "docs/decisions/0023-bts-lifecycle-authority.md"
+        },
+        {
+          "label": "ADR-0024: Per-assertion oracle provenance",
+          "path": "docs/decisions/0024-per-assertion-oracle-provenance.md"
+        },
+        {
+          "label": "ADR-0025: Licence and provenance policy for IBM oracle evidence",
+          "path": "docs/decisions/0025-licence-and-provenance-policy.md"
+        },
+        {
+          "label": "ADR-0026: CardDemo run bundle",
+          "path": "docs/decisions/0026-run-bundle.md"
+        },
+        {
+          "label": "ADR-0027: CICS task ownership across logical program frames",
+          "path": "docs/decisions/0027-cics-logical-program-frames.md"
+        },
+        {
+          "label": "Decision index and template",
+          "path": "docs/decisions/README.md"
+        }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
     },
     {
       "heading": "Delivery and development",
       "entries": [
-        {"label": "Implementation roadmap", "path": "docs/delivery/IMPLEMENTATION-ROADMAP.md"},
-        {"label": "Implementation status", "path": "docs/delivery/IMPLEMENTATION-STATUS.md"},
-        {"label": "Verification strategy", "path": "docs/delivery/VERIFICATION-STRATEGY.md"},
-        {"label": "Compatibility and cutover", "path": "docs/delivery/COMPATIBILITY-AND-CUTOVER.md"},
-        {"label": "Versioning and releases", "path": "docs/delivery/VERSIONING-AND-RELEASES.md"},
-        {"label": "z/OSMF compatibility API", "path": "docs/delivery/ZOSMF-API.md"},
-        {"label": "IBM coverage release plans", "path": "docs/delivery/coverage-versions/README.md"},
-        {"label": "Db2 0.12 reuse spike", "path": "docs/delivery/coverage-versions/0.12.0-reuse-spike.md"},
-        {"label": "Db2 0.12 proposed status", "path": "docs/delivery/coverage-versions/status/0.12.0.md"},
-        {"label": "Parallel implementation plan", "path": "docs/delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md"},
-        {"label": "Implementation prompt index", "path": "docs/prompts/coverage-versions/README.md"}
+        {
+          "label": "Implementation roadmap",
+          "path": "docs/delivery/IMPLEMENTATION-ROADMAP.md"
+        },
+        {
+          "label": "Implementation status",
+          "path": "docs/delivery/IMPLEMENTATION-STATUS.md"
+        },
+        {
+          "label": "Verification strategy",
+          "path": "docs/delivery/VERIFICATION-STRATEGY.md"
+        },
+        {
+          "label": "Compatibility and cutover",
+          "path": "docs/delivery/COMPATIBILITY-AND-CUTOVER.md"
+        },
+        {
+          "label": "Versioning and releases",
+          "path": "docs/delivery/VERSIONING-AND-RELEASES.md"
+        },
+        {
+          "label": "z/OSMF compatibility API",
+          "path": "docs/delivery/ZOSMF-API.md"
+        }
       ],
-      "note": "Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation."
+      "note": "Implementation progress is organized by subsystem and phase. Release versions identify compatibility and historical evidence."
+    },
+    {
+      "heading": "Subsystem progress",
+      "entries": [
+        {
+          "label": "Subsystem plans and acceptance contract",
+          "path": "docs/delivery/subsystems/README.md"
+        },
+        {
+          "label": "Subsystem dependencies and concurrency",
+          "path": "docs/delivery/subsystems/DEPENDENCIES.md"
+        },
+        {
+          "label": "Workload-profile track",
+          "path": "docs/delivery/subsystems/PROFILE-TRACK.md"
+        },
+        {
+          "label": "Subsystem implementation prompts",
+          "path": "docs/prompts/subsystems/README.md"
+        },
+        {
+          "label": "Project coordination and release history",
+          "path": "docs/delivery/subsystems/GITHUB-PROJECT.md"
+        }
+      ],
+      "subsystem_entries": true
     },
     {
       "heading": "Operations",
       "entries": [
-        {"label": "Core-server operations", "path": "docs/runbooks/OPERATIONS.md"},
-        {"label": "Backup and restore", "path": "docs/runbooks/BACKUP-RESTORE.md"},
-        {"label": "Capacity and recovery", "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md"},
-        {"label": "Local Jenkins", "path": "docs/runbooks/JENKINS-LOCAL.md"},
-        {"label": "CardDemo operator guide", "path": "docs/runbooks/CARDDEMO-OPERATOR.md"},
-        {"label": "CardDemo READACCT run bundle", "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md"},
-        {"label": "CICS licensed pilot", "path": "docs/runbooks/cics-licensed-pilot.md"},
-        {"label": "Conformance family rollout", "path": "docs/runbooks/conformance-family-rollout.md"}
+        {
+          "label": "Core-server operations",
+          "path": "docs/runbooks/OPERATIONS.md"
+        },
+        {
+          "label": "Backup and restore",
+          "path": "docs/runbooks/BACKUP-RESTORE.md"
+        },
+        {
+          "label": "Capacity and recovery",
+          "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md"
+        },
+        {
+          "label": "Local Jenkins",
+          "path": "docs/runbooks/JENKINS-LOCAL.md"
+        },
+        {
+          "label": "CardDemo operator guide",
+          "path": "docs/runbooks/CARDDEMO-OPERATOR.md"
+        },
+        {
+          "label": "CardDemo READACCT run bundle",
+          "path": "docs/runbooks/CARDDEMO-READACCT-BUNDLE.md"
+        },
+        {
+          "label": "CICS licensed pilot",
+          "path": "docs/runbooks/cics-licensed-pilot.md"
+        },
+        {
+          "label": "Conformance family rollout",
+          "path": "docs/runbooks/conformance-family-rollout.md"
+        }
       ]
     },
     {
       "heading": "Releases, reviews, and research",
       "entries": [
-        {"label": "0.8 release notes", "path": "docs/releases/0.8.md"},
-        {"label": "Pre-0.9 deep review", "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"},
-        {"label": "Review index", "path": "docs/reviews/README.md"},
-        {"label": "IBM official coverage roadmap", "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md"},
-        {"label": "Publication source probe", "path": "docs/research/publication-source-probe.md"},
-        {"label": "CICS behavioral pilot", "path": "docs/research/cics-behavioral-conformance-pilot.md"}
+        {
+          "label": "0.8 release notes",
+          "path": "docs/releases/0.8.md"
+        },
+        {
+          "label": "Pre-0.9 deep review",
+          "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"
+        },
+        {
+          "label": "Review index",
+          "path": "docs/reviews/README.md"
+        },
+        {
+          "label": "IBM official coverage roadmap",
+          "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md"
+        },
+        {
+          "label": "Publication source probe",
+          "path": "docs/research/publication-source-probe.md"
+        },
+        {
+          "label": "CICS behavioral pilot",
+          "path": "docs/research/cics-behavioral-conformance-pilot.md"
+        }
+      ]
+    }
+  ],
+  "subsystems": [
+    {
+      "id": "coverage",
+      "label": "Coverage and conformance",
+      "phases": [
+        {
+          "id": "foundation",
+          "label": "Coverage authority",
+          "target_version": "0.2.0",
+          "plan": "docs/delivery/subsystems/coverage/foundation-plan.md",
+          "status": "docs/delivery/subsystems/coverage/foundation-status.md",
+          "prompt": "docs/prompts/subsystems/coverage/IMPLEMENT_FOUNDATION.md",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "cobol",
+      "label": "COBOL",
+      "phases": [
+        {
+          "id": "structure",
+          "label": "Grammar and types",
+          "target_version": "0.3.0",
+          "plan": "docs/delivery/subsystems/cobol/structure-plan.md",
+          "status": "docs/delivery/subsystems/cobol/structure-status.md",
+          "prompt": "docs/prompts/subsystems/cobol/IMPLEMENT_STRUCTURE.md",
+          "dependencies": [
+            "coverage.foundation"
+          ]
+        },
+        {
+          "id": "execution",
+          "label": "Execution semantics",
+          "target_version": "0.4.0",
+          "plan": "docs/delivery/subsystems/cobol/execution-plan.md",
+          "status": "docs/delivery/subsystems/cobol/execution-status.md",
+          "prompt": "docs/prompts/subsystems/cobol/IMPLEMENT_EXECUTION.md",
+          "dependencies": [
+            "cobol.structure"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "racf",
+      "label": "RACF / SAF",
+      "phases": [
+        {
+          "id": "security",
+          "label": "Commands and authorization",
+          "target_version": "0.5.0",
+          "plan": "docs/delivery/subsystems/racf/security-plan.md",
+          "status": "docs/delivery/subsystems/racf/security-status.md",
+          "prompt": "docs/prompts/subsystems/racf/IMPLEMENT_SECURITY.md",
+          "dependencies": [
+            "coverage.foundation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dataset",
+      "label": "Datasets / VSAM / AMS",
+      "phases": [
+        {
+          "id": "data",
+          "label": "Dataset services",
+          "target_version": "0.6.0",
+          "plan": "docs/delivery/subsystems/dataset/data-plan.md",
+          "status": "docs/delivery/subsystems/dataset/data-status.md",
+          "prompt": "docs/prompts/subsystems/dataset/IMPLEMENT_DATA.md",
+          "dependencies": [
+            "coverage.foundation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jcl",
+      "label": "JCL",
+      "phases": [
+        {
+          "id": "planning",
+          "label": "Converter and planner",
+          "target_version": "0.7.0",
+          "plan": "docs/delivery/subsystems/jcl/planning-plan.md",
+          "status": "docs/delivery/subsystems/jcl/planning-status.md",
+          "prompt": "docs/prompts/subsystems/jcl/IMPLEMENT_PLANNING.md",
+          "dependencies": [
+            "coverage.foundation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jes",
+      "label": "JES2 and utilities",
+      "phases": [
+        {
+          "id": "execution",
+          "label": "Jobs, spool and utilities",
+          "target_version": "0.8.0",
+          "plan": "docs/delivery/subsystems/jes/execution-plan.md",
+          "status": "docs/delivery/subsystems/jes/execution-status.md",
+          "prompt": "docs/prompts/subsystems/jes/IMPLEMENT_EXECUTION.md",
+          "dependencies": [
+            "racf.security",
+            "dataset.data",
+            "jcl.planning"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cics",
+      "label": "CICS",
+      "phases": [
+        {
+          "id": "application-api",
+          "label": "Application API",
+          "target_version": "0.9.0",
+          "plan": "docs/delivery/subsystems/cics/application-api-plan.md",
+          "status": "docs/delivery/subsystems/cics/application-api-status.md",
+          "prompt": "docs/prompts/subsystems/cics/IMPLEMENT_APPLICATION_API.md",
+          "dependencies": [
+            "cobol.execution",
+            "racf.security",
+            "dataset.data"
+          ]
+        },
+        {
+          "id": "system-api",
+          "label": "SPI and FEPI",
+          "target_version": "0.10.0",
+          "plan": "docs/delivery/subsystems/cics/system-api-plan.md",
+          "status": "docs/delivery/subsystems/cics/system-api-status.md",
+          "prompt": "docs/prompts/subsystems/cics/IMPLEMENT_SYSTEM_API.md",
+          "dependencies": [
+            "cics.application-api"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "zosmf",
+      "label": "z/OSMF",
+      "phases": [
+        {
+          "id": "rest",
+          "label": "REST portfolio",
+          "target_version": "0.11.0",
+          "plan": "docs/delivery/subsystems/zosmf/rest-plan.md",
+          "status": "docs/delivery/subsystems/zosmf/rest-status.md",
+          "prompt": "docs/prompts/subsystems/zosmf/IMPLEMENT_REST.md",
+          "dependencies": [
+            "racf.security",
+            "dataset.data",
+            "jes.execution",
+            "cics.system-api"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "db2",
+      "label": "Db2",
+      "phases": [
+        {
+          "id": "core",
+          "label": "Engine and common SQL",
+          "target_version": "0.12.0",
+          "plan": "docs/delivery/subsystems/db2/core-plan.md",
+          "status": "docs/delivery/subsystems/db2/core-status.md",
+          "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_CORE.md",
+          "dependencies": [
+            "coverage.foundation",
+            "cobol.execution",
+            "racf.security"
+          ]
+        },
+        {
+          "id": "programming",
+          "label": "Complete programming surface",
+          "target_version": "0.13.0",
+          "plan": "docs/delivery/subsystems/db2/programming-plan.md",
+          "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md",
+          "dependencies": [
+            "db2.core"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ims",
+      "label": "IMS",
+      "phases": [
+        {
+          "id": "programming",
+          "label": "DB / TM programming surface",
+          "target_version": "0.14.0",
+          "plan": "docs/delivery/subsystems/ims/programming-plan.md",
+          "status": "docs/delivery/subsystems/ims/programming-status.md",
+          "prompt": "docs/prompts/subsystems/ims/IMPLEMENT_PROGRAMMING.md",
+          "dependencies": [
+            "cobol.execution",
+            "racf.security",
+            "dataset.data"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mq",
+      "label": "IBM MQ",
+      "phases": [
+        {
+          "id": "programming",
+          "label": "MQI programming surface",
+          "target_version": "0.15.0",
+          "plan": "docs/delivery/subsystems/mq/programming-plan.md",
+          "status": "docs/delivery/subsystems/mq/programming-status.md",
+          "prompt": "docs/prompts/subsystems/mq/IMPLEMENT_PROGRAMMING.md",
+          "dependencies": [
+            "cobol.execution",
+            "racf.security"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "label": "Cross-resource integration",
+      "phases": [
+        {
+          "id": "transactions",
+          "label": "Transactions and recovery",
+          "target_version": "0.16.0",
+          "plan": "docs/delivery/subsystems/integration/transactions-plan.md",
+          "status": "docs/delivery/subsystems/integration/transactions-status.md",
+          "prompt": "docs/prompts/subsystems/integration/IMPLEMENT_TRANSACTIONS.md",
+          "dependencies": [
+            "jes.execution",
+            "cics.system-api",
+            "db2.programming",
+            "ims.programming",
+            "mq.programming"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "certification",
+      "label": "Licensed certification",
+      "phases": [
+        {
+          "id": "licensed",
+          "label": "Differential certification",
+          "target_version": "0.17.0",
+          "plan": "docs/delivery/subsystems/certification/licensed-plan.md",
+          "status": "docs/delivery/subsystems/certification/licensed-status.md",
+          "prompt": "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
+          "dependencies": [
+            "zosmf.rest",
+            "integration.transactions"
+          ]
+        },
+        {
+          "id": "stable-release",
+          "label": "Stable release promotion",
+          "target_version": "1.0.0",
+          "plan": "docs/delivery/subsystems/certification/stable-release-plan.md",
+          "dependencies": [
+            "certification.licensed"
+          ]
+        }
       ]
     }
   ]

@@ -1,0 +1,86 @@
+# Cross-resource integration — Transactions and recovery
+
+Subsystem: **integration**
+Phase: **transactions**
+Target release: **0.16.0**
+
+Status: **Proposed**
+Start gate: accepted JES, CICS, Db2, IMS, and MQ provider state/UOW contracts
+Completion dependencies: jes.execution, cics.system-api, db2.programming, ims.programming, mq.programming
+Estimate: 14–22 engineer-months
+
+The [common release contract](../README.md#common-release-contract) and
+[hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
+apply, including early participant-contract and licensed-harness preparation.
+These requirements do not themselves certify implementation or waive an exit gate.
+
+## Outcome
+
+Unify transactions, security context, cancellation, failure, restart, and
+recovery across batch, CICS, datasets, Db2, IMS, and MQ without hidden fallback.
+
+## Owned scope
+
+- Extend the accepted cross-provider unit-of-work coordinator and close explicit
+  prepare, commit, rollback, compensation, heuristic, in-doubt and unknown outcomes.
+- Preserve principal/delegation, authorization decisions, correlation,
+  idempotency keys, causality, deadlines, cancellation, and audit across calls.
+- Define deterministic effect ordering, lock ordering, retry boundaries,
+  timeout behavior, crash points, recovery logs, and operator resolution.
+- Exercise mixed-resource paths across JES, CICS, dataset/VSAM, Db2, IMS, and MQ,
+  including provider loss, process restart, overload, and partial availability.
+- Complete compatible backup/restore, migration, replay, and state-integrity
+  behavior for a single candidate identity.
+
+## Work packages
+
+| ID | Deliverable |
+|---|---|
+| INT-1601 | Common UOW/effect protocol and transaction coordinator |
+| INT-1602 | Principal, delegation, correlation, deadline, and audit propagation |
+| INT-1603 | Cancellation, retry, idempotency, overload, and backpressure semantics |
+| INT-1604 | Crash, in-doubt, heuristic, unknown-outcome, and operator recovery |
+| INT-1605 | Mixed-provider backup/restore, migration, replay, and compatibility |
+| INT-1606 | Cross-resource matrix, soak, chaos, scale, and differential suites |
+
+## Early participant handoff and coherent restore
+
+The common early participant-contract rule applies before dependent provider
+adapters integrate. INT-1601 reviews and completes that accepted boundary; 0.16
+is not the first time CICS, Db2, IMS and MQ agree on transaction ownership,
+capabilities, prepare applicability, compensation limits, fencing, idempotency,
+lock order or recovery ownership. Record early slices under the existing parent;
+they neither complete 0.16 nor expose unfinished mixed-resource behavior.
+
+INT-1605 must restore a coherent mixed-resource recovery boundary, with compatible
+provider/schema generations and valid journal, checkpoint, artifact, replay and
+retention references. Independent successful provider restores are insufficient.
+Inject partial backup/restore, provider lag/loss and restart around that boundary;
+reject inconsistent sets or retain explicit recoverable/in-doubt/unknown states.
+INT-1606 proves all required capability combinations and failure obligations on
+one candidate without claiming universal atomicity or exactly-once behavior.
+
+## Parallelization
+
+Transaction, identity, cancellation, recovery, and backup/restore matrix shards
+can run in parallel. The public UOW state machine, effect ordering, lock order,
+durable log schema, and final candidate merge each have one owner.
+
+Provider adapters may be developed incrementally as their contracts freeze, but
+0.16 cannot complete until all five dependency versions are accepted.
+
+## Exit gate
+
+- The required mixed-resource commit, rollback, compensation, in-doubt,
+  heuristic, and unknown-outcome matrix passes at every injected failure point.
+- Principal, deadline, cancellation, idempotency, audit, and result causality
+  remain intact across every supported provider boundary.
+- Restart, retry, backup/restore, migration, overload, and concurrent mutation
+  preserve documented invariants with no silent partial success.
+- No provider-private shortcut bypasses the common UOW or SAF authorities.
+- Full CardDemo journeys pass under mixed-resource fault injection.
+
+## Non-goals
+
+- Claiming universal exactly-once or atomic behavior for combinations whose
+  observable contract permits heuristic or unknown outcomes.

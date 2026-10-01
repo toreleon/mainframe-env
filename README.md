@@ -16,7 +16,7 @@ presented as licensed IBM equivalence.
 | Latest published release | [0.8.2](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.8.2), source bundle only |
 | Current workspace version | `0.8.3` (development) |
 | Development baseline | `0.8.3` contains unreleased pre-0.9 hardening after the published 0.8.2 tag |
-| Next planned minor | [0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md) |
+| Implementation progress | [Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md) |
 | Production readiness | Not claimed |
 | Licensed differential status | Required campaigns remain pending where the release notes say so |
 
@@ -24,11 +24,11 @@ The [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) recorded the
 original no-go for broad implementation. Its R-01–R-15 P1 items (#101–#115)
 were closed through PR #131 on 2026-09-09, and the integrated entry gate accepted
 the post-review candidate that day. The tracked
-[0.9 status record](docs/delivery/coverage-versions/status/0.9.0.md) documents
+[CICS application API progress](docs/delivery/subsystems/cics/application-api-status.md) documents
 that decision and its fix mapping. The accepted gate authorizes implementation;
 it does not establish 0.9 release readiness or licensed certification.
 
-The [0.12.0 implementation status](docs/delivery/coverage-versions/status/0.12.0.md)
+The [Db2 core progress](docs/delivery/subsystems/db2/core-status.md)
 tracks recovered Db2 parser slices. They do not grant whole-row catalog,
 execution, conformance, differential, or licensed credit.
 
@@ -128,7 +128,7 @@ receive no evidence credit.
 - [Verification strategy](docs/delivery/VERIFICATION-STRATEGY.md)
 - [Versioning and release policy](docs/delivery/VERSIONING-AND-RELEASES.md)
 - [0.8 release notes](docs/releases/0.8.md)
-- [0.9.0 readiness status](docs/delivery/coverage-versions/status/0.9.0.md)
+- [0.9.0 readiness status](docs/delivery/subsystems/cics/application-api-status.md)
 - [Pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

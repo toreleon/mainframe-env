@@ -1,0 +1,71 @@
+# COBOL — Execution semantics
+
+Subsystem: **cobol**
+Phase: **execution**
+Target release: **0.4.0**
+
+Status: **Implemented — pass-with-licensed-differential-pending**
+Start gate: 0.3 typed COBOL model and publication legality accepted
+Completion dependencies: cobol.structure
+Estimate: 12–18 engineer-months
+
+## Outcome
+
+Execute every mandatory Enterprise COBOL 6.5 programming row through the
+reference runtime and prove it against a licensed compiler/runtime environment.
+
+## Owned scope
+
+- Implement DELETE, START, INVOKE, MERGE, RELEASE, sort-file RETURN, SORT, and
+  every remaining statement form and phrase.
+- Implement all 82 intrinsic functions with exact type, boundary, exception,
+  locale/code-page, date/time, numeric, and determinism behavior.
+- Complete numeric/floating/national/UTF-8/DBCS, pointer/object, dynamic-length,
+  table, file, sort/merge, declarative, inter-program, OO, and method/function
+  runtime semantics.
+- Add complete file status, size-error, exception phrase, rounding, truncation,
+  overflow, alias, and storage-initialization behavior.
+- Implement versioned LE callable-service and host-extension registries.
+- Repair known incompatibilities such as TEST-NUMVAL result positioning.
+
+## Work packages
+
+| ID | Deliverable |
+|---|---|
+| CB-401 | Remaining statement and control semantics |
+| CB-402 | Full intrinsic-function runtime |
+| CB-403 | Complete data representation and expression runtime |
+| CB-404 | File, sort/merge, declarative, call, OO, and LE runtime |
+| CB-405 | Checkpoint/state migration for new runtime values |
+| CB-406 | Bounded GnuCOBOL reference campaign, failure/recovery evidence, and licensed COBOL differential handoff |
+
+## Parallelization
+
+CB-401 through CB-404 may use separate interpreter modules once operation and
+value contracts freeze. CB-405 is serialized with durable-state ownership.
+Oracle cohorts in CB-406 can run by statement/function family in parallel.
+
+0.4 can run alongside 0.5–0.7. Db2/IMS/MQ parser work may proceed, but embedded
+host integration must consume the final 0.4 extension ABI.
+
+## Exit gate
+
+- Every mandatory COBOL row is recognized, validated, executed, and
+  conditioned.
+- All stateful rows pass checkpoint/restart/cancellation/resource gates.
+- No accepted unsupported COBOL row remains.
+- The approved GnuCOBOL 3.2.0 `reference=gnucobol` portable allowlist campaign
+  and focused comparator mutants pass with a candidate-bound external receipt.
+- Licensed Enterprise COBOL 6.5 differential remains exactly 0/153 pending;
+  its real positive, negative, boundary, condition, and interaction campaign is
+  mandatory at the 0.17 release-certification hard gate.
+- CardDemo and all earlier COBOL fixtures remain byte/condition compatible.
+- Every execution/condition/recovery/differential claim extends an accepted 0.3
+  Conformance IR obligation and is derived from explicit executable verdict
+  events; broad workload success alone grants no row coverage.
+
+## Non-goals
+
+- Optimized native execution.
+- Subsystem semantics beyond the host-extension contracts.
+- Treating GnuCOBOL or any other reference simulation as licensed IBM evidence.

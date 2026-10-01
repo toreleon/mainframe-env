@@ -51,7 +51,7 @@ The machine-readable companion is
 `conformance/roadmap/ibm-official-coverage-roadmap.json`.
 
 The prepared implementation dossiers are indexed at
-[`docs/delivery/coverage-versions/README.md`](../delivery/coverage-versions/README.md),
+[`docs/delivery/subsystems/README.md`](../delivery/subsystems/README.md),
 including the dependency graph and safe parallel work lanes.
 
 ## Measurement contract

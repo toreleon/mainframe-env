@@ -1,0 +1,9653 @@
+# CICS — Application API progress
+
+Subsystem: **cics**
+Phase: **application-api**
+Target release: **0.9.0**
+Status: **Implementation in progress; application API acceptance and licensed differential remain incomplete**
+
+Current G5 candidate (#325): **260 typed / 0 legacy / 3 unready** application
+rows. The remaining unready rows are 0027, 0093, and 0114. The historical
+checkpoint counts below describe their named earlier commits.
+
+The `CIC-901.registration-admission` hardening slice binds executable identity
+lookup, compiler/interpreter catalogs, and CICS semantic verification to a plan
+operation set generated from the sealed typed registrations. Its scope is
+admission only: the reserved ISSUE COPY row 0114 keeps its canonical codec
+identity but cannot enter an executable catalog or pass a forged generic or
+operation-specific semantic contract. The registry remains **260 typed / 0
+legacy / 3 unready**. The source reference is `sources-b`, catalog row 0114,
+topic `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuecopy3270logical.html`,
+SHA-256 `5dbb492e27c785e28f50bad277640a3193a4f90b367c1a36da9812d8af6683b8`.
+Acceptance requires negative decoded-plan/interpreter admission regressions,
+compiler/interpreter catalog parity, generated-registration freshness and
+mandatory documentation/dependency policy checks. This grants no command or
+licensed differential credit.
+The IR (160), compiler (341), and interpreter (116) library regressions pass,
+including the negative admission cases. The descriptor tooling suite (34),
+catalog parity test, spec/docs/changelog, generated freshness, module boundaries,
+formatting and dependency policy checks pass. The broader conformance library
+attempt ran 256 passing tests, four failures caused by an unset
+`CARDDEMO_CORPUS_DIR`, and two ignored tests; it is not a passing full-suite or
+CardDemo completion result.
+
+`CIC-906.container-replay-retention` owns full-codec validation of private
+`cics-container-replay-v1` rows before the existing capacity-CAS archive path.
+It reuses the container writers' schema and the outer CICS/core effect authority,
+binds execution/run/principal ownership, and preserves the store epoch, recovery
+dependencies, watermark and atomic capacity replacement. Owning modules are the
+CICS retention codec and server maintenance planner. Acceptance covers malformed
+and foreign-owner receipts without mutation, valid private-first/outer-second
+pruning, Memory/SQLite reopen and PostgreSQL parity. No row readiness or licensed
+credit changes.
+Focused acceptance passes: 37 CICS container regressions, 15 server maintenance
+regressions, and the explicitly selected PostgreSQL archive/rejection test on an
+isolated PostgreSQL 18.6 instance. The ordinary maintenance run leaves that
+PostgreSQL test ignored; its separate passing execution supplies backend evidence.
+Nine corrupt/schema/version/foreign-owner cases preserve private and outer rows,
+capacity, archive contents and the provider epoch on all three backends. This is
+retention-slice evidence, not CardDemo-full or v0.9 final-candidate certification.
+
+The export audit fixes #326 and #327 leave the registry at **260 typed / 0
+legacy / 3 unready**. The interpreter releases a channel GET CONTAINER SET area
+on the next SET retrieval of the same container, successful DELETE CONTAINER or
+MOVE CONTAINER of that source, successful DELETE CHANNEL, or program completion;
+released bases remain invalid across checkpoint/restore. This follows baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_getcontainerchannel.html`
+(SHA-256 `e699b5c003cedd015c05ec116bd05e5cdd46e8fce2f0bd070559555984386674`).
+The BTS GET CONTAINER topic
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getcontainerbts.html`
+(SHA-256 `e486de8019489b85dbcf0b0f343849d0cc088a331c03054db7329aa1da58ad16`)
+specifies a task-wide next-GET-SET/task-end lifetime; BTS-owned GET remains
+fenced at the provider, so no BTS SET area is created. Container recovery now
+rejects stored CCSIDs other than the PUT-writable set (none or 37), for both
+channel and BTS rows, before exposing their contents.
+
+## Declared CIC-904.bts-container.get-length
+
+Parent CIC-904 remains in progress. This slice owns row 0086 GET CONTAINER
+length/data-copy obligations for the BTS INTO, SET and NODATA forms, and the
+typed INTO prefix writer shared with the channel form. Dependencies are the
+accepted 0.4 host ABI, 0.5 SAF, BTS lifecycle/UOW authority and durable
+coordinator. Owners are `handlers/bts_container/bts.rs`, typed interpreter
+output conversion and the selected compiled server restart route. No registry,
+stored-row, checkpoint format or command identity changes are planned.
+
+The source-reviewed rules are output-only FLENGTH for SET/NODATA; negative INTO
+length interpreted as zero; BTS unequal INTO lengths returning LENGERR 22/11;
+actual container length returned, with neither larger nor truncated INTO areas
+padded. Acceptance requires positive/negative provider cases, checked interpreter
+prefix copies, compiled COBOL/coordinator/SAF execution with SQLite and PostgreSQL
+reopen, relevant container regressions and mandatory policy/derived gates.
+
+Authority is `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, row 0086,
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getcontainerbts.html`
+(`e486de8019489b85dbcf0b0f343849d0cc088a331c03054db7329aa1da58ad16`),
+plus the channel form `commands-api/dfhp4_getcontainerchannel.html`
+(`e699b5c003cedd015c05ec116bd05e5cdd46e8fce2f0bd070559555984386674`).
+Both topics were hash-verified and read offline. The current BTS provider does
+return SET data; earlier notes describing a dispatch fence are historical.
+Task-wide BTS SET-area retirement across program boundaries remains open and
+is not certified by this length slice. Readiness stays 260/0/3 and licensed
+differential stays pending.
+
+Focused acceptance passes: both new provider regressions (negative/zero/equal/
+short/long and omitted INTO FLENGTH, plus SET/NODATA output-only receiving
+fields), all 39 CICS container regressions and all 118 interpreter library
+regressions. The selected compiled BTS route passes after SQLite reopen and an
+explicit PostgreSQL 18.6 reopen execution; independent COBOL storage and
+RESP/RESP2/EIBRESP/EIBRESP2 assertions establish prefix preservation, actual
+length and LENGERR 22/11. Both affected compiled channel-route regressions pass.
+No durable row or checkpoint migration is needed. These results certify only
+this length/data-copy slice, not task-wide BTS SET lifetime, full CardDemo or
+licensed final-candidate conformance.
+
+## Declared CIC-904.bts-container.get-scope-conditions
+
+Parent CIC-904 remains in progress. This slice owns GET CONTAINER row 0086's
+implicit channel/BTS selection and source-defined missing-scope conditions:
+current activity INVREQ 16/4, PROCESS 16/25, ACQPROCESS 16/15, ACQACTIVITY
+16/24, missing child ACTIVITYERR 109/8, missing container CONTAINERERR 110/10,
+and INTOCCSID without an explicit/current channel INVREQ 16/2. An implicit
+current channel takes precedence over a coexisting active BTS context; explicit
+BTS selectors retain their BTS meaning. Existing PUT/MOVE/DELETE conditions
+are outside this slice and must not change.
+
+Owners are the shared container dispatcher and BTS scope/read resolver, with
+the accepted host ABI, SAF, lifecycle acquisition/context and coordinator as
+dependencies. Acceptance requires focused positive/negative dispatch and
+condition regressions, no container/process/acquisition mutations on failures,
+compiled RESP/RESP2/EIB proof through SQLite and PostgreSQL reopen, affected
+container regressions, and mandatory policy/derived checks. No row, checkpoint
+or operation-identity change is planned.
+
+The hash-verified offline authority is baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands:0086`, BTS topic
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getcontainerbts.html`
+(`e486de8019489b85dbcf0b0f343849d0cc088a331c03054db7329aa1da58ad16`),
+and the implicit-channel rule in `commands-api/dfhp4_getcontainerchannel.html`
+(`e699b5c003cedd015c05ec116bd05e5cdd46e8fce2f0bd070559555984386674`).
+Readiness stays 260/0/3; task-wide BTS SET lifetime and licensed differential
+remain pending. The separate linked-program virtual-storage model must be
+addressed at the shared task ABI rather than certified by a per-machine release.
+
+Focused acceptance passes: the new missing-scope/data regressions and the
+enhanced coexistence regression first failed against the preceding implementation,
+then pass with the source-defined conditions and distinct channel/BTS payloads.
+Failure paths preserve the exact process, acquisition, activity index/context,
+pending container, capacity and private replay rows; normal task/audit journaling
+is not falsely treated as a container mutation. All 41 container regressions
+pass. The broader affected CICS library has 657 passing and 19 ignored tests;
+those ignored environment tests earn no completion credit. The compiled BTS
+route passes SQLite and explicitly executed PostgreSQL 18.6 process reopen,
+asserting all seven conditions, RESP/RESP2, EIB values, and untouched receiving
+data/length fields. Both selected compiled channel regressions pass. This is
+slice evidence only; no full minor, CardDemo-full or licensed claim is made.
+
+## Declared CIC-902.local-link.installed-program
+
+Parent CIC-902 remains in progress. This slice owns row 0138 LINK's already
+typed local PROGRAM/COMMAREA/LENGTH path for installed immutable CICS program
+definitions. It selects the latest installed generation through the existing
+program-definition/artifact authority and selected LINK executor, preserves the
+caller continuation and checked COMMAREA prefix/copy-back, and establishes the
+callee EIBCALEN from that prefix. Missing/disabled/unloadable target and program
+SAF denial need source-defined PGMIDERR/NOTAUTH conditions; remote/Java/entry
+offset modes remain explicitly unsupported rather than dispatched as COBOL.
+Existing no-definition compatibility routing is not replaced.
+
+Owners are `handlers/program_control.rs` and the server's selected LINK adapter,
+with the accepted typed plan, host ABI, SAF, program/artifact definitions and
+durable call/coordinator/replay authorities as dependencies. No new coordinator,
+program namespace, request schema, checkpoint or operation identity is planned.
+Acceptance requires compiled parent/callee execution, independent copy-back and
+EIBCALEN assertions, source-defined negative and deny-before-call cases, exact
+replay without a second child run, SQLite/PostgreSQL reopen, affected program
+control regressions and mandatory policy/derived gates.
+
+Offline authority is baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands:0138`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_link.html`, SHA-256
+`d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`.
+Readiness stays 260/0/3. CHANNEL, INPUTMSG, remote LINK/DPL, application-context
+version selection, shared-task virtual storage/lifetimes and licensed full-row
+completion are not certified by this installed local-COMMAREA slice.
+
+Focused acceptance passes. The compiled caller/callee fixture reproduced zero
+installed child-call receipts before the fix. On SQLite and an explicitly
+executed isolated PostgreSQL 18.6 test, the child now writes its EIBCALEN of four
+and `OK` into the four-byte passed span while a write in the child's larger
+linkage declaration cannot overwrite the caller's trailing `zzzz`. RESP/RESP2
+and EIBFN are asserted independently from compiled storage after reopen.
+Reissuing the original compiled LINK after reopen returns the stored four-byte
+result without changing the outer CICS or child-call receipts; changed LENGTH
+under that key fails with IdempotencyConflict. The caller then resumes and ends.
+
+Four provider regressions cover latest-generation selection, replay retaining
+the original selection despite a newly installed generation, disabled latest
+generation without older-generation fallback (27/2), unavailable artifact
+(27/3), compatibility host NotFound (27/1), remote/Java/nonzero-entry rejection,
+program-resource denial (70/101) with deny audit, and pre-dispatch cancellation
+and timeout. The interpreter separately proves short/empty copy-back without
+padding and overlong host-output rejection without writing. The CICS library
+passes 661 tests with 19 environment tests ignored; those skips are not backend
+credit. The interpreter passes 119 tests. Five selected server regressions for
+legacy LINK, immutable INVOKE APPLICATION, BTS LINK ACQPROCESS, BREXIT and
+installed-call preflight pass. Descriptor tooling passes 48 tests and spec
+passes its 134 tooling tests. This is local slice evidence only, not licensed
+differential, CardDemo-full or full-row/minor completion.
+
+No durable schema or source pin changes. Existing name-only legacy routes are
+retained; their transport/payload restrictions are not removed. Selected calls
+now fingerprint the actual callee COMMAREA binding. Completed outer CICS replay
+remains readable; an older in-flight inner call with a different fingerprint
+must fail closed, not redispatch. Shared CICS task state/virtual addresses across
+linked machines and the remaining CHANNEL, INPUTMSG, remote/application-context
+obligations remain pending. The next independent work remains those task-scope
+and program-transfer obligations, plus final integrated/licensed gates.
+
+## Declared CIC-902.invoke-application.commarea-copyback
+
+Parent CIC-902 remains in progress. This slice owns the already typed row 0106
+INVOKE APPLICATION's local COMMAREA/LENGTH return-copy boundary. The selected
+program executor already bounds the child reply and sets callee EIBCALEN from
+the passed prefix, but typed output conversion can blank-pad the caller's
+remaining area. The interpreter must copy only the returned prefix; the
+application provider must reject a wrong-schema or overlong host reply rather
+than exposing it as a valid COMMAREA result. Owning modules are typed CICS output
+conversion, `program_control/invoke_application.rs` and compiled server tests.
+Existing application/version selection, installed ABI, SAF and durable call and
+outer replay are dependencies; no new coordinator, schema, registry or source
+authority is introduced.
+
+Acceptance requires independent short/empty/overlong output tests, bad host
+reply rejection, compiled application invocation with EIBCALEN and untouched
+caller suffix, SQLite/PostgreSQL reopen and exact replay, affected INVOKE/LINK
+regressions and mandatory policy/derived gates. Source authority is baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands:0106`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_invokeapplication.html`,
+SHA-256 `bb3ae579baa513fb2f08fdf61f464b047d319ac7ce8153c25c696e65a985cadc`.
+The selected topic was verified and read offline. Readiness remains 260/0/3;
+CHANNEL/application-context/shared-task semantics and licensed full-row/minor
+acceptance remain pending.
+
+Focused acceptance passes. Before the repair, the compiled application call
+blank-padded the caller's trailing `zzzz`, and the provider accepted a five-byte
+reply for LENGTH 4. The repaired selected application call passes on SQLite and
+an explicitly executed isolated PostgreSQL 18.6 reopen test: child EIBCALEN is
+four, returned bytes are `00044f4b`, caller suffix `zzzz` is untouched, and
+RESP/RESP2/EIBFN are checked from compiled storage. Original invocation replay
+after reopen leaves the outer and child-call receipts unchanged; a different
+LENGTH under the same key fails closed, then the caller resumes and ends.
+
+Fresh host-reply tests accept short/empty data and reject overlong results with
+and without explicit LENGTH, plus wrong reply schema, without publishing a
+completed outer replay. An eighteen-case legacy/current receipt matrix accepts
+valid short/empty results and handled conditions without COMMAREA data, and
+rejects overlong, output-schema, payload-schema, missing-output, mismatched
+payload/output and condition-with-data cases. Those finalized/legacy
+receipt reads preserve the exact stored rows and provider epoch and never
+dispatch a child. Replay validation reuses the existing source/domain limits;
+the CICS facade's production-line count does not grow.
+
+The CICS library passes 664 tests, with 19 environment tests ignored and no
+failures; the interpreter passes 119 tests, including independent prefix and
+overlong-output checks for both LINK and INVOKE APPLICATION. Six focused
+application provider tests, the compiled application and local-LINK SQLite
+fixtures, and existing selected INVOKE/LINK server regressions pass. The new
+PostgreSQL test is executed separately, not counted as an ignored test's credit.
+Descriptor tooling passes 48 tests and spec passes 134 tooling tests. These
+results give local slice evidence only, not full-row/minor or licensed credit.
+
+No stored schema, command tag or source pin changes. Valid legacy/current
+COMMAREA receipts remain readable; previously accepted malformed/overlong
+replies now fail closed. The selected call ABI and task-scope limitations from
+the preceding local-LINK slice remain unchanged. This validation covers fresh
+host replies and CICS-private replay, not a new original-LENGTH guard on generic
+coordinator replay; interpreter prefix conversion checks the receiving area,
+and an independent audit of that generic replay boundary remains pending.
+Shared linked-task state and
+virtual-address lifetimes, CHANNEL/application-context semantics, the three
+unready identities, integrated final-candidate and licensed gates remain open.
+
+## Declared CIC-902.local-link.reply-bounds
+
+Parent CIC-902 remains in progress. This slice owns row 0138 local LINK's
+fresh host and legacy/current CICS-private COMMAREA reply validation, including
+name-only compatibility hosts. The provider currently drops the returned schema
+and can publish more bytes than the original LENGTH. Owning modules are shared
+program control, its application-invoke consumer, provider regressions and the
+compiled server replay/restart fixture. Reuse the installed program ABI, existing
+coordinator, SAF and replay protocols; preserve LINK's existing 1..32763 and
+INVOKE APPLICATION's 1..24576 explicit length domains. No new schema, registry,
+checkpoint or source authority is planned.
+
+Acceptance requires focused failing fresh/replay LINK regressions, unchanged
+INVOKE APPLICATION and handled-condition replay behavior, compiled local LINK
+through the selected provider/coordinator on SQLite and PostgreSQL reopen,
+and relevant policy/derived gates. Baseline is
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands:0138`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_link.html`, SHA-256
+`d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`.
+The selected source and TOC were verified and all 403 lines read offline; eleven
+unrelated B-scope topics are unavailable. No refresh or source repin is needed.
+
+Inspection of `ExecutionCoordinator::execute_resumable_with_control` corrects
+the preceding provisional replay concern: core records hold digests, not reply
+bodies. Resume invokes the scoped host/provider under the original effect and
+requires its result digest to equal the completed core record before exposing
+the result to the machine. Thus CICS-private validation is not bypassed by
+generic durable replay. Independent interpreter receiving-area bounds do not
+themselves enforce original LENGTH; custom unmediated hosts remain responsible
+for that contract. Shared-task lifetimes, other LINK options, the three unready
+identities and full integrated/licensed gates remain pending.
+
+Focused acceptance passes. Both new LINK tests first reproduced a five-byte
+result accepted for LENGTH four, on fresh dispatch and legacy receipt replay.
+Shared program-control validation now rejects bad schema, overlong results,
+missing normal COMMAREA output, payload/output disagreement and condition replies
+carrying copy-back data. Valid handled conditions remain readable without an
+output. Fresh selected and compatibility host cases cover short, empty,
+wrong-schema and overlong replies; legacy/current matrices cover 28 cases per
+command (56 total), including command-specific maximum, excessive, zero,
+negative and omitted LENGTH. Reads preserve exact retained rows/epoch and never
+dispatch another child. Existing test hosts now return data within the passed
+span instead of fabricating five bytes for a four-byte area.
+
+The CICS library passes 666 tests with 19 environment tests ignored and no
+failures. Three focused compiled server checks pass on SQLite reopen and are
+executed explicitly on separate isolated PostgreSQL 18.6 databases: online LINK,
+INVOKE APPLICATION and the new LINK coordinator replay. Each PostgreSQL run
+executes one test, none ignored. The new route starts with fresh compiled storage
+after reopen, replays the completed effect through the real scoped host/provider,
+and verifies EIBCALEN four, returned `00044f4b`, untouched caller suffix `zzzz`,
+EIBFN, unchanged core/private/child receipts and a second journaled result for
+effect one. The durable checkpoint then resumes to completion with no additional
+child call. This independently establishes the inspected core replay path.
+
+Dependency policy, formatting, descriptor freshness, module boundaries,
+changelog, regenerated documentation/check and diff checks pass. No production
+facade growth, new module, stored schema, checkpoint or source pin is introduced.
+Valid historical replies remain readable; malformed historical LINK replies
+now fail closed and may need operator repair, never automatic child redispatch.
+XCTL and local DATALENGTH behavior are unchanged. Readiness remains 260/0/3;
+these focused results are not full-row/minor or licensed differential credit.
+
+## Declared CIC-902.program-task.frames
+
+Parent CIC-902 and v0.9 remain in progress. This slice owns local LINK row
+0138 and selected INVOKE APPLICATION row 0106 task/frame ownership, with
+HANDLE CONDITION 0099, IGNORE CONDITION 0100, POP HANDLE 0146 and PUSH HANDLE
+0149 as logical-level consumers, plus ASSIGN row 0011 lineage/link level and
+RETURN row 0178 lower-level task lifetime. Required obligations are callee-local handlers
+and stack, caller restoration, one shared task/UOW, frame-scoped effect/audit
+identity, bounded reentry, principal/concurrency fencing and lower-level RETURN
+without task-end cleanup. Owners are existing CICS host boundary, task context,
+handle state, program control and task RETURN, with the selected COBOL executor
+and compiled server regressions as consumers. This is owned IBM semantics,
+not a new commodity framework or coordinator.
+
+Use the accepted dependency, SAF, coordinator, installed-call intent, session
+and provider-row authorities. Unresolved child intents remain non-redispatchable.
+An additive durable frame protocol requires a boundary ADR, bounded compatible
+reader, retention/recovery fences and backend restart proof before integration.
+Acceptance includes a failing compiled caller PUSH/child POP regression, caller
+restoration, nested depth/identity tests, shared file update/rollback, denied,
+cancelled and failed child restoration, and SQLite/PostgreSQL selected-route
+replay/restart plus mandatory policy/derived gates. Shared virtual addresses and
+task-wide SET storage lifetime are separate pending obligations; a frame repair
+alone cannot close them. No new readiness or official coverage is claimed.
+
+Offline source authority is baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands` rows listed above. Relevant verified
+topics under `SSJL4D_6.x/reference-applications/commands-api/` are
+`dfhp4_link.html` (SHA-256
+`d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`),
+`dfhp4_handlecondition.html`
+(`4355374497f90dc693ddc5eab4c90231b433e3580613ef4201c7975bb61bf7ba`),
+`dfhp4_pophandle.html`
+(`73f11954246a7448bcefe7ff1f0fa55ecc3f9877c7658824ac491d8a6c8a4f7e`)
+and `dfhp4_pushhandle.html`
+(`09c6ba45b2ca6b18930ac13375ecf3526efcaac21a602dd8607fbd129fd0e199`).
+Search and full selected topic reads verify relevant bytes and TOC; eleven
+unrelated topics in that partial B cache are missing. Consult remaining sources
+before their semantic changes. No refresh or publication body is committed.
+
+The first compiled regression reproduced the unrepaired runtime failure. Command:
+`cargo test -p mainframe-env-server --lib compiled_local_link_handle_frames_recovers_after_sqlite_restart --locked`.
+It executes caller PUSH, selected local LINK, child POP with RESP, caller POP
+with RESP, and suspension through the durable coordinator. With the caller's
+terminal session explicitly bound at launch, compiled storage is
+`00040000` plus untouched `zzzz`, instead of independent expected `00040010`
+plus `zzzz`: the child consumed the caller's stack. Without that launch binding,
+the same preliminary test passed because child registration silently chose a
+different default session; that is not proof of one shared task. The strengthened
+fixture also requires one session, caller restoration and durable replay/reopen.
+The in-progress repair supplies owned command/program leases, a stable task
+invocation, a separate current-frame effect invocation and frame-local HANDLE
+state. Child updates return to the single shared Run; child HANDLE persistence
+cannot overwrite the root session. Lower-level bare RETURN no longer cleans
+task resources. Admission checks program/artifact, parent identity, principal,
+generations, shared cancellation probe and non-widening deadline/resource limits.
+Other threads and terminal lifecycle operations are fenced while a loan is
+active; held tasks still count against admission capacity. ADR-0027 remains
+proposed, not accepted.
+
+Compiled SQLite regressions now pass for LINK handler isolation, lower RETURN,
+INVOKE APPLICATION handler isolation, and child READ UPDATE followed by lower
+RETURN and caller REWRITE with either commit or rollback. The PostgreSQL 18.6
+LINK and INVOKE APPLICATION handler, file commit and file rollback variants also pass on separate fresh
+databases. These selected-route fixtures reopen the backend, replay the durable
+outer result, compare retained call/private/core receipts and resume a checkpoint
+without child redispatch. The file fixtures independently check both command
+responses and actual record bytes (`003EDIT` on commit; original `003DATA` on
+rollback). They do not prove independent resumption of an in-flight child.
+The current WIP CICS library run passes 675 tests with 19 environment tests
+ignored. Seven focused lease/admission tests include live cancellation, narrowed
+frame budgets, recursion and held-task capacity. Nine existing syncpoint tests
+and the three existing compiled SQLite LINK, INVOKE APPLICATION and coordinator
+replay regressions pass after the runtime edits. Ignored tests earn no credit;
+these observations are not a sealed final-candidate receipt.
+
+Terminal cleanup now holds an exclusive, thread-confined session lease across
+provider calls outside the state mutex. Actual completion, abort, suspension,
+discard, disconnect and expiry interleavings pause the first cleanup provider
+read and verify concurrent admission, dispatch, input, registration, restore
+and duplicate cleanup are rejected without changing the session row. Both the
+successful and injected-failure matrices pass; failure releases the lease and
+leaves the task available. The existing terminal lifecycle owner now owns
+disconnect as well, reducing the protected service facade rather than growing it.
+
+Final lower-RETURN review added a regression for an already-claimed task
+continuation. A child bare RETURN originally deleted that row; only root RETURN
+may retire it. The repair preserves exact continuation bytes/map ownership on
+child return and still removes the row on root return. The logical-frame tests
+now use the normalized uppercase session identity, strengthening their row
+comparisons from accidental absent-key comparisons to the actual stored session.
+This does not close all RETURN options or pending ABEND/unknown-call obligations.
+After that fix, all eight focused logical-frame tests pass, as does the compiled
+SQLite lower-RETURN/reopen test. The compiled child SYNCPOINT commit and rollback
+tests also pass again on SQLite and on separate fresh PostgreSQL 18.6 databases
+(`v09_frame_child_commit_20261001_c` and
+`v09_frame_child_rollback_20261001_c`); each PostgreSQL check executes one test
+with none ignored. Earlier results below keep their original tested-input scope.
+
+A compiled child-issued SYNCPOINT regression reproduced the identity
+conflation: the core SYNCPOINT effect belonged to the selected child execution,
+but the UOW provenance named the root execution. The repair keeps root writes
+byte-compatible `MECU2` and uses bounded `MECU3` only for distinct effect/task
+owners. All three generations remain readable without read-time rewriting;
+partial, equal-owner, oversized, trailing and mislabeled V3 metadata is rejected.
+The strengthened compiled child commit and rollback fixtures now pass on
+SQLite reopen and explicitly executed PostgreSQL 18.6 reopen, each on a fresh
+database. They independently bind the core child effect and stable root task
+owner, inspect actual record bytes, and preserve exact UOW, core, private and
+installed-call rows through outer replay. These are not in-flight child-resume
+or licensed proofs.
+
+BTS reconciliation settles the root acquisition, not the child actor. Focused
+commit/rollback and forged-root tests pass; forged ownership preserves the
+acquisition and UOW. Pending V3 settlement after physical backend reopen passes
+on SQLite and explicitly on PostgreSQL, and reissue preserves the settled rows.
+The generic retention contract adds a bounded additional-execution proof to
+`CicsNested`. Memory, SQLite and PostgreSQL archive transactions reject missing,
+foreign-run, active, checkpointed, intent/unknown and oversized root proofs
+without changing source rows, archives or epoch. The safe terminal case passes.
+Server planning protects both executions in the core dependency snapshot and
+checks the root recovery fences for UOW and nested replay candidates. Existing
+backend validators were extracted into private modules under the same lock or
+transaction owner, and oversized facade ratchets were lowered, not widened.
+
+Verification of these repairs: the store retention contract passes 61 tests
+with four environment tests ordinarily ignored; its new PostgreSQL root-proof
+matrix was executed separately and passes. Server retention maintenance passes
+16 tests with one unrelated PostgreSQL container test ignored. The new codec,
+BTS owner/reconciliation and compiled child commit/rollback tests pass as
+described above. Earlier handler-isolation/file and CICS-library observations
+retain their original WIP scope; they are not renamed final-candidate receipts.
+The persistence contract records both owners, retention protection and downgrade
+requirements. Older binaries reject V3: drain writers and restore a verified
+pre-V3 backup, or retain the compatible reader; never discard the root identity.
+
+The architecture route guard originally treated a diagnostic probe inside the
+terminal unit-test module as a production dispatch route (including the existing
+probe in the preceding commit). It now reuses the module ratchet's proven
+terminal-test boundary; six regressions cover both source trees, production
+before/after test modules, raw-string markers and missing roots. Production
+driving remains prohibited outside `ExecutionCoordinator`. The retention guard
+now follows the extracted private deletion validator and still requires both
+dependency variants and execution-list bounds; its mutation regression passes.
+The new codec unit module is placed after production, not before the decoder.
+
+The public-API documentation ratchet is not fully green: unchanged execution
+and host API packages report 303/176 and 1427/1128 undocumented items. Neither
+package has changes in this repair. The affected store API remains at its
+unchanged 95-item limit and all new fields have documentation. Do not raise
+unrelated ratchets or call the full architecture/API acceptance complete.
+
+Repair checks pass for formatting, dependency policy, spec (134 tooling tests),
+changelog, regenerated docs/check, module boundaries, common production route
+and affected persistence/retention guards. Full `architecture-fast --check`
+passes those owned guards and descriptor/source-map/corpus/projection freshness,
+then stops in the unchanged sources-A automatic review: pinned
+`SSJL4D_6.x/fundamentals/connections/dfht1c0079.html`, SHA-256
+`cb6ff139ab0b7bb2832dc03dd4f53672181657f11d0740a417aab84819aaf254`,
+is absent from the configured integration cache, retained topic-path root and
+retained raw hash path. The earlier default-cache miss for `dfhp37p.html` was
+resolved by selecting the existing integration cache; its pinned raw bytes and
+repository-parser read verify. No refresh, repin, browser operation or whole-cache
+audit was performed. The unchanged missing-topic failure was not retried. These
+blockers, pending frame semantics and missing licensed/final integration evidence
+keep the review PR draft and this slice unsealed.
+
+Additional source review: ASSIGN row 0011 uses sources A baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, topic
+`dfhp4_assign.html`, SHA-256
+`594c0885848525ccc9c0c1f939a449f0d759f90ada7d29a82ed580342a99bbee`.
+RETURN row 0178 uses sources C baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, topic
+`dfhp4_return.html`, SHA-256
+`71396046a1caeab92a27bc0debfac79b2bb5a0d5567db69887c8e5ad1e0b84c4`.
+Shared file/UOW consumers use READ row 0156 (sources B), `dfhp4_read.html`,
+SHA-256 `856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`;
+REWRITE row 0181 (sources C), `dfhp4_rewrite.html`, SHA-256
+`0ef4733dca7d0a743ad31939c61ecf7a820a0885ca56aeef48f5bbef6254d3fc`;
+and SYNCPOINT row 0218 (sources C), `dfhp4_syncpoint.html` /
+`dfhp4_syncpointrollback.html`, SHA-256
+`2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34` /
+`566d8661a0af02559d8679234e959d2e2aa2577dcf14c55211ec07c7c03e2954`.
+All paths share the commands-api directory above. Selected topics and TOCs are
+verified offline; unrelated partial-cache holes grant no source credit.
+
+Acceptance remains pending: deterministic nested identities compatible with
+legacy pending-call fences, ancestor HANDLE ABEND search, actual selected-route
+deny/cancel/failure restoration, cross-provider frame recovery and final slice
+policy/derived checks. Do not seal this slice from normal-path proof alone.
+The current changes are a focused repair commit, allowed by the common execution
+contract, not a `Complete CIC-902.program-task.frames` commit or passing slice
+seal. The review PR must keep these remaining obligations explicit; no frame
+slice, command-readiness, official coverage or full-minor completion is claimed.
+
+Continuation at `b8896942` starts the remaining ancestor explicit-ABEND obligation
+inside this same slice, adding consumers HANDLE ABEND row 0097 and ABEND row
+0001. Owners remain the task-control and logical-program lease modules; selected
+LINK/INVOKE and compiled COBOL are consumers. Required proof is nearest active
+logical-level exit, current-level precedence, skipped inactive/suspended exits,
+deactivation/reset, task-wide CANCEL bypass, exact original abend metadata,
+restored caller context and no child redispatch after durable outer replay.
+Unknown installed-call outcomes must not be converted into a handler result.
+General machine-check/default-condition abends and full HANDLE ABEND PROGRAM
+transfer execution remain separate acceptance obligations, not inferred from
+explicit ABEND LABEL proof.
+
+Offline authority adds sources B `dfhp4_handleabend.html` (row 0097), SHA-256
+`ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`,
+and `applications/designing/dfhp378.html`, SHA-256
+`1ca20494e0ff11efc12073511fb76ddd50bb384f0eaafd2a613e88349c579e31`;
+sources A `dfhp4_abend.html` (row 0001), SHA-256
+`a138b2bdbd99e655e07f3b773d5b45bb91a0ce633b36215e8a46825b2033f425`.
+The command topics use the directory/baselines above; the design topic is below
+`SSJL4D_6.x/`. Selected topics and TOCs were verified and fully read offline.
+Search reports the existing unrelated partial-cache holes, not a selected-source
+failure. No refresh or body import was performed.
+
+The focused repair now unwinds only an observed explicit child ABEND paired
+with its known installed-executor ABEND result. Nearest active ancestor LABEL
+selection, local precedence, suspended-exit exclusion, deactivation and task-wide
+CANCEL use the existing logical loans. Mismatched/unknown executor replies stay
+UnknownOutcome and fence further commands. Latest/original ABEND metadata is
+task-wide, including a normally returning child-local exit; root session
+persistence uses the existing authority. Handled ABEND retains task resources,
+but still-protected START requests are unconditionally discarded. START row
+0205 source `dfhp4_start.html`, sources C baseline above, SHA-256
+`35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`,
+was verified and fully read offline; lines 271–277 define this cancellation.
+LINK exception design `applications/designing/dfhp3c00237.html`, sources B,
+SHA-256 `15437f723e698bf2e69bc0e5688daabf69e0b66aaf1369ee119bd6630892ef7e`
+was also verified/read; its separate DPL context is not credited as local proof.
+
+Retained outer replies add bounded `ABEND.CODE` and pair it with `ABEND.DUMP`.
+Replay rejects partial, forged and unbounded control metadata without COMMAREA
+copyback or child redispatch. The interpreter preserves the original code/dump
+on unhandled LINK/INVOKE outcomes; historical replies without the additive output
+keep their old interpretation. In-flight markers remain volatile, and a known
+child ABEND does not fabricate a completed installed-call reservation: that row
+remains under its existing recovery/retention fence. Downgrade requires a
+compatible reader or a verified pre-change backup, not reply rewriting.
+
+Fourteen focused frame tests pass, including exact task-enqueue retention under
+handled ABEND and release under CANCEL, unknown-result fencing, and strict
+replay validation. The selected compiled LINK regressions pass on physical
+SQLite reopen for ancestor LABEL, CANCEL bypass and child-local LABEL return.
+Each also ran explicitly on a separate fresh PostgreSQL 18.6 database, one test
+with none ignored: `v09_frame_ancestor_abend_20261001_b`,
+`v09_frame_cancel_abend_20261001_a`, and `v09_frame_local_abend_20261001_b`.
+The ordinary SQLite command reports three PostgreSQL tests ignored; those skips
+are not credited. Cold ASSIGN reads prove persisted task metadata in handled
+cases. Exact outer core, private CICS and installed-call rows survive replay.
+Removing the LINK unwind step from the correctly registered selected fixture
+reproduced Completed instead of required Suspended; restoring it makes the test
+pass. Earlier invalid fixture requests earned no regression credit.
+
+Two interpreter ABEND metadata tests, the compiled normal LINK/INVOKE handle
+frame pair, and the existing compiled HANDLE ABEND RESET/PROGRAM pair pass.
+The protected START commit/rollback/ABEND regression also passes. None of these
+closes general/default-condition ABEND, ancestor PROGRAM execution, explicit
+INVOKE ABEND selected-route proof, legacy unknown-call identity compatibility,
+cross-provider recovery, virtual-storage lifetime or final/licensed acceptance.
+This remains a focused repair, not a completed/sealed frame slice or v0.9.
+
+Focused repair gates pass for formatting, dependency policy, changelog,
+module boundaries, typed semantic boundaries and the common production-route
+guard. The extracted selected fixture is explicitly enclosed in a terminal
+`cfg(test)` module; no guard exemption was widened. Documentation is regenerated
+and checked for this repair. The unchanged missing pinned architecture-review
+topic and unrelated public-API ratchet failures recorded above remain blockers;
+they were not rerun without changed evidence. Earlier broad suites retain their
+original input scope and are not relabeled as final-candidate receipts.
+
+## CIC-902.program-task.frames installed-program identity repair
+
+Continuation at `1dd5cf64` addresses installed program occurrence identity in
+`CIC-902.program-task.frames`. Scope: local LINK row 0138 and INVOKE APPLICATION
+row 0106, plus the shared installed-program dispatch used by BTS/bridge/web
+consumers. Owners are CICS host-boundary/current-frame bookkeeping and the
+existing COBOL installed-call protocol reader. The task-global host counter must
+not choose a new child after warm retry or reopen. Stable identity binds the
+outer durable effect, frame actor and bounded per-command program occurrence;
+changed inputs retain an idempotency conflict, not a second mutation. The
+installed-call protocol must explicitly fence counter-era runs before allowing
+the new domain, preserve cached old replies, and never rewrite pending receipts.
+Required proof: compiled selected child mutation followed by injected uncertainty,
+warm and cold exact pending-row retention/no redispatch on SQLite/PostgreSQL,
+legacy pending/completed compatibility and malformed/version/domain fences.
+This is owned persistence infrastructure, not a new IBM command or option.
+Sources B LINK row 0138 was searched/read offline at the existing pinned hash
+above; unrelated partial-cache holes remain explicit. No new source pin or
+publication body is introduced. Other nested subsystem identities and remaining
+frame semantics stay separate required acceptance obligations.
+
+The compiled selected LINK regression first reproduced a second installed-call
+reservation after child WRITE committed and became uncertain. Dataset bytes
+remained unchanged in that reproducer; it does not prove a second business
+mutation. The repair uses `cics-program-v2:` keys derived from durable outer
+command, root run, frame actor and bounded per-command occurrence. The existing
+fingerprint still owns input/selected-generation conflicts. Fresh protocol
+admission, including ordinary COBOL admission before LINK, now writes JSON
+schema 3 in `cobol-call-protocol@2`; schema 2 and legacy markers are not rewritten
+and cannot authorize the new domain. Cached historical replies remain readable.
+Missing protocol authority beside a retained new-key receipt remains unknown,
+not a newly created protocol. ADR-0027 and the effect/retention contracts record
+exact key framing, version/digest, bounds, dependencies and rollback rules.
+
+Focused local verification on the repaired inputs:
+
+- Compiled LINK and INVOKE APPLICATION each commit a real selected child
+  WRITE then inject uncertainty. Warm direct-provider retry and physical reopen
+  preserve the exact one pending installed-call row, `ONCE` dataset bytes and
+  unknown core effect: **two SQLite and two PostgreSQL 18.6 cases passed**.
+  PostgreSQL cases ran separately with `--ignored` against fresh isolated
+  databases, not as skipped evidence.
+- **45 COBOL tests passed**, covering installed calls, cancellation, retained
+  instances, retention, old counter-era fences and recovery. Four identity tests
+  cover the 12-case memory/SQLite legacy pending/completed matrix, completed
+  warm/cold replay, changed-input conflict, missing protocol, malformed domains,
+  digest/version/owner/terminal fences and occurrence bounds. Memory copies are
+  deterministic compatibility probes, not process-reopen evidence. PostgreSQL
+  legacy-marker matrix and full mixed/nested-family acceptance remain pending.
+- Existing compiled LINK/INVOKE HANDLE-frame SQLite reopen cases passed (two).
+  Selected bridge, BTS LINK reconciliation and web-service replay consumers
+  passed (one each). These provider probes do not grant compiled IBM credit.
+- The logical-frame identity probe passes with a frozen key vector, actor/outer/
+  occurrence separation, missing identity rejection and caller-counter restore.
+  Existing 14 other frame probes passed earlier in this repair on unchanged
+  production inputs; they are not a new final-candidate suite.
+- Dependency policy and changelog checks pass. Formatting, module boundaries
+  and production execution-route checks pass on an exported staged candidate.
+  The live checkout's unrelated local ABEND fixture changes fail formatting and
+  the route guard; they are preserved and excluded from this feature commit.
+  Typed semantic boundaries pass on the intended checkout. Documentation is
+  regenerated and checked after the final prose edits. No ratchet was widened.
+
+Source review searched/read sources B LINK row 0138 and INVOKE APPLICATION row
+0106, plus sources C WRITE FILE row 0253 for the real child mutation. Verified
+topics are `reference-applications/commands-api/dfhp4_link.html` SHA-256
+`d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`,
+`dfhp4_invokeapplication.html` SHA-256
+`bb3ae579baa513fb2f08fdf61f464b047d319ac7ce8153c25c696e65a985cadc`, and
+`dfhp4_write.html` SHA-256
+`b10def8933ac6db8e73c4876370202c496e01e5dd295e2993fb33f528ed98685`,
+all beneath `SSJL4D_6.x/` and their 2026-09-10 sources B/C baselines. Source
+review is offline reference only, with zero licensed execution credit.
+No workers, network refresh, whole-cache audit or publication-body import ran.
+Full v0.9 acceptance and existing documented infrastructure/source blockers
+remain open; this focused repair does not close the frame slice or the goal.
+
+## CIC-902.program-task.frames PROGRAM-exit continuation
+
+Continuation from `1cc829e7` adds a compiled diagnostic for HANDLE ABEND row
+0097 PROGRAM, explicit ABEND row 0001, LINK row 0138 and ASSIGN row 0011. A
+root owner registers PEEXIT; PELEAF abends at logical level two. The actual
+online transfer selects PEEXIT at level one, preserves the registering owner's
+eight-byte COMMAREA rather than the child's four-byte area, and exposes latest
+and original ABCODE, origin ABPROGRAM, PROGRAM and LINKLEVEL through ASSIGN.
+The suspended exit checkpoint and pending installed-call row survive physical
+backend reopen without redispatch of the child.
+
+The initial normal-completion experiment **failed with UnknownOutcome**. Stored
+rows show the abandoned PELEAF instance remains busy and the run's active count
+remains one. The online replacement has a different execution ID from the
+retained run/protocol owner. The committed diagnostic explicitly expects this
+unresolved completion fence and verifies that run, instance, protocol, pending
+call, exchange and continuation rows are not erased or relabelled as successful.
+It is not a passing normal-completion acceptance test. Repair requires an owned
+known-ABEND lifecycle and stable run-owner handoff; uncertain child outcomes must
+still fence. No production semantics, durable schema or authority changed here.
+
+The HANDLE ABEND and abnormal-recovery topics above were re-read offline with
+pinned Python 3.12.13; no source pin, publication body, framework or worker is
+introduced. Exit deactivation/reset, normal completion, nearest non-root PROGRAM
+replacement, equivalent INVOKE APPLICATION behavior and general/default-condition
+recovery remain required, not inferred from this root-owner diagnostic. Full
+v0.9 acceptance remains open.
+
+Focused verification: the compiled cold-reopen diagnostic passes once against
+SQLite and once against a fresh PostgreSQL 18.6 database (the normally ignored
+PostgreSQL case was explicitly selected, not skipped). Both assert the original
+child's durable execution is Failed, the installed reply remains pending and
+the six named provider-state authorities remain unchanged after the fenced
+completion attempt. These are local diagnostic checks with zero licensed
+execution credit, not a normal-completion acceptance receipt.
+
+## CIC-902.program-task.frames known-ABEND instance lifecycle
+
+Continuation from `930f576c` implements the abandoned-instance half of the
+declared PROGRAM-exit completion repair. Relevant rows remain sources A ABEND
+0001 and ASSIGN 0011, sources B HANDLE ABEND 0097 and LINK 0138, in an allowed
+local installed-CICS context. Owners are the existing installed COBOL executor,
+instance/run-state codec and retention descriptor; the actual online transfer,
+coordinator, selected program and pending-call authorities are unchanged.
+
+The exact durable Failed execution plus terminal Abend event now permits an
+atomic run-active decrement and non-reusable instance disposition, never a
+successful installed-call reply. Instance schema 2 retains bounded child
+version/attempt proof and current open-file obligation. The metadata digest
+binds namespace, program, artifact, root owner, child and open-file flag. Normal schema-1
+bytes and earlier busy-instance behavior remain unchanged. Missing, generic
+non-Abend Failed, foreign or mismatched proof and CAS conflicts cannot retire a
+lease. Unknown outcomes stay busy and cannot be retried to rebuild their frames.
+
+The abandoned instance stays Active retention state with exact child/root
+execution dependencies, and CALL/CANCEL cannot reset it. Only owned task-end
+cleanup with no active or open-file obligations can delete it after exact proof
+validation.
+ADR-0027 and the retention contract document strict compatibility and rollback:
+old readers reject schema 2; drain and retain a compatible reader or verified
+backup, never relabel a pending call or remove its proof.
+
+The compiled PROGRAM-exit cold-reopen diagnostic now observes active count zero
+and the known-abandoned instance, but still fences task completion because the
+replacement execution lacks the original run owner. Stable owner handoff,
+nearest non-root PROGRAM replacement, general/default recovery and full v0.9
+acceptance remain required. This repair does not close the frame slice.
+
+Focused checks: seven new memory/SQLite lifecycle/codec probes pass, including
+SQLite store reopen, a frozen metadata vector, fourteen missing/non-Abend/foreign
+terminal cases, stale instance CAS, non-reuse, open-file/CANCEL and other-active
+instance fences. The separate PostgreSQL 18.6 case explicitly executes against
+a fresh database: a losing run stays fenced while a distinct known-ABEND run
+survives reopen and completes atomic owned cleanup. Fifty-one existing/new COBOL
+tests passed during the repair; the external PostgreSQL case's default skip
+earns no credit and is recorded only from its explicit execution.
+
+The actual compiled PROGRAM-exit diagnostic passes on SQLite and a fresh
+PostgreSQL 18.6 database with an inactive known-abandoned child; normal task
+completion still expects UnknownOutcome for the owner-handoff gap. The actual
+compiled LINK and INVOKE APPLICATION AfterMutation-unknown fixtures each pass
+warm retry and cold SQLite/PostgreSQL reopen with unchanged busy schema-1
+instances, active count one, pending reply and one-time business bytes. These
+are focused local proofs, not licensed IBM execution or full frame acceptance.
+
+## Declared CIC-902.program-task.frames durable run-owner handoff
+
+Continuation from `9460b447` implements the remaining root PROGRAM-exit
+run-owner handoff in the existing online exchange/continuation and installed
+COBOL owner-binding contracts. Scope remains ABEND 0001, HANDLE ABEND 0097,
+LINK 0138 and ASSIGN 0011 in the local compiled online context. The prerequisite
+known-abandoned-instance disposition remains authoritative; a pending call is
+not converted into success. Required proof is selected PROGRAM-exit completion
+after SQLite/PostgreSQL reopen, with unchanged pending-child identity and
+correct owner COMMAREA/ABEND metadata. Ownership must survive repeated transfers,
+strict codec validation, staged handoff recovery and core retention. Legacy
+ownerless rows cannot authorize guessed transferred ownership. Normal/legacy
+read compatibility, malformed/mismatched owner, failed/missing original handoff,
+CAS/recovery and bounded dependency guards remain required. No alternate
+coordinator, task workflow or security evaluator is introduced. CICS provider
+acquisition/UOW ownership across replacement, nearest non-root PROGRAM exits
+and general/default recovery remain separately required, not inferred from this
+COBOL run-owner repair.
+
+The root PROGRAM-exit route now passes actual normal completion after SQLite
+and an explicit isolated PostgreSQL 18.6 reopen execution. It observes owner
+COMMAREA `OWNER123`, current/original `U789`, child `PELEAF`, exit `PEEXIT` and
+logical level 1; removes the online exchange/checkpoint and abandoned instance;
+ends the original COBOL run/protocol; and leaves the pending installed-call
+reservation byte-identical. The earlier expected-UnknownOutcome diagnostic is
+replaced with this positive regression, not relabeled as a full-family pass.
+Five owner/codec/CAS/retention regressions pass, including frozen digest framing,
+legacy read bytes, malformed/foreign/missing/non-handoff/failed root rejection,
+repeated actor-owner binding and orphan/corrupt continuation fencing. Existing
+XCTL (2), HANDLE ABEND including staged recovery (2), pseudo-conversation (1),
+COBOL (52 passed / 1 ignored) and retention (16 passed / 1 ignored) regressions
+pass. Those unrelated ignored PostgreSQL tests earn no current-candidate credit.
+
+Authority was searched and read offline before this semantic change: sources B
+baseline `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, HANDLE ABEND row
+0097 topic `SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleabend.html`
+(`ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`), plus
+abnormal-recovery context `SSJL4D_6.x/applications/designing/dfhp378.html`
+(`1ca20494e0ff11efc12073511fb76ddd50bb384f0eaafd2a613e88349c579e31`).
+These pinned references do not constitute licensed execution evidence. No
+network refresh, publication-body import or v0.9 final certification occurred.
+
+## Declared CIC-902.program-task.frames restored CICS task ownership
+
+Continuation from `1f101404` addresses the remaining CICS task-owner mismatch
+when PROGRAM/XCTL replaces a root online actor. The existing validated online
+owner/handoff and CICS Run/current-frame boundaries remain the authorities; no
+provider-private task ledger, borrowed CALL retry or inferred acquisition owner
+is permitted. Scope is restoration of the original task execution for existing
+BTS acquisitions and UOW settlement, while effects/audits retain the replacement
+actor. Required proofs are compiled DEFINE PROCESS before a handled child
+ABEND, selected PROGRAM-exit SYNCPOINT commit/rollback after SQLite/PostgreSQL
+reopen, unchanged pending-call identity, and exact root/actor UOW provenance.
+Warm restoration must retain shared task resources and fail without mutation
+on conflicting owner, widened authority, live loans, stale session or capacity.
+Legacy ordinary restoration remains supported; ownership cannot be guessed
+from durable resource rows. Nearest non-root PROGRAM exits, general/default
+ancestor recovery and final v0.9 certification remain separate obligations.
+
+Implemented through the existing exchange V2/core handoff proof and provider
+Run/current-frame split. The provider's explicit task/actor restoration API
+requires embedding attestation, equal run/principal/attempt/generations and
+non-widening scope. The product restores root identity/selector/artifact from
+core authority while retaining validated current permissions/controls; it does
+not claim to reconstruct unpersisted original Invocation fields. Warm file
+updates, records, cursors and channels remain shared; cold restoration reloads
+existing durable HANDLE/undo only. Session version is rechecked after undo
+load, and idle-session/live-loan/cleanup/capacity fences precede replacement.
+No codec or namespace is added. Existing MECU3 keeps task and effect owners
+distinct and retention protects both; prior downgrade rules remain unchanged.
+
+Source review used hash-verified offline search/read, with no refresh or licensed
+execution credit. Catalog prefix `ibm-cics-ts-6x-2026-08-31:api-commands:`:
+
+- Sources A `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, row 0003
+  ACQUIRE PROCESS, `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_acquire.html`,
+  SHA-256 `646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a`;
+  row 0037 DEFINE PROCESS, `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_defineprocess.html`,
+  SHA-256 `a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`.
+- Sources B `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, row 0097
+  HANDLE ABEND, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleabend.html`,
+  SHA-256 `ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`;
+  recovery context `SSJL4D_6.x/applications/designing/dfhp378.html`,
+  SHA-256 `1ca20494e0ff11efc12073511fb76ddd50bb384f0eaafd2a613e88349c579e31`.
+- Sources C `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, row 0218
+  SYNCPOINT, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpoint.html`,
+  SHA-256 `2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34`;
+  ROLLBACK variant `SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpointrollback.html`,
+  SHA-256 `566d8661a0af02559d8679234e959d2e2aa2577dcf14c55211ec07c7c03e2954`.
+
+All selected topics matched; baseline search inventories remain partial
+(A 171 verified/2 missing, B 174/11, C 221/3). Those unrelated holes are neither
+refreshed nor promoted to source-completeness evidence.
+
+Focused local verification: provider restoration 4/4 (including 15 negative
+scope/owner cases), logical-frame regressions 17/17 and cleanup interleavings
+2/2; compiled PROGRAM-exit SQLite 2/2 (the BTS case runs commit and rollback),
+and all three isolated PostgreSQL 18.6 exit cases explicitly selected 1/1 each.
+The latter confirm actor-owned core SYNCPOINT intent, task-root MECU3 metadata,
+acquisition release and process commit/removal after reopen. Pending CALL rows
+remain byte-for-byte unchanged and final COBOL owner/run/protocol state closes.
+Affected exchange owner/codec/CAS/retention units 5/5, XCTL 2/2, HANDLE ABEND
+2/2 (including staged recovery), pseudo-conversation 1/1 and local LINK/file/UOW
+7/7 pass. Six unrelated PostgreSQL LINK cases were not selected; their skips
+earn no current parity credit. Existing dead-code warnings are unchanged.
+
+Dependency policy and changelog pass. Formatting, module budgets, execution
+route and typed-boundary checks pass on an index export excluding the unrelated
+dirty ancestor fixture; this is not whole dirty-checkout or Jenkins candidate
+certification. Product/service ratchets lower from 6014/3420 to 6008/3392, with
+no ceiling increase. Documentation is regenerated normally and checked. No
+licensed IBM oracle, full-source audit or final release gate was attempted.
+
+## Declared CIC-902.program-task.frames immutable target staging
+
+Continuation from `d92f14ac`: freeze an eligible local CICS program definition
+in the PROGRAM/XCTL Transfer result before existing outer replay/core result
+publication. Attest that retained selection against the exact completed source
+CICS effect and observed target/payload, never a later generic name lookup.
+Stage a deterministic target invocation identity, inherited-context digest and
+exact reference-machine start checkpoint inside the original pending CALL.
+Owners: CICS program control/ABEND and replay owner; installed COBOL CALL codec,
+artifact adapter and target-staging helper. Acceptance: generation replacement
+cannot retarget a staged transfer; malformed/foreign/mismatched result and
+selection fail closed; checkpoint/identity/context/CAS bounds and retention;
+compiled selected SQLite/PostgreSQL physical reopen and negative proof tests;
+normal program routes and policy/module/docs guards remain intact.
+
+Do not complete source handoff or release/acquire instances yet. The start
+checkpoint precedes last-used instance admission; a later owned phase must
+validate/apply instance authority under CAS, acquire same-level CICS admission,
+preserve caller/task/channel/COMMAREA, complete source handoff and execute the
+target. Legacy/name-only transfers lacking selection remain protected unknown;
+no selection may be fabricated from current catalogs. Readiness and licensed
+credit remain unchanged. No new coordinator, ledger or automatic redispatch.
+
+Implemented: existing CICS Transfer output freezes canonical MECPGD1 definition
+bytes. The read-only attestor binds completed core effect and MECER003 replay
+owner/run/attempt/capability/key/sequence/deadline/result to observed target and
+payload, validates the exact immutable generation and executable artifact,
+and rejects unready definitions. Original CALL schema 4/CAS 3 saves the full
+bounded invocation DTO (including controls, bindings, generations and audit)
+and canonical-base64 constructor checkpoint, not merely its digest. Live probe
+presence is retained, but a trusted run-scoped probe must be explicitly
+reinstalled before use. Target identities/digests have frozen independent
+framed vectors. Reserved selection metadata and target phases fail closed on
+malformation; active retention adds exact definition/replay dependencies.
+ADR 0027 defines the wire fields, limits, migration and pre-admission boundary.
+
+Pinned offline source review: sources B baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands:0097`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleabend.html`, SHA-256
+`ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`;
+sources C baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0263`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_xctl.html`, SHA-256
+`36f21ef4427db220cc83f8d92b3f37296df4fc9f546ff10200ac61f891aa73fc`.
+Both selected HTML topics were hash-verified and read locally. Other cache holes
+were not refreshed or credited. Current-level PROGRAM now uses the issuer's
+entry COMMAREA; root-only retrieve compatibility remains. No new handler or
+channel inheritance rule was inferred.
+
+Focused compiled proofs: ancestor PROGRAM, direct/current-level PROGRAM and
+nested XCTL pass on SQLite and explicitly selected fresh PostgreSQL 18.6
+databases after physical reopen. Each independently reconstructs/restores the
+exact target constructor checkpoint, checks inherited context and retained
+ROOT COMMAREA binding, confirms no target core execution, verifies generation 1
+selection after generation 2 and generic catalog replacement, and rejects
+wrong result digest/owner/payload. CALL bytes and source checkpoint remain
+unchanged on cold replay; source stays Suspended, instance busy, run active and
+caller unknown. The unchanged child-SUSPEND SQLite regression also passes.
+This is target-staging evidence only, not target execution, source retirement,
+instance release, complete program-family closure or final v0.9 certification.
+
+Invocation context roundtrip/strict-negative units 2/2, target phase/vector
+units 2/2, existing source-intent units 6/6 and COBOL retention units 4/4 pass.
+The reserved CICS selection unit, two legacy/current program replay units and
+the outer replay clock/strict-codec unit pass. Normal local LINK/file/UOW routes
+8/8 and root PROGRAM exit/explicit BTS settlement routes 2/2 pass on SQLite.
+Seven unrelated PostgreSQL LINK tests and one root PROGRAM PostgreSQL test were
+not selected; they earn no current-candidate parity credit. The ordinary pending
+control run ignores its four PostgreSQL tests; the three transfer cases were
+executed separately, while unchanged PostgreSQL child SUSPEND was not rerun.
+An initial assertion expecting already initialized constructor linkage was
+corrected: independent constructor equality and the saved ROOT binding prove
+pre-init staging, not executed target storage. A malformed synthetic semantic
+identity in the new reserved-output fixture was corrected before its pass.
+Existing dead-code warnings remain unchanged.
+
+Dependency/license policy, changelog and normally regenerated documentation
+checks pass. Module/typed-boundary checks pass without ratchet increases;
+product/service ceilings remain 6008/3392. Staged-index formatting and execution
+route checks exclude the unrelated user-owned dirty ancestor fixture. This is
+not whole dirty-checkout or Jenkins candidate evidence. No licensed oracle,
+whole-cache refresh, full CardDemo or final release aggregate was attempted.
+
+## Declared CIC-902.program-task.frames transfer-intent persistence
+
+Continuation from `78c83f12`: capture the installed executor's observed
+same-level Transfer (HANDLE ABEND PROGRAM row 0097 / XCTL row 0263) inside its
+existing pending CALL reservation. The durable source checkpoint alone does
+not retain the returned Transfer selector/payload. Bind the intent to the exact
+source execution, attempt, artifact, suspended journal version and checkpoint
+digest/sequence; advance only that reservation's CAS. Owners: installed COBOL
+executor and CALL codec/retention reader. Acceptance: strict bounds, digest,
+schema/row-version and owner validation; old receipt compatibility; failure
+before/at persistence; compiled SQLite/PostgreSQL close/reopen proving retained
+target intent, unchanged source/instance authority and unknown caller outcome;
+focused normal CALL regressions and policy/architecture/docs gates.
+
+This is the first durable replacement-protocol phase, not target admission or
+execution. Keep the source Suspended, checkpoint retained, instance busy and
+CALL pending. A later phase must obtain immutable target selection through the
+existing CICS resource/security owner, stage the exact target checkpoint,
+revalidate source proof, own same-level frame and instance disposition, then
+complete handoff and execute/return. Do not select a possibly different target
+from the generic installed-program catalog or invent completed handoff proof.
+No new coordinator, namespace, automatic redispatch or readiness/license credit.
+
+Implemented observation capture: pending-only JSON receipt schema 3, row CAS 2,
+in the existing namespace. The original source remains Suspended with retained
+checkpoint and busy/active instance; caller storage remains unchanged and its
+outer effect remains UnknownOutcome. Secondary cursor failure also cannot
+replace pending control with a known return. ADR-0027 records exact digest
+framing, reader versions, retention and downgrade requirements. Ordinary schema
+2 writes omit the new field and old cached replies stay readable. No target
+artifact has been selected, no target checkpoint staged, no handoff completed.
+
+Local scoped verification: six new transfer codec/proof/CAS/vector/error tests
+pass, including 29 source-proof/observed-control rejection probes; four existing
+CALL identity tests and four retention tests pass. Independent compiled SQLite
+PROGRAM/XCTL intent-reopen cases pass (2), with unchanged child SUSPEND (1).
+Fresh PostgreSQL 18.6 PROGRAM and XCTL cases explicitly pass 1/1 each on
+`v09_intent_program_20261001_c` / `v09_intent_xctl_20261001_b`. Exact pending
+intent/source/checkpoint/run/instance/protocol/CICS replay bytes survive physical
+close/reopen; warm commands/restore/cleanup and cold replay remain fenced.
+Normal nested CALL (1), active-instance lifecycle (1), compiled normal LINK (1),
+root PROGRAM SQLite (2), and default POP SQLite (2) pass. Other PostgreSQL cases
+remain ignored, not credited. No executable Invoke fixture/official Invoke
+credit is added by the classification unit.
+
+Pinned offline source authority is the adjacent unresolved-control section:
+sources-B row 0097 HANDLE ABEND and sources-C row 0263 XCTL, catalog prefix
+`ibm-cics-ts-6x-2026-08-31:api-commands:`. Both selected full reads match their
+recorded SHA-256 identities. Unrelated cache holes remain unrefreshed. No IBM
+execution oracle, full-source audit, CardDemo-full or final-candidate gate is
+claimed. Full replacement admission/execution, suspension resume and v0.9
+remain incomplete; readiness is unchanged at 260 typed / 0 legacy / 3 unready.
+
+Dependency policy (all four checks), changelog and regenerated docs pass.
+Formatting, module budgets (738 production modules; unchanged exemptions),
+execution-route and typed-boundary guards pass on index export tree
+`2da22f9d206c47ef30ce500c15c122ec8df91831`; subsequent changes are this
+verification prose and generated documentation hashes only. No API/size ceiling
+increased. The unrelated dirty ancestor fixture is untouched and excluded from
+staging. These are intended-checkout scoped tests and staged-source guards,
+not whole-dirty-checkout/Jenkins or licensed final-candidate certification.
+Receipts remain outside disposable Cargo targets.
+
+## Declared CIC-902.program-task.frames unresolved-control prerequisite
+
+From `a60e2627`, the next frame-replacement obligation includes non-root
+HANDLE ABEND PROGRAM (row 0097), nested XCTL (sources-C row 0263), and
+child SUSPEND (sources-C row 0214).
+The installed executor currently converts durable child Transfer/Invoke/
+Suspended outcomes into ordinary negative conditions, although its CALL
+reservation is pending and leased instance remains busy. A parent LINK RESP
+must not turn those unresolved control outcomes into normal continuation.
+Before adding the owned replacement/resume protocol, reject this false known
+return as UnknownOutcome and retain a volatile task/session dispatch fence.
+No fabricated completed CALL, terminal child proof, run cleanup or automatic
+redispatch is allowed. Existing durable coordinator/CALL authorities retain
+cold uncertainty; volatile fences must not pretend to add cold recovery.
+Owners: installed COBOL executor and existing CICS host-boundary dispatch.
+Acceptance: independent compiled non-root PROGRAM, nested XCTL and child
+SUSPEND regressions; SQLite/PostgreSQL physical reopen and pending-row byte
+identity; warm commands/restoration/cleanup rejected without mutation; existing
+normal LINK and known ABEND recovery preserved. This is a safety prerequisite,
+not replacement execution or full frame-family completion. Readiness/licensed
+credit remain unchanged.
+
+The compiled non-root PROGRAM regression reproduced the false known return:
+the root reached its own scheduler SUSPEND after the child selected an exit.
+The installed executor now preserves Transfer/Invoke/Suspended as unresolved
+UnknownOutcome; the existing task dispatcher fences that live session after
+a linked unknown result. Three SQLite regressions and three explicitly run
+PostgreSQL 18.6 fresh-database regressions pass for PROGRAM exit, XCTL and child
+SUSPEND. They assert unchanged caller storage, unknown outer effect, pending
+CALLs, busy source instance, exact suspended child/checkpoint and byte-identical
+rows after close/reopen/replay. Warm dispatch, restoration and cleanup reject
+without mutation; a focused unit probe preserves held resources while admitting
+an unrelated session. Existing 19 logical-frame tests, normal compiled LINK
+replay (1), root PROGRAM SQLite (2), default POP SQLite (2), online HANDLE ABEND
+(2), installed active-instance lifecycle (1), normal nested CALL replay (1), and
+fault-injected pending LINK/application identity SQLite (2) pass. Unrelated
+PostgreSQL variants remain ordinary-run ignored, not new-candidate evidence.
+Invoke is conservatively fenced by the shared outcome branch; this probe does
+not provide a separate source-derived executable Invoke fixture or family credit.
+
+Sources reviewed offline in full: sources-B baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, HANDLE ABEND row 0097,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleabend.html`, SHA-256
+`ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`;
+sources-C baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, XCTL
+row 0263 `SSJL4D_6.x/reference-applications/commands-api/dfhp4_xctl.html`,
+SHA-256 `36f21ef4427db220cc83f8d92b3f37296df4fc9f546ff10200ac61f891aa73fc`,
+and SUSPEND row 0214 `SSJL4D_6.x/reference-applications/commands-api/dfhp4_suspend.html`,
+SHA-256 `f6f4715d102266e134d06c08d24cbba29b6fe578be56c8ab0e446741b09e1811`.
+Catalog prefix is `ibm-cics-ts-6x-2026-08-31:api-commands:`. All selected pins
+match; eleven unrelated B and three C topics missing, no refresh. No durable
+codec changes or terminal child proof invented. This fixes false normal
+continuation, not execution of a replacement or resumed child. The next step
+still needs owned staging, same-level admission and instance disposition
+under exact durable handoff proof, preserving caller/task/COMMAREA ownership.
+
+## Declared CIC-902.program-task.frames default POP HANDLE recovery
+
+Continuation from `b7a8266c` addresses sources-B POP HANDLE row 0146 INVREQ's
+default abnormal termination when no matching PUSH exists at the child link
+level, with HANDLE ABEND row 0097 nearest active ancestor LABEL and LINK row
+0138 as consumers. Reuse the existing synchronous frame lease, durable child
+Failed/Abend proof, pending installed-call reservation and CICS replay owner.
+No guessed IBM abend code, generic condition-to-abend table, new workflow or
+redispatch policy is permitted. An origin marker must distinguish this exact
+source-backed default from explicit ABEND, preserve RESP/NOHANDLE/condition
+handler precedence and fail closed on forged or mismatched replay metadata.
+Owners are task_control, program_abend, existing host boundary and compiled
+server regressions. Acceptance requires deepest/nearest LABEL selection, no
+ordinary parent condition-handler inheritance, LINK RESP not suppressing the
+child abend, explicit child RESP suppression, unknown-result fencing, negative
+metadata validation, SQLite/PostgreSQL physical reopen/replay and policy gates.
+This is one default recovery obligation, not all default/machine-check abends
+or non-root PROGRAM replacement. No readiness or licensed credit is claimed.
+
+Source-reviewed full offline reads: sources B baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog prefix
+`ibm-cics-ts-6x-2026-08-31:api-commands:` rows 0146 and 0097; POP topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_pophandle.html`, SHA-256
+`73f11954246a7448bcefe7ff1f0fa55ecc3f9877c7658824ac491d8a6c8a4f7e`;
+HANDLE topic `SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleabend.html`,
+SHA-256 `ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`;
+recovery context `SSJL4D_6.x/applications/designing/dfhp378.html`, SHA-256
+`1ca20494e0ff11efc12073511fb76ddd50bb384f0eaafd2a613e88349c579e31`.
+All selected pins match; eleven unrelated B topics remain missing. No refresh.
+
+LINK row 0138 was read in full at
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_link.html`, SHA-256
+`d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`.
+Protected START cancellation uses sources-C baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row 0205,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_start.html`, SHA-256
+`35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+All selected pins match; three unrelated C topics remain missing.
+
+The compiled three-level regression first reproduced ordinary `NORM` return
+instead of the required nearest exit's `GOOD`. The repair reuses the existing
+pending marker/unwind boundary with exact `ABEND.DEFAULT` origin `POP-HANDLE`,
+INVREQ 16/0 and empty outer `ABEND.CODE`; it invents neither an IBM code nor a
+dump decision. Current-level condition precedence remains local; parent LINK
+RESP does not suppress default child abnormal termination. No namespace,
+protocol generation or completed installed-call receipt is introduced. ADR-0027
+and the retention contract document compatible-reader/drain downgrade rules.
+
+Focused checks: 19 logical-frame tests pass, including seven current-level
+precedence cases, four unknown/mismatched executor cases, six forged pending
+responses and twelve forged replay responses; four protected-START tests pass
+(including default POP recovery versus RESP). Two new SQLite tests exercise
+three independent compiled scenarios. The three corresponding PostgreSQL 18.6
+tests each pass on a fresh database after physical close/reopen. Retained core,
+CICS replay, pending installed-call rows and checkpoint bytes stay identical on
+replay; restored machines then complete and release their owned run. Existing
+root PROGRAM-exit SQLite regressions pass (2), as do online HANDLE ABEND tests
+(2). Their three unrelated PostgreSQL PROGRAM-exit tests remain ordinary-run
+ignored here; this does not relabel their older receipts as current evidence.
+No full-source audit, licensed oracle or final release gate was attempted.
+
+## Integrated compiler regression fix F1
+
+At integrated HEAD `ad446405`, the application registry remains **258 typed / 0
+legacy / 5 unready**. The compiler now checks source-reviewed INQUIRE candidates
+when no BTS selector appears in the canonical second-token position. This
+restores the specific unknown-option diagnostic for `INQUIRE FILE(...)` and
+resolves reordered `INQUIRE PROGRAM(...) ACTIVITYID(...)` as typed `INQUIRE
+ACTIVITYID`, with PROGRAM bound as an output. The legacy `INQUIRE PROGRAM`
+compatibility form remains scoped to its existing exact syntax. `GETNEXT TIMER`
+row 0093 stays unready because its source does not establish the browse cursor
+transition; operation tag 205 remains unassigned.
+
+## Declared CIC-905 conversation-control ISSUE slice
+
+`CIC-905.conversation-issue` starts from `589b7bad` with **151 typed / 112
+unready** application rows. Its complete and exclusive scope is the twenty
+`sources-b` catalog rows below. The isolated target is **171 typed / 92
+unready** only when all twenty are executable. Operation tags **239–258**,
+operand tags **1472–1599**, option tags **1404–1531**, and output tags
+**1528–1655** are reserved for this slice. The source baseline is
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`; each row has prefix
+`ibm-cics-ts-6x-2026-08-31:api-commands:`. All forms also allow the common
+`NOHANDLE`, `RESP`, and `RESP2` condition controls, with `RESP2` requiring
+`RESP`.
+
+The ISSUE worktree contains sealed conversation-open integration `fad10596`,
+sealed data/wait integration `9027d142`, and the bounded CIC-906 SAF/audit
+validation integration `28ae5736`. It also contains sealed BTS lifecycle
+integration `a293c1e6`. The pre-browse integrated registry had **231 typed / 32
+unready** rows; seventeen assigned ISSUE rows are
+registered: mapped ABEND, CONFIRMATION, ERROR, PREPARE, SIGNAL; basic GDS
+ABEND, PREPARE, SIGNAL; and DISCONNECT, ENDFILE, ENDOUTPUT, EODS, ERASEAUP,
+LOAD, PASS, PRINT, RESET (rows 0108–0109, 0112, 0115, 0117–0119,
+0121–0122, 0124, 0126–0129, 0133, and 0135–0136). If every ISSUE row
+later passes its execution gates,
+this integrated aggregate becomes **234 typed / 29
+unready**. The original **171 / 92** target above applies only to the
+unintegrated `589b7bad` comparison. ISSUE plan identities and codec tags are
+retained for implementation, including explicit MCEP v1 rejection of tags
+239–258 and canonical v2 encoding; the sealed ledger remains the sole APPC/MRO
+state authority. The retired pre-integration ledger module was removed during
+the bounded merge. Partner-side SIGNAL, CONFIRMATION, ERROR, and PASS effects
+must be consumed by the shared protocol path before any corresponding ISSUE
+row is promoted. The APPC ISSUE state transitions described in the earlier
+checkpoint notes below belonged to that pre-integration kernel; they are not
+active routes on this merged candidate. They must be ported into the sealed
+ledger and retested before row registration.
+The first post-merge ISSUE protocol addition restores the pinned six-byte GDS
+failure table inside the sealed conversation handler. Rows 0109, 0113, 0123,
+0128, and 0135 retain distinct PREPARE state/sync-level and CONFIRMATION
+sync-level codes. The focused return-code and module-boundary regressions
+pass. This is a response contract for future provider routes; it does not
+stage peer controls, consume partner results, or change the 184/79 catalog.
+The shared `ConversationRecord` now checks ISSUE owner lease, DPL context,
+mapped versus basic APPC kind, applicable sync level, and source state before
+control dispatch. It leaves the ledger unchanged; the GDS failure mapper keeps
+sync-level failures distinct from corrupt storage. Focused preflight and
+architecture tests pass. A later provider route must stage a control frame
+and consume its partner outcome before changing conversation state or
+registering any ISSUE row.
+The next bounded feature retains one ISSUE control intent in that same
+versioned conversation record. Staging preserves source-visible state;
+dispatch is marked durably before a carrier attempt, and only an explicit
+confirmed result applies the flow transition. A competing operation or FREE
+cannot discard a pending control, and task cleanup refuses to discard one
+whose dispatch was attempted. Optional fields preserve canonical older rows.
+Staging a canonical v1 record upgrades its record version and effective
+processing profile before persistence; the focused migration regression passes.
+Focused transition and SQLite reopen tests, the full 459-test CICS provider
+suite, and module-boundary review pass. [ADR-0021](../../../decisions/0021-conversation-issue-control-staging.md)
+records this boundary. No provider route yet transmits or consumes the
+control, so all ISSUE rows remain unready at 184/79.
+An isolated PostgreSQL 18.6 regression now races two providers staging the
+same control from one ledger version: one CAS wins, the pending control
+survives reopen, and a separately persisted attempt marker precedes its
+confirmed state transition. This is backend state evidence only; no carrier
+transmission or partner-side consumption is claimed.
+The five mapped ISSUE heads now have an internal provider staging route using
+the same ledger. It validates CONVID/SESSION and the principal default,
+checks SAF before mutation, retains exact request identity for uncertain
+retries, and suspends while a control is pending. A trusted confirmation hook
+atomically applies the state and final replay receipt. Direct provider tests
+cover same-key retry, changed-request conflict, foreign owner NOTALLOC,
+DPL-principal INVREQ/200, and SQLite reopen across staging, attempted dispatch,
+and final replay; all 464 CICS provider tests and the module gate pass. The
+hook has no carrier or partner consumption yet, and the public registry remains
+184/79 with every ISSUE row unready.
+The shared confirmed conversation carrier now exposes separate ISSUE control
+IDs, so data SEND and control attempts cannot collide on a token. An internal
+flush saves the control attempt marker before dispatch, reconciles by ID on
+restart, and writes the final replay only after explicit carrier confirmation.
+A focused mock-carrier regression proves one transmission followed by a
+read-only reconciliation. Partner ingress and public ISSUE routes are not yet
+bound; the integrated registry remains 191/72 and all twenty ISSUE rows stay
+unready.
+An isolated paired-carrier regression now delivers mapped ISSUE SIGNAL into
+the partner's sealed peer-frame ledger before returning confirmation. The
+source's pending control then completes, and the partner consumes SIGNAL
+exactly once through the same exchange used by SEND/RECEIVE. This proves the
+mapped SIGNAL ingress path; CONFIRMATION, ERROR, PASS carrier integration and
+the other ISSUE rows remain unready.
+A second paired-carrier regression stages SEND CONFIRM in a partner ledger,
+then internally issues mapped CONFIRMATION or ERROR. The ISSUE carrier waits
+for the partner SEND to reconcile and commit before confirming the issuer.
+Positive confirmation drains the pending send; ERROR retains IBM's four-byte
+`08890000` negative response by send ID for EIB projection. This exercises
+the shared data/wait partner response path, while production partner adapters,
+public ISSUE routing, and all twenty readiness gates remain incomplete.
+The internal mapped ISSUE command now calls that control carrier after staging
+and on a same-key resume. With no carrier it suspends without an attempt; a
+confirmed carrier result completes from the atomically saved replay. All six
+focused mapped ISSUE provider regressions pass, including paired SIGNAL and
+CONFIRMATION/ERROR consumption. The five mapped rows remain unregistered
+until selected public and compiled routes, carrier recovery, and remaining
+partner gates pass.
+The five APPC basic GDS ISSUE heads now share that staged control, carrier,
+and replay path internally. Confirmed results return a six-byte RETCODE,
+optional 24-byte DFHCDBLK CONVDATA, and numeric STATE. Wrong form, sync level,
+state, and owner return their pinned GDS codes without an EXEC CICS condition
+or a ledger mutation. An attempted ABEND survives SQLite restart and resolves
+through read-only carrier reconciliation without a second transmission; the
+503-test CICS provider suite and module gate pass. GDS command registration,
+partner adapter delivery, and all twenty ISSUE readiness gates remain pending.
+The conversation-control family now dispatches eight physical ISSUE heads
+(DISCONNECT, ENDFILE, ENDOUTPUT, EODS, LOAD, PASS, PRINT, RESET) to the
+existing durable device handler. The selected ENDFILE family route proves
+atomic state and exact replay. COPY, ERASEAUP, and the LU6.1 SIGNAL selector
+remain separate implementation work; none of the device rows is registered.
+COPY without CTLCHAR and ERASEAUP now also dispatch through the same family
+to the existing durable terminal/BMS authority. Selected COPY and ERASEAUP
+regressions pass within 51 runnable ISSUE tests. COPY with CTLCHAR still
+fails explicitly because the pinned command page lacks the referenced CCC
+bit table; its exact option semantics cannot be claimed from that page.
+LU6.1 SIGNAL selection and public registration remain pending.
+ISSUE SIGNAL now selects the sealed APPC record for an explicit CONVID, a
+four-byte SESSION that is an existing conversation token, or an owned mapped
+principal. Otherwise its symbolic SESSION/principal path reaches the existing
+LU6.1 device authority. The family route preserves the LU6.1 one-to-four
+character TCTTE selector and exact replay. A foreign APPC token colliding
+with a local TCTTE name returns NOTALLOC without signalling the device.
+LU6.1 CONVID-to-TCTTE binding and public registration still need proof.
+ISSUE ENDFILE row 0117 is registered after the public 3740 provider path,
+ENDOUTPUT companion flag, exact replay, source condition checks, Memory and
+SQLite routes, and selected compiled COBOL plan/host dispatch passed. The
+compiler now preserves source flag tokens consumed by a longer ISSUE
+recognition head; GDS ISSUE head parsing remains exact. The generated
+registry had 192 typed / 71 unready at that checkpoint.
+ISSUE ENDOUTPUT and EODS rows 0118–0119 now also have public provider routes,
+exact replay, source form checks, and selected compiled COBOL plans. ENDFILE
+on ENDOUTPUT sets both 3740 markers; EODS sets the 3650 end-of-data-set
+marker. The integrated registry is 194 typed / 69 unready; seventeen ISSUE
+rows remain unregistered, including COPY with unpinned CCC semantics.
+ISSUE LOAD row 0124 now binds the 3650 PROGRAM operand and CONVERSE flag
+through compiled COBOL and the public device route. Memory replay and a
+SQLite restart after uncertain commit preserve one loaded program and its
+conversation capability. The integrated registry is 195 typed / 68 unready;
+sixteen ISSUE rows remain unregistered.
+ISSUE ERASEAUP row 0121 now uses its public terminal/BMS route and selected
+compiled COBOL WAIT plan. The provider clears unprotected data/MDTs, moves the
+cursor, restores the keyboard, and replays the same terminal state. Its
+existing SQLite restart and negative owner tests remain applicable. The
+integrated registry is 196 typed / 67 unready; fifteen ISSUE rows remain.
+ISSUE DISCONNECT row 0115 and its compatibility sibling RESET row 0133 now
+have public device routes and selected compiled COBOL plans. Default use
+closes the owned session; a symbolic LU6.1 SESSION selects an alternate
+facility without severing the principal. Memory public replay, existing
+SQLite restart, PostgreSQL atomic races, owner/capability conditions, and
+source-pinned default/LU6.1 behavior support 198 typed / 65 unready. Thirteen
+ISSUE rows remain unregistered.
+ISSUE PRINT row 0129 now selects the first available configured printer on
+the public provider path. The terminal and printer commit one identical
+screen image, and exact replay does not print a second copy. Compiled COBOL
+dispatch, selected Memory, SQLite restart, PostgreSQL concurrency, SAF, and
+TERMERR cases support 199 typed / 64 unready. Twelve ISSUE rows remain.
+ISSUE PASS row 0126 now uses the public source route, selected compiled COBOL
+operands/flags, a commit-only task-end transfer, and the existing trusted
+target claim with once-only CICS EXTRACT LOGONMSG publication. The source
+session stays usable after an aborted task; a committed transfer disconnects
+it and admits exactly one target claim. Memory and SQLite tests plus two
+isolated PostgreSQL 18.6 restart/race tests pass on this candidate. The
+integrated registry is 200 typed / 63 unready; eleven ISSUE rows remain.
+Partner ABEND and PREPARE now enter the same versioned conversation ledger
+through a trusted, owner- and SAF-fenced peer event. The target persists its
+state and exact receipt before the source carrier confirms. Mapped and basic
+ABEND reach FREE with the pinned `0864` peer error; basic CONVDATA reports
+CDBERR/CDBFREE, and sync-level-2 PREPARE reaches SYNCRECEIVE with CDBSYNC.
+Paired carrier, foreign-owner/conflicting replay, and SQLite restart tests
+pass. These routes are still internal, so the registry stays at 200/63.
+Mapped ISSUE ABEND, CONFIRMATION, ERROR, PREPARE, and SIGNAL now pass public
+provider dispatch and selected compiled COBOL dispatch. SIGNAL reaches a peer
+frame before source confirmation; CONFIRMATION/ERROR resolve a target SEND
+CONFIRM and retain an exact negative response; ABEND/PREPARE commit their
+partner ledger changes before confirmation. Shared owner, DPL, SAF, replay,
+carrier recovery, and the MCEP v2 tag-258 boundary remain enforced. The
+generated registry is 205 typed / 58 unready, leaving the five GDS ISSUE rows
+and COPY.
+GDS ISSUE ABEND, PREPARE, and SIGNAL now pass public APPC basic dispatch with
+exact six-byte RETCODE, CONVDATA, and STATE outputs. Paired carriers commit
+target ABEND/PREPARE before source completion, while a basic SIGNAL is
+observed once through the target WAIT TERMINAL route. The GDS forms remain
+assembler/C-only in compiled COBOL. Focused Memory and existing SQLite
+reconciliation checks pass. The integrated registry is 208 typed / 55 unready;
+three assigned rows remain: GDS ISSUE CONFIRMATION (0113), ISSUE COPY (0114),
+and GDS ISSUE ERROR (0123). The two GDS response rows retain internal source
+staging and exact return-code tests. COPY retains a default
+route, but the pinned command topic does not provide the referenced CCC byte
+table needed to execute CTLCHAR exactly. None of these three is advertised.
+
+G1 (#294) adds an internal peer response path for a carrier-confirmed basic
+SEND CONFIRM. The durable record binds a send ID to its four-byte CONVID, and
+the peer event consumes it with owner, DPL, SAF, CAS, and replay checks. Provider
+tests cover exact RETCODE, CONVDATA, and STATE bytes on Memory and SQLite,
+including SQLite reopen. This is bounded to the existing ISSUE transition rules:
+CONFIRMATION requires CONFRECEIVE and advances to RECEIVE; ERROR is accepted
+from CONFRECEIVE, SEND, or RECEIVE and advances only CONFRECEIVE to RECEIVE.
+G2 (#294) pins GDS SEND and the APPC basic state-transition overview `dfhp625`
+as same-product, row-specific batch B context for 0113 and 0123. The source
+corpus has 178 verified topics and retains zero execution or coverage credit.
+`dfhp625` links to separate sync-level state-table pages; those tables are not
+yet pinned as B authority. G3 must resolve the table-page source gap and the
+resulting transition-rule differences before registering either response row.
+Rows 0113 and 0123 remain unready, with the registry at 258 typed / 0 legacy /
+5 unready.
+
+G3a (#294) pins the three APPC basic state-table pages as row-specific batch B
+context for 0113 and 0123: `appcbasic_sl0.html`
+`84eae747802d0e534537cce6cd919c5e20ffb1871b13e88a172405b67f0cf5a4`,
+`appcbasic_sl1.html`
+`09a4eb1d8ceef2f9bfb01461927d86b140d8a3a3e2b0f65b06f2f457f1c48086`, and
+`appcbasic_sl2.html`
+`bf9fa4805dd120957b6b40d2fdf5042ac8de1dfa38f9c9fa8b5343aa06e58e46`.
+Batch B now has 181 verified topics and zero missing. The `appcbasic_sl2.html`
+heading says mapped, but its basic-conversation path, the adjacent links from
+`dfhp625.html` `268f6810e1a4dec5143289637b40e233538fafbd3d876ec781f9c494a1a5e88c`,
+and its GDS-command table shape identify the sync-level-2 basic table.
+Internal GDS ISSUE CONFIRMATION now maps CONFRECEIVE/CONFSEND/CONFFREE to
+RECEIVE/SEND/FREE at levels 1 and 2, releasing the FREE allocation. Internal
+GDS ISSUE ERROR accepts the table states at levels 0, 1, and 2 and maps its
+normal outcome to SEND. The peer-response input carries no CDBFREE indicator,
+so its FREE outcome is unreachable. Basic SEND CONFIRM staging now requires
+level 1 or 2 and a table-valid sender state. Rows 0113 and 0123 stay unready;
+the registry remains 258 typed / 0 legacy / 5 unready. Other ISSUE controls
+remain outside G3a; the tables expose separate ABEND/PREPARE/SIGNAL state-rule gaps
+for an owner decision before those controls are changed.
+
+G3b (#294) registers GDS ISSUE CONFIRMATION (0113) and GDS ISSUE ERROR
+(0123) for assembler/C APPC basic dispatch. The typed registry is now **260
+typed / 0 legacy / 3 unready**; only rows 0027, 0093, and 0114 remain
+unready. Both commands use the existing MCEP v2 operation tags 242 and 250,
+the shared durable conversation ledger and the G3a state tables. CONFIRMATION
+requires a received SEND CONFIRM at sync level 1 or 2 and a CONF* state;
+invalid state returns RETCODE `03 08`, and sync level 0 returns `03 14`
+before staging. ERROR accepts only the G3a origin states. Both return exact
+six-byte RETCODE, 24-byte CONVDATA, and decimal STATE outputs, with no EXEC
+condition. The carrier and peer paths retain owner, DPL, SAF, CAS, and replay
+checks, including SQLite reopen. COBOL GDS ISSUE forms, CDBFREE-indicated
+ERROR deallocation, non-APPC/non-basic sessions, unowned or relay sessions,
+and invalid-state forms remain rejected or receive their source-defined
+RETCODE before side effects. The peer-response input cannot carry CDBFREE,
+so its FREE result remains unreachable. No ABEND, PREPARE, or SIGNAL state
+rule changes are included. Source authority: batch B
+`dfhp4_gdsissueconfirmation.html` `19ca5eef4cf4e6ba54c16d0020cd27b8d86a859f25fc3fbbbaee88fd73093789`,
+`dfhp4_gdsissueerror.html` `366916438f4e2ede56f4e8e2763d89f77249c9e51e00c043ff6441999d1653e5`,
+and the G2/G3a row context above.
+
+G4 (#325) pins the mapped APPC overview `dfhp616.html`
+`9cc3a008446e679498529aa6af94a402c337b0347ffcff08ecc1f304894146d9`
+and state tables `appcmapped_sl0.html`
+`432747a2d74603ad7be6f701a9c2cfc1dfc0be751373bec6417b778f0cb2e7b8`,
+`appcmapped_sl1.html`
+`a8b57e14b3943b06fa62419cccaa3c8c0579dd517c4cd8d07fe0cdf439401cc2`,
+and `appcmapped_sl2.html`
+`4b031f6d510194bcfcea5dfbd774e255c9a8c368d34210203a391fa40fd626f6`.
+Batch B has 185 verified topics and zero missing. The existing basic overview
+and tables also apply to rows 0109, 0128, and 0135. The six already typed
+ABEND, SIGNAL, and PREPARE rows now follow their basic and mapped `×` cells
+at sync levels 0, 1, and 2; those cells agree across the two APPC forms.
+ABEND is invalid in states 1 and 12, and state 13 at level 2. SIGNAL retains
+states 2, 3, and 5, plus states 6–8 at levels 1–2 and 9–11 at level 2.
+PREPARE at level 2 maps state 2 to 10, state 3 to 9, and state 4 to 11.
+All other PREPARE origins reject before staging. The peer response has no
+response-indicator input, so PREPARE's CDBERR outcomes to Receive, Free, and
+Rollback remain unreachable, as does the earlier CDBFREE response outcome.
+Cell coordinates (table 1 covers states 1–6; table 2 covers states 7–13):
+basic level 0 ABEND/SIGNAL rows 23/24, mapped level 0 rows 24/25;
+basic level 1 rows 30/31, mapped level 1 rows 31/32; basic level 2
+ABEND/SIGNAL/PREPARE `×` rows 34/35/39, mapped level 2 rows 36/37/41.
+The only basic-versus-mapped cell difference for these controls is in level-2
+PREPARE states 1, 5, and 6: basic table 1 rows 36–39 marks them invalid as
+`Abend`, while mapped table 1 rows 38–41 marks them `INVREQ`. All normal
+outcome cells agree.
+
+The table-correct public test adaptations connect ABEND sources before staging
+(state 1 ABEND is invalid), move the SIGNAL failure case from state 2 to state
+4 (state 2 SIGNAL is valid), and expect state 10 after PREPARE from state 2.
+This covers the mapped route, carrier and SQLite restart tests, the basic
+output and restart tests, and the paired peer test. The provider state-table
+matrix covers every ABEND, SIGNAL, and PREPARE cell for both APPC forms and
+all three sync levels. Registry counts remain **260 typed / 0 legacy / 3
+unready**; no operation tags change.
+
+G5 (#325) aligns mapped CONFIRMATION (0112) and ERROR (0122) with the pinned
+mapped normal-response cells. CONFIRMATION is invalid at level 0; at levels
+1–2, CONFRECEIVE, CONFSEND, and CONFFREE become RECEIVE, SEND, and FREE.
+ERROR accepts SEND, PENDRECEIVE, and RECEIVE at every level; CONF* at levels
+1–2; and SYNC* at level 2, always becoming SEND. Other origins reject before
+staging. The EIBFREE ERROR response would deallocate to FREE, but no indicator
+input exists, so that branch remains unreachable. Batch B remains 185/185;
+the mapped overview and three state tables above now apply to rows 0112 and
+0122 as well. Cell coordinates (table 1 states 1–6, table 2 states 7–13):
+mapped level 0 ERROR `×` row 23; level 1 CONFIRMATION/ERROR `×` rows 28/30;
+level 2 rows 33/35. The provider matrix covers all 13 origins at each level
+for both forms. The mapped public partner-send test retains its CONFRECEIVE
+origin (level 1, CONFIRMATION table 1 row 28 and ERROR table 1 row 30) and
+now asserts NORMAL RESP/RESP2 and exact next state for each outcome. No
+dependent test needed a state change. Registry counts remain 260/0/3 and
+operation tags are unchanged.
+
+| Bounded child / rows | Commands and source options | Owning boundary |
+| --- | --- | --- |
+| `CIC-905.conversation-issue.mapped` / 0108, 0112, 0122, 0127, 0136 | ISSUE ABEND, CONFIRMATION, ERROR, PREPARE, SIGNAL: each `CONVID SESSION STATE`, with `SESSION` a compatibility synonym for `CONVID` | Shared `conversation_protocol` transitions, `handlers/conversation_control`, typed compiler/IR/interpreter and selected COBOL route |
+| `CIC-905.conversation-issue.basic` / 0109, 0113, 0123, 0128, 0135 | GDS ISSUE ABEND, CONFIRMATION, ERROR, PREPARE, SIGNAL: each `CONVID CONVDATA RETCODE STATE` | Same shared protocol and durable ledger; assembler/C-only host entry and exact six-byte GDS results, with COBOL rejection |
+| `CIC-905.conversation-issue.device` / 0114, 0115, 0117–0119, 0121, 0124, 0126, 0129, 0133 | ISSUE COPY `TERMID CTLCHAR WAIT`; DISCONNECT `SESSION`; ENDFILE `ENDOUTPUT`, ENDOUTPUT `ENDFILE`, EODS (no specific options); ERASEAUP `WAIT`; LOAD `PROGRAM CONVERSE`; PASS `LUNAME FROM LENGTH LOGMODE LOGONLOGMODE NOQUIESCE`; PRINT and RESET (no specific options) | Existing terminal/session authority and device capability contracts, with conversation ledger only where a session is actually owned |
+| `CIC-905.conversation-issue.integration` / all twenty | Exact registration, tag round-trip, generated contracts and aggregate 171/92 | Descriptor/generator/status/ratchet owners and selected server route |
+
+Dependencies are the accepted CIC-901 registry, 0.4 host ABI, 0.5 SAF, 0.6
+data authority, durable coordinator/provider-state CAS, and the committed
+`CIC-905.conversation-open` kernel `3944e66c` plus ledger `5cde1910`.
+These are interface references for one transport-neutral APPC/MRO authority;
+MQ delivery and acknowledgement never determine conversation state. The
+mapped and device forms require selected compiled COBOL proof where applicable;
+the GDS forms require selected assembler/C host proof and negative COBOL proof.
+Local and DPL execution contexts, including the function-shipping principal
+facility restriction, are explicit obligations.
+
+Each child gate requires every named option to affect behavior or produce a
+source-defined rejection, exact EIBFN/RESP/RESP2 or GDS RETCODE/CONVDATA/STATE,
+positive and negative state/condition cases, typed SAF and audit before
+mutation, cancellation/deadline and size limits, replay/unknown-outcome and
+owner-fenced recovery, Memory/SQLite selected routes and affected PostgreSQL
+concurrency/restart routes. Integration also requires MCEP v1 decode/v2 encode,
+schema/generator/architecture/docs/API ratchets, focused regressions and
+mandatory policy gates, unchanged protected roots **6302/3667/12943** and
+ordinary modules at most 1,200 production lines. Licensed differential stays
+pending until a pinned licensed oracle runs; offline HTML carries no execution
+credit. Every child remains **in progress** until these gates pass. Source
+pins were verified against the raw SHA-256 archive and read with the repository
+`ibm_docs.py` plain-text parser without a browser or network refresh.
+
+The selected topic locators below are under
+`SSJL4D_6.x/reference-applications/commands-api/`; hashes are the committed
+raw HTML SHA-256 values. `0115` and `0136` have two source variants, each
+retained under its own pin. All selected topics were available and matched;
+the deliberately bounded `ibm_docs.py` search cache reported 144 unrelated
+uncached topics in the wider sources-b scope.
+
+The additive BTS private replay archive/capacity-CAS store primitive is now
+present for Memory, SQLite, and PostgreSQL, but no current CICS handler invokes
+it. The provider planner, lifecycle authority adapter, and container command
+routes remain unready; this store primitive grants no additional 0.9 command
+or licensed-execution credit.
+
+| Row | Topic basename(s) and SHA-256 |
+| --- | --- |
+| 0108 | `dfhp4_issueabend.html` `10103ed20eb91c32428d3df3f68549f3eb3130945ac963255a6265401105a025` |
+| 0109 | `dfhp4_gdsissueabend.html` `3c8407c316508f04b7d7446ee3c634e6a5f6f9fc86a78b43a57756640543d70e` |
+| 0112 | `dfhp4_issueconfirmation.html` `0f5198ab73872d2df8bb881133d595efa765e002e35b27f7eaf3dcf675e30be6` |
+| 0113 | `dfhp4_gdsissueconfirmation.html` `19ca5eef4cf4e6ba54c16d0020cd27b8d86a859f25fc3fbbbaee88fd73093789` |
+| 0114 | `dfhp4_issuecopy3270logical.html` `5dbb492e27c785e28f50bad277640a3193a4f90b367c1a36da9812d8af6683b8` |
+| 0115 | `dfhp4_issuedisconnectdefault.html` `c5697183645d15b3306b6c040e20680d5451bdd796f6e09688b53647b063a290`; `dfhp4_issuedisconnectlutype61.html` `f7d945ea466cdb9a004f3cbb9fe9bdba98d0053aa9da6ff29701177edfa40e09` |
+| 0117 | `dfhp4_issueendfile.html` `2d173fcd208f67e81db2eb208524d7c3143f741d84bdd97ca59c99b01b19e224` |
+| 0118 | `dfhp4_issueendoutput.html` `34a567cd30e7f4b816c8186a837b7f5af707949aa0f32bc1014deaab4b84ef56` |
+| 0119 | `dfhp4_issueeods.html` `8a09f3a74c458d3aedf1294ad213646d2a4441d6aca6d9b073e8a848d3a31d0f` |
+| 0121 | `dfhp4_issueeraseaup.html` `368c098d49fc2ac69e9516cc0a226a95b67cbe04e43dcdb6dd41bb36da2fcbfd` |
+| 0122 | `dfhp4_issueerror.html` `8853c7ca2c430e58b70372fc952f9bb0f01b0d87a64cbe4d4a33da2c76fd829a` |
+| 0123 | `dfhp4_gdsissueerror.html` `366916438f4e2ede56f4e8e2763d89f77249c9e51e00c043ff6441999d1653e5` |
+| 0124 | `dfhp4_issueload.html` `71044e772faee37400ec110514f5b3dc7e34ab9f95f778226d14ccaf4e93e591` |
+| 0126 | `dfhp4_issuepass.html` `2b4fd4acfa3485a857180ff9124110b36185402308e8f0e4a72ed296d3baaeae` |
+| 0127 | `dfhp4_issueprepare.html` `c8249eedcf48c0dfe8569da500889418578d8a84cdd1ccd47bd449129dd9886b` |
+| 0128 | `dfhp4_gdsissueprepare.html` `2d931ad6d389ad1a2d4c8f31673c5b3aa90cf31ddebe9ba6de775511cae152de` |
+| 0129 | `dfhp4_issueprint.html` `8bc85764e0251728947cc257369bc9127e07d69cd7517e9401ce13a7d5c8ef94` |
+| 0133 | `dfhp4_issuereset.html` `450e6df3f4238250dfb3538ffe601610451da4b115e52bbc05bfcfa07bff0f10` |
+| 0135 | `dfhp4_gdsissuesignal.html` `69f5b6db5b48a28d35b6facdd0b4b7fcab22063a187f6072dbedd725a01d1f4c` |
+| 0136 | `dfhp4_issuesignalappc.html` `27e96414c6b41db7f66e413b21628139c9dbf5b74cd95cb88276ed84b0e99433`; `dfhp4_issuesignallutype61.html` `187e87e28d0b4fd582a384c5daa8f5b426c6ce84ae4300d69cb6139fc3b4ad2b` |
+
+The command topics' CONVDATA reference is available in the committed
+`sources-b` manifest: `SSJL4D_6.x/applications/developing/connections/dfhp622.html`,
+SHA-256 `370c20bbc905dffb1162f207caa9aec981749529ab8f6c1eb1d89dcf69d97a23`.
+Its raw HTML matched that pin and `ibm_docs.py` parsed the 24-byte DFHCDBLK
+fields (CDBCOMPL, CDBSYNC, CDBFREE, CDBRECV, CDBSIG, CDBCONF, CDBERR,
+four-byte CDBERRCD, CDBSYNRB, and 12 reserved bytes). The conversation-data
+lane owns the shared indicator implementation; ISSUE must consume that record
+after integration. The pinned CVDA topic
+`SSJL4D_6.x/system-programming/intro/dfha80x.html`, SHA-256
+`81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25`,
+requires fullword numeric return values and links to `dfha80c.html` for
+their numbers. The zero-credit manager supplement
+`ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` (committed at `baf2bdbb`
+and included at `856af1cd`) pins
+`SSJL4D_6.x/reference-applications/commands-api/dfha80c.html` at SHA-256
+`5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`.
+Its retained 356,101-byte HTML matched the committed hash and `ibm_docs.py`
+read the ALLOCATED–SYNCSEND table at lines 2507–2532. The shared
+`ConversationState` now maps those fullword values exactly to 82–94,
+including PENDRECEIVE 88. This supplies ISSUE STATE response data at
+integration; it does not by itself make a row executable.
+
+The source-b syntax projection omitted the companion flags from the registry
+option shape for rows 0117 and 0118. A row-specific generated-registry
+correction binds `ENDOUTPUT` to ENDFILE and `ENDFILE` to ENDOUTPUT from the
+two SHA-pinned topics above. It changes only those unready option descriptors
+and the aggregate registry digest; it does not promote readiness or rewrite
+the reviewed source projection. The companion flags now have no value-capacity
+metadata; the generated registry differs only on rows 0117 and 0118. All 33
+descriptor-generator tests, the non-mutating generator check, and all 111 IR
+tests pass. The oversized IR codec-tags root was split at the complete option
+tag boundary: the root is 938 production lines and the new option module is
+279. Every moved tag mapping is byte-identical to the previous source, so no
+other slice's tag or command value changed. The module-boundary checker now
+passes the size review and stops at the temporary pre-integration
+`conversation_protocol/gds.rs` location outside `handlers/`; the final open
+branch moves that shared kernel under the handler family before the ISSUE
+rebase. The three protected roots remain 6302/3667/12943 production lines.
+The same source projection missed the documented `SESSION` compatibility
+synonym for `CONVID` on mapped rows 0108, 0112, 0122, and 0127. Their pinned
+topics and hashes appear above. A second bounded registry correction adds
+four-byte input `SESSION` only to those rows; row 0136 already included it.
+The COBOL clause resolver accepts the four-byte APPC alias while rejecting
+simultaneous `CONVID` and `SESSION`; the distinct LU6.1 SIGNAL and DISCONNECT
+SESSION range remains one to four bytes. The generated digest changes, with all four rows
+remaining unready and no execution or source credit added.
+
+The first ISSUE protocol feature extends the shared record with guarded
+ABEND, CONFIRMATION, ERROR, PREPARE, and SIGNAL transitions, including sync
+level and owner failures, and adds the source-specific six-byte GDS ISSUE
+return-code mapping. These are internal kernel contracts only; no ISSUE row is
+advertised or counted executable at this checkpoint. Focused protocol tests
+pass, and the separate MCEP regression proves the 255/256 v1-width boundary
+and canonical v2 256–258 tags while preserving the existing v1 migration test.
+The global output whitelist now admits mapped ISSUE STATE and GDS ISSUE
+STATE/CONVDATA/RETCODE; a valid GDS SIGNAL tag-257 plan round-trips, every
+tag 256–258 rejects v1 encoding, and mapped ISSUE refuses GDS RETCODE.
+The verified GDS ISSUE ABEND row 0109 allows termination regardless of
+conversation state. The shared record now accepts ABEND from ALLOCATED as
+well as connected states, releases the owned allocation, and reopens the
+resulting FREE record canonically; mapped row 0108 uses the same protocol flow.
+ISSUE SIGNAL now retains a pending direction-change marker on that same
+APPC record. The optional field preserves canonical reads of earlier rows;
+foreign/stale owners cannot set it, and ABEND clears it. Partner delivery and
+the next SEND/RECEIVE/CONVERSE condition boundary remain unsealed, so neither
+SIGNAL row gains readiness.
+The distinct LUTYPE6.1 branch of row 0136 now retains a direction-change
+request on its existing physical TCTTE record. Explicit one-to-four-character
+SESSION and the task's principal TCTTE select the owner-fenced internal route;
+SAF, atomic device/receipt replay, cancellation and deadline checks are reused.
+The optional marker decodes older rows canonically, clears on disconnect, and
+survives SQLite reopen after an injected unknown outcome. A marker without a
+retained LU6.1 owner now fails validation before reopen. All 39 runnable ISSUE
+tests pass. A foreign run gets
+NOTALLOC/61 without mutation. CONVID token selection and partner-side
+SEND/RECEIVE/CONVERSE consumption are still pending, so this does not register
+ISSUE SIGNAL or create an APPC/MRO state authority.
+The same owner-fenced LUTYPE6.1 pending marker now has isolated PostgreSQL
+18.6 restart/concurrency evidence: two providers race one SIGNAL effect,
+retain one versioned marker and replay receipt, and leave the principal
+session connected. This verifies storage only; partner-side SIGNAL
+consumption remains pending.
+The next bounded feature reserves ten APPC mapped/basic ISSUE plan identities
+and validates CONVID/SESSION versus STATE/CONVDATA/RETCODE bindings in MCEP v2.
+It does not alter the generated application registration or the 151/112 split;
+GDS remains non-COBOL and no command is yet selectable at the public route.
+All 109 IR tests pass on this checkpoint, including uniqueness and v1/v2
+round-trip checks; Cargo target output was cleaned afterward.
+The host operation enum and canonical request identity now distinguish the
+five mapped ISSUE heads from their five GDS ISSUE heads and from outboard
+`ISSUE ABORT`. These identities remain unregistered. All 44 focused host API
+tests passed, then the target was cleaned. Provider, compiler, interpreter,
+server and generated-contract integration remain pending.
+The host/provider boundary now rejects these ten unregistered ISSUE identities
+before dispatch, and the generated descriptor lookup returns `None` for them
+rather than assuming every Rust enum variant is registered. GDS ISSUE failure
+mapping distinguishes non-APPC, non-basic, state, sync-level, and owner errors
+while leaving malformed durable rows as infrastructure failures. Focused
+provider and descriptor tests pass after updating the stale existing descriptor
+and family test expectations to their generated 153/19 values. The public
+registry remains **151 typed / 112 unready**.
+The ten device ISSUE plan identities now fill the remaining operation tags
+243–248, 251–252, and 255–256. `ISSUE RESET` at tag 256 has a full MCEP v2
+round trip and an explicit v1 rejection, as do tags 257–258. The plan shape
+binds COPY, DISCONNECT, paired 3740 end markers, EODS, ERASEAUP, LOAD, PASS,
+PRINT, and RESET to their own operands and flags. A focused negative regression
+rejects the wrong end-marker flag, missing COPY terminal, and incomplete PASS
+data/length pair. All 109 prior IR tests and the new focused device test pass;
+the public registry remains unchanged and no device row is yet executable.
+The host operation boundary now recognizes all twenty assigned ISSUE heads,
+including the five GDS three-token forms, and preserves the existing outboard
+ISSUE ABORT identity. All twenty remain `supported() == false` until selected
+execution is wired and tested; a focused host regression proves recognition,
+non-registration, and mutation classification. The provider descriptor test
+continues to pass with the twenty unregistered variants absent from its
+generated lookup. No count or generated catalog was promoted.
+The compiler now carries distinct typed HIR operations for the fifteen COBOL
+applicable ISSUE rows, with source-shaped clause, flag, data-length, paired
+PASS, and writable four-byte STATE checks. The five GDS heads remain
+assembler/C-only. A catalog-row regression checks all fifteen operation heads,
+the five GDS rejections, and selected device option mappings. Existing outboard
+ISSUE compiler regression and the focused row test pass. The generated
+readiness remains unready, so selected compiled execution is not yet claimed.
+COBOL COPY preprocessing now ignores the `COPY` word inside an EXEC block,
+matching the existing REPLACE scanner boundary. A real COPY statement after
+`EXEC CICS ISSUE COPY` still expands its copybook with exact origin data.
+All 28 focused syntax tests pass, and the protected syntax root remains 2265
+production lines. Actual ISSUE source lowering still stops at the intended
+unready catalog gate. The sibling REQUEST PASSTICKET qualifier fixture now
+uses its already registered typed route and declared storage; its missing
+discriminator remains rejected. No sibling production command or registration
+changed. The full compiler library suite now passes **301/301** tests.
+The interpreter now maps all twenty MCEP operations to their exact host
+identities and wire names. ISSUE STATE uses a four-byte fullword receiver;
+GDS CONVDATA and RETCODE use exact 24-byte and six-byte writable output
+areas from the pinned GDS ISSUE topics. The interpreter rejects 23/25-byte
+CONVDATA and 5/7-byte RETCODE storage before execution. Focused tests
+check all twenty operation mappings and representative operands/options.
+The reply boundary now also rejects malformed ISSUE host outputs before any
+receiving storage write: STATE requires a four-byte CVDA payload, CONVDATA
+exactly 24 bytes, and RETCODE the shared six-byte GDS return-code schema.
+The focused reply regression checks short/long values and wrong schemas with
+unchanged destinations; all 65 interpreter library tests pass. The exact
+CONVDATA schema remains an additive data-lane integration decision; these
+checks do not promote any row.
+No provider route or public registration is inferred from this mapping.
+The device child now has an internal versioned provider-state record for
+physical 3270, 3740, and 3650 definitions and their source-specific end
+markers, LOAD, PASS, and print state. It bounds names, PASS data at 255 bytes,
+print images, and row size; stale CAS and malformed reopen fail closed. Three
+focused Memory/SQLite and negative tests pass. This record does not own APPC,
+MRO, or LU6.1 conversation state. Screen COPY/ERASEAUP and task-end delivery
+still require the existing terminal authority, so no device row is registered.
+The same physical record now retains a bounded owner run unit for an alternate
+LUTYPE6.1 TCTTE facility, following pinned row 0115. Older rows reopen with
+the field absent, and a focused CAS test proves ownership persistence. This
+does not create an APPC/MRO state authority or register DISCONNECT.
+The next device feature routes ENDFILE, ENDOUTPUT, EODS, and LOAD through the
+installed physical-device row. It validates the source form and DPL principal
+restriction where defined, performs a typed FACILITY SAF check, and atomically
+persists the device transition with an exact owner/sequence/request replay
+receipt. Receipts are capped at 4,096 and prune only past a safe watermark
+without protected effect keys. Focused direct-provider tests prove paired
+ENDFILE normal/replay, malformed rejection, and SAF denial before mutation;
+the companion ENDOUTPUT/ENDFILE path sets both 3740 markers once, replays
+without a second transition, and rejects the wrong flag. The device tests
+prove SQLite reopen and receipt protection. The four rows
+remain unregistered until compiled selected-route and backend gates pass.
+For a launched terminal with retained task identity, new physical ISSUE
+mutations now require the issuing run unit and principal to own that session.
+An exact saved receipt remains replayable before this fence. A foreign run
+gets NOTALLOC/61 without changing device or session state; the owning run can
+then commit. The focused owner regression and all 35 runnable ISSUE tests
+pass. The two isolated PostgreSQL ISSUE tests were run separately against
+PostgreSQL 18.6; their ordinary ignored status grants no additional credit.
+The 3650 direct-provider regression proves LOAD `PROGRAM` selection and
+`CONVERSE`, EODS state, exact replay, NONVAL for an unknown program, NOSTART
+when the 3651 cannot start it, TERMERR for EODS on a failed terminal, and
+source-defined DPL principal INVREQ/200 before mutation.
+The physical-device route now checks cancellation and deadline before effect
+and returns unknown outcome when either is observed after the atomic commit.
+An injected post-persist unknown outcome is recovered by the exact saved
+receipt in a focused ENDFILE/ENDOUTPUT regression.
+The ENDFILE selected-provider regression also reopens SQLite and restores the
+task after an injected unknown commit outcome. Exact receipt replay returns
+NORMAL with the device still at one committed transition; this is backend
+recovery evidence, not selected compiled execution credit.
+The same `ISSUE ENDFILE ENDOUTPUT` atomic device/receipt transition passes
+`issue_endfile_unknown_outcome_replays_after_postgres_restart` against an
+isolated local PostgreSQL 18.6 cluster. After an injected post-commit unknown
+outcome and a new provider instance, exact replay returns NORMAL with both
+3740 markers set and the device at version 2. Two independent PostgreSQL
+provider instances then raced the same ENDOUTPUT/ENDFILE effect; both resolved
+to NORMAL from one receipt, and the device reached version 3 only once. The
+disposable cluster was stopped and removed, and Cargo output was cleaned.
+This is affected-backend restart/concurrency evidence only; selected compiled
+execution is still pending, and rows 0117–0118 remain unready.
+The BMS-backed COPY and ERASEAUP paths also check cancellation and deadline
+before their atomic state/receipt commit, return unknown outcome if the caller
+is cancelled or expires afterward, and allow exact receipt recovery. A COPY
+regression injects post-persist unknown outcome and verifies replay leaves the
+target session version unchanged.
+ISSUE PASS now stages an authorized, replay-safe target and bounded logon data
+in the same physical-device authority. `LOGONLOGMODE` selects the retained
+CINIT mode rather than silently using the default; it conflicts with explicit
+`LOGMODE`. Optional saved-mode fields decode older v1 rows with canonical
+omission, so this additive state does not invalidate prior device records.
+Direct-provider and SQLite tests cover mode selection, byte bounds, malformed
+option conflict, and reopen. Task-end disposition is described below; row
+0126 remains unregistered pending selected compiled and backend gates.
+The pinned row 0126 defines `LENGTH` as halfword binary. The typed
+interpreter now converts that two-byte COBOL input to the provider's canonical
+decimal payload instead of forwarding raw storage bytes. The selected-plan
+regression `issue_pass_halfword_length_reaches_host_as_decimal` passes, as do
+all 64 interpreter library tests. This repairs a compiled-route argument
+boundary; it does not register or claim complete execution for ISSUE PASS.
+The retained PASS owner now also fences staging: a different run unit receives
+NOTALLOC/61 before replacing the target or user data. Unit and direct-provider
+regressions prove no device-version or staged-state change.
+The task-end continuation now resolves staged PASS through the existing
+terminal completion or abort outcome. A known commit atomically marks delivery
+with the persisted source-session disconnect; rollback clears the stage. The
+PASS owner is a retained run-unit identity, with legacy ownerless staged rows
+failing closed, and repeated completion cannot redispatch. Focused direct
+provider tests cover commit, rollback, saved logon mode, malformed operands,
+staged-state SQLite reopen, task restoration and committed completion after
+SQLite restart, exact stage replay, and owner fencing. The public row remains unready pending
+compiled selected-route and backend integration.
+An isolated PostgreSQL 18.6 regression now stages PASS with bounded logon
+data, saved LOGONLOGMODE and NOQUIESCE, injects an unknown outcome, then races
+task-end completion through two restored providers. Exactly one completion
+commits the device and source-session disconnect; the other reports an
+uncertain outcome. A fresh provider sees one delivery and the disconnected
+session, and the original stage receipt replays normally. This closes the
+affected PostgreSQL restart/concurrency test gap for the physical PASS path.
+It does not prove partner-side APPC consumption or selected compiled execution,
+so row 0126 remains unready.
+The physical PASS target now has a trusted claim path over the same device
+record. A target run whose APPLID matches LUNAME can claim the committed
+terminal and exact logon bytes once; a stable event ID replays after an
+uncertain result, while another target or event fails. For a CICS target with
+LGNMSG enabled, the claim publishes those bytes to the existing EXTRACT
+metadata. Row 0071 `EXTRACT LOGONMSG` then returns the bytes once and a retry
+does not restore consumed data. Its source pin is baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, topic
+`dfhp4_extractlogonmsg.html`, SHA-256
+`6ea9d8e4eb3a93414a39a329fddd342390048b3779d576a8c00380fc59098c94`;
+the retained raw HTML matched and was parsed offline. Memory, SQLite restart,
+and isolated PostgreSQL concurrent-provider claims pass. [ADR-0022](../../../decisions/0022-issue-pass-target-handoff.md)
+records the boundary. External Communications Server carrier delivery and
+selected compiled execution are still pending, so PASS remains unready.
+Default-facility ISSUE DISCONNECT and compatibility ISSUE RESET now commit the
+physical-device disconnect, persisted session state, and exact replay receipt
+atomically. A replay of the committed request succeeds even after session
+disconnect; a new default request receives NORMAL without advancing either
+version, matching source row 0115's no-condition rule for these terminal
+types. The LUTYPE6.1 `SESSION` form selects a one to four character alternate
+physical TCTTE from that same device authority. It requires an exact task
+owner and DISCREQ capability, commits device and receipt atomically, and
+leaves the principal terminal connected. Direct-provider tests cover normal
+replay, foreign-owner NOTALLOC, capability TERMERR, and malformed length.
+Neither row is registered pending selected-route and backend gates; no
+APPC/MRO protocol state is duplicated.
+The alternate LUTYPE6.1 form also has SQLite restart evidence after an
+injected unknown outcome: task ownership reopens, exact receipt replay leaves
+the device at one disconnect transition, and the principal session remains
+connected.
+An isolated PostgreSQL 18.6 race now proves the alternate LUTYPE6.1 owner and
+device record survive restart: two providers resolve one SESSION effect with
+one device transition, replay returns NORMAL, and the principal terminal
+session stays connected. This closes the affected backend gap for that
+physical DISCONNECT form; selected compiled execution and partner integration
+remain outstanding.
+An injected unknown DISCONNECT outcome also replays after SQLite reopen while
+the persisted session is closed; a fresh default request receives NORMAL with
+both session and physical-device versions unchanged.
+The default DISCONNECT and compatibility RESET paths now also pass an isolated
+PostgreSQL 18.6 concurrency/restart regression. Two independent providers
+race one effect; the device and session each advance once, every result is
+NORMAL or an explicit uncertain outcome, and exact replay after reopening
+returns NORMAL. The alternate LUTYPE6.1 path and selected compiled routes
+remain pending, so rows 0115 and 0133 are still unready.
+The 3270 ISSUE ERASEAUP form now reuses the existing durable BMS
+terminal/session transaction. It clears unprotected field values to X'00',
+resets only their modified tags, selects the first unprotected cursor address,
+and unlocks the keyboard. The direct-provider regression proves protected
+fields stay intact and replay does not increment session state. Without WAIT,
+the deterministic terminal executor completes the operation at its start
+boundary, an allowed source timing. Raw 3270 buffers remain pending, so row
+0121 stays unregistered.
+The BMS-backed path now has SQLite restart evidence: after an injected
+post-commit unknown outcome, restored-task replay preserves the protected
+field and null unprotected field without a second session transition.
+For a launched terminal, BMS-backed ISSUE ERASEAUP and default ISSUE COPY now
+fence new work by the retained run unit and principal after exact receipt
+replay. A foreign run receives NOTALLOC/61 before target mutation, while the
+owner can erase and copy normally; `issue_bms_controls_reject_foreign_run_on_owned_terminal`
+and all 36 runnable ISSUE tests pass. This adds no raw-buffer or CCC claim.
+The verified row 0114 `ISSUE COPY` topic specifies a one-byte `CTLCHAR` CCC
+but does not enumerate its byte values; its links lead only to the API format
+and command summary. No committed 0.9 topic manifest names a CCC value table.
+The default copy path can proceed independently, while non-default CCC
+interpretation remains a source gap; no browser or network refresh was used.
+The default path with or without `WAIT` now copies the exact source buffer, including nulls,
+into the target terminal using the existing BMS session and receipt authority.
+Installed terminal definitions must name the same control unit. Source-read
+and target-update SAF checks precede the atomic target-state commit. The
+direct-provider regression records both typed FACILITY intents. It also covers
+complete-buffer copy, idempotent replay, missing
+source, LENGERR for out-of-range TERMID/CTLCHAR sizes, no-WAIT normal
+completion, TERMERR for a different control unit without target mutation,
+and explicit CCC rejection. The row remains
+unready because CCC interpretation is not yet sealed.
+The same default COPY route now has SQLite restart evidence: the null-inclusive
+source buffer and target receipt persist through an injected unknown outcome,
+and restored target-task replay returns NORMAL without a second session
+version increment. Selected compiled execution and CCC semantics remain open.
+The physical ISSUE PRINT route now checks printer definitions in preference
+order and selects the first connected, in-service, unattached printer for a
+3270 display or configured 3650 host conversational 3270 source. The
+display's printed image, the printer's printed image and count, and the exact
+replay receipt commit atomically after SAF. A direct provider test covers fallback
+from an unavailable first printer, null-inclusive image bytes, replay, and
+TERMERR without mutation when all configured printers are unavailable.
+SQLite restart after an injected post-commit unknown outcome replays the
+saved result with the display and printer counts unchanged at one.
+The same three-row display/printer/receipt transaction passes
+`issue_print_postgres_restarts_and_concurrent_providers_commit_once` against
+an isolated PostgreSQL 18.6 cluster. Restart replay leaves both print counts
+at one; two independent providers racing a later identical effect advance
+both counts to two only once. The disposable cluster and Cargo output were
+removed. Selected compiled execution and other slice gates remain pending,
+so row 0129 is unready.
+The physical-device record and its atomic provider/replay adapter are now in
+separate modules (both below 1,200 production lines) to keep the remaining
+device commands reviewable. Focused device and direct-provider replay tests
+pass after this layout change; no readiness claim changed.
+
+## Declared CIC-905 conversation-open slice
+
+`CIC-905.conversation-open` starts from commit `589b7bad` (151 typed, no legacy,
+112 unready). Its only application rows are `0007 ALLOCATE`, `0008 GDS
+ALLOCATE`, `0012 GDS ASSIGN`, `0015 BUILD ATTACH`, `0028 CONNECT PROCESS`,
+`0029 GDS CONNECT PROCESS`, `0030 CONVERSE`, `0081 FREE`, and `0082 GDS FREE`.
+The isolated target is 160 typed, no legacy, 103 unready. It owns operation
+tags 222–230, operand tags 1216–1343, option tags 1148–1275, and output tags
+1272–1399; no sibling slice may allocate from these ranges.
+
+| Row | Source options, including common response options |
+| --- | --- |
+| 0007 | SESSION, SYSID, PROFILE, PARTNER, NOQUEUE, STATE, NOHANDLE, RESP, RESP2 |
+| 0008 | SYSID, MODENAME, PARTNER, CONVID, RETCODE, NOQUEUE, STATE, NOHANDLE, RESP, RESP2 |
+| 0012 | PRINCONVID, PRINSYSID, RETCODE, NOHANDLE, RESP, RESP2 |
+| 0015 | ATTACHID, PROCESS, RESOURCE, RPROCESS, RRESOURCE, QUEUE, IUTYPE, DATASTR, RECFM, NOHANDLE, RESP, RESP2 |
+| 0028 | CONVID, SESSION, PROCNAME, PROCLENGTH, PARTNER, PIPLIST, PIPLENGTH, SYNCLEVEL, STATE, NOHANDLE, RESP, RESP2 |
+| 0029 | CONVID, PROCNAME, PROCLENGTH, PARTNER, PIPLIST, PIPLENGTH, SYNCLEVEL, CONVDATA, RETCODE, STATE, NOHANDLE, RESP, RESP2 |
+| 0030 | CONVID, SESSION, ATTACHID, FROM, FROMLENGTH, FROMFLENGTH, INTO, SET, TOLENGTH, TOFLENGTH, MAXLENGTH, MAXFLENGTH, NOTRUNCATE, DEFRESP, FMH, ALTERNATE, ASIS, CTLCHAR, DEFAULT, ERASE, LDC, LEAVEKB, LINEADDR, PSEUDOBIN, STATE, STRFIELD, NOHANDLE, RESP, RESP2 |
+| 0081 | CONVID, SESSION, STATE, NOHANDLE, RESP, RESP2 |
+| 0082 | CONVID, CONVDATA, RETCODE, STATE, NOHANDLE, RESP, RESP2 |
+
+The shared transport-neutral APPC mapped, APPC basic, and MRO conversation
+authority owns allocation, attach headers, connect, exchange, free, task
+ownership, lifecycle, and DPL principal-facility restrictions. The pinned
+source makes GDS basic commands assembler/C-only and reports failures in the
+six-byte RETCODE without EXEC CICS conditions; COBOL selected-route evidence
+applies to the mapped/MRO rows. CONVERSE device-specific option combinations
+must be source-selected and validated, not silently treated as APPC/MRO.
+Local tasks can use allocated alternate facilities; DPL server programs cannot
+use their function-shipping principal facility where the source specifies
+`INVREQ` RESP2 200. This slice owns the shared protocol and restriction
+contracts consumed by later CIC-905 siblings, without claiming their rows.
+
+Owners: `cics_plan`/descriptor/codec in IR, typed CICS resolution in the
+compiler, interpreter output and EIB binding, `handlers/conversation_control`
+and durable provider rows, selected CICS route in the server, and the existing
+0.9 registries/generators. Dependencies are the accepted CIC-901 registry,
+0.4 host ABI, 0.5 SAF, 0.6 data authority, shared coordinator and provider-row
+CAS. Acceptance requires canonical MCEP v1 decode/v2 encode, exact nine-row
+registration and option legality, negative conditions and GDS return codes,
+SAF/audit before mutation, cancellation/deadline and bounded replay, fenced
+owner recovery and SQLite reopen, Memory/SQLite selected compiled route,
+affected PostgreSQL concurrency/restart route, schema/generator/ratchet gates,
+format/docs/dependency policy, and unchanged protected-root production lines
+6302/3667/12943. Licensed differential remains pending; no local result earns
+licensed credit. The slice is **in progress** until every applicable gate passes.
+
+The first feature commit adds the transport-neutral, versioned conversation
+protocol record and guarded mapped/basic/MRO transitions. It rejects stale or
+foreign owners and the DPL server's principal facility before mutation, bounds
+APPC process/PIP records, keeps GDS FREE illegal until the peer reaches FREE,
+and validates records after decode. Four focused provider tests passed. This
+kernel is not yet a selected CICS command route and does not change readiness.
+The follow-on durable ledger feature uses one versioned provider-state CAS row
+for installed APPC/MRO session groups, task-owned allocations and attach
+headers. It bounds capacity and unique CONVID token issuance, rejects stale
+CAS writes and malformed reopen data, and releases owned state on task cleanup.
+Focused Memory and SQLite reopen tests pass. Command-level authorization,
+audit/replay, transport adapter, typed compilation and registration remain
+pending; the ledger alone has no CICS execution or conformance credit.
+The GDS code table feature fixes source-distinct six-byte RETCODE values for
+GDS ALLOCATE, GDS ASSIGN, GDS CONNECT PROCESS, and GDS FREE. It keeps the
+source's no-EXEC-condition rule explicit. The table is a reusable contract;
+the GDS command routes and their output bindings are still pending. Its
+primary pinned topics are `dfhp4_gdsallocate.html`
+`780401ffdefbfe247d03ee21c3212d0d86059f32632c86d51a7264921d129d23`,
+`dfhp4_gdsassign.html`
+`60be08cebb700631a9b98f543b1a8907ceed95fa80500a50d63414f66d809a8d`,
+`dfhp4_gdsconnectprocess.html`
+`c22037571fff90621c7f16c502e72951f46c6825221af2f5738e1ab6c2c061e2`,
+and `dfhp4_gdsfree.html`
+`59c9b4b46a779339b21ddd73fa6adc0d58d5422b34cdb200dde7ff9294f8e06f`.
+
+Source baseline: `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, catalog
+rows above. The committed topic map and manifest identify all 36 mapped HTML
+topics. The SHA archive at
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256`
+matched and parsed all 36 locally with `ibm_docs.py` PlainText; the common TOC
+pin `f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a`
+also matched. Key command topic/hash pairs: `dfhp4_allocateappc.html`
+`5f207c39d360d68f2f6a94ad63e156e0067ba6741daeb7a224675bcfe3c649d3`,
+`dfhp4_allocatemro.html`
+`7c790e6cf393526757fa8661f2174437eae67888cc76f080024d1a13dfacf845`,
+`dfhp4_gdsallocate.html`
+`780401ffdefbfe247d03ee21c3212d0d86059f32632c86d51a7264921d129d23`,
+`dfhp4_gdsassign.html`
+`60be08cebb700631a9b98f543b1a8907ceed95fa80500a50d63414f66d809a8d`,
+`dfhp4_buildattachmro.html`
+`a054e3d288d82a8e4f4b982fec09982aac2f10185e1fc1985920a0e46ef68f7d`,
+`dfhp4_connectprocess.html`
+`4b46a7cad4c66210b972bdf2549ab87166791cd0977b797b46a5340aa9a169fb`,
+`dfhp4_gdsconnectprocess.html`
+`c22037571fff90621c7f16c502e72951f46c6825221af2f5738e1ab6c2c061e2`,
+`dfhp4_converseappc.html`
+`3084c526b8a710fff97f697a110c56418b7f1413ffddd8eda90224936456e98e`,
+`dfhp4_conversemro.html`
+`8c59321913adebb03d103037665ecd76f954ccdd5aa8e80a091f5bc2c944229b`,
+`dfhp4_freeappc.html`
+`20490becead829986d54ceaf6c3b4966dbf10d4709139f2968c7e365c2fc87d8`,
+`dfhp4_freemro.html`
+`06e70ebe9174cf67aeb4782de975bfbf942669fc178861e5c781a6450cc694eb`,
+and `dfhp4_gdsfree.html`
+`59c9b4b46a779339b21ddd73fa6adc0d58d5422b34cdb200dde7ff9294f8e06f`.
+No browser or network refresh was used. The archive's unselected topics were
+not audited; the focused `ibm_docs.py search` reports them as absent from the
+temporary reader cache, while each selected `read` verifies its topic and TOC.
+## CIC-905 conversation data and wait integration
+
+The data/wait integration preserved all 184 typed routes from `870bc850` and added exactly
+seven frozen application rows from `codex/v09-conv-data` (`fd1d3c54`):
+`0161 RECEIVE`, `0162 GDS RECEIVE`, `0187 SEND`, `0231 WAIT` (GDS WAIT),
+`0232 WAIT CONVID`, `0237 WAIT SIGNAL`, and `0238 WAIT TERMINAL`. The generated
+263-row contract at that checkpoint was **191 typed, 0 legacy compatibility,
+72 unready**. The BTS/SAF checkpoint reached **214 typed / 49 unready**;
+the combined ISSUE/BTS candidate is **231 typed / 32 unready**.
+GDS RECEIVE and GDS WAIT remain assembler/C-only; their host routes have no
+COBOL alias. Reserved MCEP v2 operation tags `259`–`265` are distinct from the
+sealed open/extract identities.
+
+| Row | Pinned CICS TS 6.x topic(s) and SHA-256 |
+| --- | --- |
+| `0161 RECEIVE` | sources-b `dfhp4_receiveappc.html` `2230157051a7f8d490d86765cc01dc468dd5af7efb9da8caa5463ad7229937e0`; `dfhp4_receivemro.html` `72031444dc37f1dac6d8e798ab013182b1e4c8c71af5f6cf4151835ca14e12bf` |
+| `0162 GDS RECEIVE` | sources-b `dfhp4_gdsreceive.html` `61912afe7606b5dee8b43447b5f1b1b90055c7287249ab05d0f45ad850c039a9` |
+| `0187 SEND` | sources-c `dfhp4_sendappc.html` `b2c2a082b826f1419838b53ae1dcfee56d8642004d900298183d748cd4be0686`; `dfhp4_sendmro.html` `7b6f9b5ca459cde2c69c6bf69b3cab2fd97bbb302fb3790afb28e7a18308f274` |
+| `0231 WAIT` | sources-c `dfhp4_gdswait.html` `e43a09e96b83a83aae703766ee1d25320ca8eca0e8426abdb6caddfe91c2f685` |
+| `0232 WAIT CONVID` | sources-c `dfhp4_waitconvidappc.html` `7837137b034688731a64c91c5f59920b3dff8cb7d801006576ce10febed731cc` |
+| `0237 WAIT SIGNAL` | sources-c `dfhp4_waitsignal.html` `96e4a6dc039dbc9cbf7dbb74b99b375dce7db0e4d9421802a0c5ace7a4927200` |
+| `0238 WAIT TERMINAL` | sources-c `dfhp4_waitterminal.html` `9613c7363e391f4b34890b7e2ecdf9a3dd0e2046b0d54dd18d08589fd6052453` |
+
+The source baseline for these application topics is
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10` or
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` as shown above.
+Conversation STATE uses the pinned `cics-misc-tail-cvda` `dfha80c.html`
+(`5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`):
+its conversation table assigns `ALLOCATED=82` through `SYNCSEND=94`.
+The single versioned `cics-conversation-v1` ledger retains open, EXTRACT, and
+CONVERSE authority while adding mapped peer exchange, APPC basic data,
+principal signal events, staged transmission IDs, and exact replay receipts.
+Memory, SQLite reopen, and isolated PostgreSQL 18 reopen regressions exercise
+the selected data/wait behavior; no licensed or architecture-fast credit is
+inferred from the offline source review.
+
+## CIC-906 bounded licensed-oracle BIF adapter
+
+`CIC-906.oracle-bif-builtins` owns a capture/comparison boundary for catalog
+rows `0013 BIF DEEDIT` and `0014 BIF DIGEST`, with six sealed observation IDs
+in `conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json`.
+The existing twelve-observation file/UOW pilot and v1 signature payload remain
+unchanged. The v2 family payload binds the family and manifest digests in
+addition to candidate, compiled spec, fixture, source review, environment,
+observation and protected run identity. Local/model captures have zero licensed
+credit. A real signed licensed capture and exact external CICS/COBOL/CPACF
+environment are unavailable, so differential and the full 263-command minor
+gate remain pending. The protected handoff and outstanding families are in
+[the CICS licensed runbook](../../../runbooks/cics-licensed-pilot.md).
+
+Product `SSJL4D_6.x`, baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, catalog
+`ibm-cics-ts-6x-2026-08-31:api-commands` rows `0013`/`0014`: pinned topics
+`dfhp4_bifdeedit.html` (`c166e90680e4f846cf2a69e9287273c95a5bb6551ed31bc8c3f516ec49af5d3a`)
+and `dfhp4_bifdigest.html` (`e6f40f97a1ffa4d1c6e1764e8118fb4498f030f98fd4596e240c9ac51747781c`).
+The source branch recorded matching raw archive bodies and a review with the
+repository plain-text parser. In this integration checkout, both retained
+HTML paths are absent at their manifest locations; offline `ibm_docs.py search`
+found no verified topics and `read` could not verify the relevant TOC. No
+network or browser refresh occurred.
+The source review has zero licensed or execution credit.
+
+## CIC-905 conversation-open integration
+
+The prior conversation-open checkpoint combined the nine unique conversation-open rows with
+the existing 175 typed routes. Its generated 263-row registry contained
+**184 typed, 0 legacy compatibility, and 79 unready** rows. Its new official
+catalog rows are `0007`, `0008`, `0012`, `0015`, `0028`, `0029`, `0030`,
+`0081`, and `0082`; the eight EXTRACT/POINT rows, miscellaneous routes, BTS
+routes, and bounded CIC-906 checks remain present. Operation tags `222`–`230`
+are v2 only. Existing EXTRACT operand/output tags, including `STATE` output
+tag `1408`, stay fixed in both MCEP versions.
+
+The single `cics-conversation-v1` provider row carries task-owned APPC/MRO
+allocations, LU 6.1 extraction state, source-visible indicators, attach
+headers, and optional bounded peer exchange state. Canonical v1 records reopen;
+the next mutation writes v2. A legacy ambiguous principal fails closed in
+EXTRACT, while v2 rejects creating one. The EXTRACT sidecar owns presentation,
+POINT position, and unresolved mutation replies only. CONVERSE stages an
+outbound frame before suspension and completes against a trusted explicit
+peer frame with owner-fenced replay. The selected compiled FREE and CONVERSE
+paths convert the pinned binary STATE CVDA to COBOL numeric storage.
+
+Source authority is product `SSJL4D_6.x`, baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, with catalog identities
+`ibm-cics-ts-6x-2026-08-31:api-commands:<row>`. These are SHA-verified pinned
+HTML references and grant no licensed execution credit.
+
+| Row | Pinned topic under `reference-applications/commands-api/` | SHA-256 |
+| --- | --- | --- |
+| 0007 ALLOCATE | `dfhp4_allocateappc.html`; MRO `dfhp4_allocatemro.html` | `5f207c39d360d68f2f6a94ad63e156e0067ba6741daeb7a224675bcfe3c649d3`; `7c790e6cf393526757fa8661f2174437eae67888cc76f080024d1a13dfacf845` |
+| 0008 GDS ALLOCATE | `dfhp4_gdsallocate.html` | `780401ffdefbfe247d03ee21c3212d0d86059f32632c86d51a7264921d129d23` |
+| 0012 GDS ASSIGN | `dfhp4_gdsassign.html` | `60be08cebb700631a9b98f543b1a8907ceed95fa80500a50d63414f66d809a8d` |
+| 0015 BUILD ATTACH | `dfhp4_buildattachmro.html` | `a054e3d288d82a8e4f4b982fec09982aac2f10185e1fc1985920a0e46ef68f7d` |
+| 0028 CONNECT PROCESS | `dfhp4_connectprocess.html` | `4b46a7cad4c66210b972bdf2549ab87166791cd0977b797b46a5340aa9a169fb` |
+| 0029 GDS CONNECT PROCESS | `dfhp4_gdsconnectprocess.html` | `c22037571fff90621c7f16c502e72951f46c6825221af2f5738e1ab6c2c061e2` |
+| 0030 CONVERSE | `dfhp4_converseappc.html` | `3084c526b8a710fff97f697a110c56418b7f1413ffddd8eda90224936456e98e` |
+| 0081 FREE | `dfhp4_freeappc.html` | `20490becead829986d54ceaf6c3b4966dbf10d4709139f2968c7e365c2fc87d8` |
+| 0082 GDS FREE | `dfhp4_gdsfree.html` | `59c9b4b46a779339b21ddd73fa6adc0d58d5422b34cdb200dde7ff9294f8e06f` |
+
+The numeric STATE table remains pinned separately by baseline
+`ibm-cics-ts-6x-misc-tail-cvda-2026-09-23`, topic `dfha80c.html`, SHA-256
+`5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`.
+The peer-frame contract is recorded in [ADR-0020](../../../decisions/0020-conversation-peer-exchange-ledger.md).
+
+## CIC-904.bts-container.read-port declared slice (A1)
+
+This private preparatory slice owns `handlers/bts_container/{mod,scope,state,browse_read}.rs`
+and a narrow CICS service read facade. It depends on the sealed BTS lifecycle
+acquisition projection and precedes the channel/BTS container commands and BTS
+container browse rows. A task channel is keyed by authenticated execution,
+principal, run unit, and channel; BTS process/activity container lanes are keyed
+by the lifecycle process incarnation and activity identity. The read port lists
+at most 256 owner-local names in key order, checks existence, and reads bounded
+bytes, datatype, CCSID, and read-only metadata. It checks the held acquisition
+epoch and process row before and after each read; the service facade sends every
+read through nested SAF authorization and its audit path. No process or activity
+row is created by this lane. No command, MCEP tag, descriptor, or registry row
+is registered: **231 typed / 0 legacy / 32 unready** remains the aggregate.
+Future writers must attach their mutations, UOW rollback, replay retirement,
+and capacity CAS before command registration. The source reference is baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, row `0090`, topic
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getnextcontainer.html`
+SHA-256 `e818120b35e36308002200c1d83ee1df3a6ac1eb4ad35509e0a78494f2d159c3`,
+and row `0102`, topic
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquirecontainer.html`
+SHA-256 `d551edea0d0039551271c01ff29f515393b9fddc9bab6d6580007d026d5253d8`.
+The bounded repository reader could not verify its TOC in this checkout; the
+matching retained HTML bytes were checked directly against these manifest pins.
+
+## CIC-904.bts-container.channel-32 declared slice (A2, in progress)
+
+This slice owns rows `0042` DELETE CHANNEL and `0152` QUERY CHANNEL, plus the
+task-channel profiles of `0043` DELETE CONTAINER, `0086` GET CONTAINER, `0144`
+MOVE CONTAINER, and `0150` PUT CONTAINER. It depends on the A1 owner-scoped read
+port and precedes the BTS selector and 64-bit container slices. Its owning
+modules are `handlers/bts_container/{channel,state}.rs`, the CICS host and
+typed-plan boundaries, compiler resolution, interpreter, selected server route,
+and generated descriptors. Acceptance includes the focused provider, IR,
+compiler, interpreter, server, SQLite-restart, descriptor, documentation,
+format, dependency, and retention gates named in the slice contract.
+
+The private writer now uses one atomic provider-state mutation for each task
+channel update, including channel deletion with all its contained data. The
+global capacity row and private replay receipt are in the same mutation, using
+the capacity shape accepted by the atomic replay archive. It checks owner
+scope and calls the supplied authorization callback with the requested intent
+before mutation; the public SAF/audit adapter remains to be attached. It uses
+the A1 reader for content and
+count. Memory and SQLite-reopen regressions cover replacement, append, move,
+delete, replay conflict, authorization denial, and retained count/data.
+
+The public task-channel route now compiles and selects six 32-bit command
+profiles, with **237 typed / 0 legacy / 26 unready** in the generated registry.
+The mixed rows admit only their channel profile: PROCESS, ACTIVITY,
+ACQPROCESS, and ACQACTIVITY selectors are rejected by compiler, MCEP plan
+validator, and provider. A task's current channel comes from its validated
+`cics.channel` invocation binding; omitted CHANNEL on container commands uses
+that value and otherwise returns INVREQ. Task channels are owner-scoped by
+execution, run unit, and principal. DELETE CHANNEL records the creating program
+and rejects a foreign program or the current channel. QUERY CHANNEL counts
+containers in that owner-scoped channel, including the empty system
+`DFHTRANSACTION` channel. RUN TRANSID CHANNEL takes an audited
+issue-time read of its container bytes and metadata for the child snapshot.
+The store's CICS replay archive pass retires private command receipts with
+the capacity row through one atomic operation before retiring the outer
+receipt. Tags 188, 189, 190, 192, 193, and 195 are MCEP v2 operations;
+operand tags 1720–1731, option tags 1550–1556, and output tags 1720–1724
+are outside the browse lane's reserved ranges. Tags 191 and 194 remain
+unreachable 64-bit forms. Charset/codepage conversion without a modeled
+conversion path remains explicitly unsupported before mutation.
+
+The source review used product `SSJL4D_6.x`, baselines
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` (rows 0042, 0043,
+0086) and `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` (rows 0144,
+0150, 0152). The pinned channel topics are
+`reference-applications/commands-api/dfhp4_deletechannel.html`
+`68c617dabe4c88cd87ae7aa77b95ea5ffb62b25cb75d769ef2826d42f4eb9b48`,
+`dfhp4_deletecontainerchannel.html`
+`2959973d252d55231e9973cc1e02e1c6221dabfa467530eee351575917a2db19`,
+`dfhp4_getcontainerchannel.html`
+`e699b5c003cedd015c05ec116bd05e5cdd46e8fce2f0bd070559555984386674`,
+`dfhp4_movecontainerchannel.html`
+`c0a3a4f796978d7611724a99fe985c3db108dbfccd6ffa2ae2e4132ba1a083f6`,
+`dfhp4_putcontainerchannel.html`
+`84782737176e49a7425b71052bc2564d1600a64baa2229a72e6ffaa5aa087869`,
+and `dfhp4_querychannel.html`
+`9949db7ddbfd5d2dfd6e192bb5500a582863cf54c1dbb1fb519ac8889381f012`.
+The retained HTML bytes matched every manifest SHA-256. The repository's
+`ibm_docs.py search/read` could not verify its separately configured TOC;
+no refresh or network access was attempted.
+
+### CIC-904.bts-container A3: lifecycle container forms
+
+Rows `0043` DELETE CONTAINER, `0086` GET CONTAINER, `0144` MOVE CONTAINER,
+and `0150` PUT CONTAINER remain typed, now with bounded BTS process and
+activity profiles in addition to their task-channel profiles. The registry
+remains **237 typed / 0 legacy / 26 unready**. A current activity is selected
+when no selector is supplied in an active BTS context; PROCESS selects the
+current process, ACTIVITY selects a named direct child, ACQACTIVITY selects the
+held activity, and ACQPROCESS selects a held root process. MOVE accepts current
+activity, named child, and current process source and target scopes under the
+same process. Channel and BTS selectors cannot be combined.
+
+The public route authorizes BTSLIFE read or update against the exact process
+resource before content access. Mutations stage bounded command data under the
+UOW, with a process-row CAS fence and private replay receipt in one atomic
+store batch. Syncpoint publishes or discards staged data; lifecycle deletion,
+reset, and completion attach command-data removal to the same process mutation.
+Private replay receipts use the existing atomic capacity-aware CICS replay
+retirement. A compiled SQLite restart route exercises DEFINE PROCESS, process
+and activity container operations, the attached activity fence, and resumed
+pending data.
+
+The reviewed SSJL4D_6.x BTS topic pins are
+`reference-applications/commands-bts/dfhp4_deletecontainerbcs.html`
+`0f102c198ec0b4ac8bfa0226507b2dc78e448ce8aee4982b905f58031c2dc7d8`,
+`dfhp4_getcontainerbts.html`
+`e486de8019489b85dbcf0b0f343849d0cc088a331c03054db7329aa1da58ad16`,
+`dfhp4_movecontainerbts.html`
+`cf00e409a219ba27f7646cebbd04503dd5411deb293be0bbf6afdbf66b9ceaee`,
+`dfhp4_putcontainerbts.html`
+`76a379f3ad71c30fb362671f071374e1bff3b6a6b71c4912282cb10b6c77ed67`,
+and `dfhp4_acquire.html`
+`646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a`.
+The retained HTML bytes match these pins. The ACQUIRE topic grants an acquired
+descendant read-only process-container access, but the GET topic does not
+settle whether that caller may use ACQPROCESS. GET CONTAINER ACQPROCESS from
+an acquired descendant remains explicitly unsupported until a source resolves
+the selector and resulting condition. The same selector is unavailable for
+descendant mutation. The separately configured IBM topic cache remains
+unverified here; this source review grants no licensed conformance credit.
+
+### CIC-904.task-channel A4: checked 64-bit container data
+
+Rows `0096 GET64 CONTAINER` and `0151 PUT64 CONTAINER` are typed on the
+non-LE AMODE(64) MCEP/provider route. The generated registry moves from
+**237 typed / 0 legacy / 26 unready** to **239 typed / 0 legacy / 24 unready**.
+They remain inapplicable to COBOL source; the compiler rejects that source
+before lowering, as for GETMAIN64 and FREEMAIN64. MCEP v2 operation tags
+**191** and **194**, operand tag **1735** (`ContainerFrom64`), and output tag
+**1725** (`ContainerInto64`) are append-only; v1 rejects both operations.
+The existing `ABI64` marker and the checked invocation binding require the
+non-LE caller and a task data key. Pointer slots hold opaque eight-byte
+virtual addresses, never native pointers. PUT64 reads an exact checked prefix
+of a live owner/key-valid allocation; GET64 writes only the provider-returned
+bytes to a checked allocation after validating the response and capacity.
+Fullword FLENGTH is parsed without narrowing, negative or overrun lengths
+return LENGERR 22/1, and invalid or stale pointers return INVREQ 16/1 before
+container mutation. The 32-bit channel port supplies the data, SAF, audit,
+capacity, replay, and retention semantics. No assembler source frontend or
+native above-bar storage is claimed.
+
+The admitted GET64 profile is CONTAINER, optional CHANNEL, INTO, optional
+FLENGTH and BYTEOFFSET, and common condition options. SET, NODATA, CCSID,
+INTOCCSID, INTOCODEPAGE, and CONVERTST are fenced by MCEP shape and provider
+argument validation. The admitted PUT64 profile is CONTAINER, optional
+CHANNEL, FROM, optional FLENGTH and APPEND, and common condition options;
+DATATYPE, FROMCCSID, FROMCODEPAGE, and PREPEND are fenced. Those fences cover
+all eight `cics-b-issue-0096-*` and four `cics-b-issue-0151-*` bounded
+option-legality issues without treating their unresolved prose as accepted
+semantics. Mixed BTS selectors are rejected at MCEP and provider boundaries.
+
+The pinned `SSJL4D_6.x` baseline is
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`. The reviewed topics
+are `SSJL4D_6.x/reference-applications/commands-api/dfhp4_get64container.html`
+(`d379e6fe60e5c47c4cdc790629c7525b8e2c81c6c6a76c1a21f228dc18931e16`)
+and `SSJL4D_6.x/reference-applications/commands-api/dfhp4_put64container.html`
+(`a96acc368bcf733acfe09776fdde862f4ccd5a11b2b1faee692892acb6e3dd2d`).
+Retained HTML matched both pinned hashes; `ibm_docs.py read` could not verify
+the separately configured TOC, so this grants no cache-backed credit.
+
+### CIC-904.task-channel L3: bounded GET64 and PUT64 options
+
+Offline `ibm_docs.py read` verified both pinned `sources-b` topics above;
+this source review grants no licensed execution credit.
+
+The L3 candidate keeps the **258 typed / 0 legacy / 5 unready** registry
+unchanged. GET64 now admits NODATA with FLENGTH only; CCSID output with
+CONVERTST(NOCONVERT); and INTOCCSID or numeric INTOCODEPAGE("37") when it
+equals the stored CCSID. INTO
+and BYTEOFFSET retain the A4 bounds. PUT64 admits DATATYPE(BIT) and
+DATATYPE(CHAR), with raw bytes and FROMCCSID 37 (the modeled region/default
+CCSID) for CHAR. APPEND retains its A4 behavior. A different CCSID, any
+FROMCODEPAGE or nonnumeric INTOCODEPAGE, and conversion status other than NOCONVERT
+remain fenced before mutation. The pinned topics do not supply a deterministic
+conversion table. COBOL source remains inapplicable to both commands.
+
+| Frozen finding ID | Bounded decision |
+| --- | --- |
+| `cics-b-issue-0096-prose-option-legality-not-structured-10f792451c1d` | FLENGTH output admitted for NODATA; INTO retains checked input/output length. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-27729a3e3e81` | CONVERTST(NOCONVERT) admitted; other values fenced. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-5b9037db3cde` | INTOCCSID admitted only when it equals the stored CCSID; conversion fenced. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-7711ab4e2c40` | NODATA with FLENGTH admitted; no pointer or data returned. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-8f2050341f44` | SET fenced: the provider has no invalidation model for its source-defined cross-program lifetime. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-df83408113f0` | NOCONVERT admitted as a raw-byte read. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-f98786b56f23` | BYTEOFFSET retains A4 checked INTO behavior; NODATA with BYTEOFFSET and converted-codepage offset are fenced. |
+| `cics-b-issue-0096-prose-option-legality-not-structured-fa601487123b` | FLENGTH output admitted for NODATA; other unmodeled combinations fenced. |
+| `cics-b-issue-0151-prose-option-legality-not-structured-327b6c497866` | DATATYPE(BIT) admitted as raw bytes. |
+| `cics-b-issue-0151-prose-option-legality-not-structured-5c2dd543443b` | DATATYPE(CHAR) admitted with default/equal CCSID and raw bytes. |
+| `cics-b-issue-0151-prose-option-legality-not-structured-c66b2232ef2a` | BIT remains the default; BIT with FROMCCSID fenced. |
+| `cics-b-issue-0151-prose-option-legality-not-structured-cc7ed7e475dd` | Named CONTAINER retains A4 behavior. |
+
+PREPEND remains fenced in the compiler, MCEP validator, and provider: the
+topic limits it to CICS TS 6.2 or later, but the provider has no declared
+runtime CICS TS level to test. The version cannot be inferred from a 6.x
+source label. GET64 SET remains fenced until the source-defined invalidation
+events can be modeled. These are partial row profiles, not resolution of the
+frozen findings or licensed differential credit.
+
+### CIC-904 local gaps L4: PostgreSQL selected-route restart tests
+
+Three ignored PostgreSQL 18.6 product tests now exercise compiled channel
+containers, attached-process BTS containers, and BTS browse through a reopened
+server and store. They require an isolated `MAINFRAME_ENV_POSTGRES_TEST_URL` and
+fail if it is absent when selected. The corresponding SQLite tests use the same
+backend-parameterized setup and retain their selectors. This test-only slice
+does not change the **258 typed / 0 legacy / 5 unready** registry. Live
+PostgreSQL results are pending a cluster that can start in the test environment;
+ignored tests do not grant backend completion credit.
+The channel restart fixture now grants the `Alter` authority required by DELETE
+CHANNEL and runs the same delete after SQLite restart. Issue #289's observed
+`CHANNELERR` was the fixture's missing authority; live PostgreSQL rerun is pending.
+
+## CIC-904.bts-lifecycle declared slice
+
+Baseline: `589b7badad78ad73c6a3425fb3d2caa2ee86c841` (151 typed, 0
+legacy, 112 unready). This isolated slice owns exactly catalog rows `0002`,
+`0003`, `0017`–`0019`, `0023`–`0025`, `0032`, `0037`, `0041`, `0169`, `0170`,
+`0172`–`0174`, `0183`–`0186`, and `0215`–`0217` in family `bts-control`.
+The target isolated aggregate is 174 typed, 0 legacy, 89 unready.
+The isolated lifecycle branch reached that aggregate; its BTS/SAF checkpoint
+was 214/0/49 and the combined ISSUE/BTS candidate is 231/0/32. The 151/0/112
+counts in authority checkpoints below record their
+earlier commit states.
+
+| Command forms | Admitted options beyond common RESP, RESP2 and NOHANDLE |
+| --- | --- |
+| ACQUIRE ACTIVITYID | ACTIVITYID |
+| ACQUIRE PROCESS | PROCESS, PROCESSTYPE |
+| CANCEL ACQACTIVITY/ACQPROCESS/ACTIVITY | ACQACTIVITY; ACQPROCESS; ACTIVITY |
+| CHECK ACQACTIVITY/ACQPROCESS/ACTIVITY | ACQACTIVITY/ACQPROCESS/ACTIVITY, COMPSTATUS, MODE, SUSPSTATUS, ABCODE, ABPROGRAM |
+| DEFINE ACTIVITY; DEFINE PROCESS | ACTIVITY, EVENT, TRANSID, PROGRAM, USERID, ACTIVITYID; PROCESS, PROCESSTYPE, TRANSID, PROGRAM, USERID, NOCHECK |
+| DELETE ACTIVITY; RESET ACQPROCESS/ACTIVITY | ACTIVITY; ACQPROCESS/ACTIVITY |
+| RESUME ACQACTIVITY/ACQPROCESS/ACTIVITY | ACQACTIVITY/ACQPROCESS/ACTIVITY |
+| RUN ACQACTIVITY/ACQPROCESS/ACTIVITY; RUN TRANSID | ACQACTIVITY/ACQPROCESS/ACTIVITY, SYNCHRONOUS, ASYNCHRONOUS, INPUTEVENT, FACILITYTOKN; TRANSID, CHANNEL, CHILD |
+| SUSPEND ACQACTIVITY/ACQPROCESS/ACTIVITY | ACQACTIVITY/ACQPROCESS/ACTIVITY |
+
+Owners: the generated application registry and typed execution registrations;
+`mainframe-env-ir` CICS plan and append-only MCEP tags 165–187 (operation),
+704–831 (operand), 636–763 (option), and 760–887 (output);
+`mainframe-env-compiler` CICS resolution; `mainframe-env-interpreter` typed
+request/output routing; `mainframe-env-cics` BTS lifecycle handler and shared
+versioned process/activity state; the existing store's provider row CAS,
+coordinator checkpoint, and participant contract. The isolated protected-root
+production-line counts were 6302/3667/12943. The
+merged service refactor ratchets the CICS root to 3641; server and interpreter
+remain 6302/12943. Ordinary modules remain at most 1200 production lines.
+No other slice's tag allocation is owned here.
+
+Dependencies: accepted 0.4 COBOL host ABI, 0.5 SAF, 0.6 durable authority,
+CIC-901 command grammar, and the existing BTS event authority. Allowed context
+is the pinned local BTS scope and explicit DPL applicability per row; RUN
+TRANSID is a local asynchronous child-task route. Public routes are the typed
+compiled COBOL/host ABI/provider path and server selected-route path. Acceptance
+requires exact source-backed option/condition/EIB behavior, SAF and typed audit
+before mutation, cancellation/deadline/fencing, UOW and replay semantics,
+versioned row restart/migration/rollback, bounded capacity, memory and SQLite
+reopen/concurrency checks, compiled selected-route proof, MCEP v1/v2 and tag
+uniqueness, generated registry and ratchet checks, focused regression and
+mandatory policy/docs gates. PostgreSQL and licensed differential evidence
+remain separately identified by their required environment and candidate.
+The child/link lane supplies `CicsService::register_bts_child(parent,
+token, reply_channel)` and `complete_bts_child(parent, token, completion,
+abcode)` with `CicsBtsChildCompletion::{Normal,Abend,SecurityError}`. RUN TRANSID
+must issue the token through that interface and completion must feed the same
+child outcome; its separate FETCH/FREE token row is not a process/activity
+lifecycle authority. The child/link worktree cherry-picked lifecycle authority
+commit `b8d2a9f8` as `d74663a4`. LINK now resolves the shared
+`cics-bts-process-v1` process tree, `cics-bts-activity-index-v1` identity and
+`cics-bts-acquisition-v1` UOW lease, with activation intent and completion
+recorded by that authority's process CAS and exact replay. No parallel
+process/activity row exists in the child/link slice.
+
+Source review uses product `SSJL4D_6.x` and baselines
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` (A),
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10` (B), and
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` (C). Topic paths below
+are under `SSJL4D_6.x/reference-applications/`; the first 12 use
+`commands-bts/` and RUN TRANSID uses `commands-api/`.
+
+| Catalog rows | Baseline | Topic | Raw HTML SHA-256 |
+| --- | --- | --- | --- |
+| 0002–0003 | A | dfhp4_acquire.html | 646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a |
+| 0017–0019 | A | dfhp4_cancelbts.html | e05f60f142c8d7ed615e813cb22bab3d7cd56b1f3ad50eadcc251769d286a0df |
+| 0023, 0025 | A | dfhp4_checkactivity.html | b186b17e08692ee0297f716ed472b262d945be7d762fec2d57459a793daa9c61 |
+| 0024 | A | dfhp4_checkacqprocess.html | d971a87715692cabfd028bc1be82f695f1da5640fe23eca024a2aac108d3a9c7 |
+| 0032 | A | dfhp4_defineactivity.html | 85c07bc78fc04f6a2496240292a0766033eff1b4f4f0c2ab5daff19402667260 |
+| 0037 | A | dfhp4_defineprocess.html | a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56 |
+| 0041 | A | dfhp4_deleteactivity.html | 3d91328683fc209e5ee8583f96f8c77de09c99caf6ca1994b2e19e81a00e7a24 |
+| 0169 | B | dfhp4_resetacqprocess.html | d6c44056558e34b0d36cf64352ea4476d726f8ed59d29d4758f9eb760293bf76 |
+| 0170 | B | dfhp4_resetactivity.html | 23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52 |
+| 0172–0174 | B | dfhp4_resume.html | 350da29cf791bb80915ba22880a6919b1f313e89cf858440013031a993f2eb7f |
+| 0183–0185 | C | dfhp4_run.html | 2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874 |
+| 0186 | C | dfhp4_runtransid.html | b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d |
+| 0215–0217 | C | dfhp4_suspendbts.html | ddae8c6a987bb1f1341ef0f34040a150a60fa6b449c6ef8de16c7abf480049cd |
+
+The 13 distinct mapped HTML topics and TOC matched the committed manifest pins
+in the external raw SHA-256 archive and were read with `ibm_docs.py` without a
+browser or network refresh. Source review grants no licensed execution credit.
+
+The BTS/SAF merge of lifecycle head `b49affa4` and SAF/audit head `28ae5736`
+registered all 23 lifecycle rows alongside the incoming 40 distinct typed
+rows. That checkpoint had 214 typed, 0 legacy, 49 unready and 191 exact
+registrations; the combined ISSUE/BTS candidate has 231/0/32 and 208 exact
+registrations. One
+`cics-bts-process-v1`/`cics-bts-activity-index-v1` authority owns process and
+activity state; one `cics-bts-child-ownership-v1` row serves RUN TRANSID and
+FETCH/FREE. New root IDs bind the defining UOW and new child IDs bind their
+root. Retained key-only candidate IDs remain opaque through row/index reads
+and process mutations without rewriting their bytes. The MCEP v2 lifecycle
+tags remain 165–187/704–831/636–763/760–887; child/LINK operand and output
+identities retain their separate 1088–1091 and 1144–1147 tags. Baseline A
+DEFINE PROCESS row `0037`, `dfhp4_defineprocess.html` SHA-256
+`a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`;
+DEFINE ACTIVITY row `0032`, `dfhp4_defineactivity.html` SHA-256
+`85c07bc78fc04f6a2496240292a0766033eff1b4f4f0c2ab5daff19402667260`;
+baseline C RUN TRANSID row `0186`, `dfhp4_runtransid.html` SHA-256
+`b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
+The merged candidate's `architecture-fast --check` passed effect, provider-row,
+storage, authorization, retention, descriptor, source-map, corpus, and A/B/C
+projection stages, then stopped at the sources-a auto-review because
+`SSJL4D_6.x/applications/designing/dfhp37p.html` was unavailable in the
+gate's configured offline cache. The allowed retained path is absent; the raw
+archive has bytes matching the committed A/B/C SHA-256 pin
+`0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640`.
+This is not a passing architecture gate or licensed evidence. No browser or
+network refresh was performed.
+
+Implementation checkpoint: the shared `cics-bts-process-v1`,
+`cics-bts-activity-index-v1`, and `cics-bts-acquisition-v1` authority is present
+with strict schema readers, CAS, monotonic epochs, an acquisition tombstone,
+pending DEFINE publication/rollback, checkpoint references, and exact replay.
+Focused Memory and SQLite reopen tests pass. This checkpoint registers no new
+command. A barriered Memory/SQLite ACQUIRE PROCESS race now proves one UOW
+owner and one `PROCESSBUSY 106/13` loser without split process state. Child
+activity transitions were added in the next authority feature
+below. See [ADR-0023](../../../decisions/0023-bts-lifecycle-authority.md).
+
+The acquisition row now stores exact DEFINE PROCESS and ACQUIRE operation,
+key, request digest, and selected identity atomically. Memory restart and
+SQLite reopen regressions cover same-key replay, changed-input conflicts,
+held-acquisition `INVREQ 16/22`, and retention through rollback. This extends
+the shared authority without registering commands; counts remain 151/0/112.
+Source: baseline A catalog rows `0002`–`0003`, `0037`, pinned
+`dfhp4_acquire.html` SHA-256
+`646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a`
+and `dfhp4_defineprocess.html` SHA-256
+`a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`.
+
+The lifecycle authority now provides
+`BtsLifecycleStore::acquired_process_container_scope(run_unit,
+owner_execution, owner_principal)` for the sibling BTS container lane. It
+validates the held acquisition, exact execution/principal, process/activity
+index, and pending-UOW visibility. Root access permits process-container
+reads and writes; an acquired descendant permits only reads. The returned
+`permits_acqprocess()` is false for a descendant: GET CONTAINER (BTS)
+`ACQPROCESS` requires an acquired root in the current UOW and otherwise has
+`INVREQ 16/15`. No descendant command selector or GET CONTAINER route is
+promoted by this slice. Focused Memory and SQLite reopen tests cover root,
+descendant, owner mismatch, syncpoint release, and read-only scope. Source:
+baseline A row `0002` ACQUIRE topic `dfhp4_acquire.html` SHA-256
+`646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a`;
+baseline A catalog row `0086` GET CONTAINER (BTS) variant topic
+`dfhp4_getcontainerbts.html` SHA-256
+`e486de8019489b85dbcf0b0f343849d0cc088a331c03054db7329aa1da58ad16`.
+
+A child-token adapter now exposes the sibling lane's exact
+`register_bts_child(parent, token, reply_channel)` and
+`complete_bts_child(parent, token, completion, abcode)` signatures with its
+versioned `cics-bts-child-ownership-v1` row shape. It is an ownership/reply
+dependency for RUN TRANSID, separate from process/activity state. The pinned
+RUN TRANSID topic allows more channel-name characters than the sibling's
+current validator; reconciliation must widen that validator. The adapter does
+not attach a child task or grant row `0186` readiness. Baseline C topic
+`dfhp4_runtransid.html` SHA-256
+`b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
+
+The RUN TRANSID dependency now has a `cics-bts-transid-run-v1` request and
+bounded `cics-bts-transid-outbox-v1` index. Exact effect replay retains a
+deterministic 16-byte token and an issue-time channel/container snapshot;
+claimed work and completion are lease-fenced. A focused Memory regression
+covers reopen, changed-input conflict, stale completion, and terminal replay.
+The server attach and public route are still pending, so row `0186` has no
+readiness credit. Source: baseline C row `0186`, `dfhp4_runtransid.html`
+SHA-256 `b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
+
+A versioned `cics-bts-repository-name-v1` uniqueness row now reserves
+repository resource/name, including when different process types map to the
+same repository. Definition and reservation are one atomic mutation;
+syncpoint publishes or rolls them back together. Memory and SQLite reopen
+regressions cover duplicate `PROCESSERR 108/2`, exact replay, and retained
+published ownership. It adds an index to the single lifecycle authority and
+does not register commands: 151/0/112. Source: baseline A row `0037`,
+`dfhp4_defineprocess.html` SHA-256
+`a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`.
+
+The NOCHECK authority path now defers repository-name reservation until
+syncpoint. A known duplicate remains a durable acquisition effect and reports
+`PROCESSERR 108/2` at commit preflight before CICS writes its UOW intent;
+rollback leaves any existing process unchanged. Memory, SQLite reopen, and
+the CICS syncpoint regression cover these transitions. A new collision after
+preflight remains an uncertain outcome for reconciliation. A deferred duplicate
+has no substitute process tree for intervening lifecycle commands. Public
+NOCHECK command routing and readiness credit are pending; counts stay
+151/0/112. Source: baseline A row `0037`, `dfhp4_defineprocess.html` SHA-256
+`a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`.
+
+The typed lifecycle candidate now has host operation identities, bounded IR
+plans and MCEP v2 tags, compiler resolution, interpreter request/output
+routing, installed process-type/transaction catalog, and CICS dispatch for
+the 23 reviewed forms. The isolated registry reported 174 typed, 0 legacy,
+and 89 unready; its BTS/SAF checkpoint reported 214/0/49, and the combined
+ISSUE/BTS registry reports 231/0/32. Direct provider regressions cover definition,
+acquisition, checks, named child state changes, and RUN work admission. A
+focused public-route matrix now invokes every one of the 23 assigned forms,
+including acquired descendant and root UOW selectors, named-child CHECK/RUN,
+and a BTSREPO denial that leaves no process row and retains an audit record.
+An exact child-transaction `TCICSTRN` denial on RUN TRANSID returns
+`NOTAUTH 70/101` before token/request admission and retains an audit record;
+the pinned baseline C row `0186` topic/hash appears in the source map.
+A provider attach-denial regression repeats the child transaction SAF check
+and retains `SecurityError` with a blank ABCODE in the sibling-compatible
+token row before closing the RUN TRANSID request. The dependent FETCH CHILD
+row `0078` topic/hash is recorded below.
+For a complete root activity, SUSPEND ACQPROCESS now returns `INVREQ 16/14`
+from the SUSPEND activity-mode rule, while RESUME ACQPROCESS retains its
+explicit `PROCESSERR 108/14`. Authority and public-route regressions cover
+both. Baseline C row `0216`, `dfhp4_suspendbts.html` SHA-256
+`ddae8c6a987bb1f1341ef0f34040a150a60fa6b449c6ef8de16c7abf480049cd`;
+baseline B row `0173`, `dfhp4_resume.html` SHA-256
+`350da29cf791bb80915ba22880a6919b1f313e89cf858440013031a993f2eb7f`.
+The same pinned SUSPEND and RESUME topics require deferred reattachment:
+SUSPEND prevents attachment when events fire, and RESUME reattaches for events
+fired during suspension. The authority now releases deferred RUN work and
+creates one reattachment work row for queued events on a suspended DORMANT
+activity. Late delivery of queued events remains under review, so rows
+`0172`–`0174` and `0215`–`0217` are not yet sealed.
+An additive `DEFERRED` RUN state and disjoint bounded outbox set are now
+readable; legacy outboxes without the set default empty. A focused test proves
+overlap rejection and that a deferred record cannot be converted into work.
+The state shape alone grants no semantic readiness or licensed credit.
+Public asynchronous RUN now creates a DEFERRED request when its subject is
+suspended, retains the prior INITIAL/DORMANT mode and reserved activation
+epoch, and does not enqueue work or admit it on startup recovery. Exact retry
+and a second INITIAL RUN are fenced. Focused authority and public-route
+negative work-admission tests pass. RESUME release and queued-event
+reattachment are described below; full command readiness is still pending.
+Source: baseline C RUN rows `0183`–`0185`, `dfhp4_run.html` SHA-256
+`2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`;
+SUSPEND topic/hash above.
+RESUME now atomically moves a DEFERRED request to PENDING and enqueues its
+exact work. For a suspended DORMANT activity with fired queued events and no
+deferred request, it creates one reattachment RUN while fencing the event
+snapshot in the same CAS batch. Public and direct Memory tests and a SQLite
+reopen regression cover work admission, queue preservation, exact replay, and
+single-work identity. A late event after the worker's last retrieval remains
+unsealed. Source: baseline B RESUME rows
+`0172`–`0174`, `dfhp4_resume.html` SHA-256
+`350da29cf791bb80915ba22880a6919b1f313e89cf858440013031a993f2eb7f`.
+Cancellation now forces and retires a deferred RUN in the same CAS batch as
+the process and event transition. RESET and DELETE likewise retire deferred
+requests for their subject or removed descendants and drain the deferred
+outbox without admitting work. Focused Memory regressions cover all three
+transitions. Parent completion still declines a suspended descendant, leaving
+its deferred request intact. Source: baseline A CANCEL rows `0017`–`0019`,
+`dfhp4_cancelbts.html` SHA-256
+`e05f60f142c8d7ed615e813cb22bab3d7cd56b1f3ad50eadcc251769d286a0df`;
+baseline A DELETE row `0041`, `dfhp4_deleteactivity.html` SHA-256
+`3d91328683fc209e5ee8583f96f8c77de09c99caf6ca1994b2e19e81a00e7a24`;
+baseline B RESET row `0170`, `dfhp4_resetactivity.html` SHA-256
+`23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52`.
+DEFINE ACTIVITY and DEFINE PROCESS rollback now retire deferred RUN reservations
+for removed pending children or the pending process in the same CAS batch as
+index/process deletion. The outbox is drained and no worker is admitted.
+Focused pending-child and pending-root rollback regressions pass. Source:
+baseline A DEFINE ACTIVITY row `0032`, `dfhp4_defineactivity.html` SHA-256
+`85c07bc78fc04f6a2496240292a0766033eff1b4f4f0c2ab5daff19402667260`;
+DEFINE PROCESS row `0037`, `dfhp4_defineprocess.html` SHA-256
+`a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`.
+Compiled selected routes cover DEFINE PROCESS NOCHECK, ACQUIRE PROCESS,
+CHECK ACQPROCESS, RUN ACQPROCESS, and RUN TRANSID through the server's
+separate-UOW workers. RUN TRANSID retains the issue-time channel snapshot in
+the child invocation; second transaction authorization occurs at attach.
+For RUN process/activity, startup recovery now retains a terminal work row
+with a pending lifecycle request and admits other independent RUN work; an
+exact retry of the terminal request still reports `UnknownOutcome`. A focused
+reopen regression covers both outcomes. Source: baseline C rows `0183`–`0185`,
+`dfhp4_run.html` SHA-256
+`2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`.
+Memory and SQLite process-reopen regressions now prove that a pending RUN
+request admits the same exact work identity after restart without a second
+lifecycle activation.
+New RUN work IDs bind the effect key with the source statement. A focused
+worker/reset regression proves the same statement creates a new activation
+and work row after RESET, while an exact retry retains that new row. A
+retained statement-only row remains readable and replays its original work
+identity without rekeying. A synchronous continuation of the same activation
+returns its existing RUN row, saves its new effect key, and replays exactly
+even after RESET; changed bytes conflict. Focused provider and public
+continuation regressions pass. Distinct INPUTEVENTs from asynchronous RUN
+requests in one UOW now coalesce while the activity is ACTIVE: both events
+remain fired in the queue, one worker/outbox is retained, and each request
+replays exactly. Reusing a fired event returns `EVENTERR 111/7`. Memory and
+SQLite reopen regressions pass. Delivery of an event posted after the worker's
+last retrieval remains an unsealed timing edge. Source: baseline C rows
+`0183`–`0185`, `dfhp4_run.html` SHA-256
+`2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`.
+The focused BTS provider and compiled selected-route tests, docs,
+module-boundary, and rustfmt gates pass for this candidate. Strict Clippy
+remains stopped by 31 library warnings across existing modules (46 with test
+targets); it reports no diagnostic in the changed RUN module. This is not a
+passing Clippy gate.
+Terminal parent RUN completion now atomically removes settled descendants,
+their indexes, and direct-child completion events. A focused negative
+regression shows an active descendant returns `UnknownOutcome` without
+completing the parent or deleting either row. Automatic deletion of live,
+acquired, or pending descendants remains unresolved; the slice is not sealed.
+Source: baseline A row `0041` DELETE ACTIVITY,
+`dfhp4_deleteactivity.html` SHA-256
+`3d91328683fc209e5ee8583f96f8c77de09c99caf6ca1994b2e19e81a00e7a24`.
+RESET and explicit DELETE now likewise preserve a subtree with an active,
+dormant, or cancelling descendant instead of orphaning its RUN work. They
+reject a descendant pending in another UOW while preserving a caller-owned
+pending INITIAL child for deletion. A focused Memory guard regression checks
+that foreign pending DELETE and RESET leave the process and index unchanged.
+A focused transition regression checks that neither command changes the
+process snapshot when a grandchild is active. Coordinated live-descendant
+deletion remains an unsealed semantic path. Source: baseline B row `0170`,
+`dfhp4_resetactivity.html` SHA-256
+`23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52`;
+baseline A row `0041` DELETE ACTIVITY hash above.
+SQLite reopen preserves its pending outbox and exact channel snapshot.
+New RUN TRANSID admission rejects over-capacity container counts or payloads
+before writing an outbox row; an exact retry keeps the saved issue-time copy
+even if the caller's current channel has changed. Focused bounds and replay
+regressions pass for baseline C row `0186`, `dfhp4_runtransid.html` SHA-256
+`b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
+The old `CHANNEL` path read a transform-container map keyed only by
+channel/container name, without issuing-task ownership. That copy was
+removed. A valid CHANNEL request now returns `Unsupported` after transaction
+SAF and before a child token, request, or outbox row is admitted; malformed
+channels still return `CHANNELERR 122/1`. A focused negative regression
+proves a name-global transform container is not copied. RUN TRANSID without
+CHANNEL remains executable. The separate container lane's `cics-channel-v1`
+and `cics-container-v1` rows are keyed by run unit; row `0186` remains
+unsealed until that selected-route authority is reconciled.
+The required container-lane handoff is an authenticated in-flight parent/run
+snapshot that checks task ownership, creates a missing empty channel through
+its capacity CAS, and returns the bounded issue-time copy; no process/activity
+lifecycle row is owned by that lane. A SQLite process-reopen regression now
+proves the separate retained child-token result closes the request/outbox
+before work readmission.
+The sibling container worktree now exposes
+`CicsService::snapshot_channel_for_bts_child(&mut Run, channel)` with
+per-container CCSID and read-only metadata. This lifecycle request row has an
+additive v1 reader/writer for that metadata, accepts old rows without it, and
+bounds new copies to 256 containers, 65,536 bytes each, and 524,288 bytes
+total. New byte payloads use base64 JSON encoding while the v1 reader accepts
+older byte arrays. An all-255 maximum copy fits both the bounded request row
+and child invocation payload. Focused provider and selected server tests pass;
+the direct worktrees have not been reconciled, so this does not seal `CHANNEL`
+or add licensed credit.
+The same request row now retains the task-owned snapshot's channel-level
+read-only flag and sends it in the selected child invocation as
+`cics.channel.readonly`. The additive reader defaults old v1 rows to false;
+SQLite reopen and selected child binding regressions cover true and legacy
+absent values. The public CHANNEL path awaits the sibling task-owned snapshot
+and cannot yet supply this flag, so row `0186` remains unsealed. Source:
+baseline C row `0186`, `dfhp4_runtransid.html` SHA-256
+`b3f40c566ff759f5ec78a5f1609471ad2f8c698e8b078578f7f924b8dd474b8d`.
+Restart reconciliation reads the sibling token result before work readmission
+and atomically closes a completed request/outbox. A cancelled terminal work
+item with no child result stays pending with an explicit unknown outcome;
+startup continues to admit independent pending child work, while exact
+reconciliation of the cancelled request reports `UnknownOutcome`. Neither
+normal completion nor an undocumented abend code is synthesized.
+The child/link sibling must preserve `cics-bts-process-v1` as the only
+process/activity authority and reuse its separate token row. Cancellation,
+terminal work failure, and post-admission reconciliation for the child task
+remain under review; this candidate is not yet sealed or licensed execution
+credit. The source map above identifies all 23 catalog rows and verified
+SHA-pinned topics. The dependent FETCH CHILD baseline C row `0078` topic
+`dfhp4_fetchchild.html` was also parsed from SHA-256
+`b4604930c609dff5ff193308c67314717737d5b06ad9ddebd3c95c8806fe48e6`:
+its terminal statuses are NORMAL, ABEND, and SECERROR, and attach security
+denial has a blank ABCODE.
+
+The compiler accepts ACQUIRE PROCESS with PROCESS and PROCESSTYPE; ACTIVITYID
+is the separate ACQUIRE ACTIVITYID selector, not an ACQUIRE PROCESS output.
+The public route now reports `PROCESSERR 108/9` for an unknown process type
+before looking up the named process; a known type with a missing process
+reports `PROCESSERR 108/5`. A focused negative regression verifies both
+without creating a UOW acquisition. Source: baseline A catalog row `0003`,
+`dfhp4_acquire.html` SHA-256
+`646a460e9ba3dd34548c5d73939a9a102538fda186d9e1e6b0721c20a12e927a`.
+The pinned DEFINE PROCESS and DEFINE ACTIVITY names permit `¬`; provider,
+compiler, and MCEP v2 checks now count source characters for PROCESS and
+ACTIVITY rather than UTF-8 bytes. A 36-character process identity survives
+SQLite reopen and a selected compiled DEFINE/SYNCPOINT/ACQUIRE/CHECK/RUN route;
+an explicit completion EVENT permits the 16-character activity name. The
+selected route uses source literals. A `PIC X(36)` VALUE initialized from the
+same 36-character name currently truncates its UTF-8 representation before a
+data-reference CICS call; that host-storage path requires an ABI repair and
+has no readiness proof for `¬` variable values. The compiler also counts RUN
+TRANSID CHANNEL literals by source characters, while
+its task-owned snapshot dependency remains unsealed. The container lane's
+current 72-hex-character process-key reader must be reconciled with the
+lifecycle key's UTF-8 encoding before shared-name use. Source: baseline A rows
+`0032`, `0037`, `dfhp4_defineactivity.html` SHA-256
+`85c07bc78fc04f6a2496240292a0766033eff1b4f4f0c2ab5daff19402667260`
+and `dfhp4_defineprocess.html` SHA-256
+`a31702315bb8d6cb0ac499858593eed0e2d4c2e3b65145474e95a39ecbd71f56`;
+baseline C row `0186` CHANNEL is in the source map.
+Parent CHECK ACTIVITY now atomically removes a completed child's completion
+event while preserving its retained status for repeated CHECKs. An incomplete
+child keeps the event; RESET ACTIVITY recreates a consumed event as NOTFIRED.
+The focused parent public route covers INITIAL CHECK, forced completion,
+repeated completed CHECK, RESET, and DELETE after acknowledgement. A SQLite
+reopen regression keeps the event consumed and verifies RESET restores it.
+Source: baseline A rows `0023`,
+`0025`, `dfhp4_checkactivity.html` SHA-256
+`b186b17e08692ee0297f716ed472b262d945be7d762fec2d57459a793daa9c61`;
+baseline B row `0170`, `dfhp4_resetactivity.html` SHA-256
+`23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52`.
+
+CHECK COMPSTATUS, MODE, and SUSPSTATUS are exact four-byte CVDA receivers;
+the bounded source projection's `cvda`/`none` ambiguity is resolved for these
+three CHECK forms by the pinned CHECK topics while other ambiguous shapes
+stay fail-closed. CHECK lifecycle SAF names encode the repository key with a
+RACF-compatible dot separator. Selected COBOL/server tests exercise the
+source-backed NOCHECK syncpoint, acquisition, CVDA check, process RUN, and
+RUN TRANSID child completion. Baseline A rows `0002`–`0003`, `0023`–`0025`,
+and `0037`; baseline C rows `0183`–`0186`; topic hashes are in the source map.
+
+The BTS/SAF checkpoint application-contract schema pinned 214 typed, 0 legacy,
+and 49 unready rows with 191 exact registrations. The combined ISSUE/BTS
+schemas now pin 231 typed, 0 legacy, 32 unready and 208 exact registrations,
+including all 23 lifecycle rows, six child/LINK rows, and 17 ISSUE rows.
+Their Draft 2020-12 schemas and application contract pass the focused xtask validator.
+The broader `cargo xtask schemas --check` remains stopped by the unchanged
+0.8 CardDemo evidence sentence exceeding its historical 256-character bound;
+that unrelated receipt was not edited. The descriptor generator check passes.
+
+The next authority feature adds source-shaped initial/dormant run, activation
+epoch and checkpoint fencing, completion, suspend/resume, forced cancellation,
+reset, and child subtree deletion. DEFINE ACTIVITY now creates a 52-byte
+incarnation-scoped child ID, process child, and lookup index in one CAS batch;
+child publication/rollback and acquisition release share one atomic UOW
+transition. RESET and DELETE remove descendant indexes atomically with the
+process row and exact replay. The first v1 pending-root payload remains
+readable through a bounded additive reader. Focused Memory and SQLite tests
+and the unchanged module-budget gate pass. These are authority transitions,
+not yet compiled or registered commands; counts remain 151/0/112.
+Provider command routes, compiled selected-route proof, and slice gates remain
+in progress.
+
+The lifecycle authority now stores a separate `cics-bts-activity-context-v1`
+run-unit binding to the exact process, 52-byte activity ID, activation epoch,
+and coordinator lease epoch. Bind and read reject a stale or missing active
+checkpoint; a lease takeover can advance only the same activation; close
+retains a fenced tombstone. Memory and SQLite reopen regressions cover stale
+lease rejection and restart identity. This is an adapter contract for RUN and
+later LINK integration, not a new public command registration.
+
+The existing CICS syncpoint now calls the BTS participant before finalization
+to publish or roll back pending process/child rows and release the UOW
+acquisition. An unfinished UOW reconciliation replays that settlement using
+durable owner metadata; wrong-owner attempts fail without releasing state.
+Focused participant tests pass. This step adds no typed command registration;
+the isolated counts remain 151/0/112.
+
+The existing BTS event authority now resolves a fenced active lifecycle
+context before its legacy 16-character binding, keys content by the exact
+52-character activity ID, and rejects fallback from a closed BTS binding.
+Input-event delivery checks the indexed active process/activity. A focused
+selected-provider test covers event definition, delivery, and closed-context
+denial. Source: A catalog row 0036, `dfhp4_defineinputevent.html`, SHA-256
+`5088d0996767082611905999e6378f69b919d9ff76b30582f5e5e0e631ee78c9`,
+plus RUN rows 0183–0185 cited above. This adapter registers no lifecycle row.
+
+Activity completion events now use the existing event authority with the
+child's exact lifecycle ID. DEFINE ACTIVITY and UOW rollback, RESET, DELETE,
+and forced CANCEL update the event row atomically with the process/index
+rows, including composite and reattachment queue state. Focused Memory tests
+cover event creation, rollback, deletion, cancellation, replay, and the
+unchanged module budget. Sources: A rows 0032 and 0017–0019, B row 0170, and
+A row 0041 in the source table above. This authority feature adds no public
+command; the isolated counts remain 151/0/112.
+
+The shared RUN authority now has an atomic activation/outbox admission row,
+bounded pending index, work-lease checkpoint takeover, and exact completion
+with child-event publication. `CicsService::open_with_runtime` re-admits work
+after a crash gap; the server worker executes an installed compiled program
+in a separate CICS run and records NORMAL completion. Focused Memory restart,
+lease, malformed input, terminal-work, and selected server-route tests pass.
+Source: C rows 0183–0185, `dfhp4_run.html`, SHA-256
+`2879aac70f7d67457e032f2dd56b2888208a5ba7ba332c22cfed5153b0bf8874`.
+Synchronous public command routing, attach-failure reconciliation, and the
+remaining RUN options remain in progress; this commit does not register a
+lifecycle row or change the 151/0/112 count.
+
+## CIC-904.bts-browse B1 progress
+
+Baseline `7765d48b` has 231 typed, 0 legacy, and 32 unready application rows.
+This slice registers the eight ACTIVITY and PROCESS browse/INQUIRE rows as
+typed runtime; the registry is 239/0/24. The task-owned cursor core reads the
+shared BTS lifecycle store. It caps a
+task at 32 cursors and each snapshot at 256 items, persists exact transitions
+with CAS and replay, checks caller-supplied lifecycle epochs and expected next items, and
+clears cursor state on task end and rollback. A SQLite reopen test covers the
+persisted cursor, and a compiled selected CICS route test executes all eight
+rows after a SQLite restart.
+
+The retained HTML bytes matched the pinned SHA-256 values below for product
+`SSJL4D_6.x`, baseline `ibm-cics-ts-6x-2026-08-31:api-commands`.
+Topic paths are under `SSJL4D_6.x/reference-applications/commands-bts/`.
+The checkout's `ibm_docs.py search` and `read` commands could not use the
+unprovisioned verified TOC cache; these local raw HTML checks are source review
+and earn no execution or conformance credit.
+
+| Rows | Topic path | Raw HTML SHA-256 |
+| --- | --- | --- |
+| 0059 | dfhp4_endbrowseactivity.html | 3ce6a6978090b5378aa09abb660dafb474105a1b3ef6f8136fa2dcd6d43ab4a7 |
+| 0062 | dfhp4_endbrowseprocess.html | 0e8a379279c79e31ebf289c671fd62a154e47d061aa038c964611c6f4e5e71e3 |
+| 0089 | dfhp4_getnextactivity.html | 7f6311218b9232eb7a807d31a05526a6bb417c95d1fe15d300872c7f9c2c34d6 |
+| 0092 | dfhp4_getnextprocess.html | bd2606ad49d3d4288d38e6c5e4eb1a37a710232435072ee8a221418844ca869d |
+| 0101 | dfhp4_inquireactivityid.html | 3577aa0007bfda7f229ff19fa2b1872b6e77ba5dad19e1d4e67ebf4063f7b37d |
+| 0104 | dfhp4_inquireprocess.html | b59438ad6914a2ca2455ca4bb7302b7c8e1f625972995c8a566878c2bdd5d6da |
+| 0209 | dfhp4_startbrowseactivity.html | 609732786754b82eb0df3187e75e3312970d55a3db77f1aa206fd2914604fee3 |
+| 0212 | dfhp4_startbrowseprocess.html | 946ed7e1ec203e6118e2cccd378a5cbdd78756620b53176f293f21a69bd32d76 |
+
+The STARTBROWSE ACTIVITY and PROCESS pages define BROWSETOKEN as a fullword
+receiving area, resolving the source projection's bounded direction for these
+forms. The ACTIVITY receiver on GETNEXT ACTIVITY and INQUIRE ACTIVITYID is 16
+characters while the lifecycle root name can be 36. The provider fences an
+ACTIVITY output over 16 bytes and a PROCESS browse name over 36 bytes before
+cursor start or receiver write. INQUIRE
+ACTIVITYID's COMPSTATUS, MODE, and SUSPSTATUS are admitted as individual
+fullword CVDA outputs. Each command may request one of these with ACTIVITYID
+and optional NOHANDLE/RESP/RESP2; co-occurrence with another inquiry output
+remains fenced in compiler, MCEP validator, and provider because the frozen
+`cics-b-issue-0101-prose-option-legality-not-structured-*` findings do not
+settle those combinations. B3 CONTAINER tags and rows remain unreachable.
+
+## CIC-904.bts-browse B2 progress
+
+Seven EVENT and TIMER browse/INQUIRE rows extend the B1 task-owned cursor
+authority; the application registry is 246 typed / 0 legacy / 17 unready.
+EVENT names and TIMER names are read from the existing bounded per-activity
+maps. A cursor retains only names and state versions, and GETNEXT EVENT checks
+the live event-state version and lifecycle epoch before advancing. The selected
+compiled route covers these seven rows after SQLite reopen. The frozen
+`GETNEXT TIMER` row 0093 remains unready: its pinned page has a BROWSETOKEN
+receiving area but does not define the sibling GETNEXT END/TOKENERR cursor
+transition, so operation tag 205 is unassigned.
+
+The source review used retained HTML for product `SSJL4D_6.x`, baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`; all eight bytes matched the pinned
+SHA-256 values. The verified TOC cache was unavailable, so this review grants
+no conformance or differential credit. Topic paths are under
+`SSJL4D_6.x/reference-applications/commands-bts/`.
+
+| Row | Topic path | Raw HTML SHA-256 |
+| --- | --- | --- |
+| 0061 | dfhp4_endbrowseevent.html | e09068977047376b71be7e805eb7dbb2343ada8e04ab8789cde84ff5f3791c72 |
+| 0063 | dfhp4-endbrowsetimer.html | 66d015bcb2431ed1680bdb6a4007463e05f318a38526c77eeacf45d557e1c0b3 |
+| 0091 | dfhp4_getnextevent.html | 1d3bfc2c662c3dd20926245bb79ce0622178cb4a8eba5ac424bbb97b31eb8e84 |
+| 0093 | dfhp4-getnexttimer.html | ec17a7fa02900abc6995c958e6c1045f566369fa932c56c281915f5da2ad5dc2 |
+| 0103 | dfhp4_inquireevent.html | 972ebb40939722e87638da8d8a7d724232bbe6706a9974af6b49fa31c6f7de75 |
+| 0105 | dfhp4_inquiretimer.html | fc4f94a00c72517aa24077de301323870f84fb570c648eccd7082a0b2fef35d6 |
+| 0211 | dfhp4_startbrowseevent.html | 45f2a301a9ea54a359cb1e16b529cceaaca91c535a3eb1a066c24c67b9ba2521 |
+| 0213 | dfhp4-startbrowsetimer.html | a7d2b84967cb0eff199a64fefe3b89f5c8e4f066184f2d4c3a346254ef9a7ec8 |
+
+GETNEXT EVENT row 0091 has the frozen issue
+`cics-b-issue-0091-prose-option-legality-not-structured-4116d87d3bef`.
+Its mandatory EVENT receiver is admitted from the pinned prose; optional
+attribute outputs EVENTTYPE, FIRESTATUS, COMPOSITE, PREDICATE, and TIMER are
+admitted one at a time with BROWSETOKEN, EVENT, and common options. The source
+defines each receiver and its applicable event kind, but the frozen finding
+does not settle metadata-output co-occurrence, so combinations remain fenced
+in compiler, MCEP validator, and provider. The cursor snapshots each event's
+metadata with its name, checks the event-state version before advancing, and
+persists the returned item for identical replay after SQLite restart.
+INQUIRE EVENT now returns EVENTTYPE, FIRESTATUS, COMPOSITE,
+PREDICATE, and TIMER from the held event record; PREDICATE requires a composite
+event. INQUIRE TIMER returns EVENT, STATUS, and ABSTIME from the held timer
+record. ABSTIME is a packed decimal millisecond count since 1900-01-01 rounded
+to the nearest 10 ms. These inquiry outputs use append-only MCEP v2 tags
+1031–1040; the registry remains 258 typed / 0 legacy / 5 unready.
+The event authority does not model SYSTEM event kinds. DFH-prefixed SYSTEM
+event inquiry and any stored DFH-prefixed event browse fail explicitly before
+cursor mutation; no SYSTEM event output is synthesized.
+
+The inquiry-output source baseline is
+`ibm-cics-ts-6x-2026-08-31:api-commands`, rows 0101, 0103, and 0105.
+Pinned topic paths are
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquireactivityid.html`
+(`3577aa0007bfda7f229ff19fa2b1872b6e77ba5dad19e1d4e67ebf4063f7b37d`),
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquireevent.html`
+(`972ebb40939722e87638da8d8a7d724232bbe6706a9974af6b49fa31c6f7de75`), and
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquiretimer.html`
+(`fc4f94a00c72517aa24077de301323870f84fb570c648eccd7082a0b2fef35d6`).
+Numeric CVDA codes come from the retained 6.x table
+`SSJL4D_6.x/reference-applications/commands-api/dfha80c.html`
+(`5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`);
+its bytes match the pinned manifest, though that topic is absent from the
+configured `ibm_docs.py` cache.
+The GETNEXT EVENT source is
+`SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getnextevent.html`
+(`1d3bfc2c662c3dd20926245bb79ce0622178cb4a8eba5ac424bbb97b31eb8e84`),
+row 0091 of the same baseline. SYSTEM events and GETNEXT TIMER remain fenced.
+
+### CIC-904 channel/container and BTS browse integration
+
+The channel/container slice, checked 64-bit container routes, and the ACTIVITY,
+PROCESS, EVENT, TIMER, and CONTAINER browse slices together register **258 typed
+runtime, 0 legacy compatibility, and 5 unready** application rows. The remaining
+rows are 0027, 0093, 0113, 0114, and 0123. CONTAINER browse rows
+0060/0090/0102/0210 use the A1 owner-scoped read port, bounded task-owned
+name snapshots, and MCEP v2 operation tags 197/202/207/212. Explicit CHANNEL
+on STARTBROWSE uses the task-channel read authority; the current channel is
+used when present, otherwise the held BTS activity. INQUIRE CONTAINER reads
+the held BTS process or activity and returns its SET data and DATALENGTH.
+GETNEXT skips names deleted after STARTBROWSE while retaining exact cursor
+replay and lifecycle-epoch checks. The pinned container browse and INQUIRE
+topics do not define ACQPROCESS or ACQACTIVITY flag options, so those flags
+are rejected by compiler, MCEP shape validation, and provider validation;
+the held acquisition remains usable through PROCESS/PROCESSTYPE, ACTIVITYID,
+and current-activity selectors. An acquired descendant cannot issue an
+ACQPROCESS flag form. The source baseline is
+`ibm-cics-ts-6x-2026-08-31:api-commands`; retained HTML for rows 0060, 0090,
+0102, and 0210 matched manifest SHA-256 values `1361625d7463d1b43c63319144a7ff518e3375d017b5805e399fabb504974959`,
+`e818120b35e36308002200c1d83ee1df3a6ac1eb4ad35509e0a78494f2d159c3`,
+`d551edea0d0039551271c01ff29f515393b9fddc9bab6d6580007d026d5253d8`,
+and `9481faf2d4b45d5dd8fd25a78cb1e6843a7b71ad404d69bb0f46430d454dcd4c`.
+The CHANNEL variant topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbrowsecontainerchannel.html`
+matched `7eb27dfa7466f393ca4824a3c5df85de1cb0a68ba3f5c74ea2a2c942d6fad5d3`.
+The repository IBM docs CLI lacked a verified TOC in this checkout; retained
+HTML review grants no licensed conformance credit.
+GETNEXT TIMER row 0093 remains unready pending its source-defined cursor
+transition. The other unready rows retain their prior fences. MCEP operation
+tags 188–195 belong to channel/container (191 and 194 are GET64/PUT64), while 196–215
+belong to BTS browse (205 held for unready GETNEXT TIMER). Container browse
+operand tags 966–967 and output tags 1028–1030 are append-only; no new
+option tags are used.
+
+## `CIC-904.bts-child-link` declared slice
+
+Stable slice ID: `CIC-904.bts-child-link`. This worktree owns exactly catalog
+rows `0077 FETCH ANY`, `0078 FETCH CHILD`, `0083 FREE CHILD`, `0139 LINK
+ACQACTIVITY`, `0140 LINK ACQPROCESS`, and `0141 LINK ACTIVITY` in the
+`bts-control` family. The reserved v2 operation tags are 216–221, operand
+tags 1088–1215, option tags 1020–1147, and output tags 1144–1271. No other
+command row or another slice's tag range is owned here. `FETCH` admits its
+source defined child token, completion status, reply channel, abend code,
+`NOSUSPEND` or bounded `TIMEOUT`; `FREE` admits the child token; `LINK` admits
+the named or acquired activity/process and optional input event, with the
+common `NOHANDLE`, `RESP`, and `RESP2` controls.
+
+Owning modules are the typed CICS compiler resolution, CICS plan/codec,
+interpreter host bridge, CICS provider BTS child/link handler, selected-program
+server route, and versioned provider-state authority. Dependencies are the
+accepted 0.4 host ABI, 0.5 SAF, 0.6 durable coordinator, installed CICS program
+catalog, and the common BTS activity/process lifecycle and event authority at
+integration. Acceptance requires source-checked compiler and v1/v2 codec
+regressions; exact EIB/condition/output and negative bounds; SAF allow/deny and
+audit; finite deadline and live cancellation; owner-fenced atomic replay and
+Memory/SQLite reopen; compiled COBOL through the selected provider and server
+route; generated registry/schema/ratchet consistency; focused affected tests,
+format, dependency policy and documentation gates. PostgreSQL and licensed
+evidence retain their existing separate acceptance requirements and receive no
+credit from this declaration.
+
+Source baseline `ibm-cics-ts-6x-2026-08-31:api-commands` maps rows 0077,
+0078, and 0083 to
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` topics
+`commands-api/fetchany.html` SHA-256
+`e44b1169c8dc0ab43af20c045724e2a39b986bbe9ca96214bfa99d209e8e4a5b`,
+`commands-api/dfhp4_fetchchild.html` SHA-256
+`b4604930c609dff5ff193308c67314717737d5b06ad9ddebd3c95c8806fe48e6`,
+and `commands-api/freechild.html` SHA-256
+`ca62635850e7d91236b58a9ca3ac0d4a32ed889c9dbf6c6c08c6d052b8fd94a0`.
+Rows 0139 and 0141 share
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10` topic
+`commands-bts/dfhp4_linkactivity.html` SHA-256
+`8a945284d9ad2688e290fa2488ef5f0ee1f8d1e6ea287bcd3ad3e85727066994`;
+row 0140 uses `commands-bts/dfhp4_linkacqprocess.html` SHA-256
+`3b85be529e49d33d514057795bc6de5f48100e2cdde9fb9e434ccddd54dd66f7`.
+All five raw HTML archive objects matched their manifest SHA-256 and byte
+counts and were parsed offline with the repository `ibm_docs.py` `PlainText`
+parser. `ibm_docs.py search` was run; `read` cannot verify its separate flat
+cache TOC, which is unavailable in this checkout. No browser or network
+refresh was attempted. Publication text grants no execution or licensed credit.
+
+Integration checkpoint: the six assigned rows join the sealed 161 typed rows,
+giving 167 typed, 0 legacy, and 96 unready. FETCH ANY/CHILD and FREE
+CHILD use one bounded parent-owned token row with completion, one-time reply
+channel acquisition, implicit parent-end freeing, timeout identity across
+reissue, live cancellation/deadline checks, exact owner replay, and
+Memory/SQLite reopen. LINK ACTIVITY,
+LINK ACQACTIVITY, and LINK ACQPROCESS resolve the common lifecycle process
+tree and UOW acquisition, authorize BTS and selected installed program
+resources before activation, and persist an intent before program dispatch.
+The separate v2 LINK context row binds its active activity to the registering
+execution and principal; forged or stale owner bindings fail before selection.
+LINK checks live cancellation/deadline before dispatch and fences a late
+failure as an unknown outcome.
+An unresolved selected call remains `UnknownOutcome` and is never
+redispatched automatically. SQLite and isolated local PostgreSQL 18 reopen
+regressions reconcile a persisted outer receipt after selected LINK without
+dispatching the program twice; both backends also preserve child completion
+and reply-channel ownership across reopen. A
+selected compiled COBOL route has passed for
+FETCH CHILD and LINK ACQPROCESS; direct provider tests cover both other LINK
+selectors, event mode and UOW acquisition selection. The selected child also
+defines an input event against its activated 52-hex lifecycle activity ID
+through a bounded, epoch-fenced LINK execution frame. A compiled nested
+`LINK ACTIVITY` now resolves a named descendant from that activated frame;
+the selected descendant defines its own event under its lifecycle ID and both
+frames unwind after return. A nested selected `RETURN` retains the parent
+run unit's pending child tokens and active LINK frame; a compiled regression
+defines another event after the nested return and checks the token remains
+owned. The shared RUN TRANSID
+producer and DEFINE ACTIVITY/PROCESS command routes remain owned by the
+lifecycle lane; this slice exposes only its required child completion and
+active activity binding hooks. No licensed differential credit is claimed.
+
+Focused CICS, compiler, IR, and selected server tests pass, as do descriptor
+generation, module boundaries, format, documentation, `cargo deny check`,
+and `spec --check`. The source-map compatibility guard now selects the frozen
+25 runtime operations explicitly. The two later typed family declarations
+(`transform-control` and `spool-control`) moved from the frozen source
+descriptor to typed admission, restoring its accepted SHA-256
+`af06985dba30c6fd7f8dab88886340b3b4fa88ad5b770ef287201b7e172ea948`.
+All three committed source maps, corpora, and projections pass unchanged.
+
+`architecture-fast` passes its effect, provider-row, storage, authorization,
+retention, descriptor, source-map, corpus, and A/B/C projection stages, then
+stops at the source-a auto-review on
+`SSJL4D_6.x/fundamentals/connections/dfht1c0079.html` (3,031 bytes; SHA-256
+`cb6ff139ab0b7bb2832dc03dd4f53672181657f11d0740a417aab84819aaf254`).
+The raw SHA archive and retained topic cache contain 495/501 unique pinned
+CICS manifest topics. Six are absent from both locations: `dfht1c0079.html`,
+`dfhtl20.html`, `dfhtl_client_encoding.html`, `dfhp4_codesassign.html`,
+`dfha4_summary.html`, and `troubleshooting_web_ref.html`. Five separate
+supplements are also absent: `r_dump.html`, `r_enter.html`, `idiug166.html`,
+`dfhp4_entertracenum.html`, and `dfha4_attributes.html`. A temporary flat cache
+of verified local bodies reproduced the first missing-topic stop; no network or
+browser refresh was attempted. These unavailable topics are outside the six-row
+BTS source set and grant no review credit.
+
+## Counter control source and implementation ledger
+
+The counter-control lane starts from 73 typed, 0 legacy, and 190 unready CICS
+application rows. Each source below was resolved through the committed IBM
+manifest, verified byte for byte in the raw SHA-256 HTML archive, and read
+offline with `conformance/tools/ibm_docs.py` PlainText. Publication text is
+reference data and carries no licensed execution credit.
+
+| Rows | IBM source baseline | Topic under `SSJL4D_6.x/reference-applications/commands-api/` | SHA-256 |
+| --- | --- | --- | --- |
+| 0034, 0035 DEFINE COUNTER/DCOUNTER | `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` | `dfhp4_definecounter.html` | `a0851a951c4efd1ab06d9e90c42e616c937628af0b3df21119be25c4db65cd05` |
+| 0044, 0045 DELETE COUNTER/DCOUNTER | `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` | `dfhp4_deletecounter.html` | `513604a38bff3bdf3e4dcffb92ffc83aa86e54d065410d4999946f74646428c8` |
+| 0087, 0088 GET COUNTER/DCOUNTER | `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` | `dfhp4_getcounter.html` | `1f757d4a8974f5876acc3d6ddf2708350e3cff3f8a2350cc4a67f4958c5440c8` |
+| 0153, 0154 QUERY COUNTER/DCOUNTER | `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` | `dfhp4_querycounter.html` | `c6d6ab036e5c41a7a56ac7fe4e635e2fdcaa16654baf25d23046fd19d03e5967` |
+| 0179, 0180 REWIND COUNTER/DCOUNTER | `ibm-cics-ts-6x-application-api-sources-c-2026-09-10` | `dfhp4_rewindcounter.html` | `3b183121c402aac01f946b585d9c3e706e6c387aaef46f6d3000ee7820498196` |
+| 0226, 0227 UPDATE COUNTER/DCOUNTER | `ibm-cics-ts-6x-application-api-sources-c-2026-09-10` | `dfhp4_updatecounter.html` | `68ea3e5ca998b7c127132a94dad8fde820838d9dbb32b9af29335cfe5a317b38` |
+
+The first bounded slice defines signed fullword and unsigned doubleword
+named counters with atomic provider-state CAS, pool and name validation,
+inclusive minimum and maximum, the one-past-maximum limit value, duplicate
+and capacity conditions, SAF before mutation, owner-fenced replay, and a
+versioned local pool-rebuild flag. Subsequent slices add the other ten rows
+against the same authority. The protected root budgets stay fixed.
+
+DELETE COUNTER/DCOUNTER removes an existing name in one versioned CAS update
+with the replay record. A new deletion of an absent name returns `INVREQ 201`;
+a replay of the original effect returns the saved normal result. Source:
+rows 0044/0045 in the ledger above.
+
+GET COUNTER/DCOUNTER allocates the current number and advances atomically.
+INCREMENT, REDUCE, WRAP, and inverted inclusive comparisons operate against
+the versioned record; at-limit and comparison failures leave the value
+unchanged. The signed fullword route returns the low 32 bits with LENGERR
+while completing a wide counter allocation. Source: rows 0087/0088 above.
+
+QUERY COUNTER/DCOUNTER reads current, minimum, and maximum from the same
+durable authority without advancing it. It reports the one-past-maximum
+at-limit value normally and warns when a requested signed fullword output
+cannot represent a wide counter value. Source: rows 0153/0154 above.
+
+REWIND COUNTER/DCOUNTER resets the current value to its defined minimum only
+at limit, including when an optional increment reaches the limit. Earlier
+states return `SUPPRESSED 102` without mutation. Source: rows 0179/0180 above.
+
+UPDATE COUNTER/DCOUNTER compares the previous current value against optional
+inclusive bounds and stores a new value from minimum through maximum plus
+one. It returns `SUPPRESSED 103` for a failed comparison and `INVREQ 406` for
+an invalid new value, with no state change on either result. Source: rows
+0226/0227 above. All twelve counter-control rows are now typed at this lane's
+boundary: 85 typed, 0 legacy, 178 unready. The integrated
+web-service-control and counter-control branches yield 93 typed, 0 legacy,
+and 170 unready.
+
+The six command pairs use one versioned `cics-counter-control-v1` provider
+state record. Memory and SQLite workers use the same compare-and-swap
+transition, and the SQLite state is checked after reopen. A failed outer
+effect receipt produces `UnknownOutcome`; a matching owner and request can
+reconcile the durable counter reply without repeating the mutation. Resource
+authorization uses `COUNTER CICS.COUNTER.<pool>.<name>` before writes, with
+audited denial. Pool rebuild returns `BUSY 128/500` with `NOSUSPEND`, or a
+bounded CICS suspension for coordinator reissue. The existing online
+coordinator owns finite deadlines and live cancellation for that suspension.
+The selected compiled COBOL route covers all twelve operations, including
+signed fullword and unsigned doubleword storage, EIBFN, RESP, and RESP2.
+
+Focused counter tests cover compiler option and binary-width rejection, v2
+tag allocation with v1 decoding intact, malformed names and bounds, atomic
+GET/UPDATE/REWIND, cross-width LENGERR, SAF allow/deny audit, replay after a
+post-dispatch receipt failure, Memory and SQLite concurrent workers, SQLite
+reopen, and both selected compiled routes. The isolated PostgreSQL 18 test
+entry is present but was not run: `MAINFRAME_ENV_POSTGRES_TEST_URL` is not
+configured in this checkout. No licensed named-counter server or coupling
+facility differential evidence is claimed.
+
+Status: **0.9.0 Proposed; CIC-901 complete at its non-release implementation
+boundary**
+
+- Historical reviewed candidate: `1bd294c170cae35c470f0d183635f758f80e2c98`
+- Historical reviewed tree: `dd0c3b38c9a6d44eda73f29a520bd7039b7fd893`
+- Merged hardening candidate: `8b7459ab9d9c23e3b872314323d3e30020e13f31` (PR #131)
+- Merged hardening tree: `12860bddc8e26fab21c4167942175d02b466b767`
+- Accepted post-review hardening candidate:
+  2f3120ae4e294ce01b7058a139554c186b65903e
+- Accepted post-review hardening tree:
+  c2961adbcc96060746c87ac1c96f7f11bb8f73f0
+- Integrated R-01–R-28 entry authority: local Jenkins mainframe-env build #8,
+  RUN_MODE=full, SUCCESS, 2026-09-09
+- Last integrated acceptance review: 2026-09-09
+- Current CIC-901 feature commits: source authority
+  `059bd56745556e4243c2d67645db8b75dfbfd825`, contract/registry
+  `f8d44ec13009544530189374575357f74c3ab71d`, and compiler routing
+  `f1fe39e2afe6de76b7f60353e3683a9bcfe56d01`; compatibility and evidence
+  closure culminate in `49ae7c9dbb763c8a88f42a041a58e9e99b59d05c`.
+- Tested CIC-901 implementation tree:
+  `f2424b755badf83ecb70aa8c3faeb2f7a4326121`.
+- Current CIC-901 aggregate validation result: **pass at the non-release
+  boundary**. Jenkins #8 remains
+  authority only for accepted candidate `2f3120ae4e294ce01b7058a139554c186b65903e`
+  and tree `c2961adbcc96060746c87ac1c96f7f11bb8f73f0`.
+- Entry verification: [#137](https://github.com/toreleon/mainframe-env/issues/137)
+- Review backlog: [#101](https://github.com/toreleon/mainframe-env/issues/101)
+  through [#128](https://github.com/toreleon/mainframe-env/issues/128)
+
+## Objective
+
+Deliver the complete 263-command CICS application programming surface without
+weakening deterministic execution, SAF authorization, durable mutation,
+unknown-outcome, recovery, or conformance boundaries.
+
+## Current state
+
+- Hardening changes merged in [#131](https://github.com/toreleon/mainframe-env/pull/131).
+  Its head e677c3e5e38497bef6cb42ebf54ae60ad417c739 and merge
+  8b7459ab9d9c23e3b872314323d3e30020e13f31 have the same tree,
+  12860bddc8e26fab21c4167942175d02b466b767. The accepted candidate above
+  descends from that tree and the post-merge dossier amendments.
+- CIC-901 now seals the source-derived command contract, candidate-aware
+  compiler route, and fail-closed registry for all 263 application rows at a
+  non-release boundary. The declared source, workspace, architecture,
+  documentation, MSRV, dependency-policy, and PostgreSQL gates pass.
+- Sources A/B/C are automatically accepted for 88/88/87 rows by a verifier
+  independent from the extractor. Their 18,070 candidates comprise 16,307
+  verified facts and 1,763 bounded product ambiguities, with no accepted source
+  gap, reprojection, mismatch, or blocking finding.
+- The generated contract is `frozen-with-bounded-ambiguities` for 263/263 rows.
+  The CIC-901 baseline contained three typed runtime handlers, 20 explicit
+  legacy compatibility handlers, and 240 unready handlers. The current
+  development registry adds typed ADDRESS COMMAREA/ADDRESS SET, ENQ/DEQ,
+  CHANGE TASK, SET
+  ASSOCIATION USERCORRDATA, SUSPEND, PUSH/POP HANDLE, and IGNORE CONDITION
+  routes, promotes HANDLE CONDITION from its legacy route, and adds HANDLE AID,
+  the typed time/abend routes, the 92-output ASSIGN subset, and local
+  LINK/XCTL/RETURN program control,
+  plus the default-cursor STARTBR/READNEXT/READPREV/ENDBR file-browse loop,
+  the explicit-key DELETE/WRITE FILE mutation pair, local WRITEQ/READQ/DELETEQ TD and
+  DELETEQ TS QUEUE/QNAME, and the
+  bounded local RECEIVE MAP/SEND MAP/SEND TEXT terminal trio, and empty-state
+  PURGE MESSAGE, plus bounded local-data START and RETRIEVE routes, and the
+  task-local GETMAIN SET/FLENGTH/LENGTH allocator and FREEMAIN DATAPOINTER/DATA release,
+  plus WAIT EVENT, WAIT EXTERNAL, WAIT JOURNALNAME, WAIT JOURNALNUM, WRITE JOURNALNAME, and WRITE JOURNALNUM, local READQ/WRITEQ TS, INVOKE APPLICATION,
+  LOAD, RELEASE, and DOCUMENT CREATE/DELETE/INSERT/RETRIEVE/SET, plus the
+  checked nonshared GETMAIN64 and FREEMAIN64 routes, the eight
+  web-service-control rows, twelve counter-control rows, fourteen web-control
+  rows, terminal, diagnostics, and event controls, and all ten security-control
+  rows, plus ten miscellaneous-command rows, six BTS child/LINK rows, eight
+  EXTRACT/POINT rows, and nine conversation-open rows. The live split is 184
+  typed, 0 legacy compatibility, and 79 unready.
+  Automatic registration is
+  disabled, no default handler exists, and unready rows fail explicitly.
+- `VERIFY TOKEN` is bound to source baseline
+  `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0230`, topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_verifytoken.html`,
+  raw SHA-256 `1c1b12e1817b42323a8fd7f87e5e49917a7dc80f12bf6bea2bcc87d9c873cfab`.
+  The committed raw archive matched its SHA and was parsed with the repository
+  `ibm_docs.py` PlainText parser. Source CVDA clauses select BasicAuth, a
+  registered exact-byte JWT, or a registered local Kerberos token. SAF verifies
+  the credential or token before returning ISUSERID, ESM status, an optional
+  mutual token, or a four-byte task key. The local JWT route requires a signed
+  registered token; JWT generation and external Kerberos GSS interoperability
+  require an installed authority and fail with source conditions when absent.
+- `REQUEST ENCRYPTPTKT` is bound to source baseline
+  `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog row
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0167`, topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_requestencryptptkt.html`,
+  raw SHA-256 `01f6330864f897f885d4c2400a73053ffbf97661db7aa4f47aa35840e0fdebfc`.
+  The committed raw archive matched its SHA and was parsed locally. A fresh
+  VERIFY TOKEN key is bound to its issuing task, invalidates the previous key,
+  and is consumed after one authorized SAF PassTicket issuance. The local
+  encrypted envelope uses AES-256-GCM and the application identity as associated
+  data; it is a bounded local security-control contract, not a claim of RACF
+  GSS wire interoperability. No browser or network refresh was used.
+- `QUERY SECURITY` is bound to baseline
+  `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog row
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0155`, topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_querysecurity.html`,
+  raw SHA-256 `572bbc96a2dccbcc6ae29804c614f761efa65594a80eb155b9c99d736a092024`.
+  The committed SHA matched the local raw archive and the topic was parsed with
+  `ibm_docs.py` PlainText; no browser or network refresh was used. Its RESTYPE
+  route checks local installation before SAF, RESCLASS queries the literal
+  class, and a different USERID needs SURROGAT authority before evaluation.
+- The credential verification authority for rows `0228` and `0229` now uses
+  separate optional password and phrase verifier slots, durable invalid-count
+  and last-use activity, group checks, and an exact request binding in SAF
+  replay. `VERIFY PASSWORD` and `VERIFY PHRASE` are registered credential
+  routes, with selected compiled COBOL paths and exact `7406` and `740A`
+  EIBFN values. Source baseline
+  `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`; catalog rows
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0228` and `:0229`; topics
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_verifypassword.html`
+  SHA-256 `2fbb391bb796ea1d84fa053124df78733565bc2b62f3b1be2c103e1a8de5526a`
+  and `dfhp4_verifyphrase.html` SHA-256
+  `007d1e58177c1059a6ba61ff7456bc9e983812fd49ef06218e76d6af034020cc`.
+  Both committed hashes matched local raw archive HTML and were parsed with
+  `ibm_docs.py` PlainText; no browser or network refresh was used.
+- The CHANGE PASSWORD/PHRASE SAF authority is in place for rows `0020` and
+  `0021`; both commands are registered.
+  It verifies the old secret and
+  applies the new verifier under one durable audited transition, with replay
+  and SQLite restart coverage. Source baseline
+  `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, catalog rows
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0020` and `:0021`, topics
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_changepassword.html`
+  SHA-256 `d3d0b92eb4f58e4bf401c5f2be4abf14900ace7c68513bbbd9f85a1d58928297`
+  and `dfhp4_changephrase.html` SHA-256
+  `fa6ef7d12bd56cf36652213ed916cfa703eec5b5e14c59d64e07438a8a321258`.
+  Both committed hashes matched exact local raw archive HTML and were parsed
+  with `ibm_docs.py` PlainText; no browser or network refresh was used.
+- The shared PassTicket SAF authority is in place for rows `0167` and `0168`;
+  REQUEST PASSTICKET is registered while REQUEST ENCRYPTPTKT remains pending.
+  It enforces FACILITY and PTKTDATA
+  grants before issuance, bounds one-use tickets to a user and application,
+  audits denial/redemption, and omits clear ticket bytes from the durable SAF
+  receipt. Its local HMAC ticket is an emulator credential; IBM cross-system
+  PassTicket interoperability has no licensed evidence. Memory and SQLite
+  restart regressions pass. Source baseline
+  `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog rows
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0167` and `:0168`, topics
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_requestencryptptkt.html`
+  SHA-256 `01f6330864f897f885d4c2400a73053ffbf97661db7aa4f47aa35840e0fdebfc`
+  and `dfhp4_requestpassticket.html` SHA-256
+  `b2f06e79f3ff04bf949d2d0caaed380a34b0ee240b0ed58c2bda64e3eddfda7e`.
+  Both committed hashes matched the exact local raw archive and were parsed
+  with `ibm_docs.py` PlainText; no browser or network refresh was used.
+- `SIGNON` is bound to baseline
+  `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0196`, topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_signon.html`,
+  raw SHA-256 `e8e3ce48f36a02e5a353db0ebe4ad56b2fdbb0a960d07a7bc0b9ac85fe37a99f`.
+  The committed SHA matched exact local raw archive HTML parsed with
+  `ibm_docs.py` PlainText; no browser or network refresh was used. The MECSC
+  session schema persists terminal identity separately from the issuing task
+  principal and reads earlier session versions. SAF verifies or changes
+  credentials before terminal mutation, including expired-password changes
+  with group validation. Selected compiled COBOL reports EIBFN `7402`.
+- `SIGNOFF` is bound to baseline
+  `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0195`, topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_signoff.html`,
+  raw SHA-256 `2f87dbd9cec316f6eb27d942e66061167d2142d97e83403c37c7f6ab47f22a4b`.
+  The committed SHA matched exact local raw archive HTML parsed with
+  `ibm_docs.py` PlainText; no browser or network refresh was used. The current
+  task principal stays fixed while terminal user, group, and language return
+  to their defaults. SAF audits allowance and denial before terminal mutation;
+  selected compiled COBOL reports EIBFN `7404`.
+- A separate versioned runtime-admission catalog now records an empty legacy
+  route set. Keeping it separate prevents runtime-readiness edits from changing
+  frozen IBM source-receipt identities. Generation still requires an exact
+  match between that catalog and any raw runtime route, so an accidental legacy
+  fallback fails closed.
+- CIC-902 through CIC-906 family implementation, release work, and licensed
+  campaigns remain pending. No unready command receives execution, coverage,
+  semantic, or differential credit from CIC-901.
+- The bounded CICS file/UOW pilot is accepted and merged. It covers 12 explicit
+  obligation credits over one constrained file scenario with memory/SQLite
+  execution and restart faults; it is a baseline, not completion credit for the
+  263-command program.
+- The licensed CICS adapter is fail-closed and the protected licensed campaign
+  has not run. Differential credit remains zero.
+- The [pre-0.9 deep review](../../../reviews/PRE-0.9.0-DEEP-REVIEW.md) found
+  P1 durability, audit, CICS, queueing, timeout, authentication, configuration,
+  retention, release, licensing, reproducibility, and release-truth blockers.
+
+## Web-service-control source and bounded route
+
+The eight web-service-control rows use baseline `ibm-cics-ts-6x-2026-08-31`.
+Before implementation, the committed source maps and topic manifests were
+checked against the exact raw HTML in the external SHA-256 archive. Each topic
+was read offline with `conformance/tools/ibm_docs.py search` and `read` and
+parsed with its `PlainText` parser. The topic bytes are not committed.
+
+| Catalog row | Command | Topic under `SSJL4D_6.x/reference-applications/commands-api/` | SHA-256 |
+| --- | --- | --- | --- |
+| `0107` | INVOKE SERVICE | `dfhp4_invokeservice.html` | `a1c4d3df178606b1bca4cd3ab486254f86f5b0a6d84e46e1b0abe4a70789fc3c` |
+| `0197` | SOAPFAULT ADD | `dfhp4_soapfaultadd.html` | `d01e86aacc69f54bb407ae33e9d7c384a6726be7b8fbf14cf4d4d3a11a564931` |
+| `0198` | SOAPFAULT CREATE | `dfhp4_soapfaultcreate.html` | `025883729f52ab63c7e8c3126089633f4a67e5fdb2b9eed86bd73059b38459ad` |
+| `0199` | SOAPFAULT DELETE | `dfhp4_soapfaultdelete.html` | `6d6b4e70bc12dc279e3421b9b4101cda1d196f9085dc382ef9352f54e185e970` |
+| `0259` | WSACONTEXT BUILD | `dfhp4_wsacontextbuild.html` | `4fa65b0495b1d792dc286be81d2de28658f255bf798fa1e05d9801448f4a535d` |
+| `0260` | WSACONTEXT DELETE | `dfhp4_wsacontextdelete.html` | `9d7193f96a959fff3abe44c5f79372e254c69480d051a002f3ee989dd906e34b` |
+| `0261` | WSACONTEXT GET | `dfhp4_wsacontextget.html` | `de298c78cd7d1bdf059dd8efab3610921179e5b6cfcf971e5beb8cf4103dd5d1` |
+| `0262` | WSAEPR CREATE | `dfhp4_wsaeprcreate.html` | `37386ecab67224ec91fe56c831f704ba79360558b4364e7c0cabc2bf9e33cade` |
+
+The typed route models SOAP fault lifecycle, request and response addressing
+contexts, endpoint reference construction and output bounds, and installed
+local service dispatch over the existing program and channel abstractions.
+Complete WS-Addressing endpoint references are XML validated and split into
+retrievable fields. A later partial BUILD invalidates the stored complete
+snapshot, and GET ALL rebuilds it from the current fields within the same
+screen and output limits.
+`INVOKE SERVICE` currently admits installed immutable local program bindings;
+there is no remote HTTP transport in this provider. A missing binding or an
+invalid URI, operation, channel, or addressing combination returns its reviewed
+CICS condition instead of a generic successful result. UTF-8 and IBM-037 are
+owned character conversions; other code pages return CCSIDERR or CODEPAGEERR.
+The channel authority and output container are durable and the service result
+is atomically bound to effect replay. Requester/provider and SOAP handler
+bindings guard context-specific commands. This is bounded implementation
+credit only, with zero licensed differential or release credit.
+
+## Mandatory baseline reading
+
+1. [0.9.0 release dossier](application-api-plan.md)
+2. [Pre-0.9.0 deep review](../../../reviews/PRE-0.9.0-DEEP-REVIEW.md)
+3. [CICS behavioral conformance pilot](../../../research/cics-behavioral-conformance-pilot.md)
+4. `conformance/0.9/cics/pilot-rule-review.json`
+5. `conformance/0.9/cics/pilot-fixtures.json`
+6. `conformance/0.9/cics/pilot-environment.json`
+7. [Licensed CICS pilot runbook](../../../runbooks/cics-licensed-pilot.md)
+8. [Canonical effect encoding](../../../contracts/EFFECT-CANONICAL-V1.md)
+9. [Execution and durability](../../../architecture/EXECUTION-AND-DURABILITY.md)
+10. [Security and capabilities](../../../architecture/PLUGIN-AND-SECURITY.md)
+11. [Provider object-row persistence](../../../contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
+12. [Durable storage profile](../../../contracts/DURABLE-STORAGE-PROFILE.md)
+13. [Current package topology](../../../decisions/0009-current-package-topology.md)
+14. [Core-server operations](../../../runbooks/OPERATIONS.md)
+15. [Capacity and recovery](../../../runbooks/CAPACITY-AND-RECOVERY.md)
+16. [Verification strategy](../../VERIFICATION-STRATEGY.md)
+
+## Integrated entry acceptance
+
+The authoritative finding detail and close criteria remain in the historical
+deep review. The current implementation plan requires closure of all
+[R-01](https://github.com/toreleon/mainframe-env/issues/101) through
+[R-28](https://github.com/toreleon/mainframe-env/issues/128), including the P2/P3
+storage, assurance, module and documentation baseline.
+
+The accepted candidate was checked by local Jenkins
+[mainframe-env #8](http://127.0.0.1:8080/job/mainframe-env/8/) on the capped
+10 GiB controller. Its archived full-tier and PostgreSQL summaries both name
+the exact candidate/tree above, report selected_commands_passed=true, and give
+zero licensed credit and no release-acceptance credit. The full summary contains
+24/24 passing primary gates; the backend summary contains 11/11 passing
+PostgreSQL gates.
+
+These are immutable historical receipts, not current-candidate receipts. The
+current CIC-901 boundary was independently revalidated with the current source
+and generated identities; its passing result does not relabel Jenkins #8.
+
+| Review gate | Accepted result |
+|---|---|
+| Gate A — release and repository truth | Development/release identity, exact native runtime smoke, cargo-deny, license notices, supply-chain, release-entry guards and runtime-verified archive reproduction passed. Reproduced source archive SHA-256: 1d40c711a28a2765f83938aaf074d11a52e82429f88b53e05d3bf19c86ba4a50. |
+| Gate B — mutation safety and security | Workspace tests, conformance, evidence seal and all 10 source mutants passed; memory/SQLite focused contracts passed and PostgreSQL effect, stale recovery, online resume, atomic invariant, retention and durable contracts passed. |
+| Gate C — service lifecycle | Exact runtime architecture, readiness, work-lease fencing, CardDemo restart, worker and retention paths passed. |
+| Gate D — assurance and modularity | Tool discovery ran 358 tests with one documented optional JCL skip; API/docs/module ratchets, Rust 1.95 MSRV, fuzz smoke/periodic, 3 model tests and 222 coverage tests passed. Coverage was 74.88% functions and 73.74% lines in the declared critical package set. |
+
+Focused exact-candidate entry receipts also passed: CICS local 30/30 verdicts
+over memory and SQLite; RACF/SAF 48/48 at each local gate; Dataset/VSAM/AMS
+180 events across five organizations, 31 commands, 13 properties and eight
+rejected perturbations; Dataset contract; and GnuCOBOL 3.2.0 reference 16/16
+cases with four mutants. The Jenkins PostgreSQL stage passed move, canonical
+effect, stale-effect recovery, online resume, atomic invariants, work leases,
+storage profile, writable readiness, retention, durable migration and CardDemo
+restart.
+
+### Retained dependency receipts
+
+All three release tag commits are ancestors of the accepted candidate. Their
+two-target documents remain under release/VERSION/targets for
+aarch64-apple-darwin and x86_64-unknown-linux-gnu.
+
+| Dependency | Release identity | Retained source digest | Disposition |
+|---|---|---|---|
+| [0.4.0](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.4.0) | commit 4a50a4e66f08b9cb5d293fb276cfbd52424b07fc; tree 92ba4ce0855c02b6157d08fedac2cae51977a972 | sha256:143050b6cc13f22dd23e1edba1a4f5a872dde835be9bb7c7ce02a2479ad903ca | pass-with-licensed-differential-pending; IBM COBOL 0/153 |
+| [0.5.0](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.5.0) | commit bd5e8ecd211b7da4f3e18dfcfc807352d0ebd2e8; tree 7e89e90c372a8bb1ca63a7b06c3c744e1a85e8d9 | sha256:67faf4b40e2e8c1c619a9564188d4ffe26efff5354e2c60b7032035e37d8b4f6 | pass-with-licensed-differential-pending; RACF/SAF 0/48 |
+| [0.6.0](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.6.0) | commit ca3c061adaa63af71eefe8ee494b7c523c3e5540; tree a0dbae4c52a0e3aea28a3ea4bf2e1e8297d2d360 | sha256:905ab74be195244083bf49f8aa0dab53ad2265cd2b9d3b9afbe12ec064ba2b57 | pass-with-licensed-differential-pending; Dataset 0/36 |
+
+### R-01–R-28 integrated mapping
+
+Each commit is present in the accepted candidate. The evidence column names
+the focused regression family or blocking aggregate gate used at entry.
+
+| Finding | Fix commit | Integrated evidence |
+|---|---|---|
+| [R-01](https://github.com/toreleon/mainframe-env/issues/101) | [24bf035](https://github.com/toreleon/mainframe-env/commit/24bf0352e384ddc4daa0e54325f503293ced9062) | stale-effect recovery on memory, SQLite and PostgreSQL; no redispatch after known success |
+| [R-02](https://github.com/toreleon/mainframe-env/issues/102) | [50a5351](https://github.com/toreleon/mainframe-env/commit/50a5351e0031a3f1d2778b9dab12e582b82e4bfa) | versioned audit resource digest, mandatory persisted audit and rollback/saturation tests |
+| [R-03](https://github.com/toreleon/mainframe-env/issues/103) | [7d2988b](https://github.com/toreleon/mainframe-env/commit/7d2988bf22ea20ab61bafb25c629dc992ff80876) | durable resume blocks unknown outcomes; PostgreSQL and process-crash replay |
+| [R-04](https://github.com/toreleon/mainframe-env/issues/104) | [e350c2f](https://github.com/toreleon/mainframe-env/commit/e350c2f0767049c3da7d7acb34f2935f490e6de5) | JES FIFO/identity, SQLite lease reclaim and background-worker lifecycle |
+| [R-05](https://github.com/toreleon/mainframe-env/issues/105) | [ce44365](https://github.com/toreleon/mainframe-env/commit/ce4436500d0468348a2d47c258ac01c67bbdd73c) | global concurrency limit and timeout preemption of blocking backends |
+| [R-06](https://github.com/toreleon/mainframe-env/issues/106) | [eaad1af](https://github.com/toreleon/mainframe-env/commit/eaad1af3fa5aeab9e0b48cbf6b76c39886eab2c1) | atomic invariant contracts on memory, SQLite and PostgreSQL |
+| [R-07](https://github.com/toreleon/mainframe-env/issues/107) | [e3e4212](https://github.com/toreleon/mainframe-env/commit/e3e421267b09056626f970056ccc69b322fbd8d4) | canonical provider replay, lifecycle outbox and message identity goldens |
+| [R-08](https://github.com/toreleon/mainframe-env/issues/108) | [0885079](https://github.com/toreleon/mainframe-env/commit/088507935a33f24f4693116f49223c3c14d47511) | secret-free auth scopes; hashed expiring epoch-bound sessions |
+| [R-09](https://github.com/toreleon/mainframe-env/issues/109) | [8fc946f](https://github.com/toreleon/mainframe-env/commit/8fc946f555f437d2257e5cc3ab3534d8a3bf8e4f) | bootstrap principal/secret, worker capacity/freshness and PostgreSQL writable readiness |
+| [R-10](https://github.com/toreleon/mainframe-env/issues/110) | [a51f274](https://github.com/toreleon/mainframe-env/commit/a51f2745dbf962d65906e0b2dc9751830340c713) | grants from verified plans; Db2/IMS/MQ enterprise denial precedes mutation |
+| [R-11](https://github.com/toreleon/mainframe-env/issues/111) | [a5fbc43](https://github.com/toreleon/mainframe-env/commit/a5fbc434a56e9d2b20774a6c87381fa4b5bb9c5c) | safe oldest-owner selection and memory/SQLite/PostgreSQL retention contracts |
+| [R-12](https://github.com/toreleon/mainframe-env/issues/112) | [ad0cf0a](https://github.com/toreleon/mainframe-env/commit/ad0cf0ab60f31396cbd01779c09efbe817f8372f) | deterministic macOS LC_UUID, foreign-target refusal and bounded defaults |
+| [R-13](https://github.com/toreleon/mainframe-env/issues/113) | [447a1a5](https://github.com/toreleon/mainframe-env/commit/447a1a559f95f0719cf02a61a31b2cf1a1aece76) | dependency policy, cargo-deny and deterministic license notices |
+| [R-14](https://github.com/toreleon/mainframe-env/issues/114) | [b429d62](https://github.com/toreleon/mainframe-env/commit/b429d62c687856e36fddae8bc288902ceafd75df) | two-stage mtime/symlink/mismatch tests and Jenkins archive reproduction |
+| [R-15](https://github.com/toreleon/mainframe-env/issues/115) | [83ec4b8](https://github.com/toreleon/mainframe-env/commit/83ec4b87dd143ffe3de10953394493afb1bdc24a) | distinct development identity and guarded release entry paths |
+| [R-16](https://github.com/toreleon/mainframe-env/issues/116) | [c029219](https://github.com/toreleon/mainframe-env/commit/c029219f0dd647d9255b4334d93167f5524d062d) | semantic/content artifact identity and payload binding |
+| [R-17](https://github.com/toreleon/mainframe-env/issues/117) | [f87eaaa](https://github.com/toreleon/mainframe-env/commit/f87eaaabe873b5d296c502334f2a7a7797eed3d6) | independent table, database, queue, index, cursor and replay rows |
+| [R-18](https://github.com/toreleon/mainframe-env/issues/118) | [6891baf](https://github.com/toreleon/mainframe-env/commit/6891baf5da765e41f9ce5c48076e04a4192a1817) | deadline and fencing contracts on memory, SQLite and PostgreSQL |
+| [R-19](https://github.com/toreleon/mainframe-env/issues/119) | [68dc3c5](https://github.com/toreleon/mainframe-env/commit/68dc3c5f9bb4f31084c5d3f0bfbcf8827fbd6fc4) | concurrent/no-replace publication, transactional quotas and shared PostgreSQL artifacts |
+| [R-20](https://github.com/toreleon/mainframe-env/issues/120) | [9d0025a](https://github.com/toreleon/mainframe-env/commit/9d0025a6f458d23b2b5f289ef7d2a60e727dc545) | per-name SAF filtering for dataset catalog listing |
+| [R-21](https://github.com/toreleon/mainframe-env/issues/121) | [40ff5eb](https://github.com/toreleon/mainframe-env/commit/40ff5eb043d24dd9b21d083c5acae66cd6e50395) | discovered tooling and complete 11-gate PostgreSQL Jenkins stage |
+| [R-22](https://github.com/toreleon/mainframe-env/issues/122) | [540484c](https://github.com/toreleon/mainframe-env/commit/540484ca9e915f0b758cf8921107040df4fa1657) | capture schema/parser parity and numeric conformance-version discovery |
+| [R-23](https://github.com/toreleon/mainframe-env/issues/123) | [49da315](https://github.com/toreleon/mainframe-env/commit/49da315b78cf0ac62e75d6e79c5265e4446e5793) | release tamper, DSSE authentication and retained CycloneDX schemas |
+| [R-24](https://github.com/toreleon/mainframe-env/issues/124) | [88bc06b](https://github.com/toreleon/mainframe-env/commit/88bc06b152b042a3863f2a00660bb69abf1d1f32) | fenced Loom model and killed lost-update/missing-corpus mutants |
+| [R-25](https://github.com/toreleon/mainframe-env/issues/125) | [1a3f39f](https://github.com/toreleon/mainframe-env/commit/1a3f39f248c31c42b4223a6fe562bd1ce865239a) | full Rust 1.95 MSRV, no ambient install and pinned Jenkins inputs |
+| [R-26](https://github.com/toreleon/mainframe-env/issues/126) | [e677c3e](https://github.com/toreleon/mainframe-env/commit/e677c3e5e38497bef6cb42ebf54ae60ad417c739) | generated descriptors plus CICS module size/growth and handler boundaries |
+| [R-27](https://github.com/toreleon/mainframe-env/issues/127) | [48ce19c](https://github.com/toreleon/mainframe-env/commit/48ce19c1be16e8bfe22bdae80687ee1764e188e1) | public API documentation diagnostics and debt ratchet |
+| [R-28](https://github.com/toreleon/mainframe-env/issues/128) | [f1a89ad](https://github.com/toreleon/mainframe-env/commit/f1a89add6ec9544b876350aec498de9fd0ce9be5) | documented-command, relative-link and Markdown-only plan gates |
+
+The following historical blocker themes are retained from the immutable review;
+every row is closed for CIC-901 entry by the mapping and receipts above:
+
+| Gate | Required outcome |
+|---|---|
+| Mutation safety | Post-dispatch journal failure becomes reconcilable uncertainty; online CICS uses the durable path |
+| Audit and authorization | Host audits persist; enterprise resources receive typed SAF decisions before mutation |
+| Work lifecycle | JES has a real worker/clock/fencing model; HTTP deadlines cancel or isolate blocking work |
+| Authentication/config | Secret cleanup, hashed expiring sessions, real reference resolution, secure bootstrap, and truthful readiness |
+| Capacity | Event, outbox, session, work, and replay state have safe retention/reclamation |
+| Release | Exact macOS binaries execute; archives reproduce; non-identical assets cannot be clobbered |
+| Compliance | Root/project and third-party license material ships; `cargo deny check` passes in CI |
+| Release truth | Development and released identities are distinct and public status is generated/checked |
+| Storage and contracts | Sealed artifact identity, schema/parser parity, per-object persistence, fenced leases, transactional quotas and shared PostgreSQL artifacts |
+| Assurance and maintainability | Discovered tooling/PostgreSQL suites, fuzz/model/coverage baseline, full MSRV/supply-chain gates, family modules and docs/API ratchets |
+
+This acceptance changes only the historical 0.9 implementation entry state. It
+does not promote a release, claim IBM equivalence, or close licensed campaigns.
+
+### Current non-release boundary
+
+The CIC-901 artifacts seal only the 263-row source/contract/compiler/registry
+shape. Development checks run directly without nested orchestration or
+deployment. Release generation, exact-target launch, archive
+reproduction, deployment, and licensed campaigns are explicitly deferred and
+remain pending. The full 0.9 status therefore remains **Proposed** even though
+the CIC-901 aggregate gates pass.
+
+## Licensed campaign readiness
+
+- Accepted adapter scope: the bounded file/UOW pilot only.
+- Protected runner availability and exact product/environment identity for
+  the full campaign: **not established here**.
+- Family-wide capture/comparison plan: **pending**; declare the supported
+  families, missing obligations and next runner prerequisite during entry
+  planning, then extend the existing typed adapter incrementally.
+- Differential remains pending until actual candidate-bound licensed runs
+  pass. This final-gate dependency does not prevent independent implementation
+  once the hardening entry gate passes.
+- Current licensed differential credit is **0**. Every application-command row
+  remains `differential=pending`; local catalog or fixture checks cannot change
+  that result.
+
+## Work-package status
+
+| Work package | State | Next reviewable outcome |
+|---|---|---|
+| Pre-0.9 hardening | **Historically accepted** | Preserve candidate/tree and Jenkins #8 only as historical receipts |
+| CIC-901 | **Complete at the non-release implementation boundary.** Sources A/B/C accepted 88/88/87; 263-row contract and registry generated; readiness is 3 typed, 20 legacy compatibility, 240 unready; aggregate gates pass | Begin CIC-902 family vertical slices |
+| CIC-902 | **In progress.** Twelve bounded parent slices, twenty-eight implemented interval children, and the START/RETRIEVE metadata, FMH, SET, WAIT-data, and task-local GETMAIN/FREEMAIN children are described below. The local-data cycle connects strict START records to the shared fenced work queue and typed RETRIEVE consumption, now including automatic facility-less target-task launch under the retained principal with one durable execution identity across worker retries and SQLite reopen before launch or after target completion; local TERMID validation, durable terminal association, facility-matched RETRIEVE, busy-terminal deferral and automatic launch on availability; packed plus literal/dynamic `AFTER`/`AT` unit scheduling; no-data START with replay-safe RETRIEVE ENDDATA; bounded RTRANSID/RTERMID/QUEUE propagation; pre-consumption ENVDEFERR; FMH-to-EIBFMH state; either INTO or checkpointed virtual-pointer SET delivery; durable WAIT suspension/reissue until a promoted record appears; generated REQID/EIBREQID identity with local NOCHECK suppression; RACF-backed USERID validity, surrogate admission and durable target-principal binding; PROTECT admission after explicit or implicit committing syncpoint with rollback cleanup on known execution failure, disconnect, or idle timeout, disposition-bound crash-gap recovery after durable execution terminalization, explicit ABEND cancellation of still-protected rows, and source-defined CANCEL refusal before PROTECT commit followed by ordinary cancellation after commit; bounded local CANCEL tombstones unhonored committed START records and cancels their work; bare/default and literal-zero DELAY complete immediately; positive literal or storage-backed packed INTERVAL, packed TIME, and literal/dynamic FOR/UNTIL unit DELAY including MILLISECS persist one task/statement cycle, suspend, promote under the shared worker fence, automatically resume the matching durable exchange in-process or after SQLite reopen, and complete on reissue; elapsed absolute and sub-50 ms targets return source-defined EXPIRED; and local application-named delays support other-task early-expiration cancellation plus bounded terminal cleanup. The local/default and unambiguous installed-ENQMODEL portions of `task-enqueue`, both ASKTIME forms, the source-checked FORMATTIME and local LINK subsets, typed ABEND/HANDLE ABEND, the 92-output ASSIGN subset, ADDRESS SET virtual-pointer transfer, bounded GETMAIN SET/FLENGTH/LENGTH allocation and FREEMAIN DATAPOINTER/DATA release, CHANGE TASK priority, SET ASSOCIATION USERCORRDATA, one-shot SUSPEND, nested PUSH/POP HANDLE stack, and IGNORE CONDITION are executable, but no whole row is credited yet | Continue source-available storage, interval, and START/RETRIEVE obligations; POST remains blocked on its missing pinned body |
+| CIC-903 | **In progress.** The default-cursor STARTBR/READNEXT/READPREV/ENDBR browse subset, including STARTBR EQUAL/GTEQ and GENERIC/KEYLENGTH positioning plus READNEXT/READPREV LENGTH in/out behavior, keyed READ including GTEQ/GENERIC plus WRITE/DELETE with LENGTH/KEYLENGTH where applicable, held-record REWRITE LENGTH, current-record DELETE after READ UPDATE, local WRITEQ/READQ/DELETEQ TD with durable local TDQUEUE definitions and DELETEQ TS QUEUE/QNAME plus READQ/WRITEQ TS, bounded local RECEIVE MAP/SEND MAP/SEND TEXT including RECEIVE FROM/LENGTH/TERMINAL, send lengths and SEND MAP MAPONLY/DATAONLY, empty-state PURGE MESSAGE, and durable SPOOLCLOSE and SPOOLOPEN INPUT/OUTPUT, SPOOLREAD, and SPOOLWRITE are typed; named/remote cursors, alternate key forms, RLS token locking, TSQ definition state, broader BMS controls, and JES-backed spool integration remain pending | Continue file update/browse, terminal/BMS, TSQ/TDQ, journal, and spool slices |
+| CIC-904 | **In progress.** Typed transform, document, all thirteen assigned event-control rows, eight web-service-control rows, and twelve named-counter rows are implemented; broader BTS controls remain pending | Continue separately assigned CIC-904 families |
+| CIC-905 | **In progress.** Nine conversation-open and eight EXTRACT/POINT rows are typed over one ledger; broader APPC/MRO and distributed program link remain pending | Continue sibling commands and licensed differential review |
+| CIC-906 | **In progress: bounded R-24, PostgreSQL durable-profile, and representative SAF/audit/uncertainty validation.** No integrated campaign or release gate completed | Cross-family security, concurrency, recovery, scale, and licensed campaigns |
+
+The bounded [CIC-906 PostgreSQL durable-profile validation inventory](CIC-906-POSTGRES-VALIDATION.md)
+tracks focused local backend selectors without advancing this parent milestone
+or granting final-candidate credit.
+The [bounded parser, decoder, and replay validation slice](cic-906-bounded-validation.md)
+adds fuzz targets, properties, and Loom models on its 175/0/88 base registry;
+its earlier integration had 184/0/79, the SAF/audit validation branch used
+191/0/72, and this combined ISSUE candidate has 208/0/55 without changing
+that CIC-906 slice.
+The [representative SAF/audit/uncertainty scope receipt](CIC-906-SAF-AUDIT-UNCERTAINTY.md)
+binds only rows 0034, 0140, and 0187 on the 191/0/72 base, with exact
+covered and open matrix cells. It grants no whole-family, licensed, or
+final-candidate credit.
+
+The ordering and composition of remaining roadmap slices are subject to change
+as source and dependency audits resolve. Sealed behavior and acceptance gates
+remain fixed unless they are explicitly revised.
+
+The full-minor implementation resumes from the integrated PR #163/#199 tree
+at `24fdcabff31c142725d870ba9b852f4559fee443`. This is the implementation base,
+not a new acceptance receipt. CIC-902 through CIC-906 and the full 263-command
+exit gate remain in scope. The first local interval producer/consumer cycle is
+now connected, bounded local START cancellation is implemented, and zero plus
+positive literal or storage-backed packed relative, packed absolute TIME, and
+millisecond-precise explicit-unit relative/absolute DELAY are executable,
+including local named other-task cancellation and bounded terminal cleanup. The
+registered POST body `dfhp4_post.html` at
+`sha256:88e3a9d9873b15515cfc7722de03fb8180b635551aea97cf819f9d544c44e2f9`
+is now verified in the retained content-addressed archive and readable through
+the offline plain-text parser. POST remains unready pending its own slice.
+
+The interval work reuses the shared durable clock, fenced work queue, provider
+object rows, SAF decisions, and execution journal. Its time calculation and
+START/RETRIEVE/DELAY transitions are IBM semantics owned by CICS; no third-party
+scheduler or provider-private worker loop is introduced. Source review uses the
+registered START row `0205`, RETRIEVE row `0175`, DELAY row `0039`, and CANCEL
+row `0016`, plus their registered interval-control context. Publication bodies
+stay external and source review grants no execution or differential credit.
+
+The interval child slices establish:
+
+| Slice | Owning boundary | Mandatory acceptance |
+|---|---|---|
+| `CIC-902.interval-timers.clock` | CICS interval time resolver, shared clock adapter | Packed/explicit-unit conversion, conditional unit bounds, absolute-time expiry across midnight, checked deadline arithmetic, and independent boundary fixtures |
+| `CIC-902.interval-timers.records-core` | Versioned CICS START-record rows and exact producer/consumer identities | Strict bounded codec, duplicate REQID rejection, expiry ordering, protected-pending state, one-time consumption with same-request replay, stale-consumer rejection, and memory/SQLite reopen parity; internal only, with no command advertisement or row credit |
+| `CIC-902.interval-timers.local-data-cycle` | Typed local START and RETRIEVE lowering, shared work admission, provider interval state, and interpreter storage bindings | Required TRANSID/REQID/FROM and INTO/LENGTH identities, target authorization, relative/absolute/default scheduling, fenced promotion, expiry-order one-time consumption, LENGERR/ENDDATA, replay, compiled selected route, and memory/SQLite reopen; bounded partial routes only, with no whole-row credit |
+| `CIC-902.interval-timers.start-auto-launch` | Facility-less local task creation from promoted START work through the installed online-program and durable execution authorities | Resolve transaction/program at expiration, bind the retained target principal, preserve no-facility RETRIEVE context, use the fenced work execution identity, clean terminal task state, tolerate unavailable targets asynchronously, and prove compiled sender/receiver plus release/reclaim no-duplicate behavior; terminal/remote starts, in-flight machine crash, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-restart-launch` | SQLite reopen around the facility-less START target-creation and work-completion crash gaps | Reopen installed application/artifacts, RACF identity, promoted/consumed interval row, stale work lease and durable target execution; reclaim under increasing lease epochs before launch and after execution, complete exactly once with an unchanged execution journal; in-flight machine crash, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-termid` | Local START principal-facility association over the durable virtual-terminal, interval-record, worker and online-exchange authorities | Append-only TERMID operand tag 38, literal/storage 1–4-character lowering, active-terminal validation with TERMIDERR 11/0, signed-on principal binding, durable row/reopen compatibility, terminal-matched RETRIEVE, deleted-terminal discard, busy-terminal deferred lease, automatic available-terminal launch and compiled selected route; TERMID+USERID, APPC/remote facilities, same-terminal coalescing, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-explicit-units` | Local START literal `AFTER`/`AT` HOURS/MINUTES/SECONDS over the existing interval resolver and durable work deadline | Source-presence conditional bounds, single-unit extended ranges, combined-unit 0–59 narrowing, exact INVREQ 16 response2 4/5/6, valid literal compilation, canonical explicit-component provider route, durable deadline/work identity and compiled selected route; remote routing, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-dynamic-units` | Storage-backed START `AFTER`/`AT` components through the typed plan, codec, checkpoint, and interpreter | Append-only operand tags 33–35 and option tags 18–19, literal/integer or resolved numeric-storage values, exact mode/component shape validation, canonical decimal host arguments, provider runtime bounds/conditions, codec rejection and round-trip, compiled dynamic selected route; remote routing, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-no-data` | Local START scheduling without FROM and RETRIEVE's corresponding no-data result | Optional FROM through compiler/plan/provider, LENGTH and FMH dependency rejection, ordinary request/work identity and worker promotion, one-time no-data consume with ENDDATA 29/0 replay, metadata-only zero-length success, direct-provider and compiled selected route; automatic target launch, terminal/remote routing, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-protect-syncpoint` | Local START PROTECT admission coordinated with the existing explicit SYNCPOINT UOW authority | Protected-pending row without work, committing syncpoint release and deterministic idempotent admission, interrupted-enqueue healing, rollback deletion and REQID reuse, SQLite row reopen and compiled selected route; PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-protect-abend` | Explicit typed ABEND cleanup over the protected START row authority | Delete every still-protected row for the exact issuing run before handler transfer or terminal ABEND disposition, admit no work, permit REQID reuse, direct-provider and compiled selected-route proof; PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-protect-cancel` | Source-defined CANCEL boundary around START PROTECT commit | NOTFND with the protected row intact and no work before commit; ordinary replay-safe START cancellation, work cancellation flag, and worker fence after committing SYNCPOINT; direct-provider and compiled selected-route proof |
+| `CIC-902.interval-timers.start-protect-task-end` | Implicit committing or rollback task-end boundary over protected START | Normal completion and highest-level RETURN commit/admit, known execution failure rollback deletion, suspension nonfinality, direct-provider completion/RETURN/abort and compiled STOP RUN proof; PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-protect-terminal-cleanup` | Terminal disconnect and idle-timeout rollback over protected START and existing task-state cleanup | Delete only the exact run's protected-pending rows with no START work, preserve existing named-delay abandonment/work cancellation, caller-held interval-map transition without recursive lock, direct disconnect/timeout proof; PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-protect-recovery` | Durable execution disposition reconciliation over the retained online exchange and protected START undo state | Reconstruct exact invocation and saved priority, reload the volatile CICS run from durable undo, commit on `Completed`, roll back on cancelled/timed-out/failed/dead-letter, preserve handoff without double finalization, then clear continuation/checkpoint/exchange; compiled completed, feature-gated failed, and handoff proof; PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-generated-reqid` | Omitted local START REQID and implicit EIBREQID over the existing interval/work identity | Optional typed operand, deterministic eight-character generation from effect/request identity, strict EIB output and checkpoint, replay-stable row/work names, explicit-name preservation, direct-provider and compiled protected selected-route proof |
+| `CIC-902.interval-timers.start-nocheck` | Local START NOCHECK suppression over generated request identity | Append-only option tag 22, deterministic internal row/work identity when REQID is omitted, no EIBREQID output or checkpoint mutation, replay stability, direct-provider and compiled selected-route proof; remote reduced-checking behavior remains pending |
+| `CIC-902.interval-timers.start-userid-surrogate` | Optional local START execution identity and pre-mutation SAF surrogate boundary | One-to-eight-character literal/storage USERID, append-only plan operand tag, issuer-default preservation, `SURROGAT <userid>.DFHSTART` READ authorization, exact NOTAUTH 70/9 with no row/work, durable accepted principal, direct-provider denial/success and compiled RACF-selected route; terminal combinations, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.start-userid-validation` | RACF-backed non-login validity check before START USERID surrogate authorization | Additive typed `ValidatePrincipal` host request and frozen canonical bytes; active/password-expired acceptance, exact USERIDERR 69/8 unknown, 69/10 indeterminate/locked, 69/19 revoked, INVREQ 16/18 unavailable security, validation-before-surrogate ordering, no interval/work mutation, direct-provider and compiled RACF-selected route; terminal combinations, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.cancel-start-local` | Typed CANCEL lowering for the bounded local START-record/work authority | Required REQID with optional local TRANSID, reject SYSID and no-REQID POST form, authorize the selected or originating transaction, cancel only unhonored committed pending START work, exact NOTFND/replay/race behavior, fenced worker rejection, memory/SQLite reopen, and compiled selected route; DELAY/POST/remote and immediate REQID-reuse semantics remain outside this child |
+| `CIC-902.interval-timers.delay-zero` | Typed DELAY lowering for the source-defined zero-delay boundary | Bare/default DELAY and literal packed INTERVAL(0), local and DPL contexts, exact common response/EIBFN, reject positive/dynamic INTERVAL and TIME/FOR/UNTIL/REQID before publication, no persistent state, compiled selected route, and explicit no whole-row credit |
+| `CIC-902.interval-timers.delay-relative` | Positive literal packed INTERVAL DELAY over a stable task/statement identity and shared durable worker lane | Strict versioned delay rows, one work identity per cycle, suspended reissue, due promotion with lease fencing, same-consumer replay, repeated-loop generation, memory/SQLite reopen and compiled selected route; TIME, units, REQID/CANCEL, timeout/task cleanup, automatic resume, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-explicit-units` | Literal and storage-backed DELAY `FOR`/`UNTIL` HOURS/MINUTES/SECONDS over the existing delay row and shared clocks | Append-only option tags 20–21, exact mode/component shape, runtime numeric storage, conditional source bounds and INVREQ 16 response2 4/5/6, one-clock deadline resolution, ignored-by-default EXPIRED 31, unchanged durable row codec, due promotion and compiled selected route; packed TIME, MILLISECS, automatic redispatch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-packed-time` | Literal and storage-backed packed DELAY `TIME` over the existing absolute resolver and durable delay path | Reused append-only StartTime operand tag 29, input/output role separation from FORMATTIME, packed numeric storage, domain-separated absolute identity, exact INVREQ response2 4/5/6 and ignored-by-default EXPIRED 31, due promotion and compiled selected route; MILLISECS, dynamic packed INTERVAL, automatic redispatch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-milliseconds` | Literal and storage-backed DELAY `FOR MILLISECS` over a millisecond-precise shared interval value | Append-only Milliseconds operand tag 36, pure 0–359999999 and combined 0–999 bounds, combined minutes/seconds narrowing, exact INVREQ 16 response2 22, sub-50 ms ignored-by-default EXPIRED, domain-separated retained identity, unchanged delay row codec, exact durable deadline and compiled selected route; dynamic packed INTERVAL, automatic redispatch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-dynamic-interval` | Storage-backed packed DELAY `INTERVAL` over the existing typed operand and provider runtime validation | Reused append-only Interval operand tag 28, packed numeric storage through checkpoint/interpreter canonical decimal output, runtime INVREQ/no-state bounds, dynamic named-delay cancellation and compiled selected route; automatic redispatch, PostgreSQL concurrency, generic retention and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-auto-wake` | In-process post-promotion resume of the durable online DELAY exchange | Bounded exchange scan, exact run-unit match, duplicate rejection, ordinary coordinator/checkpoint resume before work completion, idempotent missing-exchange retry after finalization, compiled relative and packed-TIME automatic progress; shutdown/AICB, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-restart-wake` | SQLite process-restart reconstruction and automatic wake of a durable online DELAY exchange | Reopen installed application and artifact, terminal session, exchange, machine checkpoint, CICS delay row and due work; reconstruct the volatile run, resume through the ordinary fenced worker, checkpoint post-DELAY progress, and complete the work lease without client re-entry; PostgreSQL, shutdown/AICB and licensed evidence remain pending |
+| `CIC-902.interval-timers.delay-cancel-cleanup` | Application-named positive literal DELAY, cross-task CANCEL, and terminal task cleanup over the same durable delay/work authority | Literal or bounded storage REQID, retained-name uniqueness until retention, other-task-only early expiration, NORMAL RESP2 23 on delayed-task reissue, exact CANCEL replay/NOTFND/race behavior, work cancellation fencing, timeout/disconnect/terminal cleanup, retained codec compatibility, memory/SQLite reopen and compiled selected route; remote routing, TIME/units, automatic redispatch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.task-retrieve.start-metadata` | Local data-bearing START metadata and exact RETRIEVE output bindings over the existing versioned interval row | Source-checked RTRANSID/RTERMID/QUEUE names, exact 4/4/8-character writable outputs, producer persistence, requested-field ENVDEFERR before consumption, replay and one-time consumption, Memory/SQLite compatibility and compiled selected route; WAIT timeout/shutdown, terminal association, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.task-retrieve.fmh` | START FMH and RETRIEVE implicit EIBFMH propagation over the existing data record | Typed FMH flag, durable row bit, exact `X'FF'`/`X'00'` output schema, compiled implicit-EIB update, replay compatibility, Memory/SQLite state and selected route; WAIT timeout/shutdown, terminal association, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.task-retrieve.set` | RETRIEVE SET over interpreter-owned virtual storage and the existing consumed-record fence | Exactly one INTO/SET destination, POINTER/POINTER-32 target, mandatory output LENGTH, pre-consumption capacity fence, checkpointed task allocation and selected compiled route; WAIT timeout/shutdown, terminal association, automatic launch, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.task-retrieve.wait-data` | RETRIEVE WAIT data-arrival suspension over the existing interval authority and machine checkpoint | Append-only WAIT plan tag, no-data durable suspension without ENDDATA or consumption, same-statement reissue, post-promotion one-time consumption, direct-provider and compiled selected-route proof; deadlock timeout, shutdown/AICB, automatic wake, process restart, terminal applicability, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.storage-main.getmain-local` | Typed GETMAIN SET/FLENGTH over interpreter-owned virtual storage and the task checkpoint | Append-only operation/operand identities, literal or fullword-binary positive FLENGTH, optional one-byte INITIMG, NOSUSPEND/common response policy, exact LENGERR 22/1 pointer clearing and NOSTG 42/2, frame/byte capacity, response replay, checkpoint restoration and compiled selected route; BELOW, keys, SHARED, EXECUTABLE, 64-bit forms, DPL proof and licensed evidence remain pending |
+| `CIC-902.storage-main.getmain-length` | Typed GETMAIN compatibility LENGTH over the same interpreter-owned virtual storage | Exactly-one FLENGTH/LENGTH plan shape, literal or unsigned-halfword-binary input, 65,520-byte ceiling, exact LENGERR pointer clearing, capacity/NOSTG reuse, initialized selected route, checkpoint restoration and release; physical below-line identity, keys, SHARED, EXECUTABLE, 64-bit forms, DPL proof and licensed evidence remain pending |
+| `CIC-902.storage-main.freemain-datapointer` | Typed FREEMAIN DATAPOINTER over GETMAIN virtual allocation identity and the task checkpoint | Append-only operation/operand identities, POINTER/POINTER-32 input, exact live task-local allocation validation, idempotent host replay intent, interpreter-owned release, freed capacity accounting, checkpointed stale-pointer rejection, exact INVREQ 16/1 and compiled selected route; DATA, key/shared/load ownership, FREEMAIN64, DPL proof and licensed evidence remain pending |
+| `CIC-902.storage-main.freemain-data` | Typed FREEMAIN DATA over the current virtual view of a declared COBOL area | Append-only DATA-area operand identity, exactly-one DATA/DATAPOINTER shape, live offset-zero task allocation validation, replay-bound interpreter release, static/unassigned/repeated INVREQ 16/1, checkpoint restoration and compiled selected route; key/shared/load ownership, FREEMAIN64, DPL proof and licensed evidence remain pending |
+| `CIC-902.storage-main.getmain64-virtual` | Checked non-LE AMODE(64) GETMAIN64 over a bounded, separate virtual-address arena | Operation tag 72, operand tags 172–174, option tags 108–111, output tag 232; eight-byte ABI target, fullword FLENGTH, numeric LOC24/LOC31/above-bar virtual ranges, key and executable metadata, 16-byte rounding plus task guard-zone charge, exact source conditions, checkpoint v11, replay, Memory/SQLite and translated typed-IR selected route; SHARED, native instruction execution, an assembler source frontend, DPL and licensed evidence remain pending |
+| `CIC-902.storage-main.freemain64-virtual` | Checked non-LE AMODE(64) FREEMAIN64 release of a task-owned virtual allocation | Operation tag 73, DATA/DATAPOINTER operand tags 175–176 with ABI tag 174; exactly one eight-byte pointer or separately bound DATA area, exact INVREQ 16/1–2, replay-bound release, capacity recovery, checkpoint v12 area-binding restoration and stale-pointer rejection, Memory/SQLite and translated typed-IR selected route; native assembler source/execution, SHARED, DPL and licensed evidence remain pending |
+| `CIC-902.task-context.address-commarea` | Typed ADDRESS COMMAREA over checked interpreter virtual addresses | Append-only operation tag 42 and pointer-target tag 45, writable four-byte POINTER/POINTER-32 output, optional linkage-backed DFHCOMMAREA source, exact `X'FF000000'` null when absent/unassigned, opaque provider metadata validation, dereference through ADDRESS SET, compiled EIBFN `0202` selected route; ACEE, CWA, EIB, TCTUA, TWA, broader pointer widths and licensed evidence remain pending |
+| `CIC-902.program-load-invoke.invoke-application` | Typed INVOKE APPLICATION over immutable installed application and program generations | Append-only operation tag 46, operand tags 56–61 and option tags 36–37; exact/default/minimum version selection with highest microversion; nested LINK binding to the exact selected artifact, program generation and application content identity; production dispatch of an older selected artifact while the name catalog points to a newer generation; mismatch and multiple-generation regressions; exact APPNOTFOUND 127/1,2,3, CHANNELERR 122/1, INVREQ 16/1,2,3,4, LENGERR 22/11,26, PGMIDERR 27/1,2 and NOTAUTH 70/101 without program dispatch; Memory/SQLite reopen, replay and compiled EIBFN `0E10` selected route. The source description says no current platform returns APPNOTFOUND, but its Conditions table assigns INVREQ 16/1; the runtime follows the explicit table mapping. Container contents, PostgreSQL and licensed evidence remain pending |
+| `CIC-902.program-load-invoke.release` | Typed RELEASE for a previously loaded program | Append-only operation tag 48 and existing PROGRAM operand identity; one LOAD ownership level consumed per command, retained HOLD releasable by a later task, program SAF check before atomic ownership/receipt mutation, replay after outer-receipt failure, Memory/SQLite reopen and compiled EIBFN `0E0A` route; PostgreSQL, shared-region ownership, and licensed evidence remain pending |
+| `CIC-903.tsq.deleteq-queue` | Typed local DELETEQ TS QUEUE over durable temporary-storage rows | Append-only operation tag 41, literal/storage 1–8-character QUEUE selector, separate `cics-tsq` authority and `CICS.TS.<name>` RACF resource, versioned delete/free, exact QIDERR 44/0 and all-zero INVREQ 16/0, effect replay, SQLite reopen and compiled EIBFN `0A06` selected route; QNAME, SYSID, TSMODEL/shared pools, lock state, WRITEQ/READQ TS, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tsq.deleteq-qname` | Typed DELETEQ TS QNAME over the same local durable queue authority | Append-only operand tag 43, 1–16-character literal or exact 16-byte padded storage, QUEUE/QNAME exact-one validation across compiler/plan/provider, shared RACF/delete/replay/condition behavior, malformed-conflict nonmutation, SQLite reopen and compiled QNAME/EIBFN selected route; SYSID, TSMODEL/shared pools, lock state, WRITEQ/READQ TS, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tsq.deleteq-local-sysid` | Explicit local-system SYSID routing for DELETEQ TS | Append-only operand tag 44, literal/storage 1–4-character system name, exact current-system comparison before authorization/mutation, unknown-system SYSIDERR 53/0 with queue preservation, compiled SYSID binding and unchanged durable delete/replay path; remote systems, shared pools, TSMODEL state, locking, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tdq.readq-into-length` | Typed local READQ TD QUEUE/INTO/LENGTH over durable FIFO records | Append-only operation tag 51, literal/storage 1–4-character QUEUE, exactly one writable INTO area, optional writable halfword LENGTH input/output, compiler-derived omitted length, exact consume-and-LENGERR behavior, QIDERR/QZERO separation, SAF/audit and compiled EIBFN `0804` selected route; SET, SYSID, NOSUSPEND, TDQUEUE definitions, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tdq.readq-set` | Typed local READQ TD SET over interpreter-owned virtual storage | Exactly-one INTO/SET plan shape, writable POINTER/POINTER-32 target, bounded allocation capacity before queue consumption, complete-record output, optional original LENGTH, checkpoint restoration and compiled selected route; allocation expiry, SYSID, NOSUSPEND, TDQUEUE definitions, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tdq.local-sysid` | Explicit current-system SYSID routing for WRITEQ TD, READQ TD and DELETEQ TD | Reused append-only SYSID operand tag 44, literal/storage 1–4-character system name, exact current-system comparison before authorization/mutation, unknown-system SYSIDERR 53/0 with queue preservation, all three compiled bindings and unchanged local durable paths; remote systems, TDQUEUE definition routing, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.document.delete` | Typed DOCUMENT DELETE over the same durable authority | Reserved operation tag 64; storage-backed 16-byte DOCTOKEN input, task/transaction ownership, immediate capacity release, atomic durable delete and effect replay, NOTFND 13/1 for an absent token, direct-provider and compiled EIBFN `3C10` routes; PostgreSQL, licensed evidence and rows 0053–0055 remain pending |
+| `CIC-903.document.insert` | Typed DOCUMENT INSERT over the shared durable authority | Reserved operation tag 65; text/binary/FROM/FROMDOC/template/symbol sources, bookmark insertion and AT/TO overlay, bounded tagged-buffer round trips, case-sensitive symbol rules, DOCSIZE, atomic versioned update and replay, direct-provider and compiled EIBFN `3C04` routes; PostgreSQL, licensed evidence and rows 0054–0055 remain pending |
+| `CIC-903.document.retrieve` | Typed DOCUMENT RETRIEVE from the shared durable authority | Reserved operation tag 66, MAXLENGTH/CHARACTERSET operand tags 145–146 and document DATAONLY option tag 85; bounded tagged/data-only output, CP037 conversion for supported client sets, zero/short-buffer LENGERR 22/2 with exact required LENGTH, negative MAXLENGTH LENGERR 22/1, direct-provider and compiled EIBFN `3C06` routes; PostgreSQL, licensed evidence and row 0055 remain pending |
+| `CIC-903.document.set` | Typed DOCUMENT SET over the shared durable authority | Reserved operation tag 67; individual SYMBOL/VALUE or SYMBOLLIST with fullword LENGTH, DELIMITER/UNESCAPED, case-sensitive replacement without rewriting materialized content, atomic versioned document and replay update, direct-provider and compiled EIBFN `3C08` routes; PostgreSQL and licensed evidence remain pending |
+| `CIC-903.document.create` | Typed DOCUMENT CREATE over one shared bounded durable transaction document authority | Reserved operation tag 63, document operand tags 132–147, UNESCAPED option tag 84 and non-ASSIGN DOCTOKEN/DOCSIZE output tags 216–217; empty/text/binary/FROM/FROMDOC/template construction, symbol-list bounds, deterministic token ownership, DOCTEMPLATE READ authorization, atomic document-plus-replay write, task cleanup, memory/SQLite reopen and compiled EIBFN `3C02` selected route; PostgreSQL, licensed evidence and rows 0052–0055 remain pending |
+| `CIC-903.tdq.definitions` | Durable installed local TDQUEUE definitions shared by WRITEQ TD, READQ TD, and DELETEQ TD | Public bounded definition API, intrapartition/extrapartition direction and enabled/open state, record-size and per-queue capacity limits, exact DISABLED/INVREQ/NOTOPEN/LENGERR/NOSPACE/IOERR/QIDERR/QZERO conditions, idempotent registration and SQLite reopen; NOSUSPEND/QBUSY, indoubt locking, remote/external data sets, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tdq.definition-migration` | Atomic first-time migration from compatibility-profile queues to durable TDQUEUE definitions | Complete proposed-set coverage, retained record-count/byte-count and per-record direction/fixed-or-maximum-size validation before any definition write, unchanged store/in-memory state on partial or incompatible registration, and successful Memory/SQLite reopen; online definition replacement, remote/external data sets, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.tsq.readq-local` | Typed CICS TS 6.x READQ TS row `0160` over the sealed local temporary-storage authority | Append-only operation tag 49, ITEM operand tag 70, NEXT option tag 44, QUEUE/QNAME and exact-local SYSID, INTO/SET, in/out LENGTH, normal-only NUMITEMS, exact local conditions, queue SAF/audit, effect replay, legacy-row migration, SQLite reopen and compiled EIBFN `0A04`; remote/shared queues, TSMODEL routing, PostgreSQL and licensed differential remain pending |
+| `CIC-903.tsq.writeq-local` | Typed CICS TS 6.x WRITEQ TS row `0258` over the same local temporary-storage authority | Append-only operation tag 50, ITEM/REWRITE, MAIN/AUXILIARY, NOSUSPEND, bounded LENGTH, QUEUE/QNAME and exact-local SYSID, append or replacement, local conditions, SAF/audit, effect replay, legacy-row migration, SQLite reopen and compiled EIBFN `0A02`; remote/shared queues, TSMODEL placement, recoverable-UOW coupling, PostgreSQL and licensed differential remain pending |
+| `CIC-903.journal-control.wait-journalname` | `0235 WAIT JOURNALNAME` over the shared durable journal authority | Operation tag 54, JOURNALNAME/REQID operand tags 96–97, reserved journal tag ranges and collision regression, 1–8 character known journal, explicit task-owned fullword token or journal-wide current buffer, immediate hardened completion or coordinator suspension/reissue, exact IOERR/JIDERR/NOTOPEN/NOTAUTH, SAF/audit, aggregate bounds, SQLite reopen and compiled selected route; PostgreSQL and licensed evidence remain pending |
+| `CIC-903.journal-control.wait-journalnum` | `0236 WAIT JOURNALNUM` over the same durable authority | Operation tag 55 and JOURNALNUM operand tag 98, numeric 1–99 mapping to `DFHJnn`, distinct typed/compiled route, task-owned explicit REQID and journal-wide omitted-token wait, SAF and condition parity; PostgreSQL and licensed evidence remain pending |
+| `CIC-903.journal-control.write-journalname` | `0254 WRITE JOURNALNAME` over the same durable authority | Operation tag 56, JTYPEID/FROM/FLENGTH/PREFIX/PFXLENG operand tags 99–103, REQID output tag 201, source-defined async REQID versus WAIT exclusion, bounded record slices and conditions, two pending buffer slots with NOSUSPEND/NOJBUFSP, SAF/audit, idempotent durable bytes, legacy codec read, SQLite reopen and compiled selected route; native System Logger/SMF transport, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.journal-control.write-journalnum` | `0255 WRITE JOURNALNUM` over the same durable authority | Operation tag 57 and reused JOURNALNUM operand tag 98, numeric 1–99 mapping to `DFHJnn`, bounded 0254 record-option inheritance from the short compatibility source, distinct typed/compiled route, shared durable REQID, WAIT, NOSUSPEND, SAF and condition path; native System Logger/SMF transport, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.spool-control.spoolclose` | Typed SPOOLCLOSE over the shared bounded durable report state | Append-only operation tag 58, TOKEN tag 112 and KEEP/DELETE tags 72–73; mandatory RESP/NOHANDLE, exact task/principal ownership, JESSPOOL SAF/audit, input DELETE and output KEEP defaults, explicit disposition override, atomic state-plus-replay CAS, SQLite state codec/reopen and compiled EIBFN `5610` selected route; implicit close, JES allocation failures, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.spool-control.spoolopen-input` | Typed SPOOLOPEN INPUT selection and ownership | Append-only operation tag 59, USERID/CLASS tags 113–114 and non-ASSIGN TOKEN output tag 208; writable eight-byte token, APPLID-prefix and JESSPOOL authorization, optional class selection, exact SPOLBUSY 88/4 and 88/8 single-thread results, NOTFND 13/4, atomic claim/replay, SQLite reopen and compiled EIBFN `5602` selected route; held datasets, dynamic allocation failures, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.spool-control.spoolopen-output` | Typed SPOOLOPEN OUTPUT report creation | Append-only operation tag 60, NODE/RECORDLENGTH/OUTDESCR tags 115–117, NOCC/ASA/MCC/PRINT/PUNCH tags 74–78 and reused TOKEN output 208; defaults, exclusive formats, local-star pairing, bounded double-indirect OUTDESCR, NODEIDERR/LENGERR/INVREQ, concurrent opens, atomic token/replay, SQLite reopen and compiled EIBFN `5602` selected route; JES dynamic allocation, macro failures, implicit close, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.spool-control.spoolread` | Typed SPOOLREAD input-record transfer | Append-only operation tag 61, MAXFLENGTH operand tag 118 and TOFLENGTH output tag 209; required TOKEN/INTO/MAXFLENGTH/RESP-or-NOHANDLE, truncation bytes and actual length, same-record LENGERR retry, one ENDFILE then INVREQ 16/12, NOTOPEN direction/owner checks, atomic cursor/reply replay, SQLite reopen and compiled EIBFN `5604` selected route; JES macros, implicit close, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.spool-control.spoolwrite` | Typed SPOOLWRITE output-record transfer | Append-only operation tag 62, FROM/FLENGTH operand tags 119–120 and LINE/PAGE option tags 79–80; omitted FLENGTH derives source area size, source-backed exclusive PAGE correction, record-length truncation and LENGERR RESP2, NOTOPEN direction/owner checks, INTRDR JOB USER surrogate denial, atomic append/reply replay, SQLite reopen and compiled EIBFN `5606` selected route; JES macros, alternate surrogate configuration, implicit close, PostgreSQL and licensed evidence remain pending |
+| `CIC-903.diagnostics.core` | Bounded local diagnostic record authority | Versioned canonical state and trace configuration, aggregate entry/byte/replay limits, malformed state rejection, and SQLite reopen are implemented without advertising a command yet; six diagnostic command slices follow |
+| `CIC-903.web-control.close` | Typed WEB CLOSE session release | MCEP v2 operation tag 93 and SESSTOKEN operand tag 267; eight-byte task-owned token, source NOTOPEN 19/27 and 19/144 paths, URIMAP SAF before release, transport release with pooling selection, atomic session deletion and replay persistence, audited failure and post-dispatch UnknownOutcome; the other 11 web-control rows remain pending |
+| `CIC-903.web-control.open` | Typed WEB OPEN client-session admission | MCEP v2 operation tag 92, operand tags 258 and 261–266, output tags 321–323; source-fenced direct HOST/SCHEME/PORT or durable USAGE(CLIENT) URIMAP, 8-byte task token, transport-confirmed HTTP version, endpoint SAF, atomic session/replay persistence, memory/SQLite reopen, audited deny/failure, live cancellation/deadline fencing and selected compiled EIBFN `3818` route; client SEND/RECEIVE and the other 12 web-control rows remain pending |
+| `CIC-903.web-control.parse-url` | Typed WEB PARSE URL over bounded URL bytes | MCEP v2 operation tag 91, operand tags 256–260 and output tags 312–320; scheme, host, host type, default or explicit port, path and escaped query outputs, checked percent escapes, exact HOSTLENGTH/PATHLENGTH/QUERYSTRLEN truncation conditions, direct provider and compiled EIBFN `3816` routes; client/server sessions and the other 13 web-control rows remain pending |
+| `CIC-903.web-control.extract` | Typed WEB EXTRACT request and session metadata | MCEP v2 operation tag 94, length operand tags 268–270 and output tags 324–332; task-bound inbound request or durable client SESSTOKEN selection, host/method/version/path/query/URIMAP and CVDA outputs, actual lengths with LENGERR truncation, audited failure, SQLite client recovery and compiled EIBFN selected route; the other 10 web-control rows remain pending |
+| `CIC-903.web-control.extract-web` | Typed EXTRACT WEB synonym with distinct catalog identity | MCEP v2 operation tag 95 and shared WEB EXTRACT typed operands/outputs; exact server/client form, conditions, bounds and audit on the shared checked handler, with direct and compiled selected-route proof; the other 9 web-control rows remain pending |
+| `CIC-903.web-control.read` | Typed WEB READ selected request fields | MCEP v2 operation tag 96, name/length operand tags 271–275 and VALUE outputs 333–334; HTTPHEADER, QUERYPARM and URL-encoded FORMFIELD selection, escaped query decoding, case-insensitive names, source length and NOTFND/INVREQ conditions, audit and selected compiled route; SET pointers, multipart forms and code-page conversion remain pending within this row |
+| `CIC-903.web-control.startbrowse` | Typed WEB STARTBROWSE over bounded request fields | MCEP v2 operation tag 97, optional start-name operand tag 276 and kind option tags 188–190; HTTPHEADER, QUERYPARM and URL-encoded FORMFIELD snapshots, optional named start, ILLOGIC/NOTFND/source bounds, atomic browse/replay persistence, Memory/SQLite recovery, task cleanup, post-persist UnknownOutcome and selected compiled route; client response browsing follows WEB RECEIVE |
+| `CIC-903.web-control.readnext` | Typed WEB READNEXT over the durable browse snapshot | MCEP v2 operation tag 98, reused fullword length operands and kind options, name output tags 335–336 with VALUE outputs 333–334; actual lengths, sticky LENGERR on short name/value buffers, ENDFILE, atomic cursor/replay update, Memory/SQLite recovery, UnknownOutcome replay and selected compiled route; client response browsing follows WEB RECEIVE |
+| `CIC-903.web-control.endbrowse` | Typed WEB ENDBROWSE snapshot release | MCEP v2 operation tag 99 with kind options 188–190 and optional client SESSTOKEN; exact INVREQ 16/4 on absent browse, atomic snapshot deletion and replay, post-persist UnknownOutcome reconciliation, SQLite delete and selected compiled route; client response browsing follows WEB RECEIVE |
+| `CIC-903.web-control.write` | Typed WEB WRITE HTTPHEADER staging | MCEP v2 operation tag 100 and header-value operand tag 277; bounded name/value lengths, duplicate header order, forbidden generated client headers, token ownership, URIMAP SAF before mutation, atomic staged headers/replay, Memory/SQLite recovery, task/WEB CLOSE cleanup, post-persist UnknownOutcome and selected compiled route; WEB SEND consumes staged headers |
+| `CIC-903.web-control.send` | Typed WEB SEND server response selection and client HTTP request dispatch | MCEP v2 operation tag 101 and operands 278–290; staged headers, checked client method/path/body, server EVENTUAL replacement and IMMEDIATE exclusion, document source, URIMAP and WEBPATH SAF, atomic durable response/replay, pre-dispatch marker and post-dispatch UnknownOutcome; WEB RECEIVE consumes the retained client response and WEB RETRIEVE exposes the pending document token |
+| `CIC-903.web-control.retrieve` | Typed WEB RETRIEVE pending document token lookup | MCEP v2 operation tag 102 and output tag 337; exact 16-byte writable COBOL output, task-owned last EVENTUAL server document send, INVREQ 16/1 or 16/2 and NOTFND 13/1 conditions, audit and selected compiled route |
+| `CIC-903.web-control.receive` | Typed WEB RECEIVE bounded buffer body consumption | MCEP v2 operation tag 103, operand tags 291–292, option tags 191–193 and output tags 338–344; server request or client response body, MAXLENGTH, NOTRUNCATE retain/discard conditions, client status and media outputs, checked conversion to CP037 for text response bodies, durable cursor/replay, SQLite-compatible recovery, client header READ/browse after RECEIVE, audit and selected compiled route; SET and container forms remain pending within this row |
+| `CIC-903.web-control.converse` | Typed WEB CONVERSE combined client exchange | MCEP v2 operation tag 104 and output tags 345–351; selected SESSTOKEN/METHOD/path, bounded response buffer and metadata, NOTRUNCATE, outstanding-response exclusion, URIMAP/WEBPATH SAF, staged header consumption, pre-dispatch uncertainty marker, atomic response/replay persistence, provider and selected compiled COBOL routes; credentials, containers, and broader translation remain pending within this row |
+| `CIC-903.terminal-bms.receive-map-from-length` | Typed RECEIVE MAP FROM/LENGTH over a supplied symbolic-map input area | Storage-backed FROM plus optional bounded literal, halfword-binary or matching `LENGTH OF`; strict dependency/schema checks, exact prefix mapping against the selected durable map, no queued-terminal-input consumption or session mutation, direct-provider and compiled selected-route proof; TIOAPFX, SET pointers, AID-only and broader terminal controls remain pending |
+| `CIC-903.terminal-bms.receive-map-terminal` | Typed explicit RECEIVE MAP TERMINAL selection | Append-only option tag 27, originating terminal input consumption through the existing durable session, strict FROM exclusion and empty option schema, queued-input preservation on malformed conflict, direct-provider and compiled EIBFN `1802` selected-route proof; translation, partitions, TIOAPFX, SET pointers and broader terminal controls remain pending |
+| `CIC-903.terminal-bms.send-map-length` | Typed SEND MAP LENGTH over an explicit symbolic-map FROM area | Literal, halfword-binary, or matching LENGTH OF plan value; strict request schemas and FROM dependency; exact prefix selection before durable map formatting; direct-provider and compiled selected route; implicit symbolic storage, DATAONLY and broader BMS controls remain pending |
+| `CIC-903.terminal-bms.send-text-length` | Typed SEND TEXT LENGTH over its required FROM area | Literal, halfword-binary, or matching LENGTH OF plan value; exact prefix selection, LENGERR 22/0 before mutation, direct-provider and compiled terminal-screen proof; headers/trailers, paging and broader BMS controls remain pending |
+| `CIC-903.terminal-bms.send-map-maponly` | Typed SEND MAP MAPONLY over initialized map defaults | Append-only option tag 23, no FROM/LENGTH application data, strict defensive request shape, initialized field/session state, direct-provider and compiled TN3270 selected-route proof; implicit symbolic storage, DATAONLY and broader BMS controls remain pending |
+| `CIC-903.terminal-bms.send-map-dataonly` | Typed SEND MAP DATAONLY over explicit symbolic data and attributes | Append-only option tag 24, required FROM with optional existing LENGTH forms, MAPONLY exclusion, map-default suppression, supplied attribute application, `X'00'` preservation, malformed-attribute nonmutation, direct-provider and compiled TN3270 selected-route proof; implicit symbolic storage and broader BMS controls remain pending |
+| `CIC-903.file-update.delete-current-record` | Typed DELETE without RIDFLD after READ UPDATE | Same-file latest update hold, no caller key on DELETE, exact one-shot hold consumption and `INVREQ` 16/31 when absent, durable keyed deletion through SYNCPOINT, direct-provider and compiled selected-route proof; TOKEN/browse-update correlation and RLS concurrency remain pending |
+| `CIC-903.file-update.write-length` | Typed WRITE FILE LENGTH over its FROM record | Literal, halfword-binary, or matching `LENGTH OF` plan value; WRITE-only defensive shape and exact FROM identity; provider dataset-attribute validation, prefix mutation, direct-provider and compiled variable-KSDS selected route; remote and fixed-record edge routes remain pending |
+| `CIC-903.file-update.rewrite-length` | Typed REWRITE LENGTH over its FROM record and prior update hold | Literal, halfword-binary, or matching `LENGTH OF` plan value; REWRITE-only defensive shape and exact FROM identity; durable attribute validation, prefix replacement, direct-provider and compiled variable-KSDS selected route; TOKEN, remote and RLS ownership remain pending |
+| `CIC-903.file-update.write-keylength` | Typed WRITE FILE KEYLENGTH over its RIDFLD key | Positive literal, halfword-binary, or matching `LENGTH OF` plan value; exact RIDFLD identity, durable definition comparison and `INVREQ` 16/26; direct-provider, conformance-pilot and compiled selected-route proof; remote and alternate identifiers remain pending |
+| `CIC-903.file-update.delete-keylength` | Typed explicit-key DELETE KEYLENGTH over its RIDFLD key | Positive literal, halfword-binary, or matching `LENGTH OF` plan value; mandatory RIDFLD, current-record exclusion, durable definition comparison and `INVREQ` 16/26; direct-provider and compiled selected-route proof; GENERIC, remote and alternate identifiers remain pending |
+| `CIC-903.file-update.read-keylength` | Typed non-generic READ KEYLENGTH over its RIDFLD key | Positive literal, halfword-binary, or matching `LENGTH OF` plan value; exact RIDFLD identity, durable definition comparison and `INVREQ` 16/26; direct-provider and compiled fixed-KSDS selected route; remote and alternate identifiers remain pending |
+| `CIC-903.file-update.read-length` | Typed READ LENGTH input/output over its INTO record | Writable halfword storage only, identical input/output binding, provider capacity enforcement and actual-length response, direct-provider and compiled variable-KSDS selected route; SET, remote and broader edge conditions remain pending |
+| `CIC-903.file-update.read-gteq` | Typed keyed READ GTEQ over RIDFLD and INTO | Append-only existing GTEQ option identity, READ-only defensive shape, equal-or-first-greater selection through a bounded transient dataset cursor, exact cursor cleanup and NOTFND mapping, compiled fixed-KSDS selected route; alternate identifiers, remote and RLS modes remain pending |
+| `CIC-903.file-update.read-generic` | Typed READ GENERIC prefix selection over RIDFLD/KEYLENGTH | Append-only option tag 25, mandatory positive partial KEYLENGTH, strict READ-only plan shape, durable full-key comparison and `INVREQ` 16/25, bounded transient cursor with prefix guard and NOTFND 13/80, compiled fixed-KSDS positive/negative proof; zero-length, alternate, remote and RLS forms remain pending |
+| `CIC-903.file-update.read-keylength-zero` | Typed READ GTEQ KEYLENGTH zero first-record selection | Literal or halfword zero only with non-generic GTEQ, defensive plan/runtime exclusion elsewhere, empty-key greater-or-equal cursor selection, exact first-record compiled proof; alternate identifiers, remote and RLS modes remain pending |
+| `CIC-903.file-update.read-generic-gteq-zero` | Typed READ GENERIC GTEQ KEYLENGTH zero first-record selection | Literal or halfword zero with the combined options, defensive plan/runtime exclusion without GTEQ, empty-key greater-or-equal selection without a vacuous prefix rejection, exact compiled first-record proof; alternate identifiers, remote and RLS modes remain pending |
+| `CIC-903.file-update.read-equal` | Typed explicit READ EQUAL over complete and generic RIDFLD keys | Append-only option tag 26, READ-only admission, defensive EQUAL/GTEQ choice enforcement, exact direct-read and generic-prefix provider routes, compiled selected-route proof for both key forms; alternate identifiers, remote and RLS modes remain pending |
+| `CIC-903.file-browse.startbr-equal` | Typed STARTBR EQUAL exact-key positioning | Reused append-only EQUAL tag 26, STARTBR-only admission, defensive EQUAL/GTEQ choice enforcement, exact dataset cursor relation, direct-provider trace and compiled-machine selected-route proof; named/remote cursors and alternate identifiers remain pending, with GENERIC/KEYLENGTH closed by the following child |
+| `CIC-903.file-browse.startbr-generic-keylength` | Typed STARTBR GENERIC/KEYLENGTH prefix and first-record positioning | Reuse GENERIC tag 25 plus bounded literal, halfword-binary or matching `LENGTH OF` KEYLENGTH; mandatory partial length, EQUAL prefix validation, GTEQ greater-key route, zero-length GTEQ first-record selection, exact `INVREQ` 16/25, 16/26 and 16/42 plus NOTFND 13/80; direct-provider and compiled selected-route proof; named/remote cursors and alternate identifiers remain pending |
+| `CIC-903.file-browse.read-length` | Typed READNEXT/READPREV LENGTH over each INTO record | Writable halfword input/output binding, provider record-attribute validation on both directions, missing variable length `LENGERR` 22/10, truncation 22/11 with pre-truncation actual output, fixed mismatch 22/13, direct-provider forward/reverse proof and compiled RESP/RESP2 selected route; SET, key repositioning, named/remote cursors and RLS modes remain pending |
+| `CIC-903.file-update.pilot-storage-fixtures` | CICS file/UOW pilot repair for storage-backed typed REWRITE | Replace stale literal FROM fixtures with declared record storage while preserving exact mutation bytes, retain invalid-context coverage, move WRITE LENGTH source into the test-only suffix, restore the 1,321-line production ceiling and warnings-denied conformance build; no new command or option credit |
+| `CIC-904.transform.datatojson` | Typed row `0221 TRANSFORM DATATOJSON` over the shared transform-control runtime | Operation tag 68 and shared CHANNEL operand tag 61 and transform operand tags 153–155; required CHANNEL/INCONTAINER/TRANSFORMER plus optional OUTCONTAINER; immutable bounded JSON binding fields; durable BIT input and CHAR output containers; `DFHJSON-JSON` default; exact CHANNELERR 122/1,2, CONTAINERERR 110/3, INVREQ 16/1,6,8,101 and NOTFND 13/1; TRANSFORM-class SAF/update audit, atomic transform effect/output persistence, restart replay and compiled `cics.transform@1.data-to-json` selected route. Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, row `0221`, topic `dfhp4_transform_data2json.html`, SHA-256 `340ee71dcde15271c0493da79d19476954375a3419041dab3457005c5e2198a2`; other transform forms remain pending. |
+| `CIC-904.transform.datatoxml` | Typed row `0222 TRANSFORM DATATOXML` on the same transform-control authority | Operation tag 69; XML container/resource operand tags 156–158; fullword metadata-length operand tags 161/163/165/167; non-ASSIGN output tags 224–231; deterministic escaped XML with namespace and xsi:type metadata; exact LENGERR 22/1–7 plus applicable CHANNELERR/CONTAINERERR/INVREQ 16/1,5,6,8,101 and NOTFND; replay-bound metadata and CHAR container replacement, compiled selected route. Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, row `0222`, topic `dfhp4_transform_data2xml.html`, SHA-256 `427eed4046a077974bafb1e363fe3d29ae7c7332a2890dbf10139ead8387e46d`; other transform forms remain pending. |
+| `CIC-904.transform.jsontodata` | Typed row `0223 TRANSFORM JSONTODATA` on the shared transform-control authority | Operation tag 70 and shared CHANNEL operand tag 61 and JSON operand tags 153–155; `DFHJSON-DATA` default BIT output; bounded fixed-field reconstruction from CHAR or UTF-8-detectable BIT JSON; exact CHANNELERR 122/1,2, CONTAINERERR 110/1, INVREQ 16/1,4,7,101 and NOTFND 13/1; SAF/audit, atomic replacement, restart replay, and compiled `cics.transform@1.json-to-data` selected route. Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, row `0223`, topic `dfhp4_transform_json2data.html`, SHA-256 `154218011ed9175cdef96b707a4f821de65884cc33ca11ac8c66e921e78c6d0f`; other transform forms remain pending. |
+| `CIC-904.transform.xmltodata` | Typed row `0224 TRANSFORM XMLTODATA` on the shared transform-control authority | Operation tag 71; NSCONTAINER and metadata input operand tags 159/160/162/164/166, paired fullword lengths 161/163/165/167, metadata outputs 224–231; query mode returns root element/type metadata without a transformer, while transform mode writes bounded fixed-field BIT data; UTF-8 CHAR or detectable BIT XML, optional CHAR namespace declarations, bounded XML 1.0 parsing with comments and CDATA, without DTD, exact supported CHANNELERR 122/1,2, CONTAINERERR 110/1,2, LENGERR 22/2–5, INVREQ 16/1,2,3,4,7,9,10,16,101 and NOTFND 13/1; SAF/audit, atomic transform effects, restart replay and compiled `cics.transform@1.xml-to-data` selected route. Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, row `0224`, topic `dfhp4_transform_xml2data.html`, SHA-256 `cec17585ce389e5afa2f694065cbe9df18b8caa39f5e2c5f4a2dd8cdacc2f3be`. |
+| `CIC-902.runtime-handler-layout` | CICS interval and new runtime handlers under the reviewed semantic-family layout | Move deterministic interval normalization below `handlers/` with stable crate re-exports, freeze every current interval/start/storage handler module in the reviewed inventory, pass the exact module-boundary gate; no command, option, or semantic credit |
+| `CIC-902.typed-semantic-boundary-guard` | Typed CICS architecture guard aligned with the split legacy module | Bound inspection from typed `execute` to the first in-file legacy helper, retain explicit legacy grammar-path rejection without colliding with typed SET allocation arguments, focused guard regression and passing policy check; no runtime or semantic credit |
+| `CIC-903.dataset-replay.application-neutral-profile` | Application-neutral production documentation for the shared dataset replay index | Remove the residual application fixture name from the production optimization note, preserve generic incremental replay behavior, clear the production hardcode scan and advance architecture-fast to later gates; no runtime or semantic credit |
+| `CIC-902.retention-guard-snapshot-api` | Durable-retention guard aligned with the instrumented memory snapshot API | Require `self.snapshot(&state)` staging, archive insertion into the staged state and one final state replacement, pass the standalone retention guard and advance architecture-fast to descriptor validation; no runtime or semantic credit |
+| `CIC-902.cics-descriptor-family-schema` | CICS descriptor schema ratchet for the current reviewed runtime families | Raise the exact family array bound from seven to nine for interval-control and storage-control, preserve generator equality against the frozen family map, pass descriptor generation and advance architecture-fast to application-contract validation; no command or semantic credit |
+| `CIC-902.cics-contract-readiness-schema` | Generated CICS application-contract schema ratchet for current runtime readiness | Pin 41 typed, 0 legacy, 41 advertised and 222 unready rows in both registry/count summaries, require exactly 24 command-family counts, pass independent generation and advance architecture-fast to source-map freshness; no new command or semantic credit |
+| `CIC-902.cics-source-map-runtime-filter` | Frozen source-map compatibility view separated from newer typed runtime admissions | Exclude DELETEQ TD, FREEMAIN and GETMAIN from the no-admission baseline comparison, regenerate all three map descriptor/digest bindings, pass source-map and descriptor checks and advance architecture-fast to corpus freshness; no command or semantic credit |
+| `CIC-902.cics-source-corpus-map-bindings` | Zero-credit CICS corpus bindings to regenerated source maps | Update A/B/C mapping identities and canonical corpus digests, retain exact topic manifests, HTML counts, link closures and browser receipts, pass all-batch corpus checks plus 30 focused tests and advance architecture-fast to extraction freshness; no source, command, or semantic credit |
+| `CIC-902.cics-extraction-input-bindings` | Zero-credit CICS extraction plans bound to refreshed maps and corpora | Update A/B/C map/corpus input identities and canonical extraction-plan digests while preserving selectors, bounds, source resolutions and expected shapes; all extractors advance to candidate-envelope freshness; no source, command, or semantic credit |
+| `CIC-902.cics-candidate-input-bindings` | Zero-credit CICS candidate projections bound to refreshed source inputs | Update A/B/C map, corpus and extraction-plan identities plus canonical projection digests while preserving all 18,070 candidate facts and review states; all committed extraction checks pass and architecture-fast advances to generated-registry freshness; no source, command, or semantic credit |
+| `CIC-902.cics-review-contract-bindings` | Accepted CICS review and generated contract envelopes bound to refreshed candidates | Rebind A/B/C review inputs and canonical receipt digests while retaining prior independent-verification report identities, dispositions and zero-credit policy; regenerate only projection/review file identities and the canonical command-contract digest; ratchet focused descriptor tests to the sealed 41/0/222 registry; no source replay, readiness change, or semantic credit |
+| `CIC-902.interval-timers.start-records` | Typed START lowering, CICS interval state, shared work admission and worker | Exact request/data identity, expiry and terminal association, task principal and surrogate SAF, PROTECT/syncpoint, cancellation, bounds, atomic mutation/replay, lease fencing, SQLite/PostgreSQL restart, and compiled selected-route proof |
+| `CIC-902.task-retrieve.start-records` | Typed RETRIEVE lowering, CICS interval state and interpreter storage bindings | Expiry order, one-time consumption, terminal/nonterminal applicability, INTO/SET and in/out LENGTH, originating metadata, FMH, ENDDATA/ENVDEFERR/LENGERR/IOERR, WAIT/deadline/shutdown, restart/replay, and compiled selected-route proof |
+
+These children retain the parent command/option scopes declared below. A passing
+internal time resolver does not advertise START, replace RETRIEVE, complete an
+application row, or satisfy the family or licensed completion gate.
+
+### Declared CIC-902 slices
+
+Every row below receives the same mandatory obligation identities, prefixed by
+its four-digit row ordinal: `valid-form`, `invalid-form`, `option-influence`,
+`local-context`, `dpl-context`, `eibfn-response`, `condition-matrix`,
+`bounds-cancellation`, `saf-audit`, `effect-recovery-disposition`,
+`compiled-selected-route`, and `licensed-differential`. The
+`effect-recovery-disposition` obligation must either execute the applicable
+mutation/replay/restart/unknown-outcome matrix or retain a source-backed
+non-applicable disposition; it cannot turn an unsupported behavior into a
+pass. `licensed-differential` remains pending until a candidate-bound protected
+run succeeds. This gives every slice an exact obligation set without imposing
+recovery execution on a genuinely non-mutating row or treating a missing
+licensed environment as local evidence.
+
+All slices use the generated CICS application contract and compact registry,
+COBOL HIR/MIR and `mainframe-env.cics@1` host ABI, the shared coordinator,
+`handlers/*` family modules, and the shared Conformance IR. Their selected-route
+proof compiles COBOL and crosses the coordinator and selected provider; direct
+handler calls are supplementary. Memory is required for deterministic
+semantics. Any durable CICS/provider-state mutation additionally requires
+SQLite process restart and PostgreSQL shared-store/CAS parity; pure task-local
+state records an explicit durable-backend non-applicability decision instead.
+Public routes remain unchanged until a slice is sealed.
+
+| Slice | Exact row and option scope | Context and owning boundary | Acceptance boundary |
+|---|---|---|---|
+| `CIC-902.recovery-syncpoint` | `0218 SYNCPOINT`: `NOHANDLE`, `RESP`, `RESP2`, `ROLLBACK` | Local allowed; DPL restricted. `handlers/recovery.rs`, typed CICS plan/adapter, coordinator and provider UOW participants | Exact commit/rollback, EIBFN/RESP, DPL rejection, update-context invalidation, journal failure, fenced replay, SQLite/PostgreSQL restart, selected route, and licensed adapter expansion |
+| `CIC-902.task-abend-condition` | `0001 ABEND`: `ABCODE`, `CANCEL`, `NODUMP`, `NOHANDLE`, `RESP`, `RESP2`; `0097 HANDLE ABEND`: `CANCEL`, `LABEL`, `PROGRAM`, `RESET`, common response options; `0098 HANDLE AID`; `0099 HANDLE CONDITION`; `0100 IGNORE CONDITION`; `0146 POP HANDLE`; `0149 PUSH HANDLE` (the last five use their generated dynamic/common option contracts) | Local allowed; `HANDLE AID` is DPL restricted, other rows allowed. `handlers/task_control.rs`, compiler condition policy, machine control edges | Nested handler-stack state, label/program separation, cancellation/reset, every dynamic condition/AID form, ABEND dump disposition, exact EIB/conditions, bounds, selected route and state recovery disposition |
+| `CIC-902.task-context` | `0005 ADDRESS`: `ACEE`, `COMMAREA`, `CWA`, `EIB`, `TCTUA`, `TWA`, common response options; `0006 ADDRESS SET`: `SET`, `USING`, common response options; `0011 ASSIGN`: all 116 generated options; `0022 CHANGE TASK`: `PRIORITY` plus common response options; `0193 SET ASSOCIATION USERCORRDATA`: `USERCORRDATA` plus common response options | Local allowed; `ASSIGN` is DPL restricted. `handlers/task_context.rs`, `handlers/task_control.rs`, compiler storage bindings and invocation/task context | Exact per-option output shape and partial `INVREQ`, writable storage, task priority/correlation lifecycle, no address fabrication, context/DPL matrix, selected route and checkpoint compatibility |
+| `CIC-902.time-clock` | `0009 ASKTIME`: common response options; `0010 ASKTIME ABSTIME`: `ABSTIME` plus common response options | Local and DPL allowed. `handlers/time.rs`, interpreter EIB authority, and the selected clock provider | One clock instant, exact packed EIBDATE/EIBTIME, packed ABSTIME separation, malformed provider output, retained-response compatibility, selected route, and licensed differential |
+| `CIC-902.time-format` | `0080 FORMATTIME`: `ABSTIME`, valued `DATESEP`/`TIMESEP`, `YYYYMMDD`, `YYMMDD`, `MMDDYY`, `MMDDYYYY`, `YYDDD`, `TIME`, `MILLISECONDS`, and common response options | Local and DPL allowed. `handlers/time.rs`, typed CICS plan/output layouts, and interpreter result validation | Exact packed input, fixed character/fullword outputs, separator/default boundary, INVREQ 16/1, malformed provider output, selected route, deferred-option rejection, and licensed differential |
+| `CIC-902.time-convert` | `0031 CONVERTTIME`: required 64-character `DATESTRING`, writable packed `ABSTIME`, and common response options | Local and DPL allowed. `handlers/time/convert_time.rs` over the existing time and typed CICS authorities | Four architected forms, truncated milliseconds, exact INVREQ/RESP2, 64-byte and packed layout checks, selected route, memory/SQLite parity, and licensed differential pending |
+| `CIC-902.task-enqueue` | `0050 DEQ`: `LENGTH`, `MAXLIFETIME`, `RESOURCE`, common response options; `0064 ENQ`: the same plus `NOSUSPEND` | Local and DPL allowed; threadsafety is conditional. `handlers/task_enqueue.rs` over one bounded lock authority and durable clock | Ownership/count/lifetime, enqueue ordering, `NOSUSPEND`, deadlock/timeout/cancel, stale owner, SAF/audit, restart and PostgreSQL concurrency |
+| `CIC-902.task-wait` | `0214 SUSPEND`: common response options; `0233 WAIT EVENT`: `ECADDR`, `NAME`, common response options; `0234 WAIT EXTERNAL` and `0239 WAITCICS`: `ECBLIST`, `NAME`, `NUMEVENTS`, `PURGEABILITY`, common response options | Local and DPL allowed. `handlers/task_control.rs`, machine suspension/checkpoint and bounded worker lanes | Durable suspension/resume, event-list bounds, purgeability, deadline/cancel/shutdown, stale resume rejection, SQLite/PostgreSQL restart and selected route |
+| `CIC-902.program-link-return` | `0138 LINK`: `PROGRAM`, `COMMAREA`, `CHANNEL`, `DATALENGTH`, `INPUTMSG`, `INPUTMSGLEN`, `LENGTH`, `SYNCONRETURN`, `SYSID`, `TRANSID`, common response options; `0178 RETURN`: `TRANSID`, `COMMAREA`, `CHANNEL`, `ENDACTIVITY`, `IMMEDIATE`, `INPUTMSG`, `INPUTMSGLEN`, `LENGTH`, common response options; `0263 XCTL`: `PROGRAM`, `COMMAREA`, `CHANNEL`, `INPUTMSG`, `INPUTMSGLEN`, `LENGTH`, common response options | Local allowed; all three DPL restricted. `handlers/program_control.rs` plus task RETURN, program authority, coordinator and continuation store | Local/DPL and `SYNCONRETURN` ownership, LINK return bytes, XCTL replacement, pseudo-conversation RETURN, SAF/audit, mutation replay/unknown outcome, durable continuation restart and selected route |
+| `CIC-902.program-load-invoke` | `0106 INVOKE APPLICATION`: `APPLICATION`, `PLATFORM`, `OPERATION`, version/match selectors, `CHANNEL`, `COMMAREA`, `LENGTH`, common response options; `0142 LOAD`: `PROGRAM`, `ENTRY`, `FLENGTH`, `HOLD`, `LENGTH`, `SET`, common response options; `0165 RELEASE`: `PROGRAM` plus common response options | Local and DPL allowed. `handlers/program_control.rs`, installed application/program generations and artifact authority | Typed generation selection, immutable content identity, LOAD hold/release lifecycle, SAF/audit, bounds/cancel, stale generation, restart/read-version and selected route |
+| `CIC-902.interval-timers` | `0016 CANCEL`: `REQID`, `SYSID`, `TRANSID`, common response options; `0039 DELAY`: `FOR`, `UNTIL`, `INTERVAL`, `TIME`, `HOURS`, `MINUTES`, `SECONDS`, `MILLISECS`, `REQID`, common response options; `0147 POST`: `AFTER`, `AT`, `INTERVAL`, `TIME`, `HOURS`, `MINUTES`, `SECONDS`, `REQID`, `SET`, common response options; `0205 START`: all generated scheduling, payload, terminal, routing and identity options; `0206 START ATTACH`: `TRANSID`, `FROM`, `LENGTH`, common response options; `0207 START BREXIT`: `TRANSID`, `USERID`, `BREXIT`, `BRDATA`, `BRDATALENGTH`, common response options | Local allowed; `START` is DPL restricted, other rows allowed. `handlers/task_control.rs` with shared durable clock/work authority | Absolute/relative timing, request identity, cancel/post/start races, payload bounds, surrogate SAF, deadlines, fencing, crash/restart and no duplicate start |
+| `CIC-902.storage-main` | `0084 FREEMAIN`: `DATA`, `DATAPOINTER`, common response options; `0085 FREEMAIN64`: same; `0094 GETMAIN`: `LENGTH`, `FLENGTH`, `SET`, initialization/key/location/share/executable/suspend options and common response options; `0095 GETMAIN64`: the generated 64-bit subset | Local and DPL allowed; `0085`/`0095` are not applicable to COBOL and must be rejected there. `handlers/storage_control.rs` and interpreter-owned bounded storage | Address width, allocation/free ownership, initialization, keys, shared/executable policy, `NOSUSPEND`, exhaustion, cancellation and checkpoint/restart disposition without unsafe/native address exposure |
+| `CIC-902.task-retrieve` | `0175 RETRIEVE`: `INTO`, `SET`, `LENGTH`, `QUEUE`, `RTERMID`, `RTRANSID`, `WAIT`, common response options | Local and DPL allowed. `handlers/task_control.rs`, interval payload authority and compiler output bindings | Exact originating START payload/metadata, INTO/SET and LENGTH, WAIT/condition behavior, bounds, durable restart and selected route |
+
+The long `ASSIGN`, `START`, and `GETMAIN` option lists are frozen in
+`cics-application-command-contracts.json`; the descriptions above do not
+replace that machine authority. A slice must enumerate every generated option
+in its executable fixture matrix before it can seal, and an option that has not
+been implemented remains fail-closed.
+
+### Declared CIC-903 slices
+
+The CIC-902 obligation identities and runtime boundaries above also apply to
+CIC-903. The first bounded child is declared before broader CIC-903 work:
+
+| Slice | Exact row and option scope | Context and owning boundary | Acceptance boundary |
+|---|---|---|---|
+| `CIC-903.file-browse` | `0058 ENDBR`: `FILE`, `REQID`, `SYSID`, common response options; `0157 READNEXT` and `0158 READPREV`: `FILE`, `INTO`, `RIDFLD`, `KEYLENGTH`, `LENGTH`, `SET`, `REQID`, `SYSID`, `RBA`, `RRN`, `XRBA`, `CONSISTENT`, `REPEATABLE`, `UNCOMMITTED`, `UPDATE`, `TOKEN`, `NOSUSPEND`, and common response options; `0208 STARTBR`: `FILE`, `RIDFLD`, `KEYLENGTH`, `REQID`, `SYSID`, `RBA`, `RRN`, `XRBA`, `DEBKEY`, `DEBREC`, `EQUAL`, `GENERIC`, `GTEQ`, and common response options | Local/default cursor subset first; remote and named cursors plus RLS update state remain separate. Typed CICS plan/compiler/interpreter over the existing `handlers/file.rs` provider browse authority | Exact cursor positioning/direction, shared RIDFLD input/output identity, INTO bytes, EIBFN/conditions, cursor lifecycle, option influence/rejection, SAF/audit, checkpoint/restart disposition, selected route, and licensed differential |
+| `CIC-903.file-update` | `0040 DELETE`: `FILE`, `RIDFLD`, `TOKEN`, `KEYLENGTH`, `GENERIC`, `NUMREC`, `SYSID`, `RBA`, `RRN`, `NOSUSPEND`, and common response options; `0156 READ`: its generated read/update/key/consistency options; `0181 REWRITE`: `FILE`, `FROM`, `LENGTH`, `TOKEN`, `SYSID`, `NOSUSPEND`, and common response options; `0253 WRITE FILE`: `FILE`, `FROM`, `RIDFLD`, `KEYLENGTH`, `LENGTH`, `SYSID`, `RBA`, `RRN`, `XRBA`, `MASSINSERT`, `NOSUSPEND`, and common response options | Local explicit-key WRITE/DELETE and existing bounded READ UPDATE/REWRITE subsets first; prior-update identity, remote routing, alternate identifiers, and RLS concurrency remain separate. Typed CICS plans over `handlers/file.rs` and durable UOW participants | Exact record/key identity, direct versus prior-update delete, lock/token lifecycle, length/key validation, EIBFN/conditions, SAF/audit, mutation replay/unknown outcome, memory/SQLite/PostgreSQL restart, selected route, and licensed differential |
+| `CIC-903.tdq` | `0048 DELETEQ TD`: `QUEUE`, `SYSID`, and common response options; `0257 WRITEQ TD`: `QUEUE`, `FROM`, `LENGTH`, `SYSID`, and common response options; remaining transient-data rows retain their full generated option contracts | Local WRITEQ/DELETEQ TD first; remote routing and definition-driven intrapartition/extrapartition behavior remain separate. Typed CICS queue plans over `handlers/queue_control.rs` and durable provider state | Exact queue/record/length identity, QIDERR/open/disabled/space/lock conditions, SAF/audit, mutation replay/unknown outcome, memory/SQLite/PostgreSQL restart, selected route, and licensed differential |
+| `CIC-903.tsq` | `0049 DELETEQ TS`: `QUEUE`, `QNAME`, `SYSID`, and common response options; `0160 READQ TS`: its full generated QUEUE/QNAME, INTO/SET, LENGTH, NUMITEMS, NEXT/ITEM, SYSID and common response contract; `0258 WRITEQ TS` retains its full generated item/rewrite/placement/nosuspend contract | Local DELETEQ, READQ and WRITEQ over a dedicated durable namespace first; remote/shared pools, TSMODEL placement, recoverable-UOW coupling and broader lock ownership remain separate. Typed CICS queue plans over `handlers/queue_control.rs` and provider state | Exact queue/item identity, sequential cursor and deletion, QIDERR/INVREQ/ITEMERR/LENGERR/LOCKED/NOTAUTH conditions, SAF/audit, mutation replay/unknown outcome, memory/SQLite/PostgreSQL restart, selected route, and licensed differential |
+| `CIC-903.terminal-bms` | `0148 PURGE MESSAGE`: common response options; `0163 RECEIVE MAP`: `MAP`, `MAPSET`, `INTO`, `SET`, `LENGTH`, terminal controls and common response options; `0189 SEND MAP`: `MAP`, `MAPSET`, `FROM`, `LENGTH`, terminal controls and common response options; `0192 SEND TEXT`: `FROM`, `LENGTH`, terminal controls and common response options | Local empty-logical-message PURGE plus explicit-MAP and storage-backed map/text subsets first; nonempty accumulated pages, omitted-map/AID-only receive, implicit symbolic storage, SET pointers, paging, device and broader terminal controls remain separate. Typed CICS terminal plans over `handlers/terminal_control.rs` and durable session/map definitions | Exact logical-message lifecycle, map identity/default, input/output bindings, field normalization, terminal fit, EIBFN/conditions, bounds, SAF/audit, state recovery disposition, selected route, and licensed differential |
+
+### CIC-904 event-control implementation
+
+Event-control rows use the activity-scoped provider-state authority. A BTS
+adapter binds a registered run to its current activity before these commands;
+an unbound run receives `INVREQ` 16/1. The publication text remains external
+reference data and grants no licensed execution credit.
+
+| Catalog row | Implemented behavior and verification scope | Pinned IBM source |
+|---|---|---|
+| `0036 DEFINE INPUT EVENT` | `EVENT` (1–16 permitted characters), common response options, v2 operation tag 108 and operand tag 320; activity ownership, `EVENTERR` 111/6,7, durable CAS/replay, restart recovery, update SAF, and selected compiled `cics.event@1.define-input-event` route. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0036`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_defineinputevent.html`; SHA-256 `5088d0996767082611905999e6378f69b919d9ff76b30582f5e5e0e631ee78c9`. |
+| `0033 DEFINE COMPOSITE EVENT` | AND/OR exclusive predicate with zero to eight initial atomic children; empty AND is FIRED and empty OR is NOTFIRED; child ownership and source-specific `EVENTERR`/`INVREQ`, update/read SAF, durable CAS/replay, compiled `cics.event@1.define-composite-event` route. Reserved v2 operation tag 107, child operand tags 321–328, and predicate option tags 252–253. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0033`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_definecompositeevent.html`; SHA-256 `6cb693cbb57d78f7a5b2fbb6f9bba40442924bffdac6de3d077c7be89e465b04`. |
+| `0004 ADD SUBEVENT` | Adds a previously defined atomic event to one composite, rejects system/composite/already-owned children and input children of AND predicates, reevaluates fire state, and persists the parent/child link and fired subevent queue atomically. Exact `EVENTERR` 111/4,5 and `INVREQ` 16/1,2,3; update/read SAF and compiled `cics.event@1.add-subevent` route. Reserved v2 operation tag 105 and shared `SUBEVENT` operand tag 329. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0004`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_addsubevent.html`; SHA-256 `8d8ba8beeab1255f5da76d6e7bfc57d4628ce22780f34ed91156d898ed9df68c`. |
+| `0166 REMOVE SUBEVENT` | Removes one child without deleting or resetting it, removes its queued composite occurrence, and reevaluates the predicate; absent/wrong-membership conditions, update/read SAF, durable CAS/replay, and compiled `cics.event@1.remove-subevent` route. Reserved v2 operation tag 113 and shared operand tag 329. | Baseline `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0166`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_removesubevent.html`; SHA-256 `c036bc724c9726756a3a6b03cd9db5acea8833cc7384732cf7dc8190b052c236`. |
+| `0046 DELETE EVENT` | Deletes an input or composite event, unlinks a child from its parent predicate, preserves children when deleting a composite, and rejects system or timer events. Exact `EVENTERR` 111/4 and `INVREQ` 16/1,2; update SAF, durable replay, and selected compiled `cics.event@1.delete-event` route. Reserved v2 operation tag 110. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0046`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_deleteevent.html`; SHA-256 `3648c51b6d055cfb0eb50e81ea5788d4b110e0b7c7a44102b3cb83041b01d7d2`. |
+| `0038 DEFINE TIMER` | Creates an activity-owned timer and associated atomic event. Checked AFTER/AT/ON components and bounds in a bound region-local UTC offset, immediate expiry, `EVENTERR` 111/6,7, `INVREQ` 16/1,11,12, `TIMERERR` 115/14,15, durable CAS/replay, SAF, and selected compiled route. V2 operation tag 109, timer operand tags 330–338, option tags 254–256. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0038`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_definetimer.html`; SHA-256 `1e553115d562465778d23a3318f65d3732e4a661142c097fc8949ef252dec740`. |
+| `0026 CHECK TIMER` | Returns `UNEXPIRED`, `EXPIRED`, or `FORCED`; expiry consumes the associated event exactly once while retaining the timer. `TIMERERR` 115/13, SAF, durable replay, compiled route; v2 operation tag 106 and output tag 376. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0026`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_checktimer.html`; SHA-256 `5b886a524054e10063175d128fe4b41b420fdc2485fdb8d79feb3a3b7957f188`. |
+| `0079 FORCE TIMER` | Expires a pending timer and fires its associated event, with current/acquired activity selection and no-op after expiry. `INVREQ` 16/1,16,17 and `TIMERERR` 115/13, SAF, replay, and compiled route; v2 operation tag 112, acquired-scope option tags 257–258. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0079`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_forcetimer.html`; SHA-256 `47bcd58ccaf1f568c96923ffb6188d471c3710665db6faa0d9a14492141219a8`. |
+| `0047 DELETE TIMER` | Deletes an activity-owned timer and any associated event remaining in its pool, whether pending or expired. `INVREQ` 16/1 and `TIMERERR` 115/13, SAF, replay, and compiled route; v2 operation tag 111. | Baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0047`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_deletetimer.html`; SHA-256 `df9ac58bc9033d188e6eb4d92c5439c473d9e17402d366023ef16c75a42280f3`. |
+| `0176 RETRIEVE REATTACH EVENT` | Pops the activity reattachment queue, returns a 16-character `EVENT` and `EVENTTYPE`, resets atomic fire status, and retains composite fire status until its predicate changes. `END` 83/8, activity scope, SAF, replay, and compiled route; v2 operation tag 114 and output tags 377/379. | Baseline `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0176`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_retrievereattachevent.html`; SHA-256 `ebf0ec8e216c228d2d79fb8ebaa56e9b2ffc2837ddfab826b00794bc0965a141`. |
+| `0177 RETRIEVE SUBEVENT` | Pops one fired child from a composite queue, returns its 16-character name/type, resets the child, and reevaluates the composite. `END` 83/9,10, `EVENTERR` 111/4, `INVREQ` 16/1,2, SAF/replay, and compiled route; v2 operation tag 115 and output tags 378/379. | Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0177`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_retrievesubevent.html`; SHA-256 `3e5df64ce2731d2f1fda9acaefb2c55b608b7e0282a5b496fe937808e89659db`. |
+| `0219 TEST EVENT` | Returns `FIRED` or `NOTFIRED` from the current durable event pool, with timer deadline refresh, `EVENTERR` 111/4, SAF/replay, and selected compiled route; v2 operation tag 117 and output tag 380. | Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0219`; topic `SSJL4D_6.x/reference-applications/commands-bts/dfhp4_testevent.html`; SHA-256 `74aa7fce0bfa138844a248784afda3235413618c21d425da42b2a76476523cb3`. |
+| `0194 SIGNAL EVENT` | An application capture point with 1–32 character signal identifiers, FROM/FROMLENGTH or FROMCHANNEL input, region processing enablement, durable capture specifications with primary and secondary predicates, bounded business-event journal, replay, SAF, and selected compiled route. `CHANNELERR` 122/2, `EVENTERR` 111/6, `LENGERR` 22/3; v2 operation tag 116 and signal operand tags 339–341. | Baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`; catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0194`; topic `SSJL4D_6.x/reference-applications/commands-api/dfhp4_signalevent.html`; SHA-256 `24954cac0969adf8f2406e106dba1c884312ef6c61d26173ae25e58b7c408bed`. |
+
+### Declared CIC-904 transform slices
+
+The transform-control section is sealed one row at a time over one shared
+bounded resource, container, and effect-ledger authority. Publication bodies
+remain external and the source review grants no licensed differential credit.
+
+| Slice | Exact row and option scope | Context and owning boundary | Acceptance boundary |
+|---|---|---|---|
+| `CIC-904.transform.datatojson` | `0221 TRANSFORM DATATOJSON`: `CHANNEL`, `INCONTAINER`, optional `OUTCONTAINER`, `TRANSFORMER`, and common response options | Local and DPL allowed. `handlers/transform_control.rs`, typed plan/compiler/interpreter, transform-specific durable resource/container/effect namespaces | Deterministic canonical JSON, exact conditions, binding and byte bounds, SAF/audit, deadline/cancellation at the shared host boundary, atomic replacement/replay, SQLite-style reopen through provider state, tag round-trip/uniqueness, and compiled selected route |
+| `CIC-904.transform.datatoxml` | `0222 TRANSFORM DATATOXML`: `CHANNEL`, `DATCONTAINER`, `XMLCONTAINER`, `XMLTRANSFORM`, optional paired `ELEMNAME`/`ELEMNAMELEN`, `ELEMNS`/`ELEMNSLEN`, `TYPENAME`/`TYPENAMELEN`, `TYPENS`/`TYPENSLEN`, and common response options | Local and DPL allowed. Shared transform handler plus typed metadata input/output bindings | Deterministic escaped XML and schema metadata, exact name/namespace buffer conditions, binding/container bounds, SAF/audit, atomic output/metadata replay, reserved tag uniqueness and compiled selected route |
+| `CIC-904.transform.jsontodata` | `0223 TRANSFORM JSONTODATA`: `CHANNEL`, `INCONTAINER`, optional `OUTCONTAINER`, `TRANSFORMER`, and common response options | Local and DPL allowed. Shared JSON resource and transform handler; typed plan/compiler/interpreter route | Deterministic fixed-field BIT output, UTF-8 BIT detection, exact source conditions, SAF/audit, atomic replacement/replay, SQLite reopen, tag round-trip, and compiled selected route |
+| `CIC-904.transform.xmltodata` | `0224 TRANSFORM XMLTODATA`: required `CHANNEL`/`XMLCONTAINER`, optional `DATCONTAINER`, `NSCONTAINER`, `XMLTRANSFORM`, paired `ELEMNAME`/`ELEMNAMELEN`, `ELEMNS`/`ELEMNSLEN`, `TYPENAME`/`TYPENAMELEN`, `TYPENS`/`TYPENSLEN`, and common response options | Local and DPL allowed. Shared XML resource/container/effect authority and a bounded parser owned by the transform handler | Query and transform routes, namespace/type metadata and override, fixed-field BIT output, source conditions, SAF/audit, atomic replay, tag round-trip, and compiled selected route |
+
+### CIC-902 slice progress
+
+#### `CIC-902.program-load-invoke.invoke-application` progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and Sources B row
+`0106` pin
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_invokeapplication.html`
+at
+`sha256:bb3ae579baa513fb2f08fdf61f464b047d319ac7ce8153c25c696e65a985cadc`.
+The 34,009-byte retained HTML was verified from the archive and read offline
+through `ibm_docs.py` and its `PlainText` parser. It establishes required
+APPLICATION and OPERATION names, current or explicit PLATFORM selection,
+paired fullword major/minor selectors, exact/minimum rules with the highest
+microversion, the 24 KiB COMMAREA boundary, CHANNEL name rules, and the exact
+APPNOTFOUND, CHANNELERR, INVREQ, LENGERR, NOTAUTH, and PGMIDERR responses.
+
+Row `0106` now lowers through append-only operation tag 46, application,
+platform, operation, major, minor, and channel operand tags 56–61, and
+EXACTMATCH/MINIMUM option tags 36–37. The durable catalog keeps application
+package identity separate from the exact program artifact and semantic
+identity, verifies executable bytes through the shared artifact authority,
+refuses identity replacement, and rejects stale or unavailable entry-point
+generations. Default selection chooses the highest available version;
+EXACTMATCH fixes major/minor and chooses the highest microversion; MINIMUM fixes
+the major and chooses the highest qualifying minor and microversion.
+
+The provider authorizes the selected `CICS.PROGRAM.<name>` resource before the
+nested link, applies the source COMMAREA length and mutual-exclusion rules, and
+passes a validated channel identity only as a protocol-neutral boundary; it
+does not invent CIC-904 container contents. The typed compiler and provider
+reject malformed names, partial version pairs, conflicting selectors, and
+COMMAREA/CHANNEL conflicts. A direct provider matrix covers selection,
+immutable identities, COMMAREA return and catalog reopen, including SQLite
+process-object restart. The compiled selected route crosses COBOL, the durable
+coordinator, SAF/audit, the selected CICS provider and nested program route,
+then observes EIBFN `0E10` and returned COMMAREA bytes.
+
+The generated application contract identity is
+`sha256:f762a17daa5779c56eda8ad256cfadc9f02d59d622f398fb73f139b0aff96991`
+and registry identity is
+`sha256:abbfd7db39afb9161d9aac86093f21e89547a43aa066a37b8f8dfe10da313dab`,
+with 49 typed, 0 legacy compatibility, and 214 unready rows. Java class and
+JVMSERVER readiness map to exact INVREQ response2 2/3/4. Container payload
+ownership, PostgreSQL shared-store evidence and licensed differential remain
+pending. LOAD and RELEASE remain pending in this slice.
+
+#### `CIC-902.program-load-invoke.load` progress
+
+The `ibm-cics-ts-6x-2026-08-31` baseline, catalog row `api-commands:0142`,
+topic `SSJL4D_6.x/reference-applications/commands-api/dfhp4_load.html`,
+SHA-256 `514329d0e65daff38c8144d288b18fc8ee608aadcea6e7723eb9d71937266cd4`,
+was verified in the local SHA archive and parsed with `ibm_docs.py` PlainText.
+LOAD now uses append-only operation tag 47, operand tags 62–65, and HOLD option
+tag 38. The selected immutable program generation supplies bounded SET, ENTRY,
+LENGTH, and FLENGTH outputs; durable task ownership and HOLD survive replay and
+SQLite reopen. The CICS interpreter's response driving and shared handler
+argument parsing were extracted to keep the combined TSQ/program-control
+modules below their exact ceilings.
+
+The merged generated application contract identity is
+`sha256:097f20916deea786c6825d6cc8882ad28391053a3c7e70f6a29d3b6f495defa8`
+and registry identity is
+`sha256:90a992963a5770378c2d3a35fcf2320477be60dc7a0fce4759f7425778c4bc79`,
+with 50 typed, 0 legacy compatibility, and 213 unready rows. RELEASE remains
+pending in this child.
+
+#### `CIC-902.program-load-invoke.release` progress
+
+The program-control source review verified the exact retained HTML bytes in the
+local SHA archive against baseline `ibm-cics-ts-6x-2026-08-31` and read them
+with `conformance/tools/ibm_docs.py` PlainText:
+
+- Catalog row `api-commands:0106`,
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_invokeapplication.html`,
+  SHA-256 `bb3ae579baa513fb2f08fdf61f464b047d319ac7ce8153c25c696e65a985cadc`.
+- Catalog row `api-commands:0142`,
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_load.html`,
+  SHA-256 `514329d0e65daff38c8144d288b18fc8ee608aadcea6e7723eb9d71937266cd4`.
+- Catalog row `api-commands:0165`,
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_release.html`,
+  SHA-256 `4f4abf26879e8876481696c1911f93f562a3fc6e75e63414f89bf826696dc944`.
+
+The RELEASE topic distinguishes self-release without a qualifying LOAD
+(`INVREQ` 16/5), no LOAD (16/6), another task's non-HOLD LOAD (16/7),
+`RELOAD=YES` (16/17), and an uninitialized program manager (16/30). The
+PROGRAM security denial returns `NOTAUTH` 70. The global-user-exit branch of
+16/7 remains outside the installed-definition model.
+
+The merged generated application contract identity is
+`sha256:f4dbec90cdfe1d64932117d252a45aa1b5103a34eb1191f7ae68b2bc4cd059da`
+and registry identity is
+`sha256:694852bb378fd93db100fa45aa98b9121886d63e35f6c16dbabd34a16ea9d808`,
+with 51 typed, 0 legacy compatibility, and 212 unready rows. The selected
+RELEASE route consumes one durable LOAD ownership level and has compiled EIBFN
+`0E0A`, replay, SQLite reopen, and denial regressions.
+
+#### `CIC-902.runtime-handler-layout` progress
+
+This infrastructure-only child restores the reviewed CICS module-family
+boundary after interval timers, START work, and virtual storage introduced new
+runtime modules. It changes no IBM language or subsystem semantics, so no new
+publication lookup or semantic credit applies.
+
+Deterministic interval time normalization moved from the CICS crate root to
+`handlers/interval.rs`. The crate retains the same public
+`CicsIntervalError`, `CicsIntervalMode`, and `CicsIntervalTime` re-exports, so
+callers and serialized behavior do not change. The reviewed module inventory
+now enumerates that module plus every current interval-control child and the
+START/storage handler families.
+
+The exact module-boundary gate passes across 319 production modules, including
+36 reviewed oversized modules, four generated exemptions, and one legacy
+facade. Package tests and warnings-denied Clippy preserve interval behavior and
+the public API. Application contract and registry identities, runtime counts,
+command readiness, and all pending semantic/licensed gates remain unchanged.
+
+#### `CIC-902.typed-semantic-boundary-guard` progress
+
+This policy-only child updates the typed CICS source guard after
+`execute_legacy` moved into its own module and became an import rather than the
+next function in `typed_cics.rs`. No compiler, interpreter, provider, wire, or
+IBM semantic behavior changes.
+
+The guard now inspects the complete typed `execute` region through the first
+in-file legacy condition helper. Its forbidden grammar-path check still rejects
+a bare legacy `arguments(...)` call, while no longer mistaking the typed
+`retrieve::allocation_arguments(...)` SET-capacity helper for that route. A
+focused Python regression pins both the current structural boundary and this
+collision distinction.
+
+The standalone typed-semantic boundary check passes. Application contract and
+registry identities, the 41/0/222 readiness split, command credit, and all
+pending semantic/licensed gates remain unchanged.
+
+#### `CIC-902.retention-guard-snapshot-api` progress
+
+This policy-only child aligns the durable-retention architecture guard with the
+memory store's current instrumented `snapshot` helper. The helper remains the
+single whole-state clone authority and is counted by store regressions; no
+retention algorithm, row format, capacity, transaction, or backend behavior
+changes.
+
+The guard continues to require archive construction against a staged state,
+`insert_memory_archive(&mut staged, ...)`, and one final `*state = staged`
+replacement. It now pins `let mut staged = self.snapshot(&state)` instead of
+the retired direct `state.clone()` spelling. The standalone durable-retention
+guard passes, and architecture-fast advances through retention to the next
+independent descriptor-schema check.
+
+Application contract and registry identities, the 41/0/222 readiness split,
+command credit, and all pending semantic/licensed gates remain unchanged.
+
+#### `CIC-902.cics-descriptor-family-schema` progress
+
+This schema-only child updates the CICS command-descriptor family array from an
+obsolete exact count of seven to the current exact count of nine. The added
+families—`interval-control` and `storage-control`—were already present in the
+reviewed catalog and generator's frozen `EXPECTED_FAMILIES` map.
+
+Both schema bounds are nine, so missing or additional families still fail
+closed. The independent descriptor generator check passes and continues to
+require exact family identifiers, Rust variants, responsibilities, and map
+equality. Architecture-fast advances from descriptor validation to the next
+independent application-contract schema check.
+
+Application contract and registry identities, the 41/0/222 readiness split,
+command credit, and all pending semantic/licensed gates remain unchanged.
+
+#### `CIC-902.cics-contract-readiness-schema` progress
+
+This schema-only child reconciles the generated application-contract schema
+with the already sealed live registry. Its registry and aggregate summaries
+now require exactly 41 typed runtime rows, no legacy compatibility rows, 41
+advertised rows, and 222 unready rows. The command-family summary is bounded to
+exactly the 24 frozen application families rather than the obsolete minimum of
+seven.
+
+The independent descriptor/contract generator check passes without changing
+generated contract bytes, contract identity, registry identity, or command
+behavior. Architecture-fast advances through descriptor and contract schema
+validation to the next independent source-map freshness check. No command,
+option, semantic, conformance, or licensed credit is added.
+
+#### `CIC-902.cics-source-map-runtime-filter` progress
+
+The source-map generator intentionally loads the descriptor catalog without
+the separate runtime-admission overlay so frozen IBM row mappings do not drift
+when executable slices are added. Its exclusion set lagged three newer typed
+registrations: DELETEQ TD, FREEMAIN, and GETMAIN.
+
+Those operations now join the existing post-freeze admission exclusions. The
+observed no-admission operation set again equals the frozen 25-operation
+catalog, while the live 41-row typed registry remains unchanged. All three
+source maps were regenerated only for the current descriptor SHA-256 and their
+derived mapping identities; row ranges, topic locators, source facts, and IBM
+bytes did not change.
+
+The all-batch source-map and descriptor generator checks pass. Architecture-fast
+advances to the next independently bound corpus mapping digest. No command,
+option, semantic, conformance, source, or licensed credit is added.
+
+#### `CIC-902.cics-source-corpus-map-bindings` progress
+
+The three zero-credit CICS source corpora bind the deterministic map identity
+as an input to their own canonical digest. After the map layer was regenerated,
+the corpus bodies remained exact but those input identities were stale.
+
+Sources A, B, and C now carry their current mapping SHA-256 values and
+independently recomputed corpus SHA-256 values. The sources-A generator's frozen
+map constant and digest regression were updated to the same identity. Topic
+manifests, counts, retained HTML hashes, one-hop link closures, manual and
+supplemental topics, source gaps/resolutions, and browser verification receipts
+are unchanged; no cache or network access occurred.
+
+The all-batch corpus check, 13 source-map tests, and 17 corpus tests pass.
+Architecture-fast advances to the next independently bound extraction-plan
+input. No source, command, option, semantic, conformance, or licensed credit is
+added.
+
+#### `CIC-902.cics-extraction-input-bindings` progress
+
+Each zero-credit extraction plan binds its source map and corpus identities in
+the canonical plan digest. The refreshed A/B/C map and corpus values are now
+recorded in all three plans, with independently recomputed extraction SHA-256
+values.
+
+No selector profile, dimension, bound, section exception, source resolution,
+supplement authority, expected shape, topic identity, or IBM byte changed. The
+offline committed extractor validates every updated plan and input, then
+advances to the next independently bound candidate projection envelope. No
+cache or network access occurred and no source, command, option, semantic,
+conformance, or licensed credit is added.
+
+#### `CIC-902.cics-candidate-input-bindings` progress
+
+Each zero-credit candidate projection binds the file and logical identities of
+its source map, source corpus, and extraction plan. Sources A, B, and C now
+carry the refreshed inputs and independently recomputed canonical projection
+SHA-256 values.
+
+The 18,070 candidate facts, row ordering, structural locators, bounded symbolic
+values, source fragments, issue states, review states, and zero-credit policy
+are unchanged. All three committed extraction checks pass without reading IBM
+topic bytes, and architecture-fast advances to the generated CICS registry
+that independently binds the candidate projection files. No cache or network
+access occurred and no source, command, option, semantic, conformance, or
+licensed credit is added.
+
+#### `CIC-902.cics-review-contract-bindings` progress
+
+The accepted A/B/C source-review receipts now bind the refreshed source map,
+corpus, extraction-plan, and candidate-projection file identities. Their
+canonical receipt SHA-256 values were recomputed, while the prior independent
+verification report identities, candidate and issue dispositions, ambiguity
+scope, row and candidate counts, acceptance status, and zero-credit authority
+remain unchanged.
+
+The generated application-command contract now records the current candidate
+and review file identities and a correspondingly refreshed canonical contract
+digest. Its 263 command rows, 41 typed-runtime rows, 222 unready rows, readiness
+states, operation mappings, and source-derived facts are byte-for-byte
+unchanged. The bounded retained cache does not contain the full historical
+A/B/C review corpus, so this child performs no source replay, cache refresh,
+or new verification claim. The independent descriptor generator accepts the
+rebound envelopes, and its 30 focused tests now pin 41 API plus two SPI runtime
+operations, the 41/0/222 readiness split, and the already admitted DELETEQ TD,
+FREEMAIN, and GETMAIN effect/readiness rows. No source, command, option,
+semantic, conformance, or licensed credit is added.
+
+#### `CIC-902.interval-timers.records-core` progress
+
+Offline source review used baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`,
+RETRIEVE row `0175` topic `dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`,
+interval-control context `dfhp37p.html` at
+`sha256:0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640`,
+and expiration-time context `dfhp3mq.html` at
+`sha256:0426c4e616120fb222b9ca7f1aa9d3a63275a511ed2799f0e79e2bd60a82f76f`.
+All bodies were read through the repository parser from the retained verified
+cache; no network refresh or licensed execution was performed.
+
+The internal `cics-interval-start-v1` authority now stores one strict bounded
+row per request identifier. Each row binds transaction, principal, originating
+run unit, expiration tick, optional terminal and originating metadata, exact
+data and FMH disposition, producer idempotency key/request digest, state, and
+an optional consumer idempotency key/request digest. A duplicate REQID is
+distinguished from an exact producer replay. Pending rows promote in
+expiration/REQID order, protected rows remain invisible until their producer
+is released, and one consumer atomically moves a ready row to consumed state.
+The same consumer request replays exactly; another request cannot consume or
+reinterpret that record. Opening the provider validates every row, key, bound,
+state/digest combination, and aggregate retained-byte limit before admission.
+
+Focused memory and SQLite close/reopen tests cover duplicate/replay behavior,
+expiry ordering, protected release, one-time consumption, same-request replay,
+and strict durable restoration. Warnings-denied package Clippy and diff hygiene
+pass. This sealed child granted no command route on its own. The subsequent
+local-data-cycle child connects only the bounded producer/consumer subset
+described below; records-core alone grants no row, execution, semantic, or
+differential credit.
+
+#### `CIC-902.interval-timers.local-data-cycle` progress
+
+The typed row `0205` subset requires local `TRANSID`, explicit `REQID`, and a
+data-bearing `FROM`; `LENGTH` may select a nonzero prefix, and exactly one of
+packed `INTERVAL` or `TIME` may schedule it, with omission meaning immediate.
+The provider authorizes the target transaction, resolves the shared durable
+clock, writes the versioned interval record, and enqueues a deterministic
+`cics-start-v1` work row. Duplicate request identifiers distinguish exact
+producer replay from `IOERR`. The two existing core workers poll that
+generation after JES and promote a due record under the ordinary durable
+lease/epoch fence. Promotion deliberately does not yet create or launch the
+target CICS task.
+
+The typed row `0175` subset requires writable `INTO` and in/out `LENGTH`
+bindings. It consumes the oldest ready nonterminal record for the current
+transaction exactly once, returns the original length, truncates with
+`LENGERR`, returns `ENDDATA` when no eligible record exists, and replays only
+the same canonical consumer request. The old raw compatibility route is gone;
+historical executable artifacts retain their narrowly scoped empty-argument
+continuation read without making that path available to new typed lowering.
+
+Compiler, IR codec, interpreter, provider, canonical-wire, generated-registry,
+and selected product-route tests cover the connected cycle. A SQLite
+close/reopen regression reconstructs both provider and work authorities before
+promotion and consumption. At this child's seal the live registry was 36 typed,
+0 legacy compatibility, and 227 unready rows. PostgreSQL concurrency evidence, automatic
+target-task launch, terminal and remote routing,
+USERID/surrogate rules, protected task-end/abend cleanup, WAIT, cancellation races, and
+licensed differential remain pending. This
+is a bounded partial implementation and grants neither START nor RETRIEVE
+whole-row credit.
+
+#### `CIC-902.interval-timers.immediate-start-target` authority progress
+
+Pinned baseline `ibm-cics-ts-6x-2026-08-31` identifies `START ATTACH` as
+catalog `api-commands:0206`, topic `dfhp4_startattach.html`,
+`sha256:ebda4b40984414871bfa2fb294104dc5aefa81599a99351c94cdb4974f3d4b3a`,
+and `START BREXIT` as catalog `api-commands:0207`, topic
+`dfhp4_startbrexit.html`,
+`sha256:6456007b2abdcf4042a6aac59ae5ab653652b406e9e65b6b1fe886eafe9543b1`.
+Both exact retained raw HTML files were hash verified and parsed with the
+repository PlainText parser. The reviewed 3270 bridge source scope
+`ibm-cics-ts-6x-misc-tail-bridge-2026-09-23` additionally pins the BRXA
+6.2/6.1 definition at
+`sha256:56075309a1bb829491a830bd3343f1806cf7dad90c2d758587f3d3e0fefee55e`.
+
+The CICS provider now resolves a local START target through the server-owned
+durable `online-transaction` and `online-program` rows and verifies its bound
+executable artifact. Undefined targets return TRANSIDERR 28/0; malformed
+retained definitions fail as infrastructure errors. A second canonical
+`cics-bridge-default-v1` authority binds a transaction's source-defined
+default exit to an installed executable. Explicit BREXIT selection overrides
+the default; absence returns PGMIDERR 27/0. Memory and SQLite reopen,
+idempotency, conflict, and corrupt-row regressions pass. The no-FROM form of
+row `0206` now uses append-only attached interval states 6/7 and the existing
+durable start worker to launch a facility-less local task immediately. The
+issuing EIBREQID stays null; attached work cannot be canceled, and the child
+invocation carries STARTCODE `U`. MCEP v2 operation tag 162 is used without
+changing legacy v1 tags. Provider memory/SQLite replay and a selected
+compiled COBOL launch route pass. FROM/LENGTH stay explicitly closed because
+the source passes a live address rather than copying data; row `0206` has no
+whole-command credit. Row `0207` was unready at this preparatory checkpoint.
+
+The next row `0207` slice adds canonical `cics-bridge-start-v1` admission and
+the private `cics:bridge-start` work generation. It freezes the resolved local
+transaction, installed exit artifact, principal, bounded BRDATA prefix, and
+producer identity before enqueue. Exact replay returns the first admitted
+tick; interrupted enqueue can be repaired from the retained row; a claimed
+worker must match that row. A focused SQLite reopen, replay, LENGERR,
+conflict, claim, and corrupt-row regression passes. This is based on catalog
+baseline `ibm-cics-ts-6x-2026-08-31`, `api-commands:0207`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbrexit.html`,
+`sha256:6456007b2abdcf4042a6aac59ae5ab653652b406e9e65b6b1fe886eafe9543b1`.
+The retained raw HTML matched that committed pin and was parsed locally. The
+BRXA 6.2/6.1 topic in baseline
+`ibm-cics-ts-6x-misc-tail-bridge-2026-09-23`,
+`SSJL4D_6.x/reference-data-areas/data-areas/DFHBRARK_6.2_6.1.html`,
+`sha256:56075309a1bb829491a830bd3343f1806cf7dad90c2d758587f3d3e0fefee55e`,
+was likewise hash verified and parsed. It names the current ABI version and
+the Bind call without pinning their numeric constants. The work generation
+had no dispatch consumer at that checkpoint.
+The compiler now accepts both `START BREXIT TRANSID(...)` (default exit) and
+`START BREXIT(name) TRANSID(...)` as source-recognized forms. An empty
+`BREXIT()` operand is rejected. At this checkpoint the registration split
+remained 82/0/181.
+
+The BRXA Init layout now has a checked in-memory frame builder and reply
+validator under `handlers/bridge_abi.rs`. The 6.2/6.1 source above fixes a
+56-byte header, 180-byte transaction area, 48-byte common command area,
+the BRDATA pointer/length at transaction offsets `0x94`/`0x98`, and the Init
+writable-field list. Four focused tests cover pointer offsets, optional data,
+reply mutation bounds, and address/capacity failures. A separate external
+flat cache of hard links to the four verified raw bridge topics and matching
+TOC allowed `ibm_docs.py search` and `read` of the exact baseline/topic/SHA
+without a browser or network refresh. The source does not give numeric values
+for `brxa_current_version_no` or the Bind call code, so the frame builder
+required a caller supplied version. At that preparatory slice no bridge
+callback was dispatched.
+The same pinned BRARC source now drives a checked Init-to-Bind transition:
+the prior image and BRDATA pointer are retained, the Bind reply may change
+only STARTCODE, LOAD ADS, facility keep time, user abend code, and identifier,
+and keep time above 604,800 seconds is capped at one week. A focused
+transition/rejection regression uses a synthetic test command code; no IBM
+Bind code is inferred or registered from it.
+
+#### `CIC-902.interval-timers.start-brexit` typed local receipt
+
+The sealed source branch registered only `START BREXIT` row `0207` and had
+exactly **83 typed-runtime, 0 legacy-compatibility, and 180 unready** API
+rows. The compiler and MCEP v2 codec own operation tag `163` and operand
+tags `653`–`655`; registration remains exact and no `CICSMESSAGE` row is
+changed here. Admission requires an installed local target and exit, a
+transaction-bound default or explicit BREXIT, and a deployment ABI profile
+bound to the exact installed exit artifact. Missing profile fails with
+INVREQ 16/12; the runtime does not supply IBM constants by guesswork.
+
+The work authority durably freezes the BRDATA prefix, principal, priority,
+target program and artifact, exit artifact, ABI profile, and producer identity.
+The server worker invokes
+that selected COBOL exit for BRXA Init and Bind, stores the checked post-Bind
+image, runs the target in a 24×80 bridge task, and intercepts SEND MAP, SEND
+TEXT, and RECEIVE MAP through a checked BRXA BMS command image. The selected
+link replay authority prevents duplicate callback execution after a retry.
+Task completion issues Term; failed terminal execution issues Abend. The
+post-Bind record is released only after the target has settled and the final
+callback succeeds. Unsupported BMS option forms and pointers outside the
+selected exit's DFHCOMMAREA fail closed.
+
+Source review used `ibm_docs.py search` and `read` and independently verified
+the committed raw HTML bytes under the SHA archive. Baseline
+`ibm-cics-ts-6x-2026-08-31`, catalog `api-commands:0207`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbrexit.html`
+matched SHA-256 `6456007b2abdcf4042a6aac59ae5ab653652b406e9e65b6b1fe886eafe9543b1`.
+Baseline `ibm-cics-ts-6x-misc-tail-bridge-2026-09-23`, topic
+`SSJL4D_6.x/reference-data-areas/data-areas/DFHBRARK_6.2_6.1.html`
+matched SHA-256 `56075309a1bb829491a830bd3343f1806cf7dad90c2d758587f3d3e0fefee55e`.
+The bridge topic names `brxa_current_version_no` and Bind but does not pin
+their numeric values; this deployment profile is required and synthetic test
+values carry no IBM semantic claim. Three other topics in the broader
+application API scope were unavailable from the local pinned cache; neither
+required START BREXIT or BRXA topic was unavailable. No network refresh or
+licensed execution oracle was used.
+
+Focused checks: one IR codec regression, one compiler form regression, nine
+provider bridge tests including SQLite recovery, one compiled server launch
+and callback replay test, and 31 descriptor tooling tests passed. The dedicated
+CICS descriptor generator, schema count assertions, module boundary guard,
+typed semantic guard, effect encoding guard, documentation check, rustfmt,
+`cargo deny check`, and `git diff --check` passed. The broader `xtask spec`
+check still reports a stale committed CICS source-map projection, and strict
+Clippy reports warnings in unchanged CICS/compiler modules; neither result is
+claimed as a pass. A broad CICS package run was stopped after its unrelated
+CardDemo tests exceeded one minute; no full-package receipt is claimed.
+
+#### `CIC-902.interval-timers.start-auto-launch` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 23 and 50–58 require task creation only after the
+expiration boundary; lines 91–107 establish that a START without a terminal
+creates a separate facility-less task whose data remains available through
+RETRIEVE. Lines 188–200 establish the asynchronous failure boundary: an
+unavailable transaction or initial program can prevent task creation without
+turning the already accepted START into an exception.
+
+Promotion now returns the immutable request, transaction, principal, and
+facility identity from the durable interval row. For the reachable local
+nonterminal subset, the product resolves the installed transaction at
+expiration, creates a facility-less CICS run, and drives the target program
+through the ordinary durable online coordinator. The START work's immutable
+execution identifier is also the target execution identifier. The retained
+principal is reauthorized for the target transaction before first creation;
+the synthetic task session carries no terminal identifier, so RETRIEVE selects
+the ready nonterminal record. Missing transaction/program definitions and an
+authorization refusal produce the source-defined asynchronous no-task outcome
+and still complete the accepted START work.
+
+A retry after target consumption or terminal execution accepts the already
+promoted/consumed row, verifies the exact run-unit, selector, artifact,
+principal, and attempt identities, and observes the existing execution rather
+than launching another task. Known target conditions, ABENDs, cancellation,
+or timeout remain outcomes of the new task and do not retroactively fail the
+START worker; unresolved infrastructure or effect uncertainty still prevents
+work completion. Suspended started tasks retain their ordinary exchange and
+checkpoint, and a later DELAY wake uses the same cleanup boundary.
+
+The compiled selected-route regression runs a START issuer and a distinct
+RETRIEVE target, proves target completion, deliberately releases the claimed
+START lease before work completion, reclaims it under a later lease epoch, and
+proves that the execution journal version is unchanged and the facility-less
+session is cleaned. The earlier producer/consumer fixture now promotes its
+records directly so it continues to isolate multi-record RETRIEVE semantics.
+Explicit process-kill recovery during target execution, terminal-associated
+and remote starts, PostgreSQL concurrency, retention policy, and licensed
+differential remain pending. This child grants no whole-row START or RETRIEVE
+credit.
+
+#### `CIC-902.interval-timers.start-restart-launch` progress
+
+This acceptance child reuses the same pinned START row `0205` source identity
+and the task-creation/asynchronous-failure lines cited by
+`start-auto-launch`; it changes no CICS command semantics. Its scope is the two
+durability gaps around that implementation.
+
+A compiled issuer and distinct RETRIEVE target are installed into a SQLite
+product profile. The first process claims and promotes the due START, then is
+dropped without releasing or completing its lease and before target creation.
+After the lease expires, a second process reopens the application artifacts,
+RACF and interval authorities, reclaims the same work under a higher epoch,
+and runs the target to durable completion. That process is then dropped before
+the START work completion CAS. A third process reclaims the second stale lease,
+observes the consumed START row and exact terminal target execution, and
+completes the work without changing the execution journal version.
+
+The regression uses three independent `ProductServer` and
+`SqliteStateStore` instances over one retained database and artifact root; no
+in-memory provider or work state crosses either boundary. It proves restart
+reconstruction before task creation and no duplicate launch after target
+completion. A process stop while the target machine is actively running,
+PostgreSQL lease/concurrency parity, retention expiry and licensed differential
+remain pending. This child changes no registry readiness and grants no
+whole-row credit.
+
+#### `CIC-902.interval-timers.start-termid` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 38–58 require the named terminal to exist and be
+available when task creation takes effect; lines 119–167 distinguish terminal
+starts with and without data; lines 322–336 define TERMID as the one-to-four
+character principal-facility identifier and require it for a transaction that
+must communicate with a terminal. Lines 205–207 and 457–462 define command-time
+`TERMIDERR` and later terminal deletion as asynchronous request discard.
+
+Typed START now accepts literal or alphanumeric-storage TERMID through
+append-only operand tag 38. The provider resolves it against the durable
+virtual-terminal identity allocated to active terminal sessions. An unknown
+identifier returns `TERMIDERR` 11/0 before interval or work mutation. A valid
+row retains the terminal identifier and the signed-on terminal principal;
+RETRIEVE now supplies the current run's terminal identity to the existing
+one-time consumer fence, so a facility-associated record cannot be consumed by
+a nonterminal or another terminal.
+
+At expiration the product resolves the retained terminal again. Deletion or
+principal replacement discards the asynchronous request. An unrelated active
+run or online exchange returns the START work as deferred under the ordinary
+lease protocol. Once free, the terminal session is atomically retasked with
+the deterministic START execution/run-unit identities and the installed target
+transaction, then driven through the ordinary durable coordinator. Terminal
+sessions remain connected after target completion; facility-less cleanup is
+not applied to them.
+
+Direct-provider coverage proves exact TERMIDERR no-mutation behavior and
+terminal-matched data retrieval. The compiled selected-route fixture schedules
+from virtual terminal `T000`, first proves busy-terminal deferral, releases the
+incumbent run, advances the durable clock, then proves automatic target
+RETRIEVE completion on the same connected terminal. Combined TERMID/USERID is
+kept fail-closed until its security precedence is independently sourced. APPC
+and remote facilities, coalescing several same-transaction terminal requests,
+restart while the terminal target is active, PostgreSQL concurrency and
+licensed differential remain pending. This child changes no row readiness and
+grants no whole-row credit.
+
+#### `CIC-902.interval-timers.start-explicit-units` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 222–235 define AFTER as relative and AT as absolute.
+Lines 225–231 and 246–266 define HOURS 0–99, lone MINUTES 0–5999, and lone
+SECONDS 0–359999, while a combination narrows minutes and seconds to 0–59.
+Lines 383–393 assign INVREQ 16 response2 4, 5, and 6 to the respective invalid
+components.
+
+The provider now accepts canonical `OPTION.AFTER` or `OPTION.AT` with one or
+more decimal HOURS/MINUTES/SECONDS components, rejects mixed or orphaned mode
+and component forms before mutation, and delegates conditional bounds and
+absolute/relative arithmetic to the existing interval resolver. Valid requests
+persist the one resolved expiration tick in the ordinary strict START row and
+work item. Invalid hours, minutes, and seconds return the exact source-defined
+response2 values without provider/work state.
+
+At this child seal, typed compilation admitted valid source literal AFTER/AT
+forms by normalizing them to the existing packed relative or absolute operand.
+Compiler regressions covered `AFTER HOURS(1) SECONDS(3)` and `AT MINUTES(62)`;
+provider tests covered relative and absolute durable deadlines, malformed
+combinations, exact conditions, and no-mutation failures. The following dynamic
+child replaces only that compiler normalization with explicit append-only plan
+identities while preserving the sealed provider behavior.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Terminal/remote routing, automatic target-task launch, PostgreSQL concurrency,
+and licensed differential remain pending, so START receives no whole-row
+credit.
+
+#### `CIC-902.interval-timers.start-dynamic-units` progress
+
+Offline source review reused the START identity above. Lines 246–266 and
+313–318 define HOURS, MINUTES, and SECONDS as data-values, not literal-only
+syntax, so their runtime storage identity must survive typed lowering. The
+retained verified body was read through the repository parser without a network
+refresh.
+
+The CICS plan now assigns append-only operand tags 33, 34, and 35 to HOURS,
+MINUTES, and SECONDS, plus option tags 18 and 19 to AFTER and AT. Shape
+validation requires exactly one explicit mode when any components are present,
+rejects mixed packed/explicit schedules, permits only integer or resolved
+numeric-storage component values, and preserves all prior tags and bytes.
+Codec tests freeze the new tags, round-trip a storage-backed component, and
+retain unknown-tag rejection.
+
+Compiler lowering now retains literal or numeric-storage components and the
+relative/absolute mode instead of normalizing at compile time. The interpreter
+reads each storage value through its typed integer path and emits canonical
+decimal HOURS/MINUTES/SECONDS plus `OPTION.AFTER` or `OPTION.AT`; provider-side
+conditional bounds and exact response2 conditions therefore govern runtime
+values. Compiler tests cover literals, a dynamic MINUTES data item, structural
+rejections, and defer an out-of-range literal to the runtime condition path.
+The compiled product START/RETRIEVE fixture uses `AFTER SECONDS(TIME-X)` with a
+fullword value of zero before the shared worker fence.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Terminal/remote routing, automatic target-task launch, PostgreSQL concurrency,
+and licensed differential remain pending, so START receives no whole-row
+credit.
+
+#### `CIC-902.interval-timers.start-no-data` progress
+
+Offline source review reused the START identity above and baseline
+`ibm-cics-ts-6x-2026-08-31`, RETRIEVE row `0175` topic
+`dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`.
+Both retained verified bodies were read through the repository parser without a
+network refresh. START lines 91–93 and 105–118 state that a task may be started
+without data. Lines 135–139 define data as one or more of FROM, RTRANSID,
+RTERMID, or QUEUE. RETRIEVE lines 56–63 require ENDDATA when the corresponding
+START supplied none of those data options.
+
+Typed START now requires only TRANSID. FROM remains an optional resolved data
+area; LENGTH and FMH are rejected unless FROM is present. The provider stores
+an empty data field when all passed-data options are absent but still creates
+the ordinary request identity, interval row, and fenced work item, so scheduling
+and later automatic launch can share the same durable path. The existing row
+codec already represented bounded empty bytes and therefore needs no version or
+migration change.
+
+When RETRIEVE atomically consumes a ready no-data row, it returns ENDDATA 29/0
+instead of a false zero-length NORMAL response. The consumed row retains the
+canonical consumer identity, so the identical request replays the same ENDDATA
+and another consumer cannot reinterpret it. A metadata-only START is correctly
+data-bearing: RETRIEVE returns the requested metadata with actual length zero.
+Direct-provider tests cover scheduling, promotion, ENDDATA replay,
+metadata-only retrieval, and LENGTH/FMH dependency rejection. IR/compiler tests
+cover the optional FROM shape and malformed dependent operands. A compiled
+selected-route fixture issues no-data START, suspends, and observes its exact
+queued work identity without a fabricated payload.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Automatic target-task launch, terminal/remote routing, PostgreSQL concurrency,
+and licensed differential remain pending, so START and RETRIEVE receive no
+whole-row credit.
+
+#### `CIC-902.interval-timers.start-protect-syncpoint` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`
+and SYNCPOINT row `0218` topic `dfhp4_syncpoint.html` at
+`sha256:2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34`.
+The retained verified bodies were read through the repository parser without a
+network refresh. START lines 271–278 define PROTECT as withholding the new task
+until the starting task takes a syncpoint and canceling the request if that task
+abends first. SYNCPOINT lines 21–25 define the ordinary command as committing
+recoverable changes since the prior syncpoint.
+
+Typed START now admits PROTECT as append-only option tag 16. The local provider
+persists the ordinary strict interval record in protected-pending state but
+creates no shared work. During an explicit committing SYNCPOINT, the existing
+UOW authority transitions every protected record from the issuing run to
+pending and admits its deterministic work. Retry also scans that run's pending
+records for absent work, healing a crash after the state CAS and before enqueue;
+existing work remains idempotent. Explicit SYNCPOINT ROLLBACK deletes only
+still-protected rows after durable UOW finalization and permits immediate REQID
+reuse.
+
+Focused compiler, plan-codec, provider, UOW, Memory/SQLite row-reopen, and
+compiled selected-product tests cover the route. The product fixture proves a
+protected START crosses SYNCPOINT before the shared worker can promote it, then
+participates in the existing RETRIEVE cycle. The registry remains 38 typed,
+0 legacy compatibility, and 225 unready rows. Terminal/remote starts,
+PostgreSQL concurrency, automatic target launch, and licensed differential
+remain pending, so START and SYNCPOINT receive no additional whole-row credit.
+
+#### `CIC-902.interval-timers.start-protect-abend` progress
+
+Offline source review reused the START identity above and baseline
+`ibm-cics-ts-6x-2026-08-31` ABEND row `0001` topic `dfhp4_abend.html` at
+`sha256:a138b2bdbd99e655e07f3b773d5b45bb91a0ce633b36215e8a46825b2033f425`.
+START lines 271–278 require cancellation when the issuing task abends before
+syncpoint; ABEND lines 13–18 define the command as abnormal task termination.
+Both retained verified bodies were read through the repository parser without
+a network refresh.
+
+Before the typed ABEND handler examines installed exits or returns a terminal
+ABEND disposition, the provider now deletes every protected-pending START row
+whose originating run-unit exactly matches the issuing run. No work exists for
+those rows, and deletion permits their REQIDs to be reused. Other runs' records,
+already committed pending work, ready/consumed rows, and ordinary unprotected
+START records are untouched. The direct provider regression combines commit,
+rollback, finalized-retry repair, and ABEND deletion. The compiled HANDLE ABEND
+fixture adds a protected START, proves both ABEND transfers preserve its prior
+handler behavior, and verifies that neither provider state nor shared work
+survives the first ABEND.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+PostgreSQL concurrency and licensed differential remain pending, so START and
+ABEND receive no additional whole-row credit.
+
+#### `CIC-902.interval-timers.start-protect-task-end` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`
+and the `cics-file-uow-pilot` synchronization topic `dfht2c0034.html` at
+`sha256:9faa985f20ae267453f4fdfecbc945a963c311eecbf1c72595dc580866442dfb`.
+The retained verified bodies were read through the repository parser without a
+network refresh. START lines 271–278 require PROTECT to wait for syncpoint and
+cancel on pre-syncpoint abend. Synchronization lines 3–16 define an implicit
+syncpoint at transaction end through highest-level RETURN; lines 40–55 define
+abnormal termination as backout and state that CICS issues the end syncpoint.
+
+The terminal lifecycle now carries an explicit protected-START outcome. Normal
+machine completion and highest-level RETURN commit the issuing run's
+protected-pending rows, idempotently admit deterministic work, then release
+volatile task state. Known execution failure deletes still-protected rows before
+task cleanup. Scheduler, DELAY, ENQ, and RETRIEVE WAIT suspension pass no
+outcome and retain the task and rows. Existing explicit SYNCPOINT and typed
+ABEND behavior is unchanged.
+
+Focused provider tests cover normal completion, RETURN, known abort, exact row
+state, and work admission/nonadmission. A compiled selected-product fixture
+issues START PROTECT and reaches STOP RUN without an explicit SYNCPOINT; the
+durable execution completes and its work is queued before the volatile CICS run
+is removed. PostgreSQL concurrency and licensed differential remain pending.
+The registry stays 38 typed, 0 legacy compatibility, and 225 unready rows, so
+START receives no whole-row credit.
+
+#### `CIC-902.interval-timers.start-protect-terminal-cleanup` progress
+
+Offline source review reused the START and synchronization identities from the
+preceding task-end child. Synchronization lines 40–55 define abnormal task
+termination as backout and require interrupted changes to be backed out. The
+retained verified bodies were read through the repository parser without a
+network refresh.
+
+Terminal disconnect and idle-timeout cleanup now route through one rollback
+helper while the service owns the terminal-state mutex. The helper deletes only
+protected-pending START rows whose originating run-unit exactly matches the
+terminal run, creates no START work, then performs the existing enqueue release
+and named-delay abandonment/work cancellation. The protected-row transition
+accepts the caller-held interval map, avoiding recursive service locking and
+keeping the frozen service facade at 3,712 production lines.
+
+The existing direct terminal disconnect and timeout regressions now each create
+a protected START alongside a positive DELAY. Both prove the delay work remains
+cancelled and unclaimable while the protected interval row disappears and no
+START work is admitted. PostgreSQL concurrency and licensed differential remain
+pending. The registry stays 38 typed, 0 legacy compatibility, and 225 unready
+rows, so START receives no whole-row credit.
+
+#### `CIC-902.interval-timers.start-protect-recovery` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`
+and the `cics-file-uow-pilot` synchronization topic `dfht2c0034.html` at
+`sha256:9faa985f20ae267453f4fdfecbc945a963c311eecbf1c72595dc580866442dfb`.
+The retained verified bodies were read through the repository parser without a
+network refresh. START lines 271–278 require PROTECT to wait for syncpoint and
+cancel on pre-syncpoint abend. Synchronization lines 3–16 define the implicit
+end-transaction syncpoint; lines 40–55 define abnormal termination as backout.
+
+Terminal-exchange recovery now reads the journaled execution state before
+destructive cleanup. It reconstructs the exact invocation from the retained
+exchange, restores checkpointed task priority, and asks CICS to rebuild the
+volatile run from its durable undo row. `Completed` uses the ordinary terminal
+completion path, committing protected START and admitting deterministic work.
+`Cancelled`, `TimedOut`, `Failed`, and `DeadLetter` use the abort path, deleting
+protected rows without work. `HandoffCompleted` preserves the RETURN
+finalization already applied and discards the rebuilt run without a second
+commit. Continuation, checkpoint, and exchange rows are cleared only after the
+CICS disposition transition has been attempted; missing identity or a
+nonterminal execution fails closed.
+
+The compiled task-end regression recreates a `Completed` crash gap with a
+durable protected row and proves recovery queues its exact work. The
+fault-injection SQLite restart regression recreates a `Failed` crash gap and
+proves recovery removes the protected row without work. The existing handoff
+regression proves recovery does not double-finalize RETURN state. The full
+server suite and warning-free clippy pass; the registry remains 38 typed,
+0 legacy compatibility, and 225 unready rows. PostgreSQL concurrency and
+licensed differential remain pending, so START receives no whole-row credit.
+
+#### `CIC-902.interval-timers.start-protect-cancel` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, CANCEL row
+`0016` topic `dfhp4_cancel.html` at
+`sha256:d04d29525fbe2ec6b762cc4eb2622a21fc297613dbadc99d8a7b319b50571c88`
+and the START identity above. CANCEL lines 34–38 require REQID, permit
+cancellation only before START is honored, and state specifically that START
+PROTECT is cancelable only after it is committed. Lines 74–77 define NOTFND
+when the REQID does not match an eligible unexpired request. Both retained
+verified bodies were read offline through the repository parser.
+
+The provider regression proves CANCEL before committing SYNCPOINT returns exact
+NOTFND 13/0 while retaining the protected row and creating no work. After the
+same run commits, the deterministic work exists and ordinary local START
+cancellation writes its replay tombstone, requests work cancellation, and
+preserves the existing worker fence. The compiled product fixture now executes
+START PROTECT, SYNCPOINT, and CANCEL in that order and verifies the shared work
+is cancelled and unclaimable. No new permissive precommit path was added.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Remote CANCEL, immediate tombstone retention/reuse, PostgreSQL concurrency, and
+licensed differential remain pending, so START and CANCEL receive no additional
+whole-row credit.
+
+#### `CIC-902.interval-timers.start-generated-reqid` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+Lines 287–297 define REQID as optional, require CICS to generate a unique
+identifier in EIBREQID when it is omitted without NOCHECK, and use that
+specified or generated name for stored START data. The retained verified body
+was read offline through the repository parser.
+
+Typed START no longer requires a REQID operand. When absent, the provider hashes
+a domain separator, the mutation idempotency key, and the canonical request
+digest, then uses the first eight uppercase hexadecimal characters as the local
+request identity. The existing duplicate fence fails closed on a retained
+collision. That exact value names the interval row, deterministic shared work,
+and work payload. A newly executed response returns strict
+`mainframe-env.cics.reqid@1`; the interpreter validates the eight-character
+name, updates implicit EIBREQID, and checkpoints it. Explicit REQID requests do
+not synthesize or overwrite EIBREQID, and historical responses without the
+additive output remain compatible.
+
+Focused IR, compiler, provider, replay, interpreter, and compiled product tests
+cover the route. The product's protected second START omits REQID, restores the
+generated EIBREQID from its suspended checkpoint, and observes the same bytes
+on the post-SYNCPOINT work item before RETRIEVE. Remote generation,
+PostgreSQL concurrency, and licensed differential remain pending. The registry
+stays 38 typed, 0 legacy compatibility, and 225 unready rows, so START receives
+no whole-row credit.
+
+#### `CIC-902.interval-timers.start-nocheck` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+Lines 267–270 define NOCHECK as reduced checking for remote START, while lines
+287–299 specify that an omitted REQID is generated and returned in EIBREQID
+unless NOCHECK is present, in which case EIBREQID is null. The retained verified
+body was read offline through the repository parser.
+
+The typed local START subset now retains NOCHECK under append-only option tag
+22. When REQID is omitted, the provider still derives the same deterministic
+eight-character identity for the interval row, work ID, work payload, duplicate
+fence, and replay. It suppresses only the additive EIBREQID output. The
+interpreter therefore leaves the initialized eight null bytes unchanged in its
+durable checkpoint. Explicit REQID remains unchanged.
+
+Focused codec-tag, compiler, provider/replay, and compiled product tests cover
+the route. The selected product fixture proves that a generated eight-character
+work identity is queued while checkpointed EIBREQID remains null. Remote
+shipping and NOCHECK's reduced remote checking, automatic target-task launch,
+terminal routing, PostgreSQL concurrency, and licensed differential remain
+pending. The registry stays 38 typed, 0 legacy compatibility, and 225 unready
+rows, so START receives no whole-row credit.
+
+#### `CIC-902.interval-timers.start-userid-surrogate` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 352–377 define USERID as the started transaction's
+authority, default omission to the issuing user, and require a surrogate check
+authorizing that issuer to act for `<userid>` through READ access to
+`<userid>.DFHSTART`. Lines 430–436 define NOTAUTH response 70, response2 9 for
+surrogate failure.
+
+Typed local START now accepts USERID as a one-to-eight-character literal or
+alpha/alphanumeric storage value under append-only operand tag 32. Before any
+interval or work mutation, the provider performs a `SURROGAT` READ check for
+`<userid>.DFHSTART` under the issuing principal. Denial returns exact NOTAUTH
+70/9 and leaves no provider/work row. Success stores the normalized explicit
+identity in the existing versioned interval record; omission still stores the
+issuer. USERID remains part of canonical producer identity, so replay preserves
+the selected principal and a different identity cannot replace a retained
+REQID.
+
+Focused plan-codec, compiler, provider authorization/denial, issuer-default,
+and compiled product tests cover the route. The compiled fixture activates the
+SURROGAT class through SETROPTS, defines and permits `TARGET.DFHSTART`, and
+executes the typed START through the durable coordinator before worker
+promotion and RETRIEVE. Terminal combinations, actual target-task launch,
+PostgreSQL concurrency, and licensed differential remain pending. The registry
+stays 38 typed, 0 legacy compatibility, and 225 unready rows, so START receives
+no whole-row credit.
+
+#### `CIC-902.interval-timers.start-userid-validation` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 352–366 require the started transaction to run under a
+valid identity and place the surrogate check after selecting that identity.
+Lines 397–398 define INVREQ 16/18 when the external-security interface is not
+initialized. Lines 470–478 define USERIDERR 69/8 for an unknown identity,
+69/10 when RACF cannot determine validity, and 69/19 for a revoked identity.
+
+The host security contract now has an additive, non-mutating
+`ValidatePrincipal` request carrying only a bounded principal. Its canonical
+variant bytes have a golden vector, while the independent clock declaration
+and principal-field encoder helper were extracted without changing existing
+bytes or growing the frozen compatibility modules.
+RACF answers from durable account state without resolving a secret: active and
+password-expired accounts are valid for non-login execution, missing accounts
+are `NotFound`, revoked or suspended accounts are `Revoked`, locked accounts
+remain distinct, and an unavailable subsystem fails closed.
+
+START issues that check after TRANSID authorization but before SURROGAT and
+before interval/work mutation. It maps missing to USERIDERR 69/8, locked to
+69/10, revoked to 69/19, and unavailable security to INVREQ 16/18; only a valid
+identity proceeds to the existing `SURROGAT <userid>.DFHSTART` READ decision.
+Direct provider tests cover every projection, ordering, no-mutation, successful
+binding, and issuer default. The compiled selected-route fixture uses the real
+RACF provider to reject unknown and revoked users and proves neither request
+creates interval or work state. The positive compiled START/RETRIEVE fixture
+now defines TARGET as an active RACF user before surrogate admission.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Terminal combinations, automatic target-task launch, PostgreSQL concurrency,
+and licensed differential remain pending, so START receives no whole-row
+credit.
+
+#### `CIC-902.task-retrieve.start-metadata` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`
+and RETRIEVE row `0175` topic `dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`.
+Both bodies were read through the repository parser from the retained verified
+cache; no network refresh or licensed execution was performed.
+
+The source defines RTRANSID and RTERMID as one-to-four-character values and
+QUEUE as a one-to-eight-character value passed by START for later RETRIEVE. The
+implemented child keeps the existing local data-bearing START
+boundary and admits those three values as bounded literals or alpha/alphanumeric
+storage inputs. QUEUE cannot equal REQID. RETRIEVE may request exact-width
+writable 4/4/8-character areas. The provider persists all metadata in the
+existing strict interval row, returns only requested values, and raises
+ENVDEFERR 56 before its consumed-state CAS when the corresponding START omitted
+a requested field. Corrected retrieval therefore remains possible; successful
+retrieval and replay retain the existing one-consumer identity.
+
+Focused compiler, plan-codec, interpreter, provider, ENVDEFERR/nonconsumption,
+Memory/SQLite state, and compiled selected-product tests cover the extension.
+The live registry remains 38 typed, 0 legacy compatibility, and 225 unready
+rows. WAIT deadlock/shutdown behavior, terminal association, automatic
+target-task launch, PostgreSQL concurrency, and licensed differential remain
+pending, so START and RETRIEVE still receive no whole-row credit.
+
+#### `CIC-902.task-retrieve.fmh` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, START row
+`0205` topic `dfhp4_start.html` at
+`sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`
+and RETRIEVE row `0175` topic `dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`.
+The pinned text defines START FMH as marking passed data that contains function
+management headers and RETRIEVE as setting EIBFMH to `X'FF'` when FMH is
+present, otherwise `X'00'`.
+
+The typed START route now admits FMH as that source-defined flag and persists
+the bit in the existing strict interval row. RETRIEVE emits a bounded
+`mainframe-env.cics.eib-fmh@1` one-byte output for every newly executed data
+retrieval. The interpreter adds EIBFMH to its implicit EIB state, validates only
+`X'00'` or `X'FF'`, and applies the value through durable checkpoint/resume;
+retained pre-extension responses without the output remain replay-compatible.
+Focused compiler, plan-codec, provider, interpreter, Memory/SQLite, and compiled
+selected-product tests cover the path. The registry remains 38 typed, 0 legacy
+compatibility, and 225 unready rows. FMH payload interpretation, WAIT
+deadlock/shutdown behavior,
+terminal association, automatic launch, PostgreSQL concurrency, and licensed
+differential remain pending, so neither row receives whole-row credit.
+
+#### `CIC-902.task-retrieve.set` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, RETRIEVE
+row `0175` topic `dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 27–48 define INTO's input maximum and truncating LENGERR
+behavior separately from SET: SET receives the address of the retrieved data,
+requires LENGTH, and returns the actual data length through that field.
+
+Typed lowering now requires exactly one of INTO or SET and always requires a
+writable halfword LENGTH. SET accepts only POINTER or POINTER-32 storage and
+models LENGTH as output-only. Before the consuming host effect, the interpreter
+places its exact remaining frame/storage capacity in the canonical request.
+The interval authority checks the selected record against that capacity before
+its consumed-state CAS, so a capacity failure leaves the ready record
+retrievable. On success, the interpreter copies the full record into one
+task-owned virtual base and writes only a checked four- or eight-byte virtual
+address. The ordinary checkpoint codec retains that base, pointer, and any
+derived linkage address; no native address crosses the runtime boundary.
+
+Focused compiler and plan-codec tests cover valid and conflicting forms. The
+provider regression proves a too-small capacity does not consume the record,
+then retrieves it successfully. The compiled selected-product route consumes
+both INTO and SET records, dereferences the SET pointer, suspends, restores the
+checkpoint, and rereads the allocated linkage bytes. The registry remains 38
+typed, 0 legacy compatibility, and 225 unready rows. WAIT deadlock/shutdown behavior,
+terminal association, automatic launch, PostgreSQL concurrency, and licensed
+differential remain pending, so RETRIEVE still receives no whole-row credit.
+
+#### `CIC-902.task-retrieve.wait-data` progress
+
+Offline source review reused baseline `ibm-cics-ts-6x-2026-08-31`, RETRIEVE
+row `0175` topic `dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 49–54 define WAIT as suspending when every expired data
+record has been consumed and require at least one other option. Lines 50–63
+separately define later ENDDATA on deadlock timeout or shutdown and the
+shutdown-time AICB boundary.
+
+Typed RETRIEVE now admits WAIT as append-only plan option tag 17 on the existing
+required INTO-or-SET plus LENGTH shapes. If no eligible record exists, the
+provider returns a suspension without emitting ENDDATA, changing output areas,
+or consuming provider state. The interpreter classifies that suspension as a
+reissuing `cics-retrieve` checkpoint, and the online continuation retains the
+exchange instead of treating it as terminal input. On explicit execution
+re-entry after the shared worker promotes a matching START record, the same
+statement issues a fresh bounded effect and the existing atomic consumer fence
+returns that record exactly once. A ready record still completes immediately.
+
+Focused plan-codec, compiler, provider, interpreter/continuation, and compiled
+product tests cover no-data suspension and post-promotion consumption. The
+compiled consumer begins before either START record exists, survives its first
+durable suspension, and completes both INTO and SET retrieval after worker
+promotion. Deadlock timeout, shutdown/AICB, automatic wake, process-restart
+continuation proof, terminal applicability, PostgreSQL concurrency, and
+licensed differential remain pending. The registry stays 38 typed, 0 legacy
+compatibility, and 225 unready rows, so RETRIEVE receives no whole-row credit.
+
+#### `CIC-902.interval-timers.cancel-start-local` progress
+
+Offline source review used baseline `ibm-cics-ts-6x-2026-08-31`, CANCEL row
+`0016` topic `dfhp4_cancel.html` at
+`sha256:d04d29525fbe2ec6b762cc4eb2622a21fc297613dbadc99d8a7b319b50571c88`,
+and the already verified interval-control context `dfhp37p.html` at
+`sha256:0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640`.
+Both bodies were read through the repository parser from the retained verified
+cache; no network refresh or licensed execution was performed.
+
+The source defines CANCEL across DELAY, POST, and START. For START, REQID is
+required, cancellation is effective only before the request is honored, and
+its effect is as if START had never been issued. NOTFND means the request is no
+longer outstanding and does not prove that a started task completed or consumed
+its data. TRANSID selects the execution system when SYSID is omitted and is
+subject to transaction security; SYSID function-ships to a remote system.
+The implemented child is deliberately narrower. Typed lowering requires REQID,
+accepts optional local TRANSID, and rejects SYSID and the no-REQID POST form.
+The provider authorizes the selected TRANSID or originating START transaction,
+verifies the shared work identity, CAS-transitions only a committed pending
+record to a cancelled replay tombstone, and requests cancellation of queued or
+claimed work. Protected-uncommitted, ready, consumed, missing, and differently
+cancelled records return NOTFND. The same canonical mutation can complete or
+replay the state/work crash gap; a different mutation cannot reinterpret it.
+
+Focused compiler, plan-codec, interpreter, provider, generated-registry, and
+selected product-route tests cover the bounded route. SQLite close/reopen
+proves the cancelled provider row and work state remain nonclaimable and that a
+new CANCEL receives exact NOTFND. At this child's seal the live registry was
+37 typed, 0 legacy compatibility, and 226 unready rows. POST, DELAY, no-REQID same-task
+POST, remote SYSID/TRANSID routing, immediate reuse of a cancelled REQID,
+PostgreSQL concurrency evidence, and licensed differential remain pending, so
+the child grants no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-zero` progress
+
+Offline source review used baseline `ibm-cics-ts-6x-2026-08-31`, DELAY row
+`0039` topic `dfhp4_delay.html` at
+`sha256:aeefa4cb55dc8658e4be0790f5d4e376f963ebd6e00ee5848928df6f777bb904`,
+interval-control context `dfhp37p.html` at
+`sha256:0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640`,
+and expiration-time context `dfhp3mq.html` at
+`sha256:0426c4e616120fb222b9ca7f1aa9d3a63275a511ed2799f0e79e2bd60a82f76f`.
+All bodies were read through the repository parser from the retained verified
+cache; no network refresh or licensed execution was performed.
+
+The source defines default `INTERVAL(0)`, identifies zero interval as the only
+threadsafe DELAY form, and otherwise suspends the issuing task for relative or
+absolute packed time or explicit FOR/UNTIL units. It defines EXPIRED for a time
+already elapsed, INVREQ unit-range RESP2 values 4/5/6/22, and NORMAL RESP2 23
+when another task cancels a named delay. The implemented child owns only bare
+default DELAY and compile-time literal `INTERVAL(0)`, both of which complete
+immediately without persistent timer state. At this child's seal compiler
+admission rejected positive or dynamic INTERVAL, TIME, FOR/UNTIL units, and
+REQID before publication; the subsequent relative-delay child adds only
+positive compile-time literals.
+Defensive provider admission accepts only absent or decimal zero INTERVAL plus
+common condition controls. Plan-codec, compiler, interpreter, provider,
+generated-registry, and selected product-route tests prove NORMAL response and
+no scheduler suspension. The live registry is 38 typed, 0 legacy
+compatibility, and 225 unready rows. Positive timing, named cancellation,
+EXPIRED, durable suspension/resume, PostgreSQL evidence, and licensed
+differential remain pending, so DELAY receives no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-relative` progress
+
+This child retains baseline `ibm-cics-ts-6x-2026-08-31`, DELAY row `0039`
+topic `dfhp4_delay.html` at
+`sha256:aeefa4cb55dc8658e4be0790f5d4e376f963ebd6e00ee5848928df6f777bb904`,
+interval-control context `dfhp37p.html` at
+`sha256:0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640`,
+and expiration-time context `dfhp3mq.html` at
+`sha256:0426c4e616120fb222b9ca7f1aa9d3a63275a511ed2799f0e79e2bd60a82f76f`.
+All bodies were read through the repository parser from the retained verified
+cache; no network refresh or licensed execution was performed. The source says
+positive INTERVAL is packed `hhmmss`, adds the duration to the current clock,
+and suspends the issuing task until expiration.
+
+Typed lowering now admits valid positive compile-time literal INTERVAL values
+through the same row `0039` route and classifies DELAY as a mutation so every
+suspended and completed attempt has durable replay identity. The interpreter
+adds a hidden run-unit/statement-position identifier, rewinds the command on
+suspension, and retains the online continuation under `cics-delay`. First
+admission writes a strict bounded `cics-delay-v1` pending row and one
+deterministic work item. The two shared workers poll JES, START, then DELAY;
+only a due claimed item with the matching lease-fenced identity can promote the
+row to ready. Reissue atomically records the consumer and completes; the same
+consumer request replays exactly, while a later loop encounter creates a fresh
+cycle and work identity.
+
+Focused provider tests cover pending reissue, due fencing, completion replay,
+and repeated-loop generation. Memory and SQLite close/reopen preserve row/work
+authority, and a compiled selected-product route proves suspension, shared
+worker promotion, checkpoint restore, reissue, and forward progress. The live
+registry remains 38 typed, 0 legacy compatibility, and 225 unready rows; its
+participant contract now records 20 mutating rows. At this child's seal, REQID
+cancellation and task-timeout cleanup remained pending; the following child
+closes those local boundaries. TIME, FOR/UNTIL units, automatic redispatch,
+PostgreSQL concurrency, retention eligibility, and licensed differential remain
+pending, so DELAY still receives no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-cancel-cleanup` progress
+
+Offline source review retains baseline `ibm-cics-ts-6x-2026-08-31`, DELAY row
+`0039` topic `dfhp4_delay.html` at
+`sha256:aeefa4cb55dc8658e4be0790f5d4e376f963ebd6e00ee5848928df6f777bb904`,
+CANCEL row `0016` topic `dfhp4_cancel.html` at
+`sha256:d04d29525fbe2ec6b762cc4eb2622a21fc297613dbadc99d8a7b319b50571c88`,
+and interval-control context `dfhp37p.html` at
+`sha256:0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640`.
+All bodies were read through the repository parser from the retained verified
+cache; no network refresh or licensed execution was performed.
+
+The source makes REQID a one-to-eight-character application name for exposing
+an unexpired DELAY to another transaction. Only a task other than the suspended
+issuer may cancel it, and cancellation is an early expiration: the delayed task
+becomes dispatchable and receives NORMAL with RESP2 23 when control returns.
+NOTFND means the supplied identifier does not match an unexpired interval
+request.
+
+Typed DELAY now admits REQID as a literal or bounded alpha/alphanumeric storage
+name only with a positive literal INTERVAL. The version-two `cics-delay-v1`
+codec binds that application name and optional cancellation identity while
+retaining strict reads of version-one unnamed rows. Provider open rejects
+duplicate retained names, and admission prevents collisions with retained
+START identities or another delay statement. Local CANCEL first preserves its
+existing START behavior; when no START identity matches, it resolves the named
+delay, rejects the issuing task and expiration boundary with NOTFND, authorizes
+the selected/originating transaction, CAS-promotes the pending cycle as early
+expiration, and requests cancellation of the exact shared work row. The same
+canonical CANCEL replays; another request cannot reinterpret ready, consumed,
+abandoned, or expired state. Reissuing the original DELAY consumes that early
+expiration exactly once and returns NORMAL RESP2 23.
+
+The common task cleanup hook now releases enqueue ownership and abandons any
+pending or ready delay before disconnect, idle timeout, RETURN, abend, terminal
+completion, or abandoned-run removal. Its work cancellation is idempotent and
+lease-fenced. Focused tests cover literal/storage compiler shapes, name
+uniqueness, issuer rejection, cancellation replay, expiration precedence,
+RESP2 23, disconnect and timeout cleanup, version-one codec compatibility,
+Memory and SQLite reopen, and a compiled two-task product route. The live
+registry remains 38 typed, 0 legacy compatibility, and 225 unready rows, with
+20 mutating participant rows. Remote SYSID/TRANSID routing, TIME and explicit
+units, automatic redispatch, PostgreSQL concurrency, generic retention, and
+licensed differential remain pending, so DELAY and CANCEL receive no whole-row
+credit from this child.
+
+#### `CIC-902.interval-timers.delay-explicit-units` progress
+
+Offline source review retains baseline `ibm-cics-ts-6x-2026-08-31`, DELAY row
+`0039` topic `dfhp4_delay.html` at
+`sha256:aeefa4cb55dc8658e4be0790f5d4e376f963ebd6e00ee5848928df6f777bb904`.
+The retained verified body was read through the repository parser without a
+network refresh. Lines 26–44 and 58–70 define relative FOR and absolute UNTIL
+with fullword HOURS, MINUTES, and SECONDS. Lines 108–115 preserve the
+single-component extended ranges and combined-component 0–59 narrowing; lines
+77–94 define EXPIRED 31 and INVREQ 16 response2 4/5/6.
+
+Typed plans now assign append-only option tags 20 and 21 to FOR and UNTIL and
+reuse operand tags 33–35 for literal or resolved numeric-storage components.
+Shape validation requires exactly one explicit mode when units are present and
+rejects mixed packed/explicit schedules. The interpreter emits canonical
+decimal unit arguments, so runtime storage values reach the provider's
+source-defined conditional bounds.
+
+The provider resolves one relative or absolute deadline only when creating a
+new delay cycle, then reuses the existing strict `cics-delay-v1` row, work
+identity, lease fence, and suspended reissue path. No row codec or migration
+changed. An UNTIL target already elapsed in the source-defined window returns
+EXPIRED 31 through normal condition handling, including its ignored default;
+invalid hours, minutes, and seconds return exact response2 4, 5, and 6 without
+state. IR/compiler/provider tests cover shape, dynamic values, deadlines,
+conditions, and bounds. A compiled selected-product route drives dynamic
+`FOR SECONDS(data-item)` through checkpoint, worker promotion, and reissue.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Packed TIME, MILLISECS, automatic redispatch, remote routing, PostgreSQL
+concurrency, generic retention, and licensed differential remain pending, so
+DELAY receives no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-packed-time` progress
+
+Offline source review retains the DELAY identity above. Lines 62–67 define
+TIME as a packed `hhmmss` absolute resume time; lines 77–94 retain EXPIRED 31
+and INVREQ response2 4/5/6. The retained verified body was read through the
+repository parser without a network refresh.
+
+Typed DELAY now accepts TIME as either an integer constant or resolved numeric
+storage and reuses append-only StartTime operand tag 29. The compiler separates
+TIME's input role for DELAY and START from its writable output role for
+FORMATTIME, preventing a packed input from being misclassified as an output
+binding. Plan validation admits literal or storage values, rejects mixed
+INTERVAL/TIME/FOR/UNTIL schedules, and permits REQID on a packed TIME cycle.
+
+The provider validates packed hours, minutes, and seconds through the existing
+absolute resolver, assigns TIME its own positive identity domain inside the
+unchanged `cics-delay-v1` codec, and stores the resolved durable deadline once.
+Elapsed targets return ignored-by-default EXPIRED 31; malformed components
+return INVREQ 16 response2 4, 5, or 6 without state. Focused provider tests
+freeze the exact absolute deadline and conditions. A compiled selected-product
+route reads packed storage, suspends, crosses the shared worker fence, restores
+its checkpoint, and resumes to forward progress.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Dynamic packed INTERVAL, MILLISECS, automatic redispatch, remote routing,
+PostgreSQL concurrency, generic retention, and licensed differential remain
+pending, so DELAY receives no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-milliseconds` progress
+
+Offline source review retains the DELAY identity above. Lines 22–24 define the
+250 ms scan caveat; lines 36–40 define pure MILLISECS 0–359999999, combined
+MILLISECS 0–999, and immediate expiry below 50 ms. Lines 41–60 make
+MILLISECS count as another component when narrowing MINUTES and SECONDS, and
+lines 83–92 assign INVREQ 16 response2 22 to an invalid millisecond value. The
+retained verified body was read without a network refresh.
+
+The shared interval value now retains total milliseconds while preserving its
+existing whole-second constructors and outputs. A DELAY-specific constructor
+enforces pure and combined component bounds without changing START semantics.
+Typed plans assign append-only operand tag 36 to MILLISECS, permit literal or
+resolved numeric storage only with FOR, and reject UNTIL MILLISECS and mixed
+schedules. The interpreter emits the runtime value as canonical decimal data.
+
+The provider returns ignored-by-default EXPIRED 31 for a nonzero delay below
+50 ms, returns INVREQ 16/22 for either oversized pure or combined milliseconds,
+and otherwise stores the exact millisecond deadline. Forms that mention
+MILLISECS use a separate positive identity domain; earlier whole-second delay
+rows and the strict version-two codec remain unchanged. Focused interval,
+provider, IR, and compiler tests cover precision, shape, bounds, and conditions.
+The compiled selected-product route reads both SECONDS and MILLISECS from
+storage, suspends, promotes at the exact due tick, restores its checkpoint, and
+continues.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Dynamic packed INTERVAL, automatic redispatch, remote routing, PostgreSQL
+concurrency, generic retention, and licensed differential remain pending, so
+DELAY receives no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-dynamic-interval` progress
+
+Offline source review retains the DELAY identity above. Lines 30–35 define
+packed INTERVAL and explicitly permit a non-constant value when the application
+supplies packed-decimal storage. The retained verified body was read without a
+network refresh.
+
+Typed DELAY now accepts a resolved numeric storage slot under the existing
+append-only Interval operand tag 28. Plan validation permits integer or storage
+values, while compiler admission no longer predicts packed HHMMSS validity.
+The interpreter reads the packed numeric item through its typed integer path
+and emits canonical decimal data, leaving the provider as the one authority for
+hours/minutes/seconds bounds and exact INVREQ response2 behavior. A literal or
+dynamic zero paired with REQID still fails before durable state at runtime.
+
+The provider row, codec, work identity, clock, promotion fence, and cancellation
+logic are unchanged. Compiler/plan tests cover storage-backed and deferred
+out-of-range forms. The compiled two-task selected route now uses
+`INTERVAL(data-item)` with an application REQID, proves another task can cancel
+it, and resumes the original checkpoint with NORMAL response2 23.
+
+The registry remains 38 typed, 0 legacy compatibility, and 225 unready rows.
+Automatic redispatch, remote cancellation, PostgreSQL concurrency, generic
+retention, and licensed differential remain pending, so DELAY receives no
+whole-row credit.
+
+#### `CIC-902.interval-timers.delay-auto-wake` progress
+
+This infrastructure child reuses the DELAY source and semantic identities
+above; it introduces no new IBM command interpretation. Due DELAY work still
+promotes only through the shared lease/epoch fence. After promotion, a bounded
+product-owned wake adapter decodes the durable delay identity, extracts its
+run unit, scans at most the configured CICS session bound in the durable online
+exchange namespace, and requires zero or one exact match.
+
+One match is resumed through the ordinary saved program, principal, session,
+machine checkpoint, CICS run restoration, and durable coordinator path before
+the worker completes its lease. More than one match fails closed. No match is a
+safe replay only because ordinary terminal finalization clears the exchange
+before the worker completion CAS; a reclaimed promoted work item can therefore
+finish without re-executing a completed task. The adapter remains a small
+module below the review ceiling and the frozen product facade remains exactly
+6,302 production lines.
+
+The compiled dynamic FOR/MILLISECS and packed TIME routes now prove promotion
+causes forward progress without an explicit client `CicsResume` call. Focused
+server tests and warnings-denied clippy pass. Graceful shutdown/AICB behavior,
+automatic RETRIEVE WAIT wake, PostgreSQL concurrency, generic retention, and
+licensed differential remain pending. The registry
+remains 38 typed, 0 legacy compatibility, and 225 unready rows, so DELAY
+receives no whole-row credit.
+
+#### `CIC-902.interval-timers.delay-restart-wake` progress
+
+This durability child introduces no new command interpretation and reuses the
+same pinned DELAY source identity as the preceding children. A compiled dynamic
+FOR DELAY is suspended before its due tick, then the product and SQLite store
+are closed. Reopening the same database and local artifact root restores the
+installed online application, terminal session, durable exchange, machine
+continuation, provider delay cycle, and queued work.
+
+At the due tick, the restarted worker claims the existing work item, promotes
+the provider row, reconstructs the volatile CICS run from the durable exchange,
+and resumes the ordinary coordinator path. The post-DELAY assignment is present
+in the restored checkpoint and the work lease reaches Completed without an
+explicit client `CicsResume` call. The regression also proves the item is not
+claimable before restart and before its deadline.
+
+The focused SQLite restart test passes. PostgreSQL restart concurrency,
+graceful shutdown/AICB handling, automatic RETRIEVE WAIT wake, generic
+retention, and licensed differential remain pending. The registry remains 38
+typed, 0 legacy compatibility, and 225 unready rows, so DELAY receives no
+whole-row credit.
+
+#### `CIC-902` admission groundwork
+
+The versioned runtime-admission catalog owns the exact executable option subset
+for every legacy compatibility route and is now empty after RETRIEVE's typed
+migration. It binds the
+logical 263-row application identity set without changing the descriptor file
+hash frozen into CIC-901 source receipts. The generator proves that only legacy
+API routes carry a nonempty subset, that entries are canonical and unique, and
+that a current accepted source projection contains every entry. The compiler
+reads the generated registry field directly; its former handwritten 20-row
+table is gone. This keeps later family-slice option expansion in one reviewed
+machine authority. It intentionally changes no readiness or coverage count.
+
+#### `CIC-902.time-clock` progress
+
+The verified `cics-application-api-sources-a` scope pins ASKTIME topic
+`dfhp4_asktime.html` at
+`sha256:8e9eb927feabec8427c4f66458aa7c401f788a669173f19b34408603e8499ef7`
+and EIB field topic `dfhp4_eibfields.html` at
+`sha256:a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7`.
+They distinguish bare ASKTIME, which refreshes EIBDATE and EIBTIME, from
+ASKTIME ABSTIME, which additionally returns the eight-byte packed absolute
+time destination.
+
+Row `0009` now has its own `AsktimeEib` runtime operation and remains distinct
+from row `0010` during longest-label compiler selection, provider dispatch,
+canonical request encoding, EIBFN selection, and generated registration. The
+provider takes one checked clock instant, emits `0CYYDDD+` and `0HHMMSS+`
+coefficients for the interpreter's existing packed-decimal EIB layouts, and
+accepts only the two documented centuries. The ABSTIME route refreshes the same
+implicit fields from that instant before returning its absolute destination.
+Retained pre-change row `0010` responses without implicit EIB outputs remain
+replayable with their historical EIB state; the new row `0009` fails closed if
+either required EIB output is absent or malformed.
+
+Row `0010` now lowers through its own typed `Asktime` plan instead of the raw
+compatibility route. The append-only plan encoding gives the operation tag 15
+and the ABSTIME output tag 3; compiler and defensive interpreter admission both
+require one writable `PIC S9(15) COMP-3` destination. The generated registry no
+longer assigns legacy execution options to this row. Historical raw ASKTIME
+artifacts remain executable through the retained version-one interpreter path.
+
+Focused provider tests use the exact `20260830123456789` clock fixture and
+observe EIBDATE `0126242+` and EIBTIME `0123456+`; compiler tests admit the bare
+form and bind the qualified ABSTIME form to its exact packed layout. A compiled
+online selected route executes both forms across the durable coordinator,
+audited CICS provider, and system clock, then retains valid positive packed
+ABSTIME/EIBDATE/EIBTIME through the existing task suspension. Malformed
+ABSTIME and implicit EIB payloads fail before storage can be accepted. The
+selected system-clock descriptor now budgets 256 canonical
+bytes, covering the measured 135-byte request and 109-byte reply envelopes
+instead of rejecting the nested clock before dispatch. ASKTIME is read-only and
+adds no provider-state recovery obligation. Candidate-bound licensed
+differential remains pending, so neither row receives whole-row credit.
+
+#### `CIC-902.time-format` progress
+
+The verified `cics-application-api-sources-a` scope pins FORMATTIME topic
+`dfhp4_formattime.html` at
+`sha256:55155b9534a16c10ec27886e44685c8e2d0e124d55df9042f805ef91440e1403`.
+It defines ABSTIME as `PIC S9(15) COMP-3`, fixed character widths for explicit
+date and time forms, fullword binary MILLISECONDS, separator omission/default
+behavior, and INVREQ RESP 16 RESP2 1 for a negative or invalid packed value.
+
+Row `0080` now lowers the previously advertised compatibility subset through a
+typed `FormatTime` plan. Append-only tag 16 identifies the operation; operands
+carry exact packed ABSTIME plus optional one-byte DATESEP/TIMESEP values, and
+named output tags bind YYYYMMDD, YYMMDD, MMDDYY, MMDDYYYY, YYDDD, TIME, and
+MILLISECONDS to pre-resolved receiving storage. Compiler and defensive
+interpreter admission enforce each IBM field width and category. The provider
+returns character fields under the bounded CICS payload schema, returns
+MILLISECONDS as a typed decimal for fullword encoding, maps invalid absolute
+time to INVREQ 16/1, and rejects unknown or malformed request fields.
+
+A fixed provider fixture observes `2026-08-30`, `12:34:56`, and binary 789. A
+Conformance IR regression verifies exact request decoding, character and
+fullword writes, EIBFN `4A04`, and wrong-schema rejection. The compiled product
+route obtains a live absolute time, formats it through the durable coordinator
+and selected CICS provider, and retains separator/digit shape plus bounded
+milliseconds at task suspension.
+
+DATE, FULLDATE, DATEFORM, DATESTRING, STRINGZONE, DAYCOUNT, DAYOFMONTH,
+DAYOFWEEK, DDMMYY, DDMMYYYY, MONTHOFYEAR, STRINGFORMAT, YEAR, YYDDMM,
+YYYYDDD, and YYYYDDMM remain explicit typed-lowering rejections. Bare
+DATESEP/TIMESEP defaults also remain deferred because the frozen generated
+option shape records a required value. Retained raw FORMATTIME artifacts can
+still use their historical separator flags. Those options and the
+candidate-bound licensed differential remain pending, so row `0080` receives
+no whole-row credit.
+
+#### `CIC-902.time-convert` progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application catalog row `0031`, is
+bound to the verified CICS TS 6.x topic `dfhp4_converttime.html` at
+`sha256:a591db697674cb2738fd8537e697aaea225d90eb31c79df21760e9c0228fcc67`.
+The committed topic bytes were checked against the retained raw HTML archive
+and read through `ibm_docs.py`'s plain-text parser before this semantic change.
+The source defines RFC 1123, RFC 3339, RFC 850, and ASCtime inputs, a 64-byte
+DATESTRING area, packed ABSTIME output, truncation of fractional milliseconds,
+and INVREQ RESP2 1–9 for malformed dates and times.
+
+`ConvertTime` uses append-only MCEP v2 operation tag 154 and DATESTRING operand
+tag 640; v1 retains its original byte-tag decoder. Compiler and interpreter
+admission require a 64-character source and writable `PIC S9(15) COMP-3`
+destination. The provider uses the existing UTC reference clock profile as its
+local zone, validates the four formats and offsets, and returns zero ABSTIME
+with exact INVREQ/RESP2 when RESP handles an invalid input. Focused parser,
+compiler, memory/SQLite provider, and compiled online selected-route tests
+cover success, malformed input, EIBFN `4A06`, and packed storage. No provider
+state is mutated; the existing host gate owns authorization, audit, deadline,
+and cancellation. Licensed differential evidence remains pending.
+
+#### `CIC-902.builtin-deedit` progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application catalog row `0013`, uses
+the verified CICS TS 6.x topic `dfhp4_bifdeedit.html` at
+`sha256:c166e90680e4f846cf2a69e9287273c95a5bb6551ed31bc8c3f516ec49af5d3a`.
+The committed topic SHA matched retained raw HTML in the offline archive and
+its bytes were read through the repository `ibm_docs.py` plain-text parser
+before implementation. The source defines in-place FIELD editing, optional
+LENGTH, removal of editing characters, right-aligned zero fill, terminal zoned
+numeric preservation, negative final zone, and `LENGERR` response 22.
+
+The typed route uses append-only MCEP v2 operation tag 155, FIELD operand tag
+641, and FIELD output tag 696. It requires the same writable character slot
+for input and output and rejects malformed or unknown tags. The provider edits
+only caller-owned storage; its existing host gate provides SAF, audit,
+deadline, and cancellation. Focused IR, compiler, provider memory/SQLite, and
+compiled online selected-route tests cover normal and invalid lengths, source
+examples, EIBFN `2002`, and in-place output. MCEP v1 keeps its historical u8
+decoder and does not encode the new identities. Licensed differential evidence
+remains pending.
+
+#### `CIC-902.builtin-digest` progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application catalog row `0014`, uses
+the verified CICS TS 6.x topic `dfhp4_bifdigest.html` at
+`sha256:e6f40f97a1ffa4d1c6e1764e8118fb4498f030f98fd4596e240c9ac51747781c`.
+The exact retained raw HTML SHA was checked and its bytes read through the
+repository `ibm_docs.py` plain-text parser before implementation. The source
+specifies SHA-1 over RECORD/RECORDLEN; 40-byte uppercase HEX, 20-byte BINARY,
+and 28-byte BASE64 results; `INVREQ` 16/1 for invalid DIGESTTYPE; and
+`LENGERR` 22/2 for RECORDLEN less than one. The virtual MSA implementation is
+always available, so `INVREQ` 16/3 has no reachable virtual hardware state.
+The source explicitly disallows treating SHA-1 as a security hash.
+
+The typed route uses MCEP v2 operation tag 156, RECORD/RECORDLEN/DIGESTTYPE
+operand tags 642–644, HEX/BINARY/BASE64 option tags 572–574, and RESULT output
+tag 697. It requires one explicit format selector because the pinned topic
+does not define a default. Numeric DIGESTTYPE CVDAs without a pinned value
+table remain unsupported; named `DFHVALUE` selectors are accepted. Result
+extent checks prevent a short destination. Focused codec, compiler, provider
+memory/SQLite, and compiled online selected-route tests cover each format,
+the SHA-1 `abc` vector, EIBFN `2020`, malformed selectors and lengths, and
+bounded output. The common host gate owns SAF, audit, deadline, and
+cancellation; MCEP v1 keeps its original u8 decoder. Licensed differential
+evidence remains pending.
+
+#### `CIC-902.task-waitcics` progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application catalog row `0239`, uses
+the verified CICS TS 6.x topic `dfhp4_waitcics.html` at
+`sha256:b4774e4d772202e850b095ba008ffb4b05995faf7365888db0f8426c8ca823e4`.
+The retained raw HTML SHA matched the committed topic identity and the bytes
+were read with the repository `ibm_docs.py` plain-text parser before the
+semantic change. The source defines a checked list of fullword-aligned
+MVS-format ECBs, one-or-more wait completion, already-posted fast completion,
+standard or hand posting, default purgeability, optional NAME, and `INVREQ`
+RESP2 1/3/4/5 for invalid ECBs, count, CVDA, or empty valid list.
+
+The typed route uses MCEP v2 operation tag 157, sharing the existing
+ECBLIST/NUMEVENTS/PURGEABILITY/NAME identities. Its separate durable wait kind
+survives SQLite reopen, accepts hand posting only on WAITCICS, and keeps
+WAIT EXTERNAL's standard-post rule. The compiled online selected route checks
+EIBFN `5E32`, posting, task completion, and cleanup. The common host gate
+provides SAF, audit, finite deadline, cancellation, and replay protection.
+The new operation is rejected in MCEP v1 while historical u8-tag plans remain
+decodable. A terminal cleanup mutex recursion found by the selected route
+was repaired by releasing task state outside the mutex and rechecking the run
+before removal. Licensed differential evidence remains pending.
+
+#### `CIC-902.interval-post` progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application catalog row `0147`, uses
+the verified CICS TS 6.x topic `dfhp4_post.html` at
+`sha256:88e3a9d9873b15515cfc7722de03fb8180b635551aea97cf819f9d544c44e2f9`.
+The retained raw HTML SHA matched the committed topic identity and its bytes
+were read through the repository `ibm_docs.py` plain-text parser before the
+semantic change. The source defines a task-owned four-byte timer area,
+initially zero and posted as `40 00 80 00`; relative or absolute schedules;
+one active POST per task; cross-task CANCEL posting by REQID; and supersession
+by another POST, DELAY, or local START. EXPIRED 31 and INVREQ 16/4–6 follow
+the source's time bounds.
+
+The typed route uses MCEP v2 operation tag 158 and the existing interval,
+REQID, explicit-unit, and SET pointer identities. The interpreter prevalidates
+the four-byte virtual pointer allocation, and the provider persists one timer
+record before placing due work on the existing durable clock/work authority.
+Worker promotion marks a matching WAIT EVENT, WAIT EXTERNAL, or WAITCICS
+dispatchable. The next CICS response writes the posted bytes into the
+interpreter-owned area; POST itself returns an initialized zero area.
+Memory and SQLite reopen, malformed/expired schedules, cross-task CANCEL,
+supersession, replay, and compiled online POST-to-WAITCICS selected-route
+regressions cover the boundary, including EIBFN `1006`. The common host gate
+provides SAF, audit, deadline, cancellation, and post-dispatch unknown-outcome
+protection. MCEP v1 keeps its historical u8 decoder and rejects the new
+operation. Licensed differential evidence remains pending.
+
+#### `CIC-902.operator-write` progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application catalog row `0256`, uses
+the verified CICS TS 6.x topic `dfhp4_writeoperator.html` at
+`sha256:a0c239d675dd55bc26f5e08bd4bc90535d1f9917de7525c417ea2ce7b0c07aa4`.
+The retained raw HTML matched the committed SHA and was parsed with the
+repository `ibm_docs.py` PlainText parser before changing operator behavior.
+The source bounds non-reply text to 690 bytes, reply text to 121 bytes,
+reply areas to 1–119 bytes, route codes to 1–28, and action descriptors to
+2, 3, or 11. It defines EXPIRED 31/7 when a requested reply times out.
+
+The typed route uses MCEP v2 operation tag 159, new operand tags 645–652,
+action flags 575–577, and reply output tags 698–699. The task-owned
+`cics-operator-v1` record strictly persists the message, console/routing
+choice, action, optional reply deadline, and replay identity. An atomic
+`cics-operator-active-v1` pointer binds one suspended COBOL command position to
+the message through a reply or expiry; consuming that result allows a later
+loop iteration to issue a fresh message. The CICS open path rejects malformed
+or noncanonical durable rows and broken pointers. The console gateway lists
+messages, formats text longer than 113 bytes into at most ten 69-byte lines,
+and uses SAF before accepting a reply. The durable worker expires unanswered
+requests and wakes the selected compiled online route, including recovery when
+a posted reply outlives a failed immediate wake. Memory/SQLite reopen,
+bounded conditions, replay, post-dispatch UnknownOutcome, and compiled reply
+and timeout regressions pass with EIBFN `6C02`. MCEP v1 keeps its historical
+u8-tag decoder and rejects the new operation. Licensed differential evidence
+remains pending.
+
+#### `CIC-902.network-extract` authority progress
+
+Baseline `ibm-cics-ts-6x-2026-08-31`, application rows `0070` and `0074`,
+uses verified CICS TS 6.x topics `dfhp4_extractcertificate.html` at
+`sha256:5222642cdc1028d3601dd9f905476ee28c6e435d0e15792f421c6e9ada503bb6`
+and `dfhp4_extracttcpip.html` at
+`sha256:6a7441511637549ec5246ca013f0b62249047666995e4a2ff570acf04cf389fc`.
+Both retained raw HTML files matched committed hashes and were read through
+the repository PlainText parser before changes. The shared argument-value
+topic `dfhp4_argumentvalues.html` at
+`sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70`
+and CVDA overview `dfha80x.html` at
+`sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25`
+were verified and parsed offline as well. The overview states that returned
+CVDAs are fullword binary and links to `dfha80c.html` for numeric values;
+that table is now pinned separately at
+`sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`.
+
+The CICS provider now owns an immutable, task-scoped
+`cics-tcpip-context-v1` record accepted only from a trusted host invocation
+already bound to that run. It holds canonical peer/local IP addresses,
+resolved names, TCPIPSERVICE, port, symbolic authentication/privacy/TLS
+settings, and optional TLS-accepted certificate bytes and parsed owner/issuer
+fields. Strict canonical decoding, malformed input rejection, SQLite reopen,
+idempotent registration, conflict detection, and task release are covered.
+Row `0070` now reads this authority through a typed `EXTRACT CERTIFICATE`
+route. OWNER and ISSUER select distinct name fields; checked virtual pointers
+expire on the next CICS command, and a selected compiled COBOL route exercises
+the returned values and EIB/RESP fields. Row `0074` has a typed route for
+address, name, service, port, length, and five source-mapped numeric CVDA
+outputs. The selected compiled COBOL route covers IPv4/IPv6 and CVDA fields,
+EIBFN `3E0E`, and RESP/RESP2; provider regressions cover INVREQ 16/5,
+LENGERR 22/3 and 22/4, and all CVDA mappings. Licensed differential evidence
+remains pending.
+
+#### `CIC-902.recovery-syncpoint` progress
+
+The current implementation review used baseline
+`ibm-cics-ts-6x-2026-08-31`, command topics
+`dfhp4_syncpoint.html` at
+`sha256:2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34`
+and `dfhp4_syncpointrollback.html` at
+`sha256:566d8661a0af02559d8679234e959d2e2aa2577dcf14c55211ec07c7c03e2954`,
+plus the accepted file/UOW pilot topics. The provider now recognizes the owned
+`mainframe-env.cics.execution-context@1` invocation binding and returns
+`INVREQ`, RESP 16, RESP2 200 before UOW mutation for a DPL server without
+`SYNCONRETURN` or one constrained by `EXECUTIONSET=DPLSUBSET`; local and
+`SYNCONRETURN`-owned contexts retain the existing commit/rollback path. For an
+owned DPL syncpoint, `mainframe-env.cics.syncpoint.remote-outcome@1` now models
+the remote system's commit decision. An `unable-to-commit` decision drives the
+local UOW through rollback, durably finalizes it as rolled back, returns exact
+`ROLLEDBACK` RESP 82, and replays the same response without rerunning rollback.
+The remote outcome binding is malformed outside `dpl-synconreturn`. Memory,
+SQLite restart, and PostgreSQL 18.6 reopen regressions pass. A zero-credit
+selected-route regression passes through typed COBOL, Conformance IR, the
+durable coordinator, and the product CICS provider with exact RESP/RESP2
+output. It is an internal probe, not reviewed obligation or licensed
+differential credit.
+
+This is partial slice progress only. Public DPL admission and its reviewed
+Conformance binding, deferred-send cancellation, reviewed licensed adapter
+extension and candidate-bound differential remain pending. The current product
+exposes no public DPL server admission route, so both bindings are internal
+contracts for CIC-905 to populate; they do not advertise distributed execution
+early or complete row `0218`.
+
+#### `CIC-902.task-abend-condition` progress
+
+The zero-credit source scope `cics-handle-aid` binds HANDLE AID topic
+`dfhp4_handleaid.html` at
+`sha256:a5270e56450bf8fda4bde93427d7345c9e3e590d36ecae03d3c0dee50a1ac627`
+and its linked BMS/DFHAID constant authority `dfhp4_bmsconstants.html` at
+`sha256:a9034f346d4b726d001d402228462c41535b3dba143749cbc91c58e3dc6c29bb`.
+Both exact HTML bodies were reproduced through the user's existing Chrome
+session before offline verification. The scope provides source identity only
+and grants no execution or licensed differential credit.
+
+The current implementation review used baseline
+`ibm-cics-ts-6x-2026-08-31`, command topic `dfhp4_abend.html` at
+`sha256:a138b2bdbd99e655e07f3b773d5b45bb91a0ce633b36215e8a46825b2033f425`,
+and its referenced `dfhp4_dumptransaction.html` format authority at
+`sha256:165e1964974c535a90fc4d18084012225b4ead00f55b214be59a3ee5aabc12d5`.
+Row `0001` now lowers through typed `cics.task@1.abend` rather than the raw
+compatibility route. Append-only operation tag 17, operand tag 18, and option
+tags 6 and 7 encode ABEND, ABCODE, CANCEL, and NODUMP without retaining source
+text. Compiler and defensive interpreter admission accept an omitted code or
+one 1–4 character literal/storage value; RESP/RESP2 remain pre-resolved numeric
+outputs under the shared condition policy. The typed descriptor declares
+memory read/write, program control, transaction, condition, SAF, and audit
+effects because task termination releases enqueues and can durably change
+HANDLE state.
+
+`ABEND CANCEL` now clears the active HANDLE ABEND exit before returning the
+abnormal-termination disposition, so the handler cannot intercept that abend
+or remain active afterward. The generated runtime-admission catalog now admits
+`CANCEL` and `NODUMP` for row `0001`. A terminal response carries typed
+`ABEND.DUMP` metadata: a valid 1–4 character nonreserved ABCODE requests a dump,
+while an omitted or invalid code and explicit NODUMP suppress it. The execution
+outcome preserves the supplied ABCODE, maps the typed metadata to requested or
+suppressed, and reads historical retained responses without the metadata as
+unspecified. Compiler, provider and interpreter regressions cover the combined
+forms, reserved-code suppression, malformed flags and ABCODE schemas, exact
+output schema, backward-compatible interpretation, and the typed host request.
+Existing compiled selected-route HANDLE ABEND label/reset and program-transfer
+tests now cross the typed ABEND operation while preserving EIBFN `0E0C` and the
+durable exit state.
+
+The same source baseline pins HANDLE ABEND topic `dfhp4_handleabend.html` at
+`sha256:ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e`.
+Row `0097` now lowers through typed `cics.task@1.handle-abend` rather than raw
+compatibility. Append-only operation tag 18, LABEL/PROGRAM operand tags 19/20,
+and RESET option tag 8 preserve the four mutually exclusive action forms; bare
+HANDLE ABEND remains the documented default CANCEL. LABEL is canonical
+intra-program control identity, while PROGRAM is a literal or pre-resolved
+1–8 character field. Defensive plan and machine validation reject mixed
+actions, malformed labels, numeric program fields, and drifted storage slots.
+Retained raw artifacts remain executable through the version-one interpreter.
+
+Selecting an active label automatically moves it
+to the canceled slot before transferring control; RESET reactivates exactly
+that slot, and a bare HANDLE ABEND performs the documented default CANCEL.
+Conflicting CANCEL/LABEL/PROGRAM/RESET forms fail during compiler validation
+and again at the provider boundary. Provider validation also rejects drifted
+LABEL/PROGRAM schemas before authorization or state change. A compiled
+selected-route regression takes
+the same exit twice around RESET, observes exact ABEND EIBFN `0E0C` on both
+entries, then reaches a durable SUSPEND after the default CANCEL with six
+successful audited CICS effects.
+
+The registered LINK topic `dfhp4_link.html` was missing from the local pinned
+cache and was reproduced through the user's existing Chrome session at 61,911
+bytes and
+`sha256:d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`
+before offline read. Together with HANDLE ABEND, it establishes that LINK
+creates a lower logical level with independent condition/AID specifications,
+while CICS searches outward for an active ABEND exit.
+
+Row `0097` now also admits current-level `PROGRAM(name)`. The provider retains
+LABEL and PROGRAM as distinct active/canceled exit kinds, restricts this slice
+to a registered 1–8 character local online program, and performs the exact
+`FACILITY CICS.PROGRAM.<name>` execute check before state change. Missing and
+denied exits return PGMIDERR 27/1 and NOTAUTH 70 respectively. ABEND and an
+otherwise unhandled POP transfer to the program with the issuing program's
+COMMAREA; RESET, CANCEL, PUSH/POP, session CAS, and SQLite reopen preserve the
+typed exit. `MECS7` records that kind, while `MECS6` remains readable as
+label-only state. `MECS9` adds first/current explicit abend lineage without
+changing those exit semantics; `MECS8` remains readable with its sole code
+serving both roles. A compiled two-program route completes the
+source artifact as a handoff and advances the durable exchange to a distinct
+artifact-bound execution,
+and reaches SUSPEND in the exit program with two source-execution and one
+exit-execution CICS audit records. The `MEOM4` staging marker is recovery-tested
+across the gap between predecessor completion and exchange CAS.
+
+The same source batch now reproduces PUSH HANDLE topic `dfhp4_pushhandle.html`
+at `sha256:09c6ba45b2ca6b18930ac13375ecf3526efcaac21a602dd8607fbd129fd0e199`
+and POP HANDLE topic `dfhp4_pophandle.html` at
+`sha256:73f11954246a7448bcefe7ff1f0fa55ecc3f9877c7658824ac491d8a6c8a4f7e`.
+Both missing bodies were fetched through the user's existing Chrome debugging
+session and matched the registered byte counts and hashes before offline read.
+Rows `0149` and `0146` now lower through typed HIR/MIR. PUSH snapshots and
+suspends the current condition mappings, ignored-condition set, and
+active/canceled typed ABEND exits; POP discards the nested specifications and
+restores one of at most 64 frames. An unmatched POP returns INVREQ, RESP 16,
+RESP2 0 through NOHANDLE/RESP policy and takes the abnormal-termination
+disposition by default. Malformed options and stack overflow fail before state
+change.
+
+Focused plan/compiler/provider tests cover canonical tags, empty operand shape,
+nested restoration, exact unmatched behavior, malformed options and the depth
+bound. The compiled selected route installs outer and inner ABEND labels,
+selects the inner label, restores the outer frame with POP, selects the outer
+label, observes EIBFN `0E0C` at both exits and zero POP RESP/RESP2, then reaches
+a durable SUSPEND with eight successful audited CICS effects.
+
+IGNORE CONDITION topic `dfhp4_ignorecondition.html` was reproduced from the
+same Chrome session at its registered 9,526 bytes and
+`sha256:e846c044f3325b379f23ee4ac53b0a2a10c0018f3af1bfd4d4b04f7f1a156891`,
+then read from the external cache. Row `0100` now lowers 1–16 unique condition
+names from the generated 121-name EIBRESP authority into one canonical typed
+operand. The provider validates the exact schema and authority again, removes
+any HANDLE CONDITION mapping for each selected name, and records the ignored
+set at the current program level. A matching failure returns the ignored
+disposition so the interpreter updates EIB state and continues; a later HANDLE
+CONDITION for the same name overrides the ignore. PUSH/POP includes the ignored
+set in its nested snapshot.
+
+Focused IR/compiler/provider tests cover the 1/16 bounds, duplicate, unknown,
+wrong-schema and oversized lists, PGMIDERR continuation, HANDLE override, and
+stack restoration. The compiled selected route ignores unmatched-POP INVREQ
+twice around a pushed HANDLE CONDITION, observes IGNORE EIBFN `020A`, POP EIBFN
+`020E`, EIBRESP 16 after both failures, no error-label transfer, and seven
+successful audited CICS effects before durable suspension.
+
+HANDLE CONDITION topic `dfhp4_handlecondition.html` was reproduced through the
+same Chrome session at its registered 15,152 bytes and
+`sha256:4355374497f90dc693ddc5eab4c90231b433e3580613ef4201c7975bb61bf7ba`,
+then read from the external cache for catalog row `0099`. The command now lowers
+1–16 unique generated condition specifications into one strictly name-ordered
+typed operand and `mainframe-env.cics.condition-handlers@1` host payload. Each
+entry atomically replaces its condition label or, when the label is omitted,
+removes the specific handler and restores the default action. Specific ignores
+and handlers precede the generalized ERROR specification; the latter applies
+only to an otherwise unhandled condition whose default action terminates.
+
+Focused IR/compiler/provider tests cover stable plan tagging, canonical order,
+the 1/16 bound, unknown and case-folded duplicate names, malformed labels,
+wrong schemas, atomic multi-handler installation, omitted-label deactivation,
+IGNORE override, and generalized ERROR fallback. The compiled selected route
+installs ERROR, INVREQ, and unlabeled LENGERR in one command, takes the specific
+INVREQ exit, deactivates it, then takes the generalized ERROR exit on the next
+unmatched POP. It observes HANDLE CONDITION EIBFN `0204` twice, EIBRESP 16 at
+both exits, no fallthrough, and five successful audited CICS effects before
+durable suspension.
+
+Row `0098 HANDLE AID` now lowers through typed HIR/MIR with one canonical
+`mainframe-env.cics.aid-handlers@1` payload. The generator owns a sorted 34-name
+authority covering ANYKEY, CLEAR, CLRPARTN, ENTER, LIGHTPEN, OPERID, PA1–PA3,
+PF1–PF24, and TRIGGER. Each command contains at most 16 unique specifications;
+a missing label is retained as a deactivation tombstone rather than discarded.
+Terminal dispatch checks the exact AID first, then applies ANYKEY only to
+PA/PF/CLEAR. This makes IBM's `ANYKEY(label) PF10` example continue normally
+for PF10 while other PA/PF/CLEAR input takes the label. The reached DFHAID ABI
+now includes PA3, Clear Partition, selector pen, trigger, OPERID/MSR, and
+extended-MSR bytes in addition to the prior Enter/Clear/PA/PF set.
+
+HANDLE AID state participates in the same bounded PUSH/POP stack as condition
+and ABEND specifications. The provider rejects malformed schemas, names,
+ordering, labels, duplicates, and more than 16 entries before state change. A
+DPL execution-context binding returns INVREQ, RESP 16, RESP2 200 under RESP
+policy without installing any handler. Focused tests cover every supported AID
+byte, exact-over-ANYKEY precedence, PF10 deactivation, nested restoration,
+direct terminal-input routing, and the DPL rejection. The compiled selected
+route installs outer ANYKEY/ENTER/PF10 specifications, replaces them inside a
+PUSH frame, restores them with POP, observes HANDLE AID EIBFN `0206` and POP
+EIBFN `020E`, and reaches durable SUSPEND with five successful audited CICS
+effects.
+
+The complete condition/AID/IGNORE/ABEND state, latest explicit abend record,
+and every bounded PUSH frame now live in the existing session authority as
+`MECS8`. Each state change uses the session CAS and restores the prior in-memory
+run if persistence fails. `MECS7` retains typed HANDLE state without an abend
+record, `MECS6` retains its label-only state, and `MECS5` continues to expose
+only its association correlator. `MECS1`–`MECS4` retain their existing readers.
+A SQLite
+close/reopen regression restores a populated current frame and outer PUSH
+frame into a replacement run. A compiled product route installs ANYKEY,
+reaches `RECEIVE MAP`, completes the old execution as a terminal handoff,
+removes the volatile CICS run, resumes under a new execution identity, and
+takes the preserved exit on PF1. Normal completion and non-handoff recovery
+clear the session state so handlers cannot leak into a fresh task.
+
+This is partial slice progress and grants no row credit. Physical dump
+materialization, the non-Language-Environment transaction-dump-table override,
+nested logical-level search, PROGRAM autoinstall/current-channel transfer, and
+licensed differentials remain pending.
+
+#### `CIC-902.task-enqueue` progress
+
+The contract review used baseline `ibm-cics-ts-6x-2026-08-31`, ENQ topic
+`dfhp4_enq.html` at
+`sha256:5c7bdcd1e3bdae56f3b786e5d60d1d90a83f987e94d70f2cfd1b7b0932a611ee`,
+and DEQ topic `dfhp4_deq.html` at
+`sha256:09c89c6001943ab36a0a331db9fae0db13d3a7ce6962ce9ea21acd0795fa9353`.
+The registered zero-credit `cics-task-enqueue` source scope also pins
+`dfha3l3.html` at
+`sha256:be0e7a8eeeecbc39788d6abd8470c46f5fc109b09d12dcafcd79c6a26f5b13d5`;
+that page establishes the dynamic CVDA encodings `TASK=233` and `UOW=246` and
+confirms that ENQ/DEQ have no command-level output fields. ENQMODEL definition
+topic `dfha4_summary.html` is pinned at
+`sha256:0b996b8c9ddaeb10cc92d8031d9e970ac026b249f548a2e0c87b35e14973e322`,
+and global-enqueue tuning topic `dfht3rc.html` is pinned at
+`sha256:190b0b0ab492b284f5ffdba3fb98fb22d729ed48c0ab58dd1f30d4d1688a29ac`.
+They establish blank/local versus nonblank/sysplex scope, generic terminal `*`,
+address locality, disabled-model abend behavior, and shared-region installation.
+All five topics and the CICS 6.x TOC verify in the external cache.
+The generated semantic contract preserves direct `UOW` and `TASK` as flag
+forms distinct from valued `MAXLIFETIME(cvda)`, resolves `RESOURCE` and
+`MAXLIFETIME` as inputs, requires `RESOURCE`, and enforces the three lifetime
+forms as mutually exclusive. A separate identity-bound typed-registration
+catalog advances rows `0050` and `0064` without changing the frozen CIC-901
+descriptor bytes or source receipts. Both rows now lower through typed HIR/MIR;
+the runtime distinguishes address identity from `LENGTH`-selected content,
+decodes dynamic `MAXLIFETIME` values, and updates EIBFN with `1206` for DEQ and
+`1204` for ENQ.
+
+One bounded durable lock authority stores owner execution/run-unit identities,
+nested UOW/TASK counts, a pending promotion, and a FIFO waiter list. A separate
+CAS catalog enforces the resource-row bound. Acquisition, dequeue/promotion,
+and waiter registration commit with the existing retained CICS replay envelope,
+so result-journal failure is reconcilable without redispatch. Syncpoint and
+task termination release the documented lifetimes; abnormal termination,
+discard, disconnect, timeout, and cancellation also remove stale ownership and
+wait entries. `NOSUSPEND` and an active `HANDLE CONDITION ENQBUSY` return RESP
+55, while `NOHANDLE`/`RESP` negate the active handler exactly as the pinned ENQ
+topic specifies. Default ENQBUSY is represented as an ignored condition rather
+than a false normal response.
+
+The model-aware extension persists one complete bounded ENQMODEL set plus a
+singleton count/digest catalog before any lock exists. Blank-scope matches and
+unmatched resources are isolated by APPLID/SYSID; nonblank scope names replace
+that region identity and serialize through the shared store. Terminal `*`
+patterns are supported, address enqueues remain local, disabled matches abend
+ENQ, concurrent installers have one CAS winner, and reopen validates the exact
+catalog. Because the pinned pages do not state priority among overlapping
+patterns, such installations fail closed instead of inventing an ordering.
+
+Focused tests cover nesting, content/address separation, FIFO ordering,
+handler precedence, cycle cancellation, configured bounds, UOW/task cleanup,
+atomic standard replay, SQLite reopen/promotion, and concurrent PostgreSQL 18.6
+CAS ownership. A product test proves compiled COBOL remains the same durable
+online task while contended and resumes only after DEQ; a second path proves a
+deadline terminalizes the execution and removes its waiter. Independent
+selected-route tests cross typed COBOL, Conformance IR, the coordinator, SAF
+and audit, and the selected CICS provider in both local and DPL contexts with
+exact EIBFN bytes.
+
+The current generated contract logical digest is
+`sha256:e1630b63143afdc77aab752e8339884c137c68cebd3cc637d445682cb5e328e4`
+and its physical SHA-256 is
+`5e874daa2926e47dd1918a0f855f37591104ebd53ed71f2d9424defcb0f56005`.
+The generated registry logical digest is
+`sha256:d6cd878e82b19f61c444fff42130034328a13a282bda039a615a195fd0d935ea`
+and its physical SHA-256 is
+`26f2b4280def9cd9a4206970faca65b97561242a85e4c48f741f35c4da7d4694`.
+The legacy-admission catalog SHA-256 is
+`69ed7a3793737a79c534039ea6443d73d996a882059480447c6b3dad5813f283`.
+The typed-registration catalog SHA-256 is
+`e1cc3b79407f258f998daf6275509aa86da747ccf0e64c3b4907b49d414f1384`.
+Generation, source-map, schema, profile, inventory, module, API-doc, rustfmt,
+Clippy, documentation, and dependency-policy checks pass. The broader
+`architecture-fast` command, run against the explicit pinned 0.9 cache, reached
+the CICS source-review freshness step and stopped because that cache lacks linked
+topic `SSNAQ8_11.1.0/reference-api/r_dump.html`; no whole-cache refresh was
+performed for this bounded topic review, so that aggregate gate remains pending.
+
+This extends the executable sub-slice but grants no whole-row or licensed
+differential credit. Overlapping ENQMODEL precedence, NQRNL/RNL rewriting,
+XNQEREQ/XNQEREQC prefixing, protected-runner capture, and candidate-bound
+licensed differential remain pending. The generic signed CICS oracle importer
+can carry the future scenarios, but no task-enqueue licensed capture has run.
+
+#### `CIC-902.task-context` ADDRESS SET progress
+
+The verified `cics-application-api-sources-a` scope pins ADDRESS SET topic
+`dfhp4_addressset.html` at
+`sha256:8cf576daf4efb8ef021037522e0529123078d03aee16b40d16f89ba3d95a4bc5`.
+Row `0006` now distinguishes both documented COBOL forms: set a POINTER or
+POINTER-32 from `ADDRESS OF` a data area, or retarget `ADDRESS OF` linkage data
+from a pointer. The typed plan records those roles explicitly. Provider requests
+carry checked opaque storage identities and virtual-pointer bytes only; no host
+or native address crosses the ABI. Pointer category, writable target, linkage
+target and exact two-role shape fail before storage change, and the interpreter
+applies the alias only after a successful audited provider response.
+
+Focused IR/compiler/provider tests cover both forms and reject pointer/pointer,
+missing, wrong-schema, wrong-category and wrong-width shapes. The compiled
+selected route crosses the coordinator, SAF, audit and selected CICS provider,
+then proves pointer-to-working-storage and pointer-to-linkage aliasing, retained
+alias bytes in the machine checkpoint, RESP/RESP2 zero, and exact EIBFN `0210`.
+This state is interpreter-local and creates no provider row or PostgreSQL CAS
+obligation. ADDRESS COMMAREA and its IBM `X'FF000000'` null are closed by the
+following child; the remaining ADDRESS control-area outputs, backend
+process-restart checkpoint evidence, and licensed differential remain pending,
+so row `0006` receives no whole-row credit.
+
+#### `CIC-902.task-context` priority progress
+
+The zero-credit `cics-task-scheduling` source scope pins CHANGE TASK topic
+`dfhp4_changetask.html` at
+`sha256:e2639224866fcc161c9b08f13d594fa1c5fcfac1f0c6d3e8cdb67c31459b4349`.
+Row `0022` now lowers through typed HIR/MIR. Omitted PRIORITY and value `-1`
+complete without a priority change or yield; values `0..255` update the task
+priority and yield once; other values return exact `INVREQ`, RESP 16, RESP2 1.
+Malformed schemas and unknown options fail before state change. The provider
+returns typed priority control metadata, the interpreter updates its invocation,
+and online continuation `MEOM4` preserves that value across the durable
+checkpoint while retaining readers for `MEOM3` and `MEOM2`.
+
+Focused provider tests cover the value/condition/malformed matrix. A compiled
+selected-route test crosses the coordinator, SAF, audit, and selected CICS
+provider, proves one durable scheduling suspension, closes and reopens the
+`ProductServer` over the same memory store, retains priority 200, and observes
+exact EIBFN `5E06` after resume. This proves process-object-boundary restoration,
+not durable backend process-restart credit. Multi-task ready-queue ordering,
+SQLite/PostgreSQL process restart, the remaining task-context rows/options, and
+licensed differential remain pending, so row `0022` receives no whole-row credit.
+
+#### `CIC-902.task-context` ADDRESS COMMAREA progress
+
+The verified `cics-application-api-sources-a` scope pins ADDRESS topic
+`dfhp4_address.html` at
+`sha256:05c64fdcedf5688ee3b06be8902c4a9fb1b79901bb5ca7d70e5fa295ded0a424`.
+Lines 17–38 establish the COMMAREA pointer output and exact `X'FF000000'` null
+when that area does not exist. The other options expose ACEE, CWA, EIB, TCTUA,
+and TWA control areas whose contiguous source-faithful layouts are not owned by
+the bounded runtime.
+
+Row `0005` now admits only COMMAREA through append-only operation tag 42 and
+pointer-target operand tag 45. The compiler requires writable four-byte
+POINTER or POINTER-32 storage and, when declared, binds DFHCOMMAREA only from
+LINKAGE SECTION. The typed plan records the pointer target and optional source
+area without embedding a native address. The provider validates opaque target
+and source identities, while the interpreter writes a checked virtual address
+only after NORMAL completion. An absent declaration or unassigned linkage area
+writes exact `X'FF000000'`.
+
+The compiled selected route binds a real entry COMMAREA, obtains its virtual
+address, consumes it through the existing ADDRESS SET linkage alias, and reads
+the original bytes. A second route proves exact null output without a COMMAREA;
+both observe EIBFN `0202`. IR/compiler/provider tests cover shape, pointer
+width/category, absent source, malformed schemas, and fail-closed adjacent EIB
+output. No native address crosses the host ABI.
+
+The generated application contract identity is
+`sha256:0c8c3f7be25c4a2758995c75e6ad07ace7b920d15208f5ab08f2376df57855e6`
+and registry identity is
+`sha256:8e12669790b99709d41bd7d5efd41b72c642f40cc0b4dbff98b413a16e9572f6`,
+with 43 typed, 0 legacy compatibility, and 220 unready rows. The host API, IR,
+compiler, CICS, and conformance package suites pass (41, 53, 236, 118 plus
+three environment-gated ignores, and 227 plus two intentional ignores), and
+all 52 focused descriptor/source-map/module-boundary tests pass. ACEE, CWA,
+EIB, TCTUA, TWA, broader
+pointer widths, process-restart checkpoint evidence, and licensed differential
+remain pending. This is partial `CIC-902.task-context` progress and grants no
+whole-row credit.
+
+#### `CIC-902.task-context` ASSIGN context progress
+
+The same scope pins ASSIGN topic `dfhp4_assign.html` at
+`sha256:594c0885848525ccc9c0c1f939a449f0d759f90ada7d29a82ed580342a99bbee`.
+Offline review read the complete 756-line topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html` from its
+257,379-byte verified external-cache body at
+`topic-08b63bafa5162074a3de667f3432a5dec7de10e5346c7a72b5a7ba10e4b14058-sha256-594c0885848525ccc9c0c1f939a449f0d759f90ada7d29a82ed580342a99bbee.html`.
+No host publication cache is available.
+Its source-resolved context subset now executes 92 semantic options plus the
+three common response options. APPLID, SYSID, and USERID come from the owned
+CICS run and authenticated principal; TASKPRIORITY returns the current
+`0..255` invocation priority as a typed decimal into a writable halfword-binary
+receiver. No IBM application context or current channel is bound, so
+APPLICATION, PLATFORM, OPERATION, and CHANNEL return their exact fixed-width
+blank values, while MAJORVERSION, MINORVERSION, and MICROVERSION return typed
+fullword `-1`. Product application names are deliberately not treated as IBM
+CICS application context. Because this runtime defines neither a CWA nor TWA,
+CWALENG and TWALENG return halfword zero; OPERKEYS returns its documented
+eight-byte null compatibility value; RESTART returns `X'00'` because ordinary
+checkpoint resume is not an IBM emergency task restart. All output references
+are resolved before dispatch. The compiler and provider enforce the 16-option
+maximum, exact numeric/fixed receiver shapes, known names, argument schemas,
+and empty flag payloads.
+
+LOCALCCSID returns fullword 37 from the runtime's fixed CP037 CICS-region
+encoding authority. It is available in local and DPL execution and is never
+inferred from source bytes, a terminal request, or a dataset definition. The
+compiler rejects nonbinary, non-fullword, and scaled receivers; provider and
+compiled selected-route tests observe the typed decimal value and exact COBOL
+binary bytes.
+
+The same pinned ASSIGN page specifies that absent initialization parameters
+leave INITPARM unchanged and return INITPARMLEN zero. With no runtime INITPARM
+configuration authority, the provider therefore omits the 60-byte INITPARM
+output and returns typed halfword zero for INITPARMLEN in local and DPL
+contexts. Focused compiler tests reject wrong receiver widths and categories;
+provider and compiled-route tests preserve a 60-byte marker exactly.
+
+The same page defines PROGRAM as the eight-character name of the currently
+running program. The provider derives it only from the selected runtime
+invocation frame and refreshes it for the same authenticated task when control
+transfers to another program; it does not accept a source-supplied context
+binding. The compiler requires an exact eight-byte writable receiver. A
+compiled HANDLE ABEND PROGRAM transfer observes `ABEXIT` in the exit program
+before its durable suspension, and a missing program frame fails closed.
+
+NEXTTRANSID returns the documented four blanks when no next transaction is
+set. No currently executable command can create an observable pending value:
+SET NEXTTRANSID remains unready, and RETURN TRANSID terminates the issuing task.
+The compiler requires an exact four-byte writable receiver. The compiled local
+route overwrites a nonblank marker, while the DPL restriction below leaves the
+receiver unchanged under RESP policy.
+
+RETURNPROG lines 385–395 return eight blanks in the highest-level application
+program, including after an XCTL from that level. The local provider refreshes
+the current frame's parent execution identity from every authenticated
+invocation and returns those blanks only when no parent exists. A LINK child
+and every DPL server program fail closed until the runtime owns a durable CICS
+caller stack; they are not misreported as top level. The compiler and
+interpreter require an exact eight-byte writable receiver, and the compiled
+selected route replaces a nonblank marker with eight blanks.
+
+INVOKINGPROG lines 247–254 return eight blanks for the initial highest-level
+application program, but identify the prior caller after XCTL or LINK. The
+local provider therefore requires both the authenticated current-frame parent
+identity and the durable online program-entry marker before returning blanks.
+XCTL targets, LINK children, and every DPL server program fail closed until the
+runtime owns the required local or remote caller name. Compiler and interpreter
+admission require an exact eight-byte writable receiver, and the compiled
+selected route replaces a nonblank marker with eight blanks.
+
+TERMPRIORITY lines 450–451 return the halfword terminal priority independently
+of the mutable current task priority. The pinned TERMINAL resource topic
+`dfha4_summary.html` at
+`sha256:293c1a2d7c17b49c88bfd27fe7548b6da402377f40ec90b8d6b6a848f1830fe5`
+defines `TERMPRIORITY(0)` as the default at lines 411–415. The runtime has no
+terminal-priority override, so an owned local terminal returns typed zero even
+after CHANGE TASK raises TASKPRIORITY to 200. A local run without the owned
+terminal returns `INVREQ` 16/5 and DPL prohibition returns 16/200, preserving
+the receiver. TRANPRIORITY and USERPRIORITY remain rejected until their
+separate transaction and RACF operator-priority authorities exist.
+
+LANGINUSE lines 258–259 return the three-byte mnemonic for the language in use.
+The same pinned TERMINAL topic defines unoverridden NATLANG `E` as English at
+lines 185–191, and pinned national-language topic `dfhp4_nlscodes.html` at
+`sha256:0f4d6eb9095d5f00059056939483d04dd5a1398bb07d09989be854d4a7457540`
+maps `E` to `ENU` at lines 1–18. The runtime has no terminal or system language
+override, so local and DPL execution return exactly `ENU`; compiler and
+interpreter admission require an exact three-byte writable receiver.
+NATLANGINUSE remains rejected because it is the current USERID's distinct
+RACF-associated language, not the system default.
+
+INPUTMSGLEN lines 245–246 return a halfword byte length for the terminal input
+string and zero when no input data exists. The runtime now bounds normalized
+input to 32,767 bytes, records its exact encoded map-input length in current
+session codec `MECSB`, preserves that length when RECEIVE consumes the payload,
+and restores it after SQLite reopen. Historical `MECS1`–`MECSA` sessions remain
+strictly readable; pre-`MECSA` rows derive the length from an unconsumed payload.
+A
+compiled HANDLE AID handoff receives one field, consumes it, and then observes
+length 15; the ordinary selected route and DPL context observe zero.
+
+INPARTN lines 242–244 return the one- or two-character most recent input
+partition and define `INVREQ` when no map has yet been positioned or the task
+has no terminal. The admitted negative path returns 16/2 for an owned terminal
+before map positioning, 16/5 for local nonterminal use, and the pinned DPL
+restriction's 16/200, preserving the receiver in every case. Once a map is
+positioned, the provider fails closed until it owns durable input-partition
+state rather than fabricating a partition name.
+
+FACILITY lines 210–212 return the four-byte principal-facility identifier, and
+NETNAME lines 299–306 return its eight-character Communications Server name.
+The pinned TERMINAL resource topic defines an omitted NETNAME to default to the
+TERMINAL name at lines 196–206. New virtual-terminal sessions therefore
+allocate the lowest unused `T000`–`TZZZ` identifier under the session lock and
+persist it in codec `MECSB`; FACILITY returns the four bytes and NETNAME pads
+the same name to eight. Historical sessions decode with no identity and fail
+closed rather than being relabeled. Local nonterminal use returns 16/5,
+FACILITY follows the pinned DPL prohibition at 16/200, and DPL NETNAME fails
+closed until a remote terminal identity is propagated.
+
+TNADDR lines 458–461 return a 39-character IPv4 or IPv6 client address and
+require blanks when TNIPFAMILY is NOTAPPLIC; an unresolvable address is one of
+the source-defined NOTAPPLIC cases. The runtime retains no client network
+endpoint, so an owned local terminal returns exactly 39 blanks. Local
+nonterminal use returns 16/5, while DPL fails closed until remote endpoint
+context is propagated. TNIPFAMILY and TNPORT remain rejected because the
+required CVDA identity and actual client port are not owned.
+
+BRIDGE returns its documented four blanks because this runtime has no bridge
+monitor start path. IBM defines the same value for an ordinary local task and a
+DPL server program, so the provider does not need to fabricate a terminal or
+bridge identifier. The compiler requires an exact four-byte writable receiver,
+and the compiled selected route overwrites a nonblank marker.
+
+ABCODE returns the latest explicit EXEC CICS ABEND code, padded to four bytes,
+or four blanks before such an abend. ORGABCODE returns the first abend code and
+therefore differs from ABCODE after a repeated abend. The supplemental pinned
+program-error topic `dfha34n.html` at
+`sha256:f5640481c5ce23ff12badf448e32b7b016ed49022c3ae16c1d5e242ca6bb0c8f`
+defines that first-abend lineage. ABDUMP is `X'FF'` when the current command
+carried a valid ABCODE without NODUMP and `X'00'` otherwise. ABPROGRAM returns
+the trusted current program captured when the abend was issued, or eight binary
+zero bytes when no program can be determined. `MECS9` persists both codes and
+the other fields with the HANDLE state CAS; `MECS8` decodes its one code as both
+original and current, while `MECS7` remains readable with no abend record. A
+compiled two-program HANDLE ABEND PROGRAM route observes `B777`, `X'FF'`, and
+`HABPROG` from ABEXIT after the artifact-bound handoff, while a SQLite reopen
+test restores a NODUMP record without inventing a missing program name. A
+compiled repeated-handler route observes current `B002` and original `B001`.
+
+The same ASSIGN source defines the no-fault forms of ABOFFSET as fullword zero,
+ASRAINTRPT as eight zero bytes, ASRAPSW and ASRAPSW16 as 8 and 16 zero bytes,
+and ASRAREGS and ASRAREGS64 as 64 and 128 zero bytes. The runtime has no
+recoverable AICA/ASRA/ASRB/ASRD/ASRE machine-check-to-CICS handoff, and an
+explicit EXEC CICS ABEND is not treated as a processor fault, so these absence
+values are exact in local and DPL contexts. Compiler checks enforce every
+binary category and fixed width; provider and compiled-route tests replace
+nonzero markers without fabricating instruction-interrupt, PSW, register, or
+offset data.
+
+ERRORMSG returns its full 500-byte area as binary nulls and ERRORMSGLEN returns
+halfword zero because the runtime has no transaction-abend-control-block error
+message. An explicit EXEC CICS ABEND record is not reinterpreted as such a
+message. Both values are exact in local and DPL contexts; compiler checks
+enforce the 500-byte character area and halfword-binary length, and the compiled
+selected route replaces nonzero markers.
+
+ALTSCRNHT, ALTSCRNWD, DEFSCRNHT, DEFSCRNWD, SCRNHT, and SCRNWD return halfword
+binary values from the durable terminal session's owned rows and columns. The
+runtime has one fixed physical geometry per session, so its alternate, default,
+and current values are identical. A local run whose session lacks the matching
+principal, run-unit, and transaction attachment returns `INVREQ` 16/5; allowed
+outputs in the same RESP-handled command still populate. All six screen options
+are DPL-prohibited and therefore return `INVREQ` 16/200 without changing their
+receivers. The compiler enforces halfword-binary output areas, and the compiled
+selected route observes 24 rows by 80 columns after durable task resume.
+
+FCI is always returned locally: `X'01'` when the same owned terminal attachment
+is present and `X'00'` when the run has no principal facility. Those are the
+pinned facility-control codes for a terminal and no facility. The compiler
+requires one writable byte; the selected route observes `X'01'`, while the
+local nonterminal partial-condition regression still receives `X'00'`. DPL
+prohibits FCI and leaves its receiver unchanged under RESP policy.
+
+LINKLEVEL returns halfword one for a top-level local invocation. In DPL, the
+pinned source makes the mirror program DFHMIRS level one, so the server
+application returns level two. A local child invocation with no owned CICS
+link-depth chain fails closed instead of assuming that one parent execution is
+exactly one LINK. Compiler and provider tests enforce the halfword receiver,
+local and DPL values, and the nested-context failure; the compiled selected
+route observes level one.
+
+PARTNSET returns the documented six blanks because the runtime has no
+application partition-set definition. It uses the same exact durable terminal
+attachment as the screen options: local nonterminal use returns `INVREQ` 16/5
+and DPL returns 16/200 without changing the receiver. Compiler,
+provider, and compiled-route tests enforce the six-byte area and overwrite a
+nonblank marker only for the valid terminal path.
+
+The zero-credit `cics-bms-map-origin` scope pins the target-product DFHMDI
+overview `dfhp3cd.html` at
+`sha256:e86190106cf43d40b79fdf2e6e64f40ffa0cef4f5b56a3e4894c9aec95b0eb72`
+and macro topic `dfhp47g.html` at
+`sha256:4c3fc95c18540c56a993770d06ed82a61ac2eec2886c0d24e46c055b2b2bd38c`.
+Both were reproduced from IBM's official HTML content endpoint through the
+user's existing Chrome debugging session and reverified offline. They establish
+that DFHMDI owns map size and placement, including numeric LINE/COLUMN.
+
+MAPCOLUMN, MAPHEIGHT, MAPLINE, and MAPWIDTH return the four halfword geometry
+values from the durable definition of the map most recently positioned by SEND
+MAP. The session owns the last mapset/map identity, and the map catalog supplies
+its geometry after an in-memory server reopen; no value is inferred from screen
+geometry. `MECM6` persists numeric LINE/COLUMN, and historical `MECM1`–`MECM5`
+rows retain the runtime's prior top-left origin. Terminal rendering applies the
+origin to map-relative fields. A terminal task with no positioned map receives
+`INVREQ` 16/2 and preserves all four receivers; DPL returns 16/200. A map whose
+origin and extent exceed the terminal fails before session mutation with
+source-named `INVMPSZ`, RESP 38.
+
+The virtual terminal authority emits and accepts a 3270 data stream over its
+TN3270 adapter and is not a basic SCS data-stream device. DS3270 and DSSCS
+therefore return the documented `X'FF'` and `X'00'` indicators for that owned
+terminal. Its deliberately minimal terminal definition has no APL keyboard or
+text, background transparency, color, Erase Write Alternative, extended data
+stream, good-morning-message, highlighting, Katakana, magnetic-slot-reader,
+outline, partition, programmed-symbol, mixed EBCDIC/DBCS, text keyboard or
+print, or validation capability. APLKYBD, APLTEXT, BTRANS, COLOR, EWASUPP,
+EXTDS, GMMI, HILIGHT, KATAKANA, MSRCONTROL, OUTLINE, PARTNS, PS, SOSI,
+TEXTKYBD, TEXTPRINT, and VALIDATION therefore return `X'00'`; the provider
+does not infer capability from unparsed input bytes. All 19 indicators require
+exact one-byte receivers; local nonterminal and DPL requests preserve them
+under the same partial-`INVREQ` matrix.
+
+UNATTEND returns the documented attended indicator `X'00'`. Every terminal
+session is an interactive attachment authenticated to the task principal and
+protected by its anti-forgery token; the runtime has no unattended terminal
+mode to infer. The compiler requires an exact one-byte receiver. A local task
+without the owned terminal returns `INVREQ` 16/5, and DPL returns 16/200,
+leaving the receiver unchanged under RESP policy.
+
+CMDSEC and RESSEC return the documented `X` enabled indicator. Every CICS
+dispatch requires the caller's execution grant and a `TCICSTRN CICS.<transid>`
+authorization before its handler runs; handlers that own program, file, queue,
+or task-correlation resources add their exact typed SAF checks. The fixed
+secure profile therefore does not infer these values from a permissive test
+fixture. Both require exact one-byte receivers and remain available in DPL.
+
+QNAME has an exact negative implementation because no runtime path starts a
+task through an automatic transaction initiation trigger. A local request
+therefore returns `INVREQ` 16/4 and leaves its exact four-byte receiver
+unchanged; DPL prohibition takes precedence and returns 16/200. Other allowed
+outputs in the same RESP-handled request still populate. A later ATI slice must
+add the positive queue-name authority before any successful value is exposed.
+
+ACTIVITY, ACTIVITYID, PROCESS, and PROCESSTYPE likewise have exact negative
+implementations because no runtime path executes on behalf of a BTS activity.
+IBM fixes their output widths at 16, 52, 36, and 8 bytes and qualifies the
+missing BTS environment with `INVREQ` 16/6. The compiler enforces those widths;
+local and DPL provider regressions preserve all four receivers while populating
+an allowed APPLID in the same RESP-handled request. These options are not on the
+DPL-prohibited list, so RESP2 6 remains the applicable result in DPL.
+
+DESTID and DESTIDLENG have exact negative implementations because no batch data
+interchange command can establish a destination in this runtime. IBM fixes the
+receivers at eight bytes and a halfword and qualifies a request made before any
+BDI command with `INVREQ` 16/3. In DPL, both options are explicitly prohibited,
+so 16/200 takes precedence. Local and DPL regressions preserve both receivers
+while populating an allowed APPLID in the same RESP-handled request.
+
+PRINSYSID has an exact negative implementation because the runtime has no MRO,
+LU6.1, or APPC principal facility. IBM fixes its receiver at four bytes and
+qualifies both an inapplicable facility and no principal facility with `INVREQ`
+16/5. Local and DPL regressions preserve the receiver while populating an
+allowed APPLID in the same RESP-handled request; PRINSYSID is not among the
+source-prohibited DPL options.
+
+DESTCOUNT, LDCMNEM, LDCNUM, PAGENUM, and PARTNPAGE have exact negative
+implementations because no executable BMS command in this runtime establishes
+overflow state. Lines 172–176, 260–265, and 341–345 of the pinned ASSIGN topic
+define their halfword, two-byte, one-byte, halfword, and two-byte receivers;
+lines 495–511 define `INVREQ` 16/2 when no BMS command or positioned map
+precedes the request. Local provider and compiled selected-route regressions
+preserve all five receivers while an allowed APPLID in the same RESP-handled
+request still populates. The pinned DPL restriction topic
+`dfhp3c00237.html` at
+`sha256:15437f723e698bf2e69bc0e5688daabf69e0b66aaf1369ee119bd6630892ef7e`
+prohibits all five, so DPL returns 16/200 and preserves their receivers.
+
+STARTCODE lines 412–431 of the pinned ASSIGN topic define a two-character
+output and the `D`, `DS`, `QD`, `S`, `SD`, `SZ`, `TD`, and `U` values. The
+frozen source projection currently merges those value-table rows into the
+option's syntax stacks, leaving its value shape and direction bounded rather
+than resolved. The compiler therefore continues to reject STARTCODE before
+legacy lowering. No execution option was admitted from this review; a later
+slice must correct and independently verify the source projection first.
+
+The pinned DPL restriction topic `dfhp3c00237.html` at
+`sha256:15437f723e698bf2e69bc0e5688daabf69e0b66aaf1369ee119bd6630892ef7e`
+prohibits ALTSCRNHT, ALTSCRNWD, APLKYBD, APLTEXT, BTRANS, COLOR, DEFSCRNHT,
+DEFSCRNWD, DESTCOUNT, DESTID, DESTIDLENG, DS3270, DSSCS, EWASUPP, EXTDS, FCI,
+GMMI, HILIGHT, KATAKANA, LDCMNEM, LDCNUM, MAPCOLUMN, MAPHEIGHT, MAPLINE,
+MAPWIDTH, MSRCONTROL, NEXTTRANSID, OPSECURITY, OUTLINE, PAGENUM, PARTNPAGE,
+PARTNS, PARTNSET, PS, QNAME, SCRNHT, SCRNWD, SOSI, TCTUALENG, TERMPRIORITY,
+TEXTKYBD, TEXTPRINT, UNATTEND, and VALIDATION. In their valid local contexts
+they return the owned terminal geometry and capability indicators, the
+applicable four- or six-blank value, three null bytes, and halfword zero, but
+an explicit DPL context returns `INVREQ`, RESP 16, RESP2 200; with RESP
+policy, an allowed APPLID requested in the same command is still populated
+while all prohibited outputs remain unchanged. Default unhandled policy
+retains the ADPL-equivalent
+abnormal path as the typed condition error.
+The other 35 successful options execute normally under
+`dpl-without-synconreturn`; the four admitted BTS outputs return their exact
+non-BTS 16/6 condition and PRINSYSID returns its exact 16/5 condition in both
+local and DPL contexts.
+
+The compiled selected route changes the task priority to 200, resumes the same
+durable online task, then observes the owned identifiers and priority, all 63
+exact absence/default values, six terminal geometry values, four positioned-map
+geometry values, fixed region CCSID 37, the terminal FCI, link level one, EIBFN
+`0208`, zero RESP/RESP2,
+and thirteen successful CICS audit decisions after the selected route also
+purges the reachable empty logical message. ASSIGN is read-only and creates no
+provider-state recovery obligation. A separate durable selected-route proof
+observes the updated PROGRAM and explicit abend values after program transfer.
+
+Row `0011` now lowers through typed `cics.task@1.assign`. Append-only operation
+tag 32 and ASSIGN output tags 13–90 encode the original 78 admitted names;
+extension tags 96–100 encode the five BMS-overflow outputs and tags 101–109
+encode RETURNPROG, TERMPRIORITY, LANGINUSE, INPUTMSGLEN, and INVOKINGPROG
+plus INPARTN, FACILITY, NETNAME, and TNADDR without changing fixed output tags
+91–95 or retained artifacts.
+Every output carries its
+pre-resolved writable storage slot; RESP/RESP2 retain their common typed
+condition bindings. The codec rejects unknown, duplicate, cross-command and
+more-than-16 output forms, while interpreter admission repeats every binary and
+fixed-width receiver check before dispatch. A compiled Conformance regression
+observes exact APPLID/TASKPRIORITY arguments, returned character/binary bytes,
+and EIBFN `0208`. Retained raw ASSIGN artifacts remain readable by the
+compatibility decoder.
+
+At the ASSIGN integration point, the regenerated contract had identity
+`sha256:30aaa1d583674ddc278689ece7110c4e27e0b7756439a8a4da44115d64131957`
+and registry identity
+`sha256:103c271605bf4b5450184ffa2564a1b9b2a0abe794f56d836256749c47a7e2c4`,
+with 33 typed, 1 legacy compatibility, and 229 unready rows. The other 21
+generated semantic options, their partial-`INVREQ` combinations, complete DPL
+matrix, and licensed differential remain pending, so row `0011` receives no
+whole-row credit and remains partial `CIC-902.task-context` progress.
+
+#### `CIC-902.task-context` task-association progress
+
+The zero-credit `cics-task-association` scope pins system-command topic
+`set-association-usercorrdata.html` at
+`sha256:c38ae42617d5dbbdf8e1dd8f1aa546d4c76ef960c1f2431b2ec1eb65e503c42a`.
+Row `0193` now lowers through typed HIR/MIR and overwrites the originating
+task's correlator. Inputs longer than 64 bytes are silently truncated exactly as
+documented. A different issuing task returns `INVREQ`, RESP 16, RESP2 1; the
+owned `FACILITY` command decision maps denial to `NOTAUTH`, RESP 70, RESP2 100
+before state change. Platform SAF audit remains mandatory and is explicitly
+distinct from the source statement that CICS does not audit the command.
+
+The task value lives in the existing durable `cics-session` authority. `MECS9`
+binds its last write to the mutation key and canonical request digest while
+also carrying task HANDLE state and abend history. The reader maps
+`MECS1`–`MECS4` to empty association state, preserves the `MECS5`–`MECS8`
+correlator, maps
+versions 1–5 to empty HANDLE state, and retains label-only exits from `MECS6`
+and typed exits from `MECS7` onward. Focused tests cover
+overwrite/truncation, malformed schemas, origin and authorization failures,
+same-key/different-request rejection, a replay-journal failure followed by exact
+recovery, and SQLite reopen. The compiled selected route crosses real RACF/SAF,
+audit, the coordinator and selected CICS provider, persists 64 exact bytes, and
+captures EIBFN `C404` with zero RESP/RESP2. The PostgreSQL CAS/reopen test is
+present but its isolated database was unavailable, and DPL task-origin mapping
+plus licensed differential remain pending, so row `0193` receives no whole-row
+credit.
+
+#### `CIC-902.task-wait` SUSPEND progress
+
+The same source scope pins SUSPEND topic `dfhp4_suspend.html` at
+`sha256:f6f4715d102266e134d06c08d24cbba29b6fe578be56c8ab0e446741b09e1811`.
+Row `0214` now emits a typed one-shot `cics-scheduler` suspension: the program
+counter advances before the durable handoff, and the next resume continues
+after SUSPEND rather than reissuing it. The compiled selected route observes
+exact EIBFN `1208`, a second successful audited effect, and terminal completion
+after the next resume, including across the same in-memory server reopen. That
+reopen receives no durable backend process-restart credit. Priority-aware
+concurrent dispatch, WAIT EXTERNAL/WAITCICS, SQLite/PostgreSQL process
+restart, and licensed differential remain pending, so row `0214` receives no
+whole-row credit.
+
+#### `CIC-902.task-wait.wait-event` progress
+
+Offline source review used baseline `ibm-cics-ts-6x-2026-08-31`, row `0233`
+topic `dfhp4_waitevent.html` at
+`sha256:cd2dc039863cac02b71761484e13c5424568617ae7480e4b4991a3d8ddc2f58f`.
+The committed sources-C manifest resolves 13,558 bytes for that primary topic;
+the matching retained archive body was SHA-256 verified and read through the
+repository `PlainText` parser without network or browser refresh. Lines 17–31
+define suspension until the one ECB is posted, lines 38–46 define ECADDR and
+optional 1–8 alphanumeric NAME, and lines 48–70 define INVREQ response2 2, 3,
+4, and 6. The bounded runtime uses checked 31-bit virtual addresses, so the
+24-bit above-line response2 3 case is source-backed non-applicable.
+
+Row `0233` now lowers through typed `cics.task@1.wait-event`. Append-only plan
+operation tag 43 plus ECADDR and NAME operand tags 46/47 preserve all existing
+encodings. The compiler accepts POINTER or POINTER-32 ECADDR storage only when
+its resolved length is exactly four bytes and validates NAME; the interpreter
+rejects exact null pointers with INVREQ 16/2, rejects non-fullword alignment
+with 16/4, recognizes posting only from the first-byte `X'40'` POST bit,
+reissues the same statement after suspension, and applies the posted ECB value
+only after a validated completion output.
+
+The provider stores one versioned `cics-task-wait-v1` row per run with exact
+execution/session/event identity, CAS-fenced post state, consumer effect key,
+and canonical request digest. Standard post is authorized against the live
+run/session/principal tuple, survives SQLite reopen, and a repeated identical
+effect replays the same suspension or completion. Hand post is rejected for
+this POST-style event, terminal completion/cancellation cleanup deletes the
+row, and no background worker or provider-private scheduler is introduced.
+The existing bounded online lane and coordinator own resume, deadline,
+cancellation, audit, and checkpoint lifecycle.
+
+The runtime does not yet own shared POST provenance or cross-task storage-key
+metadata. Cross-task user-key INVREQ 16/6 and duplicate ECB ownership are
+therefore explicitly pending until a shared POST provenance authority exists;
+this WAIT EVENT slice claims neither behavior.
+
+Direct provider tests cover SQLite reopen, post replay, null condition, cleanup,
+and DPL admission. Independent compiled-machine proof covers suspension,
+same-statement reissue, ECB update, and EIBFN `1202`; the product selected route
+crosses the durable coordinator, host ABI, audit, and selected CICS provider
+before resuming to a one-shot SUSPEND. The generated contract identity is
+`sha256:a3e86326e669d608b118e334e3d62436fefd7280d9c99ef3d453bb9d91ccebf3`
+and registry identity is
+`sha256:f2100240c73cc98b61876ce0ca320f222c3727b7bd16bc87729683218521e8dc`,
+with 47 typed, 0 legacy compatibility, and 216 unready rows. PostgreSQL shared
+CAS and licensed differential remain pending at their declared integration
+gates; WAIT EXTERNAL and WAITCICS remain fail-closed for their following
+children.
+
+#### `CIC-902.program-link-return` LINK/XCTL/RETURN progress
+
+The `cics-application-api-sources-b` scope pins LINK topic
+`dfhp4_link.html` at
+`sha256:d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`.
+It defines a 1–8 character PROGRAM selector, COMMAREA as data made available to
+the lower logical level, optional halfword LENGTH, independent condition state
+at the linked level, local versus distributed routing, and the remote-only
+CHANNEL, INPUTMSG, SYSID, TRANSID, and SYNCONRETURN behaviors.
+
+Row `0138` now lowers its previously advertised local PROGRAM/COMMAREA subset
+through typed `cics.program@1.link`. Append-only operation tag 19, PROGRAM and
+COMMAREA operand tags 20/21, and COMMAREA output tag 11 bind a literal or
+pre-resolved program name plus one identity-checked input/output data area.
+The existing LENGTH operand now also accepts a literal, numeric storage, or
+matching LENGTH OF identity and selects the copied prefix before dispatch.
+Compiler and defensive plan validation require PROGRAM, reject numeric or
+oversized names, require COMMAREA to be writable storage, and prove that its
+input and output roles name the same slot. The interpreter preserves a captured
+input payload when registering that same name as an output, requires the typed
+CICS payload schema on return, and updates EIBFN `0E02`.
+
+The provider revalidates the exact request schemas and performs
+`FACILITY CICS.PROGRAM.<name>` execute authorization before nested dispatch. A
+fixed conformance probe observes exact request and returned bytes. A compiled
+online selected route crosses the durable coordinator, SAF, audit, CICS
+provider, and the registered IEFBR14 program route; the returned program result
+overwrites the same COMMAREA before a durable SUSPEND.
+
+The `cics-application-api-sources-c` scope pins XCTL topic `dfhp4_xctl.html` at
+`sha256:36f21ef4427db220cc83f8d92b3f37296df4fc9f546ff10200ac61f891aa73fc`.
+It was absent from the external cache and was reproduced from IBM's official
+HTML content endpoint through the user's existing Chrome debugging session as
+28,961 bytes, matching that registered digest exactly under content-addressed
+cache key
+`topic-d7158be11fbb0d72da08ca52b5b8cfceebad39122392e0ad66951347bab2c4e2-sha256-36f21ef4427db220cc83f8d92b3f37296df4fc9f546ff10200ac61f891aa73fc.html`.
+Offline read establishes an unconditional same-level transfer that releases the
+caller, a 1–8 alphanumeric PROGRAM selector, COMMAREA contents made available to
+the invoked program, and EIBFN `0E04`.
+
+Row `0263` now lowers its advertised local PROGRAM/COMMAREA subset through typed
+`cics.program@1.xctl`. Append-only operation tag 20 reuses PROGRAM and COMMAREA
+operand tags 20/21, but deliberately has no COMMAREA output binding because the
+caller does not regain control. Literal, numeric-storage, and matching LENGTH
+OF forms select the target frame's copied COMMAREA and EIBCALEN. Compiler and
+plan validation require PROGRAM,
+admit only a literal or resolved bounded program name, require COMMAREA to be
+writable storage, and reject every unowned option before executable lowering.
+The exact conformance probe observes the typed mutation request, input bytes,
+frame-replacing transfer, and EIBFN `0E04`. The compiled online selected route
+crosses the durable coordinator, SAF, audit, and CICS provider, replaces the
+caller with a separately installed program, initializes its `DFHCOMMAREA`, and
+suspends in that target frame.
+
+The `cics-application-api-sources-c` scope also pins RETURN topic
+`dfhp4_return.html` at
+`sha256:71396046a1caeab92a27bc0debfac79b2bb5a0d5567db69887c8e5ad1e0b84c4`.
+It was absent from the external cache and was reproduced through the same
+Chrome session as 32,574 bytes, matching the registered digest exactly under
+content-addressed cache key
+`topic-c38cc91db2acc9b7a630abd3b6b4aabc4598bfc78bd637a9762876bd0a81a3d8-sha256-71396046a1caeab92a27bc0debfac79b2bb5a0d5567db69887c8e5ad1e0b84c4.html`.
+Offline read establishes return to a higher logical level or CICS, a copied
+COMMAREA, a 1–4 character next TRANSID, and EIBFN `0E08`.
+
+Row `0178` now lowers bare RETURN and its bounded local TRANSID/COMMAREA subset
+through typed `cics.task@1.return`. Append-only operation tag 21 and TRANSID
+operand tag 22 reuse the input-only COMMAREA tag 21. The compiler admits a
+literal or resolved 1–4 character transaction name and requires TRANSID when
+COMMAREA is present so the copied bytes have a durable continuation identity.
+Its LENGTH accepts the same literal, numeric-storage, or matching LENGTH OF
+forms and persists only the selected continuation prefix.
+The provider revalidates exact schemas, mutation identity, name bounds, and
+local execution context before state change. A fixed conformance probe observes
+the typed mutation request, copied bytes, terminal completion, response fields,
+and EIBFN `0E08`. Existing compiled product routes then prove both durable
+TRANSID/COMMAREA carryover and crash-safe pseudo-conversation handoff without a
+leaked suspended execution.
+
+For LINK, remote DATALENGTH validation, CHANNEL, INPUTMSG/INPUTMSGLEN, SYSID,
+TRANSID, and SYNCONRETURN remain pending. For XCTL, CHANNEL,
+and INPUTMSG/INPUTMSGLEN remain pending. For RETURN, CHANNEL,
+INPUTMSG/INPUTMSGLEN, IMMEDIATE, ENDACTIVITY, COMMAREA without TRANSID, and
+higher-level/DPL ownership remain pending. Remote conditions, broader restart
+recovery, and licensed differential also remain pending and are explicit
+typed-lowering rejections. Retained raw LINK, XCTL, and RETURN artifacts remain
+readable. This is partial slice progress and grants no whole-row credit.
+
+#### `CIC-902.program-link-return.commarea-length` progress
+
+Offline review reused LINK row `0138` topic `dfhp4_link.html` at
+`sha256:d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`
+from `cics-application-api-sources-b` and XCTL row `0263` topic
+`dfhp4_xctl.html` at
+`sha256:36f21ef4427db220cc83f8d92b3f37296df4fc9f546ff10200ac61f891aa73fc`
+from `cics-application-api-sources-c`. LINK lines 103–150 and XCTL lines 47–56
+define COMMAREA plus halfword LENGTH. RETURN row `0178` topic
+`dfhp4_return.html` at
+`sha256:71396046a1caeab92a27bc0debfac79b2bb5a0d5567db69887c8e5ad1e0b84c4`
+from the same source-c scope defines the copied area, 0–32763 range, and
+halfword LENGTH at lines 15–25 and 65–79. Their condition sections define
+LENGERR 22 with response2 11 for out-of-range lengths and response2 26/28 for
+missing or overrun storage. The retained verified bodies were read offline
+through the repository parser.
+
+The existing typed LENGTH operand now applies to LINK and XCTL as well as
+RETURN. Compiler lowering accepts integer literals, numeric storage, and
+`LENGTH OF` the exact COMMAREA. Defensive plan validation rejects a missing
+COMMAREA or a mismatched LENGTH OF identity. The provider parses one bounded
+length (1–32763 for LINK, 0–32763 for XCTL/RETURN), rejects nonzero length
+without COMMAREA, refuses a prefix past the resolved data area, and truncates
+before nested dispatch or frame transfer. No native adjacent storage can be
+read.
+
+Focused plan, compiler, provider-condition, and compiled selected-product tests
+pass. The LINK fixture crosses the ordinary durable provider route with an
+explicit LENGTH OF; the XCTL fixture transfers only `REQU` from `REQUEST` and
+the replacement frame checkpoints EIBCALEN 4. DATALENGTH, channels, input
+messages, remote DPL/SYNCONRETURN, higher-level RETURN ownership, broader
+restart recovery, and licensed differential remain pending, so no whole row is
+credited.
+
+#### `CIC-902.program-link-return.local-datalength` progress
+
+Offline review reused LINK row `0138` topic `dfhp4_link.html` at
+`sha256:d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`
+from `cics-application-api-sources-b`. Lines 113–122 define DATALENGTH as the
+halfword length of the contiguous area sent from the start of COMMAREA for a
+remote transfer, require it not to exceed LENGTH when checked, and explicitly
+state that static local LINK does not check it. The retained verified body was
+read offline through the repository parser.
+
+Typed LINK now retains DATALENGTH under append-only operand tag 37 as a literal
+or numeric-storage value. It requires both COMMAREA and LENGTH at compiler,
+plan, and provider boundaries. The current provider has only the static local
+LINK route, so it validates the canonical decimal schema but intentionally
+does not range-check DATALENGTH or use it to truncate the payload. LENGTH remains
+the sole local COMMAREA selector. A negative DATALENGTH provider regression and
+the compiled selected-product route with `DATALENGTH(1)` both prove that the
+full LENGTH-selected JSON COMMAREA reaches the child program.
+
+The supporting identity enums moved from the exactly-at-limit plan facade into
+a 248-line module; the facade is now below the 1,200-line review ceiling while
+wire tags and public type paths remain stable. Focused plan-tag, compiler,
+provider, and compiled product tests pass. Remote/dynamic LINK admission and
+DATALENGTH response2 12/13 checks, DPL recovery, and licensed differential
+remain pending, so LINK receives no whole-row credit.
+
+### `CIC-902.storage-main` local GETMAIN progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0094` pin GETMAIN topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain.html` at
+`sha256:a7cabe581f65570ab751c82ad00520777b84bafbbecceef52d067c33196269aa`.
+The retained verified body was read offline through the repository parser.
+Lines 15–17 and 135–174 define SET pointer output, fullword FLENGTH, optional
+one-byte INITIMG, positive length, and zero-pointer behavior for invalid
+length. Lines 188–202 define exact LENGERR 22/1 and NOSTG 42/2, with NOSTG
+ignored by default.
+
+Row `0094` now lowers the bounded task-local subset through typed
+`cics.storage@1.getmain`. Append-only operation tag 39 plus FLENGTH and INITIMG
+operand tags 39 and 40 carry a literal or fullword-binary allocation length and
+an optional one-byte character image. SET is a pre-resolved POINTER or
+POINTER-32 output; NOSUSPEND and the common response forms are the only admitted
+options. LENGTH, BELOW, USERDATAKEY, CICSDATAKEY, SHARED, EXECUTABLE, and every
+unowned form remain fail-closed before publication.
+
+The interpreter publishes its remaining byte/frame capacity to the provider,
+allocates no native address, and writes only its checked virtual address into
+SET. The provider returns initialized bytes under the request mutation/replay
+identity, returns LENGERR 22/1 with a null pointer for nonpositive FLENGTH or a
+request above the configured storage limit, and returns source-defined NOSTG
+42/2 when an otherwise valid area is not currently available. Allocated bases
+and virtual addresses are preserved by the existing
+machine checkpoint; no provider-state row or durable-backend parity claim is
+applicable to this task-local storage. Without INITIMG, backing bytes are
+deterministic for safety but remain semantically unspecified.
+
+Direct provider coverage proves initialization, exact conditions, default
+NOSTG disposition, and response replay. The selected compiled route restores a
+checkpoint containing initialized GETMAIN storage, dereferences it through a
+COBOL linkage item, and observes exact zero-pointer and RESP/RESP2 values for a
+second zero-length request. The resulting application contract identity is
+`sha256:95c209f66cc9ddcc14b9aa3af629a0a15164da99c9c6eb1e9b9db2f518469ddb`
+and registry identity is
+`sha256:904482ff4fa7fdc77cbd1ca760b0efa12c003aac9f5cab486bd9fbc299095d43`,
+with 40 typed, 0 legacy compatibility, and 223 unready rows. FREEMAIN,
+task-end release assertions, DATA/LENGTH, key/share/executable policy, DPL and
+64-bit forms, broader exhaustion concurrency, and licensed differential remain
+pending. This is partial `CIC-902.storage-main` progress and grants no whole-row
+credit.
+
+### `CIC-902.storage-main` local GETMAIN LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0094` retain GETMAIN topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain.html` at
+`sha256:a7cabe581f65570ab751c82ad00520777b84bafbbecceef52d067c33196269aa`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 26–29 define LENGTH as the below-16-MB compatibility form. Lines 152–174
+define its unsigned-halfword value, 65,520-byte ceiling, zero-length failure,
+and SET clearing. Lines 188–202 retain exact LENGERR 22/1 and NOSTG 42/2.
+
+Typed row `0094` now requires SET plus exactly one FLENGTH or LENGTH. LENGTH
+reuses append-only operand tag 5 and accepts a literal in 0–65,520 or a declared
+unsigned two-byte binary item; signed, wider, negative, oversized, missing, and
+combined forms fail closed during compilation or plan admission. The provider
+selects the canonical length argument, enforces both the fixed compatibility
+ceiling and configured target limit, clears SET on LENGERR, and reuses the
+existing capacity-driven NOSTG path.
+
+The interpreter uses the same bounded task-local virtual allocator, optional
+INITIMG handling, checkpoint state, and release fence. LENGTH selects the
+source-defined below-line compatibility policy, but the runtime exposes no
+native address and therefore makes no physical 24-bit-address claim. Direct
+provider coverage proves initialized success and the 65,521 rejection. The
+compiled selected route reads an unsigned halfword, observes initialized bytes
+through linkage, proves zero-length LENGERR 22/1 with a cleared pointer, frees
+the allocation, and restores the checkpointed release state.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another form of row `0094`. Physical below-line identity, key/share/executable
+policy, 64-bit forms, DPL proof, broader capacity stress, and licensed
+differential remain pending. This is partial `CIC-902.storage-main` progress
+and grants no whole-row credit.
+
+### `CIC-902.storage-main` local FREEMAIN DATAPOINTER progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` row `0084` pin FREEMAIN topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain.html` at
+`sha256:c2bc7b268e2e906abb52a8e93d9a78a09fc22d19d635298bd783fb002de4f6bd`.
+The retained verified body was read offline through the repository parser.
+Lines 37–50 define DATA and DATAPOINTER as alternatives and require
+DATAPOINTER to identify the pointer returned by GETMAIN SET. Lines 51–61 define
+INVREQ 16 response2 1 for storage not acquired by GETMAIN, response2 2 for
+inaccessible CICS-key storage, and response2 3 for CICS-maintained storage.
+
+Row `0084` now lowers the bounded DATAPOINTER subset through typed
+`cics.storage@1.freemain`. Append-only operation tag 40 and DATAPOINTER operand
+tag 41 carry one pre-resolved POINTER or POINTER-32 storage slot. DATA and all
+nonpointer forms remain fail-closed. Before host dispatch, the interpreter
+classifies only a nonzero, offset-zero, unfreed allocation owned by the current
+machine as a live GETMAIN pointer. The provider returns a replay-bound release
+intent for that exact virtual address; only the interpreter can apply it.
+
+Successful application marks the allocation freed in checkpointed machine
+state, prevents linkage dereference and repeated release, and removes the
+allocation from current frame/byte capacity accounting without exposing or
+reusing a native address. Null, static, malformed, foreign, or already-freed
+pointers return exact INVREQ 16/1 under RESP/RESP2. CICS-key and
+CICS-maintained allocations are not constructible in this subset, so response2
+2 and 3 remain unreachable rather than being falsely emulated.
+
+Direct provider coverage proves the release-intent schema and invalid-pointer
+condition. The selected compiled route allocates and reads INITIMG storage,
+releases it, observes the linkage item become inaccessible, repeats FREEMAIN
+for exact INVREQ 16/1, and restores the freed allocation state from the
+ordinary task checkpoint. The resulting application contract identity is
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity is
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows. DATA release,
+shared/key/load ownership, FREEMAIN64, DPL proof, broader capacity stress, and
+licensed differential remain pending. This is partial
+`CIC-902.storage-main` progress and grants no whole-row credit.
+
+### `CIC-902.storage-main` local FREEMAIN DATA progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` row `0084` retain the FREEMAIN topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain.html` at
+`sha256:c2bc7b268e2e906abb52a8e93d9a78a09fc22d19d635298bd783fb002de4f6bd`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 37–50 define DATA and DATAPOINTER as alternatives and define DATA as the
+data area whose storage is released. Lines 51–61 retain exact INVREQ 16
+response2 1 for storage not acquired by GETMAIN, response2 2 for inaccessible
+CICS-key storage, and response2 3 for CICS-maintained storage.
+
+The typed row now accepts exactly one DATA or DATAPOINTER clause. Append-only
+operand tag 42 represents a pre-resolved DATA-area slot; literals and combined
+forms fail closed. Before dispatch, the interpreter resolves the area's current
+virtual-storage view and classifies only a live, offset-zero GETMAIN allocation
+owned by that machine as releasable. Static working storage, unassigned linkage,
+nonzero views, and already-freed allocations use the invalid-pointer schema and
+receive exact INVREQ 16/1 under the common response policy.
+
+The provider continues to return only a replay-bound virtual-address release
+intent, and the interpreter remains the sole owner of checkpoint mutation.
+Successful DATA release therefore invalidates every linkage view of the base,
+restores frame/byte capacity, and survives ordinary checkpoint restoration
+without exposing a native address. The direct provider test proves DATA intent,
+exclusive-form rejection, and the condition route. The compiled selected route
+rejects static and unassigned areas, allocates initialized storage, binds and
+observes a linkage area, frees it by DATA, repeats the command for INVREQ 16/1,
+and restores the freed state.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because DATA closes
+another form of row `0084` rather than registering another row. Key/shared/load
+ownership, FREEMAIN64, DPL proof, broader capacity stress, and licensed
+differential remain pending. This is partial `CIC-902.storage-main` progress
+and grants no whole-row credit.
+
+### `CIC-902.storage-main` checked GETMAIN64 virtual allocation
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` catalog row `0095` is bound to
+`cics-application-api-sources-b` (registered baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`) topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain64.html` at
+`sha256:3df90f5932a9b3d23dd9e71b5da382953e67e35c4f6428f5250edf18ac10c0ee`.
+The repository manifest registry and exact hash-addressed raw HTML archive
+were verified offline; the repository `ibm_docs.py` PlainText parser read the
+archive file. The earlier pinned `ibm_docs.py read` verified its TOC.
+Lines 3–10 restrict the command to non-LE AMODE(64) assembler and name INVREQ,
+LENGERR, and NOSTG. Lines 18–25 define the eight-byte pointer and LOCATION
+selection; lines 43–47 define 16-byte rounding and task guard zones; lines
+121–149 define fullword FLENGTH, the 2,146,435,056-byte source ceiling,
+LOC24/LOC31, NOSUSPEND and SET; lines 164–180 define INVREQ 16/2–3,
+LENGERR 22/1, and NOSTG 42/2.
+
+The typed Core-MIR operation `cics.storage@1.getmain64` uses append-only
+operation tag 72, FLENGTH/LOCATION/ABI operand tags 172–174, key/share/execute
+option tags 108–111, and non-ASSIGN SET64 output tag 232. A checked invocation
+must bind the non-LE AMODE(64) caller ABI and TASKDATAKEY; an eight-byte
+pointer target is mandatory. COBOL source admission still rejects GETMAIN64.
+The interpreter owns a separate monotonically allocated arena. Above-bar
+addresses use a disjoint high-word prefix, while virtual LOC24 and LOC31
+addresses occupy their respective numerical ranges; none is a native process
+pointer. The exact requested bytes plus 16-byte rounding and two eight-byte
+task guard zones count against the combined 31/64 task budget. Task-local
+bytes, attributes, and never-reused location cursors are checkpointed under
+`mainframe-env.reference-machine-checkpoint@12`, with historical reads kept.
+Malformed, foreign, cross-width, out-of-bounds, and stale identities cannot
+access the arena. Task completion, cancellation, deadline expiration, and
+typed CICS ABEND release private allocations. The host returns an allocation
+specification under its
+existing authorization, audit, cancellation/deadline and mutation-replay
+boundary; only the interpreter creates the virtual address. SQLite reopen
+replays the same host intent.
+
+The provider returns source-defined conditions and clears SET64 on LENGERR.
+An above-bar EXECUTABLE request returns INVREQ 16/2; invalid LOCATION returns
+INVREQ 16/3. Explicit key options override the checked TASKDATAKEY. SHARED
+fails closed because the current machine checkpoint is task-local and cannot
+preserve cross-task bytes; the runtime therefore grants no shared-storage
+credit. The interpreter binds the expected location, key, executable flag and
+length to the pending request, then rejects a mismatched host result or a
+restored checkpoint that asserts a shared allocation. The selected executable
+test translates a compiled 64-bit-pointer layout scaffold into the distinct
+typed IR operation and proves the resulting
+host request, virtual pointer, and checkpoint restoration. It is not an
+assembler-source translation claim. Native instruction execution, full
+assembler admission, DPL behavior, and licensed differential evidence remain
+unproven. The current contract digest is
+`sha256:a2ddd047ba59b0ffd8f7bbd6f77d62594405e37d532ddf0ebc10cf7fc0f9b896`
+and registry digest is
+`sha256:384ebcb2f1858c41d57ec87ba06b0e27508b13f431be8746ab3feaab39e2ef6e`.
+This is a bounded local feature, not whole-row semantic credit.
+
+### `CIC-902.storage-main` checked FREEMAIN64 virtual release
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` catalog row `0085` is bound to
+`cics-application-api-sources-a` (registered baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`) topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain64.html` at
+`sha256:0fff6a28a72a46895fe5ca3760229a75a25d018c80053c79e646ffb9e0d93d2f`.
+The exact hash-addressed raw HTML archive file and manifest were verified
+offline and read with the repository `ibm_docs.py` PlainText parser. Lines
+3–10 restrict the command to
+non-LE AMODE(64) assembler; lines 39–54 distinguish the relocatable DATA
+reference from the eight-byte DATAPOINTER value; lines 55–65 define INVREQ
+16/1 for invalid storage, 16/2 for user-key release of CICS-key storage, and
+16/3 for CICS-maintained storage.
+
+The distinct `cics.storage@1.freemain64` plan requires the checked caller ABI
+and TASKDATAKEY and exactly one DATA or DATAPOINTER operand. DATA resolves a
+declared area's explicit allocation binding, not its contents. Only the
+interpreter owns the virtual address and release; the provider performs the
+authorized, audited, replay-bound intent. A successful host result must echo
+the pending pointer before the interpreter releases it. Invalid, foreign,
+cross-width and repeated pointers yield INVREQ 16/1; a user-key caller
+releasing CICS-key storage yields INVREQ 16/2. Checkpoint v12 stores live
+allocation bytes, non-reused cursors and DATA-area bindings, rejects invalid
+restored bindings, and keeps freed addresses stale. Release recovers the
+allocation's charged bytes and frame. Task completion, cancellation, timeout
+and typed CICS ABEND clear private storage. Direct Memory/SQLite provider and
+translated compiled selected-route checks cover both operand forms. The
+host preflight regression covers cancellation and deadline rejection for both
+64-bit commands, including durable audit records and no replay-intent write.
+The checked virtual arena cannot represent CICS-maintained storage, so INVREQ
+16/3 is outside this bounded route. Native assembler source admission,
+SHARED storage, DPL and licensed differential evidence remain pending; this
+does not grant whole-row semantic credit.
+
+The required `architecture-fast --check` remains without a passing receipt
+for this candidate. The previously observed `sources-a` review stop is still
+explained by six committed closure pins whose exact HTML is absent from both
+the hash-addressed raw archive and the retained host HTML root. The row 0085
+and 0095 command topics themselves verify. No browser or network refresh was
+requested or performed. The missing `SSJL4D_6.x/` topic suffixes and SHA-256
+values are:
+
+| Topic suffix | SHA-256 |
+| --- | --- |
+| `fundamentals/connections/dfht1c0079.html` | `cb6ff139ab0b7bb2832dc03dd4f53672181657f11d0740a417aab84819aaf254` |
+| `fundamentals/web/dfhtl20.html` | `c4f1b5c389f451720b62b8dc3787e52c54fe988d3ba8b749928e7815063aa45b` |
+| `fundamentals/web/dfhtl_client_encoding.html` | `38ff92b29e9bff1add9a2add4bef33f1f7ccc6a29076b42b48f3e5b3733bf740` |
+| `reference-applications/commands-api/dfhp4_codesassign.html` | `ed02eedd2e152ff18c4fdc0a0d678cd53ed94e7cd198d369cba71224f3832359` |
+| `reference-system-management/resources/transaction/dfha4_summary.html` | `03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac` |
+| `troubleshooting/java/troubleshooting_web_ref.html` | `b07229031a6b7b9d622586842457c3c71f06fc9fe087a5dfd3a334f621e2e5a5` |
+
+A bounded source-a review check against the existing `ibm-docs-pinned-0.9`
+cache stops at the separate CICS TX 11.1 DUMP supplement
+`SSNAQ8_11.1.0/reference-api/r_dump.html`, whose committed SHA-256 is
+`0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee`.
+No matching local body was found. That older cache does contain verified copies
+of `dfht1c0079.html` and `dfhp4_codesassign.html` from the table; the other
+four tabled bodies remain absent there. This check is a failed source-review
+preflight, not a passing `architecture-fast` receipt.
+
+### `CIC-903.dataset-replay` application-neutral profile progress
+
+This architecture-only child removes the residual application fixture name
+from a production documentation comment in the shared dataset replay index.
+The incremental version/length/byte comparison, decode staging, replay rows,
+public API, and runtime behavior are unchanged; no IBM semantic lookup applies.
+
+The production application-hardcode scan now passes and `architecture-fast`
+advances through effect encoding, provider-row persistence, durable storage,
+and enterprise authorization before reaching the next independent retention
+guard. Application contract and registry identities, the 41/0/222 readiness
+split, command credit, and all pending semantic/licensed gates remain
+unchanged.
+
+### `CIC-903.file-browse` default-cursor progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline binds the four browse
+rows to their exact official HTML topics. The `cics-application-api-sources-c`
+scope pins row `0208` STARTBR topic `dfhp4_startbr.html` at
+`sha256:bff4e45c5c6be404323460eab6e2a89a925b6f78815da6ee61e56d7c85988914`.
+It was reproduced through the user's existing Chrome debugging session as
+44,234 bytes under content-addressed cache key
+`topic-b0f460d6b09ba010f637bbb06a6751acb5d47a968d9defa5d0563fb45019d1d3-sha256-bff4e45c5c6be404323460eab6e2a89a925b6f78815da6ee61e56d7c85988914.html`.
+
+The `cics-application-api-sources-b` scope pins row `0157` READNEXT topic
+`dfhp4_readnext.html` at
+`sha256:f72929a541bfe74947544cb3810f940b25f8a5b35e2299ccea135088f72067ce`
+and row `0158` READPREV topic `dfhp4_readprev.html` at
+`sha256:f0ce4b309ab7b3869225fac927e6a717c925dd4d34fbbc6a7493c05b726820ab`.
+They were reproduced through the same Chrome session as 69,774 and 64,433
+bytes under cache keys
+`topic-4a00a948a1d8efe620326ae9922bada64c21b7fc228b2cc0f48f4ae7bf86047d-sha256-f72929a541bfe74947544cb3810f940b25f8a5b35e2299ccea135088f72067ce.html`
+and
+`topic-7290007fd9bb53aeba24c6d7ef4f062e84c08668bc401ceab3842416bfdbfd25-sha256-f0ce4b309ab7b3869225fac927e6a717c925dd4d34fbbc6a7493c05b726820ab.html`.
+The `cics-application-api-sources-a` scope already contained row `0058` ENDBR
+topic `dfhp4_endbr.html`, 15,990 bytes at
+`sha256:32737cfc5ac428eca4eb52ab8d527c9d9dc4ea2eacd287bb4b74c5b9c94e45c6`
+under cache key
+`topic-3209ecf1a92920b9f7ee1dc1c94c7e75c1c630784e3d79275416f6b45f95741f-sha256-32737cfc5ac428eca4eb52ab8d527c9d9dc4ea2eacd287bb4b74c5b9c94e45c6.html`.
+No separate host publication cache is retained.
+
+Offline reads establish that STARTBR positions a browse without returning a
+record, READNEXT and READPREV require an active browse and update RIDFLD with
+the full retrieved record identity, and ENDBR closes the browse. Row `0157` or
+`0158` UPDATE additionally requires TOKEN under RLS, so UPDATE without that
+separate lock identity is not promoted from retained compatibility execution.
+
+Rows `0208`, `0157`, `0158`, and `0058` now lower through typed
+`StartBrowse`, `ReadNext`, `ReadPrev`, and `EndBrowse` plans with append-only
+operation tags 22–25. RIDFLD output tag 12 names the same pre-resolved storage
+slot as the read input. The compiler admits exactly one FILE/DATASET alias,
+requires writable RIDFLD for STARTBR and both reads, requires writable INTO for
+both reads, and rejects unowned forms before executable lowering. A compiled
+machine regression observes the host-call sequence, record/key writeback, and
+EIBFN `060C`, `060E`, `0610`, and `0612`; the existing provider regression
+continues to prove forward/reverse cursor state over the base record identity.
+
+The browse integration contract had identity
+`sha256:5fb3712fbacac854a00e0f1db426c90232e6aacc8c5655b58dca36a5b0249d1b`
+and registry identity
+`sha256:5e697d4e615fa59034b541099a688ead01f652c20b71a7365c1684add952ff20`,
+with 26 typed, 8 legacy compatibility, and 229 unready rows at that integration
+point. REQID/SYSID,
+READNEXT/READPREV KEYLENGTH, SET, alternate RBA/RRN/XRBA forms,
+UPDATE/TOKEN/RLS ownership, broader cursor recovery, and licensed differential
+remain pending. Retained raw artifacts remain readable. This is partial
+`CIC-903.file-browse` progress and grants no whole-row credit.
+
+### `CIC-903.file-browse` STARTBR EQUAL progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0208` retain STARTBR topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbr.html` at
+`sha256:bff4e45c5c6be404323460eab6e2a89a925b6f78815da6ee61e56d7c85988914`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Syntax lines 4–6 place GTEQ and EQUAL in one choice; lines
+59–67 describe precise-key browse positioning, and lines 81–109 define EQUAL
+as same complete-or-generic key while GTEQ admits the first greater key.
+
+Typed row `0208` now reuses append-only EQUAL option tag 26. Compiler admission
+accepts EQUAL only on STARTBR and rejects EQUAL with GTEQ. Defensive plan and
+provider checks enforce the same source-defined choice, preserving the prior
+default/GTEQ route unchanged.
+
+The provider maps explicit EQUAL to the dataset authority's exact cursor
+relation instead of the default greater-or-equal relation. The direct-provider
+trace observes that exact request. A compiled COBOL machine route carries
+`OPTION.EQUAL` through STARTBR, then preserves the existing READNEXT,
+READPREV, ENDBR, RIDFLD writeback, and EIBFN sequence.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0208`. The following child closes GENERIC/KEYLENGTH;
+named and remote cursors, alternate identifiers, RLS ownership, PostgreSQL
+evidence, and licensed differential remain pending. This is partial
+`CIC-903.file-browse` progress and grants no whole-row credit.
+
+### `CIC-903.file-browse` STARTBR GENERIC/KEYLENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0208` retain STARTBR topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbr.html` at
+`sha256:bff4e45c5c6be404323460eab6e2a89a925b6f78815da6ee61e56d7c85988914`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 95–109 define GENERIC prefix matching and GTEQ's
+greater-key fallback. Lines 110–126 require KEYLENGTH with GENERIC, require a
+partial generic key, and require GTEQ for KEYLENGTH zero. Condition lines
+203–222 establish `INVREQ` response2 25, 26, and 42.
+
+Typed STARTBR now reuses append-only GENERIC option tag 25 and the existing
+KEYLENGTH operand. The compiler and plan codec require KEYLENGTH with GENERIC,
+accept a bounded literal, halfword-binary field, or matching `LENGTH OF`
+RIDFLD, reject EQUAL with GTEQ, and admit zero only with GTEQ. Defensive runtime
+validation compares positive generic lengths with the installed full key,
+reports 16/25 when they are not partial, reports 16/26 for a non-generic
+definition mismatch, and reports 16/42 for a negative dynamic generic length.
+
+GENERIC EQUAL validates that the first greater-or-equal key has the requested
+prefix before creating the application browse cursor; a miss returns NOTFND
+13/80. GENERIC GTEQ retains the first equal-or-greater key, while
+KEYLENGTH zero plus GTEQ supplies an empty lower bound and positions at the
+first record. Direct-provider tests observe the exact bounded transient and
+retained cursor requests, positive/negative conditions, and prefix miss. A
+compiled COBOL machine route carries dynamic KEYLENGTH, GENERIC, and EQUAL
+through the selected CICS request.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows. The full IR,
+compiler, CICS, and conformance package suites pass (52, 231, 113 plus three
+environment-gated ignores, and 222 plus two intentional ignores), as does
+warnings-denied Clippy for all four packages. Named and remote cursors,
+alternate identifiers, RLS ownership, PostgreSQL evidence, and licensed
+differential remain pending. This is partial `CIC-903.file-browse` progress and
+grants no whole-row credit.
+
+### `CIC-903.file-browse` READNEXT/READPREV LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` retain READNEXT topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_readnext.html` at
+`sha256:f72929a541bfe74947544cb3810f940b25f8a5b35e2299ccea135088f72067ce`
+and READPREV topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_readprev.html` at
+`sha256:f0ce4b309ab7b3869225fac927e6a717c925dd4d34fbbc6a7493c05b726820ab`.
+Both hash-verified retained bodies were searched and read offline through the
+repository parser. READNEXT lines 236–267 and READPREV lines 198–229 define
+LENGTH as a halfword input capacity and actual-record-length output. Their
+condition tables at READNEXT lines 512–527 and READPREV lines 458–472 establish
+`LENGERR` response2 10, 11, and 13.
+
+Typed READNEXT and READPREV now require any supplied LENGTH to be a writable
+halfword data area and encode that exact slot once as input and once as output.
+The plan codec
+rejects literal, mismatched, or cross-command LENGTH output shapes. Before each
+local browse read, the provider obtains the dataset attributes: a
+variable-length record without LENGTH returns 22/10; a record larger than the
+input capacity is truncated, returns 22/11, and writes its pre-truncation
+actual length; an incorrect fixed-record length preserves 22/13. Forward and
+reverse requests share this behavior without changing cursor ownership.
+
+Direct-provider tests cover both directions, exact payloads, conditions, and
+actual-length outputs. A compiled COBOL selected route carries the initial
+halfword capacity, receives truncated data and decimal actual length, and
+writes exact RESP/RESP2 plus EIBFN `060E` state. The application contract and
+registry identities remain
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and `sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows. The full IR,
+compiler, CICS, and conformance package suites pass (52, 232, 114 plus three
+environment-gated ignores, and 223 plus two intentional ignores), as does
+warnings-denied Clippy for all four packages. SET, READNEXT key-length
+repositioning, named and remote cursors, alternate identifiers, RLS ownership,
+PostgreSQL evidence, and licensed differential remain pending. This is partial
+`CIC-903.file-browse` progress and grants no whole-row credit.
+
+### `CIC-903.file-update` explicit-key mutation progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` scope pin row `0040` DELETE topic
+`dfhp4_delete.html` at
+`sha256:510691cea8f075af47294afe8ff7d009e931793843395eaac3710ab5d337fad4`.
+Its 48,588 bytes were already present under content-addressed key
+`topic-5c9ffa6ff7bd14d084d8d75558270a1c5dfeab623bf570d29e64d58954133202-sha256-510691cea8f075af47294afe8ff7d009e931793843395eaac3710ab5d337fad4.html`.
+Offline read establishes direct deletion by RIDFLD and the distinct form that
+omits RIDFLD after READ UPDATE; TOKEN correlates a delete with an earlier READ
+UPDATE or BROWSE FOR UPDATE identity.
+
+The `cics-application-api-sources-c` scope pins row `0253` WRITE FILE topic
+`dfhp4_write.html` at
+`sha256:b10def8933ac6db8e73c4876370202c496e01e5dd295e2993fb33f528ed98685`.
+It was missing from the external cache and was reproduced from IBM's official
+HTML content endpoint through the user's existing Chrome debugging session as
+48,349 bytes, matching the registered digest exactly under cache key
+`topic-59bc07cf04e590b108a6e8429ddc2c389ff5da4cf1175b811e65915c1a053156-sha256-b10def8933ac6db8e73c4876370202c496e01e5dd295e2993fb33f528ed98685.html`.
+Offline read establishes FROM as the record area, RIDFLD as the complete key
+for a keyed data set, exact record/key agreement, and the separate output role
+of RIDFLD only for deferred RBA/XRBA modes.
+
+Rows `0040` and `0253` now lower through typed `cics.file@1.delete` and
+`cics.file@1.write` plans with append-only operation tags 26 and 27. Defensive
+plan validation requires exactly one FILE/DATASET alias, optional
+storage-backed RIDFLD for DELETE, and storage-backed FROM plus RIDFLD for
+WRITE. Neither typed subset registers a RIDFLD output. Both emit typed mutation
+envelopes and exact dataset-write/memory/condition/transaction effects. A
+compiled machine regression observes captured record/key bytes, mutation
+identity, and EIBFN `0604` then `0608`; existing provider tests retain
+direct-delete identity and durable WRITE replay coverage.
+
+The keyed-mutation integration contract had identity
+`sha256:84fe6b5d1be55dae06ce9114c9ea19c2ce30d8151eb5ce24b80dddc0019707a4`
+and registry identity
+`sha256:16a7d27261b91245c9356881130a6c92e30f76fb8f594a7bbce9b6e6ee45d2a6`,
+with 28 typed, 6 legacy compatibility, and 229 unready rows at that integration
+point. TOKEN/prior-update correlation, GENERIC/NUMREC, SYSID/KEYLENGTH,
+RBA/RRN/XRBA, WRITE MASSINSERT, NOSUSPEND/RLS concurrency, broader restart,
+and licensed differential remain pending. Retained raw artifacts remain
+readable. This is partial `CIC-903.file-update` progress and grants no
+whole-row credit.
+
+### `CIC-903.file-update` pilot storage-fixture repair
+
+The sealed compiler and plan contracts now require REWRITE FROM to identify a
+declared storage area. The CICS file/UOW pilot still embedded literal rewrite
+records in its historical commit, rollback, invalid-context, and crash/restart
+programs, so those programs correctly stopped publishing after the typed
+boundary was tightened.
+
+Each pilot now passes its existing record area to REWRITE. Successful mutation
+paths move the same `AA22` or `AA33` bytes into that area immediately before
+dispatch; invalid-context paths retain their prior record bytes because no
+mutation is permitted. Expected observations, obligations, fixture JSON,
+contract identities, and registry identities do not change.
+
+The WRITE LENGTH selected-route source moved under the terminal test-only
+module where it is used. That removes the non-test dead-code warning and
+restores `cics_pilot.rs` to its reviewed 1,321-production-line ceiling. All
+eight CICS pilot tests pass serially, including memory/SQLite comparison,
+bounded process crash/restart points, independent perturbation rejection,
+remote rollback plumbing, enqueue contexts, and WRITE LENGTH. Warnings-denied
+conformance Clippy also passes.
+
+This repair grants no new command, option, semantic, conformance, or licensed
+credit. It restores current-candidate evidence for already declared file/UOW
+children; PostgreSQL and licensed campaigns remain pending at their existing
+gates.
+
+### `CIC-903.file-update` current-record DELETE progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` row `0040` retain DELETE topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_delete.html` at
+`sha256:510691cea8f075af47294afe8ff7d009e931793843395eaac3710ab5d337fad4`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 26–30 define keyed deletion, while lines 39–41 define the distinct
+single-record form after READ UPDATE and prohibit RIDFLD on that DELETE.
+
+The typed DELETE plan already admits an omitted RIDFLD while retaining the
+resolved FILE/DATASET identity. READ UPDATE records the latest key and record
+for that exact file in task state. DELETE without RIDFLD consumes that hold
+once, dispatches the keyed durable delete under its own mutation identity, and
+removes the hold; no hold or a repeated DELETE returns exact `INVREQ` 16/31.
+TOKEN and browse-for-update correlation remain separate forms.
+
+Existing direct-provider coverage proves request identity, one-shot hold
+consumption, and the absent-hold condition. The new compiled selected route
+creates and seeds a keyed data set through the product boundary, executes READ
+UPDATE followed by DELETE without RIDFLD, commits with SYNCPOINT, and observes
+the selected key as `NOTFND` through the durable dataset authority. Its CICS
+trace contains exactly one READ and one DELETE.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another form of row `0040`. TOKEN/browse-update correlation, GENERIC/NUMREC,
+remote and alternate identifiers, RLS concurrency, PostgreSQL evidence, and
+licensed differential remain pending. This is partial `CIC-903.file-update`
+progress and grants no whole-row credit.
+
+### `CIC-903.file-update` WRITE FILE LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0253` retain WRITE topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_write.html` at
+`sha256:b10def8933ac6db8e73c4876370202c496e01e5dd295e2993fb33f528ed98685`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 62–65 define the FROM record area, lines 76–89 define halfword-binary
+LENGTH and its variable/fixed-record effects, and lines 230–244 define LENGERR
+response2 12, 10, and 14 boundaries.
+
+Typed row `0253` now accepts a nonnegative bounded literal, halfword-binary
+storage item, or `LENGTH OF` the exact FROM area. Defensive plan admission
+restricts LENGTH to WRITE, rejects negative/over-halfword literals and
+mismatched `LENGTH OF` identities, and retains the existing storage-backed
+FROM/RIDFLD requirements. The interpreter emits the canonical decimal runtime
+value.
+
+The provider reads the selected file's durable attributes before mutation,
+validates variable/fixed record length policy, chooses the bounded FROM prefix,
+and preserves its existing source-defined LENGERR mapping and fixed-record
+truncate/pad behavior. Existing direct-provider coverage proves prefix
+persistence. The compiled selected route creates a variable-length keyed data
+set, sends a halfword length of five over `003ABCDE`, commits at SYNCPOINT, and
+reads back exact `003AB` through the durable dataset authority.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0253`. Remote and alternate identifiers, MASSINSERT,
+RLS concurrency, PostgreSQL evidence, and licensed differential
+remain pending. This is partial `CIC-903.file-update` progress and grants no
+whole-row credit.
+
+### `CIC-903.file-update` REWRITE LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0181` retain REWRITE topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html` at
+`sha256:0ef4733dca7d0a743ad31939c61ecf7a820a0885ca56aeef48f5bbef6254d3fc`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 22–26 require a preceding READ UPDATE and stable key, lines 48–59 define
+the FROM area and halfword-binary LENGTH behavior, and lines 149–159 define the
+variable/fixed-record LENGERR response2 boundaries.
+
+Typed row `0181` now accepts a nonnegative bounded literal, halfword-binary
+storage item, or `LENGTH OF` the exact FROM area. Compiler and defensive plan
+admission reject negative or over-halfword literals, wrong-width storage,
+mismatched `LENGTH OF` identities, and REWRITE plans carrying RIDFLD or
+KEYLENGTH instead of consuming the same-file update hold.
+
+The interpreter emits canonical decimal LENGTH next to the captured FROM
+prefix source. The provider reads durable file attributes, applies the selected
+prefix, and preserves exact LENGERR 22/10, 22/12, and 22/14 behavior. Direct
+provider coverage reads for update and rewrites `ABC67890` at length five. The
+compiled selected route creates and seeds a variable keyed data set, reads key
+`003` for update, rewrites `003ABCDE` at halfword length five, commits at
+SYNCPOINT, and reads back exact `003AB`.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0181`. TOKEN, remote routing, NOSUSPEND/RLS concurrency,
+PostgreSQL evidence, and licensed differential remain pending. This is partial
+`CIC-903.file-update` progress and grants no whole-row credit.
+
+### `CIC-903.file-update` WRITE FILE KEYLENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0253` retain WRITE topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_write.html` at
+`sha256:b10def8933ac6db8e73c4876370202c496e01e5dd295e2993fb33f528ed98685`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 66–75 define KEYLENGTH as the halfword-binary RIDFLD key length and its
+definition-match requirement; lines 117–130 define the complete keyed RIDFLD.
+
+Typed row `0253` now accepts a positive bounded literal, halfword-binary storage
+item, or `LENGTH OF` the exact RIDFLD area. Compiler and defensive plan
+admission reject zero/negative/over-halfword literals, non-halfword storage,
+and mismatched `LENGTH OF` identities. The interpreter emits the canonical
+decimal key length alongside the captured RIDFLD bytes.
+
+Before mutation, the provider loads the durable file attributes and requires
+the supplied key length to equal the definition, preserving exact `INVREQ`
+16/26 on mismatch. Existing direct-provider coverage exercises that condition.
+The conformance pilot and compiled selected route carry a COBOL halfword value
+of three through the interpreter and provider, persist the five-byte record
+prefix under key `003`, and read back exact `003AB`.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0253`. Remote and alternate identifiers, MASSINSERT,
+RLS concurrency, PostgreSQL evidence, and licensed differential remain
+pending. This is partial `CIC-903.file-update` progress and grants no whole-row
+credit.
+
+### `CIC-903.file-update` DELETE KEYLENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` row `0040` retain DELETE topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_delete.html` at
+`sha256:510691cea8f075af47294afe8ff7d009e931793843395eaac3710ab5d337fad4`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 65–81 define KEYLENGTH as the halfword-binary RIDFLD key length and its
+definition-match rule; lines 101–112 define RIDFLD, and lines 174–189 define
+exact `INVREQ` response2 26 for a non-generic definition mismatch.
+
+Typed row `0040` now accepts KEYLENGTH only with explicit RIDFLD. A positive
+bounded literal, halfword-binary storage item, or `LENGTH OF` the exact RIDFLD
+area reaches the plan. Compiler and defensive admission reject zero, negative,
+or over-halfword literals, wrong-width storage, mismatched identities, and the
+source-distinct current-record DELETE form.
+
+The interpreter emits canonical decimal KEYLENGTH next to the captured key.
+The provider checks it against the durable file definition before mutation and
+retains exact `INVREQ` 16/26 on mismatch. Existing direct-provider coverage
+exercises that shared validator. The compiled selected route creates and seeds
+a keyed data set, deletes key `003` with a COBOL halfword value of three,
+commits at SYNCPOINT, and observes the key as NOTFND.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0040`. GENERIC/NUMREC, remote and alternate identifiers,
+TOKEN, RLS concurrency, PostgreSQL evidence, and licensed differential remain
+pending. This is partial `CIC-903.file-update` progress and grants no whole-row
+credit.
+
+### `CIC-903.file-update` READ EQUAL progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Syntax lines 4–6 place EQUAL and GTEQ in one choice; lines
+102–105 define EQUAL as the same-key relation for a complete or generic RIDFLD
+key, and lines 114–123 distinguish generic matching from GTEQ fallback.
+
+Typed row `0156` now carries EQUAL as append-only plan option tag 26. Compiler
+admission accepts it only on READ and rejects the source-defined EQUAL/GTEQ
+conflict. Defensive plan validation and direct provider admission enforce the
+same choice, while explicit EQUAL with KEYLENGTH zero remains outside the
+admitted first-record route.
+
+Complete-key EQUAL uses the existing exact dataset read. GENERIC EQUAL uses the
+bounded greater-or-equal cursor with its prefix guard, so a greater key that
+does not share RIDFLD's selected prefix remains NOTFND. Compiled selected-route
+proof now carries explicit EQUAL through both the fixed-key KEYLENGTH case and
+the generic positive-prefix case without changing their exact outcomes.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0156`. Alternate identifiers, remote routing, RLS
+integrity and suspension modes, PostgreSQL evidence, and licensed differential
+remain pending. This is partial `CIC-903.file-update` progress and grants no
+whole-row credit.
+
+### `CIC-903.file-update` READ KEYLENGTH zero progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 128–140 define KEYLENGTH and require GTEQ when zero is used to read the
+first keyed record; default EQUAL with zero has unpredictable results.
+
+Typed row `0156` now admits literal or halfword-binary runtime zero only on the
+non-generic GTEQ route. Compiler and defensive plan admission reject literal
+zero without GTEQ and reject the zero/GENERIC combination; WRITE and DELETE
+retain their positive-only KEYLENGTH contracts.
+
+The provider recognizes runtime zero after interpreter decoding, bypasses the
+ordinary full-key equality check only for READ GTEQ, truncates RIDFLD to an empty
+start key, and reuses the bounded greater-or-equal cursor to select the first
+record. The compiled selected route first preserves ordinary `004` GTEQ
+selection of `005NEXT`, then supplies halfword zero and observes first record
+`003DATA`, with both temporary cursors closed.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option interaction of row `0156`. GENERIC plus GTEQ zero, alternate
+identifiers, remote routing, TOKEN/RLS ownership, PostgreSQL evidence, and
+licensed differential remain pending. This is partial `CIC-903.file-update`
+progress and grants no whole-row credit.
+
+### `CIC-903.file-update` READ GENERIC GTEQ KEYLENGTH zero progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 114–123 define GENERIC and its GTEQ first-greater
+fallback; lines 128–140 require GTEQ when KEYLENGTH zero selects the first
+record.
+
+Typed row `0156` now permits literal or halfword-binary zero with the combined
+GENERIC and GTEQ options. Compiler admission continues to reject literal zero
+for default EQUAL and GENERIC without GTEQ, while defensive plan validation now
+accepts the source-defined combined shape.
+
+The provider accepts runtime generic zero only when GTEQ is present, truncates
+RIDFLD to the empty start key, and disables the ordinary positive-prefix guard
+for the first-record case. The compiled selected route preserves ordinary GTEQ
+and non-generic zero behavior, then observes `003DATA` from the same zero value
+with GENERIC and GTEQ; all three request-local cursors close before completion.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option interaction of row `0156`. Alternate identifiers, remote
+routing, TOKEN/RLS ownership, PostgreSQL evidence, and licensed differential
+remain pending. This is partial `CIC-903.file-update` progress and grants no
+whole-row credit.
+
+### `CIC-903.file-update` READ GENERIC progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 114–140 define GENERIC prefix selection, mandatory
+KEYLENGTH, and the strict-less-than-full-key boundary; lines 353–370 define
+exact `INVREQ` response2 25 for a generic length that is not partial.
+
+Typed row `0156` now carries GENERIC as append-only plan option tag 25. Compiler
+and defensive plan admission require READ, RIDFLD, INTO, and positive bounded
+KEYLENGTH, rejecting absent or zero lengths and unrelated operations. The
+provider compares the runtime length with the durable full-key definition and
+retains `INVREQ` 16/25 when it is not strictly shorter.
+
+The provider reuses the bounded greater-or-equal dataset cursor, closes it on
+all reached result paths, and accepts the candidate only when its logical key
+shares the encoded RIDFLD prefix. GENERIC with GTEQ retains first-greater
+fallback. The compiled selected route finds `003DATA` from prefix `00`, then
+returns NOTFND 13/80 for prefix `01`, with both commands completing through
+their typed INTO/RESP bindings.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0156`. GENERIC plus GTEQ zero-length first-record
+selection, alternate identifiers, remote routing, TOKEN/RLS ownership,
+PostgreSQL evidence, and licensed differential remain pending. This is partial
+`CIC-903.file-update` progress and grants no whole-row credit.
+
+### `CIC-903.file-update` READ GTEQ progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 102–105 define the default exact-key relation and
+lines 119–123 define GTEQ as equal-key selection with first-greater fallback.
+
+Typed row `0156` now admits the existing append-only GTEQ option only on READ.
+Compiler and defensive plan admission retain the required single FILE/DATASET,
+RIDFLD, and INTO roles and reject the option on mutation and unrelated
+operations.
+
+The provider encodes the requested key, opens the dataset service's bounded
+greater-or-equal cursor, reads exactly one record, and closes the cursor before
+returning success, NOTFND, or a close failure. No browse identity is retained in
+the CICS task. The compiled selected route seeds fixed keyed records `003DATA`
+and `005NEXT`, requests key `004`, and observes exact `005NEXT` through INTO.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0156`. GENERIC/zero-length first-record selection,
+alternate identifiers, remote routing, TOKEN/RLS ownership, PostgreSQL evidence,
+and licensed differential remain pending. This is partial
+`CIC-903.file-update` progress and grants no whole-row credit.
+
+### `CIC-903.file-update` READ LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 124–127 define INTO and its LENGTH dependency; lines 145–159 define
+LENGTH as a halfword-binary input capacity that receives the actual record
+length and describe variable/fixed-record behavior.
+
+Typed row `0156` retains exactly one writable halfword storage slot as both the
+LENGTH input and output. Compiler and defensive plan admission reject literals,
+`LENGTH OF`, wrong-width or nonbinary storage, absent output write-back, and
+input/output identity drift. Existing RIDFLD, INTO, and single FILE/DATASET
+requirements remain unchanged.
+
+The provider reads the input capacity, bounds the returned payload, writes the
+actual pre-truncation length to its typed output, and preserves source-defined
+LENGERR behavior. Direct-provider coverage observes an actual length of five.
+The compiled selected route creates a variable keyed data set, supplies a COBOL
+halfword capacity of eight, reads the seven-byte `003DATA` record, and observes
+binary seven written back to the same LENGTH area.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0156`. SET, remote routing, alternate identifiers,
+TOKEN/RLS ownership, PostgreSQL evidence, and licensed differential remain
+pending. This is partial `CIC-903.file-update` progress and grants no whole-row
+credit.
+
+### `CIC-903.file-update` READ KEYLENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0156` retain READ topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` at
+`sha256:856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 128–140 define KEYLENGTH as the halfword-binary RIDFLD key length and its
+non-generic definition-match rule; lines 345–370 define exact `INVREQ`
+response2 26 for a mismatch and reserve zero/partial lengths for the deferred
+GENERIC/GTEQ forms.
+
+Typed row `0156` now accepts KEYLENGTH as a positive bounded literal,
+halfword-binary storage item, or `LENGTH OF` the exact RIDFLD area. Compiler and
+defensive plan admission reject zero, negative or over-halfword literals,
+wrong-width storage, mismatched identities, and any plan without the existing
+RIDFLD and INTO roles.
+
+The interpreter emits canonical decimal KEYLENGTH next to the captured key.
+The provider reads the durable keyed-file definition before lookup and returns
+exact `INVREQ` 16/26 when a non-generic length differs. Existing direct-provider
+coverage proves matching and mismatched definitions. The compiled selected
+route creates and seeds a fixed keyed data set, reads key `003` with a COBOL
+halfword value of three, and observes exact `003DATA` in the INTO area.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0156`. GENERIC/GTEQ, remote and alternate identifiers,
+TOKEN/RLS ownership, PostgreSQL evidence, and licensed differential remain
+pending. This is partial `CIC-903.file-update` progress and grants no whole-row
+credit.
+
+### `CIC-903.tdq` local WRITEQ progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` scope pin row `0257` WRITEQ TD topic
+`dfhp4_writeqtd.html` at
+`sha256:df0db2b00bc0583f38c44afe2fe7987d4ccfc47b5aff3caf7b4bed0be5a81e86`.
+It was missing from the external cache and was reproduced from IBM's official
+HTML content endpoint through the user's existing Chrome debugging session as
+19,269 bytes, matching the registered digest exactly under cache key
+`topic-e40efe529d1ab7274d65e977dfaf8efde1931d28b34aa2034e20e5c44f230895-sha256-df0db2b00bc0583f38c44afe2fe7987d4ccfc47b5aff3caf7b4bed0be5a81e86.html`.
+
+Offline read establishes a predefined symbolic QUEUE name of 1–4 alphanumeric
+characters, FROM record storage, halfword LENGTH, and SYSID as remote-only
+routing. Row `0257` now lowers its local subset through typed
+`cics.queue@1.write-transient-data`. Append-only operation tag 28 and QUEUE
+operand tag 23 bind the queue literal or field, a storage-backed FROM area, and
+optional integer LENGTH. Defensive plan validation excludes every cross-family
+operand and unowned option. The provider applies LENGTH to the captured record
+before persistence and replay comparison, rejects a value beyond the FROM
+extent as LENGERR, and retains mutation identity for durable queue writes.
+
+A compiled machine regression observes exact queue/data/length arguments, a
+typed mutation envelope, and EIBFN `0802`. The provider restart/replay test now
+also proves that only the selected prefix is persisted and replayed once. The
+TDQ integration contract had identity
+`sha256:8d2ebe91cea5a8560f4887daecd7400196a9e35b6b2a3c46ccebdc65fc465f2b`
+and registry identity
+`sha256:8851ff30eb530be5c0fc1078c03280b8e6249b4ca25a44ac8de3a720abf31b44`,
+with 29 typed, 5 legacy compatibility, and 229 unready rows at that integration
+point. SYSID routing,
+predefined TDQUEUE open/disabled/input state, intrapartition/extrapartition
+record-size and space limits, indoubt lock behavior, broader backend restart,
+and licensed differential remain pending. Retained raw artifacts remain
+readable. This is partial `CIC-903.tdq` progress and grants no whole-row credit.
+
+### `CIC-903.tdq` local DELETEQ progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` row `0048` pin DELETEQ TD topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_deleteqtd.html` at
+`sha256:e0d480106cd4183d94109883c9e2be44d97b2377c4533579e900bca52349d6ae`.
+The hash-verified retained HTML was read offline through the repository parser.
+It establishes that DELETEQ TD removes all data and frees the associated
+intrapartition storage, requires a defined 1–4 character QUEUE name, and uses
+QIDERR when the named queue cannot be found. SYSID remains remote-only;
+extrapartition, disabled, and locked queue states remain outside this child.
+
+Row `0048` now lowers its local subset through typed
+`cics.queue@1.delete-transient-data`. Append-only operation tag 38 carries only
+the QUEUE selector and common response operands. The provider authorizes
+`QUEUE CICS.TD.<name>` for update, atomically deletes the durable `cics-tdq`
+row at its observed version, and subtracts the retained byte count. A missing
+queue returns exact `QIDERR` RESP 44/RESP2 0, including a repeated deletion
+when RESP handling suppresses the condition.
+
+Memory coverage proves write, delete, byte-accounting release, and missing-
+queue behavior. A three-open SQLite regression proves write visibility after
+reopen, durable deletion in a second process lifetime, and absence after a
+third reopen. The selected compiled route proves WRITEQ followed by DELETEQ,
+exact RESP/RESP2 storage on a repeated delete, and two typed DELETEQ trace
+entries. The resulting application contract identity is
+`sha256:a19e4c33748860813a7994e022c41e5da1190538d52547ce7dc970b923849815`
+and registry identity is
+`sha256:03ce8d829950da94647297089ac151ab3da3992ccf24c439e7c16ba30e5ddad1`,
+with 39 typed, 0 legacy compatibility, and 224 unready rows. Remote SYSID,
+resource-definition state, extrapartition rejection, disabled and locked
+conditions, PostgreSQL restart, and licensed differential remain pending.
+This is partial `CIC-903.tdq` progress and grants no whole-row credit.
+
+### `CIC-903.tdq` local READQ INTO/LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0159` retain READQ TD topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_readqtd.html` at
+`sha256:7e4cadddf9c9d6503d7d1f0db3af02d1b71bcaf89eb96821b6c47ac6193ed546`.
+The manifest-selected 26,078-byte body was verified in the authoritative raw
+archive and parsed offline with the repository `PlainText` parser. Lines
+17–21 define destructive FIFO retrieval and empty-queue behavior; lines 23–30
+define INTO plus halfword LENGTH input/output, zero-length consumption,
+negative-length preservation and truncation; lines 37–40 define the required
+1–4 character QUEUE; and lines 88–93 distinguish QIDERR 44 from QZERO 23.
+
+Typed row `0159` now lowers local QUEUE/INTO/LENGTH through append-only plan
+operation tag 51 and `cics.queue@1.read-transient-data`. The compiler requires
+a literal or alphanumeric QUEUE, writable INTO storage and optional writable
+halfword-binary LENGTH. The interpreter contributes the resolved INTO extent
+when LENGTH is omitted and writes the original record length back when present.
+SET, SYSID and NOSUSPEND remain rejected before plan construction.
+
+The provider authorizes `QUEUE CICS.TD.<name>` for read, consumes the oldest
+durable record with versioned compare-and-swap, retains an empty durable row so
+QZERO remains distinct from QIDERR, and decrements exact retained-byte
+accounting. Negative LENGTH returns LENGERR without consumption; zero and
+truncated reads consume and return LENGERR 22/0 with the original LENGTH.
+Direct-provider tests cover FIFO consumption and sourced conditions. A compiled
+COBOL machine route crosses the coordinator and selected queue provider,
+observes EIBFN `0804`, exact INTO/LENGTH/RESP/RESP2 state, and preserves INTO on
+the subsequent QZERO.
+
+The resulting application contract identity is
+`sha256:43c0d79f1db220cc3f469cbd39bdec6a2db790ba46565100fd91b817decf7d95`
+and registry identity is
+`sha256:368868ee0e88400eea283fd5686cc42ca2b837c11e39b9a56ab9b4d39d6f2f98`,
+with 47 typed, 0 legacy compatibility, and 216 unready rows. SET, local SYSID,
+NOSUSPEND/QBUSY, definition-backed intra/extrapartition state, replay/reopen,
+PostgreSQL and licensed differential remain pending. This is partial
+`CIC-903.tdq` progress and grants no whole-row credit.
+
+### `CIC-903.tdq` local READQ SET progress
+
+The same row `0159` topic and verified archive digest
+`sha256:7e4cadddf9c9d6503d7d1f0db3af02d1b71bcaf89eb96821b6c47ac6193ed546`
+were searched and read again before this semantic change. Lines 41–47 define
+SET as a pointer output to CICS-acquired complete-record storage and bound its
+lifetime to the next transient-data command or task end.
+
+Typed READQ TD now accepts SET as the exact alternative to INTO. Compiler and
+plan validation require a writable POINTER or POINTER-32 target and preserve an
+optional writable halfword LENGTH output. The interpreter reports its bounded
+remaining virtual-storage capacity, converts the provider's complete-record
+output into a checked virtual allocation, writes only the virtual address, and
+retains the allocation through machine checkpoint restore.
+
+The provider validates the SET-only request shape before authorization or
+mutation. It returns the complete consumed record for allocation, reports the
+original LENGTH, preserves zero-length consume-and-LENGERR behavior without
+truncating SET data, and returns LENGERR without consumption when interpreter
+capacity cannot hold the record. Direct-provider tests cover capacity fencing
+and SET/LENGTH output. A compiled selected route writes, consumes through SET,
+dereferences the pointer in COBOL, suspends, restores the checkpoint, and
+observes exact record bytes and EIBFN `0804`.
+
+No registry or contract count changes in this child: the application contract
+remains `sha256:43c0d79f1db220cc3f469cbd39bdec6a2db790ba46565100fd91b817decf7d95`
+and the registry remains
+`sha256:368868ee0e88400eea283fd5686cc42ca2b837c11e39b9a56ab9b4d39d6f2f98`
+at 44 typed, 0 legacy compatibility, and 219 unready rows. Exact allocation
+expiry on a later transient-data command, SYSID, NOSUSPEND/QBUSY, definition
+state, replay/reopen, PostgreSQL and licensed evidence remain pending.
+
+### `CIC-903.tdq` local SYSID progress
+
+Before changing the three TDQ routes, the committed primary topics were
+searched and read again from the exact hash-verified raw archive bodies:
+DELETEQ TD row `0048` at
+`sha256:e0d480106cd4183d94109883c9e2be44d97b2377c4533579e900bca52349d6ae`,
+READQ TD row `0159` at
+`sha256:7e4cadddf9c9d6503d7d1f0db3af02d1b71bcaf89eb96821b6c47ac6193ed546`,
+and WRITEQ TD row `0257` at
+`sha256:df0db2b00bc0583f38c44afe2fe7987d4ccfc47b5aff3caf7b4bed0be5a81e86`.
+Each defines a 1–4 character SYSID and exact SYSIDERR 53 when the name is
+neither the local system nor a defined reachable remote system.
+
+The compiler now admits literal or alphanumeric-storage SYSID on all three
+typed commands and reuses append-only operand tag 44. Defensive plan validation
+owns the same width and character contract. The provider compares SYSID with
+the run's trusted current system before SAF authorization or queue access.
+Equality retains the existing local durable path; any other name fails with
+SYSIDERR 53/0 because remote connections and shipping remain unsupported.
+
+Direct-provider coverage proves unknown-system WRITE does not create a queue,
+unknown-system READ does not consume, and unknown-system DELETE does not remove
+records, followed by successful local-system forms. A compiled COBOL route
+binds storage-backed SYSID on WRITEQ, READQ and DELETEQ, observes both exact
+SYSIDERR responses, then completes all local mutations and leaves the queue
+empty. Contract and registry identities and the 44/0/219 readiness split remain
+unchanged. Remote CONNECTION/IPCONN routing, definition-driven placement,
+PostgreSQL and licensed differential remain pending.
+
+### `CIC-903.tdq` durable local TDQUEUE-definition progress
+
+Before this semantic change, the registered application source manifests and
+their shared TOC were validated, and the exact content-addressed bodies in the
+authoritative raw HTML archive were parsed offline through the repository
+`PlainText` parser. Baseline `ibm-cics-ts-6x-2026-08-31:api-commands` rows
+`0048`, `0159`, and `0257` retain DELETEQ TD, READQ TD, and WRITEQ TD at
+`sha256:e0d480106cd4183d94109883c9e2be44d97b2377c4533579e900bca52349d6ae`,
+`sha256:7e4cadddf9c9d6503d7d1f0db3af02d1b71bcaf89eb96821b6c47ac6193ed546`,
+and
+`sha256:df0db2b00bc0583f38c44afe2fe7987d4ccfc47b5aff3caf7b4bed0be5a81e86`.
+DELETEQ TD lines 21–30 and 40–72 require a defined intrapartition queue and
+distinguish DISABLED, extrapartition INVREQ, and missing QIDERR. READQ TD lines
+37–40 and 50–93 define definition lookup plus DISABLED, output-direction
+INVREQ, IOERR record skipping, closed NOTOPEN, QIDERR, and empty QZERO. WRITEQ
+TD lines 21–35 and 36–100 define the predefined destination, input-direction
+INVREQ, IOERR, record-size LENGERR, NOSPACE, closed NOTOPEN, and QIDERR.
+
+The provider now installs a bounded, durable set of local TDQUEUE definitions.
+Each definition owns a normalized 1–4 character name, intrapartition or local
+extrapartition kind, enabled state, applicable input/output/closed direction,
+optional record-size rule, and per-queue record/byte limits. Registration is
+atomic and idempotent, conflicting redefinition is rejected, and the provider
+reloads definitions, materialized queues, empty queue identity, and exact
+retained-byte accounting after SQLite reopen. The compatibility profile remains
+available only while no definitions have been installed.
+
+The migration-safety repair revalidated the same manifest/TOC identities and
+parsed all three hash-addressed raw archive bodies again before changing
+registration. Before its first durable definition write, the provider now
+builds the complete proposed set from installed and incoming definitions and
+preflights every materialized compatibility queue. An undeclared queue, excess
+record or byte count, intrapartition record beyond its configured maximum,
+non-fixed extrapartition output record, or retained record proposed for an
+input/closed extrapartition direction rejects the entire registration as an
+idempotency conflict. No definition row or in-memory definition is published
+on failure. Memory coverage exercises each rejection and a complete successful
+migration; SQLite coverage proves rejected partial/incompatible attempts remain
+in the compatibility profile after reopen and a later complete migration
+survives the following reopen with all records unchanged.
+
+WRITEQ, READQ, and DELETEQ consult the definition after authorization and
+before mutation. Direct-provider coverage proves exact DISABLED 84/0,
+INVREQ 16/0, NOTOPEN 19/0, LENGERR 22/0, NOSPACE 18/0, IOERR 17/0,
+QIDERR 44/0, and QZERO 23/0 behavior, input/output direction fencing,
+intrapartition and fixed extrapartition length policy, skipped-record semantics,
+per-queue capacity, durable empty queues, and restart-safe definition identity.
+No plan identity changes in this child. The combined document candidate has 56 typed, 0 legacy compatibility, and 207 unready rows. NOSUSPEND/QBUSY,
+indoubt locking, remote queues and external data-set integration, PostgreSQL,
+and licensed differential remain pending.
+### `CIC-903.document` raw-archive source verification
+
+The committed `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`
+manifest (`sha256:ab7120009fb0f2a9d121ffdf518d05960ee006e74f1d28026858cafd6c5467de`)
+binds the catalog rows below. Each exact body was verified on the host at
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/<first-two>/<sha>.html`:
+its byte count and SHA-256 match the committed topic manifest, and
+`conformance/tools/ibm_docs.py` `plain_text` parsed the local HTML. This
+2026-09-23 review used no browser or network refresh and grants no licensed
+execution credit.
+
+| Catalog row | Committed topic path | SHA-256 | Bytes | Parsed lines |
+|---|---|---|---:|---:|
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0051` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentcreate.html` | `70f130b5e467d34910ef11f8601bf6d2eb4e46f9ddf64cb90d82c24fffec0891` | 38,731 | 178 |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0052` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentdelete.html` | `82db8cb8de4176ba0560a601b15f2dd66f06ea2474a969ff11e4d8e6b3725eae` | 8,107 | 32 |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0053` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentinsert.html` | `66d47de5d4ced2416d9429e1def25ad8919a81b2337222d533140386c217733e` | 37,899 | 192 |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0054` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentretrieve.html` | `2ffcae807d28ca78a1a09b9c811664c93ab63222ae9a6ac90a1203ada4dc1685` | 20,456 | 106 |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0055` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentset.html` | `2852d1a2a84ce03aa96bd14d8353aa75681b6b1cdb56c5b544fd21f5420da121` | 23,242 | 111 |
+
+The related symbol-rules topic
+`SSJL4D_6.x/applications/designing/dfhp3_doc_symbol_rules.html` was also
+verified from the raw archive at
+`sha256:5b0e1fb401f8356602aeac05f2845ec1cbf3037c2c0b7bdcb9d1e3e0e6c3e669`
+(10,771 bytes; 129 parsed lines).
+
+### `CIC-903.document` DOCUMENT CREATE progress
+
+Before changing document semantics, the registered
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` manifest was verified at
+`sha256:ab7120009fb0f2a9d121ffdf518d05960ee006e74f1d28026858cafd6c5467de`
+with topic-set digest
+`sha256:344e912ef28b1d9ba4a1a00b4613865d759c3e337ac809ccb23fd4f4358652d5`.
+The original repository parser review searched and read row `0051` topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentcreate.html`
+from the verified pinned cache at
+`sha256:70f130b5e467d34910ef11f8601bf6d2eb4e46f9ddf64cb90d82c24fffec0891`.
+The raw hash-addressed archive body was separately verified and parsed in the
+2026-09-23 review above.
+It establishes the 16-byte generated DOCTOKEN, optional current DOCSIZE,
+empty/FROM/TEXT/BINARY/FROMDOC/TEMPLATE sources, symbol-list length and
+delimiter behavior, DOCTEMPLATE READ authorization, and exact documented
+INVREQ/LENGERR/NOTAUTH/NOTFND/SYMBOLERR/TEMPLATERR conditions.
+
+The compiler, canonical plan and interpreter now select `DOCUMENT CREATE`
+through operation tag 63. New document operands occupy only tags 132–147,
+UNESCAPED uses option tag 84, and DOCTOKEN/DOCSIZE use non-ASSIGN output tags
+216–217. Explicit uniqueness and canonical round-trip coverage protects those
+reservations. The provider owns one bounded durable authority keyed by a
+deterministic 16-byte token and fenced by execution, run unit and transaction.
+It persists the document and outer replay atomically, reloads documents and
+registered templates from SQLite, applies DOCTEMPLATE SAF before template
+access, and reclaims documents at task end.
+
+Direct-provider coverage proves capacity rejection without partial state,
+exact same-request replay, mismatched replay conflict, template authorization,
+symbol substitution and SQLite reopen. A compiled COBOL route proves
+DOCTOKEN/DOCSIZE output bindings and the selected EIBFN `3C02` path. Generated
+descriptor and registry artifacts bound 45 typed and 218 unready API rows at
+the CREATE seal; the contract digest was
+`sha256:77d79b2ae57166122bd29ddc4a2d15f7d0b6cef92f77c9d6d2c1fb1d77b07fa7`
+and the registry digest was
+`sha256:01aa97baf160e0a20b437cbf07adf77e393f229646e3eb5e38aea6fde54ac8d7`.
+PostgreSQL execution, licensed differential and release certification remain
+pending.
+
+### `CIC-903.document` DOCUMENT DELETE progress
+
+The verified `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` manifest
+binds catalog row `ibm-cics-ts-6x-2026-08-31:api-commands:0052` to
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentdelete.html`
+at `sha256:82db8cb8de4176ba0560a601b15f2dd66f06ea2474a969ff11e4d8e6b3725eae`.
+The repository offline parser searched and read the hash-verified body: lines
+15–24 require immediate release of the document and its storage using the
+16-byte token; lines 25–30 give NOTFND 13/1 for an absent document.
+
+The typed compiler and canonical plan bind the input token to operation tag
+64, rejecting a missing or incorrectly sized area. The provider checks the
+issuing execution, run unit and transaction, then atomically deletes the
+versioned document row and writes the outer effect replay. Direct-provider
+coverage proves immediate capacity release, exact retry replay, and NOTFND
+13/1 on a new delete request. A compiled COBOL route proves token input,
+RESP/RESP2 outputs and selected EIBFN `3C10`. The generated registry now has
+46 typed and 217 unready API rows at the DELETE seal.
+
+### `CIC-903.document` DOCUMENT INSERT progress
+
+The verified `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` manifest
+binds catalog row `ibm-cics-ts-6x-2026-08-31:api-commands:0053` to
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentinsert.html`
+at `sha256:66d47de5d4ced2416d9429e1def25ad8919a81b2337222d533140386c217733e`.
+The repository offline parser searched and read the hash-verified body: lines
+15–30 define bookmark placement and TOP; lines 31–132 define the source,
+overlay and size operands; lines 133–190 give DUPREC, INVREQ, LENGERR,
+NOTAUTH, NOTFND and TEMPLATERR. The related row `0054` topic
+`dfhp4_documentretrieve.html` at
+`sha256:2ffcae807d28ca78a1a09b9c811664c93ab63222ae9a6ac90a1203ada4dc1685`
+establishes the tagged-buffer interchange. The pinned symbol-rules topic
+`SSJL4D_6.x/applications/designing/dfhp3_doc_symbol_rules.html` at
+`sha256:5b0e1fb401f8356602aeac05f2845ec1cbf3037c2c0b7bdcb9d1e3e0e6c3e669`
+establishes case-sensitive symbol names and literal preservation of invalid
+percent escape sequences.
+
+The compiler and plan select operation tag 65 with a 16-byte DOCTOKEN,
+fullword LENGTH for buffer sources, source-specific names and optional
+DOCSIZE. The provider owns the versioned segment/bookmark update, capacity
+checks, template READ authorization, and atomic document-plus-replay write.
+Its bounded internal tagged transport reconstructs binary blocks and
+bookmarks for FROM buffers produced by this runtime. Direct-provider tests
+cover append, TOP insertion, bookmark shifts, overlay, duplicate names,
+exact retry, and tagged FROM reconstruction; the compiled COBOL route proves
+DOCSIZE and EIBFN `3C04`. Generated artifacts bound 47 typed and 216
+unready API rows at the INSERT seal, contract
+`sha256:72a4493f342bdbc66aa4afe21e0a2937effe0d9b858942fbbaf0364963921b9c`,
+registry `sha256:491356bd31bed643ef79838efe8593835cf3b066f9806cef291325b73b155251`.
+External IBM tag-byte equivalence, PostgreSQL and licensed differential remain
+pending.
+
+### `CIC-903.document` DOCUMENT RETRIEVE progress
+
+The verified `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` manifest
+binds catalog row `ibm-cics-ts-6x-2026-08-31:api-commands:0054` to
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentretrieve.html`
+at `sha256:2ffcae807d28ca78a1a09b9c811664c93ab63222ae9a6ac90a1203ada4dc1685`.
+The repository offline parser searched and read the hash-verified body: lines
+15–44 define tagged retrieval, DATAONLY, DOCSIZE and zero-MAXLENGTH length
+probing; lines 45–76 define CHARACTERSET, DOCTOKEN, INTO, LENGTH and
+MAXLENGTH; lines 77–104 define INVREQ 16/11–12, LENGERR 22/1–2 and
+NOTFND 13/1,7.
+
+The compiler and plan select operation tag 66 and document DATAONLY option
+tag 85, with 16-byte token input, writable INTO and fullword LENGTH, and
+optional fullword MAXLENGTH and CHARACTERSET inputs. The provider reads the
+owned document without mutation, emits tagged or data-only bytes, and uses
+the owned CP037 mapping for UTF-8, Latin-1 or CP037 conversion. An undersized
+or zero MAXLENGTH returns a bounded prefix and exact required LENGTH through
+LENGERR 22/2; negative MAXLENGTH returns LENGERR 22/1 without LENGTH output.
+Direct-provider coverage proves these branches, UTF-8 expansion beyond
+DOCSIZE and unchanged document version. A compiled COBOL route proves the
+truncated INTO prefix, RESP/RESP2, LENGTH and EIBFN `3C06`. Generated
+artifacts bound 48 typed and 215 unready API rows at the RETRIEVE seal, contract
+`sha256:1f6a85c6e55bba60414f3e155f5841fb8cf6ea324d503965359e79afe738ba08`,
+registry `sha256:fadad7969d386ea37ac6f4e0eea3ca25a2b60381db36810b76b82cae59d4fb13`.
+External IBM tag-byte equivalence, additional code pages, PostgreSQL and
+licensed differential remain pending.
+
+### `CIC-903.document` DOCUMENT SET progress
+
+The verified `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` manifest
+binds catalog row `ibm-cics-ts-6x-2026-08-31:api-commands:0055` to
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentset.html`
+at `sha256:2852d1a2a84ce03aa96bd14d8353aa75681b6b1cdb56c5b544fd21f5420da121`.
+The repository offline parser searched and read the hash-verified body: lines
+15–25 define symbol replacement without retroactive content changes; lines
+29–85 define delimiter, token, fullword length, individual and list modes,
+and UNESCAPED; lines 86–109 give INVREQ 16/8, LENGERR 22/9–10, NOTFND
+13/1 and SYMBOLERR 116/offset. The pinned symbol-rules topic
+`SSJL4D_6.x/applications/designing/dfhp3_doc_symbol_rules.html` at
+`sha256:5b0e1fb401f8356602aeac05f2845ec1cbf3037c2c0b7bdcb9d1e3e0e6c3e669`
+defines case-sensitive names and escape processing.
+
+The compiler and plan select operation tag 67 with exactly one symbol mode,
+storage-backed DOCTOKEN, fullword LENGTH, optional DELIMITER and UNESCAPED.
+The provider owns bounded symbol parsing and replacement, versioned durable
+update, and atomic effect replay. Direct-provider coverage proves exact
+same-request retry, single-value unescaping, case-sensitive list updates,
+prior inserted bytes remaining unchanged, and SYMBOLERR without mutation.
+A compiled COBOL route proves a SET symbol is used by a later INSERT and
+captures EIBFN `3C08`. The original SET seal bound 49 typed and 214 unready
+API rows, contract
+`sha256:d5204590fe0459aa588e75dd5ae7954cd75ae6db9a5e67522118857b957a682b`,
+registry `sha256:226ea6ae0b1fc5c1dd3c1f4d272c0ca0dbad8ddace79bb99a7074cd2e64d7aea`.
+After rebasing all five document commands onto the `952c9115` program-control
+base, the generated contract and registry bind 56 typed and 207 unready API
+rows, with contract digest
+`sha256:5b0c10829bccd6029b4e806f456dd9b49737df51aa70511ddd81d75a45171ffb`
+and registry digest
+`sha256:109df9283b1c374b57dd03dd5bd0e6a3b93592d6e58039b06ad409208674ee5a`.
+External IBM tag-byte equivalence, additional code pages, PostgreSQL and
+licensed differential remain pending.
+
+### `CIC-903.tsq` local DELETEQ QUEUE progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-a` row `0049` retain DELETEQ TS topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_deleteqts.html` at
+`sha256:82e8d38ffbccc3e52751ced565988a8a9465c0084d3f22eb60ce2daa0d12e689`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 21–29 define deletion of all temporary data and
+release of associated storage. Lines 38–44 define the 1–8 character QUEUE
+form, lines 55–61 define all-binary-zero `INVREQ`, lines 73–80 define NOTAUTH
+and missing-queue `QIDERR`, and lines 45–53 keep SYSID remote/shared-only.
+
+Row `0049` now lowers its local QUEUE subset through append-only plan operation
+tag 41 and `cics.queue@1.delete-temporary-storage`. Compiler admission accepts
+a 1–8 character literal or alphanumeric storage field and rejects QNAME and
+SYSID until their distinct contracts are implemented. Plan validation owns the
+QUEUE-only shape, common response policy, and literal bound. The interpreter
+emits the selected bytes under canonical QUEUE and records EIBFN `0A06` from
+the generated registry.
+
+The provider validates argument schemas before mutation, maps an all-zero name
+to exact `INVREQ` 16/0, authorizes `QUEUE CICS.TS.<name>` for update, validates
+the durable row codec, and deletes the `cics-tsq` row at its observed version.
+A missing row returns exact `QIDERR` 44/0. The ordinary effect-replay journal
+makes an identical retry return the original NORMAL result without repeating
+deletion. A SQLite regression seeds a durable multi-byte queue, proves one
+versioned delete, replay, both sourced conditions, and absence after reopen. A
+compiled COBOL route proves QUEUE and RESP/RESP2 bindings plus EIBFN `0A06`.
+
+The generated application contract identity is
+`sha256:2e6e29ba840fe3c70386a5a41b3e0c99db34f6ade2862b0c3795120691c63b2d`
+and registry identity is
+`sha256:97c073510399c63933115956221ad1dfb21cdc9faf97fecdf41d2b4ce7bd9757`,
+with 42 typed, 0 legacy compatibility, and 221 unready rows. The host API, IR,
+compiler, CICS, and conformance package suites pass (41, 52, 235, 117 plus
+three environment-gated ignores, and 226 plus two intentional ignores), and
+all 30 focused descriptor tests pass. QNAME, SYSID, TSMODEL/shared-pool and
+recoverability state, indoubt locking, WRITEQ/READQ TS, PostgreSQL restart, and
+licensed differential remain pending. This is partial `CIC-903.tsq` progress
+and grants no whole-row credit.
+
+### `CIC-903.tsq` DELETEQ QNAME progress
+
+The same hash-verified row `0049` DELETEQ TS topic at
+`sha256:82e8d38ffbccc3e52751ced565988a8a9465c0084d3f22eb60ce2daa0d12e689`
+defines QNAME at lines 31–37 as the 1–16 character alternative to QUEUE and
+requires a shorter value supplied through storage to occupy a 16-character
+blank-padded field.
+
+Typed DELETEQ TS now admits QNAME through append-only operand tag 43. Literal
+QNAME values accept 1–16 bounded resource characters; a storage-backed QNAME
+must resolve to an exact 16-byte alphabetic or alphanumeric field so COBOL
+blank padding remains part of the captured input. Compiler and encoded-plan
+validation require
+exactly one of QUEUE or QNAME and preserve their distinct host argument names.
+The provider repeats that exclusion before authorization or mutation, trims
+the padded selected name only for durable resource identity, and reuses the
+same `CICS.TS.<name>` authorization, row-codec validation, versioned deletion,
+QIDERR/INVREQ, replay, and reopen contracts.
+
+Provider proof seeds both short and long durable names, shows a conflicting
+QUEUE/QNAME request leaves the long row intact, then deletes the long row by
+QNAME and observes its absence after SQLite reopen. The compiled selected route
+captures a 16-byte padded COBOL field as `QNAME`, excludes `QUEUE`, completes
+the second mutation, and records EIBFN `0A06`.
+
+The application contract and registry identities remain
+`sha256:2e6e29ba840fe3c70386a5a41b3e0c99db34f6ade2862b0c3795120691c63b2d`
+and
+`sha256:97c073510399c63933115956221ad1dfb21cdc9faf97fecdf41d2b4ce7bd9757`,
+with 42 typed, 0 legacy compatibility, and 221 unready rows because this closes
+an option of row `0049`. The full IR, compiler, CICS, and conformance package
+suites pass (52, 235, 117 plus three environment-gated ignores, and 226 plus
+two intentional ignores). SYSID, TSMODEL/shared-pool and recoverability state,
+indoubt locking, WRITEQ/READQ TS, PostgreSQL restart, and licensed differential
+remain pending. This is partial `CIC-903.tsq` progress and grants no whole-row
+credit.
+
+### `CIC-903.tsq` DELETEQ local SYSID progress
+
+The same hash-verified row `0049` DELETEQ TS topic at
+`sha256:82e8d38ffbccc3e52751ced565988a8a9465c0084d3f22eb60ce2daa0d12e689`
+defines SYSID at lines 45–53 as a 1–4 character remote-system or shared-pool
+name. Condition lines 82–100 define `SYSIDERR` 53 when the name is neither the
+local system nor a known remote system, or when the corresponding connection
+or temporary-storage server is unavailable.
+
+Typed DELETEQ TS now carries optional SYSID through append-only operand tag 44.
+Compiler and plan validation accept only literal or resolved alphabetic/
+alphanumeric storage of 1–4 characters and retain the existing exact-one
+QUEUE/QNAME rule. The interpreter emits canonical SYSID bytes beside the
+selected queue identity.
+
+The bounded runtime owns no remote CICS connection or shared TS-server route,
+so it admits only the issuing run's exact local SYSID. That comparison occurs
+before queue authorization or mutation. An unknown but well-formed system
+returns exact `SYSIDERR` 53/0 through ordinary response handling and preserves
+the durable queue; an explicit current-system name continues through the same
+RACF, codec, versioned delete, replay, and condition path as an omitted SYSID.
+Direct provider proof covers both outcomes, and the compiled selected route
+carries `SYSID('S001')` with QUEUE and common response bindings.
+
+The application contract and registry identities remain
+`sha256:2e6e29ba840fe3c70386a5a41b3e0c99db34f6ade2862b0c3795120691c63b2d`
+and
+`sha256:97c073510399c63933115956221ad1dfb21cdc9faf97fecdf41d2b4ce7bd9757`,
+with 42 typed, 0 legacy compatibility, and 221 unready rows. The full IR,
+compiler, CICS, and conformance package suites pass (52, 235, 118 plus three
+environment-gated ignores, and 226 plus two intentional ignores). Remote CICS
+dispatch, shared pools, TSMODEL and recoverability state, indoubt locking,
+PostgreSQL evidence, and licensed differential remain pending. This is partial
+`CIC-903.tsq` progress and grants no whole-row credit.
+
+### `CIC-903.tsq` local READQ progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0160` pin READQ TS topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_readqts.html` at
+`sha256:8aaff3c1adb6ee51cc39d203b6baa0d4836b2e15784cc1b039f3098434f99706`.
+The authoritative retained HTML under the external content-addressed archive
+matches that digest and was searched and read offline with the repository
+`PlainText` parser. Lines 22–58 define INTO/SET, ITEM/default or explicit NEXT,
+in/out LENGTH, normal-only NUMITEMS, QUEUE/QNAME and SYSID. Lines 59–101 define
+the applicable INVREQ, ITEMERR, LENGERR, NOTAUTH, QIDERR and SYSIDERR results;
+IOERR and ISCINVREQ remain tied to unsupported shared or remote execution.
+
+Typed row `0160` lowers through append-only operation tag 49. ITEM uses reserved
+operand tag 70, explicit NEXT uses reserved option tag 44, and NUMITEMS has a
+distinct numeric output identity at reserved non-ASSIGN tag 200. An exhaustive
+codec regression proves that every fixed and ASSIGN-derived `CicsOutputName`
+tag is unique and decodes to its original identity. Compiler and encoded-plan
+validation require exactly one QUEUE/QNAME and INTO/SET, require LENGTH for SET,
+infer INTO capacity when LENGTH is omitted, require halfword
+ITEM/LENGTH/NUMITEMS fields, and reject ITEM plus NEXT. Literal names and exact
+padded storage fields remain distinct; only an omitted SYSID or the issuing
+run's exact local SYSID reaches the queue.
+Representable zero or negative ITEM literals reach the provider and return
+source-defined ITEMERR at execution.
+
+The provider migrates retained `MECT2` queue rows to strict `METS1` rows on the
+first successful read. The new row preserves ordered items, placement and lock
+metadata plus one versioned queue-wide next-item cursor. Explicit ITEM reads
+position that cursor after the selected record; omitted or explicit NEXT reads
+the following item and returns ITEMERR beyond the queue. INTO truncation returns
+LENGERR while writing the original record length, NUMITEMS is emitted only on
+NORMAL, and SET receives full interpreter-owned storage whose pointer is
+invalidated by the next READQ TS. All-zero names return INVREQ, missing queues
+return QIDERR, and unsupported remote/shared SYSID returns SYSIDERR 53/4 before
+authorization or row mutation.
+The retained-row migration and effect replay rules are local durability
+contracts; the pinned command page does not specify their storage format.
+
+Queue READ authorization uses `QUEUE CICS.TS.<name>` before cursor mutation.
+Focused proof covers audited success, audited SAF denial as NOTAUTH 70/101 with
+an unchanged row, effect replay without a second cursor advance, exact length
+and count outputs, legacy migration, and queue-cursor continuity after SQLite
+reopen. The compiled COBOL route carries QUEUE/QNAME, local SYSID, ITEM/NEXT,
+INTO/SET, LENGTH, NUMITEMS and RESP bindings and records EIBFN `0A04`.
+
+The generated application contract is
+`sha256:c6f003cf59680682abb176db5356c43b3b4e5ec1ad1d6dd03cf27b320a4616bf`
+and the registry is
+`sha256:b8f4785caf825b7d73aa553336403ac89781bf55ab1230b7a9916a6849489f74`,
+with 48 typed, 0 legacy compatibility, and 215 unready rows. Remote function
+shipping, shared pools, TSMODEL routing, shared IOERR/ISCINVREQ paths,
+PostgreSQL restart and licensed differential remain pending and fail closed.
+This completes the declared local row `0160` boundary without claiming those
+broader environments or whole-family credit.
+
+### `CIC-903.tsq` local WRITEQ progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0258` pin WRITEQ TS topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_writeqts.html` at
+`sha256:f9e8c7abe43ef35e88d3e2c31b4928ed4139137ab2ef57b4943c4a766a5367df`.
+The authoritative retained HTML under the external content-addressed archive
+matches that digest and was searched and read offline with the repository
+`PlainText` parser. Lines 46–130 define FROM, ITEM compatibility and REWRITE,
+bounded LENGTH, MAIN/AUXILIARY, NOSUSPEND, NUMITEMS, QUEUE/QNAME, and SYSID.
+Lines 131–205 define the applicable INVREQ, ITEMERR, LENGERR, LOCKED, NOSPACE,
+NOTAUTH, QIDERR, and SYSIDERR results; IOERR and ISCINVREQ remain tied to
+unsupported shared or remote execution.
+
+Typed row `0258` lowers through append-only operation tag 50. ITEM reuses
+reserved operand tag 70 as one writable in/out halfword, while REWRITE,
+AUXILIARY, and MAIN use reserved option tags 45–47. Compiler and encoded-plan
+validation require exactly one QUEUE/QNAME, required storage-backed FROM,
+generated or signed-halfword explicit LENGTH, ITEM with REWRITE, no
+NUMITEMS with REWRITE, explicit LENGTH with SYSID, and mutually exclusive
+MAIN/AUXILIARY. Literal names and exact padded storage fields remain distinct;
+only an omitted SYSID or the issuing run's exact local SYSID reaches the queue.
+Representable zero, negative, or greater-than-32763 LENGTH literals reach the
+provider and return source-defined LENGERR at execution.
+
+The provider creates strict `METS1` rows, migrates retained `MECT2` rows on the
+first successful write, preserves the first-write MAIN/AUXILIARY placement,
+and appends or replaces exactly one ordered item under a versioned store
+compare-and-swap. Existing queues ignore later placement requests. Reserved or
+all-zero names return INVREQ, invalid rewrite items return ITEMERR, missing
+rewrite queues return QIDERR, recovery locks return INVREQ, indoubt locks return
+LOCKED, invalid lengths return LENGERR, and unsupported remote/shared SYSID
+returns SYSIDERR 53/4 before authorization or mutation. Capacity exhaustion
+with NOSUSPEND returns the source-defined ignorable NOSPACE 18/0; without it,
+the request suspends for reissue.
+The retained-row migration and effect replay rules are local durability
+contracts; the pinned command page does not specify their storage format.
+
+Queue UPDATE authorization uses `QUEUE CICS.TS.<name>` before mutation.
+Per-item effect keys close the queue-write/replay-ledger crash gap, so a retry
+returns the original append ITEM/NUMITEMS outputs or the completed REWRITE
+without a duplicate mutation. Focused proof covers a replay-journal failure,
+conflicting replay, audited success and SAF denial, legacy migration,
+MAIN/AUXILIARY persistence, exact condition results, SQLite reopen, and a
+compiled selected route carrying EIBFN `0A02`.
+
+The generated application contract is
+`sha256:c6f003cf59680682abb176db5356c43b3b4e5ec1ad1d6dd03cf27b320a4616bf`
+and the registry is
+`sha256:b8f4785caf825b7d73aa553336403ac89781bf55ab1230b7a9916a6849489f74`,
+with 48 typed, 0 legacy compatibility, and 215 unready rows. Remote function
+shipping, shared pools, TSMODEL placement, recoverable-UOW coupling,
+PostgreSQL restart and licensed differential remain pending and fail closed.
+This completes the declared local row `0258` boundary without claiming those
+broader environments or whole-family credit.
+
+### `CIC-903.terminal-bms` local map/text progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and accepted application
+source catalogs pin three CICS TS 6.x command pages. Sources B row `0163`
+RECEIVE MAP pins topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivemap.html` at
+`sha256:7611d9cf7da0e0f20245a4ed025cf033c3406b82a9db403718053981a413ffaa`.
+It was reproduced through the user's existing Chrome debugging session as
+32,942 bytes under cache key
+`topic-83ff630e2b851c282c380833df33b3831fbbf21a8fbc276976696a653e0b025d-sha256-7611d9cf7da0e0f20245a4ed025cf033c3406b82a9db403718053981a413ffaa.html`.
+Sources C row `0189` SEND MAP pins
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendmap.html` at
+`sha256:d04b3015904867e32d0cf1e2986e56378b3fb3946a616cb9aefad052679de274`
+and 96,690 bytes under cache key
+`topic-2f2dd5a39c07111bc8fb9d6e8bafc8a9f91aeb163f906cce5779a46240aa76be-sha256-d04b3015904867e32d0cf1e2986e56378b3fb3946a616cb9aefad052679de274.html`.
+Sources C row `0192` SEND TEXT pins
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendtext.html` at
+`sha256:273d1803dbe576859b72dce428db5e6f9e4721b170cac3865cc6b1d88bce6577`
+and 84,761 bytes under cache key
+`topic-0d4b1999b272d91e7c570c0ad820ca392b612c086e42e65eaba227620f1a89aa-sha256-273d1803dbe576859b72dce428db5e6f9e4721b170cac3865cc6b1d88bce6577.html`.
+Each registered digest was verified by offline read after reproduction. No host
+publication cache is available; the verified external content-addressed cache
+is the only publication-body authority used here.
+
+The pages establish 1–7 character MAP/MAPSET names, MAP as required for SEND
+MAP, MAPSET defaulting to MAP, and the FROM/INTO data-area roles. The broader
+RECEIVE source also permits SET and omitting both INTO and SET for AID-only
+processing; SEND MAP permits implicit symbolic output storage; SEND TEXT owns
+additional terminal and paging controls. Those forms remain outside this
+bounded subset.
+
+Rows `0163`, `0189`, and `0192` now lower through typed
+`cics.terminal@1.receive-map`, `cics.terminal@1.send-map`, and
+`cics.terminal@1.send-text` plans. Append-only operation tags 29–31 and MAP and
+MAPSET operand tags 24–25 bind the map selectors, optional SEND MAP FROM input,
+optional RECEIVE MAP INTO output, and required SEND TEXT FROM input before
+dispatch. MAPSET defaults to MAP in both typed map operations. Defensive plan
+validation rejects cross-family operands, duplicate clauses, and every unowned
+option. The provider checks the requested durable map definition against the
+terminal, records a successful SEND MAP as current, and normalizes received
+field bytes against the explicitly requested definition.
+
+A compiled Conformance regression observes the typed arguments and output
+binding with EIBFN `1804`, `1806`, and `1802`; the durable public-terminal test
+exercises explicit RECEIVE MAP/MAPSET against the same session/map authority.
+The BMS integration contract had identity
+`sha256:5b8da589efa6d0252139f0f1e83d6416610b6d8b729f44326a7f0f047f477520`
+and registry identity
+`sha256:a5f328d50f42fd7c2dfa334cd5ff814c45cb186b701a3f5a70ccdb888437cfe6`,
+with 32 typed, 2 legacy compatibility, and 229 unready rows at that integration
+point. SET pointers,
+TIOAPFX and omitted-map/AID-only receive, implicit symbolic map storage,
+cursor/data-only/erase/alarm/free-keyboard/paging/device options, DPL behavior,
+broader restart, and licensed differential remain pending. Retained raw
+artifacts remain readable. This is partial `CIC-903.terminal-bms` progress and
+grants no whole-row credit.
+
+### `CIC-903.terminal-bms` RECEIVE MAP FROM/LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0163` retain RECEIVE MAP topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivemap.html` at
+`sha256:7611d9cf7da0e0f20245a4ed025cf033c3406b82a9db403718053981a413ffaa`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 30–43 define FROM as the supplied mapped-input area
+and LENGTH as a halfword-binary amount that must not exceed that area. Lines
+49–57 separately define the deferred SET pointer and TIOAPFX lifetime.
+
+Typed RECEIVE MAP now accepts a storage-backed FROM area with an optional
+nonnegative literal, halfword-binary field, or `LENGTH OF` the same area.
+Compiler and plan validation require FROM whenever LENGTH is present, reject a
+mismatched `LENGTH OF`, wrong-width storage, over-halfword literals, and every
+cross-command role. The interpreter captures the selected FROM bytes and emits
+only a canonical decimal LENGTH.
+
+The provider validates the complete bounded request shape before taking the
+session lock. It maps exactly the selected prefix against the requested durable
+map definition, returns normalized BMS field outputs, and rejects a runtime
+length beyond the supplied area without mutating state. Because FROM supplies
+the input, this route neither consumes an already queued terminal message nor
+increments the terminal-session version; the next ordinary RECEIVE still sees
+that message. Direct-provider coverage proves prefix mapping, field length,
+state preservation, queued-input preservation, missing-FROM rejection, and
+the runtime upper bound. A compiled COBOL selected route carries FROM,
+halfword LENGTH, MAP/MAPSET and INTO through the typed CICS request and writes
+the returned bytes with EIBFN `1802`.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows. The full IR,
+compiler, CICS, and conformance package suites pass (52, 233, 115 plus three
+environment-gated ignores, and 224 plus two intentional ignores), as does
+warnings-denied Clippy for all four packages. TIOAPFX, SET pointer lifetime,
+omitted-map/AID-only receive, terminal translation/partition controls,
+PostgreSQL evidence, and licensed differential remain pending. This is partial
+`CIC-903.terminal-bms` progress and grants no whole-row credit.
+
+### `CIC-903.terminal-bms` RECEIVE MAP TERMINAL progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-b` row `0163` retain RECEIVE MAP topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivemap.html` at
+`sha256:7611d9cf7da0e0f20245a4ed025cf033c3406b82a9db403718053981a413ffaa`.
+The hash-verified retained body was searched and read offline through the
+repository parser. Lines 30–43 define FROM as a supplied mapped-input area;
+lines 58–59 define TERMINAL as receiving data from the terminal that originated
+the transaction.
+
+Typed RECEIVE MAP now admits explicit TERMINAL through append-only option tag
+27. Compiler and encoded-plan validation restrict it to RECEIVE MAP and reject
+its combination with FROM. The interpreter emits canonical empty
+`OPTION.TERMINAL` storage, and the provider defensively enforces the same
+mutual exclusion and option schema before locking or changing terminal state.
+
+The local runtime has one durable terminal session per originating task, so
+explicit TERMINAL selects the same queued-input path as an ordinary local
+RECEIVE MAP without inventing a second device identity. Direct-provider proof
+shows malformed TERMINAL/FROM leaves the queued message and session version
+unchanged, then explicit TERMINAL consumes and maps that same message. A
+compiled COBOL selected route carries `OPTION.TERMINAL`, MAP/MAPSET and INTO
+through the typed request, writes the returned bytes, and records EIBFN `1802`.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+an option of row `0163`. The full IR, compiler, CICS, and conformance package
+suites pass (52, 234, 115 plus three environment-gated ignores, and 225 plus
+two intentional ignores). Translation, partitions, TIOAPFX, SET pointer
+lifetime, omitted-map/AID-only receive, PostgreSQL evidence, and licensed
+differential remain pending. This is partial `CIC-903.terminal-bms` progress
+and grants no whole-row credit.
+
+### `CIC-903.terminal-bms` SEND MAP LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0189` retain SEND MAP topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendmap.html` at
+`sha256:d04b3015904867e32d0cf1e2986e56378b3fb3946a616cb9aefad052679de274`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 91–98 define the explicit FROM area, and lines 140–149 define LENGTH as
+the halfword-binary amount of that area to format when the area is longer than
+the mapped data.
+
+Typed row `0189` now admits LENGTH only with an explicit FROM slot. The value
+can be a nonnegative bounded literal, a halfword-binary storage item, or
+`LENGTH OF` the same FROM item. Plan admission rejects LENGTH without FROM,
+cross-command inputs, and a mismatched `LENGTH OF` identity. The interpreter
+emits only canonical decimal length arguments, and the provider now validates
+the complete SEND MAP/SEND TEXT host-request allowlist and payload schemas
+before taking the session lock or mutating the durable screen.
+
+The provider selects the requested FROM prefix before symbolic-map decoding and
+formatting, so bytes beyond LENGTH cannot populate fields or the terminal
+screen. A direct provider regression observes the four-byte field value and
+rejects a malformed no-FROM request. The compiled selected route reads a COBOL
+halfword, sends four bytes from an eight-byte area through the coordinator and
+selected provider, and observes only that prefix in the TN3270 screen.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0189`. Implicit symbolic storage,
+cursor positioning, paging, DPL behavior, broader restart, and licensed
+differential remain pending. This is partial `CIC-903.terminal-bms` progress
+and grants no whole-row credit.
+
+### `CIC-903.terminal-bms` SEND MAP MAPONLY progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0189` retain SEND MAP topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendmap.html` at
+`sha256:d04b3015904867e32d0cf1e2986e56378b3fb3946a616cb9aefad052679de274`.
+The hash-verified retained body was read offline through the repository parser.
+Syntax line 10 admits MAPONLY, and lines 159–160 define it as writing only the
+default data from the map.
+
+Typed row `0189` now carries MAPONLY through append-only plan option tag 23.
+Compiler and defensive plan admission require SEND MAP and reject FROM or
+LENGTH application data with MAPONLY. The interpreter emits the canonical
+`OPTION.MAPONLY` host argument, and strict provider admission accepts its empty
+option payload while rejecting conflicting or wrongly typed request shapes
+before taking the session lock.
+
+The provider uses the selected durable map's initialized field values, records
+those values in the terminal session, and formats them into the screen payload.
+A direct provider regression proves default selection, session state, malformed
+FROM/LENGTH rejection, and screen preservation. The compiled selected route
+sends a MAPONLY command through publication, interpreter, coordinator, and the
+selected provider, then observes the initialized `WELCOME` field in the TN3270
+screen.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0189`. Implicit symbolic storage, paging, DPL behavior,
+broader restart, and licensed differential
+remain pending. This is partial `CIC-903.terminal-bms` progress and grants no
+whole-row credit.
+
+### `CIC-903.terminal-bms` SEND MAP DATAONLY progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0189` retain SEND MAP topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendmap.html` at
+`sha256:d04b3015904867e32d0cf1e2986e56378b3fb3946a616cb9aefad052679de274`.
+The hash-verified retained body was read offline through the repository parser.
+Syntax line 10 admits DATAONLY. Lines 57–61 require application data and its
+field attributes, define `X'00'` as preserving the screen attribute, and state
+that map default data and attributes are ignored.
+
+Typed row `0189` now carries DATAONLY through append-only plan option tag 24.
+Compiler and defensive plan admission require an explicit FROM area, preserve
+the existing literal, halfword-binary, and matching `LENGTH OF` forms, and
+reject MAPONLY in the same request. The interpreter emits canonical
+`OPTION.DATAONLY`; strict provider admission rejects missing data, conflicting
+mode options, wrong schemas, absent symbolic offsets, short areas, and unknown
+attribute bytes before durable mutation.
+
+For every mapped field, the provider reads the application value and attribute
+from the definition's symbolic offsets. Recognized attributes replace the
+map-defined protection and MDT defaults. `X'00'` preserves the prior attribute
+state when the same map is current, while a first-send zero leaves the modeled
+attribute clear. Map initial values are never selected. Direct provider tests
+prove default suppression, supplied protection/MDT state, `X'00'` preservation,
+and malformed-request nonmutation. The compiled selected route sends a COBOL
+group containing `A` plus `X'C1'` and observes an unprotected `A`, not the map's
+protected default `Z`, in the TN3270 screen.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0189`. Implicit symbolic storage, color/highlight
+attributes, paging, DPL behavior, broader restart, and licensed differential
+remain pending. This is partial `CIC-903.terminal-bms` progress and grants no
+whole-row credit.
+
+### `CIC-903.terminal-bms` SEND TEXT LENGTH progress
+
+The `ibm-cics-ts-6x-2026-08-31:api-commands` baseline and
+`cics-application-api-sources-c` row `0192` retain SEND TEXT topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendtext.html` at
+`sha256:273d1803dbe576859b72dce428db5e6f9e4721b170cac3865cc6b1d88bce6577`.
+The hash-verified retained body was read offline through the repository parser.
+Lines 86–87 define the required FROM area, lines 133–135 define LENGTH as its
+halfword-binary sent length, and lines 251–254 define LENGERR 22 for an
+out-of-range value.
+
+Typed row `0192` now accepts a nonnegative bounded literal, halfword-binary
+storage item, or matching `LENGTH OF` identity. The shared terminal plan keeps
+FROM mandatory and rejects other value categories before publication. The
+interpreter emits a canonical decimal length, while the provider converts a
+negative or over-area runtime value to exact LENGERR 22/0 before acquiring the
+session lock or changing the durable screen.
+
+Direct provider coverage proves prefix selection, condition mapping, and
+screen nonmutation after LENGERR. The compiled selected route reads a COBOL
+halfword, sends five bytes from `HELLOWORLD` through the coordinator and
+selected provider, and observes exact `HELLO` durable screen bytes after the
+task suspends.
+
+The application contract identity remains
+`sha256:b837194b70be47dc7fc83d0af7ea546f16a114778f98d294c1abfa3669653685`
+and registry identity remains
+`sha256:2f14a20d330e3c609523f5098cfdde538b9278116aa1bef2a4ddef3071543965`,
+with 41 typed, 0 legacy compatibility, and 222 unready rows because this closes
+another option of row `0192`. Header/trailer formatting, justification,
+cursor positioning, paging, DPL behavior, broader restart, and licensed
+differential remain pending. This is partial `CIC-903.terminal-bms` progress
+and grants no whole-row credit.
+
+### `CIC-903.terminal-bms` empty-message purge progress
+
+Sources B row `0148` PURGE MESSAGE pins topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_purgemessage.html` at
+`sha256:5e742d2abc92990142252e6bb6ac5f037252e06f14b769fac0d0aa24c24ba1fa`.
+The initially absent publication body was reproduced through the user's
+existing Chrome debugging session as exactly 6,794 bytes and published under
+content-addressed cache key
+`topic-61ef2614430f377529bd5ab1b5cd5b5f5b3d929f954c3911dc8615e0677e73f8-sha256-5e742d2abc92990142252e6bb6ac5f037252e06f14b769fac0d0aa24c24ba1fa.html`.
+Offline read reverified the registered size and digest. No publication body is
+retained in Git, and no host publication cache is available.
+
+The source defines a no-operand command, apart from common NOHANDLE/RESP/RESP2
+controls, that deletes the full-BMS logical message currently being built and
+its accumulated pages. It also defines `INVREQ` 16/200 for a DPL server and
+`TSIOERR` 35 for irrecoverable temporary-storage I/O. This runtime exposes no
+ACCUM or page-building route, so its reachable pending logical-message state is
+exactly empty. Local PURGE therefore succeeds idempotently without erasing the
+already displayed screen or current map. DPL execution returns the exact
+source-defined `INVREQ` response.
+
+Row `0148` now lowers through typed `cics.terminal@1.purge-message` with
+append-only operation tag 33 and EIBFN `180A`. Compiler and defensive provider
+admission accept only the common condition controls. The host request carries
+the command's mutation identity, replay protection, security decision, and
+audit effect even though the bounded local state transition is empty. A
+compiled Conformance probe observes the typed mutating request and EIBFN; the
+selected online route verifies EIBFN, retained displayed-map geometry, and the
+additional successful CICS audit decision. Provider regressions cover both the
+unchanged local session image and all defined DPL execution-context forms.
+
+The regenerated live contract has identity
+`sha256:86349d7ffddd945f1366bf978cd3317bfdde5fe7a69ea852bd649d2ae9cea979`
+and registry identity
+`sha256:07f4e7f4b1fb8a400be555eb1ea2060bfc14115c09814fdd86e3b880d91a235f`,
+with 34 typed, 1 legacy compatibility, and 228 unready rows. A nonempty
+accumulated logical-message authority, page deletion, `TSIOERR`, restart
+coverage for that future state, and licensed differential remain pending. This
+is partial `CIC-903.terminal-bms` progress and grants no whole-row credit.
+
+### `CIC-902.task-retrieve` source boundary
+
+The registered `cics-application-api-sources-b` RETRIEVE body was initially
+absent from the external pinned cache. It was reproduced from IBM's official
+HTML content endpoint through the user's existing Chrome debugging session as
+29,740 bytes, matched the registered SHA-256 exactly, and was published under
+content-addressed cache key
+`topic-1ee8643c1820f08ebf655c7782e5116a28dead07fb7d1035d77cf7c89a797359-sha256-9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a.html`.
+Offline read then verified topic `dfhp4_retrieve.html` at
+`sha256:9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a`.
+
+The dependent START topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_start.html` was likewise
+reproduced through the same Chrome session as exactly 88,223 bytes and verified
+at `sha256:35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2`
+under cache key
+`topic-79aefaab3cc19683d46b47b607b97aa33b0cbc4e5daee241cd23325a2a58e3e9-sha256-35c4e673c56e84e339b6e850aed85cddb9c63fc21b587964981bc38cde10e4c2.html`.
+That source confirms the scheduled-record producer side required by RETRIEVE;
+it is reference evidence only and does not make START executable.
+
+The source establishes that RETRIEVE consumes expired START records in expiry
+order; INTO with LENGTH truncates and raises LENGERR while returning the
+original record length; SET requires LENGTH; and WAIT suspends until data,
+shutdown, or deadlock timeout. The former compatibility field conflated
+terminal COMMAREA bytes with START retrieval bytes and had no atomic durable
+consumed-record replay. The bounded local-data child now supplies typed
+INTO/LENGTH, atomic record consumption, ENDDATA/LENGERR, replay, and SQLite
+restart proof. Later sealed children add origin metadata, ENVDEFERR,
+FMH/EIBFMH, SET with checkpointed virtual storage, and WAIT suspension/reissue
+until promoted data is available. WAIT deadlock timeout and shutdown/AICB,
+terminal applicability, process restart, PostgreSQL concurrency, automatic
+target launch, and licensed differential remain pending.
+
+#### `CIC-903.spool-control.spoolclose` progress
+
+The source review used baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` and pinned topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_spoolclose.html` at
+`sha256:14de9310a0e540646d08a47e68054dd35a9b93d8287ecaafdbb4b577096210f5`.
+The retained 21,976-byte HTML matched both the manifest entry and the
+hash-addressed archive before its text was parsed locally. It defines TOKEN as
+eight characters, KEEP/DELETE direction-specific disposition, input DELETE and
+output KEEP explicit-close defaults, EIBFN `5610`, and the no-default-action
+condition boundary.
+
+The typed route uses operation tag 58, TOKEN operand tag 112, and KEEP/DELETE
+option tags 72–73. One canonical `cics-spool-control/state` row bounds report,
+record, byte, OUTDESCR, and replay counts; strict decode/re-encode validation
+and versioned CAS survive SQLite reopen. Close verifies the issuing run and
+principal plus JESSPOOL update access before mutating. Its request digest and
+result are committed in the same row as the disposition, so replay after the
+state/outer-journal crash gap is observational only. Provider tests cover both
+defaults, explicit KEEP, deletion, and gap replay. The compiled product route
+crosses typed COBOL, canonical IR, coordinator, RACF/SAF, audit, provider, and
+EIBFN `5610`. SPOOLOPEN, SPOOLREAD/SPOOLWRITE, implicit close, PostgreSQL, and
+licensed differential remain pending.
+
+#### `CIC-903.spool-control.spoolopen-input` progress
+
+The source review used baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` and pinned topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_spoolopeninput.html` at
+`sha256:d59fbe93c17fc5bff0ceb65388793c130e9f9ef845f948089da4b73175e7d717`.
+The 24,879-byte retained HTML matched its manifest pin and hash-addressed
+archive path before local plain-text parsing. It defines USERID and optional
+CLASS selection, APPLID-prefix authorization, one returned eight-character
+TOKEN, the single-thread input interface, NOTFND, and SPOLBUSY ownership cases.
+
+The typed route adds operation tag 59, USERID/CLASS operand tags 113–114, and
+TOKEN output tag 208. It requires writable eight-byte output, validates dynamic
+selection values again at execution, performs JESSPOOL authorization, and
+atomically claims the first matching report in token order. A global open-input
+invariant distinguishes another task at 88/4 from the current owner at 88/8.
+The claim and exact returned token share the bounded state replay CAS, survive
+SQLite reopen, and cannot be duplicated after outer-journal loss. The compiled
+product route crosses the coordinator, SAF/audit, provider, output binding, and
+EIBFN `5602`. HELD reports, JES allocation/macros, PostgreSQL, and licensed
+differential remain pending.
+
+#### `CIC-903.spool-control.spoolopen-output` progress
+
+The source review used baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0202`, and pinned topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_spoolopenoutput.html` at
+`sha256:05fcf42b1dffb4089b14f1f463f50835a0bdd2ea6a8c4264239cdf92c570c282`.
+The 46,809-byte archived HTML matched the manifest pin before local plain-text
+parsing. It defines multithreaded output, TOKEN ownership, default class A,
+NOCC/PRINT, 32,760-byte record length, the NODE/USERID local-star pairing,
+double-indirect OUTDESCR and its INVREQ failures, and LENGERR/NODEIDERR cases.
+
+The typed route adds operation tag 60, NODE/RECORDLENGTH/OUTDESCR operand tags
+115–117, and NOCC/ASA/MCC/PRINT/PUNCH option tags 74–78 while reusing TOKEN
+output tag 208. It validates pointer and halfword input shapes, snapshots the
+bounded OUTPUT descriptor string, and opens independent task-owned reports.
+The report and returned token share one bounded state/replay CAS, including
+after SQLite reopen and outer-journal loss. The compiled product route proves
+two concurrent output opens, double-indirect OUTDESCR selection, and EIBFN
+`5602`. JES dynamic allocation and macro failures, implicit close, PostgreSQL,
+and licensed differential remain pending.
+
+#### `CIC-903.spool-control.spoolread` progress
+
+The source review used baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0203`, and pinned topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_spoolread.html` at
+`sha256:d77b462df11ad01f56086f5ec281be818b250f2bb1a4cc5e48090e359821f009`.
+The 26,920-byte archived HTML matched the manifest pin before local plain-text
+parsing. It defines the 32,760-byte maximum, prefix transfer and omitted-byte
+RESP2 on LENGERR, actual record TOFLENGTH, same-record retry, ENDFILE, and
+read-after-EOF INVREQ 16/12.
+
+The typed route adds operation tag 61, MAXFLENGTH operand tag 118, and
+TOFLENGTH output tag 209 while reusing the eight-byte TOKEN operand and INTO
+receiver. It bounds transfer by both MAXFLENGTH and actual INTO capacity,
+keeps the record pending on truncation, and commits successful cursor and EOF
+transitions with exact replay. Provider regressions cover truncated retry,
+over-limit length, ENDFILE, read-after-EOF, outer-journal loss, and SQLite
+reopen. The compiled route proves the two-read correction and EIBFN `5604`.
+JES macro failures, implicit close, PostgreSQL, and licensed differential remain
+pending.
+
+#### `CIC-903.spool-control.spoolwrite` progress
+
+The source review used baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0204`, and pinned topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_spoolwrite.html` at
+`sha256:9d6d68d870f334befe18e9d285fa62653c897292f37121eed42e0b767036f9f4`.
+The 26,303-byte archived HTML matched its manifest pin before local plain-text
+parsing. The source defines optional fullword FLENGTH, omitted-length source
+size, LINE default and PAGE choice, record-length LENGERR with RESP2 difference,
+NOTOPEN 19/16 for input files, and NOTAUTH 70/1 for a failed surrogate check.
+The linked pinned security topics
+`SSJL4D_6.x/security/resources/security-jcl-submission-internalreader.html`
+(`sha256:4c8e730a88f4aad4f4f72abbc892e500bd7ee871981c5331d6e2ee3c5bc95246`)
+and `SSJL4D_6.x/security/cics/surrogate-security.html`
+(`sha256:a451ff99b7e8336997119454ae165f12317f3ec7e2f8ee1ea3729c9b516795d7`)
+bind the INTRDR JOB USER check and default `.SUBMIT` profile.
+
+The source projection's option list retained LINE but omitted PAGE even though
+the verified syntax diagram contains both in one `groupchoice[5]` at structure
+hash `sha256:2770d1e356ff9eeccec9be06cccd5bc70d2d060ebba7bde2938751cdba6a9d30`.
+The generator adds a row-specific, structure-guarded PAGE option and mutual
+exclusion; the original candidate and independent review remain unchanged.
+The typed route uses operation tag 62, FROM/FLENGTH operand tags 119–120,
+and LINE/PAGE option tags 79–80. Provider regressions cover mode, truncation,
+negative length, surrogate denial, durable replay, and SQLite reopen. The
+compiled product route proves EIBFN `5606`. JES macro results, alternate
+surrogate configuration, implicit close, PostgreSQL, and licensed differential
+remain pending.
+
+#### `CIC-903.diagnostics.core` source and state boundary
+
+The offline review uses baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` for rows
+`ibm-cics-ts-6x-2026-08-31:api-commands:0057` (DUMP TRANSACTION,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_dumptransaction.html`,
+`sha256:165e1964974c535a90fc4d18084012225b4ead00f55b214be59a3ee5aabc12d5`)
+and `ibm-cics-ts-6x-2026-08-31:api-commands:0066` (ENTER TRACENUM,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_entertracenum.html`,
+`sha256:c342d8e29faf78891b7c6e37e0b3d9ee5e13dac9d9f9754f63729b1b74a645ba`),
+and baseline `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`
+for row `ibm-cics-ts-6x-2026-08-31:api-commands:0143` (MONITOR,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html`,
+`sha256:32d2a44aef75acfe338a79d991b513d82c87599f040a1fd75fb1e6a0543f4f02`).
+Each exact committed SHA was verified under the raw HTML archive and parsed
+locally with `ibm_docs.py` PlainText. The default flat cache and TOC used by
+`ibm_docs.py search` and `read` are unavailable; no refresh was attempted.
+
+Rows `ibm-cics-ts-6x-2026-08-31:api-commands:0056` DUMP,
+`ibm-cics-ts-6x-2026-08-31:api-commands:0065` ENTER TRACEID, and
+`ibm-cics-ts-6x-2026-08-31:api-commands:0220` TRACE have no target
+command page in the committed source maps. Their committed compatibility
+topic pins `SSNAQ8_11.1.0/reference-api/r_dump.html`
+(`sha256:0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee`),
+`SSNAQ8_11.1.0/reference-api/r_enter.html`
+(`sha256:60856d9bcd4062d58b54f80080d40b5f3210fcb8d6945b23c9873a70fa6af5dd`),
+and `SSNAQ8_11.1.0/reference-api/r_set_trace.html`
+(`sha256:28e56eef7556509f9a473ae573f6295a56c170ae9a1dd79041c18b15fafd9c83`)
+are absent from the specified raw archive and retained HTML root. Their
+cross-product option projections remain bounded evidence, not target-product
+equivalence. The implementation will report the supported local behavior and
+these missing source identities separately for each command.
+
+The durable `cics-diagnostics-v1` row retains only bounded local diagnostic
+records and replay data. Trusted region APIs register immutable dump-code and
+MCT user-point definitions. `CicsTraceConfiguration` is an explicit trusted
+region setting; its default has no active destination or user trace. The
+four new `CicsLimits` bounds cap entries, aggregate bytes, replay keys, and
+individual payloads. The codec rejects malformed, noncanonical, oversized,
+or version-mismatched state and reloads the same configuration after SQLite
+reopen. The separate `ENTER TRACENUM` slice gives row 0066 typed readiness;
+the generated application registry is 74 typed, 0 legacy, 189 unready at this
+boundary. Its reviewed source is baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0066`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_entertracenum.html`,
+`sha256:c342d8e29faf78891b7c6e37e0b3d9ee5e13dac9d9f9754f63729b1b74a645ba`.
+The raw archive bytes were verified and parsed with `ibm_docs.py` PlainText;
+the flat cache TOC remains unavailable. The local command stores the selected
+trace destinations and exact data bytes, enforces the 0–199 and 0–4000 limits,
+and retains replay across an outer dispatch-result gap.
+
+The separate `MONITOR` slice gives row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0143` typed readiness and moves the
+registry to 75 typed, 0 legacy, 188 unready. Its baseline is
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`; topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html` has
+`sha256:32d2a44aef75acfe338a79d991b513d82c87599f040a1fd75fb1e6a0543f4f02`.
+The exact raw HTML was hash verified and parsed with `ibm_docs.py` PlainText;
+the flat cache TOC remains unavailable. Registered local MCT actions include
+one-slot counters, clocks, and a checked pointer MOVE. The default `USER`
+entry, reserved point range, distinct INVREQ reasons, DATA2 omission after a
+successful MOVE, SAF before mutation, SQLite clock recovery, and replay are
+covered by focused checks. MLTCNT and additional MCT action combinations have
+no local definition type and remain outside this bounded implementation.
+
+The separate `DUMP TRANSACTION` slice gives row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0057` typed readiness and moves the
+registry to 76 typed, 0 legacy, 187 unready. Its baseline is
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`; topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_dumptransaction.html`
+has `sha256:165e1964974c535a90fc4d18084012225b4ead00f55b214be59a3ee5aabc12d5`.
+The raw HTML was hash verified and parsed with `ibm_docs.py` PlainText. The
+flat cache TOC remains unavailable. The local dump captures exact FROM and
+segment bytes plus explicitly selected provider-owned task/catalog sections;
+it does not claim CICS internal TCA, CSA, control-block, or SDUMP content.
+Registered code suppression/maximum, malformed code after capture, DUMPID
+run/count allocation across SQLite reopen, SAF denial, and durable replay have
+focused regressions. A configured system dump has no backend and fails
+explicitly. Source IOERR, NOTOPEN, and OPENERR subconditions requiring the
+licensed dump dataset/SDUMP process are not fabricated by this local store.
+
+The standalone `DUMP` slice gives catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0056` typed local readiness and moves
+the registry to 77 typed, 0 legacy, 186 unready. The target command page is
+absent from the committed CICS TS 6.x source map. Its cross-product CICS TX
+11.1 compatibility topic `SSNAQ8_11.1.0/reference-api/r_dump.html`, committed
+`sha256:0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee`,
+is absent from the exact raw archive path and retained HTML root, so it could
+not be parsed. The local `DUMP` route is explicitly limited to provider-owned
+sections and DCT content. The CICS TS 6.x diagnostic context topic
+`SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html`,
+`sha256:dcd764843508284b5fe4aa5dc7ae0fa47989be8c0b1f1049cb089174d21babea`,
+was verified and parsed with `ibm_docs.py` PlainText for row/EIB context only;
+it does not establish command option or condition semantics. No refresh was
+attempted. Focused regressions cover local selection, replay, compiled EIBFN
+`1C02`, and generic SAF denial before capture.
+
+The local `TRACE` slice gives catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0220` typed local readiness and moves
+the registry to 78 typed, 0 legacy, 185 unready. The target CICS TS 6.x
+command page is absent from the committed source map. The committed CICS TX
+11.1 compatibility topic `SSNAQ8_11.1.0/reference-api/r_set_trace.html`,
+`sha256:28e56eef7556509f9a473ae573f6295a56c170ae9a1dd79041c18b15fafd9c83`,
+is absent from the exact raw archive path and retained HTML root. The verified
+CICS TS 6.x diagnostic context topic
+`SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html`,
+`sha256:dcd764843508284b5fe4aa5dc7ae0fa47989be8c0b1f1049cb089174d21babea`,
+supports command identity/EIB context only. No network refresh was attempted.
+The implementation documents a local USER/SYSTEM/EI/SINGLE switch mapping;
+it does not claim full IBM trace-domain equivalence. Focused tests cover
+option conflict, durable replay, one-shot consumption by ENTER TRACENUM,
+compiled EIBFN `1A02`, and SAF denial before a switch change.
+
+The local `ENTER TRACEID` slice gives catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0065` typed local readiness. The
+aggregate application registry is 79 typed, 0 legacy, 184 unready. No CICS
+TS 6.x target command page is committed for this row. The CICS TX 11.1
+compatibility topic `SSNAQ8_11.1.0/reference-api/r_enter.html`,
+`sha256:60856d9bcd4062d58b54f80080d40b5f3210fcb8d6945b23c9873a70fa6af5dd`,
+and older CICS TS 5.5 context topic
+`SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html`,
+`sha256:549e208c306f3b0f5d21038d0e65fc7c1eec2322263023bd6359a63f08fdb712`,
+are absent from the exact raw archive paths and retained HTML root. The CICS
+TS 6.x target-context topics for ENTER TRACENUM and MONITOR remain the verified
+sources in rows 0066 and 0143; their exact hashes are cited above. They
+explain the replacement of ENTER TRACEID monitoring aspects but do not provide
+its full command contract. No refresh was attempted. The bounded local route
+retains exact trace bytes and flag-classified ACCOUNT/MONITOR/PERFORM event
+records, with SAF before mutation, durable replay, post-dispatch UnknownOutcome
+preservation, and compiled EIBFN `1A04`. A focused family check observes
+audited deny, rejected malformed input, live cancellation, and finite deadline
+expiry before dispatch across all six diagnostic operations. These local counters
+do not claim IBM MCT accounting or performance-record equivalence.
+
+#### Diagnostics-control rebase on `d24587b9`
+
+The six diagnostics commands coexist with the integration head's web-service
+and counter-control routes. The generated 263-row registry now has **99 typed
+runtime, 0 legacy compatibility, and 164 unready** rows. The executable
+descriptor registry has 99 distinct operations; the provider descriptor table
+also includes two SPI compatibility entries. The integrated web-service and
+counter tags remain unchanged, while diagnostics uses operation tags 148–153,
+operand tags 576–594, option tags 508–530, and output tag 632. MCEP v1
+decoding and canonical v2 round trips remain covered. Protected production
+roots are exactly server `product.rs` 6302, CICS `service.rs` 3667, and
+interpreter `machine.rs` 12943 lines; no budget was refreshed.
+
+The offline source recheck ran `ibm_docs.py search` and `read`, then resolved
+each committed topic SHA and parsed available exact raw HTML with its
+`PlainText` parser. The reader's separate flat-cache TOC is still unavailable.
+No browser or network refresh occurred. These are reference receipts, not
+licensed execution evidence.
+
+| Catalog row | Baseline / committed source | Topic and SHA-256 | Raw archive |
+|---|---|---|---|
+| 0056 DUMP | `ibm-cics-ts-6x-2026-08-31`; sources-a supplement, cross-product CICS TX 11.1 | `SSNAQ8_11.1.0/reference-api/r_dump.html` `0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee` | Absent; local semantics remain bounded |
+| 0057 DUMP TRANSACTION | `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_dumptransaction.html` `165e1964974c535a90fc4d18084012225b4ead00f55b214be59a3ee5aabc12d5` | Verified and parsed |
+| 0065 ENTER TRACEID | `ibm-cics-ts-6x-2026-08-31`; sources-a supplement, cross-product CICS TX 11.1 | `SSNAQ8_11.1.0/reference-api/r_enter.html` `60856d9bcd4062d58b54f80080d40b5f3210fcb8d6945b23c9873a70fa6af5dd` | Absent; local semantics remain bounded |
+| 0066 ENTER TRACENUM | `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_entertracenum.html` `c342d8e29faf78891b7c6e37e0b3d9ee5e13dac9d9f9754f63729b1b74a645ba` | Verified and parsed |
+| 0143 MONITOR | `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html` `32d2a44aef75acfe338a79d991b513d82c87599f040a1fd75fb1e6a0543f4f02` | Verified and parsed |
+| 0220 TRACE | `ibm-cics-ts-6x-2026-08-31`; sources-c corpus, cross-product CICS TX 11.1 | `SSNAQ8_11.1.0/reference-api/r_set_trace.html` `28e56eef7556509f9a473ae573f6295a56c170ae9a1dd79041c18b15fafd9c83` | Absent; local semantics remain bounded |
+
+The pinned CICS TS 6.x context topic
+`SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html`,
+`sha256:dcd764843508284b5fe4aa5dc7ae0fa47989be8c0b1f1049cb089174d21babea`,
+was verified and parsed for command identity and EIB context only. The older
+TRACEID context pin `SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html`,
+`sha256:549e208c306f3b0f5d21038d0e65fc7c1eec2322263023bd6359a63f08fdb712`,
+remains absent.
+
+#### Diagnostics-control rebase on `c8ca54fd`
+
+The six diagnostics routes now coexist with all 13 typed event-control routes
+from the current integration head, along with counter, web-service, spool,
+storage64, and codec-v2 behavior. The generated application registry is
+**112 typed runtime, 0 legacy compatibility, 151 unready**. The 112-entry
+executable descriptor array moved to a bounded child module; descriptor
+lookup preserves every event and diagnostics identity. Diagnostics keeps
+operation tags 148–153, operands 576–594, options 508–530, and output 632.
+Other families retain their committed tags. Protected production roots remain
+server `product.rs` 6302, CICS `service.rs` 3667, and interpreter `machine.rs`
+12943 lines, with no budget refresh. The six offline source receipts above
+remain applicable because this rebase changes routing and generated artifacts,
+not IBM command semantics; no source refresh was attempted.
+
+#### Diagnostics-control rebase on `df76d771`
+
+The six diagnostics commands now coexist with terminal control and every
+previously integrated event, counter, web-service, storage64, spool, and
+codec-v2 route. The 263-row application registry is **127 typed runtime, 0
+legacy compatibility, 136 unready**. All 127 executable descriptors are in a
+bounded child array with exact operation lookup, and the compiler moved option
+shape and static-length helpers into its bounded command-recognition child.
+Diagnostics retains operation tags 148–153, operand tags 576–594, option tags
+508–530, and output tag 632; all preexisting terminal and other family tags
+are unchanged. Protected production roots remain server `product.rs` 6302,
+CICS `service.rs` 3667, and interpreter `machine.rs` 12943 lines. No module
+budget was refreshed. The per-row pinned IBM receipts above remain unchanged;
+this coexistence repair adds no IBM command semantics or source refresh.
+
+### Declared CIC-901 slices
+
+Rows below are in the pinned `ibm-cics-ts-6x-2026-08-31:api-commands` unit.
+Identity projection is deliberately separate from objective source verification and
+handler ownership. Generated identity never grants a coverage gate.
+
+| Slice | Scope | Dependencies | Acceptance boundary |
+|---|---|---|---|
+| `CIC-901.catalog` | Rows `0001`–`0263`: official row ID, official label, EIBFN, API classification/separation and deterministic identity-projection digest only. Set `generated_coverage_credit=0` and `automatic_registration=false`. It contains no family ownership, handler, grammar, options, conditions, effects, resource key, capability, execution context or semantic obligation. | Frozen 0.2 CICS catalog and retained 0.4/0.5/0.6 identities | Schema and generator freshness; exactly 263 unique API identities; exact row/label/EIBFN projection; API/SPI/FEPI separation; missing, duplicate and foreign-row rejection; unchanged public registry and zero ledger credit |
+| `CIC-901.sources-a` | Parent source-verification slice for rows `0001`–`0088`: syntax variants, options, operand directions, conditions and execution-context fragments. Automatic source acceptance: **88/88**; semantic and coverage credit remain zero. | Accepted `CIC-901.catalog`; completed `sources-a-map`, `sources-a-corpus`, `sources-a-project` and `sources-a-review` | Exact 88-row source closure with offline reproduction and conflict/missing-fragment rejection; no semantic or differential credit |
+| `CIC-901.sources-a-map` | Rows `0001`–`0088`: deterministic candidate mapping from each official catalog row to zero or more CICS command-summary topic paths. Preserve shared command pages, protocol/variant pages and source gaps explicitly; do not infer semantics. | Accepted `CIC-901.catalog`; pinned CICS TS 6.x TOC digest `sha256:f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a` | Exactly 88 ordered rows; every mapped path exists beneath the pinned command-summary tree; duplicate/shared and one-to-many mappings are explicit; every zero-page row has an explicit source-gap disposition; foreign, stale-label and ambiguous automatic matches fail; deterministic mapping digest; zero coverage credit |
+| `CIC-901.sources-a-corpus` | Freeze the mapped command pages and the bounded, reviewed linked common/context topic closure. Raw IBM HTML remains in the external cache; Git retains only source locators, byte counts, last-modified values, SHA-256 identities and a corpus digest. | Completed `CIC-901.sources-a-map`; official IBM content endpoint; external cache | All selected bytes reverify offline; manifest count/size/digest are derived; unmapped, unhashed, duplicate, changed or repository-retained publication bodies fail; link expansion is bounded and explicit; zero coverage credit |
+| `CIC-901.sources-a-project` | Deterministically project syntax, options, operand directions, conditions and context fragments from the frozen corpus into verification candidates containing structural locators and fragment hashes, never publication text. | Completed `CIC-901.sources-a-corpus` | Offline byte-for-byte regeneration; every candidate traces to a pinned topic/fragment; missing sections, unmatched rows and conflicting interpretations fail closed; the projector itself grants zero coverage credit |
+| `CIC-901.sources-a-review` | Independent deterministic verification of projected source facts and row closure; clear evidence is auto-accepted and exact authority-bounded ambiguity remains visible. | Completed `CIC-901.sources-a-project`; digest-pinned HTML cache; verifier implementation independent from the projector | Dynamic two-way candidate closure and compact counts/digests; ordinary `--check` fails on every source gap, reprojection finding or mismatch and reports bounded product ambiguity separately; no manual approval path; zero coverage, semantic and differential credit |
+| `CIC-901.sources-b` | Rows `0089`–`0176`, with the same source projection boundary. Automatic source acceptance: **88/88**; semantic and coverage credit remain zero. | Accepted `CIC-901.catalog`; pinned topic bytes | Same source and review gates as `sources-a`; no semantic or differential credit |
+| `CIC-901.sources-c` | Rows `0177`–`0263`, with the same source projection boundary. Automatic source acceptance: **87/87**; semantic and coverage credit remain zero. | Accepted `CIC-901.catalog`; pinned topic bytes | Same source and review gates as `sources-a`; no semantic or differential credit |
+| `CIC-901.command-contract` | All 263 source-reviewed rows are closed in a generated `frozen-with-bounded-ambiguities` contract covering grammar, option legality/direction/bounds, resource/capability intent, EIB/RESP/RESP2/conditions, context applicability, effect class, cancellation, audit and recovery. | Accepted `sources-a`–`sources-c`; early `INT-1601.cics-participant` for mutating commands | Contract compatibility, malformed/forbidden-context matrices, option influence/rejection, canonical encoding and API/docs/module ratchets |
+| `INT-1601.cics-participant` | Minimum durable participant contract for mutating application commands: owner, prepare applicability, completion/compensation limits, unknown outcome, idempotency, effect order, fencing, cancellation, recovery/schema and retention. | Accepted hardening; `CIC-901.catalog`; 0.5 SAF and 0.6 data authorities | Memory/SQLite/PostgreSQL mutation, failure, replay, stale-owner, restart, migration and rollback review |
+| `CIC-901.compiler-route` | Candidate-aware source-reviewed descriptors validate before readiness. Only three typed runtime rows lower through typed COBOL HIR/MIR; 20 legacy compatibility rows remain explicit and unready rows fail closed. | `CIC-901.command-contract` | Parser/semantic negative matrix, canonical request identity and compiled-COBOL selected-route probes pass |
+| `CIC-901.registry` | Reviewed family and handler identities are generated for 263 rows with 3 typed, 20 legacy compatibility, and 240 unready handlers. Automatic registration is false, no default fallback exists, and SPI/FEPI remain outside the numerator. | All three source-review slices; `CIC-901.command-contract`; family ownership review | 263-row registration-shape closure, explicit unsupported/unready errors, API/SPI/FEPI isolation and module budget |
+| `CIC-901.integration` | Aggregate the prior slices at the non-release boundary without claiming CIC-902–CIC-905 family execution or new credit for unready rows. | All earlier CIC-901 slices | **Pass:** focused and workspace Rust suites, source/tooling/schema/architecture/docs/MSRV/dependency gates, unchanged pilot, and 11/11 PostgreSQL selectors |
+
+### CIC-901 source and generated-contract receipts
+
+Source selection, immutable HTML identity, projection, and independent review
+remain separate stages. The extractor cannot approve its own output, and the
+review has no human-only gate. Raw official IBM HTML stays in the external
+cache and never becomes licensed execution evidence.
+
+| Batch | Rows accepted | Candidates | Verified | Bounded ambiguity | Candidate file SHA-256 | Review logical SHA-256 | Review file SHA-256 |
+|---|---:|---:|---:|---:|---|---|---|
+| A | 88/88 | 6,033 | 5,393 | 640 | `sha256:f0918433d7f96d51cc7861c12e5d4434cc5f42c977d3cfd8dd264d5d5c512ed7` | `sha256:03bb2b83212da2ee3bcb6e6c155dae0bf10337ab6f4fea48c2e004b426faa76a` | `sha256:bd8af2a410dce2d5c5748546ec845c92680238971744abddf5526428184a596f` |
+| B | 88/88 | 5,028 | 4,535 | 493 | `sha256:e83ee1054f46aa872473729e2a10937c2d60ce4429cf606fe9fec4d939f3156b` | `sha256:5ccbf511b13e8af2cba83b95e13a147104cc4bca42095b748a77decc24e7f8fd` | `sha256:3da42fcb80c25c5ce6c3b7c41958b7f428963da90339398179a52be043dffe63` |
+| C | 87/87 | 7,009 | 6,379 | 630 | `sha256:828f942b652262830b9d2ce73604fcd9978e0767e26f021cc74f59f9fed13b33` | `sha256:b62ba10bf18685740cea2aa9e229f4e3f455a113eabb9edbb4ecd58ef112f369` | `sha256:5c8a50eb5c5f822181028a8b0171bb3675bd13ea5fbed63cb2e6d0f457b330b6` |
+| **Total** | **263/263** | **18,070** | **16,307** | **1,763** | — | — | — |
+
+The independent cache-backed reports have logical SHA-256 values
+`af4bdee28dd9461a6c4b6f73cb3c2d60b305e7bdb6cc839218109fdfad53b17e`,
+`74af58e09d33140b81cf1d4ba63c30ffd333dafded84cb722ccc8700a6b47597`,
+and `b1220f570c42ad15ab36c9398e52667db1a308746e3c11d13291e0637a085f4b`
+for A/B/C. Applicability closes 352/352, 352/352, and 348/348 with
+zero missing or extra record. The verifier retains 304, 264, and 509 bounded
+issue ambiguities respectively, with zero mismatch, reprojection, or blocking
+finding in every batch.
+
+The catalog remains bound to application identity-set digest
+`sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94`.
+
+Historical command-summary gaps were supplemented with official HTML fetched
+through browser control and then reprojected. `CICSMESSAGE` remains explicitly
+not applicable, and non-current authority for legacy `DUMP`, `ENTER TRACEID`,
+and `TRACE` remains bounded instead of being promoted to target equivalence.
+This closes objective source gaps without copying successor syntax or conditions.
+
+`CICSMESSAGE` is blocked as an executable application command at catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0027`. Baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` pins
+`SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html` at
+`sha256:dcd764843508284b5fe4aa5dc7ae0fa47989be8c0b1f1049cb089174d21babea`:
+its `CICSMESSAGE` footnote confines the command to CICS internal use. The same
+baseline pins `SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html` at
+`sha256:78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25`,
+which identifies EIBFN `6C12` but supplies no callable form. Both retained HTML
+files were checked against their committed byte counts and SHA-256 values and
+read with `ibm_docs.py`'s plain-text parser. The source map has no command-summary
+node; the generated contract marks grammar, options, operand directions, and
+conditions not applicable and keeps the row unready. The catalog identity is
+therefore available, but no source-backed input, output, condition, or effect
+shape exists for an MCEP plan or a public COBOL/provider route. No reserved
+CICSMESSAGE tags have been assigned and the live 82/0/181 split is unchanged.
+
+The generated command contract covers 263/263 rows and is
+`frozen-with-bounded-ambiguities`. Its logical digest is
+`sha256:3c785fc6da3419c33e080536acfd3af4302e85a9e31a3c92278d6f6223b650c7`;
+its physical file SHA-256 is
+`38e9c7d048e96a244645741ae1bf76f1ca6a6a8a9567ef804ee9b8830cc8cfde`.
+The registry logical digest is
+`sha256:5488c1cb28672bdda5741617a3fdc4f52fd3eabbd75d21f1953c3bcbe6e3cee9`;
+the generated Rust file SHA-256 is
+`f79b0dee4b085a64e74d9769e706f529b5b742d7f1c1368221a23d882d04c8d7`.
+Of 263 registry rows, three are typed runtime routes, 20 are explicit legacy
+compatibility routes, and 240 are unready and unadvertised. Automatic
+registration is false and there is no default handler.
+
+The shared dynamic-condition authority contains 121 EIBRESP names, with
+allowed-name digest
+`sha256:52e48a742cff4299f9580e4d2c082d394849304d3ce589f8ae552d0fad6258cf`
+and name/code-pair digest
+`sha256:e3eb9481136095de24a161e4e225eea43f3812aefa2222d8a3fdaa18bbbbeb78`.
+The participant contract records two known mutating rows, 260 bounded-effect
+rows, one explicit UOW-boundary row, and 261 bounded-UOW rows. These are
+contract classifications, not execution or conformance credit.
+
+Candidate-aware compiler recognition validates command heads, option shape,
+discriminators, COBOL applicability, and known constraints before readiness.
+Only the three typed rows lower into typed HIR. The common condition policy also
+preserves the `RESP` area when `NOHANDLE` is present, while rejecting `RESP2`
+without `RESP`, on typed and legacy paths. The existing time runtime is bound to
+the source-truthful `ASKTIME ABSTIME` row. A generated compiler-only descriptor
+admits exactly the legacy SPI `INQUIRE PROGRAM` form; bare `ASKTIME`, other
+`INQUIRE` forms, and `SET FILE` remain fail-closed.
+
+CIC-901 is bounded here as source/contract/compiler/registry implementation,
+not command-family execution. The 240 unready rows receive zero execution,
+coverage, semantic, and differential credit. The 574-test tooling suite (one
+intentional skip), complete test suite, Rust 1.95, Clippy, rustfmt,
+cargo-deny, docs, architecture, cache-backed independent source checks, and all
+11 PostgreSQL parity selectors pass.
+
+Every family slice carries applicable SAF/audit, condition, bounds,
+cancellation/deadline, mutation/replay and recovery tests. Use the dossier's
+backend matrix, including PostgreSQL durable online recovery and shared
+artifacts. CIC-906 integrates and stresses these guarantees rather than
+introducing them for the first time.
+
+## Next executable step
+
+Begin CIC-902 with bounded program/task/interval/storage/recovery vertical
+slices on the shared runtime. Release, deployment, nested orchestration, and
+licensed campaigns are not part of this step.
+
+Do not claim 0.9 coverage, IBM equivalence or release readiness from this entry
+acceptance. Licensed differentials remain a later final-gate dependency.
+
+## Terminal-control implementation slice
+
+This development branch starts from `c106adf7`. The `SEND PARTNSET` and
+`RECEIVE PARTN`, `SEND CONTROL`, and `SEND PAGE` slices advance the generated
+application registry to 77 typed, 0 legacy, and 186 unready rows. The
+implementation contract and public resource API are described in
+[CICS terminal control](../../../architecture/CICS-TERMINAL-CONTROL.md).
+
+Source review: IBM CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0191`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendpartnset.html`,
+raw HTML SHA-256
+`6f2af661ff00fa3559fee90e704c927966d7e03e655f94536bba116aa1142256`.
+The committed SHA matched the file in the raw archive and the local `PlainText`
+parser read its HTML. The selected topic was available; `ibm_docs.py search`
+also reported unrelated uncached scope topics as infrastructure evidence.
+
+The `RECEIVE PARTN` source is IBM CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0164`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivepartn.html`,
+raw HTML SHA-256
+`55f42adddc8b4aba65cd474531ffaca3a51d76716927a5432f9d49505d4a30f3`.
+The raw archive file matched the committed SHA, and the repository `PlainText`
+parser read it locally. Its selected topic was available; other uncached
+search-scope topics are non-candidate infrastructure evidence.
+
+`SEND CONTROL` and `SEND PAGE` use baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` with catalog rows
+`ibm-cics-ts-6x-2026-08-31:api-commands:0188` and `0190`. Their respective
+topics are `SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendcontrol.html`
+(`4de8c65be1c657057a00898a83816bfb61cdc5bc8113e1b4def1dcc057d3345a`)
+and `SSJL4D_6.x/reference-applications/commands-api/dfhp4_sendpage.html`
+(`ea6908816e60520e9de1ced1cd312b4e99745dc4a2592a06468f1b7166a43254`).
+The affected PURGE MESSAGE baseline is
+`ibm-cics-ts-6x-application-api-sources-b-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0148`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_purgemessage.html`,
+SHA-256 `5e742d2abc92990142252e6bb6ac5f037252e06f14b769fac0d0aa24c24ba1fa`.
+All three exact raw archive files matched the committed hashes and were
+parsed locally with `ibm_docs.py` `PlainText`. Uncached unrelated topics remain
+non-candidate infrastructure evidence.
+
+### ISSUE outboard typed route
+
+The ten ISSUE rows above are implemented through a typed compiled COBOL plan
+and a durable CICS provider. The development branch now has 87 typed,
+0 legacy, and 176 unready rows. The local outboard contract, resource API,
+and source table are in
+[CICS terminal control](../../../architecture/CICS-TERMINAL-CONTROL.md).
+Source baseline is `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`;
+all rows use the catalog prefix
+`ibm-cics-ts-6x-2026-08-31:api-commands:`.
+
+| Catalog row | Pinned topic | SHA-256 |
+| --- | --- | --- |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0110` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueabort.html` | `ec68732da8fa3c11089f2e956565087e6c5f7ffb772ba97400527b6aeb2cd400` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0111` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueadd.html` | `a5001110b291833185b8ee97fbaf92b57e0efd76d390927e34f1059eaed1992e` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0116` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueend.html` | `83514aab164f60599d3cf58acae481721a7f4e6bb993222da2fd5619fd1391a8` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0120` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueerase.html` | `1e77e836e5403cf303296dca54cc2f54f4a4e2f3ea48f59b72d9c6c1172e3cfa` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0125` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuenote.html` | `3c4617a73c33bf10d6499ffb061343b37d5a6dc540d6972fcf02ebd6559cc35d` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0130` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuequery.html` | `2487b7e13e0eebff4ced7070907862a371c831fdf14b687d36a0fc3902669955` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0131` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereceive.html` | `d6003e65b1c201940e7b93e401ccf4aa7e4189076f60e8ecda5300ed9e8cf279` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0132` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereplace.html` | `0d755ac8a7d3baa54e5f0e7103547fda9503f3afbe07e46718ffc3710ce3b838` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0134` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuesend.html` | `e83080cf9b75d5ec8399feaf4dbed371a2fc293698115ad8fe740cb78bee014f` |
+| `ibm-cics-ts-6x-2026-08-31:api-commands:0137` | `SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuewait.html` | `a2902eb5fa9b02edfed606d8878f7582daa29b1b837d87fda43413cc91ae974d` |
+
+For `ASSIGN DESTID/DESTIDLENG`, baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0011`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html`,
+SHA-256 `594c0885848525ccc9c0c1f939a449f0d759f90ada7d29a82ed580342a99bbee`.
+All eleven exact raw archive paths and committed hashes were verified and
+parsed with `ibm_docs.py` `PlainText`; selected search/read calls were offline.
+Other missing scope topics are non-candidate infrastructure evidence.
+
+### ROUTE typed terminal delivery
+
+`ROUTE` is the final assigned terminal-control row. The generated registry
+reaches 88 typed, 0 legacy, and 175 unready CICS application rows. It uses
+MCEP v2 operation tag 87 and durable BMS route state, local LIST and OPCLASS
+selection, source timing forms, partial-failure conditions, ERRTERM
+notification, SAF checks, and replay. The detailed public contract is in
+[CICS terminal control](../../../architecture/CICS-TERMINAL-CONTROL.md).
+
+IBM CICS TS 6.x baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, catalog row
+`ibm-cics-ts-6x-2026-08-31:api-commands:0182`, topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_route.html`, raw HTML
+SHA-256 `49856c59b55edcd7d22691e3b9aca93dafccbb0c15625c8a867a50573f61e74a`.
+The exact committed raw archive hash matched and the local HTML was parsed
+with `ibm_docs.py` `PlainText`; offline search/read selected the topic. The
+separately linked route-list-format topic has no committed hash in this
+checkout, so the implemented field layout is a bounded local contract.
+Other missing scope topics are non-candidate infrastructure evidence; there
+was no browser or network refresh.
+
+### Terminal-control integration reconciliation
+
+Rebased on integration `c8ca54fd`, the combined registry has exactly **121
+typed runtime, 0 legacy compatibility, and 142 unready** application rows.
+The five terminal commits preserve SEND PARTNSET, RECEIVE PARTN, SEND CONTROL,
+SEND PAGE, ten ISSUE commands, and ROUTE beside the integrated storage64,
+spool, web-service, counter-control, and event-control routes. The MCEP v2
+terminal tags remain operations 76–90, operands 192–255, options 124–187,
+and outputs 248–311. The executable descriptor and generator registries
+contain the union; no protected root or ordinary-module budget was raised.
+
+Source identity was rechecked offline for all 15 terminal topics and the
+ASSIGN/PURGE companion topics: each committed SHA-256 matched its raw HTML
+file under `/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256`,
+and the repository `ibm_docs.py` `PlainText` parser read the local HTML. The
+exact baseline, catalog row, topic, and SHA-256 are recorded in the source
+tables above and in [CICS terminal control](../../../architecture/CICS-TERMINAL-CONTROL.md).
+The separately linked ROUTE list-format topic has no committed SHA here and
+remains a bounded local field-layout contract. Unavailable search-scope
+topics are non-candidate infrastructure evidence; no browser or network
+refresh or licensed execution evidence was used.
+
+### `CIC-903.web-control` WEB PARSE URL progress
+
+Before changing WEB PARSE URL semantics, `python3 -B conformance/tools/ibm_docs.py`
+searched and read the CICS TS 6.x source-c topic for baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, row `0245`,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webparseurl.html`.
+The committed topic SHA-256 is
+`5abb860d6ff6e6723515e3c537ba7f1974a511f3abad5ae89461608a1aca07b4`;
+the exact 30,236-byte raw HTML was verified at the external archive
+`raw/html/sha256/5a/<sha>.html` and parsed with the repository `PlainText`
+parser (131 lines). Source lines 21–24 require percent-escape validation; lines
+47–52, 69–75, and 94–100 define in/out buffer lengths; lines 101–112 define
+scheme and URL inputs; lines 113–129 define INVREQ 16/28,16/65 and LENGERR
+22/8,22/29,22/30. The typed compiler and MCEP v2 plan route use operation
+tag 91, operands 256–260, and outputs 312–320 while v1 encoding rejects
+these tags. Direct provider and compiled COBOL tests select the EIBFN `3816`
+route and check URL components and short-buffer response. The other 13
+web-control rows remain unready at this seal; the registry is 128 typed, 0
+legacy, and 135 unready.
+
+### `CIC-903.web-control` WEB OPEN progress
+
+Before implementing row `0244` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webopen.html` at
+`sha256:10e939b391746c2bf19e08d52bf7e22cdad2270b983d2502b4e009771da7490a`.
+The 64,470-byte raw archive object at `raw/html/sha256/10/<sha>.html`
+matched the committed topic pin and parsed to 306 `PlainText` lines. Lines
+112–147 define direct HOST/HOSTLENGTH; 190–234 define SCHEME, eight-byte
+SESSTOKEN, URIMAP and its exclusion of direct-host options; 235–304 define
+IOERR, INVREQ, LENGERR, NOTFND, NOTAUTH and TIMEDOUT responses. The pinned
+`dfhtl_sesstoken.html` context at
+`sha256:c6840c29e0587640ff12872b768741ee4a4d0e7de0a5013405270adbcd6254e6`
+confirms task-end token invalidation and the 32,768 active-token ceiling. The
+`dfhtl_urioutbound.html` context at
+`sha256:373f1dbaf77d1bf87cd6333e46ec1d7976cbf9a7d69de14e3be0f052a4c789c1`
+records USAGE(CLIENT), default path, and pooling selection. Both context
+objects were verified in the same external raw archive and parsed locally.
+
+The typed route reserves operation tag 92, operand tags 261–266 plus the
+shared web HOSTLENGTH tag 258, and output tags 321–323. A transport must
+confirm the endpoint before the task-owned token is returned; missing
+transport fails closed. The provider stores session and outer replay rows
+atomically, reloads bounded rows from Memory and SQLite, audits endpoint
+SAF denial and transport failure, fences live cancellation and deadline races
+after dispatch as `UnknownOutcome`, and reconciles a post-persist retry
+without opening twice. Direct-provider and compiled COBOL routes check token,
+protocol outputs and EIBFN `3818`. The combined registry
+has 129 typed, 0 legacy, and 134 unready rows at this seal. WEB CLOSE and
+client request/response commands remain pending.
+
+### `CIC-903.web-control` WEB CLOSE progress
+
+Before implementing row `0240` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webclose.html` at
+`sha256:141f05170b7d4fc11e9f59b74b1504e89ff814e9006b5a95f0f8a2851d3341cd`.
+The 12,586-byte raw archive object at `raw/html/sha256/14/<sha>.html`
+matched the committed topic pin and parsed to 97 `PlainText` lines. The
+source requires an eight-byte SESSTOKEN, invalidates it after close, and
+specifies NOTOPEN 19/27 for an unknown token and 19/144 for an invalid
+parameter. The implementation releases the selected transport connection,
+deletes the durable task session with atomic outer replay, and reconciles a
+post-persist UnknownOutcome without releasing twice. The registry is now 76
+typed, 0 legacy, and 187 unready; 11 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB EXTRACT progress
+
+Before implementing row `0243` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webextract.html` at
+`sha256:328947a78cac9afe1efa11df299067f286e2653de9ae29ec5abc1f2bd4df3427`.
+The exact 72,981-byte raw archive object at `raw/html/sha256/32/<sha>.html`
+matched its committed pin and parsed to 231 `PlainText` lines. Lines 7–30
+distinguish inbound request metadata from client connection metadata; 33–172
+define the result areas, fullword lengths and client SESSTOKEN; 173–229 define
+INVREQ, LENGERR, NOTFND, NOTOPEN and transport conditions. The typed route
+binds bounded inbound request metadata to a registered task and reads durable
+WEB OPEN sessions after SQLite reload. It returns actual lengths on truncation,
+preserves escaped queries, and selects the compiled COBOL route. The registry
+is 131 typed, 0 legacy, and 132 unready; 10 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB READ progress
+
+Before implementing row `0246` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected the three pinned variant
+topics of baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`:
+`dfhp4_webreadhttpheader.html` at
+`sha256:f1bc6891f4891da46ef10f847406f1ed8d70c9e8712c1f1f89599f09927747d1`
+(16,457 bytes; 94 parsed lines), `dfhp4_webreadqueryparm.html` at
+`sha256:5494c4412e6656b35342cd16392e37fb423c657cd0d2aa5c583c3094ab83d9eb`
+(21,047 bytes; 120 lines), and `dfhp4_webreadformfield.html` at
+`sha256:fed30f534facad037e9dfe724e518c263efed5bf544eccf54080b73e070e4943`
+(24,024 bytes; 132 lines). Each exact raw object under
+`raw/html/sha256/<first-two>/<sha>.html` matched its committed SHA and was
+parsed locally with `ibm_docs.py` PlainText. The first topic lines 15–55 define
+request/response header timing and length behavior; the query topic lines
+17–36, 70–88 define escaped query parameters; the form topic lines 17–32,
+71–90 define GET and POST form retrieval and value lengths. The typed buffer
+path implements real reads and truncation, rejecting unsupported SET, code
+pages and multipart forms explicitly. The registry is 79 typed, 0 legacy,
+and 184 unready; 8 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB STARTBROWSE progress
+
+Before implementing row `0251` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected the three pinned variant
+topics of baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`:
+`dfhp4_webstartbrowseformfield.html` at
+`sha256:1fc8d0fcb8c30e4e56c3b596d1a40104462a6f2800dd6128e8ac0042f973568f`
+(20,755 bytes; 101 parsed lines), `dfhp4_webstartbrowsehttpheader.html` at
+`sha256:15d1b7bda4e34dd9c0c0be1a461f61bfe18bf21d2b5ad6d47e89a423c21bf9f0`
+(10,927 bytes; 49 lines), and `dfhp4_webstartbrowsequeryparm.html` at
+`sha256:ff2b1f672cfaa2729c446bdcfb478b21e02f3d68458602fab695ba70e97301e8`
+(17,991 bytes; 89 lines). Each exact raw object under
+`raw/html/sha256/<first-two>/<sha>.html` matched its committed SHA and was
+parsed locally with `ibm_docs.py` PlainText. The form topic lines 17–44,
+62–99 define named starts and ILLOGIC; the header topic lines 14–47 define
+client tokens and missing headers; the query topic lines 15–32, 61–87 define
+optional named starts and parameter conditions. The provider persists a
+bounded browse snapshot and outer replay atomically, reloads it from Memory
+or SQLite, rejects duplicate starts, and deletes it at task end. The registry
+is 134 typed, 0 legacy, and 129 unready; 7 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB READNEXT progress
+
+Before implementing row `0247` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected the three pinned variant
+topics of baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`:
+`dfhp4_webreadnextformfield.html` at
+`sha256:138c7bc282b407692750df5c2902c6a5a9b17133cb1065e2a765762872a688fd`
+(14,054 bytes; 86 parsed lines), `dfhp4_webreadnexthttpheader.html` at
+`sha256:9aebf7346383316e927a8c5857618808e7409e299c349182a46daa5c5fb80bc8`
+(16,275 bytes; 90 lines), and `dfhp4_webreadnextqueryparm.html` at
+`sha256:1503686c2b0a4ae0e9f333f148f0bee8aeddf1c6607e5115b5b914a8d614c0b3`
+(13,155 bytes; 74 lines). Each exact raw object under
+`raw/html/sha256/<first-two>/<sha>.html` matched its committed SHA and was
+parsed locally with `ibm_docs.py` PlainText. The form topic lines 20–46 and
+69–84 require sticky cursor behavior on truncation; the header topic lines
+19–44 and 45–88 define name/value lengths and client token conditions; the
+query topic lines 16–45 and 47–72 define unescaped pairs and ENDFILE. The
+provider advances the persisted cursor only after a complete read, records
+the outer replay atomically, reloads from SQLite, and selects the compiled
+COBOL route. The registry is 135 typed, 0 legacy, and 128 unready; 6 assigned
+web-control rows remain.
+
+
+### `CIC-903.web-control` WEB ENDBROWSE progress
+
+Before implementing row `0242` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected the three pinned variant
+topics of baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`:
+`dfhp4_webendbrowseformfield.html` at
+`sha256:4999d8ef5cb0a9388c43e45eccd79fc7b29e9f465f9457f263fdccea67def1e3`
+(7,703 bytes; 30 parsed lines), `dfhp4_webendbrowsehttpheader.html` at
+`sha256:28beba13ed2772907ce3144606eade62a2c82de0d2c4202c2853e1409a529f77`
+(10,604 bytes; 42 lines), and `dfhp4_webendbrowsequeryparm.html` at
+`sha256:4e4734be485e27491c4c1e0e343c391c9a54df3319cb2bddfceafcc6d044080e`
+(7,966 bytes; 31 lines). Each exact raw object under
+`raw/html/sha256/<first-two>/<sha>.html` matched its committed SHA and was
+parsed locally with `ibm_docs.py` PlainText. The form topic lines 15–28,
+header topic lines 14–40, and query topic lines 15–29 define terminal browse
+release, optional client token only for headers, and INVREQ 16/4 when no
+browse exists. The provider deletes browse state and outer replay atomically,
+reconciles post-persist UnknownOutcome, and selects the compiled route. The
+registry is 136 typed, 0 legacy, and 127 unready; 5 assigned web-control rows
+remain.
+
+
+### `CIC-903.web-control` WEB WRITE progress
+
+Before implementing row `0252` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webwritehttpheader.html`
+at `sha256:369252b2fd5372d910ec699d0ad7ade37e8dfd2a77fcac8e6dd5f43ec8dd82c3`.
+The exact 24,697-byte raw archive object at `raw/html/sha256/36/<sha>.html`
+matched its committed pin and parsed to 153 `PlainText` lines. Lines 15–60
+define server response or client request header staging, repeated header order,
+and the client generated-header exclusions; lines 90–113 define name/value
+lengths and SESSTOKEN; lines 114–151 define INVREQ, LENGERR and NOTOPEN.
+The provider stages checked headers durably with atomic outer replay, denies
+generated client headers, reloads the staged set from SQLite, and deletes
+client staging on WEB CLOSE. WEB SEND consumes this staged set. The registry
+is 137 typed, 0 legacy, and 126 unready; 4 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB SEND progress
+
+Before implementing row `0250` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, repository `ibm_docs.py search`
+and `read` selected baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` topics
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_websend.html` at
+`sha256:f91baca7b4277d6c86ab5517442b6479bb7422733845e254c3583026627b839b`
+and `dfhp4_websendclient.html` at
+`sha256:863d5f1585433c192080c326cdb1f0695350462cfd37f3b7f9ed4a3e72b4488f`.
+Their exact 76,358- and 113,464-byte archive objects matched the committed
+hashes and parsed through `ibm_docs.py` `PlainText` to 429 and 528 lines.
+The server route stages a durable response selected from FROM or DOCTOKEN,
+including status, headers and EVENTUAL/IMMEDIATE behavior. The client route
+checks session and resource authorization, persists an uncertainty marker
+before dispatch, exchanges a typed transport-neutral request and response,
+and persists the response for WEB RECEIVE. Replays, dispatch uncertainty,
+deadline and cancellation are explicit. A single outstanding unreceived
+response is currently supported; pipelined sends return INVREQ 16/79. The
+registry is 138 typed, 0 legacy, and 125 unready; 3 assigned web-control rows
+remain.
+
+
+### `CIC-903.web-control` WEB RETRIEVE progress
+
+Before implementing row `0249` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, repository `ibm_docs.py search`
+and `read` selected baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webretrieve.html` at
+`sha256:cfc8653835cdc36978993f6b4aeabb2b908267f7a07763b70167a3b95ae32fc7`.
+The exact 9,944-byte raw archive object matched its committed pin and parsed
+through `ibm_docs.py` `PlainText` to 66 lines. Lines 15–45 define the last
+EVENTUAL document-send selection; lines 47–64 define the 16-byte output and
+INVREQ/NOTFND conditions. The provider reads the task-owned durable reply,
+returns the retained token without mutation, and distinguishes no prior send
+from a pending send without a retrievable document. The registry is 85 typed,
+0 legacy, and 178 unready; 2 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB RECEIVE progress
+
+Before implementing row `0248` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, repository `ibm_docs.py search`
+and `read` selected baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` topics
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webreceive.html` at
+`sha256:4b49e5dec28edd2dc00da545fb368b9d8538f31fa2494597a5fcacf9ecaa401c`
+and `dfhp4_webreceiveclient.html` at
+`sha256:5c610ca807d29a9af74bddfc4936e2921ffef9c7c2dcf724e85ff6a682881c9b`.
+Their exact 67,605- and 67,141-byte raw archive objects matched the committed
+hashes and parsed through `ibm_docs.py` PlainText to 350 and 297 lines.
+Server lines 140–176 and client lines 117–142 define INTO/LENGTH/MAXLENGTH,
+LENGERR 22/36 with NOTRUNCATE and 22/57 on discarded remainder. Client
+lines 159–185 define status outputs. The buffer form persists consumed byte
+cursors with outer replay, including recovery and post-persist uncertainty.
+Client text media defaults to conversion to the selected CP037 host page;
+CLIENTCONV(NOCLICONVERT) preserves wire bytes. SET, containers, and broader
+code-page conversion are not in this selected form.
+
+Client response header access also follows pinned `WEB READ HTTPHEADER` row
+`0246`, topic `dfhp4_webreadhttpheader.html`,
+`sha256:f1bc6891f4891da46ef10f847406f1ed8d70c9e8712c1f1f89599f09927747d1`
+(16,457 bytes, 94 PlainText lines), and `WEB STARTBROWSE HTTPHEADER` row
+`0251`, topic `dfhp4_webstartbrowsehttpheader.html`,
+`sha256:15d1b7bda4e34dd9c0c0be1a461f61bfe18bf21d2b5ad6d47e89a423c21bf9f0`
+(10,927 bytes, 49 PlainText lines). Both exact raw objects were verified
+and parsed locally before enabling client header inspection after RECEIVE.
+The registry is 140 typed, 0 legacy, and 123 unready; WEB CONVERSE is the
+last assigned web-control row.
+
+
+### `CIC-903.web-control` EXTRACT WEB progress
+
+Before implementing row `0076` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, the repository
+`ibm_docs.py search` and `read` commands selected baseline
+`ibm-cics-ts-6x-application-api-sources-a-2026-09-10` topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractweb.html` at
+`sha256:34412c24defd5a6e0063edd6697c2091e6737f9ee5ab13744fde6fea44d591b4`.
+The exact 72,852-byte raw archive object at `raw/html/sha256/34/<sha>.html`
+matched its committed pin and parsed to 231 `PlainText` lines. Lines 3–14
+name WEB EXTRACT as the synonym and show the server/client forms; lines
+173–229 define the same bounded conditions. The separate operation tag 95
+selects the shared typed handler, preserving the catalog identity and a
+distinct compiled COBOL route. The registry is 132 typed, 0 legacy, and 131
+unready; 9 assigned web-control rows remain.
+
+
+### `CIC-903.web-control` WEB CONVERSE completion
+
+Before implementing row `0241` of baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`, repository `ibm_docs.py search`
+and `read` selected baseline
+`ibm-cics-ts-6x-application-api-sources-c-2026-09-10` topic
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_webconverse.html` at
+`sha256:326c6b1e2859591c8ab86ed252ba01d3ee57f2a109afacdf7bc7468ee1f9e658`.
+The exact 146,596-byte raw archive object matched its committed pin and
+parsed through `ibm_docs.py` PlainText to 697 lines. Lines 25–68 define the
+combined client send/receive action and outstanding response exclusion;
+lines 200–237 define method/body legality; lines 336–355 and 444–459 define
+MAXLENGTH, TOLENGTH, and NOTRUNCATE; lines 543–697 define conditions.
+The command dispatches one transport-neutral checked request, retains a
+pre-dispatch uncertainty marker, and atomically stores the bounded response,
+consumed cursor, staged-header removal, and replay result. The client may
+continue a partial response with WEB RECEIVE. The selected buffer form is
+covered by direct provider, selected compiled COBOL, codec, compiler, and
+backend recovery regressions. Credentials, SET, containers, and broader code
+page controls are outside this selected form.
+Text request bodies require CLIENTCONV(NOCLICONVERT) in this form; default
+outbound conversion fails with INVREQ 16/46 before dispatch.
+
+The committed source projection for row `0241` retains `SESSTOKEN(` as a
+recognition token and omits subsequent options. The descriptor generator has
+a row-specific, hash-cited bounded registry correction for the selected form;
+it does not revise source projections or grant semantic or licensed execution
+credit. All 14 assigned web-control rows are typed; the registry is 141 typed,
+0 legacy compatibility, and 122 unready.
+
+### Web-control integration reconciliation on `8f879673`
+
+The rebased branch contains all 14 typed web-control rows, including catalog
+row `0076 EXTRACT WEB` and rows `0240`–`0252`. The current 263-row registry
+is **141 typed runtime, 0 legacy compatibility, and 122 unready**. Web-only
+MCEP v2 tags remain operations 91–104, operands 256–319, options 188–251,
+and outputs 312–375. Integration-owned terminal, diagnostics, event, counter,
+web-service, spool, storage64, and codec identities retain their ranges.
+
+The per-command sections above retain each committed IBM baseline, catalog
+row, topic path, and raw HTML SHA-256. This reconciliation changed shared
+registration, routing, generated artifacts, and module placement only; the
+previously verified local raw archive receipts remain applicable. No IBM
+semantic source review or network refresh was needed. The protected production
+roots remain `product.rs` 6302, CICS `service.rs` 3667, and interpreter
+`machine.rs` 12943 lines, with no budget refresh.
+
+### Security-control integration reconciliation on `d2a22746`
+
+The ten security-control rows were rebased additively onto the local
+`codex/implement-0-9-0-remaining-2` head. That prior 263-row registry reported
+**151 typed runtime, 0 legacy compatibility, and 112 unready**. The web,
+terminal, diagnostics, event, counter, web-service, spool, storage64, and
+codec-v2 routes retain their registered identities and tag ranges. Security
+uses only operation tags 130–139, operand tags 448–511, option tags 380–443,
+and output tags 504–567; MCEP v1 rejects these new plans while retaining its
+previous decoder. The generated CICS descriptor lookup and executable security
+entries were placed in bounded child modules. The protected production roots
+remain 6302 / 3667 / 12943 lines, and no module budget was refreshed.
+
+The ten command-specific IBM baseline, catalog row, topic, and raw SHA-256
+citations in this status remain unchanged. Each committed topic hash was
+reverified against the pinned raw HTML under
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256`
+and parsed with the repository `ibm_docs.py` PlainText parser. No browser or
+network refresh was performed.
+
+The changed v0.9 CICS contract, descriptor catalog, and exact 128-entry typed
+registration list pass their Draft 2020-12 schemas. The broader repository
+`cargo xtask schemas --check` remains stopped by an unchanged 0.8 CardDemo
+evidence sentence that exceeds its 256-character historical schema bound.
+That receipt was left untouched by this reconciliation.
+
+### Miscellaneous-command integration on `75f6c049`
+
+The sealed `codex/v09-misc-tail` head `1580a5d7` was merged with the
+151-route integration head. At that merge, the regenerated 263-row application
+registry had **161 typed runtime, 0 legacy compatibility, and 102 unready** rows.
+`CICSMESSAGE` remains unready and fails closed. Existing security, web,
+terminal, diagnostics, event, counter, and web-service routes retain their
+registered identities. The new MCEP v2 tags remain in their reserved ranges;
+v1 decoding and rejection of v2-only operations remain in force.
+
+The command identities use catalog baseline
+`ibm-cics-ts-6x-2026-08-31:api-commands`. Each CICS TS 6.x topic below was
+read with `python3 -B conformance/tools/ibm_docs.py search` and `read` after
+its raw HTML matched the committed SHA-256. The topic paths share the prefix
+`SSJL4D_6.x/reference-applications/commands-api/`.
+
+| Row | Command | Topic | Raw HTML SHA-256 |
+|---|---|---|---|
+| 0013 | BIF DEEDIT | `dfhp4_bifdeedit.html` | `c166e90680e4f846cf2a69e9287273c95a5bb6551ed31bc8c3f516ec49af5d3a` |
+| 0014 | BIF DIGEST | `dfhp4_bifdigest.html` | `e6f40f97a1ffa4d1c6e1764e8118fb4498f030f98fd4596e240c9ac51747781c` |
+| 0031 | CONVERTTIME | `dfhp4_converttime.html` | `a591db697674cb2738fd8537e697aaea225d90eb31c79df21760e9c0228fcc67` |
+| 0070 | EXTRACT CERTIFICATE | `dfhp4_extractcertificate.html` | `5222642cdc1028d3601dd9f905476ee28c6e435d0e15792f421c6e9ada503bb6` |
+| 0074 | EXTRACT TCPIP | `dfhp4_extracttcpip.html` | `6a7441511637549ec5246ca013f0b62249047666995e4a2ff570acf04cf389fc` |
+| 0147 | POST | `dfhp4_post.html` | `88e3a9d9873b15515cfc7722de03fb8180b635551aea97cf819f9d544c44e2f9` |
+| 0206 | START ATTACH | `dfhp4_startattach.html` | `ebda4b40984414871bfa2fb294104dc5aefa81599a99351c94cdb4974f3d4b3a` |
+| 0207 | START BREXIT | `dfhp4_startbrexit.html` | `6456007b2abdcf4042a6aac59ae5ab653652b406e9e65b6b1fe886eafe9543b1` |
+| 0239 | WAITCICS | `dfhp4_waitcics.html` | `b4774e4d772202e850b095ba008ffb4b05995faf7365888db0f8426c8ca823e4` |
+| 0256 | WRITE OPERATOR | `dfhp4_writeoperator.html` | `a0c239d675dd55bc26f5e08bd4bc90535d1f9917de7525c417ea2ce7b0c07aa4` |
+
+The separately pinned CVDA baseline
+`ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` supplies
+`SSJL4D_6.x/reference-applications/commands-api/dfha80c.html` at
+`sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`.
+The bridge baseline `ibm-cics-ts-6x-misc-tail-bridge-2026-09-23`
+pins `SSJL4D_6.x/applications/developing/interfaces/dfhtm2b.html`,
+`SSJL4D_6.x/fundamentals/interfaces/dfhtm28.html`,
+`SSJL4D_6.x/reference-data-areas/data-areas/DFHBRARK_6.2_6.1.html`,
+and `SSJL4D_6.x/system-programming/cics/dfha3kz.html`. All five
+supplemental raw topics matched their committed hashes and were parsed
+offline. No network or browser refresh occurred.
+
+The protected server `product.rs` and interpreter `machine.rs` roots remain
+at 6302 and 12943 production lines. The CICS `service.rs` root was split
+into a terminal-lifecycle handler and ratcheted down from 3667 to 3646
+production lines; no protected ceiling increased.
+
+### Declared `CIC-905.conversation-extract` isolated slice
+
+Base `589b7bad`: 151 typed runtime, 0 legacy compatibility, 112 unready.
+This slice owns only catalog rows `0067 EXTRACT ATTACH`, `0068 EXTRACT
+ATTRIBUTES`, `0069 GDS EXTRACT ATTRIBUTES`, `0071 EXTRACT LOGONMSG`, `0072
+EXTRACT PROCESS`, `0073 GDS EXTRACT PROCESS`, `0075 EXTRACT TCT`, and `0145
+POINT`. The target isolated split is 159 typed and 104 unready. It reserves
+operation tags 231–238, operand tags 1344–1471, option tags 1276–1403, and
+output tags 1400–1527; no other slice's tag range is owned here.
+
+The accepted option scope is ATTACHID, CONVID, SESSION, PROCESS, RESOURCE,
+RPROCESS, RRESOURCE, QUEUE, IUTYPE, DATASTR, RECFM, STATE, CONVDATA,
+RETCODE, INTO, SET, LENGTH, PROCNAME, PROCLENGTH, MAXPROCLEN, SYNCLEVEL,
+PIPLIST, PIPLENGTH, NETNAME, SYSID, TERMID, and common NOHANDLE/RESP/RESP2
+where the relevant row permits each option. GDS rows use their six-byte
+RETCODE and never raise EXEC CICS conditions. EXTRACT PROCESS applies only to
+the task's APPC mapped principal facility; GDS EXTRACT PROCESS applies only
+to its APPC basic principal facility. EXTRACT ATTACH covers LUTYPE6.1 and
+MRO attach headers; EXTRACT TCT covers LUTYPE6.1 name conversion. POINT
+checks task ownership of an LUTYPE6.1 or MRO facility. DPL principal
+function-shipping restrictions and missing facility/attach-header cases remain
+explicit condition obligations.
+
+Owners: typed compiler resolution and CICS IR/MCEP codec; host request and
+interpreter output binding; `mainframe-env-cics` conversation extraction
+handler and durable conversation state authority; generated descriptors,
+registrations, schemas and ratchets. The slice depends on the accepted 0.4
+host ABI, 0.5 SAF, 0.6 durable coordinator and CIC-901 catalog, and will
+connect to the conversation-open state machine at integration without a
+second state authority. Applicable gates: focused source-derived valid,
+boundary, condition, DPL, GDS return-code, authorization/audit,
+cancellation, replay and recovery tests; compiled COBOL through the selected
+provider and durable SQLite route; schema, generator, docs, architecture,
+format, dependency and affected package gates. Licensed differential remains
+pending until an authorized CICS TS 6.x runner exists; no local test earns
+licensed credit. The ten source topics for these eight rows were verified
+against the committed SHA-256 pins in the retained raw HTML archive and read
+offline with `ibm_docs.py`; the batch-A/B TOC pin
+`f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a`
+also matched. No browser or network refresh was used.
+
+### Conversation extract source and implementation progress
+
+The extraction worktree consumes the conversation-open protocol kernel and
+ledger through the local dependency cherry-picks of source commits
+`3944e66c`, `5cde1910`, and `89a7ec72`. Protocol kind, state, process,
+PIP, owner/lease fence, and attach headers have one authority in
+`ConversationLedger`. The extraction sidecar stores only task presentation
+facts: POINT selection, session and NETNAME aliases, inbound attach identity,
+network-attach origin, and one-time logon bytes. It is a bounded versioned
+provider row. LUTYPE6.1 is an additive protocol kind in the shared kernel.
+The pinned GDS EXTRACT topics limit those two commands to assembler and C;
+their MCEP v2 and provider routes exist, while COBOL source analysis rejects
+the GDS forms.
+
+After this isolated candidate, the conversation-open lane advanced to
+`2a77056d` and moved its shared protocol authority under
+`handlers/conversation_control`, with a v2 record and selected processing
+profile. This lane now owns only `handlers/conversation_extract`; the module
+names can coexist at integration. Integration must transplant the additive
+LUTYPE6.1 kind, DFHCDBLK indicators, and GDS extract return codes into the
+open lane's v2 protocol kernel, then remove this lane's earlier
+`conversation_protocol` copy. The extract handler must read that single v2
+ledger and receive task presentation facts from the open/terminal owners.
+
+The following command bodies were individually SHA-256 verified in the
+retained raw HTML archive and read with the offline `ibm_docs.py` parser.
+Their catalog baseline is `ibm-cics-ts-6x-2026-08-31:api-commands`; batch A
+uses source baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`,
+and POINT uses batch B `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`.
+
+| Row | Topic filename | Raw HTML SHA-256 |
+| --- | --- | --- |
+| 0067 | `dfhp4_extractattachlutype61.html` | `f09cdc7c4c96175e23a41b6a99961141788f9d16003a73ae8336be631431fdb3` |
+| 0067 | `dfhp4_extractattachmro.html` | `1e99175a23a6bc8201317610545c90e02a5569280377c14d95a47b8cf7064189` |
+| 0068 | `dfhp4_extractattributesappc.html` | `4b5909531bab37c140ca0b189b66374b5dc357de66e29943924dfa5793527f7b` |
+| 0068 | `dfhp4_extractattributesmro.html` | `c8d95245bd13db586143010ecd4cfb3709798a4a4a6704682e6ed881263b689f` |
+| 0069 | `dfhp4_gdsextractattributes.html` | `4ec7fc1cedc106238e9fb0fb53225af56e70db822de4aaeb94a0283b4f3c4591` |
+| 0071 | `dfhp4_extractlogonmsg.html` | `6ea9d8e4eb3a93414a39a329fddd342390048b3779d576a8c00380fc59098c94` |
+| 0072 | `dfhp4_extractprocess.html` | `fa8a3ff5447f9ca8e9e74464ddac066c2a9f8165623d7bf1e6a23541e36a64c3` |
+| 0073 | `dfhp4_gdsextractprocess.html` | `bea0262fab465489964e4cf96c9c0b66cfb65c9a9cfbf18fe3275302e38a2030` |
+| 0075 | `dfhp4_extracttct.html` | `3b7b9a76137c64eabd0452dd1dd04b78d0d72721968ce2943b781b9265bf6362` |
+| 0145 | `dfhp4_point.html` | `77af73cfdcd7d60a81bab663236dd8903e17500bc965a0844dab73a96e4dd334` |
+
+The pinned one-hop `dfhp622.html` topic at
+`370c20bbc905dffb1162f207caa9aec981749529ab8f6c1eb1d89dcf69d97a23`
+defines the exact 24-byte DFHCDBLK CONVDATA layout. The pinned
+`dfha80x.html` topic at
+`81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25`
+defines receiving CVDAs as fullword binary. Its linked numeric value table,
+`SSJL4D_6.x/reference-applications/commands-api/dfha80c.html`, was verified
+in the retained raw SHA archive against the already committed zero-credit
+baseline `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` at
+`5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381`
+(356101 bytes; source last modified 2026-06-29). The existing one-topic scope
+and TOC pin verify through offline `ibm_docs.py search/read`; no
+browser or network refresh occurred. The table assigns ALLOCATED through
+SYNCSEND the exact values 82–94, including PENDRECEIVE 88. Normal APPC
+mapped/MRO EXTRACT ATTRIBUTES and basic GDS STATE now return these fullword
+CVDAs. The generated 159 typed/104 unready split now has eight isolated
+executable routes, pending shared-kernel v2 integration and applicable gates;
+it has no licensed differential credit.
+
+Conversation-open source commit `4bb2a627` identified the distinct PIP bounds
+in pinned `dfhp4_connectprocess.html`
+(`4b46a7cad4c66210b972bdf2549ab87166791cd0977b797b46a5340aa9a169fb`)
+and `dfhp4_gdsconnectprocess.html`
+(`c22037571fff90621c7f16c502e72951f46c6825221af2f5738e1ab6c2c061e2`),
+catalog rows `0028`/`0029`. Both bodies were verified and read offline. The
+isolated shared kernel now admits 32,763 PIP bytes for mapped APPC and 763 for
+basic GDS, with a record codec bound that can actually persist the mapped
+maximum. EXTRACT PROCESS returns a mapped PIP beyond the basic limit in a
+focused provider test. Integration must retain the open lane's v2 profile
+field while adopting this codec bound; its current 2,048-byte record limit
+would otherwise reject a source-valid mapped PIP.
+The compiled selected SQLite route also exercises a 32,763-byte mapped PIP:
+PIPLIST dereferences to the expected record prefix and PIPLENGTH writes
+halfword `X'7FFB'`. A source-valid value above COBOL `PIC S9(4)` decimal
+precision exposed a SIZE-ERROR in the generic output writer; the typed
+EXTRACT PROCESS/GDS EXTRACT PROCESS path now writes the checked binary
+halfword directly. Forged values above either command's source bound fail
+closed in a focused interpreter test.
+
+Focused source-derived tests currently pass for MCEP v2 identities and
+malformed shapes, compiled COBOL lowering and rejection, direct provider
+process/attach/TCT/POINT/logon behavior, GDS return-code separation, and a
+compiled selected CICS provider route on SQLite with EIBFN/output assertions
+and row/continuation reopen. The v2 conversation-open integration, terminal
+metadata publication, remaining backend gates, and licensed differential
+remain pending. GDS EXTRACT PROCESS also returns the pinned
+`05 00 00 00 00 20` RETCODE when the received process name exceeds
+MAXPROCLEN, keeps the EXEC CICS condition NORMAL even under RESP, and leaves
+PROCNAME unset. Focused POINT SAF denial and audit tests prove that rejected
+selection leaves the durable
+sidecar untouched; outer deadline and cancellation tests prove the same for
+POINT and one-time LOGONMSG before provider dispatch.
+The bounded extraction sidecar now retains up to 16 unresolved mutation
+replies, pruning each only after the outer CICS effect replay row exists. A
+focused injected outer-insert failure test interleaves LOGONMSG and POINT,
+retries the older LOGONMSG, and proves its original bytes return without
+repositioning the newer POINT selection; a conflicting retry fails closed.
+The same failure is now exercised over SQLite across a provider restart: the
+original reply and later POINT selection survive reopen, and the retry
+creates its outer replay receipt without rewriting the sidecar.
+This closes the single-last-mutation crash gap without storing protocol state
+outside the conversation-open ledger.
+The provider's task-presentation publication hook now merges terminal/open
+facts with the current sidecar under its expected store version. It preserves
+POINT selection, one-time LOGONMSG consumption, and unresolved replies, and
+rejects a changed logon message after consumption. A focused provider test
+exercises this update; wiring the open and terminal owners to the hook remains
+an integration obligation.
+EXTRACT TCT now maps an unknown or malformed eight-byte NETNAME to `INVREQ`
+16/0; a known alias whose LU allocation is absent remains `NOTALLOC` 61/0.
+The focused negative test proves neither case changes protocol or POINT state.
+The MRO EXTRACT ATTACH received-header path now has a focused source-derived
+test for every PROCESS/RESOURCE/RPROCESS/RRESOURCE/QUEUE/IUTYPE/DATASTR/RECFM
+output and the `CBIDERR` 62 response when task presentation has no received
+header. Terminal EIBATT publication is still an integration obligation.
+For commands whose omitted CONVID/SESSION defaults to the task's principal,
+an invalid ledger with two live principals now fails closed rather than
+selecting the first token. The focused negative test proves implicit EXTRACT
+ATTRIBUTES and POINT do not change position, while explicit CONVID remains
+deterministic.
+
+The current isolated candidate passes 109 IR unit tests, the focused compiler
+lowering test, 24 conversation provider tests including source-derived STATE,
+SAF and cancellation cases, 31 descriptor generator tests,
+the generated descriptor check, module budgets, `cargo deny check`, and a
+compiled COBOL selected route on SQLite with provider-row reopen. Formatting
+and generated documentation checks pass. LOGONMSG
+SET allocation is invalidated at the next EXTRACT LOGONMSG and has a focused
+interpreter test. The full provider suite completed its conversation tests but
+was interrupted after unrelated terminal/CardDemo timeout tests ran for
+several minutes. `cargo xtask schemas --check` stopped on an unchanged 0.8
+CardDemo evidence string exceeding its 256-character schema bound, before the
+0.9 schemas were reached. Neither interrupted nor blocked gate is marked pass.
+`cargo xtask architecture-fast --check` also stopped on an unchanged
+`CARDDEMO` literal in
+`crates/contracts/mainframe-env-host-api/src/canonical/tests.rs`; no
+architecture-fast pass is claimed.
+
+The isolated handoff is bound to these historical generated identities. They describe
+the source branch's 159 typed, 0 legacy, 104 unready split; the conversation-control
+family has 44 catalog shapes, eight assigned typed registrations, and 36
+unready rows. None of these digests is licensed execution evidence.
+
+| Artifact | SHA-256 identity |
+| --- | --- |
+| Official CICS application catalog | `fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba` |
+| Typed execution registrations file | `143a577c24854e93bf4f679a66bb46b6540e149d9e2a4d81680698140d0c0273` |
+| Generated registry logical digest | `6ce5217d36e0affe4e47aa63bd785d9f726d3319bf35601198ed194e83b4d158` |
+| Generated application contract logical digest | `9d2ad5f2fefac37e47fcb3f5a49e306e285da85338daa476e54a093469045f72` |
+
+### CIC-905 extract integration on `codex/v09-conv-extract-integration`
+
+The sealed extract head `5755b2db` was merged with the 167-typed candidate
+`ec6225b0`. The eight unique rows above produce **175 typed runtime, 0 legacy
+compatibility, and 88 unready** application rows. The generator retains all
+miscellaneous and BTS routes and both MCEP versions; conversation operations
+use reserved v2 tags 231–238 and remain invalid in v1. The existing numeric
+CVDA baseline `ibm-cics-ts-6x-misc-tail-cvda-2026-09-23` and its
+`dfha80c.html` SHA-256 identity remain unchanged. No second manifest or
+browser refresh was added.
+
+`ConversationLedger` is the single protocol authority carried by this
+integration. The still-active conversation-open branch has peer-frame ledger
+commit `afdd2636`; its dirty worktree was not merged. Reconcile that commit
+against this authority before accepting conversation-open frames or claiming
+the full CIC-905 family. Terminal EIBATT and task-presentation publication
+remain explicit wiring obligations; absent or ambiguous state fails closed.
+The bounded extraction sidecar holds only task presentation, POINT position,
+and unresolved mutation replies, not a second protocol ledger. Licensed
+differential credit remains pending.
+
+The integrated typed registration file SHA-256 is
+`b772fc79b00fc1c3e05c6f9883652d668fa499cefd558c2a2fa52d880b9821f9`;
+the generated registry logical digest is
+`2bb9e733f75e91454cc10eebe9607a9c66a133c458e0cd6e12b7825465e577dc`;
+the generated application contract logical digest is
+`bca7bf1fe67652eb25e9456964b57dfdb2a4238cefd566aa4aba8a8ab1370253`.
+
+### CIC-906 bounded parser, decoder, and replay validation
+
+`CIC-906.assurance-cics-boundaries` covers no new command/option or registry
+row. It owns the two `fuzz/fuzz_targets/cics_*` entry points and corpora,
+`cics_plan.rs` and typed HIR test additions, the shared Loom test, and the
+R-24 inventory metadata. It was based on the integrated 175/0/88 registry and
+the existing durable provider contracts. Acceptance is the bounded fuzz smoke,
+focused parser/decoder properties and CICS replay/restart regressions, five
+Loom tests, and affected format, module, docs, and dependency-policy gates.
+
+The [bounded validation slice](cic-906-bounded-validation.md) extends the
+R-24 inventory with dedicated `EXEC CICS` source and MCEP v1/v2 fuzz targets,
+property checks, and owner/cancellation Loom models. Its scope and remaining
+matrix cells are recorded there. The current 184/0/79 registry includes nine
+conversation-open rows without changing the CIC-906 command scope. The
+integrated PostgreSQL durable-profile selectors cover
+separate artifact/state adapters, artifact read versions, and checkpointed CICS
+replay retention; they do not close the broader concurrency or crash matrix.
+Neither slice grants release or licensed differential credit.
+
+### CIC-906.carddemo-preservation: bounded compatibility validation
+
+The compatibility repair started from `e5a6b05eaacf5737a308c92fb5d87e2ed9f80eb3`
+and was integrated into the 184-typed candidate based on `fad10596`.
+The clean external CardDemo corpus remained at commit
+`59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, tree
+`a1253e31c839f78d1f185b01771ba956da63b005`. The scope is the
+compiler/IR/interpreter/provider path for source forms reached by that corpus,
+plus the existing resource, base-online, MQ/authorization, and base-batch
+selectors. It does not certify CIC-906 or the 0.9.0 completion gate.
+
+| Catalog row and pinned HTML topic | Baseline | Verified topic SHA-256 |
+| --- | --- | --- |
+| `0080 FORMATTIME`, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_formattime.html` | `ibm-cics-ts-6x-application-api-sources-a-2026-09-10` | `55155b9534a16c10ec27886e44685c8e2d0e124d55df9042f805ef91440e1403` |
+| `0156 READ`, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` | `ibm-cics-ts-6x-application-api-sources-b-2026-09-10`; `ibm-cics-ts-6x-file-uow-pilot-2026-09-08` | `856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1` |
+| `0157 READNEXT`, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_readnext.html` | `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` | `f72929a541bfe74947544cb3810f940b25f8a5b35e2299ccea135088f72067ce` |
+| `0158 READPREV`, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_readprev.html` | `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` | `f0ce4b309ab7b3869225fac927e6a717c925dd4d34fbbc6a7493c05b726820ab` |
+| `0175 RETRIEVE`, `SSJL4D_6.x/reference-applications/commands-api/dfhp4_retrieve.html` | `ibm-cics-ts-6x-application-api-sources-b-2026-09-10` | `9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a` |
+
+The repository's offline `ibm_docs.py search` and `read` verified these topic
+identities. The retained FORMATTIME HTML also matched its manifest hash;
+the other four retained-path files were absent, and the matching pinned
+content-addressed cache served the verified reads. No browser or network
+refresh occurred. The source describes eight-character FORMATTIME fields even
+when six bytes are returned without separators, and writable halfword LENGTH
+areas for file reads. The generic six-byte unseparated output and same-area
+`LENGTH OF` input are deliberately bounded CardDemo compatibility, not IBM
+differential credit. `RETRIEVE INTO` without LENGTH is allowed by the pinned
+topic; SET still requires LENGTH. The provider receives the actual INTO area
+capacity and returns LENGERR on truncation.
+
+Focused IR, compiler, interpreter, and provider regressions passed for those
+forms, mismatched areas, missing capacity, and truncation. The corpus host
+analysis produced HIR for all 44 source closures and retained the historical
+240 CICS operation count and exact CICS opcode counts. The old
+`carddemo-host --check` selector still exits nonzero because immutable CD-008
+also pins SQL counts and a whole-host digest: current SQL operations are 22
+versus 20 in CD-008, with changed operand totals. CD-008 was not rewritten or
+credited as a current-candidate pass.
+
+The bounded CardDemo selectors passed on the source branch:
+
+| Selector | Observation |
+| --- | --- |
+| `carddemo-resources --check` | 25 transactions, 21 BMS maps, eight files, and all 25 transaction cross references; resource digest `41469c76b57cf1a92f12ffcff0d469e8e98d62fd61c0a54e47c084b8a36cba3e` |
+| `carddemo-base-online --check` | Nine journeys, 17 source-backed transactions and 17 installed maps; journey digest `664900bb2f08a694888c79da51ed294d6f09d03ff817a629cb27319b14388e0e` |
+| `carddemo-mq-authorization --check` | Four journeys and historical authorization digest `f1d26e800741be38968d77a4be33d8dab9ca99a6f20d1842eea29bbb6653f451`; affected trigger programs compile, while this selector drives MQ/IMS service APIs rather than executing trigger COBOL |
+| `carddemo-base-batch --check` | Three journeys; dataset and spool byte maps match the versioned 0.8 receipt, with journey digest `0cd4f5d879d384d5286a1cb2698d0c0687503802163f29b04060e04550b51d85` |
+
+On the integrated 184-typed checkout, the bounded MQ/authorization selector
+passed again. One base-batch attempt stopped in `CREASTMT.JCL`: the utility
+steps wrote their spool records, but the subsequent `CBSTM03A` job remained
+`ACTIVE` until the selector's completion timeout. The source-branch batch
+observation is not current integration credit; the unchanged failed run was
+not repeated.
+
+At that historical checkpoint, the generated 263-row contract was
+**184 typed, 0 legacy, 79 unready**; its typed-registration file was
+`sha256:6d76351a1f0981116b138b17f1b9bca97c0d76b9e0a4fb35d6006125c894187d`.
+No CardDemo identity was added to production dispatch. No CardDemo-full run,
+licensed campaign, or exact final-candidate certification is claimed here.
+
+Formatting, the exact module-boundary inventory, and dependency policy passed.
+`architecture-fast --check` stopped at its existing sources-a freshness step:
+the explicit pinned cache lacks supplement
+`SSNAQ8_11.1.0/reference-api/r_dump.html` (committed SHA-256
+`0234352759c3d24a0e56db00eaa8a0ad509e4e936889dc2af7ebf1cc6bdd14ee`),
+and the retained HTML path is absent. This unrelated cross-product source was
+not refreshed or credited. The architecture aggregate is not marked pass.
+
+### CIC-906.carddemo-host-v09: versioned host comparison
+
+The immutable CD-008 receipt predates CD-024 and pins 20 SQL HIR statements,
+one `SQL.INCLUDE`, two `SQL.SELECT`, and no `SQL.DECLARE`. CD-024 commit
+`3d1a55b1719e150042467e381fc5f8f609510dd6` added SQL INCLUDE
+precompilation and cursor declaration hoisting. In the pinned corpus,
+`COTRTLIC.cbl` declares forward and backward cursors at lines 338 and 354,
+then includes `CSDB2RPY` at line 2055; that copybook contains the priming
+SELECT at line 24. The accepted CD-024 receipt records nine include
+expansions, two DECLAREs, and three SELECTs. Current HIR therefore has 22 SQL
+statements: `INCLUDE` 1→0, `DECLARE` 0→2, and `SELECT` 2→3. DECLARE registers
+cursor text for later OPEN and returns without a database effect. The older
+INCLUDE opcode represented an unexpanded precompiler directive.
+
+`conformance/0.9/evidence/carddemo-host-preservation.json` stores the
+comparison observation from clean commit `46da64da4730984b0cda70789ea5c4b122a27ce2`,
+tree `fa720980d5f01b650d7f5ffe138d50a084e8670c`, explicitly as
+comparison data. Its full host token digest captures the current CICS operands
+alongside the SQL delta. The new `carddemo-v09-host --check` selector requires
+a clean checkout, checks CD-008 against its historical completion commit,
+rejects every opcode drift except the three listed SQL changes, and compares
+the current full host receipt exactly with that versioned observation. It also
+rederives the CD-010 transaction/BMS/resource receipt and CD-019 nine-journey
+online receipt. The printed bounded receipt records the actual candidate
+commit and tree; the committed comparison file makes no final-candidate pass
+claim. Historical CD-008 and the prior focused IBM CICS source pins remain
+unchanged. No IBM language or subsystem behavior was changed in the
+candidate-comparison selector itself.
+
+### #173 reviewed CICS source re-pin (2026-09-28)
+
+The `sources-b` and `sources-c` manifests now pin the four changed CICS TS 6.x
+HTML topics, and the separate `sources-a` supplement pins the changed CICS TS
+5.5 TRANSACTION attributes topic. The five new SHA-256 identities are
+`3339b4adcfd687b5e014462fcebfc33e350c2db38ec8f0b4c36a9f91c0ab1319`
+(`fundamentals/web/dfhtl20.html`),
+`bb908fcb9f23db0145218bbd535b15094f4148d22a7c0016912bcc90e8df13ca`
+(`fundamentals/web/dfhtl_client_encoding.html`),
+`21a08fd6d05c26c2b8459c3c8222b4ae743ff4e44f809d1eee8e5018ed478530`
+(`reference-system-management/resources/transaction/dfha4_summary.html`),
+`4f3daa22b3c1667c0ecbb76d5c033cdb630d2b08fe222f9eece0f46dff3084ef`
+(`troubleshooting/java/troubleshooting_web_ref.html`), and
+`c2a1ae3953c358a9acd7bbdd99df05b91be35f858c5ae68b26cfd7788fc55514`
+(`SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html`).
+The original batch baseline IDs remain source-set identifiers; the old
+supplement capture is preserved separately under its 2026-09-10 filename.
+The #173 re-pin record binds the new supplement identity to the owner's
+2026-09-28 Chrome verification without changing the original capture claim.
+
+Reprojection changed only context-source identities for rows `0056`, `0094`,
+`0095`, `0138`, `0205`, `0246`, `0247`, and `0251`. Context fact values,
+syntax, option and condition candidates, and operational contract fields are
+unchanged. The frozen registry remains **258 typed, 0 legacy, 5 unready**.
+The prior HTML bodies are unavailable in the retained root and topic cache,
+so a full old-versus-new publication-text diff is unavailable. This re-pin
+grants no new execution, semantic, conformance, or licensed differential credit.

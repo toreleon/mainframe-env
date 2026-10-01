@@ -1,0 +1,76 @@
+# Coverage and conformance — Coverage authority
+
+Subsystem: **coverage**
+Phase: **foundation**
+Target release: **0.2.0**
+
+Status: **Proposed**
+Start gate: released 0.1.1 source and evidence are immutable
+Completion dependencies: none
+Estimate: 6–9 engineer-months
+
+## Outcome
+
+Make official coverage measurable and make production behavior independent of
+CardDemo identities. This version changes the way future capabilities are
+declared and dispatched; it must not inflate coverage merely by adding catalog
+rows.
+
+## Owned scope
+
+- Pin reviewed official-source receipts for all nine subsystem baselines.
+- Add the six-gate coverage schema and immutable coverage store.
+- Add generated semantic identities, typed catalog readers, and a
+  `SubsystemHandlerRegistry`.
+- Add application-package sections for host ABI libraries, SQL schemas/data,
+  IMS definitions/data, MQ resources, batch controllers, and security
+  resources.
+- Eliminate the 29 Db2 and 3 batch H1 production hardcode hits.
+- Move DFHAID, DFHBMSCA, SQLCA, and MQ copybooks from the compiler to
+  subsystem-owned ABI libraries.
+- Replace utility name branching with the common program registry.
+- Generate official z/OSMF route registration and separate custom routes.
+- Add ledger consistency, no-application-hardcode, and no-string-dispatch
+  architecture gates.
+
+## Work packages
+
+| ID | Deliverable |
+|---|---|
+| CV-201 | Official source receipt and normalized catalog contracts |
+| CV-202 | Coverage row/store/evidence schema |
+| CV-203 | Generated identity and handler-registry foundation |
+| CV-204 | Application-package subsystem sections and migrations |
+| CV-205 | Generic minimal Db2 schema/row behavior replacing named tables |
+| CV-206 | Installed batch controllers replacing COBTUPDT/CBPAUP0C branches |
+| CV-207 | Subsystem ABI source-library ownership |
+| CV-208 | Generated route/program registries and architecture scans |
+| CV-209 | Evidence-ledger consistency and full regression |
+
+## Parallelization
+
+CV-201 and CV-202 must freeze first. After that, CV-204 through CV-208 can run
+in parallel behind the accepted contracts. CV-205 and CV-206 must coordinate on
+the program/package schema but need not touch the same provider state.
+
+No later version may merge public behavior before CV-203/CV-204 are accepted.
+Subsystem teams may research and prepare private catalogs concurrently.
+
+## Exit gate
+
+- All official baselines parse with source identity and denominator checks.
+- Coverage rows cannot reach `complete` without every applicable gate.
+- Production H1 application-hardcode count is exactly zero.
+- Production string dispatch has no application program/table/transaction
+  exception.
+- CardDemo remains 20/20 through installed package data.
+- The 260-test floor, PostgreSQL controls, full CardDemo gate, live Zowe route,
+  architecture/profile/schema/evidence gates, and release checks pass.
+- No new official compatibility numerator is claimed solely from catalog/code
+  generation.
+
+## Non-goals
+
+- Completing any IBM subsystem denominator.
+- Shipping a plugin ecosystem or dynamic native ABI.
+- Publishing, tagging, or deploying without separate authorization.

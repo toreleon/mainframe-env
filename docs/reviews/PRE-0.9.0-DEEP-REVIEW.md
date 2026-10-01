@@ -13,7 +13,7 @@ Status: **Complete review; broad 0.9.0 implementation was blocked at review**
 
 2026-09-09 update: R-01–R-15 were closed through PR #131, and the integrated
 entry gate accepted the post-review candidate. See the
-[0.9 status record and fix mapping](../delivery/coverage-versions/status/0.9.0.md).
+[0.9 status record and fix mapping](../delivery/subsystems/cics/application-api-status.md).
 The original dispositions below describe the 2026-09-08 review; acceptance
 permits implementation, not release or licensed certification.
 
@@ -688,7 +688,7 @@ Broad CIC-901 implementation may begin only when:
   added where the affected contract requires it;
 - `cargo deny check`, exact-target release smoke, archive reproduction, full
   Python discovery, and the complete PostgreSQL stage are blocking and green;
-- `docs/delivery/coverage-versions/status/0.9.0.md` names the exact candidate,
+- `docs/delivery/subsystems/cics/application-api-status.md` names the exact candidate,
   remaining blockers, and next reviewable work package; and
 - CIC-901 through CIC-906 are delivered as bounded, reviewable integration
   increments while public capability remains disabled until the minor exit

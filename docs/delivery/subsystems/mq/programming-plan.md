@@ -1,0 +1,94 @@
+# IBM MQ — MQI programming surface
+
+Subsystem: **mq**
+Phase: **programming**
+Target release: **0.15.0**
+
+Status: **Proposed**
+Start gate: 0.4 host-extension ABI and 0.5 SAF/principal contracts frozen
+Completion dependencies: cobol.execution, racf.security
+Estimate: 16–26 engineer-months
+
+The [common release contract](../README.md#common-release-contract) and
+[hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
+apply, including early participant-contract and licensed-harness preparation.
+These requirements do not themselves certify implementation or waive an exit gate.
+
+## Outcome
+
+Implement all 26 unique pinned IBM MQ 9.4 MQI calls with generic queue-manager,
+object, message, transaction, security, and recovery semantics.
+
+## Owned scope
+
+- Generate all 26 unique MQI call identities, structures, selectors, options,
+  completion/reason codes, version rules, and exhaustive handler registration.
+- Implement queue managers, local/alias/remote/model queues, topics,
+  subscriptions, channels-facing abstractions, processes, and object lifecycle.
+- Implement message descriptors, properties, selectors, browse/get/put,
+  distribution lists, callbacks, asynchronous consumption, and pub/sub.
+- Implement persistence, syncpoints, backout, dead-letter handling, triggering,
+  expiry, ordering, segmentation/grouping, limits, and recovery.
+- Apply connect, context, object, alternate-user, publish/subscribe, and
+  administrative authorization through SAF-backed principals.
+
+## Work packages
+
+| ID | Deliverable |
+|---|---|
+| MQ-1501 | Generated MQI catalog, structures, options, reason codes, and registry |
+| MQ-1502 | Queue-manager and object lifecycle plus names/resolution |
+| MQ-1503 | Put/get/browse, properties, selectors, groups, and distribution lists |
+| MQ-1504 | Pub/sub, callbacks, asynchronous consumption, and triggering |
+| MQ-1505 | Syncpoint, persistence, backout, dead-letter, restart, and recovery |
+| MQ-1506 | SAF, concurrency, overload, compatibility, and IBM differentials |
+
+Recovery state and bounded feature slices are tracked in the
+[0.15.0 implementation status](programming-status.md). The recovered MQ-1501 slice
+freezes the 26-call denominator and exact 27-row source-list provenance without
+claiming behavioral coverage.
+
+## MQ host-context and early durability acceptance
+
+MQ-1501 must freeze call, host environment, structure version, option, handle
+lifetime and syncpoint-owner applicability. Include CICS, IMS and batch/client
+contexts where the pinned MQI surface applies. MQCMIT must not become a generic
+commit operation in CICS or in IMS environments other than batch DL/I; use the
+pinned host-owned syncpoint rules and exact rejection/status behavior. Correct
+rejection in a forbidden context is required compatibility, not a missing call.
+
+Every mutating MQ-1502–MQ-1504 slice includes its applicable persistence,
+syncpoint/backout, replay, failure and restart obligations before integration.
+MQ-1505/MQ-1506 complete and stress delivery/recovery/security guarantees rather
+than introducing them after put/get or pub/sub has already integrated.
+
+Any optional native IBM-client pass-through provider is an explicit, separately
+selected profile with its own capability and evidence identity. Native execution
+cannot increment owned-simulator coverage, become hidden fallback or supply the
+product expectation for its own differential test. Preserve all 26 unique calls
+and the 27 source rows in provenance without duplicate credit.
+
+## Parallelization
+
+Catalog/structures, object lifecycle, point-to-point, pub/sub, and recovery can
+run in parallel after handle, status, and message contracts freeze. All object
+mutation and delivery paths use one queue-manager authority and lock order.
+
+0.15 can run alongside 0.8–0.14. Its transaction and failure semantics become
+an input to 0.16; no application topology is embedded in the provider.
+
+## Exit gate
+
+- 26/26 unique pinned MQI calls pass all applicable coverage gates.
+- Structures/options, completion/reason codes, handles, object lifecycle,
+  message delivery, properties, pub/sub, callbacks, security, persistence,
+  overload, syncpoint, restart, and recovery matrices pass.
+- Duplicate delivery and unknown outcome are reported according to the pinned
+  contract; exactly-once behavior is never inferred without evidence.
+- Licensed IBM MQ 9.4 differentials pass for the pinned surface.
+- CardDemo queues/topics load from its package with exact observable behavior.
+
+## Non-goals
+
+- Whole IBM MQ appliance, cluster, channel protocol, installation, or operations
+  parity outside the pinned programming surface.
