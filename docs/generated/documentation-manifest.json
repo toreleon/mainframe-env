@@ -1302,7 +1302,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.14.0.md",
       "relative_links": 0,
-      "sha256": "sha256:1fb51f34e2e0f842e015308e2731f43841f1ce5fd5122876f2cd9cf629aa8748",
+      "sha256": "sha256:d34de801cdb2939df6bdb88049aca84d27b7c41e88da5985bde4d4abe1c8d70e",
       "title": "mainframe-env 0.14.0 implementation status",
       "xtask_commands": 4
     },

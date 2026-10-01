@@ -10,6 +10,7 @@ mod cobol_differential;
 mod db2_statement_catalog;
 mod docs;
 mod evidence_seal;
+mod ims_assurance_matrix;
 mod ims_catalog;
 mod jcl_catalog;
 mod jcl_conformance;
@@ -237,6 +238,7 @@ enum XtaskCommand {
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
     ImsCatalog(CheckArgs),
+    ImsAssuranceMatrix(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
     WorkPackageSeal(WorkPackageSealArgs),
@@ -569,6 +571,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 ims_catalog::generate(root)
             }
         ),
+        XtaskCommand::ImsAssuranceMatrix(args) => {
+            checked!(
+                "ims-assurance-matrix",
+                args,
+                ims_assurance_matrix::check(root)
+            )
+        }
         XtaskCommand::RacfCatalog(args) => (
             "racf-catalog",
             args.check,
@@ -742,6 +751,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
     ims_catalog::check(root)?;
+    ims_assurance_matrix::check(root)?;
     racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;

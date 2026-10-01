@@ -530,6 +530,22 @@ fn authorization_timeout_and_live_cancellation_precede_session_mutation() {
 }
 
 #[test]
+fn denied_tm_retry_cannot_observe_an_authorized_admission_receipt() {
+    let policy = Arc::new(RecordingAuthorizer::default());
+    let (service, _) = memory_service(policy.clone());
+    let request = invocation("admission", "same-admission", 1_000);
+    let first = service
+        .enqueue(&request, message("message-replay", "PAY1", None))
+        .unwrap();
+    policy.deny("PAYPSB");
+    assert_eq!(
+        service.enqueue(&request, message("message-replay", "PAY1", None)),
+        Err(HostProblem::Unauthorized)
+    );
+    assert_eq!(service.queued("PAY1", 10).unwrap(), vec![first.message_id]);
+}
+
+#[test]
 fn admission_gap_repair_rollback_and_terminate_preserve_work_fences() {
     let policy = Arc::new(RecordingAuthorizer::default());
     let store = Arc::new(MemoryStore::new(StoreLimits::default()));

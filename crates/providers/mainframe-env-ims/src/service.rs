@@ -2624,6 +2624,43 @@ mod tests {
     }
 
     #[test]
+    fn ims_database_read_denial_hides_retained_data() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let writer = ImsService::open(store.clone(), ImsLimits::default()).unwrap();
+        writer.install(definition()).unwrap();
+        let image = ImsLoadImage {
+            database: "AUTHDB".into(),
+            roots: vec![ImsLoadRoot {
+                data: b"ROOT01DATA".to_vec(),
+                children: Vec::new(),
+            }],
+        };
+        writer
+            .execute(
+                &invocation("load-before-deny"),
+                &request(
+                    ImsOperation::Load,
+                    701,
+                    &[],
+                    &serde_json::to_vec(&image).unwrap(),
+                    Vec::new(),
+                ),
+            )
+            .unwrap();
+        let policy = Arc::new(DenyEnterprise::default());
+        let reader =
+            ImsService::open_authorized(store, ImsLimits::default(), policy.clone()).unwrap();
+        let mut read = request(ImsOperation::Unload, 702, &[], &[], Vec::new());
+        read.psb = Some("AUTHDB".into());
+        assert_eq!(
+            reader.execute(&invocation("read-after-deny"), &read),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(reader.hierarchy("AUTHDB").unwrap(), image.roots);
+        assert_eq!(policy.seen.lock().unwrap().len(), 1);
+    }
+
+    #[test]
     fn hierarchy_ssa_checkpoint_load_unload_and_restart_are_durable() {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let service = ImsService::open(store.clone(), ImsLimits::default()).unwrap();

@@ -1,0 +1,401 @@
+{
+  "schema_version": "mainframe-env.ims-assurance-matrix@1",
+  "target_version": "0.14.0",
+  "coverage_credit": 0,
+  "cases": [
+    {
+      "id": "IMS-A-001",
+      "foundation": "host",
+      "property": "saf",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "ims_database_read_denial_hides_retained_data",
+      "expected": "Authorized retained bytes cannot be returned to a denied reader; the database image remains intact.",
+      "source_scope": "ims-programming-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_currentpos.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005"
+      ]
+    },
+    {
+      "id": "IMS-A-002",
+      "foundation": "host",
+      "property": "saf",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "ims_database_denial_precedes_mutation",
+      "expected": "A denied database load returns Unauthorized and does not create a root.",
+      "source_scope": "ims-metadata-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-003",
+      "foundation": "tm",
+      "property": "saf",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/tests/tm_runtime.rs",
+      "test_name": "denied_tm_retry_cannot_observe_an_authorized_admission_receipt",
+      "expected": "A denied exact admission retry cannot reveal its previously authorized receipt or enqueue twice.",
+      "source_scope": "ims-tm-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-004",
+      "foundation": "tm",
+      "property": "saf",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/tests/tm_runtime.rs",
+      "test_name": "authorization_timeout_and_live_cancellation_precede_session_mutation",
+      "expected": "Denied transaction and destination changes, timeout, and cancellation leave protected TM state intact.",
+      "source_scope": "ims-tm-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-005",
+      "foundation": "database",
+      "property": "malformed-limit",
+      "backend": "deterministic-engine",
+      "test_file": "crates/providers/mainframe-env-ims/src/database/tests.rs",
+      "test_name": "metadata_validation_is_bounded_and_organization_aware",
+      "expected": "Invalid hierarchy and organization metadata fail within configured bounds.",
+      "source_scope": "ims-database-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howseindexmaint.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-006",
+      "foundation": "database",
+      "property": "malformed-limit",
+      "backend": "deterministic-engine",
+      "test_file": "crates/providers/mainframe-env-ims/src/database/tests.rs",
+      "test_name": "rejected_duplicate_index_and_length_changes_leave_state_unchanged",
+      "expected": "Duplicate index keys and invalid length updates preserve the pre-call digest.",
+      "source_scope": "ims-database-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howseindexmaint.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-007",
+      "foundation": "tm",
+      "property": "malformed-limit",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/tests/tm_contracts.rs",
+      "test_name": "malformed_duplicate_and_over_limit_contracts_fail_closed",
+      "expected": "Duplicate and over-limit TM definitions and messages fail validation.",
+      "source_scope": "ims-tm-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-008",
+      "foundation": "recovery",
+      "property": "malformed-limit",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/tests.rs",
+      "test_name": "checkpoint_contract_rejects_symbolic_without_xrst_and_oversized_user_areas",
+      "expected": "Symbolic checkpoint without XRST and over-limit user areas are rejected.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0023"
+      ]
+    },
+    {
+      "id": "IMS-A-009",
+      "foundation": "host",
+      "property": "cas-conflict",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "independent_database_rows_commit_from_separate_service_instances_without_global_cas",
+      "expected": "Independent database rows commit without a false global CAS conflict.",
+      "source_scope": "ims-database-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howseindexmaint.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-010",
+      "foundation": "database",
+      "property": "cas-conflict",
+      "backend": "deterministic-engine",
+      "test_file": "crates/providers/mainframe-env-ims/src/database/tests.rs",
+      "test_name": "record_version_fences_a_stale_hold_without_mutation",
+      "expected": "A stale hold version cannot replace a newer record.",
+      "source_scope": "ims-database-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howseindexmaint.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006"
+      ]
+    },
+    {
+      "id": "IMS-A-011",
+      "foundation": "recovery",
+      "property": "cas-conflict",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+      "test_name": "concurrent_proposals_conflict_atomically_and_corrupt_rows_fail_closed",
+      "expected": "Competing recovery proposals reject stale CAS and damaged rows before publication.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0018"
+      ]
+    },
+    {
+      "id": "IMS-A-012",
+      "foundation": "utility",
+      "property": "cas-conflict",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/utility_tests.rs",
+      "test_name": "staged_reorganization_conflict_preserves_stage_and_active_bytes",
+      "expected": "A changed active version fences staged reorganization publication.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_reorgutil.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-013",
+      "foundation": "host",
+      "property": "replay",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "post_commit_clock_and_cas_failures_are_unknown_then_retry_recovers",
+      "expected": "A persisted result with failed replay finalization reports unknown, then retry observes authority.",
+      "source_scope": "ims-programming-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_currentpos.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-014",
+      "foundation": "tm",
+      "property": "replay",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/tests/tm_runtime.rs",
+      "test_name": "queue_order_schedule_alternate_destinations_and_replay_are_exact",
+      "expected": "TM queue and alternate destination operations preserve exact order and replay identities.",
+      "source_scope": "ims-tm-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-015",
+      "foundation": "recovery",
+      "property": "replay",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+      "test_name": "checkpoint_log_and_restart_are_persisted_without_duplicate_replay",
+      "expected": "Checkpoint and log retry reuse durable identities without duplicate records.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0010",
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0016",
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0025"
+      ]
+    },
+    {
+      "id": "IMS-A-016",
+      "foundation": "utility",
+      "property": "replay",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/utility_tests.rs",
+      "test_name": "reorganization_rebuilds_order_and_indexes_then_publishes_new_generation",
+      "expected": "Reorganization publishes a rebuilt generation once and exact repeat returns replay.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_reorgutil.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-017",
+      "foundation": "host",
+      "property": "reopen-corruption",
+      "backend": "sqlite",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "sqlite_executes_and_reopens_the_versioned_row_layout",
+      "expected": "SQLite reopen retains versioned IMS database rows and execution behavior.",
+      "source_scope": "ims-metadata-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-018",
+      "foundation": "tm",
+      "property": "reopen-corruption",
+      "backend": "sqlite",
+      "test_file": "crates/providers/mainframe-env-ims/tests/tm_runtime.rs",
+      "test_name": "sqlite_reopen_preserves_cursor_output_and_conversation_continuation",
+      "expected": "SQLite reopen retains TM cursor, output and conversation continuation.",
+      "source_scope": "ims-tm-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-019",
+      "foundation": "recovery",
+      "property": "reopen-corruption",
+      "backend": "sqlite",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+      "test_name": "sqlite_reopen_preserves_log_and_checkpoint_images",
+      "expected": "SQLite reopen verifies retained recovery log and checkpoint images.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0010"
+      ]
+    },
+    {
+      "id": "IMS-A-020",
+      "foundation": "utility",
+      "property": "reopen-corruption",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/utility_tests.rs",
+      "test_name": "corrupt_stage_cannot_publish_or_mutate_active_database",
+      "expected": "A corrupt utility stage cannot replace or alter the active image.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_reorgutil.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-021",
+      "foundation": "utility",
+      "property": "reopen-corruption",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/log_utility_tests.rs",
+      "test_name": "close_rejects_corruption_and_psb_report_tracks_active_membership",
+      "expected": "Log closure rejects damaged input and PSB reporting observes active membership.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dur/ims_dfsurdb0.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-022",
+      "foundation": "database",
+      "property": "scale",
+      "backend": "deterministic-engine",
+      "test_file": "crates/providers/mainframe-env-ims/src/database/tests.rs",
+      "test_name": "gsam_is_bounded_ordered_and_append_only",
+      "expected": "GSAM append reaches its configured finite record limit without reordering.",
+      "source_scope": "ims-database-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_howseindexmaint.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-023",
+      "foundation": "tm",
+      "property": "scale",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/tests/tm_runtime.rs",
+      "test_name": "output_segment_capacity_rejects_before_persisting",
+      "expected": "Output segment capacity rejects the next segment before persistence.",
+      "source_scope": "ims-tm-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_conversationrecovery.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-024",
+      "foundation": "metadata",
+      "property": "compatibility-rollback",
+      "backend": "sqlite",
+      "test_file": "crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs",
+      "test_name": "sqlite_reopen_clears_absent_metadata_and_restores_retained_generation",
+      "expected": "An absent metadata selection clears on reopen and rollback restores a retained generation.",
+      "source_scope": "ims-metadata-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-025",
+      "foundation": "host",
+      "property": "compatibility-rollback",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "legacy_blob_migrates_atomically_to_versioned_scoped_rows_and_corruption_fails_closed",
+      "expected": "Legacy IMS blob migration is atomic and malformed legacy bytes fail closed.",
+      "source_scope": "ims-metadata-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgendlipcbstmt.htm",
+      "catalog_rows": []
+    },
+    {
+      "id": "IMS-A-026",
+      "foundation": "recovery",
+      "property": "compatibility-rollback",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+      "test_name": "sets_and_rols_restore_database_rows_through_shared_atomic_store",
+      "expected": "ROLS restores captured database and nonexpress message rows in one shared batch.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0018"
+      ]
+    },
+    {
+      "id": "IMS-A-027",
+      "foundation": "host",
+      "property": "unknown-outcome",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/service.rs",
+      "test_name": "post_commit_clock_and_cas_failures_are_unknown_then_retry_recovers",
+      "expected": "Post-dispatch replay finalization failure yields UnknownOutcome until an authoritative retry.",
+      "source_scope": "ims-programming-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_currentpos.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008"
+      ]
+    },
+    {
+      "id": "IMS-A-028",
+      "foundation": "recovery",
+      "property": "unknown-outcome",
+      "backend": "memory",
+      "test_file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+      "test_name": "canonical_effect_intent_is_required_before_recovery_publication",
+      "expected": "Recovery publication requires canonical effect intent and preserves unknown result state.",
+      "source_scope": "ims-recovery-utilities-contracts",
+      "source_topic": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "catalog_rows": [
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+        "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0018"
+      ]
+    }
+  ],
+  "pending": [
+    {
+      "id": "public-database-engine-route",
+      "reason": "The isolated database engine is not connected to the current public IMS host execution route."
+    },
+    {
+      "id": "full-25-family-gates",
+      "reason": "The local matrix does not satisfy every mandatory obligation and applicable gate for all 25 families."
+    },
+    {
+      "id": "licensed-ims-15.6-differential",
+      "reason": "No licensed IMS 15.6 oracle has run on this candidate or supplied a reviewed receipt."
+    },
+    {
+      "id": "mixed-resource-syncpoint",
+      "reason": "Final mixed-resource transaction outcome closure belongs to the shared 0.16 participant integration."
+    }
+  ]
+}
