@@ -1,0 +1,407 @@
+{
+  "schema_version": "mainframe-env.ims-licensed-differential-fixtures@1",
+  "target_version": "0.14.0",
+  "work_package": "IMS-1406.licensed-harness-contract",
+  "baseline_id": "ibm-ims-15.6-dli-2026-08-31",
+  "unit": "dli-call-families",
+  "independent_fixture_authority": {
+    "kind": "reviewed-external-fixture-bundle",
+    "product_output_derived": false,
+    "oracle_output_embedded": false,
+    "raw_fixture_bytes_retained": false,
+    "external_bundle_digest_required": true
+  },
+  "case_count": 25,
+  "cases_per_family": 1,
+  "cases": [
+    {
+      "case_id": "ims.dli.0001.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0001",
+      "call_family": "INIT call",
+      "source_locator": "html-table:comparison;row:1;command:ACCEPT command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.availability-init.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0001.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0002.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+      "call_family": "CHKP call (basic)",
+      "source_locator": "html-table:comparison;row:2;command:CHKP command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.basic-checkpoint.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0002.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0003.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0003",
+      "call_family": "DEQ call",
+      "source_locator": "html-table:comparison;row:3;command:DEQ command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "deq-io",
+        "deq-dedb"
+      ],
+      "input_profile": "independent-ims.deq-forbidden-context.v1",
+      "scenario_class": "rejected",
+      "fixture_bundle_member": "dli/0003.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0004.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+      "call_family": "DLET call",
+      "source_locator": "html-table:comparison;row:4;command:DLET command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "delete-full-function",
+        "delete-dedb",
+        "delete-msdb"
+      ],
+      "input_profile": "independent-ims.delete-without-hold.v1",
+      "scenario_class": "rejected",
+      "fixture_bundle_member": "dli/0004.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0005.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+      "call_family": "GU, GN, and GNP calls",
+      "source_locator": "html-table:comparison;row:5;command:GU, GN, and GNP commands",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "read-full-function",
+        "read-dedb",
+        "read-msdb",
+        "read-gsam",
+        "read-gsam-direct"
+      ],
+      "input_profile": "independent-ims.qualified-get-not-found.v1",
+      "scenario_class": "condition",
+      "fixture_bundle_member": "dli/0005.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0006.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+      "call_family": "GHU, GHN, and GHNP calls",
+      "source_locator": "html-table:comparison;row:6;command:GU, GN, and GNP commands",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "hold-full-function",
+        "hold-dedb",
+        "hold-msdb"
+      ],
+      "input_profile": "independent-ims.get-hold-position.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0006.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0007.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0007",
+      "call_family": "GSCD call",
+      "source_locator": "html-table:comparison;row:7;command:GSCD call",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.schedule-code-get.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0007.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0008.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008",
+      "call_family": "ISRT call",
+      "source_locator": "html-table:comparison;row:8;command:ISRT command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "insert-full-function",
+        "insert-dedb",
+        "insert-msdb",
+        "insert-gsam"
+      ],
+      "input_profile": "independent-ims.database-insert.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0008.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0009.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0009",
+      "call_family": "ISRT call",
+      "source_locator": "html-table:comparison;row:9;command:LOAD command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "load-full-function"
+      ],
+      "input_profile": "independent-ims.initial-load-insert.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0009.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0010.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0010",
+      "call_family": "LOG call",
+      "source_locator": "html-table:comparison;row:10;command:LOG command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.log-record.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0010.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0011.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0011",
+      "call_family": "POS call",
+      "source_locator": "html-table:comparison;row:11;command:POS command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "dedb-position"
+      ],
+      "input_profile": "independent-ims.dedb-position.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0011.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0012.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0012",
+      "call_family": "INIT call",
+      "source_locator": "html-table:comparison;row:12;command:ACCEPT command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.availability-accept.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0012.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0013.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0013",
+      "call_family": "INIT call",
+      "source_locator": "html-table:comparison;row:13;command:QUERY command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.availability-query.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0013.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0014.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0014",
+      "call_family": "INIT call",
+      "source_locator": "html-table:comparison;row:14;command:REFRESH command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.availability-refresh.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0014.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0015.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+      "call_family": "REPL call",
+      "source_locator": "html-table:comparison;row:15;command:REPL command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "replace-full-function",
+        "replace-dedb",
+        "replace-msdb"
+      ],
+      "input_profile": "independent-ims.replace-without-hold.v1",
+      "scenario_class": "rejected",
+      "fixture_bundle_member": "dli/0015.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0016.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0016",
+      "call_family": "XRST call",
+      "source_locator": "html-table:comparison;row:16;command:RETRIEVE command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.restart-retrieve.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0016.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0017.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0017",
+      "call_family": "ROLL or ROLB call",
+      "source_locator": "html-table:comparison;row:17;command:ROLL or ROLB command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.rollback.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0017.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0018.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0018",
+      "call_family": "ROLS call",
+      "source_locator": "html-table:comparison;row:18;command:ROLS command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.rollback-without-savepoint.v1",
+      "scenario_class": "rejected",
+      "fixture_bundle_member": "dli/0018.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0019.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0019",
+      "call_family": "PCB call",
+      "source_locator": "html-table:comparison;row:19;command:SCHD command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "schedule"
+      ],
+      "input_profile": "independent-ims.pcb-schedule.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0019.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0020.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0020",
+      "call_family": "SETS call",
+      "source_locator": "html-table:comparison;row:20;command:SETS command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.set-savepoint.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0020.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0021.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0021",
+      "call_family": "SETU call",
+      "source_locator": "html-table:comparison;row:21;command:SETU command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.setu-without-token.v1",
+      "scenario_class": "rejected",
+      "fixture_bundle_member": "dli/0021.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0022.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0022",
+      "call_family": "STAT call",
+      "source_locator": "html-table:comparison;row:22;command:STAT command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "statistics"
+      ],
+      "input_profile": "independent-ims.database-statistics.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0022.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0023.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0023",
+      "call_family": "CHKP call (extended)",
+      "source_locator": "html-table:comparison;row:23;command:SYMCHKP command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.extended-checkpoint.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0023.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0024.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0024",
+      "call_family": "TERM call",
+      "source_locator": "html-table:comparison;row:24;command:TERM command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.terminate.v1",
+      "scenario_class": "completed",
+      "fixture_bundle_member": "dli/0024.json",
+      "observation_profile": "ims-normalized-observation@1"
+    },
+    {
+      "case_id": "ims.dli.0025.licensed-differential",
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0025",
+      "call_family": "XRST call",
+      "source_locator": "html-table:comparison;row:25;command:XRST command",
+      "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "input_profile": "independent-ims.restart-without-checkpoint.v1",
+      "scenario_class": "condition",
+      "fixture_bundle_member": "dli/0025.json",
+      "observation_profile": "ims-normalized-observation@1"
+    }
+  ]
+}

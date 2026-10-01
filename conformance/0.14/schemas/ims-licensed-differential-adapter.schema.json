@@ -1,0 +1,592 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/ims-licensed-differential-adapter@1",
+  "title": "IBM IMS 15.6 licensed differential adapter policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "work_package",
+    "denominator",
+    "licensed_oracle",
+    "receipt_configuration",
+    "candidate_identity",
+    "spec_identity",
+    "runner_identity",
+    "fixtures",
+    "required_capabilities",
+    "normalization",
+    "required_harness_mutants",
+    "secret_and_raw_output_policy",
+    "credit_policy",
+    "licensed_campaign_status",
+    "differential_gate"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.ims-licensed-differential-adapter@1"
+    },
+    "target_version": {
+      "const": "0.14.0"
+    },
+    "work_package": {
+      "const": "IMS-1406.licensed-harness-contract"
+    },
+    "denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_id",
+        "unit",
+        "family_count",
+        "official_catalog",
+        "applicability_rules",
+        "source_manifests",
+        "comparison_topic",
+        "reviewed_source_topics",
+        "comparison_manifest"
+      ],
+      "properties": {
+        "baseline_id": {
+          "const": "ibm-ims-15.6-dli-2026-08-31"
+        },
+        "unit": {
+          "const": "dli-call-families"
+        },
+        "family_count": {
+          "const": 25
+        },
+        "official_catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+              "maxLength": 160
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "maxLength": 71
+            }
+          }
+        },
+        "applicability_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+              "maxLength": 160
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "maxLength": 71
+            }
+          }
+        },
+        "source_manifests": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256",
+              "baseline_id",
+              "topic_set_sha256",
+              "toc_sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+                "maxLength": 160
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "maxLength": 71
+              },
+              "baseline_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+                "maxLength": 160
+              },
+              "topic_set_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "maxLength": 71
+              },
+              "toc_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "maxLength": 71
+              }
+            }
+          }
+        },
+        "comparison_topic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+              "maxLength": 160
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "maxLength": 71
+            }
+          }
+        },
+        "reviewed_source_topics": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256",
+              "method",
+              "coverage_credit"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+                "maxLength": 160
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "maxLength": 71
+              },
+              "method": {
+                "const": "retained-html-sha256-and-plain-text"
+              },
+              "coverage_credit": {
+                "const": 0
+              }
+            }
+          }
+        },
+        "comparison_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "topic_set_sha256",
+            "toc_sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+              "maxLength": 160
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "maxLength": 71
+            },
+            "topic_set_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "maxLength": 71
+            },
+            "toc_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "maxLength": 71
+            }
+          }
+        }
+      }
+    },
+    "licensed_oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_name",
+        "major_minor",
+        "documentation_product",
+        "service_identity_policy",
+        "execution_role",
+        "native_product_fallback_allowed"
+      ],
+      "properties": {
+        "product_name": {
+          "const": "IBM IMS"
+        },
+        "major_minor": {
+          "const": "15.6"
+        },
+        "documentation_product": {
+          "const": "SSEPH2_15.6.0"
+        },
+        "service_identity_policy": {
+          "const": "externally-pinned-exact-release-service-build-installation"
+        },
+        "execution_role": {
+          "const": "oracle-only"
+        },
+        "native_product_fallback_allowed": {
+          "const": false
+        }
+      }
+    },
+    "receipt_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_environment_variable",
+        "external_digest_environment_variables",
+        "external_regular_file_required",
+        "symlink_allowed",
+        "maximum_receipt_bytes"
+      ],
+      "properties": {
+        "receipt_environment_variable": {
+          "const": "MAINFRAME_ENV_IMS_LICENSED_ORACLE_RECEIPT"
+        },
+        "external_digest_environment_variables": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receipt_sha256",
+            "service_identity_sha256",
+            "environment_manifest_sha256",
+            "authorization_grant_sha256",
+            "fixture_bundle_sha256",
+            "product_runner_sha256",
+            "oracle_runner_sha256"
+          ],
+          "properties": {
+            "receipt_sha256": {
+              "const": "MAINFRAME_ENV_IMS_LICENSED_ORACLE_RECEIPT_SHA256"
+            },
+            "service_identity_sha256": {
+              "const": "MAINFRAME_ENV_IMS_LICENSED_SERVICE_IDENTITY_SHA256"
+            },
+            "environment_manifest_sha256": {
+              "const": "MAINFRAME_ENV_IMS_LICENSED_ENVIRONMENT_SHA256"
+            },
+            "authorization_grant_sha256": {
+              "const": "MAINFRAME_ENV_IMS_LICENSED_AUTHORIZATION_SHA256"
+            },
+            "fixture_bundle_sha256": {
+              "const": "MAINFRAME_ENV_IMS_LICENSED_FIXTURE_BUNDLE_SHA256"
+            },
+            "product_runner_sha256": {
+              "const": "MAINFRAME_ENV_IMS_PRODUCT_RUNNER_SHA256"
+            },
+            "oracle_runner_sha256": {
+              "const": "MAINFRAME_ENV_IMS_LICENSED_RUNNER_SHA256"
+            }
+          }
+        },
+        "external_regular_file_required": {
+          "const": true
+        },
+        "symlink_allowed": {
+          "const": false
+        },
+        "maximum_receipt_bytes": {
+          "const": 2097152
+        }
+      }
+    },
+    "candidate_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "required_fields"
+      ],
+      "properties": {
+        "source": {
+          "const": "clean-git-head-and-tree"
+        },
+        "required_fields": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "const": "commit_sha"
+            },
+            {
+              "const": "tree_sha"
+            },
+            {
+              "const": "tracked_worktree_clean"
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "spec_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "domain",
+        "paths"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "domain": {
+          "const": "mainframe-env.ims-licensed-spec@1"
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+            "maxLength": 160
+          }
+        }
+      }
+    },
+    "runner_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_verifier",
+        "protocol",
+        "product_and_oracle_runners_must_differ"
+      ],
+      "properties": {
+        "contract_verifier": {
+          "const": "conformance/0.14/tools/verify_ims_licensed_differential.py"
+        },
+        "protocol": {
+          "const": "mainframe-env.ims-licensed-runner@1"
+        },
+        "product_and_oracle_runners_must_differ": {
+          "const": true
+        }
+      }
+    },
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "schema",
+        "case_count",
+        "cases_per_family",
+        "external_bundle_digest_required",
+        "product_generated_expectations_allowed"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.14/fixtures/ims-licensed-differential-cases.json"
+        },
+        "schema": {
+          "const": "mainframe-env.ims-licensed-differential-fixtures@1"
+        },
+        "case_count": {
+          "const": 25
+        },
+        "cases_per_family": {
+          "const": 1
+        },
+        "external_bundle_digest_required": {
+          "const": true
+        },
+        "product_generated_expectations_allowed": {
+          "const": false
+        }
+      }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "minItems": 30,
+      "maxItems": 30,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+        "maxLength": 160
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "comparison",
+        "fields",
+        "raw_output_retained",
+        "maximum_output_length",
+        "pcb_status_width",
+        "position_digest_required"
+      ],
+      "properties": {
+        "policy": {
+          "const": "ims-normalized-observation@1"
+        },
+        "comparison": {
+          "const": "exact-canonical-object-equality"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "prefixItems": [
+            {
+              "const": "outcome_class"
+            },
+            {
+              "const": "pcb_status"
+            },
+            {
+              "const": "pcb_kind"
+            },
+            {
+              "const": "position_state"
+            },
+            {
+              "const": "position_digest"
+            },
+            {
+              "const": "mutation_state"
+            },
+            {
+              "const": "state_digest"
+            },
+            {
+              "const": "effect_digest"
+            },
+            {
+              "const": "output_digest"
+            },
+            {
+              "const": "output_length"
+            },
+            {
+              "const": "output_encoding"
+            }
+          ],
+          "items": false
+        },
+        "raw_output_retained": {
+          "const": false
+        },
+        "maximum_output_length": {
+          "const": 16777216
+        },
+        "pcb_status_width": {
+          "const": 2
+        },
+        "position_digest_required": {
+          "const": true
+        }
+      }
+    },
+    "required_harness_mutants": {
+      "type": "array",
+      "minItems": 13,
+      "maxItems": 13,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.:@+/-]{1,160}$",
+        "maxLength": 160
+      }
+    },
+    "secret_and_raw_output_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credentials_in_git",
+        "raw_licensed_output_in_git",
+        "receipts_in_git",
+        "external_digest_pins_required"
+      ],
+      "properties": {
+        "credentials_in_git": {
+          "const": false
+        },
+        "raw_licensed_output_in_git": {
+          "const": false
+        },
+        "receipts_in_git": {
+          "const": false
+        },
+        "external_digest_pins_required": {
+          "const": true
+        }
+      }
+    },
+    "credit_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_receipt_required_for_pass",
+        "absent_receipt_differential_credit",
+        "invalid_or_partial_receipt_differential_credit",
+        "complete_receipt_family_credit",
+        "historical_local_model_synthetic_credit",
+        "native_ibm_product_fallback_credit"
+      ],
+      "properties": {
+        "external_receipt_required_for_pass": {
+          "const": true
+        },
+        "absent_receipt_differential_credit": {
+          "const": 0
+        },
+        "invalid_or_partial_receipt_differential_credit": {
+          "const": 0
+        },
+        "complete_receipt_family_credit": {
+          "const": 25
+        },
+        "historical_local_model_synthetic_credit": {
+          "const": 0
+        },
+        "native_ibm_product_fallback_credit": {
+          "const": 0
+        }
+      }
+    },
+    "licensed_campaign_status": {
+      "const": "not-run"
+    },
+    "differential_gate": {
+      "const": "pending"
+    }
+  }
+}

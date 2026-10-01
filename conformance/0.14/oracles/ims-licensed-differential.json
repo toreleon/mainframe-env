@@ -1,0 +1,213 @@
+{
+  "schema_version": "mainframe-env.ims-licensed-differential-adapter@1",
+  "target_version": "0.14.0",
+  "work_package": "IMS-1406.licensed-harness-contract",
+  "denominator": {
+    "baseline_id": "ibm-ims-15.6-dli-2026-08-31",
+    "unit": "dli-call-families",
+    "family_count": 25,
+    "official_catalog": {
+      "path": "conformance/0.2/catalogs/ims.json",
+      "sha256": "sha256:b488f67b4c5b4d71a93e97a8a1605b8eac21fcf73c802c264a7bff5dfa3ce319"
+    },
+    "applicability_rules": {
+      "path": "conformance/0.14/ims/call-applicability-rules.json",
+      "sha256": "sha256:c7b2abd93786a7ebcc1e1211456c2d08ea6f299b8cf352c7e2c8822906f63598"
+    },
+    "source_manifests": [
+      {
+        "path": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+        "sha256": "sha256:5f84803886475a9c94736d73504fb5487d77381756b7fabe65451c952f90db48",
+        "baseline_id": "ibm-ims-15.6-programming-contracts-2026-09-11",
+        "topic_set_sha256": "sha256:a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594",
+        "toc_sha256": "sha256:aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618"
+      },
+      {
+        "path": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+        "sha256": "sha256:64ac7eac823b2aacdbdfc7772bc12462fe0915168f45830da2797010550af6d0",
+        "baseline_id": "ibm-ims-15.6-database-contracts-2026-09-11",
+        "topic_set_sha256": "sha256:3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b",
+        "toc_sha256": "sha256:aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618"
+      },
+      {
+        "path": "conformance/0.14/manifests/ims-tm-contracts-topics.json",
+        "sha256": "sha256:b8bc9ec7f5edf9d20a979d295db84306946de06bcdec756d06d85787af874a5f",
+        "baseline_id": "ibm-ims-15.6-tm-contracts-2026-09-11",
+        "topic_set_sha256": "sha256:dac590371f5b7be6747c7280598ae9db075ea0f7c59473a2fcd8b9c9d8c0cd36",
+        "toc_sha256": "sha256:aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618"
+      },
+      {
+        "path": "conformance/0.14/manifests/ims-metadata-contracts-topics.json",
+        "sha256": "sha256:ade81a59c1cf695b02cc23a41f5d786e79c4a0a11072d848102081099d07aa4e",
+        "baseline_id": "ibm-ims-15.6-metadata-contracts-2026-09-11",
+        "topic_set_sha256": "sha256:847166149ae438081effe2f09e7a492b9417217d285d48944bafc3b17cb671d2",
+        "toc_sha256": "sha256:aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618"
+      },
+      {
+        "path": "conformance/0.14/manifests/ims-recovery-utilities-contracts-topics.json",
+        "sha256": "sha256:b7438f3e9d8f9e94864f35c3a8106641c4c969a5ff6f01a3359369ac4bbc6904",
+        "baseline_id": "ibm-ims-15.6-recovery-utilities-2026-09-11",
+        "topic_set_sha256": "sha256:7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8",
+        "toc_sha256": "sha256:aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618"
+      }
+    ],
+    "comparison_topic": {
+      "path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+      "sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30"
+    },
+    "reviewed_source_topics": [
+      {
+        "path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+        "sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
+        "method": "retained-html-sha256-and-plain-text",
+        "coverage_credit": 0
+      }
+    ],
+    "comparison_manifest": {
+      "path": "conformance/0.2/manifests/ims-topics.json",
+      "sha256": "sha256:ed14545e5c75f63da167a151dd01e47c169089cf7bf983ea89fd7f087946f126",
+      "topic_set_sha256": "sha256:7748d88614c92c7261c9ae430027ef8954a48f3edf921ac2283b88cfb9a6f07d",
+      "toc_sha256": "sha256:aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618"
+    }
+  },
+  "licensed_oracle": {
+    "product_name": "IBM IMS",
+    "major_minor": "15.6",
+    "documentation_product": "SSEPH2_15.6.0",
+    "service_identity_policy": "externally-pinned-exact-release-service-build-installation",
+    "execution_role": "oracle-only",
+    "native_product_fallback_allowed": false
+  },
+  "receipt_configuration": {
+    "receipt_environment_variable": "MAINFRAME_ENV_IMS_LICENSED_ORACLE_RECEIPT",
+    "external_digest_environment_variables": {
+      "receipt_sha256": "MAINFRAME_ENV_IMS_LICENSED_ORACLE_RECEIPT_SHA256",
+      "service_identity_sha256": "MAINFRAME_ENV_IMS_LICENSED_SERVICE_IDENTITY_SHA256",
+      "environment_manifest_sha256": "MAINFRAME_ENV_IMS_LICENSED_ENVIRONMENT_SHA256",
+      "authorization_grant_sha256": "MAINFRAME_ENV_IMS_LICENSED_AUTHORIZATION_SHA256",
+      "fixture_bundle_sha256": "MAINFRAME_ENV_IMS_LICENSED_FIXTURE_BUNDLE_SHA256",
+      "product_runner_sha256": "MAINFRAME_ENV_IMS_PRODUCT_RUNNER_SHA256",
+      "oracle_runner_sha256": "MAINFRAME_ENV_IMS_LICENSED_RUNNER_SHA256"
+    },
+    "external_regular_file_required": true,
+    "symlink_allowed": false,
+    "maximum_receipt_bytes": 2097152
+  },
+  "candidate_identity": {
+    "source": "clean-git-head-and-tree",
+    "required_fields": [
+      "commit_sha",
+      "tree_sha",
+      "tracked_worktree_clean"
+    ]
+  },
+  "spec_identity": {
+    "algorithm": "sha256",
+    "domain": "mainframe-env.ims-licensed-spec@1",
+    "paths": [
+      "conformance/0.14/fixtures/ims-licensed-differential-cases.json",
+      "conformance/0.14/oracles/ims-licensed-differential.json",
+      "conformance/0.14/schemas/ims-licensed-differential-adapter.schema.json",
+      "conformance/0.14/schemas/ims-licensed-differential-fixtures.schema.json",
+      "conformance/0.14/schemas/ims-licensed-differential-receipt.schema.json",
+      "conformance/0.14/tools/generate_ims_licensed_fixtures.py"
+    ]
+  },
+  "runner_identity": {
+    "contract_verifier": "conformance/0.14/tools/verify_ims_licensed_differential.py",
+    "protocol": "mainframe-env.ims-licensed-runner@1",
+    "product_and_oracle_runners_must_differ": true
+  },
+  "fixtures": {
+    "path": "conformance/0.14/fixtures/ims-licensed-differential-cases.json",
+    "schema": "mainframe-env.ims-licensed-differential-fixtures@1",
+    "case_count": 25,
+    "cases_per_family": 1,
+    "external_bundle_digest_required": true,
+    "product_generated_expectations_allowed": false
+  },
+  "required_capabilities": [
+    "licensed.ibm-ims-15.6",
+    "independent.product-oracle-execution",
+    "normalized.digest-only-capture",
+    "secrets.excluded",
+    "raw-output.excluded",
+    "dli.family.0001",
+    "dli.family.0002",
+    "dli.family.0003",
+    "dli.family.0004",
+    "dli.family.0005",
+    "dli.family.0006",
+    "dli.family.0007",
+    "dli.family.0008",
+    "dli.family.0009",
+    "dli.family.0010",
+    "dli.family.0011",
+    "dli.family.0012",
+    "dli.family.0013",
+    "dli.family.0014",
+    "dli.family.0015",
+    "dli.family.0016",
+    "dli.family.0017",
+    "dli.family.0018",
+    "dli.family.0019",
+    "dli.family.0020",
+    "dli.family.0021",
+    "dli.family.0022",
+    "dli.family.0023",
+    "dli.family.0024",
+    "dli.family.0025"
+  ],
+  "normalization": {
+    "policy": "ims-normalized-observation@1",
+    "comparison": "exact-canonical-object-equality",
+    "fields": [
+      "outcome_class",
+      "pcb_status",
+      "pcb_kind",
+      "position_state",
+      "position_digest",
+      "mutation_state",
+      "state_digest",
+      "effect_digest",
+      "output_digest",
+      "output_length",
+      "output_encoding"
+    ],
+    "raw_output_retained": false,
+    "maximum_output_length": 16777216,
+    "pcb_status_width": 2,
+    "position_digest_required": true
+  },
+  "required_harness_mutants": [
+    "omitted-row",
+    "duplicate-row",
+    "reordered-cases",
+    "generic-success",
+    "malformed-status",
+    "malformed-position",
+    "stale-candidate",
+    "stale-spec",
+    "stale-source",
+    "unauthorized-environment",
+    "internal-receipt-path",
+    "missing-external-pin",
+    "tampered-observation"
+  ],
+  "secret_and_raw_output_policy": {
+    "credentials_in_git": false,
+    "raw_licensed_output_in_git": false,
+    "receipts_in_git": false,
+    "external_digest_pins_required": true
+  },
+  "credit_policy": {
+    "external_receipt_required_for_pass": true,
+    "absent_receipt_differential_credit": 0,
+    "invalid_or_partial_receipt_differential_credit": 0,
+    "complete_receipt_family_credit": 25,
+    "historical_local_model_synthetic_credit": 0,
+    "native_ibm_product_fallback_credit": 0
+  },
+  "licensed_campaign_status": "not-run",
+  "differential_gate": "pending"
+}
