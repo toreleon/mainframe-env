@@ -167,6 +167,10 @@ mod bridge_start;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 mod continuation;
+mod exchange;
+pub(crate) use continuation::online_continuation_dependencies;
+pub(crate) use exchange::online_exchange_dependencies;
+use exchange::{decode_online_exchange, encode_online_exchange, validate_online_exchange};
 mod interval_wakeup;
 mod operator_console;
 
@@ -250,6 +254,8 @@ enum TerminalExchangeRecovery {
 #[serde(deny_unknown_fields)]
 struct OnlineExchangeState {
     schema_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    run_owner: Option<exchange::OnlineRunOwner>,
     program: String,
     request_id: String,
     execution_id: String,
@@ -1746,142 +1752,6 @@ impl ProductServer {
             return Err(HostProblem::IdempotencyConflict);
         }
         Ok(selected)
-    }
-
-    fn begin_online_exchange(
-        &self,
-        session: &SessionId,
-        program: &str,
-        context: &CicsTerminalExecution,
-    ) -> Result<OnlineExchangeState, HostProblem> {
-        let state = OnlineExchangeState {
-            schema_version: ONLINE_EXCHANGE_CONTRACT.into(),
-            program: normalize_online_name(program, 128)?,
-            request_id: context.invocation.request_id.as_str().into(),
-            execution_id: context.invocation.execution_id.as_str().into(),
-            run_unit_id: context.invocation.run_unit_id.as_str().into(),
-            selector: context.invocation.selector.as_str().into(),
-            artifact: context.invocation.artifact.as_str().into(),
-            principal: context.invocation.principal.id().as_str().into(),
-            grants: context
-                .invocation
-                .principal
-                .grants()
-                .iter()
-                .map(|capability| capability.as_str().to_string())
-                .collect(),
-            provider_generations: context
-                .invocation
-                .provider_generations
-                .iter()
-                .map(|(capability, generation)| {
-                    (capability.as_str().to_string(), generation.clone())
-                })
-                .collect(),
-            priority: context.invocation.priority,
-            deadline_tick: context.invocation.deadline_tick,
-            trace_id: context.invocation.trace_id.as_str().into(),
-            idempotency_key: context.invocation.idempotency_key.as_str().into(),
-            attempt: context.invocation.attempt,
-            audit_correlation: context.invocation.audit_correlation.clone(),
-            transaction: normalize_online_name(&context.transaction, 16)?,
-            commarea: context.commarea.clone(),
-            aid: context.aid,
-            blocking_effect: None,
-            version: 1,
-        };
-        validate_online_exchange(&state)?;
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
-                    key: session.as_str().into(),
-                    version: state.version,
-                    payload: encode_online_exchange(&state)?,
-                },
-                None,
-            )
-            .map_err(store_error)?;
-        Ok(state)
-    }
-
-    fn clear_online_exchange(
-        &self,
-        session: &SessionId,
-        state: &OnlineExchangeState,
-    ) -> Result<(), HostProblem> {
-        self.store
-            .delete_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str(), state.version)
-            .map_err(store_error)
-    }
-
-    fn online_exchange_invocation(
-        &self,
-        state: &OnlineExchangeState,
-    ) -> Result<Invocation, HostProblem> {
-        validate_online_exchange(state)?;
-        let limits = InvocationLimits::default();
-        let grants = state
-            .grants
-            .iter()
-            .map(|capability| {
-                CapabilityId::new(capability, limits)
-                    .map_err(|_| HostProblem::InfrastructureFailure)
-            })
-            .collect::<Result<BTreeSet<_>, _>>()?;
-        let generations = state
-            .provider_generations
-            .iter()
-            .map(|(capability, generation)| {
-                Ok((
-                    CapabilityId::new(capability, limits)
-                        .map_err(|_| HostProblem::InfrastructureFailure)?,
-                    generation.clone(),
-                ))
-            })
-            .collect::<Result<BTreeMap<_, _>, HostProblem>>()?;
-        let deadline_tick = current_gateway_call_context()
-            .map_or(state.deadline_tick, |context| context.deadline_tick());
-        let mut invocation = Invocation::new(
-            RequestId::new(&state.request_id, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ExecutionId::new(&state.execution_id, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            RunUnitId::new(&state.run_unit_id, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            None,
-            Selector::new(&state.selector, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ArtifactRef::new(&state.artifact, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            Principal::new(
-                PrincipalId::new(&state.principal, limits)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-                grants,
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ServiceClass::Interactive,
-            state.priority,
-            deadline_tick,
-            TraceId::new(&state.trace_id, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            IdempotencyKey::new(&state.idempotency_key, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            state.attempt,
-            ResourceLimits::default(),
-            BTreeMap::new(),
-            limits,
-        )
-        .and_then(|invocation| invocation.with_provider_generations(generations, limits))
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        invocation
-            .audit_correlation
-            .clone_from(&state.audit_correlation);
-        if let Some(context) = current_gateway_call_context() {
-            invocation = invocation.with_cancellation_probe(context.cancellation_probe());
-        }
-        Ok(invocation)
     }
 
     fn online_exchange_blocked(&self, state: &OnlineExchangeState) -> Result<bool, HostProblem> {
@@ -5728,66 +5598,6 @@ fn normalize_online_name(value: &str, max: usize) -> Result<String, HostProblem>
     } else {
         Ok(normalized)
     }
-}
-
-fn encode_online_exchange(state: &OnlineExchangeState) -> Result<Vec<u8>, HostProblem> {
-    validate_online_exchange(state)?;
-    serde_json::to_vec(state).map_err(|_| HostProblem::InfrastructureFailure)
-}
-
-fn decode_online_exchange(
-    record: &ProviderStateRecord,
-) -> Result<OnlineExchangeState, HostProblem> {
-    let mut state: OnlineExchangeState =
-        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-    state.version = record.version;
-    validate_online_exchange(&state)?;
-    Ok(state)
-}
-
-fn validate_online_exchange(state: &OnlineExchangeState) -> Result<(), HostProblem> {
-    let limits = InvocationLimits::default();
-    if state.schema_version != ONLINE_EXCHANGE_CONTRACT
-        || state.version == 0
-        || normalize_online_name(&state.program, 128)? != state.program
-        || normalize_online_name(&state.transaction, 16)? != state.transaction
-        || state.deadline_tick == 0
-        || state.attempt == 0
-        || state.grants.is_empty()
-        || state.grants.len() > limits.max_capabilities
-        || state.provider_generations.len() > limits.max_capabilities
-        || state.commarea.len() > limits.max_payload_bytes
-        || state.audit_correlation.is_empty()
-        || state.audit_correlation.len() > limits.max_identity_bytes
-    {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    RequestId::new(&state.request_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    ExecutionId::new(&state.execution_id, limits)
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-    RunUnitId::new(&state.run_unit_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    Selector::new(&state.selector, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    ArtifactRef::new(&state.artifact, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    PrincipalId::new(&state.principal, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    TraceId::new(&state.trace_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    IdempotencyKey::new(&state.idempotency_key, limits)
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-    for grant in &state.grants {
-        CapabilityId::new(grant, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    }
-    for (capability, generation) in &state.provider_generations {
-        if !state.grants.contains(capability)
-            || generation.is_empty()
-            || generation.len() > limits.max_identity_bytes
-        {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        CapabilityId::new(capability, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    }
-    if let Some(key) = &state.blocking_effect {
-        IdempotencyKey::new(key, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
-    }
-    Ok(())
 }
 
 fn digest_online_field(digest: &mut Sha256, bytes: &[u8]) {

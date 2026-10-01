@@ -1,16 +1,16 @@
-//! Actual online PROGRAM exit and the still-unimplemented task-completion boundary.
+//! Actual online PROGRAM exit, durable root owner and normal task completion.
 #[cfg(test)]
 mod tests {
     use super::super::*;
 
     #[test]
-    fn compiled_program_exit_cold_sqlite_preserves_owner_area_and_completion_fence() {
+    fn compiled_program_exit_preserves_owner_area_and_completes_after_sqlite_reopen() {
         program_exit(None);
     }
 
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
-    fn postgres_compiled_program_exit_cold_preserves_owner_area_and_completion_fence() {
+    fn postgres_compiled_program_exit_preserves_owner_area_and_completes_after_reopen() {
         program_exit(Some(required_postgres_route_url()));
     }
 
@@ -184,51 +184,42 @@ mod tests {
                 store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
                 retained
             );
-            let exchange = store
-                .get_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str())
+            server
+                .run_online_exchange(&session, &principal, "PEROOT", 3)
                 .unwrap();
-            let continuation = store
-                .get_provider_state("online-machine-continuation", session.as_str())
-                .unwrap();
-            // The selected exit is executable after reopen, but normal completion is
-            // not implemented: the replacement execution does not carry the
-            // original run owner. The known-abandoned instance is not reusable.
-            // This is a diagnostic fence regression, NOT normal-completion credit.
-            assert_eq!(
-                server.run_online_exchange(&session, &principal, "PEROOT", 3),
-                Err(HostProblem::UnknownOutcome)
-            );
-            assert_eq!(
-                store
-                    .get_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str())
-                    .unwrap(),
-                exchange
-            );
-            assert_eq!(
-                store
-                    .get_provider_state("online-machine-continuation", session.as_str())
-                    .unwrap(),
-                continuation
+            assert!(server.online_exchange(&session).unwrap().is_none());
+            assert!(
+                server
+                    .online_machine_continuation(&session)
+                    .unwrap()
+                    .is_none()
             );
             assert_eq!(
                 store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
                 retained
             );
+            let ended = store.list_provider_state("cobol-run-state@1", 8).unwrap();
+            let state: Value = serde_json::from_slice(&ended[0].payload).unwrap();
+            assert_eq!(state["ended"], true);
+            assert_eq!(state["active"], 0);
+            assert_eq!(state["instances"], 0);
             assert_eq!(
-                store.list_provider_state("cobol-run-state@1", 8).unwrap(),
-                run_rows
+                state["owner_execution"],
+                serde_json::from_slice::<Value>(&run_rows[0].payload).unwrap()["owner_execution"]
             );
-            assert_eq!(
+            assert!(
                 store
                     .list_provider_state(&format!("cobol-instance@1:{}", run_rows[0].key), 8)
-                    .unwrap(),
-                instance_rows
+                    .unwrap()
+                    .is_empty()
             );
-            assert_eq!(
-                store
-                    .list_provider_state("cobol-call-protocol@2", 8)
-                    .unwrap(),
-                protocol_rows
+            let protocol = store
+                .list_provider_state("cobol-call-protocol@2", 8)
+                .unwrap();
+            assert_eq!(protocol.len(), 1);
+            assert!(
+                !serde_json::from_slice::<Value>(&protocol[0].payload).unwrap()["ended_tick"]
+                    .is_null()
             );
         }
         std::fs::remove_dir_all(root).unwrap();

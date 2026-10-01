@@ -161,8 +161,25 @@ pub(super) fn bind_protocol_owner(
     bindings: &mut BTreeMap<String, BoundedPayload>,
 ) -> Result<(), HostProblem> {
     let owner = protocol_owner_execution(parent)?;
-    if bindings.contains_key(RUN_OWNER_BINDING) {
-        return Ok(());
+    bind_run_owner(&owner, bindings)
+}
+
+/// Restore an explicit owner without replacing a conflicting existing binding.
+pub(super) fn bind_run_owner(
+    owner: &str,
+    bindings: &mut BTreeMap<String, BoundedPayload>,
+) -> Result<(), HostProblem> {
+    if !valid_identity(owner) {
+        return Err(HostProblem::Malformed);
+    }
+    if let Some(binding) = bindings.get(RUN_OWNER_BINDING) {
+        return if binding.schema() == RUN_OWNER_BINDING_SCHEMA
+            && binding.bytes() == owner.as_bytes()
+        {
+            Ok(())
+        } else {
+            Err(HostProblem::IdempotencyConflict)
+        };
     }
     if bindings.len() >= InvocationLimits::default().max_bindings {
         return Err(HostProblem::ResourceExhausted);
@@ -171,7 +188,7 @@ pub(super) fn bind_protocol_owner(
         RUN_OWNER_BINDING.into(),
         BoundedPayload::new(
             RUN_OWNER_BINDING_SCHEMA,
-            owner.into_bytes(),
+            owner.as_bytes().to_vec(),
             InvocationLimits::default(),
         )
         .map_err(|_| HostProblem::ResourceExhausted)?,

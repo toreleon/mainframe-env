@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve the original installed-COBOL run owner across online PROGRAM/XCTL replacement and cold reopen using strict exchange V2 ownership. Normal root PROGRAM-exit completion retains pending child-call fences; core retention protects current, root and staged transfer executions. Legacy ownerless rows remain readable without guessed transfer ownership."

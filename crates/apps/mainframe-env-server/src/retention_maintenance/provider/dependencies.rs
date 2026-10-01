@@ -238,6 +238,23 @@ impl RetentionPlanner {
         let mut effects = BTreeSet::new();
         let mut unowned = false;
         let mut observations = ObservationMap::new();
+        let online_rows = self.bounded_namespace("online-exchange-v1")?;
+        let online_sessions: BTreeSet<_> = online_rows.iter().map(|row| row.key.as_str()).collect();
+        for row in &online_rows {
+            match crate::product::online_exchange_dependencies(row) {
+                Ok(owners) => executions.extend(owners),
+                Err(_) => unowned = true,
+            }
+        }
+        for row in self.bounded_namespace("online-machine-continuation")? {
+            if !online_sessions.contains(row.key.as_str()) {
+                unowned = true;
+            }
+            match crate::product::online_continuation_dependencies(&row) {
+                Ok(owners) => executions.extend(owners),
+                Err(_) => unowned = true,
+            }
+        }
         for target in [
             RetentionTarget::Db2Replay,
             RetentionTarget::ImsReplay,

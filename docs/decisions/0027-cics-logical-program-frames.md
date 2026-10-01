@@ -169,9 +169,8 @@ completion may atomically remove it with the other instances only after all
 active counts and open-file obligations are clear and its exact durable Abend
 proof is revalidated. A surviving active or uncertain instance, foreign owner
 or stale CAS keeps the run fenced. This does not implicitly close files or
-back out handled CICS work. The compiled root PROGRAM exit still needs stable
-run-owner handoff after replacement; that independent requirement is not
-satisfied by marking a known abandoned child inactive.
+back out handled CICS work. Marking a known abandoned child inactive alone
+does not provide the independent run-owner handoff described below.
 
 Schema-1 instances remain readable and normal/CANCEL-reset writes remain
 byte-compatible schema 1 (no new null field is emitted). Legacy busy rows are
@@ -180,6 +179,45 @@ proofs fail closed. Old readers reject schema 2. Downgrade requires drained
 writers and resolved abandoned frames plus a compatible reader or verified
 pre-change backup; never strip the proof, relabel the schema or turn pending
 installed calls into completed replies.
+
+### Durable online COBOL run-owner handoff
+
+New admissions write `mainframe-env.online-exchange@2` in the existing
+`online-exchange-v1` namespace. Its bounded `run_owner` contains the original
+execution and a metadata digest; actor execution still changes on PROGRAM/XCTL
+replacement. The existing staged `MEOM4` continuation carries this same owner
+in its next exchange. Admission, invocation reconstruction, transfer binding,
+CAS updates and recovery validate it without a new workflow or execution ledger.
+Restore never overwrites a different installed-COBOL owner binding. When root
+and actor differ, the root must have the same run/principal and an exact durable
+Completed/HandoffCompleted terminal event, including version, attempt and tick.
+Missing, failed, ordinarily completed or foreign roots fail closed. CAS updates
+cannot change the root or advance the caller's version on validation failure.
+
+The owner digest uses SHA-256 domain `mainframe-env.online-run-owner@2` plus a
+zero byte, then u64 big-endian length-prefixed UTF-8 fields: root execution,
+current execution, run unit, principal, program, selector, artifact, transaction.
+The final length-prefixed field is canonical compact JSON for the tuple of
+sorted grants, sorted provider generations, deadline tick and attempt. This is
+an integrity binding, not a substitute for SAF or installed-call authorization.
+Mutable COMMAREA, priority and blocking-effect updates do not change ownership.
+Core retention validates the owning codecs and protects current/root executions
+and staged prior/next/root executions. Corrupt or orphan continuation authority
+sets the global unowned fence; it cannot permit core pruning.
+
+Valid `mainframe-env.online-exchange@1` ownerless rows remain readable and ordinary
+updates remain V1; reads do not promote them or guess their owner. New transfers
+from those rows are Unsupported and require drain/reconciliation. V2 requires its
+exact owner binding; unknown versions, schema relabeling, conflicting bindings and
+malformed identities fail closed. Old readers reject V2. Rollback requires drained
+writers and a compatible reader or verified pre-change backup, never dropping the
+owner or relabeling V2 as V1.
+
+The compiled root PROGRAM exit now completes after cold reopen with the original
+owner COMMAREA and ABEND metadata; the pending child call remains unchanged.
+This closes only the COBOL run-owner handoff gap. CICS provider acquisition/UOW
+ownership across replacement, nearest non-root PROGRAM exits and general/default
+ancestor recovery remain separate acceptance obligations.
 
 ## Source and acceptance
 

@@ -45,6 +45,19 @@ pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
 use runtime::with_compatible_runtime_services;
 
+/// Read the existing bounded COBOL run-owner binding, never a provider-row guess.
+pub(crate) fn program_run_owner(invocation: &Invocation) -> Result<String, HostProblem> {
+    replay::protocol_owner_execution(invocation)
+}
+
+/// Restore a previously attested durable owner without replacing another owner.
+pub(crate) fn restore_program_run_owner(
+    invocation: &mut Invocation,
+    owner: &str,
+) -> Result<(), HostProblem> {
+    replay::bind_run_owner(owner, &mut invocation.bindings)
+}
+
 /// An embedding can supply a logical clock and a run-scoped cancellation source.
 /// All nested invocations use the same source and inherited deadline/scope.
 /// Default production ticks are Unix milliseconds advanced by a monotonic clock.

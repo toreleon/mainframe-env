@@ -119,6 +119,16 @@ The provider families have these codec-owned boundaries:
   metadata fails closed. Older readers reject V3: downgrade requires drained
   writers and a verified pre-V3 backup, or a retained compatible reader. Never
   strip the task owner to pretend a V3 row is V2.
+- Online exchange ownership is decoded by the existing product codecs for
+  `online-exchange-v1` and `online-machine-continuation`. A valid V2 exchange
+  protects current and original run-owner executions; a staged MEOM4 transfer
+  also protects the prior and next executions. Legacy V1 protects only its
+  explicit current execution, never a guessed owner. Malformed rows or orphan
+  continuations set the unowned core-retention fence. Bounded scans and the
+  existing provider epoch guard remain authoritative; no guessed terminal age
+  or new retention target is introduced. Older readers reject exchange V2;
+  drain/reconcile affected transfers and retain a compatible reader or verified
+  backup for rollback, never stripping ownership or relabeling the schema.
 - Installed COBOL validates `cobol-call-replay@1`,
   `cobol-call-protocol@2`, `cobol-run-state@1`, `cobol-cancel@1`, and every
   bounded `cobol-instance@1:` namespace. Its descriptor enumerates both owner

@@ -44,8 +44,9 @@ fn online_transfer_exchange(
     invocation: &Invocation,
     payload: &BoundedPayload,
 ) -> Result<OnlineExchangeState, HostProblem> {
-    let next = OnlineExchangeState {
+    let mut next = OnlineExchangeState {
         schema_version: current.schema_version.clone(),
+        run_owner: None,
         program: normalize_online_name(program, 128)?,
         request_id: invocation.request_id.as_str().into(),
         execution_id: invocation.execution_id.as_str().into(),
@@ -79,6 +80,8 @@ fn online_transfer_exchange(
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?,
     };
+    let owner = current.run_owner.as_ref().ok_or(HostProblem::Unsupported)?;
+    next.run_owner = Some(super::exchange::new_run_owner(&next, &owner.execution)?);
     super::validate_online_exchange(&next)?;
     if next.run_unit_id != current.run_unit_id
         || next.principal != current.principal
@@ -131,6 +134,19 @@ impl ProductServer {
         state: &mut OnlineExchangeState,
     ) -> Result<(), HostProblem> {
         let previous = state.version;
+        // The root owner is immutable across ordinary updates and transfers.
+        let stored = self
+            .online_exchange(session)?
+            .ok_or(HostProblem::UnknownOutcome)?;
+        if stored.version != previous
+            || stored.run_owner.as_ref().map(|owner| &owner.execution)
+                != state.run_owner.as_ref().map(|owner| &owner.execution)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        super::exchange::verify_run_owner(self.store.as_ref(), state)?;
+        // Encode before mutating the caller's CAS version, including codec failures.
+        let payload = encode_online_exchange(state)?;
         state.version = previous
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
@@ -139,7 +155,7 @@ impl ProductServer {
                 namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
                 key: session.as_str().into(),
                 version: state.version,
-                payload: encode_online_exchange(state)?,
+                payload,
             },
             Some(previous),
         ) {
@@ -317,7 +333,8 @@ impl ProductServer {
         coordinator: &ExecutionCoordinator,
         now_tick: u64,
     ) -> Result<(Invocation, BoundedPayload, u64), HostProblem> {
-        let next = self.transferred_online_invocation(previous, program, artifact, payload)?;
+        let mut next = self.transferred_online_invocation(previous, program, artifact, payload)?;
+        super::exchange::bind_transfer_owner(exchange, previous, &mut next)?;
         let record = self
             .artifacts
             .get_artifact(artifact)
@@ -438,6 +455,18 @@ impl ProductServer {
             .get_execution(&prior_id)
             .map_err(store_error)?
             .ok_or(HostProblem::InfrastructureFailure)?;
+        if prior.run_unit_id.as_str() != pending.next_exchange.run_unit_id
+            || prior.principal.as_str() != pending.next_exchange.principal
+            || current_is_prior
+                && exchange.run_owner.as_ref().map(|owner| &owner.execution)
+                    != pending
+                        .next_exchange
+                        .run_owner
+                        .as_ref()
+                        .map(|owner| &owner.execution)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
         if prior.state == ExecutionState::Suspended {
             if !current_is_prior {
                 return Err(HostProblem::InfrastructureFailure);
@@ -465,6 +494,10 @@ impl ProductServer {
                     .map_err(store_error)?
                     .as_slice(),
                 [event] if matches!(event.kind, LifecycleEventKind::HandoffCompleted)
+                    && event.execution_id == prior_id
+                    && event.run_unit_id == prior.run_unit_id
+                    && event.sequence == prior.version && event.attempt == prior.attempt
+                    && Some(event.tick) == prior.terminal_tick && event.tick != 0
             )
         {
             return Err(HostProblem::InfrastructureFailure);
@@ -605,6 +638,33 @@ impl ProductServer {
         self.suspend_online_machine_run(session, principal, now_tick)?;
         self.clear_online_exchange(session, exchange)
     }
+}
+
+/// Protect staged prior/next/root identities using the existing continuation codec.
+pub(crate) fn online_continuation_dependencies(
+    record: &ProviderStateRecord,
+) -> Result<Vec<ExecutionId>, HostProblem> {
+    if record.namespace != "online-machine-continuation" || SessionId::new(&record.key, 64).is_err()
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let saved = decode_online_machine_continuation(record)?;
+    let Some(pending) = saved.transfer else {
+        return Ok(Vec::new());
+    };
+    let next = ProviderStateRecord {
+        namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+        key: record.key.clone(),
+        version: pending.next_exchange.version,
+        payload: encode_online_exchange(&pending.next_exchange)?,
+    };
+    let mut result = super::online_exchange_dependencies(&next)?;
+    let prior = ExecutionId::new(&pending.prior_execution_id, InvocationLimits::default())
+        .map_err(|_| HostProblem::Malformed)?;
+    if !result.contains(&prior) {
+        result.push(prior);
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
