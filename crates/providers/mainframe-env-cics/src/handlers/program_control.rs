@@ -834,7 +834,11 @@ fn transfer(
     } else {
         HostRequest::Program(ProgramRequest::Xctl { program, payload })
     };
-    let payload = match service.nested(run, host_request) {
+    let result = service.nested(run, host_request);
+    if let Some(response) = super::program_abend::unwind(service, run, &result)? {
+        return Ok(response);
+    }
+    let payload = match result {
         Ok(HostResult::Program(payload)) => {
             if let Some(limit) = commarea_limit {
                 validate_commarea_reply(&payload, limit)?;
@@ -878,6 +882,9 @@ pub(in crate::service) fn validate_replay_response(
         CicsOperation::InvokeApplication => 24_576,
         _ => return Ok(response),
     };
+    if super::program_abend::validate_replay(&response)? {
+        return Ok(response);
+    }
     if let Some(area) = request.arguments.get("COMMAREA") {
         // Handled source conditions have no COMMAREA result to copy back.
         if response.condition != "NORMAL" || response.response != 0 || response.response2 != 0 {

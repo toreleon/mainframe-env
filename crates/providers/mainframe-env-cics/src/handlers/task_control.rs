@@ -97,6 +97,7 @@ pub(in crate::service) fn new_run_with_state(
         handle_stack: stack,
         latest_abend,
         retrieve: seed.retrieve,
+        program_abend: None,
         current_records: BTreeMap::new(),
         file_updates: Default::default(),
         undo: seed.undo,
@@ -583,15 +584,23 @@ fn abend(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
+    // START PROTECT explicitly cancels a request when its issuing task abends
+    // before syncpoint, even if an exit handles the abend. Other task resources
+    // are retained while a local/ancestor recovery exit can receive control.
     super::interval_control::discard_protected_starts(service, run)?;
-    super::release_task_state(service, run)?;
     let code = argument_bytes(request, "ABCODE").unwrap_or_default();
     let dump_requested =
         !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code);
     let previous = HandleState::from_run(run);
-    let exit = if request.arguments.contains_key("OPTION.CANCEL") {
+    let cancel = request.arguments.contains_key("OPTION.CANCEL");
+    let ancestor_exit = !cancel && service.ancestor_abend_exit(run)?;
+    let exit = if cancel {
         run.abend_handler = None;
         run.cancelled_abend_handler = None;
+        for frame in &mut run.handle_stack {
+            frame.abend_handler = None;
+            frame.cancelled_abend_handler = None;
+        }
         None
     } else if let Some(exit) = run.abend_handler.take() {
         run.cancelled_abend_handler = Some(exit.clone());
@@ -599,6 +608,9 @@ fn abend(
     } else {
         None
     };
+    if exit.is_none() && !ancestor_exit {
+        super::release_task_state(service, run)?;
+    }
     let original_code = run
         .latest_abend
         .as_ref()
@@ -638,6 +650,13 @@ fn abend(
             )
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
+        if run.current_program.logical_level > 1 {
+            run.program_abend = Some(super::program_abend::PendingProgramAbend {
+                response: response.clone(),
+                record: run.latest_abend.clone(),
+                cancel_exits: cancel,
+            });
+        }
     }
     Ok(response)
 }

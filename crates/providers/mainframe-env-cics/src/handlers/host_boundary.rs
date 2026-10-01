@@ -9,448 +9,8 @@ use std::thread::ThreadId;
 mod lifecycle_tests;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use mainframe_env_execution_api::{ArtifactRef, Principal, Selector};
-    use mainframe_env_store::MemoryStore;
-
-    fn fixture() -> (Arc<CicsService>, Invocation) {
-        let service = crate::service::tests::service(Arc::new(MemoryStore::new(
-            mainframe_env_store::StoreLimits::default(),
-        )));
-        let root = crate::service::tests::invocation();
-        let session = SessionId::new("FRAME-SESSION", 64).unwrap();
-        service
-            .launch_terminal(
-                root.clone(),
-                &session,
-                "MENU",
-                24,
-                80,
-                "frame-csrf",
-                1,
-                10_000,
-            )
-            .unwrap();
-        (service, root)
-    }
-
-    fn child(parent: &Invocation, ordinal: usize) -> Invocation {
-        let mut child = parent.clone();
-        child.parent_execution_id = Some(parent.execution_id.clone());
-        child.execution_id =
-            ExecutionId::new(format!("child-{ordinal}"), InvocationLimits::default()).unwrap();
-        child.selector = Selector::new("program:CHILD", InvocationLimits::default()).unwrap();
-        child.artifact = ArtifactRef::new("child-artifact", InvocationLimits::default()).unwrap();
-        child
-    }
-
-    #[test]
-    fn logical_frame_restores_caller_but_keeps_shared_task_updates() {
-        let (service, root) = fixture();
-        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        command.handlers.insert("ERROR".into(), "CALLER".into());
-        let actor = child(&root, 1);
-        let loan = ProgramLease::acquire(
-            &service,
-            &mut command,
-            "CHILD",
-            Some(actor.artifact.clone()),
-        )
-        .unwrap();
-        service.ensure_run(&actor).unwrap();
-        {
-            let mut child_command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-            assert!(child_command.handlers.is_empty());
-            assert!(child_command.handle_stack.is_empty());
-            assert_eq!(child_command.invocation.execution_id, root.execution_id);
-            assert_eq!(
-                child_command.current_program.effect_invocation.execution_id,
-                actor.execution_id
-            );
-            let previous = HandleState::from_run(&child_command);
-            child_command
-                .handlers
-                .insert("ERROR".into(), "CHILD".into());
-            child_command
-                .current_records
-                .insert("DATA".into(), b"child-update".to_vec());
-            child_command.undo.push(DatasetUndo::Delete {
-                dataset: DatasetName::new("USER.DATA", 44).unwrap(),
-                key: b"KEY".to_vec(),
-            });
-            let before = service
-                .store
-                .get_provider_state("cics-session", "FRAME-SESSION")
-                .unwrap();
-            super::super::handle_state::persist_handle_state(
-                &service,
-                &mut child_command,
-                previous,
-            )
-            .unwrap();
-            assert_eq!(
-                service
-                    .store
-                    .get_provider_state("cics-session", "FRAME-SESSION")
-                    .unwrap(),
-                before
-            );
-            // Drop restores the task even on an early command error path.
-        }
-        loan.finish().unwrap();
-        assert_eq!(command.handlers["ERROR"], "CALLER");
-        assert_eq!(command.current_records["DATA"], b"child-update");
-        assert_eq!(command.undo.len(), 1);
-        assert_eq!(
-            command.current_program.effect_invocation.execution_id,
-            root.execution_id
-        );
-        assert_eq!(command.current_program.logical_level, 1);
-        command.finish().unwrap();
-        let state = service.lock().unwrap();
-        assert_eq!(state.runs.len(), 1);
-        assert!(state.task_dispatch.claims.is_empty());
-    }
-
-    #[test]
-    fn logical_frame_admission_rejects_foreign_and_widened_children() {
-        let (service, root) = fixture();
-        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let valid = child(&root, 1);
-        let loan = ProgramLease::acquire(
-            &service,
-            &mut command,
-            "CHILD",
-            Some(valid.artifact.clone()),
-        )
-        .unwrap();
-        for case in 0..10 {
-            let mut invalid = valid.clone();
-            let limits = InvocationLimits::default();
-            match case {
-                0 => invalid.parent_execution_id = None,
-                1 => {
-                    invalid.principal = Principal::new(
-                        PrincipalId::new("OTHER", limits).unwrap(),
-                        root.principal.grants().clone(),
-                        limits,
-                    )
-                    .unwrap()
-                }
-                2 => invalid.deadline_tick += 1,
-                3 => invalid.limits.max_frames += 1,
-                4 => invalid.selector = Selector::new("program:OTHER", limits).unwrap(),
-                5 => invalid.artifact = ArtifactRef::new("foreign-artifact", limits).unwrap(),
-                6 => {
-                    invalid.provider_generations.insert(
-                        CapabilityId::new("host.cics.execute", limits).unwrap(),
-                        "foreign-generation".into(),
-                    );
-                }
-                7 => {
-                    invalid.bindings.insert(
-                        "cics.session".into(),
-                        BoundedPayload::new(
-                            "mainframe-env.cics.session@1",
-                            b"other-session".to_vec(),
-                            limits,
-                        )
-                        .unwrap(),
-                    );
-                }
-                8 => {
-                    invalid.cancellation_probe =
-                        Some(mainframe_env_execution_api::CancellationProbe::new());
-                }
-                9 => invalid.limits.max_effects += 1,
-                _ => unreachable!(),
-            }
-            assert_eq!(
-                service.ensure_run(&invalid),
-                Err(HostProblem::Unauthorized),
-                "case {case}"
-            );
-        }
-        service.ensure_run(&valid).unwrap();
-        let mut conflict = valid.clone();
-        conflict.execution_id =
-            ExecutionId::new("different-child", InvocationLimits::default()).unwrap();
-        assert_eq!(
-            service.ensure_run(&conflict),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        loan.finish().unwrap();
-        command.finish().unwrap();
-        assert_eq!(service.lock().unwrap().sessions.len(), 1);
-    }
-
-    #[test]
-    fn logical_frame_fences_other_threads_and_duplicate_registration() {
-        let (service, root) = fixture();
-        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let valid = child(&root, 1);
-        let loan = ProgramLease::acquire(
-            &service,
-            &mut command,
-            "CHILD",
-            Some(valid.artifact.clone()),
-        )
-        .unwrap();
-        let foreign_service = service.clone();
-        let foreign_actor = valid.clone();
-        assert_eq!(
-            std::thread::spawn(move || foreign_service.ensure_run(&foreign_actor))
-                .join()
-                .unwrap(),
-            Err(HostProblem::Unauthorized)
-        );
-        let session = SessionId::new("FRAME-SESSION", 64).unwrap();
-        let before = service
-            .store
-            .get_provider_state("cics-session", session.as_str())
-            .unwrap();
-        assert_eq!(
-            service.suspend_terminal_run(&session, root.principal.id(), 2),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        assert_eq!(
-            service.discard_terminal_run_if_present(&session, root.principal.id(), 2),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        assert_eq!(
-            service.complete_terminal_run(&session, root.principal.id(), 2),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        assert_eq!(
-            service.restore_terminal_run(root.clone(), &session, "MENU", Vec::new(), 2),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        assert_eq!(
-            service.disconnect_terminal(&session, root.principal.id(), "frame-csrf", 2),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        assert_eq!(
-            service
-                .store
-                .get_provider_state("cics-session", session.as_str())
-                .unwrap(),
-            before
-        );
-        assert_eq!(
-            service.register_run(root.clone(), &session, "MENU", "ME01", "S001"),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        service.ensure_run(&valid).unwrap();
-        drop(loan);
-        drop(command);
-        let state = service.lock().unwrap();
-        assert_eq!(state.sessions.len(), 1);
-        assert_eq!(state.runs.len(), 1);
-        assert!(state.task_dispatch.claims.is_empty());
-    }
-
-    fn descend(service: &CicsService, task: &mut Run, level: usize) {
-        let actor = child(&task.current_program.effect_invocation, level);
-        if level == MAX_PROGRAM_LEVELS {
-            assert!(matches!(
-                ProgramLease::acquire(service, task, "CHILD", Some(actor.artifact.clone())),
-                Err(HostProblem::ResourceExhausted)
-            ));
-            return;
-        }
-        let loan =
-            ProgramLease::acquire(service, task, "CHILD", Some(actor.artifact.clone())).unwrap();
-        service.ensure_run(&actor).unwrap();
-        let mut command = CommandLease::acquire(service, &actor.run_unit_id).unwrap();
-        assert_eq!(command.current_program.logical_level, (level + 1) as u32);
-        descend(service, &mut command, level + 1);
-        command.finish().unwrap();
-        loan.finish().unwrap();
-    }
-
-    #[test]
-    fn logical_frame_held_task_still_counts_against_run_capacity() {
-        let (mut service, root) = fixture();
-        Arc::get_mut(&mut service).unwrap().limits.max_runs = 1;
-        let command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let session = SessionId::new("second-session", 64).unwrap();
-        service.create_session(&session, 24, 80).unwrap();
-        let mut second = root.clone();
-        second.run_unit_id = RunUnitId::new("second-run", InvocationLimits::default()).unwrap();
-        assert_eq!(
-            service.register_run(second, &session, "MENU", "ME01", "S001"),
-            Err(HostProblem::ResourceExhausted)
-        );
-        command.finish().unwrap();
-        assert_eq!(service.lock().unwrap().runs.len(), 1);
-    }
-
-    #[test]
-    fn logical_frame_recursion_is_bounded_and_restores_every_lease() {
-        let (service, root) = fixture();
-        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        descend(&service, &mut command, 1);
-        command.finish().unwrap();
-        let state = service.lock().unwrap();
-        assert_eq!(state.runs.len(), 1);
-        assert_eq!(
-            state.runs[&root.run_unit_id].current_program.logical_level,
-            1
-        );
-        assert!(state.task_dispatch.claims.is_empty());
-    }
-
-    #[test]
-    fn logical_frame_live_cancellation_restores_caller_without_session_mutation() {
-        let (service, root) = fixture();
-        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let probe = mainframe_env_execution_api::CancellationProbe::new();
-        command.current_program.effect_invocation.cancellation_probe = Some(probe.clone());
-        command.handlers.insert("ERROR".into(), "CALLER".into());
-        let mut actor = child(&command.current_program.effect_invocation, 1);
-        actor.deadline_tick -= 1;
-        let before = service
-            .store
-            .get_provider_state("cics-session", "FRAME-SESSION")
-            .unwrap();
-        {
-            let _loan = ProgramLease::acquire(
-                &service,
-                &mut command,
-                "CHILD",
-                Some(actor.artifact.clone()),
-            )
-            .unwrap();
-            service.ensure_run(&actor).unwrap();
-            probe.request();
-            assert_eq!(service.ensure_run(&actor), Err(HostProblem::Cancelled));
-        }
-        assert_eq!(command.handlers["ERROR"], "CALLER");
-        assert_eq!(command.current_program.logical_level, 1);
-        assert_eq!(
-            service
-                .store
-                .get_provider_state("cics-session", "FRAME-SESSION")
-                .unwrap(),
-            before
-        );
-        command.finish().unwrap();
-        let state = service.lock().unwrap();
-        assert_eq!(state.runs.len(), 1);
-        assert!(state.task_dispatch.claims.is_empty());
-    }
-
-    #[test]
-    fn logical_frame_narrowed_budget_bounds_further_reentry() {
-        let (service, root) = fixture();
-        let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let mut actor = child(&root, 1);
-        actor.limits.max_frames = 2;
-        let loan = ProgramLease::acquire(
-            &service,
-            &mut command,
-            "CHILD",
-            Some(actor.artifact.clone()),
-        )
-        .unwrap();
-        service.ensure_run(&actor).unwrap();
-        let mut child_command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let descendant = child(&actor, 2);
-        assert!(matches!(
-            ProgramLease::acquire(
-                &service,
-                &mut child_command,
-                "CHILD",
-                Some(descendant.artifact)
-            ),
-            Err(HostProblem::ResourceExhausted)
-        ));
-        child_command.finish().unwrap();
-        loan.finish().unwrap();
-        command.finish().unwrap();
-        assert!(service.lock().unwrap().task_dispatch.claims.is_empty());
-    }
-
-    #[test]
-    fn logical_frame_bare_return_preserves_claimed_task_continuation() {
-        let (service, root) = fixture();
-        let continuation = DurableContinuation {
-            transaction: "NEXT".into(),
-            commarea: b"caller-state".to_vec(),
-            claimed_by: Some(root.run_unit_id.as_str().into()),
-            effect_key: "earlier-return".into(),
-            version: 1,
-        };
-        service
-            .persist_continuation("FRAME-SESSION", &continuation, None)
-            .unwrap();
-        service
-            .lock()
-            .unwrap()
-            .continuations
-            .insert("FRAME-SESSION".into(), continuation);
-        let before = service
-            .store
-            .get_provider_state("cics-continuation", "FRAME-SESSION")
-            .unwrap();
-        let mut caller = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        let actor = child(&root, 1);
-        let loan =
-            ProgramLease::acquire(&service, &mut caller, "CHILD", Some(actor.artifact.clone()))
-                .unwrap();
-        service.ensure_run(&actor).unwrap();
-        let child_command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
-        assert_eq!(child_command.session, "FRAME-SESSION");
-        assert_eq!(
-            service.lock().unwrap().continuations["FRAME-SESSION"]
-                .claimed_by
-                .as_deref(),
-            Some(child_command.invocation.run_unit_id.as_str())
-        );
-        let request = CicsRequest {
-            operation: CicsOperation::Return,
-            arguments: BTreeMap::new(),
-            condition_policy: mainframe_env_host_api::CicsConditionPolicy::Default,
-            mutation: Some(Mutation {
-                sequence: 1,
-                idempotency_key: IdempotencyKey::new("child-return", InvocationLimits::default())
-                    .unwrap(),
-                transaction: Some("MENU".into()),
-            }),
-        };
-        let response =
-            super::super::task_return::invoke(&service, &child_command, &request).unwrap();
-        assert_eq!(response.disposition, CicsDisposition::Returned);
-        assert_eq!(
-            service
-                .store
-                .get_provider_state("cics-continuation", "FRAME-SESSION")
-                .unwrap(),
-            before
-        );
-        assert!(
-            service
-                .lock()
-                .unwrap()
-                .continuations
-                .contains_key("FRAME-SESSION")
-        );
-        child_command.finish().unwrap();
-        loan.finish().unwrap();
-        // Root RETURN, unlike child RETURN, retires the claimed task continuation.
-        assert_eq!(caller.session, "FRAME-SESSION");
-        super::super::task_return::invoke(&service, &caller, &request).unwrap();
-        assert_eq!(
-            service
-                .store
-                .get_provider_state("cics-continuation", "FRAME-SESSION")
-                .unwrap(),
-            None
-        );
-        caller.finish().unwrap();
-    }
-}
+#[path = "host_boundary/frame_tests.rs"]
+mod tests;
 
 const MAX_PROGRAM_LEVELS: usize = 16;
 
@@ -551,10 +111,14 @@ struct ChildAdmission {
     program: String,
     artifact: Option<mainframe_env_execution_api::ArtifactRef>,
     actor: Option<Invocation>,
+    handles: HandleState,
 }
 
 fn command_ready(state: &State, run_unit: &RunUnitId) -> Result<(), HostProblem> {
     if let Some(task) = state.runs.get(run_unit) {
+        if task.program_abend.is_some() {
+            return Err(HostProblem::UnknownOutcome);
+        }
         state
             .task_dispatch
             .require_available_session(&task.session)?;
@@ -715,7 +279,6 @@ struct ProgramLease<'a> {
     service: &'a CicsService,
     caller: &'a mut Run,
     frame: Option<super::CurrentProgramFrame>,
-    handles: Option<HandleState>,
     outer_effect_key: Option<String>,
     depth: usize,
 }
@@ -751,6 +314,7 @@ impl<'a> ProgramLease<'a> {
             program: program.to_ascii_uppercase(),
             artifact,
             actor: None,
+            handles: HandleState::from_run(caller),
         });
         let mut task = caller.clone();
         task.current_program.logical_level += 1;
@@ -766,11 +330,11 @@ impl<'a> ProgramLease<'a> {
         );
         task.current_program.initial_entry = false;
         HandleState::default().apply(&mut task);
+        task.latest_abend = caller.latest_abend.clone();
         state.runs.insert(run_unit.clone(), task);
         Ok(Self {
             service,
             frame: Some(caller.current_program.clone()),
-            handles: Some(HandleState::from_run(caller)),
             outer_effect_key: caller.outer_effect_key.clone(),
             caller,
             depth,
@@ -798,18 +362,29 @@ impl<'a> ProgramLease<'a> {
             .runs
             .remove(run_unit)
             .ok_or(HostProblem::InfrastructureFailure)?;
-        state
+        let loan = state
             .task_dispatch
             .claims
             .get_mut(run_unit)
             .expect("validated program claim")
             .loans
-            .pop();
+            .pop()
+            .expect("validated program loan");
         task.current_program = self.frame.take().expect("active program frame");
-        self.handles
-            .take()
-            .expect("active program handles")
-            .apply(&mut task);
+        let latest_abend = task.latest_abend.clone();
+        loan.handles.apply(&mut task);
+        task.latest_abend = latest_abend;
+        if let Some(abend) = &task.program_abend {
+            task.latest_abend = abend.record.clone();
+            if abend.cancel_exits {
+                task.abend_handler = None;
+                task.cancelled_abend_handler = None;
+                for frame in &mut task.handle_stack {
+                    frame.abend_handler = None;
+                    frame.cancelled_abend_handler = None;
+                }
+            }
+        }
         task.outer_effect_key = self.outer_effect_key.take();
         *self.caller = task;
         Ok(())
@@ -827,6 +402,21 @@ impl Drop for ProgramLease<'_> {
 }
 
 impl CicsService {
+    pub(in crate::service) fn ancestor_abend_exit(&self, run: &Run) -> Result<bool, HostProblem> {
+        let state = self.lock()?;
+        let Some(claim) = state.task_dispatch.claims.get(&run.invocation.run_unit_id) else {
+            return Ok(false);
+        };
+        if claim.thread != std::thread::current().id() {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(claim
+            .loans
+            .iter()
+            .rev()
+            .any(|loan| loan.handles.abend_handler.is_some()))
+    }
+
     pub(in crate::service) fn nested(
         &self,
         run: &mut Run,
@@ -870,6 +460,7 @@ impl CicsService {
             idempotency_key: key,
             request,
         };
+        let previous_handles = HandleState::from_run(run);
         let loan = match &effect.request {
             HostRequest::Program(ProgramRequest::Link {
                 program, selection, ..
@@ -887,8 +478,16 @@ impl CicsService {
             false,
             effect,
         );
-        if let Some(loan) = loan {
-            loan.finish().map_err(|_| HostProblem::UnknownOutcome)?;
+        let linked = loan.is_some();
+        loan.map(ProgramLease::finish)
+            .transpose()
+            .map_err(|_| HostProblem::UnknownOutcome)?;
+        if linked
+            && matches!(result.outcome, Ok(HostResult::Program(_)))
+            && run.latest_abend != previous_handles.latest_abend
+        {
+            super::handle_state::persist_handle_state(self, run, previous_handles)
+                .map_err(|_| HostProblem::UnknownOutcome)?;
         }
         result.outcome
     }

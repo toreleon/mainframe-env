@@ -187,10 +187,10 @@ struct Run {
     abend_handler: Option<handlers::AbendExit>,
     cancelled_abend_handler: Option<handlers::AbendExit>,
     handle_stack: Vec<handlers::HandleFrame>,
-    /// Latest explicit application ABEND for source-faithful ASSIGN outputs.
-    /// It is restored only from the versioned session handle-state authority;
-    /// machine-check diagnostics remain a separate unsupported context.
+    /// Latest explicit ABEND, from the session authority or an active program unwind.
     latest_abend: Option<handlers::AbendRecord>,
+    /// Volatile explicit ABEND unwinding through active synchronous program loans.
+    program_abend: Option<handlers::PendingProgramAbend>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
     file_updates: handlers::FileUpdateState,

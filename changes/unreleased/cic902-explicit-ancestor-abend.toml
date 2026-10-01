@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Unwind observed explicit CICS child ABEND to the nearest active caller exit, preserve task-level abend metadata and CANCEL dump outcomes across durable outer replay, and retain handled-task resources while cancelling protected START requests. Full logical-program-frame acceptance remains pending."

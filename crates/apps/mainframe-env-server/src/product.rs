@@ -6974,6 +6974,9 @@ mod tests {
         );
     }
 
+    #[path = "program_abend_frames.rs"]
+    mod program_abend_frames;
+
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn postgres_compiled_local_link_handle_frames_recovers_after_restart() {

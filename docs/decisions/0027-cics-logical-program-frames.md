@@ -38,8 +38,11 @@ Child changes do not replace the durable root session's HANDLE state. Caller
 specifications, current program and outer command context are restored on
 normal and failed host return; shared file/UOW changes are retained. A lower
 logical-level RETURN completes that frame without task-end resource cleanup.
-HANDLE ABEND search of preceding levels remains an explicit required obligation,
-not ordinary handler inheritance. Task-wide virtual addresses are not supplied
+Explicit child ABEND searches active exits at preceding logical levels through
+the same program loans, not ordinary handler inheritance. The current-level exit
+wins; suspended PUSH HANDLE entries are not active. Entry deactivates the selected
+exit, retaining it for RESET. CANCEL bypasses and clears all traversed levels.
+Task-wide virtual addresses are not supplied
 by a Run lease and remain a separate unresolved storage boundary.
 
 ## Recovery and compatibility
@@ -71,7 +74,8 @@ linked frame. The focused repair represents both without reassigning existing
 root acquisitions. Local codec/read compatibility, two-owner retention, BTS
 reconciliation, SQLite/PostgreSQL reopen and compiled child commit/rollback
 proofs are recorded in the status document. They do not close the remaining
-unknown-call, ancestor-ABEND or selected failure-path acceptance obligations.
+unknown-call, general/default-condition ancestor ABEND or selected failure-path
+acceptance obligations.
 
 The repair adds `MECU3` only when a SYNCPOINT effect actor differs from
 its root task owner. Existing `MECU1` and `MECU2` remain readable and root writes
@@ -84,6 +88,28 @@ on read, no missing identity is inferred and no unresolved effect is redispatche
 An old reader rejects V3. Downgrade therefore requires drained writers and a
 verified backup or a compatible reader retained through the rollback; it must
 not strip the root owner or relabel a V3 row as V2.
+
+Explicit ABEND unwinding uses a volatile marker only after the provider observes
+the child command. Only the matching known `INSTALLED-CALL-ABEND` executor result
+may select an ancestor exit; an uncertain or mismatched reply returns
+UnknownOutcome and fences further commands. Root exit deactivation and task-wide
+latest/original ABEND metadata use the existing session authority. A child-local
+exit returning normally also persists that metadata when the root is restored.
+Handled ABEND retains task resources; still-protected START requests are always
+discarded, as required by their separate pre-syncpoint cancellation contract.
+
+Outer LINK/INVOKE replies add bounded `ABEND.CODE` with schema
+`mainframe-env.cics.abend-code@1` and the existing `ABEND.DUMP` decision. Replay
+validates their paired control disposition, target and payload without redispatch.
+Unhandled replies preserve the original code/dump in interpreter outcomes.
+Historical replies without the new output keep their existing interpretation.
+No new persisted protocol generation or in-flight restart is introduced. Known
+child ABEND does not fabricate a completed installed-call reservation; that
+reservation remains protected by the existing recovery/retention fence. Older
+interpreters do not honor this additive code on LINK, so downgrade requires
+draining affected writers and retaining a compatible reader or restoring a
+verified pre-change backup, not silently rewriting replies. General/default
+condition ABEND and ancestor PROGRAM exit execution remain unaccepted.
 
 ## Source and acceptance
 
@@ -102,6 +128,10 @@ ASSIGN row 0011 uses sources A baseline
 Shared file/UOW regression consumers are READ row 0156 (sources B), REWRITE
 row 0181 and SYNCPOINT row 0218 (sources C); the status document records their
 verified topic hashes and distinguishes local proofs from licensed evidence.
+Explicit ABEND uses sources A row 0001 `dfhp4_abend.html` and sources B row
+0097 `dfhp4_handleabend.html`, plus `applications/designing/dfhp378.html`.
+START row 0205 uses sources C `dfhp4_start.html` for PROTECT cancellation.
+The status document records the hash-verified offline reads and selected proofs.
 
 Require compiled handler isolation/caller restoration, shared file update and
 rollback, lower RETURN, identity/depth/concurrency fences, deny/cancel/failure

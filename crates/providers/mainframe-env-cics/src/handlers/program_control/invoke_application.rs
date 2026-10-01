@@ -128,6 +128,9 @@ pub(in crate::service) fn invoke(
             }),
         }),
     );
+    if let Some(response) = super::super::program_abend::unwind(service, run, &result)? {
+        return Ok(response);
+    }
     let returned = match result {
         Ok(HostResult::Program(payload)) => payload,
         Err(HostProblem::NotFound) => return Err(condition("PGMIDERR", 27, 2)),

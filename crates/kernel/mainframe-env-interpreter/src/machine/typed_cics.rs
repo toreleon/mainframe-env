@@ -62,47 +62,10 @@ pub(super) fn is_typed(operation: &Operation) -> bool {
 
 pub(super) use runtime_validation::into_payload_schema;
 
-pub(super) fn abend_dump_disposition(
-    operation: CicsOperation,
-    response: &CicsResponse,
-) -> Result<AbendDumpDisposition, MachineProblem> {
-    if operation != CicsOperation::Abend {
-        return Ok(AbendDumpDisposition::Unspecified);
-    }
-    let Some(value) = response.outputs.get("ABEND.DUMP") else {
-        // Retained responses written before this metadata was introduced do
-        // not claim a dump decision.
-        return Ok(AbendDumpDisposition::Unspecified);
-    };
-    if value.schema() != "mainframe-env.cics.abend-dump@1" {
-        return Err(MachineProblem::UnexpectedHostResult);
-    }
-    match value.bytes() {
-        b"requested" => Ok(AbendDumpDisposition::Requested),
-        b"suppressed" => Ok(AbendDumpDisposition::Suppressed),
-        _ => Err(MachineProblem::UnexpectedHostResult),
-    }
-}
-
-pub(super) fn abend_outcome(
-    operation: CicsOperation,
-    response: &CicsResponse,
-) -> Result<Abend, MachineProblem> {
-    let code = if operation == CicsOperation::Abend && !response.payload.bytes().is_empty() {
-        String::from_utf8(response.payload.bytes().to_vec())
-            .map_err(|_| MachineProblem::UnexpectedHostResult)?
-    } else {
-        response.condition.clone()
-    };
-    Ok(Abend {
-        code,
-        reason: Some(format!(
-            "EIBRESP={} EIBRESP2={}",
-            response.response, response.response2
-        )),
-        dump: abend_dump_disposition(operation, response)?,
-    })
-}
+mod abend;
+#[cfg(test)]
+use abend::abend_dump_disposition;
+pub(super) use abend::abend_outcome;
 
 pub(super) fn suspension(
     machine: &mut ReferenceMachine,
@@ -1978,6 +1941,61 @@ mod tests {
             abend_dump_disposition(CicsOperation::Abend, &legacy),
             Ok(AbendDumpDisposition::Unspecified)
         );
+    }
+
+    #[test]
+    fn propagated_program_abend_metadata_is_bounded_and_preserves_code_and_dump() {
+        let mut response = CicsResponse {
+            disposition: CicsDisposition::Abended,
+            condition: "ERROR".into(),
+            response: 27,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "MENU".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", Vec::new()).unwrap(),
+            outputs: BTreeMap::from([
+                (
+                    "ABEND.CODE".into(),
+                    payload("mainframe-env.cics.abend-code@1", b"U777".to_vec()).unwrap(),
+                ),
+                (
+                    "ABEND.DUMP".into(),
+                    payload("mainframe-env.cics.abend-dump@1", b"suppressed".to_vec()).unwrap(),
+                ),
+            ]),
+            unit_of_work: None,
+        };
+        for operation in [CicsOperation::Link, CicsOperation::InvokeApplication] {
+            let result = abend_outcome(operation, &response).unwrap();
+            assert_eq!(result.code, "U777");
+            assert_eq!(result.dump, AbendDumpDisposition::Suppressed);
+        }
+        assert_eq!(
+            abend_outcome(CicsOperation::Read, &response),
+            Err(MachineProblem::UnexpectedHostResult)
+        );
+        for (schema, bytes) in [
+            ("mainframe-env.cics.payload@1", b"U777".as_slice()),
+            ("mainframe-env.cics.abend-code@1", b"U7777".as_slice()),
+            ("mainframe-env.cics.abend-code@1", &[0xff]),
+        ] {
+            response.outputs.insert(
+                "ABEND.CODE".into(),
+                payload(schema, bytes.to_vec()).unwrap(),
+            );
+            assert_eq!(
+                abend_outcome(CicsOperation::Link, &response),
+                Err(MachineProblem::UnexpectedHostResult)
+            );
+        }
+        response.outputs.remove("ABEND.CODE");
+        let historical = abend_outcome(CicsOperation::Link, &response).unwrap();
+        assert_eq!(historical.code, "ERROR");
+        assert_eq!(historical.dump, AbendDumpDisposition::Unspecified);
     }
 
     fn module(
