@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Require attested MQ host context for direct commit and backout, rejecting host-owned or malformed syncpoint calls before state changes."

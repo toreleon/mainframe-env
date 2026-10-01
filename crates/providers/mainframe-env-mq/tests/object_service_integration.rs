@@ -1,6 +1,7 @@
 use mainframe_env_execution_api::{
-    ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
-    Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+    ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation,
+    InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector,
+    ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     EnterpriseAuthorizer, EnterpriseResource, HostProblem, MqOperation, MqRequest, Mutation,
@@ -85,7 +86,15 @@ fn invocation(run: &str) -> Invocation {
         IdempotencyKey::new(format!("invocation-{run}"), limits).unwrap(),
         1,
         ResourceLimits::default(),
-        BTreeMap::new(),
+        BTreeMap::from([(
+            "mq.host-context".into(),
+            BoundedPayload::new(
+                "mainframe-env.mq.host-context@1",
+                b"other-bindings|queue-manager".to_vec(),
+                limits,
+            )
+            .unwrap(),
+        )]),
         limits,
     )
     .unwrap()
