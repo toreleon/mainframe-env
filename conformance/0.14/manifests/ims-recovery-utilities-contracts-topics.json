@@ -1,0 +1,141 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-recovery-utilities-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 recovery and utilities contracts for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_chckpntcallsintro.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 20,
+  "total_bytes": 325103,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_chckpntcallsintro.htm",
+      "sha256": "c3aaf84e538be688d44af8fe9072e6cb00c47e4f9e46277f2ba22aa053be013d",
+      "bytes": 7472,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_basicchkpcall.htm",
+      "sha256": "1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a",
+      "bytes": 11733,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_symbolicchkpcall.htm",
+      "sha256": "87ede5820b177ea850473dda852c424a7b4a8f5a93dd06c68a0b95c11a4093b5",
+      "bytes": 18053,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_xrstcall.htm",
+      "sha256": "aff46320869b8910ab9916011c8d722a5e044f9e33970d2996e0501204046cb6",
+      "bytes": 28353,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_restartingprogramandcheckforpos.htm",
+      "sha256": "ac6ec41de956052fe05cb68efd58b59793af4c0903458cf447852b93b0211670",
+      "bytes": 2011,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_logcall.htm",
+      "sha256": "5106e045b54bca8564d5fc91065ca0dff7b58da4f25d8e09fd11b07d2aada5ca",
+      "bytes": 16732,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_setssetucall.htm",
+      "sha256": "53b9a76d65aed978e2eca2d9c10a295bea6abf16e88cb5f6949e3effa5709336",
+      "bytes": 17040,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolscall.htm",
+      "sha256": "b7e15d0c110d3296eac11d895326b3ef48ac913fd682b94b312aa6c59ad14af5",
+      "bytes": 15088,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rollcall.htm",
+      "sha256": "01a33e88387636985ef575bdd7bdb99e0d3ce6a794dcf227d2f1e75c843ec61f",
+      "bytes": 7137,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rolbcall.htm",
+      "sha256": "166bc5f6ac4b4a75be331419fd9a185d76867a3be2aa322316a8e385bca2158b",
+      "bytes": 12117,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_backingoutintermediate.htm",
+      "sha256": "73e987b85ca10963e4bfc68e83c4612433689052b7baba385eaff735ae42f4f2",
+      "bytes": 10531,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_loaddb.htm",
+      "sha256": "15abf89b0d2e0f9c13e9adf225f08ab5e6552bbfb05e9b64456fd6e5e4d920d1",
+      "bytes": 4887,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_basiciniloadprog.htm",
+      "sha256": "bd5ed9a995123db62d2b54d4c10ec1a4f105976bdd589523892656f8a04e7a55",
+      "bytes": 8043,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_restartiniloadprog.htm",
+      "sha256": "2038aac2c2e98efe12687574ce174f6ef85f2fa996fbded834088609249e5e69",
+      "bytes": 11167,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_hdreorgunload.htm",
+      "sha256": "b2d364b12910c71308396e4c785676e9ad370571a08ba7cb8c0a832c222a4365",
+      "bytes": 2849,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_hdreorgreload.htm",
+      "sha256": "61389f9ace26f6a12311fe6b20d5e3e4a24107b7e226ebc2243b47e0f1fc4d6c",
+      "bytes": 4290,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_reorgutil.htm",
+      "sha256": "db6c2060b5c0c652fe4638ca092c4455bee3deaa7eee6f898ee3c247ba7d1fa4",
+      "bytes": 10919,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_unloadreloadutil.htm",
+      "sha256": "b3da42146e8d011581d40f3630dd37d0fdabc78955fa79c81756cb1730619b82",
+      "bytes": 7418,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dur/ims_dfsurdb0.htm",
+      "sha256": "c16a37146a59fb6c09f908005035c32a0e974495304ea146f3b27d9fa4965cbb",
+      "bytes": 51764,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_logrecovery.htm",
+      "sha256": "0adf59f45548297e0344523994eee0b119def4b8d63bc0a1a9c074db54e00a85",
+      "bytes": 77499,
+      "last_modified": "not-recorded-in-retained-archive"
+    }
+  ]
+}
