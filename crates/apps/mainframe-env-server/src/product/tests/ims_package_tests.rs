@@ -1,13 +1,62 @@
 use super::*;
 use mainframe_env_host_api::{
     IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,
-    ImsDbLevel, ImsFieldMetadata, ImsMetadataCatalog, ImsPcbMetadata, ImsPsbMetadata,
-    ImsSegmentMetadata, ImsSensitiveSegmentMetadata, ImsTerminalPcbMetadata,
+    ImsDbLevel, ImsFieldMetadata, ImsMetadataCatalog, ImsOperation, ImsPcbMetadata, ImsPsbMetadata,
+    ImsQualifier, ImsRequest, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
+    ImsTerminalPcbMetadata, Mutation,
 };
 use mainframe_env_ims::{
     TmAlternatePcbDefinition, TmConversationAction, TmDefinitionSet, TmDestination,
     TmExecutionContext, TmPcb, TmPcbStatus, TmTransactionDefinition,
 };
+
+fn carddemo_metadata() -> ImsMetadataCatalog {
+    let mut catalog = metadata(1);
+    catalog.databases[0].name = "DBPAUTP0".into();
+    catalog.databases[0].segments[0].name = "PAUTSUM0".into();
+    catalog.databases[0].segments[0].min_length = 100;
+    catalog.databases[0].segments[0].max_length = 100;
+    catalog.databases[0].segments[0].fields[0].name = Some("ACCNTID".into());
+    catalog.databases[0].segments[0].fields[0].length = 6;
+    catalog.databases[0].segments[1].name = "PAUTDTL1".into();
+    catalog.databases[0].segments[1].parent = Some("PAUTSUM0".into());
+    catalog.databases[0].segments[1].min_length = 200;
+    catalog.databases[0].segments[1].max_length = 200;
+    catalog.databases[0].segments[1].fields[0].name = Some("PAUT9CTS".into());
+    catalog.psbs[0].name = "PSBPAUTB".into();
+    let ImsPcbMetadata::Database(pcb) = &mut catalog.psbs[0].pcbs[0] else {
+        unreachable!()
+    };
+    pcb.name = "PAUTPCB".into();
+    pcb.database = "DBPAUTP0".into();
+    pcb.sensitive_segments[0].name = "PAUTSUM0".into();
+    pcb.sensitive_segments[1].name = "PAUTDTL1".into();
+    pcb.sensitive_segments[1].parent = Some("PAUTSUM0".into());
+    pcb.sensitive_segments[1].processing_options = None;
+    catalog.psbs[0]
+        .pcbs
+        .push(ImsPcbMetadata::AlternateTerminal(ImsTerminalPcbMetadata {
+            name: "REPLY".into(),
+            destination: None,
+            modifiable: true,
+            express: false,
+            same_terminal: false,
+            response_mode: false,
+        }));
+    catalog
+}
+
+fn signed_carddemo_package(
+    trust: &HmacSha256PackageTrust,
+    generation: u64,
+) -> ApplicationPackageV2 {
+    let mut package = signed_tm_package(trust, generation, "PAUT");
+    package.base.manifest.name = "CARDDEMO-IMS".into();
+    package.sections.ims_metadata = Some(carddemo_metadata());
+    package.sections.ims_tm.as_mut().unwrap().transactions[0].psb = "PSBPAUTB".into();
+    resign_package(&mut package, trust);
+    package
+}
 
 fn metadata(version: u32) -> ImsMetadataCatalog {
     let field = |name: &str, length| ImsFieldMetadata {
@@ -184,6 +233,232 @@ fn permit_tm(server: &ProductServer, transactions: &[&str]) {
             .define_profile("IMSUOW", name, "IBMUSER", Some(AccessIntent::Control))
             .unwrap();
     }
+}
+
+fn carddemo_request(operation: ImsOperation, sequence: u64, data: Vec<u8>) -> ImsRequest {
+    let limits = InvocationLimits::default();
+    ImsRequest {
+        operation,
+        psb: (operation == ImsOperation::Schedule).then(|| "PSBPAUTB".into()),
+        pcb: 1,
+        segments: (operation == ImsOperation::Insert)
+            .then(|| vec!["PAUTSUM0".into()])
+            .unwrap_or_default(),
+        data,
+        qualifiers: Vec::new(),
+        checkpoint_id: None,
+        max_segments: 16,
+        mutation: operation.is_mutating().then(|| Mutation {
+            sequence,
+            idempotency_key: IdempotencyKey::new(format!("carddemo-db-{sequence}"), limits)
+                .unwrap(),
+            transaction: Some("CARDDEMO-IMS".into()),
+        }),
+    }
+}
+
+fn exercise_signed_carddemo_database_and_tm(store: Arc<dyn PlatformStore>, config: ServerConfig) {
+    let trust = Arc::new(test_package_trust());
+    let server = ProductServer::open_with_package_trust(
+        config.clone(),
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+        trust.clone(),
+    )
+    .unwrap();
+    let mut bad = signed_carddemo_package(&trust, 1);
+    bad.signature.value = "invalid".into();
+    assert_eq!(
+        server.install_application_package_v2(&bad),
+        Err(HostProblem::Malformed)
+    );
+    let first = server
+        .install_application_package_v2(&signed_carddemo_package(&trust, 1))
+        .unwrap();
+    server.publish_application_generation(&first).unwrap();
+    server
+        .bootstrap_administrator("IBMUSER", b"TESTPASS")
+        .unwrap();
+    for (class, name) in [
+        ("IMSPSB", "PSBPAUTB"),
+        ("IMSDB", "DBPAUTP0"),
+        ("IMSUOW", "PAUT"),
+        ("IMSUOW", "DEST.TERM1"),
+    ] {
+        server
+            .racf
+            .define_profile(class, name, "IBMUSER", Some(AccessIntent::Control))
+            .unwrap();
+    }
+    let run = "carddemo-database-run";
+    assert_eq!(
+        server
+            .ims_execute_selected(
+                "CARDDEMO-IMS",
+                &tm_invocation(run, "schedule"),
+                &carddemo_request(ImsOperation::Schedule, 1, vec![])
+            )
+            .unwrap()
+            .status,
+        "  "
+    );
+    let mut root = vec![b' '; 100];
+    root[..6].copy_from_slice(b"000001");
+    root[6..14].copy_from_slice(b"ROOT-ONE");
+    let inserted = server
+        .ims_execute_selected(
+            "CARDDEMO-IMS",
+            &tm_invocation(run, "insert"),
+            &carddemo_request(ImsOperation::Insert, 2, root.clone()),
+        )
+        .unwrap();
+    assert_eq!(
+        (inserted.status.as_str(), inserted.affected_segments),
+        ("  ", 1)
+    );
+    let mut get = carddemo_request(ImsOperation::GetUnique, 3, vec![]);
+    get.segments = vec!["PAUTSUM0".into()];
+    get.qualifiers = vec![ImsQualifier {
+        segment: "PAUTSUM0".into(),
+        field: "ACCNTID".into(),
+        value: b"000001".to_vec(),
+    }];
+    let found = server
+        .ims_execute_selected("CARDDEMO-IMS", &tm_invocation(run, "get"), &get)
+        .unwrap();
+    assert_eq!(found.status, "  ");
+    assert_eq!(found.segments[0].data, root);
+    let committed = server
+        .ims_execute_selected(
+            "CARDDEMO-IMS",
+            &tm_invocation(run, "commit"),
+            &carddemo_request(ImsOperation::Commit, 4, vec![]),
+        )
+        .unwrap();
+    assert_eq!(committed.status, "  ");
+
+    let admitted = server
+        .ims_tm_enqueue(
+            "CARDDEMO-IMS",
+            &tm_invocation("carddemo-admit", "admit"),
+            tm_message("carddemo-message", "PAUT", None),
+        )
+        .unwrap();
+    let work = server
+        .ims_tm_claim("CARDDEMO-IMS", "PAUT", "worker", 1, 100)
+        .unwrap()
+        .unwrap();
+    assert_eq!(work.work_id, admitted.work_id);
+    server
+        .ims_tm_start(
+            "CARDDEMO-IMS",
+            &tm_invocation("carddemo-tm", "start"),
+            &work,
+        )
+        .unwrap();
+    let message = server
+        .ims_tm_call(
+            "CARDDEMO-IMS",
+            &tm_invocation("carddemo-tm", "gu"),
+            TmCall::GetUnique,
+        )
+        .unwrap();
+    assert_eq!(
+        (message.status, message.segment),
+        (TmPcbStatus::SUCCESS, Some(b"first".to_vec()))
+    );
+
+    let second = server
+        .install_application_package_v2(&signed_carddemo_package(&trust, 2))
+        .unwrap();
+    server.publish_application_generation(&second).unwrap();
+    server.rollback_application_generation(&first).unwrap();
+    assert_eq!(
+        server
+            .ims_service()
+            .selected_metadata_generation("CARDDEMO-IMS")
+            .unwrap()
+            .unwrap()
+            .generation,
+        1
+    );
+    drop(server);
+    let reopened = ProductServer::open_with_package_trust(
+        config,
+        store,
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+        trust,
+    )
+    .unwrap();
+    assert_eq!(
+        reopened
+            .selected_application_v2(&first)
+            .unwrap()
+            .record()
+            .generation,
+        1
+    );
+    assert_eq!(
+        reopened
+            .ims_service()
+            .selected_metadata_generation("CARDDEMO-IMS")
+            .unwrap()
+            .unwrap()
+            .generation,
+        1
+    );
+    assert!(
+        reopened
+            .ims_service()
+            .install_metadata(carddemo_metadata())
+            .is_ok()
+    );
+    let mut get_reopened = get;
+    get_reopened.mutation = carddemo_request(ImsOperation::GetUnique, 5, vec![]).mutation;
+    let found = reopened
+        .ims_execute_selected(
+            "CARDDEMO-IMS",
+            &tm_invocation(run, "get-reopened"),
+            &get_reopened,
+        )
+        .unwrap();
+    assert_eq!(
+        (found.status.as_str(), found.segments[0].data.as_slice()),
+        ("  ", root.as_slice())
+    );
+}
+
+#[test]
+fn signed_carddemo_package_executes_generic_database_and_tm_on_memory() {
+    exercise_signed_carddemo_database_and_tm(
+        Arc::new(MemoryStore::new(Default::default())),
+        config(),
+    );
+}
+
+#[test]
+fn signed_carddemo_package_executes_generic_database_and_tm_on_sqlite() {
+    let directory = std::env::temp_dir().join(format!(
+        "carddemo-ims-package-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let file = directory.join("state.db");
+    let url = format!("sqlite://{}?mode=rwc", file.display());
+    let mut server_config = config();
+    server_config.store_profile = crate::StoreProfile::Sqlite;
+    server_config.sqlite_url = url.clone();
+    let store: Arc<dyn PlatformStore> =
+        Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    exercise_signed_carddemo_database_and_tm(store, server_config);
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_dir(directory).unwrap();
 }
 
 #[test]

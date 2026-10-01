@@ -382,8 +382,8 @@
   ],
   "pending": [
     {
-      "id": "public-database-engine-route",
-      "reason": "The isolated database engine is not connected to the current public IMS host execution route."
+      "id": "carddemo-corpus-package-route",
+      "reason": "The package-selected generic database route exists; full CardDemo corpus migration from legacy definitions and job bindings remains pending."
     },
     {
       "id": "full-25-family-gates",
@@ -396,6 +396,812 @@
     {
       "id": "mixed-resource-syncpoint",
       "reason": "Final mixed-resource transaction outcome closure belongs to the shared 0.16 participant integration."
+    }
+  ],
+  "bindings": [
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0001",
+      "source_locator": "html-table:comparison;row:1;command:ACCEPT command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002",
+      "source_locator": "html-table:comparison;row:2;command:CHKP command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "checkpoint"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "checkpoint_log_and_restart_are_persisted_without_duplicate_replay",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0003",
+      "source_locator": "html-table:comparison;row:3;command:DEQ command",
+      "applicability_profiles": [
+        "deq-io",
+        "deq-dedb"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+      "source_locator": "html-table:comparison;row:4;command:DLET command",
+      "applicability_profiles": [
+        "delete-full-function",
+        "delete-dedb",
+        "delete-msdb"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "Delete"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/service/generic.rs",
+          "test": "public_generic_status_position_replay_rollback_and_memory_reopen",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+      "source_locator": "html-table:comparison;row:5;command:GU, GN, and GNP commands",
+      "applicability_profiles": [
+        "read-full-function",
+        "read-dedb",
+        "read-msdb",
+        "read-gsam",
+        "read-gsam-direct"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "GetUnique",
+          "GetNext",
+          "GetNextParent"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/service/generic.rs",
+          "test": "public_generic_status_position_replay_rollback_and_memory_reopen",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+      "source_locator": "html-table:comparison;row:6;command:GU, GN, and GNP commands",
+      "applicability_profiles": [
+        "hold-full-function",
+        "hold-dedb",
+        "hold-msdb"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "GetHoldUnique",
+          "GetHoldNext",
+          "GetHoldNextParent"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/service/generic.rs",
+          "test": "public_generic_status_position_replay_rollback_and_memory_reopen",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0007",
+      "source_locator": "html-table:comparison;row:7;command:GSCD call",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008",
+      "source_locator": "html-table:comparison;row:8;command:ISRT command",
+      "applicability_profiles": [
+        "insert-full-function",
+        "insert-dedb",
+        "insert-msdb",
+        "insert-gsam"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "Insert"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs",
+          "test": "signed_carddemo_package_executes_generic_database_and_tm_on_memory",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0009",
+      "source_locator": "html-table:comparison;row:9;command:LOAD command",
+      "applicability_profiles": [
+        "load-full-function"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "Load"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/service/generic.rs",
+          "test": "public_generic_status_position_replay_rollback_and_memory_reopen",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0010",
+      "source_locator": "html-table:comparison;row:10;command:LOG command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "log"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "checkpoint_log_and_restart_are_persisted_without_duplicate_replay",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0011",
+      "source_locator": "html-table:comparison;row:11;command:POS command",
+      "applicability_profiles": [
+        "dedb-position"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0012",
+      "source_locator": "html-table:comparison;row:12;command:ACCEPT command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0013",
+      "source_locator": "html-table:comparison;row:13;command:QUERY command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0014",
+      "source_locator": "html-table:comparison;row:14;command:REFRESH command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+      "source_locator": "html-table:comparison;row:15;command:REPL command",
+      "applicability_profiles": [
+        "replace-full-function",
+        "replace-dedb",
+        "replace-msdb"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "Replace"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/service/generic.rs",
+          "test": "public_generic_status_position_replay_rollback_and_memory_reopen",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0016",
+      "source_locator": "html-table:comparison;row:16;command:RETRIEVE command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "xrst"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "checkpoint_log_and_restart_are_persisted_without_duplicate_replay",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0017",
+      "source_locator": "html-table:comparison;row:17;command:ROLL or ROLB command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "roll",
+          "rolb"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "setu_warning_token_reuse_and_full_rollback_are_explicit",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0018",
+      "source_locator": "html-table:comparison;row:18;command:ROLS command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "rols"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "sets_and_rols_restore_database_rows_through_shared_atomic_store",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0019",
+      "source_locator": "html-table:comparison;row:19;command:SCHD command",
+      "applicability_profiles": [
+        "schedule"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "Schedule"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs",
+          "test": "signed_carddemo_package_executes_generic_database_and_tm_on_memory",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0020",
+      "source_locator": "html-table:comparison;row:20;command:SETS command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "sets"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "sets_and_rols_restore_database_rows_through_shared_atomic_store",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0021",
+      "source_locator": "html-table:comparison;row:21;command:SETU command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "sets"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "setu_warning_token_reuse_and_full_rollback_are_explicit",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0022",
+      "source_locator": "html-table:comparison;row:22;command:STAT command",
+      "applicability_profiles": [
+        "statistics"
+      ],
+      "handler": {
+        "kind": "applicability-only",
+        "variants": [
+          "validate_ims_call_site"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "pending-execution",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0023",
+      "source_locator": "html-table:comparison;row:23;command:SYMCHKP command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "checkpoint"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "checkpoint_log_and_restart_are_persisted_without_duplicate_replay",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0024",
+      "source_locator": "html-table:comparison;row:24;command:TERM command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "ims-operation",
+        "variants": [
+          "Terminate"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/service/generic.rs",
+          "test": "public_generic_status_position_replay_rollback_and_memory_reopen",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0025",
+      "source_locator": "html-table:comparison;row:25;command:XRST command",
+      "applicability_profiles": [
+        "system-io"
+      ],
+      "handler": {
+        "kind": "recovery-method",
+        "variants": [
+          "xrst"
+        ]
+      },
+      "local_gates": [
+        {
+          "file": "crates/contracts/mainframe-env-host-api/tests/ims_call_applicability.rs",
+          "test": "every_family_and_profile_has_call_and_command_representatives",
+          "gate": "applicability"
+        },
+        {
+          "file": "crates/providers/mainframe-env-ims/src/recovery/runtime_tests.rs",
+          "test": "checkpoint_log_and_restart_are_persisted_without_duplicate_replay",
+          "gate": "local-regression"
+        }
+      ],
+      "expected_observation": {
+        "pcb_status": "pending-exact-oracle",
+        "position": "pending-exact-oracle",
+        "mutation": "pending-exact-oracle",
+        "output": "pending-exact-oracle"
+      },
+      "credit_state": "local-regression-only",
+      "coverage_credit": 0
     }
   ]
 }

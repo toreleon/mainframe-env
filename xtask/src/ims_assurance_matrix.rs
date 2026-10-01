@@ -12,7 +12,7 @@ const PROPERTIES: [&str; 8] = [
     "unknown-outcome",
 ];
 const PENDING: [&str; 4] = [
-    "public-database-engine-route",
+    "carddemo-corpus-package-route",
     "full-25-family-gates",
     "licensed-ims-15.6-differential",
     "mixed-resource-syncpoint",
@@ -32,6 +32,8 @@ pub(super) fn check(root: &Path) -> TaskResult {
         .flat_map(|unit| unit["rows"].as_array().into_iter().flatten())
         .filter_map(|row| row["id"].as_str())
         .collect::<BTreeSet<_>>();
+
+    check_handler_closure(root, &matrix, &catalog)?;
 
     let mut seen_ids = BTreeSet::new();
     let mut seen_bindings = BTreeSet::new();
@@ -107,6 +109,125 @@ pub(super) fn check(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn check_handler_closure(root: &Path, matrix: &Value, catalog: &Value) -> TaskResult {
+    let applicability = json(&root.join("conformance/0.14/ims/call-applicability-rules.json"))?;
+    let families = applicability["families"]
+        .as_array()
+        .ok_or("IMS applicability families are missing")?;
+    let rows = catalog["units"][0]["rows"]
+        .as_array()
+        .ok_or("IMS official rows are missing")?;
+    let bindings = matrix["bindings"]
+        .as_array()
+        .ok_or("IMS handler bindings are missing")?;
+    let mut seen = BTreeSet::new();
+    for binding in bindings {
+        let row_id = binding["row_id"]
+            .as_str()
+            .ok_or("IMS binding row is missing")?;
+        require(
+            seen.insert(row_id),
+            &format!("duplicate IMS handler binding {row_id}"),
+        )?;
+        let row = rows
+            .iter()
+            .find(|row| row["id"] == row_id)
+            .ok_or_else(|| format!("stale IMS handler row {row_id}"))?;
+        require(
+            row["source_locator"] == binding["source_locator"],
+            &format!("stale IMS source locator {row_id}"),
+        )?;
+        let ordinal = row_id
+            .rsplit(':')
+            .next()
+            .unwrap_or("")
+            .parse::<u64>()
+            .map_err(|_| format!("invalid IMS row ordinal {row_id}"))?;
+        let family = families
+            .iter()
+            .find(|family| family[0].as_u64() == Some(ordinal))
+            .ok_or_else(|| format!("missing IMS applicability family {row_id}"))?;
+        require(
+            binding["applicability_profiles"] == family[1],
+            &format!("stale IMS applicability profiles {row_id}"),
+        )?;
+
+        let kind = binding["handler"]["kind"]
+            .as_str()
+            .ok_or("IMS handler kind is missing")?;
+        let variants = binding["handler"]["variants"]
+            .as_array()
+            .ok_or("IMS handler variants are missing")?;
+        let source = match kind {
+            "ims-operation" => root.join("crates/contracts/mainframe-env-host-api/src/request.rs"),
+            "recovery-method" => {
+                root.join("crates/providers/mainframe-env-ims/src/recovery/runtime.rs")
+            }
+            "applicability-only" => {
+                root.join("crates/contracts/mainframe-env-host-api/src/ims_applicability.rs")
+            }
+            _ => return Err(format!("name-dispatch or unknown IMS handler kind {kind}")),
+        };
+        let code = fs::read_to_string(&source)
+            .map_err(|error| format!("IMS handler source {}: {error}", source.display()))?;
+        require(
+            !code.contains("CARDDEMO") && !code.contains("PAUTSUM0") && !code.contains("DBPAUTP0"),
+            &format!(
+                "application-name dispatch in IMS handler source {}",
+                source.display()
+            ),
+        )?;
+        for variant in variants {
+            let variant = variant
+                .as_str()
+                .ok_or("IMS handler variant is not a string")?;
+            let needle = match kind {
+                "ims-operation" => format!("    {variant},"),
+                "recovery-method" => format!("pub fn {variant}"),
+                _ => format!("pub fn {variant}("),
+            };
+            require(
+                code.contains(&needle),
+                &format!("non-executable IMS handler binding {row_id}: {kind}::{variant}"),
+            )?;
+        }
+        require(
+            (kind == "applicability-only") == (binding["credit_state"] == "pending-execution"),
+            &format!("IMS handler credit state is stale {row_id}"),
+        )?;
+        let gates = binding["local_gates"]
+            .as_array()
+            .ok_or("IMS local gates are missing")?;
+        let mut gate_ids = BTreeSet::new();
+        let mut has_applicability = false;
+        let mut has_runtime = false;
+        for gate in gates {
+            let path = gate["file"].as_str().ok_or("IMS gate file is missing")?;
+            let name = gate["test"].as_str().ok_or("IMS gate test is missing")?;
+            let gate_kind = gate["gate"].as_str().ok_or("IMS gate kind is missing")?;
+            require(
+                gate_ids.insert((path, name, gate_kind)),
+                &format!("duplicate IMS local gate {row_id}"),
+            )?;
+            check_test_binding(root, path, name)?;
+            has_applicability |= gate_kind == "applicability";
+            has_runtime |= gate_kind == "local-regression";
+        }
+        require(
+            has_applicability && (kind == "applicability-only" || has_runtime),
+            &format!("non-executable IMS local gate closure {row_id}"),
+        )?;
+        require(
+            binding["coverage_credit"] == 0,
+            &format!("IMS binding claims unearned coverage credit {row_id}"),
+        )?;
+    }
+    require(
+        seen == rows.iter().filter_map(|row| row["id"].as_str()).collect(),
+        "IMS handler closure omits official rows",
+    )
+}
+
 fn check_test_binding(root: &Path, relative: &str, name: &str) -> TaskResult {
     let path = Path::new(relative);
     require(
@@ -129,6 +250,9 @@ fn check_test_binding(root: &Path, relative: &str, name: &str) -> TaskResult {
                 && lines[index.saturating_sub(3)..index]
                     .iter()
                     .any(|prior| prior.trim() == "#[test]")
+                && !lines[index.saturating_sub(3)..index]
+                    .iter()
+                    .any(|prior| prior.trim_start().starts_with("#[ignore"))
         }),
         &format!("IMS matrix binding is not an executable #[test]: {relative}::{name}"),
     )
@@ -179,5 +303,32 @@ mod tests {
         assert!(
             check_source_binding(root, "ims-tm-contracts", "SSEPH2_15.6.0/unpinned.htm").is_err()
         );
+    }
+
+    #[test]
+    fn handler_closure_rejects_missing_duplicate_stale_name_dispatch_and_non_executable() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let matrix = json(&root.join("conformance/0.14/ims/assurance-matrix.json")).unwrap();
+        let catalog = json(&root.join("conformance/0.2/catalogs/ims.json")).unwrap();
+        check_handler_closure(root, &matrix, &catalog).unwrap();
+        let mut changed = matrix.clone();
+        changed["bindings"].as_array_mut().unwrap().pop();
+        assert!(check_handler_closure(root, &changed, &catalog).is_err());
+        let mut changed = matrix.clone();
+        let duplicate = changed["bindings"][0].clone();
+        changed["bindings"].as_array_mut().unwrap()[1] = duplicate;
+        assert!(check_handler_closure(root, &changed, &catalog).is_err());
+        let mut changed = matrix.clone();
+        changed["bindings"][0]["source_locator"] = json!("stale");
+        assert!(check_handler_closure(root, &changed, &catalog).is_err());
+        let mut changed = matrix.clone();
+        changed["bindings"][0]["handler"]["kind"] = json!("application-name-dispatch");
+        assert!(check_handler_closure(root, &changed, &catalog).is_err());
+        let mut changed = matrix.clone();
+        changed["bindings"][3]["handler"]["variants"] = json!(["MissingHandler"]);
+        assert!(check_handler_closure(root, &changed, &catalog).is_err());
+        let mut changed = matrix;
+        changed["bindings"][3]["local_gates"][1]["test"] = json!("missing_test");
+        assert!(check_handler_closure(root, &changed, &catalog).is_err());
     }
 }
