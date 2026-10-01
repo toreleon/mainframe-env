@@ -5,7 +5,7 @@ use super::{field, store_error};
 use mainframe_env_execution_api::{ArtifactRef, BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
-    HostRequest, HostResult, ProgramName, ProgramRequest,
+    HostRequest, HostResult, ProgramLinkSelection, ProgramName, ProgramRequest,
 };
 use mainframe_env_store_api::{
     ArtifactStore, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
@@ -765,12 +765,19 @@ fn transfer(
     if !matches!(target.len(), 1..=8) || !target.bytes().all(valid_program_character) {
         return Err(HostProblem::Malformed);
     }
-    service.authorize(
-        run,
-        "FACILITY",
-        &format!("CICS.PROGRAM.{target}"),
-        AccessIntent::Execute,
-    )?;
+    service
+        .authorize(
+            run,
+            "FACILITY",
+            &format!("CICS.PROGRAM.{target}"),
+            AccessIntent::Execute,
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized if request.operation == CicsOperation::Link => {
+                condition("NOTAUTH", 70, 101)
+            }
+            problem => problem,
+        })?;
     let program = ProgramName::new(target.clone(), 128).map_err(|_| HostProblem::Malformed)?;
     let mut payload = argument_bytes(request, "COMMAREA").unwrap_or_default();
     if let Some(length) = request.arguments.get("LENGTH") {
@@ -819,14 +826,18 @@ fn transfer(
         HostRequest::Program(ProgramRequest::Link {
             program,
             payload,
-            selection: None,
+            selection: local_link_selection(service, &target)?,
         })
     } else {
         HostRequest::Program(ProgramRequest::Xctl { program, payload })
     };
-    let payload = match service.nested(run, host_request)? {
-        HostResult::Program(payload) => payload.bytes().to_vec(),
-        _ => return Err(HostProblem::ProviderFailure),
+    let payload = match service.nested(run, host_request) {
+        Ok(HostResult::Program(payload)) => payload.bytes().to_vec(),
+        Err(HostProblem::NotFound) if request.operation == CicsOperation::Link => {
+            return Err(condition("PGMIDERR", 27, 1));
+        }
+        Err(problem) => return Err(problem),
+        Ok(_) => return Err(HostProblem::ProviderFailure),
     };
     let mut response = service.response(
         run,
@@ -842,12 +853,55 @@ fn transfer(
         None,
         payload.clone(),
     )?;
-    if request.operation == CicsOperation::Link {
+    if request.operation == CicsOperation::Link && request.arguments.contains_key("COMMAREA") {
         response
             .outputs
             .insert("COMMAREA".into(), bounded(payload)?);
     }
     Ok(response)
+}
+
+fn local_link_selection(
+    service: &CicsService,
+    target: &str,
+) -> Result<Option<ProgramLinkSelection>, HostProblem> {
+    let definition = service
+        .lock()?
+        .program_definitions
+        .get(target)
+        .and_then(|generations| generations.last_key_value())
+        .map(|(_, definition)| definition.clone());
+    let Some(definition) = definition else {
+        // Name-only compatibility hosts retain their existing dispatch authority.
+        return Ok(None);
+    };
+    if !definition.enabled {
+        return Err(condition("PGMIDERR", 27, 2));
+    }
+    if definition.remote
+        || definition.entry_offset != 0
+        || definition.java_status != CicsJavaStatus::NotJava
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    validate_program_artifact(
+        service
+            .artifacts
+            .get()
+            .ok_or_else(|| condition("PGMIDERR", 27, 3))?
+            .as_ref(),
+        &definition,
+    )
+    .map_err(|_| condition("PGMIDERR", 27, 3))?;
+    let content_identity = format!(
+        "sha256:{:x}",
+        Sha256::digest(encode_program_definition(&definition)?)
+    );
+    Ok(Some(ProgramLinkSelection {
+        artifact: definition.artifact,
+        generation: definition.generation,
+        content_identity,
+    }))
 }
 
 fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {

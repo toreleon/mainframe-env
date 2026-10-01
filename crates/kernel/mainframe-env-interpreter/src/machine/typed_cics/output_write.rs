@@ -269,11 +269,11 @@ pub(in crate::machine) fn write_output(
     {
         return Err(MachineProblem::UnexpectedHostResult);
     }
-    if operation == CicsOperation::GetContainer
-        && name == "INTO"
+    if (operation == CicsOperation::GetContainer && name == "INTO"
+        || operation == CicsOperation::Link && name == "COMMAREA")
         && let CicsTarget::Resolved(slot) = target
     {
-        // Both channel and BTS retrieval copy a prefix without blank padding.
+        // Container retrieval and LINK copy a prefix without blank padding.
         // A host response must not exceed the checked receiving area.
         return write_resolved_prefix(machine, slot, value.bytes());
     }
@@ -345,6 +345,37 @@ fn write_resolved_prefix(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn link_commarea_copies_only_returned_prefix_and_rejects_overlong_output() {
+        let (mut machine, slot) = super::super::tests::machine_with_alphanumeric_slot("OUT", 4);
+        machine.write("OUT", b"ZZZZ").unwrap();
+        let target = CicsTarget::Resolved(slot);
+        for (bytes, expected) in [(b"DA".as_slice(), b"DAZZ".as_slice()), (b"", b"DAZZ")] {
+            write_output(
+                &mut machine,
+                CicsOperation::Link,
+                "COMMAREA",
+                &target,
+                &payload("mainframe-env.cics.payload@1", bytes.to_vec()).unwrap(),
+                None,
+            )
+            .unwrap();
+            assert_eq!(machine.read("OUT").unwrap(), expected);
+        }
+        assert_eq!(
+            write_output(
+                &mut machine,
+                CicsOperation::Link,
+                "COMMAREA",
+                &target,
+                &payload("mainframe-env.cics.payload@1", b"TOOLONG".to_vec()).unwrap(),
+                None
+            ),
+            Err(MachineProblem::UnexpectedHostResult)
+        );
+        assert_eq!(machine.read("OUT").unwrap(), b"DAZZ");
+    }
 
     #[test]
     fn container_into_copies_only_returned_bytes_without_padding() {

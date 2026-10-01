@@ -7355,6 +7355,272 @@ mod tests {
     }
 
     #[test]
+    fn local_link_maps_compatibility_host_missing_target_to_pgmiderr() {
+        struct MissingProgram {
+            descriptor: CapabilityDescriptor,
+        }
+        impl HostProvider for MissingProgram {
+            fn descriptor(&self) -> &CapabilityDescriptor {
+                &self.descriptor
+            }
+            fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+                assert!(matches!(
+                    effect.request,
+                    HostRequest::Program(ProgramRequest::Link {
+                        selection: None,
+                        ..
+                    })
+                ));
+                EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Err(HostProblem::NotFound),
+                }
+            }
+        }
+        let security = Arc::new(DenyExactSecurityClass {
+            descriptor: descriptor("host.security.authorize"),
+            denied_class: "NONE",
+            denied_resource: None,
+            seen: Arc::new(Mutex::new(Vec::new())),
+        }) as Arc<dyn HostProvider>;
+        let missing = Arc::new(MissingProgram {
+            descriptor: descriptor("host.program.invoke"),
+        }) as Arc<dyn HostProvider>;
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![security, missing], InvocationLimits::default())
+                    .unwrap(),
+            ),
+            HostLimits::default(),
+        ));
+        let cics = CicsService::open(
+            host,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let link = request(
+            CicsOperation::Link,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"ABSENT"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+            Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 1
+            })
+        );
+    }
+
+    #[test]
+    fn installed_local_link_selects_latest_generation_and_replays_original_selection() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let links = Arc::new(Mutex::new(Vec::new()));
+        let cics = CicsService::open(
+            invoke_authorities(false, links.clone()),
+            store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        cics.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "LINKCHLD", 1, b"FIRST", 0);
+        let selected = register_load_program(&cics, store.as_ref(), "LINKCHLD", 2, b"SECOND", 0);
+        let (invocation, session) = registered(&cics);
+        let link = request(
+            CicsOperation::Link,
+            BTreeMap::from([
+                ("PROGRAM".into(), cics_literal(b"LINKCHLD")),
+                ("COMMAREA".into(), argument(b"REQUEST!")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let original_effect = effect(&invocation.run_unit_id, link.clone(), 1);
+        let response = cics.invoke(&original_effect, link.clone()).unwrap();
+        assert_eq!(response.response, 0);
+        let first_selection = match &links.lock().unwrap()[0] {
+            ProgramRequest::Link {
+                payload,
+                selection: Some(selection),
+                ..
+            } => {
+                assert_eq!(payload.bytes(), b"REQU");
+                assert_eq!(selection.artifact, selected);
+                assert_eq!(selection.generation, 2);
+                assert!(selection.content_identity.starts_with("sha256:"));
+                selection.clone()
+            }
+            other => panic!("expected selected LINK, got {other:?}"),
+        };
+        drop(cics);
+        let reopened = CicsService::open(
+            invoke_authorities(false, links.clone()),
+            store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        reopened.bind_artifact_store(store.clone()).unwrap();
+        reopened
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        register_load_program(&reopened, store.as_ref(), "LINKCHLD", 3, b"THIRD", 0);
+        assert_eq!(
+            reopened.invoke(&original_effect, link.clone()).unwrap(),
+            response
+        );
+        assert_eq!(links.lock().unwrap().len(), 1);
+        let next = request(CicsOperation::Link, link.arguments, 2);
+        reopened
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+            .unwrap();
+        let links = links.lock().unwrap();
+        let ProgramRequest::Link {
+            selection: Some(selection),
+            ..
+        } = &links[1]
+        else {
+            panic!("missing selection")
+        };
+        assert_eq!(selection.generation, 3);
+        assert_ne!(selection.content_identity, first_selection.content_identity);
+    }
+
+    #[test]
+    fn installed_local_link_rejects_disabled_unloadable_and_unsupported_targets_before_call() {
+        for case in ["disabled", "missing-artifact", "remote", "java", "offset"] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let links = Arc::new(Mutex::new(Vec::new()));
+            let cics = CicsService::open(
+                invoke_authorities(false, links.clone()),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            register_load_program(&cics, store.as_ref(), "LINKCHLD", 1, b"FIRST", 0);
+            let (artifact, semantic_identity) = install_program_artifact(store.as_ref(), b"SECOND");
+            cics.register_program_definitions(&[CicsProgramDefinition {
+                name: "LINKCHLD".into(),
+                generation: 2,
+                artifact: artifact.clone(),
+                semantic_identity,
+                entry_offset: u32::from(case == "offset"),
+                enabled: case != "disabled",
+                remote: case == "remote",
+                reload: false,
+                java_status: if case == "java" {
+                    CicsJavaStatus::Available
+                } else {
+                    CicsJavaStatus::NotJava
+                },
+            }])
+            .unwrap();
+            if case == "missing-artifact" {
+                store.delete_artifact(&artifact).unwrap();
+            }
+            let (invocation, _) = registered(&cics);
+            let link = request(
+                CicsOperation::Link,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"LINKCHLD"))]),
+                1,
+            );
+            let expected = match case {
+                "disabled" => HostProblem::Condition {
+                    name: "PGMIDERR".into(),
+                    response: 27,
+                    response2: 2,
+                },
+                "missing-artifact" => HostProblem::Condition {
+                    name: "PGMIDERR".into(),
+                    response: 27,
+                    response2: 3,
+                },
+                _ => HostProblem::Unsupported,
+            };
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+                Err(expected),
+                "{case}"
+            );
+            assert!(links.lock().unwrap().is_empty(), "{case}");
+        }
+    }
+
+    #[test]
+    fn installed_local_link_program_denial_and_execution_control_prevent_dispatch() {
+        for case in ["denied", "cancelled", "expired"] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let links = Arc::new(Mutex::new(Vec::new()));
+            let (host, seen) = if case == "denied" {
+                deny_exact_class_authorities("FACILITY", Some("CICS.PROGRAM.LINKCHLD"))
+            } else {
+                (
+                    invoke_authorities(false, links.clone()),
+                    Arc::new(Mutex::new(Vec::new())),
+                )
+            };
+            let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            register_load_program(&cics, store.as_ref(), "LINKCHLD", 1, b"FIRST", 0);
+            let (invocation, _) = registered(&cics);
+            let link = request(
+                CicsOperation::Link,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"LINKCHLD"))]),
+                1,
+            );
+            if case == "denied" {
+                assert_eq!(
+                    cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+                    Err(HostProblem::Condition {
+                        name: "NOTAUTH".into(),
+                        response: 70,
+                        response2: 101
+                    })
+                );
+                assert!(
+                    seen.lock()
+                        .unwrap()
+                        .iter()
+                        .any(|(class, resource, _)| class == "FACILITY"
+                            && resource == "CICS.PROGRAM.LINKCHLD")
+                );
+                assert!(
+                    store
+                        .audit_records(&invocation.execution_id, 0, 16)
+                        .unwrap()
+                        .iter()
+                        .any(|record| record.decision == AuditDecision::Deny)
+                );
+            } else {
+                let result = cics.invoke_host(
+                    &invocation,
+                    if case == "expired" { 100 } else { 1 },
+                    case == "cancelled",
+                    effect(&invocation.run_unit_id, link, 1),
+                );
+                assert_eq!(
+                    result.outcome,
+                    Err(if case == "expired" {
+                        HostProblem::TimedOut
+                    } else {
+                        HostProblem::Cancelled
+                    })
+                );
+            }
+            assert!(links.lock().unwrap().is_empty());
+            assert!(
+                store
+                    .list_provider_state("cobol-call-replay@1", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
     fn invoke_application_selects_immutable_versions_and_survives_restart() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();

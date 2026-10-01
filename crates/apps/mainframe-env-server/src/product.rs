@@ -6890,6 +6890,263 @@ mod tests {
         }
     }
 
+    #[test]
+    fn compiled_installed_local_link_recovers_after_sqlite_restart() {
+        compiled_installed_local_link_recovers_after_restart(None);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_installed_local_link_recovers_after_restart() {
+        compiled_installed_local_link_recovers_after_restart(Some(required_postgres_route_url()));
+    }
+
+    fn compiled_installed_local_link_recovers_after_restart(postgres_url: Option<String>) {
+        use mainframe_env_cics::{CicsJavaStatus, CicsProgramDefinition};
+        use mainframe_env_execution_api::{MachineDrive, MachineResume, Quantum};
+        let parent = published_source_fixture(
+            "LNKMAIN",
+            concat!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LNKMAIN. DATA DIVISION. WORKING-STORAGE SECTION. ",
+                "01 AREA-X PIC X(8) VALUE 'AAAAzzzz'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. ",
+                "01 FN-X PIC X(2). PROCEDURE DIVISION. ",
+                "EXEC CICS LINK PROGRAM('LNKCHLD') COMMAREA(AREA-X) LENGTH(4) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. ",
+                "MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN."
+            ),
+        );
+        let child = published_source_fixture(
+            "LNKCHLD",
+            concat!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LNKCHLD. DATA DIVISION. LINKAGE SECTION. ",
+                "01 DFHCOMMAREA. 05 CHILD-LEN PIC S9(4) COMP. 05 CHILD-TEXT PIC X(2). ",
+                "05 CHILD-TAIL PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. ",
+                "MOVE EIBCALEN TO CHILD-LEN. MOVE 'OK' TO CHILD-TEXT. MOVE 'NOPE' TO CHILD-TAIL. GOBACK."
+            ),
+        );
+        let reference = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                artifact.content_id().to_reference(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let parent_ref = reference(&parent);
+        let child_ref = reference(&child);
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-installed-local-link-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let backend = match postgres_url {
+            Some(url) => RouteRestartBackend::Postgres(url),
+            None => RouteRestartBackend::Sqlite(format!(
+                "sqlite://{}?mode=rwc",
+                root.join("state.db").display()
+            )),
+        };
+        let settings = backend.settings(root.join("artifacts"));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let session = SessionId::new("installed-local-link-selected", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let invocation;
+        let calls;
+        let original_effect;
+        let replay_invocation;
+        {
+            let (server, store) = backend.open_server(settings.clone(), secrets.clone());
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server
+                .racf
+                .define_profile("FACILITY", "CICS.PROGRAM.LNKCHLD", "IBMUSER", None)
+                .unwrap();
+            server
+                .racf
+                .permit(
+                    "FACILITY",
+                    "CICS.PROGRAM.LNKCHLD",
+                    "IBMUSER",
+                    AccessIntent::Execute,
+                )
+                .unwrap();
+            server
+                .install_online_application(OnlineApplicationDefinition {
+                    programs: vec![
+                        OnlineProgramDefinition::current("LNKMAIN", &parent),
+                        OnlineProgramDefinition::current("LNKCHLD", &child),
+                    ],
+                    transactions: BTreeMap::from([("LK01".into(), "LNKMAIN".into())]),
+                    maps: vec![BmsMapDefinition {
+                        mapset: "LNKMAIN".into(),
+                        map: "LNKMAIN".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    }],
+                })
+                .unwrap();
+            server
+                .cics
+                .register_program_definitions(&[CicsProgramDefinition {
+                    name: "LNKCHLD".into(),
+                    generation: 1,
+                    artifact: child_ref.clone(),
+                    semantic_identity: child.semantic_id().to_reference(),
+                    entry_offset: 0,
+                    enabled: true,
+                    remote: false,
+                    reload: false,
+                    java_status: CicsJavaStatus::NotJava,
+                }])
+                .unwrap();
+            invocation = server
+                .cics_invocation("IBMUSER", "LK01", Some(parent_ref.clone()))
+                .unwrap();
+            server
+                .cics
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "LK01",
+                    24,
+                    80,
+                    "local-link-csrf",
+                    1,
+                    10_000,
+                )
+                .unwrap();
+            server
+                .run_online_exchange(&session, &principal, "LNKMAIN", 2)
+                .unwrap();
+            calls = store.list_provider_state("cobol-call-replay@1", 8).unwrap();
+            assert_eq!(calls.len(), 1);
+            let exchange = server.online_exchange(&session).unwrap().unwrap();
+            let mut replay = server.online_exchange_invocation(&exchange).unwrap();
+            for (name, schema, bytes) in [
+                (
+                    "cics.commarea",
+                    "mainframe-env.cics.commarea@1",
+                    exchange.commarea,
+                ),
+                ("cics.aid", "mainframe-env.cics.aid@1", vec![exchange.aid]),
+                (
+                    "cics.transaction",
+                    "mainframe-env.cics.transaction@1",
+                    exchange.transaction.into_bytes(),
+                ),
+            ] {
+                replay.bindings.insert(
+                    name.into(),
+                    BoundedPayload::new(schema, bytes, InvocationLimits::default()).unwrap(),
+                );
+            }
+            bind_compatible_runtime_services(&mut replay).unwrap();
+            replay.idempotency_key = IdempotencyKey::new(
+                format!("{}:LNKMAIN", replay.idempotency_key.as_str()),
+                InvocationLimits::default(),
+            )
+            .unwrap();
+            let mut fresh = ReferenceMachine::from_binary(
+                parent.payload(),
+                replay.clone(),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            original_effect = match fresh.drive(
+                MachineResume::Start,
+                Quantum::new(10_000, 16 * 1024 * 1024).unwrap(),
+            ) {
+                MachineDrive::HostCall(effect) => effect,
+                other => panic!("expected original LINK, got {other:?}"),
+            };
+            assert!(
+                matches!(original_effect.request, HostRequest::Cics(ref request) if request.operation == CicsOperation::Link)
+            );
+            replay_invocation = replay;
+        }
+        {
+            let (server, store) = backend.open_server(settings, secrets);
+            let saved = server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .unwrap();
+            let mut machine =
+                ReferenceMachine::from_binary(parent.payload(), invocation, CodecLimits::default())
+                    .unwrap();
+            machine.restore_checkpoint(&saved.checkpoint).unwrap();
+            assert_eq!(machine.variable("AREA-X").unwrap().bytes(), b"\0\x04OKzzzz");
+            assert_eq!(
+                machine.variable("RESP-X").unwrap().bytes(),
+                &0_i32.to_be_bytes()
+            );
+            assert_eq!(
+                machine.variable("RESP2-X").unwrap().bytes(),
+                &0_i32.to_be_bytes()
+            );
+            assert_eq!(machine.variable("FN-X").unwrap().bytes(), &[0x0e, 0x02]);
+            server
+                .cics
+                .restore_terminal_run(replay_invocation, &session, "LK01", Vec::new(), 3)
+                .unwrap();
+            let outer_before = store
+                .list_provider_state("cics-effect-replay-v1", 8)
+                .unwrap();
+            let HostRequest::Cics(request) = &original_effect.request else {
+                unreachable!()
+            };
+            let replayed = server
+                .cics
+                .invoke(&original_effect, request.clone())
+                .unwrap();
+            assert_eq!((replayed.response, replayed.response2), (0, 0));
+            assert_eq!(replayed.outputs["COMMAREA"].bytes(), b"\0\x04OK");
+            assert_eq!(
+                store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap(),
+                outer_before
+            );
+            assert_eq!(
+                store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
+                calls
+            );
+            let mut conflicting = request.clone();
+            conflicting.arguments.insert(
+                "LENGTH".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.decimal@1",
+                    b"3".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            );
+            let mut conflicting_effect = original_effect.clone();
+            conflicting_effect.request = HostRequest::Cics(conflicting.clone());
+            assert_eq!(
+                server.cics.invoke(&conflicting_effect, conflicting),
+                Err(HostProblem::IdempotencyConflict)
+            );
+            assert_eq!(
+                store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
+                calls
+            );
+            server
+                .run_online_exchange(&session, &principal, "LNKMAIN", 3)
+                .unwrap();
+            assert_eq!(
+                store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
+                calls
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[derive(Clone)]
     enum RouteRestartBackend {
         Sqlite(String),
