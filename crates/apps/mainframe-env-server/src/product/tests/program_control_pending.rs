@@ -290,6 +290,41 @@ mod tests {
             assert_eq!(suspended.len(), 1);
             assert_eq!(suspended[0].0.selector.as_str(), "program:PCMID");
             assert!(suspended[0].0.terminal_tick.is_none());
+            let mid_receipt = receipts
+                .iter()
+                .find(|row| {
+                    serde_json::from_slice::<Value>(&row.payload).unwrap()["child_execution"]
+                        == suspended[0].0.execution_id.as_str()
+                })
+                .unwrap();
+            let mid_value: Value = serde_json::from_slice(&mid_receipt.payload).unwrap();
+            if matches!(control, PendingControl::Suspend) {
+                assert_eq!(mid_receipt.version, 1);
+                assert_eq!(mid_value["schema_version"], 2);
+                assert!(mid_value.get("transfer").is_none());
+            } else {
+                assert_eq!(mid_receipt.version, 2);
+                assert_eq!(mid_value["schema_version"], 3);
+                let transfer = &mid_value["transfer"];
+                assert_eq!(transfer["selector"], "PCEXIT");
+                assert_eq!(transfer["schema"], "mainframe-env.cics.payload@1");
+                assert_eq!(transfer["bytes"], serde_json::json!(b"ROOT".to_vec()));
+                assert_eq!(transfer["source_version"], suspended[0].0.version);
+                assert_eq!(transfer["source_attempt"], suspended[0].0.attempt);
+                assert_eq!(
+                    transfer["source_artifact"],
+                    suspended[0].0.artifact.as_str()
+                );
+                assert_eq!(transfer["source_selector"], "program:PCMID");
+                assert_eq!(
+                    transfer["checkpoint_sequence"],
+                    suspended[0].1.effect_sequence
+                );
+                assert_eq!(
+                    transfer["checkpoint_digest"],
+                    hex_digest(&suspended[0].1.payload_digest)
+                );
+            }
             runs = store.list_provider_state("cobol-run-state@1", 8).unwrap();
             assert_eq!(runs.len(), 1);
             let run: Value = serde_json::from_slice(&runs[0].payload).unwrap();

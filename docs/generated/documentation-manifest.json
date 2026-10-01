@@ -957,7 +957,7 @@
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:e97bd8458fb8d459524ec4acf80ddfe752dddda981047251001e753edecedfb2",
+      "sha256": "sha256:67e04529582c351b3885c01cee58a6bc0e77b75003e0dbc2e9206ae591ae6476",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0
@@ -1402,7 +1402,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:ecb55f26f78d23939a654c50677b91218ba492a7232a8c58d763835c226187a9",
+      "sha256": "sha256:9bd4ae067d20d8567dde101d6adf8755d0ab0a631e8dcb5b587ad333ac02e801",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },

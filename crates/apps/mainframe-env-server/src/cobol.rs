@@ -386,7 +386,8 @@ impl CobolProgram {
         {
             return Err(HostProblem::UnknownOutcome);
         }
-        cursor_result?;
+        cursor_result
+            .map_err(|problem| replay::preserve_control_cursor_failure(&outcome, problem))?;
         match outcome {
             ExecutionOutcome::Completed(_) => {
                 let mut values = machine
@@ -430,12 +431,22 @@ impl CobolProgram {
                 response: -2,
                 response2: 0,
             }),
+            ExecutionOutcome::Transfer(transfer) => {
+                replay::persist_transfer_intent(
+                    store.as_ref(),
+                    &invocation,
+                    identity,
+                    &machine,
+                    &transfer,
+                )?;
+                Err(HostProblem::UnknownOutcome)
+            }
             // The durable child is suspended and its CALL/instance are still
             // unresolved. Without an owned continuation/replacement protocol,
             // this cannot be a known condition a caller may handle as a return.
-            ExecutionOutcome::Suspended(_)
-            | ExecutionOutcome::Invoke(_)
-            | ExecutionOutcome::Transfer(_) => Err(HostProblem::UnknownOutcome),
+            ExecutionOutcome::Suspended(_) | ExecutionOutcome::Invoke(_) => {
+                Err(HostProblem::UnknownOutcome)
+            }
         }
     }
 

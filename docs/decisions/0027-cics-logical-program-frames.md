@@ -180,6 +180,51 @@ results are not rewritten as new evidence; affected active states require drain
 and owned reconciliation, never automatic redispatch. Non-root PROGRAM/XCTL
 replacement and child suspension resume remain implementation obligations.
 
+### Installed transfer intent: first replacement-protocol phase
+
+The executor now captures an observed same-level Transfer in its original
+pending CALL reservation after verifying the exact Suspended child, journal
+event and retained checkpoint against the current machine. JSON receipt schema
+3 is pending-only, at row CAS version 2, with no reply/completion tick. It adds
+one strict bounded intent: observed target selector, payload schema/bytes,
+source selector/artifact/attempt/suspended version and checkpoint digest,
+effect sequence, store machine-schema metadata and actual payload schema.
+The receipt metadata domain changes from
+`mainframe-env.cobol-call-receipt-metadata@2` to `@3`; it also includes the
+intent digest using the existing framed `installed-call@1` algorithm with first
+field `installed-transfer-intent@1`. All intent fields, in serialized order,
+are framed UTF-8/byte fields; integers use big-endian u32/u64 bytes. The intent
+digest's 64 lowercase hexadecimal bytes are appended to receipt metadata.
+
+The existing CALL namespace, protocol generation and retention dependency graph
+are unchanged. Schema 1/2 cached/pending receipts remain readable; ordinary
+writers remain byte-compatible schema 2, with the absent optional field omitted.
+Schema 3 can only represent an online-call pending intent, never a completed
+reply. Strict phase/bounds/digest validation protects it as Active and retains
+the source/caller/run/protocol/instance authority. There is no target execution
+or artifact-retention claim yet: this captures the observed target name, not
+an immutable resource selection. Checkpoint record metadata machine schema 1
+is distinct from its reference-machine payload schema 12; neither is relabeled.
+
+The writer advances only the original CALL CAS. Core source state is not in
+that provider-row transaction and is not advanced. Any future consumer must
+revalidate source proof and resolve the immutable target through the existing
+CICS resource/security owner, attest the recorded target/payload against the
+retained source command/result (an integrity digest is not execution authority),
+stage its exact initial checkpoint, acquire owned
+same-level admission/instance disposition, then complete handoff and execute.
+Neither failed capture nor cold pending replay may infer a normal return or
+automatically redispatch. Source checkpoint and busy instance remain intact.
+A secondary cursor-write failure before capture also preserves pending
+Transfer/Invoke/Suspended as UnknownOutcome, not a known error consumable by
+the caller. A crash before intent publication leaves a protected unstaged
+reservation; this phase does not close that recovery window or authorize
+reconstruction by redispatch.
+Old pending receipts cannot reconstruct a lost Transfer from the checkpoint
+alone and are not rewritten on read. Old readers reject schema 3; downgrade
+requires drained writers and a compatible reader or verified pre-change backup,
+never stripping the intent or relabeling it as a completed/schema-2 receipt.
+
 ### Known-ABEND installed-instance disposition
 
 After the existing durable coordinator returns `ExecutionOutcome::Abend`, the

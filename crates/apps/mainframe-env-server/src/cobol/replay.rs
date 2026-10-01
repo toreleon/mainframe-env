@@ -4,6 +4,10 @@ use mainframe_env_store_api::{ProviderStateMutation, StoreError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod transfer;
+pub(super) use transfer::persist_transfer_intent;
+pub(super) use transfer::preserve_control_cursor_failure;
+
 use super::retention::{
     CALL_PROTOCOL_NAMESPACE, CALL_REPLAY_NAMESPACE, CobolRetentionDependency,
     CobolRetentionRowDescriptor, CobolRetentionRowKind, CobolRetentionState,
@@ -45,6 +49,8 @@ struct Receipt {
     metadata_digest: String,
     completion_tick: Option<u64>,
     reply: Option<Reply>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    transfer: Option<transfer::TransferIntent>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -71,7 +77,11 @@ enum DecodedProtocol {
 
 fn receipt_metadata_digest(receipt: &Receipt) -> String {
     let mut hash = Sha256::new();
-    hash.update(b"mainframe-env.cobol-call-receipt-metadata@2\0");
+    hash.update(if receipt.schema_version == 3 {
+        b"mainframe-env.cobol-call-receipt-metadata@3\0"
+    } else {
+        b"mainframe-env.cobol-call-receipt-metadata@2\0"
+    });
     for field in [
         receipt.replay_key.as_bytes(),
         receipt.fingerprint.as_bytes(),
@@ -95,6 +105,9 @@ fn receipt_metadata_digest(receipt: &Receipt) -> String {
             hash.update(&reply.bytes);
         }
         None => hash.update([0]),
+    }
+    if let Some(transfer) = &receipt.transfer {
+        hash.update(transfer.metadata_digest().as_bytes());
     }
     format!("{:x}", hash.finalize())
 }
@@ -292,8 +305,11 @@ fn decode_receipt(
     record: &ProviderStateRecord,
 ) -> Result<DecodedReceipt, CobolRetentionValidationError> {
     validate_row_identity(record, CALL_REPLAY_NAMESPACE)?;
+    if record.payload.len() > 4 * InvocationLimits::default().max_payload_bytes + 8192 {
+        return Err(CobolRetentionValidationError::CorruptPayload);
+    }
     if let Ok(receipt) = serde_json::from_slice::<Receipt>(&record.payload)
-        && receipt.schema_version == 2
+        && matches!(receipt.schema_version, 2 | 3)
     {
         if !valid_digest(&receipt.fingerprint)
             || receipt.replay_key != record.key
@@ -314,14 +330,7 @@ fn decode_receipt(
                     || reply.schema.len() > 128
                     || reply.bytes.len() > InvocationLimits::default().max_payload_bytes
             })
-            || !matches!(
-                (
-                    record.version,
-                    receipt.reply.is_some(),
-                    receipt.completion_tick
-                ),
-                (1, false, None) | (2, true, Some(1..))
-            )
+            || !transfer::valid_receipt_phase(record, &receipt)
         {
             return Err(CobolRetentionValidationError::InconsistentState);
         }
@@ -753,6 +762,7 @@ impl CobolProgram {
             metadata_digest: String::new(),
             completion_tick: None,
             reply: None,
+            transfer: None,
         };
         receipt.metadata_digest = receipt_metadata_digest(&receipt);
         let pending = ProviderStateRecord {
