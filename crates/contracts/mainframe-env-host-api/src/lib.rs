@@ -15,6 +15,7 @@ mod clock;
 mod dataset;
 mod enterprise;
 mod ims;
+mod ims_applicability;
 mod ims_metadata;
 mod ims_pcb;
 mod ims_status;
@@ -60,6 +61,11 @@ pub use ims::{
     ImsSsaFieldResolver, ImsSsaLimits, ImsSsaPredicate, ImsSsaProblem, ImsSsaRelation,
     ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
     parse_ims_ssa,
+};
+pub use ims_applicability::{
+    IMS_CALL_APPLICABILITY, IMS_CALL_APPLICABILITY_RULES_SHA256, ImsApplicabilityProblem,
+    ImsCallApplicabilityDescriptor, ImsCallSite, ImsCallSyntax, ImsCallVariant,
+    ImsProcessingOptionClass, ImsSsaForm, validate_ims_call_site,
 };
 pub use ims_metadata::{
     IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,

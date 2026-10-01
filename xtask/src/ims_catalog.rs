@@ -16,6 +16,9 @@ const GENERATED_PCB_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_pcb_masks.rs";
 const GENERATED_STATUS_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_status_codes.rs";
+mod applicability;
+const GENERATED_APPLICABILITY_PATH: &str =
+    "crates/contracts/mainframe-env-host-api/src/generated/ims_call_applicability.rs";
 const BASELINE: &str = "ibm-ims-15.6-dli-2026-08-31";
 const SOURCE_TOPIC: &str =
     "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm";
@@ -78,6 +81,7 @@ pub(super) fn generate(root: &Path) -> TaskResult {
         (GENERATED_SSA_PATH, render_ssa(root)?),
         (GENERATED_PCB_PATH, generated_pcb),
         (GENERATED_STATUS_PATH, generated_status),
+        (GENERATED_APPLICABILITY_PATH, applicability::render(root)?),
     ] {
         let path = root.join(relative);
         fs::create_dir_all(path.parent().ok_or("generated IMS path has no parent")?)
@@ -95,6 +99,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
         (GENERATED_SSA_PATH, render_ssa(root)?),
         (GENERATED_PCB_PATH, generated_pcb),
         (GENERATED_STATUS_PATH, generated_status),
+        (GENERATED_APPLICABILITY_PATH, applicability::render(root)?),
     ] {
         let path = root.join(relative);
         let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
