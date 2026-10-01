@@ -910,6 +910,69 @@ fn logical_frame_held_task_still_counts_against_run_capacity() {
 }
 
 #[test]
+fn logical_frame_uncertain_session_fence_retains_resources_and_is_task_scoped() {
+    let (service, root) = fixture();
+    {
+        let mut state = service.lock().unwrap();
+        let run = state.runs.get_mut(&root.run_unit_id).unwrap();
+        run.current_records
+            .insert("DATA".into(), b"held-record".to_vec());
+        run.handlers.insert("ERROR".into(), "SAVED".into());
+        state
+            .task_dispatch
+            .uncertain_sessions
+            .insert("FRAME-SESSION".into());
+    }
+    let session = SessionId::new("FRAME-SESSION", 64).unwrap();
+    let saved = service
+        .store
+        .get_provider_state("cics-session", session.as_str())
+        .unwrap();
+    assert!(matches!(
+        CommandLease::acquire(&service, &root.run_unit_id),
+        Err(HostProblem::UnknownOutcome)
+    ));
+    assert_eq!(
+        service.restore_terminal_run(root.clone(), &session, "MENU", Vec::new(), 2),
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        service.complete_terminal_run(&session, root.principal.id(), 2),
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(
+        service
+            .store
+            .get_provider_state("cics-session", session.as_str())
+            .unwrap(),
+        saved
+    );
+    let mut other = root.clone();
+    other.run_unit_id = RunUnitId::new("unrelated-run", InvocationLimits::default()).unwrap();
+    other.execution_id =
+        ExecutionId::new("unrelated-execution", InvocationLimits::default()).unwrap();
+    let other_session = SessionId::new("unrelated-session", 64).unwrap();
+    service.create_session(&other_session, 24, 80).unwrap();
+    service
+        .register_run(other.clone(), &other_session, "MENU", "ME01", "S001")
+        .unwrap();
+    CommandLease::acquire(&service, &other.run_unit_id)
+        .unwrap()
+        .finish()
+        .unwrap();
+    let state = service.lock().unwrap();
+    assert_eq!(state.runs.len(), 2);
+    assert_eq!(
+        state.runs[&root.run_unit_id].current_records["DATA"],
+        b"held-record"
+    );
+    assert_eq!(state.runs[&root.run_unit_id].handlers["ERROR"], "SAVED");
+    assert_eq!(state.task_dispatch.uncertain_sessions.len(), 1);
+    assert!(state.task_dispatch.claims.is_empty());
+    assert!(state.task_dispatch.cleaning_sessions.is_empty());
+}
+
+#[test]
 fn logical_frame_recursion_is_bounded_and_restores_every_lease() {
     let (service, root) = fixture();
     let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();

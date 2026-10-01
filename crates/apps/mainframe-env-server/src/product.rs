@@ -6791,6 +6791,9 @@ mod tests {
     #[path = "program_default_abend.rs"]
     mod program_default_abend;
 
+    #[path = "program_control_pending.rs"]
+    mod program_control_pending;
+
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn postgres_compiled_local_link_handle_frames_recovers_after_restart() {

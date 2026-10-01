@@ -162,6 +162,24 @@ they do not satisfy the explicit ERROR/code/dump contract. Downgrade requires
 drained writers and a compatible reader or verified pre-change backup; never
 strip the origin marker, invent a code or relabel pending calls as completed.
 
+### Unresolved installed child control
+
+Installed child Transfer, Invoke and Suspended outcomes are not terminal proof.
+Until an owned installed continuation/replacement protocol can finish them, the
+executor returns UnknownOutcome, not a negative condition consumable by LINK
+RESP or COBOL exception handling. The existing host-boundary dispatch records
+a volatile uncertain-session fence after a linked unknown result; subsequent
+commands, warm restoration and task cleanup reject without releasing resources.
+This fence is bounded by held tasks, does not affect unrelated sessions and is
+not a new durable ledger or a recovery mechanism. Cold restore must be attested
+by the embedding against the existing core/CALL authority; replay of an unresolved
+reservation remains unknown and reinstates the live fence. No busy instance,
+suspended checkpoint or pending CALL is turned into completed handoff proof.
+No persisted schema changes. Previously recorded definitive negative-condition
+results are not rewritten as new evidence; affected active states require drain
+and owned reconciliation, never automatic redispatch. Non-root PROGRAM/XCTL
+replacement and child suspension resume remain implementation obligations.
+
 ### Known-ABEND installed-instance disposition
 
 After the existing durable coordinator returns `ExecutionOutcome::Abend`, the

@@ -53,6 +53,9 @@ fn program_effect_key(run: &Run, occurrence: u64) -> Result<IdempotencyKey, Host
 pub(in crate::service) struct TaskDispatch {
     claims: BTreeMap<RunUnitId, TaskClaim>,
     cleaning_sessions: BTreeSet<String>,
+    // Bounded by held runs: a pending installed child cannot become idle success.
+    // Cold uncertainty remains owned by core effects and installed-call rows.
+    uncertain_sessions: BTreeSet<String>,
 }
 
 impl TaskDispatch {
@@ -82,7 +85,9 @@ impl TaskDispatch {
         &self,
         session: &str,
     ) -> Result<(), HostProblem> {
-        if self.cleaning_sessions.contains(session) {
+        if self.uncertain_sessions.contains(session) {
+            Err(HostProblem::UnknownOutcome)
+        } else if self.cleaning_sessions.contains(session) {
             Err(HostProblem::IdempotencyConflict)
         } else {
             Ok(())
@@ -533,6 +538,13 @@ impl CicsService {
         loan.map(ProgramLease::finish)
             .transpose()
             .map_err(|_| HostProblem::UnknownOutcome)?;
+        if linked && matches!(result.outcome, Err(HostProblem::UnknownOutcome)) {
+            self.lock()
+                .map_err(|_| HostProblem::UnknownOutcome)?
+                .task_dispatch
+                .uncertain_sessions
+                .insert(run.session.clone());
+        }
         if linked
             && matches!(result.outcome, Ok(HostResult::Program(_)))
             && run.latest_abend != previous_handles.latest_abend

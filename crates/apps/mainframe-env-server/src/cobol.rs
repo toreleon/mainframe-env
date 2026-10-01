@@ -430,21 +430,12 @@ impl CobolProgram {
                 response: -2,
                 response2: 0,
             }),
-            ExecutionOutcome::Suspended(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-SUSPENDED".into(),
-                response: -3,
-                response2: 0,
-            }),
-            ExecutionOutcome::Invoke(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-INVOKE".into(),
-                response: -4,
-                response2: 0,
-            }),
-            ExecutionOutcome::Transfer(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-TRANSFER".into(),
-                response: -5,
-                response2: 0,
-            }),
+            // The durable child is suspended and its CALL/instance are still
+            // unresolved. Without an owned continuation/replacement protocol,
+            // this cannot be a known condition a caller may handle as a return.
+            ExecutionOutcome::Suspended(_)
+            | ExecutionOutcome::Invoke(_)
+            | ExecutionOutcome::Transfer(_) => Err(HostProblem::UnknownOutcome),
         }
     }
 
