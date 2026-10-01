@@ -198,8 +198,8 @@ impl ImsSystemRequest {
                 {
                     return Err(HostProblem::Malformed);
                 }
-                if let Some(ssa) = ssa {
-                    if ssa.segment.is_empty()
+                if let Some(ssa) = ssa
+                    && (ssa.segment.is_empty()
                         || ssa.segment.len() > 8
                         || !ssa
                             .segment
@@ -215,10 +215,9 @@ impl ImsSystemRequest {
                         })
                         || ssa.value.as_ref().is_some_and(|value| {
                             value.is_empty() || value.len() > limits.max_record_bytes
-                        })
-                    {
-                        return Err(HostProblem::Malformed);
-                    }
+                        }))
+                {
+                    return Err(HostProblem::Malformed);
                 }
                 Ok(())
             }
