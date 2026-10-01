@@ -20,6 +20,7 @@ mod ims_status;
 mod mq_catalog;
 mod mq_context;
 mod mq_contract;
+mod mq_handles;
 mod names;
 mod registry;
 mod request;
@@ -83,6 +84,11 @@ pub use mq_contract::{
     MqMqiContractDescriptor, MqMqiHandleAction, MqMqiHandleRole, MqMqiParameterDescriptor,
     MqMqiParameterDirection, MqMqiParameterRole, MqMqiSignatureStatus, MqMqiSourceSpellingAnomaly,
     MqMqiSourceStatus, mq_mqi_contract, mq_mqi_contract_by_label, mq_mqi_contracts,
+};
+pub use mq_handles::{
+    MQ_MAX_HANDLE_SLOTS, MQHC_DEF_HCONN, MQHC_UNASSOCIATED_HCONN, MqConnectionId, MqHandle,
+    MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHandleSharing, MqHconn,
+    MqHmsg, MqHobj, MqHsub,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
