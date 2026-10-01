@@ -22,12 +22,12 @@ struct RecordingAuthorizer {
     seen: Mutex<Vec<EnterpriseResource>>,
 }
 
-struct FailFirstEnqueue {
+struct EnqueueThenUncertain {
     inner: Arc<MemoryStore>,
     fail: Mutex<bool>,
 }
 
-impl WorkStore for FailFirstEnqueue {
+impl WorkStore for EnqueueThenUncertain {
     fn get_work(&self, work_id: &str) -> Result<Option<WorkRecord>, StoreError> {
         self.inner.get_work(work_id)
     }
@@ -36,7 +36,10 @@ impl WorkStore for FailFirstEnqueue {
         let mut fail = self.fail.lock().unwrap();
         if *fail {
             *fail = false;
-            Err(StoreError::Infrastructure("injected enqueue gap".into()))
+            self.inner.enqueue(work)?;
+            Err(StoreError::Infrastructure(
+                "injected post-dispatch uncertainty".into(),
+            ))
         } else {
             self.inner.enqueue(work)
         }
@@ -531,7 +534,7 @@ fn admission_gap_repair_rollback_and_terminate_preserve_work_fences() {
     let policy = Arc::new(RecordingAuthorizer::default());
     let store = Arc::new(MemoryStore::new(StoreLimits::default()));
     let provider: Arc<dyn ProviderStateStore> = store.clone();
-    let work: Arc<dyn WorkStore> = Arc::new(FailFirstEnqueue {
+    let work: Arc<dyn WorkStore> = Arc::new(EnqueueThenUncertain {
         inner: store.clone(),
         fail: Mutex::new(true),
     });
@@ -543,11 +546,17 @@ fn admission_gap_repair_rollback_and_terminate_preserve_work_fences() {
             &invocation("admission", "enqueue-gap", 1_000),
             message("message-gap", "PAY1", None),
         ),
-        Err(HostProblem::InfrastructureFailure)
+        Err(HostProblem::UnknownOutcome)
     );
     assert_eq!(
         service.message_state("message-gap").unwrap(),
         Some(TmMessageState::AdmissionPending)
+    );
+    assert!(
+        store
+            .get_work("ims-tm:00000000000000000001:message-gap")
+            .unwrap()
+            .is_some()
     );
     assert_eq!(service.repair_schedules(1).unwrap(), 1);
     assert_eq!(
@@ -709,4 +718,98 @@ fn sqlite_reopen_preserves_cursor_output_and_conversation_continuation() {
     }
     std::fs::remove_file(database).unwrap();
     std::fs::remove_dir(directory).unwrap();
+}
+
+#[test]
+fn sqlite_reopen_preserves_package_bound_work_across_selection_rollback() {
+    let directory = std::env::temp_dir().join(format!(
+        "mainframe-env-ims-tm-package-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let database = directory.join("package.sqlite");
+    if database.exists() {
+        std::fs::remove_file(&database).unwrap();
+    }
+    let url = format!("sqlite://{}?mode=rwc", database.display());
+    let first_identity = format!("sha256:{:064x}", 1);
+    let second_identity = format!("sha256:{:064x}", 2);
+    let policy = Arc::new(RecordingAuthorizer::default());
+    {
+        let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let work: Arc<dyn WorkStore> = store;
+        let service = TmService::open(provider, work, policy.clone(), TmLimits::default()).unwrap();
+        let first = definitions();
+        service
+            .publish_package_definitions("GENERIC.APP", 1, &first_identity, Some(&first))
+            .unwrap();
+        let second = first.clone();
+        service
+            .publish_package_definitions("GENERIC.APP", 2, &second_identity, Some(&second))
+            .unwrap();
+        service
+            .enqueue(
+                &invocation("admission", "package-enqueue", 1_000),
+                message("package-message", "PAY1", None),
+            )
+            .unwrap();
+        service
+            .publish_package_definitions("GENERIC.APP", 1, &first_identity, Some(&first))
+            .unwrap();
+        assert_eq!(
+            service.publish_package_definitions("GENERIC.APP", 2, &first_identity, Some(&second)),
+            Err(HostProblem::IdempotencyConflict)
+        );
+    }
+    {
+        let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let work: Arc<dyn WorkStore> = store;
+        let service = TmService::open(provider, work, policy, TmLimits::default()).unwrap();
+        assert!(
+            service
+                .selected_package_matches("GENERIC.APP", 1, &first_identity)
+                .unwrap()
+        );
+        assert!(
+            service
+                .claim("PAY1", "selected-worker", 1, 40)
+                .unwrap()
+                .is_none()
+        );
+        let claimed = service
+            .claim_retained(
+                "GENERIC.APP",
+                2,
+                &second_identity,
+                "PAY1",
+                "retained-worker",
+                1,
+                40,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(service.package_for_work(&claimed).unwrap().generation, 2);
+        service
+            .start(&invocation("package-run", "package-start", 1_000), &claimed)
+            .unwrap();
+        assert_eq!(
+            service
+                .call(
+                    &invocation("package-run", "package-gu", 1_000),
+                    TmCall::GetUnique
+                )
+                .unwrap()
+                .segment,
+            Some(b"first".to_vec())
+        );
+        service
+            .call(
+                &invocation("package-run", "package-rollback", 1_000),
+                TmCall::Rollback,
+            )
+            .unwrap();
+    }
+    std::fs::remove_dir_all(&directory).unwrap();
 }

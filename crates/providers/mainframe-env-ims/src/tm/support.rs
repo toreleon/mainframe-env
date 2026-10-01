@@ -1,12 +1,13 @@
 use super::codec::{
     CATALOG_KEY, CATALOG_NAMESPACE, CONVERSATION_NAMESPACE, MESSAGE_NAMESPACE, OUTBOUND_NAMESPACE,
-    REPLAY_NAMESPACE, SESSION_NAMESPACE, list, put, read, store_error,
+    PACKAGE_NAMESPACE, REPLAY_NAMESPACE, SESSION_NAMESPACE, list, put, read, store_error,
 };
 use super::contracts::{TmPcb, TmTransactionDefinition};
 use super::model::{
-    CatalogRow, ConversationRow, MessageRow, OutboundRow, OutputBuffer, ReplayResult, ReplayRow,
-    ReplayWork, SessionRow, TmCallResult, TmCancelReceipt, TmEnqueueReceipt, TmMessageState,
-    TmOutboundMessage, TmScheduleReceipt, WorkDisposition, WorkPayload,
+    CatalogRow, ConversationRow, MessageRow, OutboundRow, OutputBuffer, PackageDefinitionsRow,
+    ReplayResult, ReplayRow, ReplayWork, SessionRow, TmCallResult, TmCancelReceipt,
+    TmEnqueueReceipt, TmMessageState, TmOutboundMessage, TmScheduleReceipt, WorkDisposition,
+    WorkPayload,
 };
 use super::service::{TmService, WORK_PAYLOAD_SCHEMA};
 use mainframe_env_execution_api::{
@@ -137,7 +138,7 @@ impl TmService {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             required_selector: Selector::new(transaction.program_selector.clone(), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
-            required_generation: work_generation(transaction)?,
+            required_generation: work_generation(transaction, message.package_binding.as_deref())?,
             artifact: ArtifactRef::new(transaction.artifact.clone(), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             state: WorkState::Queued,
@@ -171,6 +172,7 @@ impl TmService {
                     Err(HostProblem::IdempotencyConflict)
                 }
             }
+            Err(StoreError::Infrastructure(_)) => Err(HostProblem::UnknownOutcome),
             Err(problem) => Err(work_error(problem)),
         }
     }
@@ -256,6 +258,32 @@ impl TmService {
         )
     }
 
+    pub(super) fn catalog_for_binding(
+        &self,
+        binding: Option<&str>,
+    ) -> Result<CatalogRow, HostProblem> {
+        let (_, mut catalog) = self.catalog()?.ok_or(HostProblem::NotFound)?;
+        if let Some(binding) = binding {
+            let (_, retained) = read::<PackageDefinitionsRow>(
+                self.store.as_ref(),
+                PACKAGE_NAMESPACE,
+                binding,
+                self.limits.max_state_bytes,
+            )?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+            if binding != format!("{}:{}", retained.application, retained.generation) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            retained.definitions.validate(self.limits)?;
+            catalog.definitions = retained.definitions;
+            catalog.package_binding = Some(binding.into());
+            catalog.application = Some(retained.application);
+        } else if catalog.package_binding.is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        Ok(catalog)
+    }
+
     pub(super) fn message(&self, id: &str) -> Result<Option<(u64, MessageRow)>, HostProblem> {
         read(
             self.store.as_ref(),
@@ -317,12 +345,21 @@ impl TmService {
         }
         if let Some((_, catalog)) = catalog {
             catalog.definitions.validate(self.limits)?;
+            if catalog.active && catalog.package_binding.is_some() {
+                let selected = self.catalog_for_binding(catalog.package_binding.as_deref())?;
+                if selected.definitions != catalog.definitions
+                    || selected.application != catalog.application
+                {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+            }
             if catalog.next_sequence == 0 {
                 return Err(HostProblem::InfrastructureFailure);
             }
             for (_, _, message) in messages {
                 message.message.validate(self.limits)?;
-                find_transaction(&catalog, &message.message.transaction)?;
+                let bound = self.catalog_for_binding(message.package_binding.as_deref())?;
+                find_transaction(&bound, &message.message.transaction)?;
                 if message.sequence == 0
                     || message.deadline_tick == 0
                     || message.enqueue_tick == 0
@@ -333,7 +370,8 @@ impl TmService {
                 }
             }
             for (_, _, session) in sessions {
-                find_transaction(&catalog, &session.transaction)?;
+                let bound = self.catalog_for_binding(session.package_binding.as_deref())?;
+                find_transaction(&bound, &session.transaction)?;
                 if !session.io_status.valid()
                     || self.message(&session.message_id)?.is_none()
                     || session.lease_epoch == 0
@@ -350,7 +388,8 @@ impl TmService {
                 }
             }
             for (_, _, conversation) in conversations {
-                find_transaction(&catalog, &conversation.next_transaction)?;
+                let bound = self.catalog_for_binding(conversation.package_binding.as_deref())?;
+                find_transaction(&bound, &conversation.next_transaction)?;
                 if conversation.spa.len() > self.limits.max_spa_bytes {
                     return Err(HostProblem::InfrastructureFailure);
                 }
@@ -448,11 +487,19 @@ pub(super) fn replay_work(session: &SessionRow, disposition: WorkDisposition) ->
 
 pub(super) fn work_generation(
     transaction: &TmTransactionDefinition,
+    package_binding: Option<&str>,
 ) -> Result<String, HostProblem> {
-    let digest = digest(
-        "mainframe-env.ims-tm-work-generation@1",
-        &transaction.required_generation,
-    )?;
+    let digest = if let Some(binding) = package_binding {
+        digest(
+            "mainframe-env.ims-tm-package-work-generation@1",
+            &(transaction.required_generation.as_str(), binding),
+        )?
+    } else {
+        digest(
+            "mainframe-env.ims-tm-work-generation@1",
+            &transaction.required_generation,
+        )?
+    };
     Ok(format!(
         "ims-tm@1:{}:{}",
         transaction.code,

@@ -51,7 +51,10 @@ use mainframe_env_host_api::{
     MemberName, Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService,
     SecretRef, SecurityDecision, SessionId, TerminalRequest,
 };
-use mainframe_env_ims::{ImsReplayClock, ImsService, ims_providers};
+use mainframe_env_ims::{
+    ImsReplayClock, ImsService, TmCall, TmCallResult, TmCancelReceipt, TmEnqueueReceipt,
+    TmInputMessage, TmLimits, TmPackageBinding, TmScheduleReceipt, TmService, ims_providers,
+};
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqReplayClock, MqService, mq_providers};
@@ -382,6 +385,7 @@ pub struct ProductServer {
     dataset: Arc<DatasetService>,
     db2: Arc<Db2Service>,
     ims: Arc<ImsService>,
+    ims_tm: Arc<TmService>,
     mq: Arc<MqService>,
     spool: Arc<SpoolService>,
     pub(crate) batch: Arc<BatchService>,
@@ -714,6 +718,13 @@ impl ProductServer {
             enterprise_authorizer.clone(),
             enterprise_replay_clock.clone(),
         )?;
+        let tm_work_store: Arc<dyn WorkStore> = store.clone();
+        let ims_tm = TmService::open(
+            provider_store.clone(),
+            tm_work_store,
+            enterprise_authorizer.clone(),
+            TmLimits::default(),
+        )?;
         let mq = MqService::open_authorized_with_replay_clock(
             provider_store.clone(),
             Default::default(),
@@ -878,6 +889,7 @@ impl ProductServer {
             dataset,
             db2,
             ims,
+            ims_tm,
             mq,
             spool,
             batch,
@@ -964,6 +976,168 @@ impl ProductServer {
     #[must_use]
     pub fn ims_service(&self) -> Arc<ImsService> {
         self.ims.clone()
+    }
+
+    /// Admit a message only against the complete selected signed package.
+    pub fn ims_tm_enqueue(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        message: TmInputMessage,
+    ) -> Result<TmEnqueueReceipt, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.selected_ims_tm_application(application)?;
+        self.ims_tm.enqueue(invocation, message)
+    }
+
+    pub fn ims_tm_claim(
+        &self,
+        application: &str,
+        transaction: &str,
+        worker: &str,
+        now_tick: u64,
+        lease_ticks: u64,
+    ) -> Result<Option<WorkRecord>, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.selected_ims_tm_application(application)?;
+        self.ims_tm
+            .claim(transaction, worker, now_tick, lease_ticks)
+    }
+
+    pub fn ims_tm_start(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        work: &WorkRecord,
+    ) -> Result<TmScheduleReceipt, HostProblem> {
+        self.verify_ims_tm_binding(application, &self.ims_tm.package_for_work(work)?)?;
+        self.ims_tm.start(invocation, work)
+    }
+
+    pub fn ims_tm_claim_retained(
+        &self,
+        application: &str,
+        generation: u64,
+        package_identity: &str,
+        transaction: &str,
+        worker: &str,
+        now_tick: u64,
+        lease_ticks: u64,
+    ) -> Result<Option<WorkRecord>, HostProblem> {
+        let binding = TmPackageBinding {
+            application: application.to_ascii_uppercase(),
+            generation,
+            package_identity: package_identity.into(),
+        };
+        self.verify_ims_tm_binding(application, &binding)?;
+        self.ims_tm.claim_retained(
+            application,
+            generation,
+            package_identity,
+            transaction,
+            worker,
+            now_tick,
+            lease_ticks,
+        )
+    }
+
+    pub fn ims_tm_call(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        call: TmCall,
+    ) -> Result<TmCallResult, HostProblem> {
+        self.verify_ims_tm_binding(
+            application,
+            &self.ims_tm.package_for_call(invocation, &call)?,
+        )?;
+        self.ims_tm.call(invocation, call)
+    }
+
+    pub fn ims_tm_cancel(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        message_id: &str,
+    ) -> Result<TmCancelReceipt, HostProblem> {
+        self.verify_ims_tm_binding(application, &self.ims_tm.package_for_message(message_id)?)?;
+        self.ims_tm.cancel(invocation, message_id)
+    }
+
+    fn selected_ims_tm_application(&self, application: &str) -> Result<(), HostProblem> {
+        let selected = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .selected_generation(application)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        if selected.record().state != InstallState::Ready
+            || selected.package().sections.ims_tm.is_none()
+            || !self.ims_tm.selected_package_matches(
+                &selected.record().package,
+                selected.record().generation,
+                &selected.record().identity,
+            )?
+        {
+            return Err(HostProblem::NotFound);
+        }
+        let publication = self
+            .store
+            .get_provider_state(
+                APPLICATION_PUBLICATION_NAMESPACE,
+                &selected.record().package.to_ascii_uppercase(),
+            )
+            .map_err(store_error)?
+            .ok_or(HostProblem::NotFound)?;
+        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if !state.complete || state.identity != selected.record().identity {
+            return Err(HostProblem::NotFound);
+        }
+        Ok(())
+    }
+
+    fn verify_ims_tm_binding(
+        &self,
+        application: &str,
+        binding: &TmPackageBinding,
+    ) -> Result<(), HostProblem> {
+        if !binding.application.eq_ignore_ascii_case(application) {
+            return Err(HostProblem::Unauthorized);
+        }
+        let retained = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .generation(
+                &binding.application,
+                binding.generation,
+                &binding.package_identity,
+            )
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        let definitions = retained.package().sections.ims_tm.as_ref();
+        if retained.record().state != InstallState::Ready
+            || definitions.is_none()
+            || !self.ims_tm.retained_package_matches(
+                &binding.application,
+                binding.generation,
+                &binding.package_identity,
+                definitions.ok_or(HostProblem::NotFound)?,
+            )?
+        {
+            return Err(HostProblem::NotFound);
+        }
+        Ok(())
     }
 
     #[must_use]
@@ -1512,6 +1686,12 @@ impl ProductServer {
             package.generation,
             &selected.record().identity,
             package.sections.ims_metadata.as_ref(),
+        )?;
+        self.ims_tm.publish_package_definitions(
+            &package.base.manifest.name,
+            package.generation,
+            &selected.record().identity,
+            package.sections.ims_tm.as_ref(),
         )?;
         Ok(())
     }
@@ -9951,6 +10131,7 @@ mod tests {
                 ims_definitions: Vec::new(),
                 ims_rows: Vec::new(),
                 ims_metadata: None,
+                ims_tm: None,
                 mq_resources: Vec::new(),
                 batch_controllers: vec![BatchController {
                     name: "TRUSTED-CONTROLLER".into(),

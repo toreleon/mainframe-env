@@ -3,7 +3,8 @@ use super::{
     validate_package, validate_sha256, validate_text,
 };
 use mainframe_env_host_api::{
-    ImsMetadataCatalog, ImsMetadataLimits, ImsMetadataProblem, validate_ims_metadata,
+    ImsMetadataCatalog, ImsMetadataLimits, ImsMetadataProblem, ImsPcbMetadata, TmDefinitionSet,
+    TmDestination, TmLimits, validate_ims_metadata,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -17,10 +18,11 @@ pub const SECURITY_RESOURCE_SECTION_CONTRACT: &str =
     "mainframe-env.application.security-resources@1";
 pub const IMS_SECTION_CONTRACT: &str = "mainframe-env.application.ims@1";
 pub const IMS_METADATA_SECTION_CONTRACT: &str = mainframe_env_host_api::IMS_METADATA_SCHEMA_V1;
+pub const IMS_TM_SECTION_CONTRACT: &str = "mainframe-env.application.ims-tm@1";
 pub const MQ_SECTION_CONTRACT: &str = "mainframe-env.application.mq@1";
 pub const BATCH_CONTROLLER_SECTION_CONTRACT: &str = "mainframe-env.application.batch-controllers@1";
 pub const APPLICATION_INSTALLER_STATE_CONTRACT: &str = "mainframe-env.application-installer@1";
-const APPLICATION_SECTION_COUNT: usize = 9;
+const APPLICATION_SECTION_COUNT: usize = 10;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum HostSubsystem {
@@ -154,6 +156,8 @@ pub struct ApplicationSections {
     pub ims_rows: Vec<ImsSeedRow>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ims_metadata: Option<ImsMetadataCatalog>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ims_tm: Option<TmDefinitionSet>,
     pub mq_resources: Vec<MqResource>,
     pub batch_controllers: Vec<BatchController>,
     pub security_resources: Vec<SecurityResource>,
@@ -207,7 +211,7 @@ pub struct PackageLimits {
 impl Default for PackageLimits {
     fn default() -> Self {
         Self {
-            max_sections: 9,
+            max_sections: 10,
             max_items_per_section: 16_384,
             max_fields_per_record: 1_024,
             max_value_bytes: 1024 * 1024,
@@ -733,6 +737,13 @@ pub fn package_v2_identity(package: &ApplicationPackageV2) -> Result<String, Ins
             &serde_json::to_vec(metadata).map_err(|_| InstallProblem::InvalidIdentity)?,
         );
     }
+    if let Some(definitions) = &package.sections.ims_tm {
+        digest_field(&mut digest, IMS_TM_SECTION_CONTRACT.as_bytes());
+        digest_field(
+            &mut digest,
+            &serde_json::to_vec(definitions).map_err(|_| InstallProblem::InvalidIdentity)?,
+        );
+    }
     for resource in sorted_by(&package.sections.mq_resources, |item| &item.name) {
         digest_field(&mut digest, resource.name.as_bytes());
         digest_field(&mut digest, resource.kind.slug().as_bytes());
@@ -822,6 +833,35 @@ fn validate_aggregate_bounds(
             }
         })?;
     }
+    if let Some(definitions) = &sections.ims_tm {
+        for transaction in &definitions.transactions {
+            for value in [
+                transaction.code.as_str(),
+                transaction.psb.as_str(),
+                transaction.program_selector.as_str(),
+                transaction.artifact.as_str(),
+                transaction.required_generation.as_str(),
+            ] {
+                bounded_text(value, 256)?;
+            }
+            for pcb in &transaction.alternate_pcbs {
+                bounded_text(&pcb.name, 256)?;
+                if let mainframe_env_host_api::TmDestination::Fixed(destination) = &pcb.destination
+                {
+                    bounded_text(destination, 256)?;
+                }
+            }
+        }
+        definitions
+            .validate(TmLimits::default())
+            .map_err(|problem| {
+                if problem == mainframe_env_host_api::HostProblem::ResourceExhausted {
+                    InstallProblem::LimitExceeded
+                } else {
+                    InstallProblem::MissingReference
+                }
+            })?;
+    }
     let section_counts = [
         sections.host_abi_libraries.len(),
         sections.sql_tables.len(),
@@ -829,6 +869,7 @@ fn validate_aggregate_bounds(
         sections.ims_definitions.len(),
         sections.ims_rows.len(),
         usize::from(sections.ims_metadata.is_some()),
+        usize::from(sections.ims_tm.is_some()),
         sections.mq_resources.len(),
         sections.batch_controllers.len(),
         sections.security_resources.len(),
@@ -859,8 +900,15 @@ fn validate_aggregate_bounds(
         .transpose()
         .map_err(|_| InstallProblem::InvalidIdentity)?
         .map_or(0, |bytes| bytes.len());
+    let tm_bytes = sections
+        .ims_tm
+        .as_ref()
+        .map(serde_json::to_vec)
+        .transpose()
+        .map_err(|_| InstallProblem::InvalidIdentity)?
+        .map_or(0, |bytes| bytes.len());
     let section_bytes = bounded_sum(
-        section_text_lengths(package).chain(std::iter::once(metadata_bytes)),
+        section_text_lengths(package).chain([metadata_bytes, tm_bytes]),
         limits.max_total_section_bytes,
     )?;
     let blob_bytes = bounded_sum(
@@ -934,6 +982,16 @@ fn validate_aggregate_bounds(
             .chain(std::iter::once(metadata_nested_items(
                 sections.ims_metadata.as_ref(),
             )?))
+            .chain(std::iter::once(sections.ims_tm.as_ref().map_or(
+                0,
+                |definitions| {
+                    1 + definitions
+                        .transactions
+                        .iter()
+                        .map(|transaction| 1 + transaction.alternate_pcbs.len())
+                        .sum::<usize>()
+                },
+            )))
             .chain(sections.mq_resources.iter().map(|_| 3))
             .chain(
                 sections
@@ -1311,6 +1369,45 @@ fn validate_sections(
             }
         })?;
     }
+    if let Some(definitions) = &sections.ims_tm {
+        let metadata = sections
+            .ims_metadata
+            .as_ref()
+            .ok_or(InstallProblem::MissingReference)?;
+        for transaction in &definitions.transactions {
+            let psb = metadata
+                .psbs
+                .iter()
+                .find(|psb| psb.name == transaction.psb)
+                .ok_or(InstallProblem::MissingReference)?;
+            if !package.base.manifest.entries.iter().any(|entry| {
+                entry.kind == EntryKind::Program
+                    && entry.path == transaction.program_selector
+                    && entry.sha256 == transaction.artifact
+            }) {
+                return Err(InstallProblem::MissingReference);
+            }
+            for alternate in &transaction.alternate_pcbs {
+                let matched = psb.pcbs.iter().any(|pcb| match pcb {
+                    ImsPcbMetadata::AlternateTerminal(pcb) => {
+                        pcb.name == alternate.name
+                            && pcb.express == alternate.express
+                            && match &alternate.destination {
+                                TmDestination::Fixed(destination) => {
+                                    !pcb.modifiable
+                                        && pcb.destination.as_deref() == Some(destination)
+                                }
+                                TmDestination::Modifiable => pcb.modifiable,
+                            }
+                    }
+                    ImsPcbMetadata::Database(_) => false,
+                });
+                if !matched {
+                    return Err(InstallProblem::MissingReference);
+                }
+            }
+        }
+    }
     let controllers = sections
         .batch_controllers
         .iter()
@@ -1494,6 +1591,7 @@ mod tests {
                 values: BTreeMap::from([("ID".into(), "1".into())]),
             }],
             ims_metadata: None,
+            ims_tm: None,
             mq_resources: vec![MqResource {
                 name: "APP.QUEUE".into(),
                 kind: MqResourceKind::Queue,

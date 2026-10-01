@@ -29,6 +29,20 @@ IMS segments/rows, controller property maps, conservative structural memory,
 and per-application and global retained byte and item totals; the installer
 rejects hostile input before hashing or cloning it.
 
+The optional `ims_tm` section binds each transaction's PSB, program selector,
+artifact digest, execution context, timeout, conversation size, and alternate
+PCB routes to the signed generation. The PSB and alternate PCBs must match the
+validated IMS metadata; the selector and artifact must match one signed program
+entry. An absent section preserves older package wire forms and identity. TM
+publication uses the existing application publication state. The TM provider
+retains immutable generation definitions through `ProviderStateStore`; message,
+session, and conversation rows keep their generation binding across package
+rollback. The public server TM API admits new messages only from the complete
+selected generation and resolves continued work through retained ready ones.
+This bounded TM runtime selects one active TM application at a time; a second
+active TM application conflicts at publication instead of replacing its
+catalog. Packages without TM definitions do not displace another application.
+
 Installation uses bounded, durable retained per-application generations.
 Staging records a fully verified identity but does not change selection. The
 retained package graph and selection are persisted under

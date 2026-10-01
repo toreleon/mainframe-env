@@ -337,7 +337,7 @@
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
       "relative_links": 0,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:8dd850f2410e463fdaa95b4dc13396a0ca546c155cb97702f88f3f6bb7c5dc0f",
+      "sha256": "sha256:2b5b04a1e11ed4d05d9681d750e2aae7975b70979ac34d26e9980315cfa54acb",
       "status": "Frozen for mainframe-env 0.2.0",
       "title": "Application package generation contract",
       "xtask_commands": 0
@@ -1302,7 +1302,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.14.0.md",
       "relative_links": 0,
-      "sha256": "sha256:daa74a2c18d41aafd834afe4c49cbe445cc5934784892a4ac95c590399d640cf",
+      "sha256": "sha256:1fb51f34e2e0f842e015308e2731f43841f1ce5fd5122876f2cd9cf629aa8748",
       "title": "mainframe-env 0.14.0 implementation status",
       "xtask_commands": 4
     },
