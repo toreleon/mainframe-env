@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added bounded generic IMS checkpoint image, restart position/status, LOG, backout-point, and utility plan contracts with digest and corruption validation."
