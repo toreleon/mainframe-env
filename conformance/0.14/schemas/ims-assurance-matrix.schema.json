@@ -42,7 +42,7 @@
           "additionalProperties": false,
           "required": ["kind", "variants"],
           "properties": {
-            "kind": { "enum": ["ims-operation", "recovery-method", "applicability-only"] },
+            "kind": { "enum": ["ims-operation", "ims-system-call", "recovery-method", "applicability-only"] },
             "variants": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" } }
           }
         },

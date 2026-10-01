@@ -160,6 +160,9 @@ fn check_handler_closure(root: &Path, matrix: &Value, catalog: &Value) -> TaskRe
             .ok_or("IMS handler variants are missing")?;
         let source = match kind {
             "ims-operation" => root.join("crates/contracts/mainframe-env-host-api/src/request.rs"),
+            "ims-system-call" => {
+                root.join("crates/contracts/mainframe-env-host-api/src/ims_system.rs")
+            }
             "recovery-method" => {
                 root.join("crates/providers/mainframe-env-ims/src/recovery/runtime.rs")
             }
@@ -183,6 +186,7 @@ fn check_handler_closure(root: &Path, matrix: &Value, catalog: &Value) -> TaskRe
                 .ok_or("IMS handler variant is not a string")?;
             let needle = match kind {
                 "ims-operation" => format!("    {variant},"),
+                "ims-system-call" => format!("    {variant}"),
                 "recovery-method" => format!("pub fn {variant}"),
                 _ => format!("pub fn {variant}("),
             };
