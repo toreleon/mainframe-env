@@ -8,9 +8,11 @@ and dataset catalogs.
 The `mainframe-env.application-package@1` reader remains available for accepted
 0.1.1 packages. Version 2 adds host ABI libraries, SQL schemas and rows, IMS
 definitions and rows, MQ resources, batch controllers, and security resources.
-Every cross-reference is validated before a generation can be staged. A
-signature verifier is mandatory; the package kernel does not contain a trust
-store or accept a digest as a signature.
+The optional IMS metadata section is additive for old v2 readers and binds the
+shared versioned DBD/PSB contract into the signed package identity. Every
+cross-reference is validated before a generation can be staged. A signature
+verifier is mandatory; the package kernel does not contain a trust store or
+accept a digest as a signature.
 
 Every blob-bearing reference is inside the validated manifest closure. Section
 counts and nested bounds are checked before normalization or owned allocation.

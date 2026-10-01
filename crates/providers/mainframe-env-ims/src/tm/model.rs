@@ -110,6 +110,25 @@ pub enum TmMessageState {
 pub(crate) struct CatalogRow {
     pub definitions: TmDefinitionSet,
     pub next_sequence: u64,
+    #[serde(default)]
+    pub package_binding: Option<String>,
+    #[serde(default)]
+    pub application: Option<String>,
+    #[serde(default = "catalog_active")]
+    pub active: bool,
+}
+
+const fn catalog_active() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PackageDefinitionsRow {
+    pub application: String,
+    pub generation: u64,
+    pub package_identity: String,
+    pub definitions: TmDefinitionSet,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -125,6 +144,8 @@ pub(crate) struct MessageRow {
     pub request_digest: [u8; 32],
     pub new_conversation: bool,
     pub run_unit: Option<String>,
+    #[serde(default)]
+    pub package_binding: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -147,6 +168,8 @@ pub(crate) struct SessionRow {
     pub work_id: String,
     pub lease_id: String,
     pub lease_epoch: u64,
+    #[serde(default)]
+    pub package_binding: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -165,6 +188,8 @@ pub(crate) struct ConversationRow {
     pub next_transaction: String,
     pub spa: Vec<u8>,
     pub step: u64,
+    #[serde(default)]
+    pub package_binding: Option<String>,
 }
 
 pub(crate) struct ConversationStart {

@@ -2632,6 +2632,9 @@ impl Canonical for ImsOperation {
             Self::GetUnique => out.variant("ImsOperation", "GetUnique", 0),
             Self::GetNext => out.variant("ImsOperation", "GetNext", 0),
             Self::GetNextParent => out.variant("ImsOperation", "GetNextParent", 0),
+            Self::GetHoldUnique => out.variant("ImsOperation", "GetHoldUnique", 0),
+            Self::GetHoldNext => out.variant("ImsOperation", "GetHoldNext", 0),
+            Self::GetHoldNextParent => out.variant("ImsOperation", "GetHoldNextParent", 0),
             Self::Insert => out.variant("ImsOperation", "Insert", 0),
             Self::Replace => out.variant("ImsOperation", "Replace", 0),
             Self::Delete => out.variant("ImsOperation", "Delete", 0),
@@ -2640,6 +2643,7 @@ impl Canonical for ImsOperation {
             Self::Unload => out.variant("ImsOperation", "Unload", 0),
             Self::Commit => out.variant("ImsOperation", "Commit", 0),
             Self::Rollback => out.variant("ImsOperation", "Rollback", 0),
+            Self::System => out.variant("ImsOperation", "System", 0),
         }
     }
 }
@@ -2674,8 +2678,15 @@ impl Canonical for ImsRequest {
             psb,
             qualifiers,
             segments,
+            system,
+            q_class,
         } = self;
-        out.object("ImsRequest", 9)?;
+        // Optional v1 extensions leave the canonical bytes of historical
+        // requests unchanged, including retained replay receipts.
+        out.object(
+            "ImsRequest",
+            9 + usize::from(system.is_some()) + usize::from(q_class.is_some()),
+        )?;
         out.text("checkpoint_id")?;
         checkpoint_id.encode(out)?;
         out.text("data")?;
@@ -2690,10 +2701,18 @@ impl Canonical for ImsRequest {
         pcb.encode(out)?;
         out.text("psb")?;
         psb.encode(out)?;
+        if let Some(class) = q_class {
+            out.text("q_class")?;
+            class.encode(out)?;
+        }
         out.text("qualifiers")?;
         qualifiers.encode(out)?;
         out.text("segments")?;
         segments.encode(out)?;
+        if let Some(system) = system {
+            out.text("system")?;
+            system.encode(out)?;
+        }
         Ok(())
     }
 }
@@ -2723,8 +2742,9 @@ impl Canonical for ImsResult {
             checkpoint_id,
             segments,
             status,
+            system,
         } = self;
-        out.object("ImsResult", 4)?;
+        out.object("ImsResult", 4 + usize::from(system.is_some()))?;
         out.text("affected_segments")?;
         affected_segments.encode(out)?;
         out.text("checkpoint_id")?;
@@ -2733,6 +2753,10 @@ impl Canonical for ImsResult {
         segments.encode(out)?;
         out.text("status")?;
         status.encode(out)?;
+        if let Some(system) = system {
+            out.text("system")?;
+            system.encode(out)?;
+        }
         Ok(())
     }
 }

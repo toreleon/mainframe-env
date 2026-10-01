@@ -18,7 +18,7 @@ upgrade can distinguish the legacy blob from row storage:
 | Provider | Manifest schema | Principal row namespaces |
 |---|---|---|
 | MQ | `mainframe-env.mq-row-store@1` | queues, handle index by run, unit of work by run, replay by idempotency key |
-| IMS | `mainframe-env.ims-row-store@1` | databases, session index by run, checkpoints, unit of work by run, replay by idempotency key |
+| IMS | `mainframe-env.ims-row-store@1` | databases, session index by run, checkpoints, unit of work by run, replay by idempotency key, retained application metadata generations and selection |
 | Db2 | `mainframe-env.db2-row-store@1` | tables, schemas, installations, catalog generations, provenance, legacy snapshots, unit of work by run, cursors, cursor declarations, replay by idempotency key |
 
 The concrete namespaces use a provider prefix and `v1`; the static architecture

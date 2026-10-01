@@ -162,7 +162,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
       "relative_links": 0,
-      "sha256": "sha256:12af0b229d7ae888564285da5dd7facb114f2be1915c976861a2cf187d4cd500",
+      "sha256": "sha256:d2ca82620540cbc6b7b1ee01a44d15eb893bc1a04ea415471a7f08bb1197f1ee",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -218,7 +218,7 @@
       "normative": false,
       "path": "crates/kernel/mainframe-env-application/README.md",
       "relative_links": 0,
-      "sha256": "sha256:751b3e3d59bd92a503ee8fc0d45d83f4babc65f9c670500e8ec4b89900af1ad6",
+      "sha256": "sha256:c89ebe2a958c67460e551379808b40073dc063f5793db74c0905db1833d427b0",
       "title": "mainframe-env-application",
       "xtask_commands": 1
     },
@@ -266,7 +266,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
       "relative_links": 2,
-      "sha256": "sha256:576de82f510956d61cd0af7ae22eebf55a817af010420e46d1b029c490bf6ba2",
+      "sha256": "sha256:c3fd3c9a6ff1e6338cec3d1451cbede29cead963bbd9e97beefd13eb02a97985",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -337,7 +337,7 @@
       "path": "docs/architecture/APPLICATION-PACKAGES.md",
       "relative_links": 0,
       "scope": "application package generation and installation contract",
-      "sha256": "sha256:d52d70407f5eea7c8ec0bea886563e4e9b3b36c18e2d3b6aab2c6fc9bb492ec8",
+      "sha256": "sha256:2b5b04a1e11ed4d05d9681d750e2aae7975b70979ac34d26e9980315cfa54acb",
       "status": "Frozen for mainframe-env 0.2.0",
       "title": "Application package generation contract",
       "xtask_commands": 0
@@ -597,7 +597,7 @@
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
       "relative_links": 1,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:3e7f935ff23d9022c93512fbc69160bc9e18a988be82371d35cc640d1e1f6ddc",
+      "sha256": "sha256:b00e3ce2a2c9545fcfbf12a1d8fad075b6b392e9b639e3e067301fdf59c4852c",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -1302,7 +1302,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.14.0.md",
       "relative_links": 0,
-      "sha256": "sha256:5c91b7a8e61e9587c14ba38c4c18fd4ace15e90d852fa1280215361d6eb1caae",
+      "sha256": "sha256:1a3e79e24894f9ab11e65b4ce68515bd130313c9e29770f24e2479851076004a",
       "title": "mainframe-env 0.14.0 implementation status",
       "xtask_commands": 4
     },

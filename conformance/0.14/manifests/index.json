@@ -47,6 +47,17 @@
       "topic_manifest_sha256": "sha256:847166149ae438081effe2f09e7a492b9417217d285d48944bafc3b17cb671d2",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-recovery-utilities-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-recovery-utilities-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-recovery-utilities-contracts-topics.json",
+      "manifest_sha256": "sha256:b7438f3e9d8f9e94864f35c3a8106641c4c969a5ff6f01a3359369ac4bbc6904",
+      "topic_count": 20,
+      "topic_manifest_sha256": "sha256:7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

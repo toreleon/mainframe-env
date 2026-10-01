@@ -20,6 +20,34 @@
         "sql_rows": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/record"}},
         "ims_definitions": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/ims_definition"}},
         "ims_rows": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/record"}},
+        "ims_metadata": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["schema_version", "databases", "psbs"],
+              "properties": {
+                "schema_version": {"const": "mainframe-env.ims-metadata@1"},
+                "databases": {"type": "array", "minItems": 1, "maxItems": 64},
+                "psbs": {"type": "array", "maxItems": 256}
+              }
+            }
+          ]
+        },
+        "ims_tm": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["transactions"],
+              "properties": {
+                "transactions": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/ims_tm_transaction"}}
+              }
+            }
+          ]
+        },
         "mq_resources": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/named"}},
         "batch_controllers": {"type": "array", "maxItems": 16384, "items": {"$ref": "#/$defs/controller"}},
         "security_resources": {"type": "array", "maxItems": 16384, "items": {"type": "object", "maxProperties": 3}}
@@ -70,6 +98,39 @@
     "record": {
       "type": "object",
       "properties": {"values": {"type": "object", "maxProperties": 1024}}
+    },
+    "ims_tm_transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "psb", "program_selector", "artifact", "required_generation", "context", "priority", "timeout_ticks", "conversational", "spa_size", "alternate_pcbs"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1, "maxLength": 8},
+        "psb": {"type": "string", "minLength": 1, "maxLength": 8},
+        "program_selector": {"type": "string", "minLength": 1, "maxLength": 256},
+        "artifact": {"type": "string", "minLength": 1, "maxLength": 256},
+        "required_generation": {"type": "string", "minLength": 1, "maxLength": 256},
+        "context": {"enum": ["message-processing", "message-driven-batch", "cpi-communications", "fast-path"]},
+        "priority": {"type": "integer", "minimum": 0, "maximum": 255},
+        "timeout_ticks": {"type": "integer", "minimum": 1, "maximum": 86400000},
+        "conversational": {"type": "boolean"},
+        "spa_size": {"type": "integer", "minimum": 0, "maximum": 32768},
+        "alternate_pcbs": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/ims_tm_alternate_pcb"}}
+      }
+    },
+    "ims_tm_alternate_pcb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "destination", "express"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 8},
+        "destination": {
+          "oneOf": [
+            {"const": "modifiable"},
+            {"type": "object", "additionalProperties": false, "required": ["fixed"], "properties": {"fixed": {"type": "string", "minLength": 1, "maxLength": 8}}}
+          ]
+        },
+        "express": {"type": "boolean"}
+      }
     },
     "controller": {
       "type": "object",

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Dispatch IMS TM messages through signed application transaction definitions with retained generation rollback and fenced work."

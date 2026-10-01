@@ -5044,6 +5044,8 @@ fn install_carddemo_db2_package(
             sql_rows: Vec::new(),
             ims_definitions: Vec::new(),
             ims_rows: Vec::new(),
+            ims_metadata: None,
+            ims_tm: None,
             mq_resources: Vec::new(),
             batch_controllers,
             security_resources: Vec::new(),
@@ -8723,6 +8725,8 @@ fn ims_request(
         checkpoint_id: checkpoint_id.map(str::to_string),
         max_segments: 64,
         mutation: mutation.transpose()?,
+        system: None,
+        q_class: None,
     })
 }
 

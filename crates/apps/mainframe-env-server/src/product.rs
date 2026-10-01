@@ -51,7 +51,10 @@ use mainframe_env_host_api::{
     MemberName, Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService,
     SecretRef, SecurityDecision, SessionId, TerminalRequest,
 };
-use mainframe_env_ims::{ImsReplayClock, ImsService, ims_providers};
+use mainframe_env_ims::{
+    ImsReplayClock, ImsService, TmCall, TmCallResult, TmCancelReceipt, TmEnqueueReceipt,
+    TmInputMessage, TmLimits, TmPackageBinding, TmScheduleReceipt, TmService, ims_providers,
+};
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqReplayClock, MqService, mq_providers};
@@ -184,6 +187,7 @@ pub struct ApplicationPublicationReceipt {
     pub identity: String,
     pub controllers: usize,
     pub db2_catalog: bool,
+    pub ims_metadata: bool,
     pub replayed: bool,
 }
 
@@ -213,7 +217,13 @@ struct ApplicationPublicationState {
     action: PublicationAction,
     controllers: PublicationSectionState,
     db2: PublicationSectionState,
+    #[serde(default = "publication_not_applicable")]
+    ims: PublicationSectionState,
     complete: bool,
+}
+
+const fn publication_not_applicable() -> PublicationSectionState {
+    PublicationSectionState::NotApplicable
 }
 
 struct DurableApplicationPublication {
@@ -375,6 +385,7 @@ pub struct ProductServer {
     dataset: Arc<DatasetService>,
     db2: Arc<Db2Service>,
     ims: Arc<ImsService>,
+    ims_tm: Arc<TmService>,
     mq: Arc<MqService>,
     spool: Arc<SpoolService>,
     pub(crate) batch: Arc<BatchService>,
@@ -707,6 +718,13 @@ impl ProductServer {
             enterprise_authorizer.clone(),
             enterprise_replay_clock.clone(),
         )?;
+        let tm_work_store: Arc<dyn WorkStore> = store.clone();
+        let ims_tm = TmService::open(
+            provider_store.clone(),
+            tm_work_store,
+            enterprise_authorizer.clone(),
+            TmLimits::default(),
+        )?;
         let mq = MqService::open_authorized_with_replay_clock(
             provider_store.clone(),
             Default::default(),
@@ -871,6 +889,7 @@ impl ProductServer {
             dataset,
             db2,
             ims,
+            ims_tm,
             mq,
             spool,
             batch,
@@ -957,6 +976,220 @@ impl ProductServer {
     #[must_use]
     pub fn ims_service(&self) -> Arc<ImsService> {
         self.ims.clone()
+    }
+
+    /// Execute with the catalog from the selected, published application package.
+    pub fn ims_execute_selected(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        request: &mainframe_env_host_api::ImsRequest,
+    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let selected = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .selected_generation(application)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        let catalog = selected
+            .package()
+            .sections
+            .ims_metadata
+            .as_ref()
+            .ok_or(HostProblem::NotFound)?;
+        let published = self
+            .ims
+            .selected_metadata_generation(application)?
+            .ok_or(HostProblem::NotFound)?;
+        if published.generation != selected.record().generation
+            || published.package_identity != selected.record().identity
+            || &published.catalog != catalog
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let publication = self
+            .store
+            .get_provider_state(
+                APPLICATION_PUBLICATION_NAMESPACE,
+                &selected.record().package.to_ascii_uppercase(),
+            )
+            .map_err(store_error)?
+            .ok_or(HostProblem::NotFound)?;
+        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if !state.complete || state.identity != selected.record().identity {
+            return Err(HostProblem::NotFound);
+        }
+        self.ims.install_metadata(published.catalog)?;
+        self.ims.execute(invocation, request)
+    }
+
+    /// Admit a message only against the complete selected signed package.
+    pub fn ims_tm_enqueue(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        message: TmInputMessage,
+    ) -> Result<TmEnqueueReceipt, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.selected_ims_tm_application(application)?;
+        self.ims_tm.enqueue(invocation, message)
+    }
+
+    pub fn ims_tm_claim(
+        &self,
+        application: &str,
+        transaction: &str,
+        worker: &str,
+        now_tick: u64,
+        lease_ticks: u64,
+    ) -> Result<Option<WorkRecord>, HostProblem> {
+        let _publication = self
+            .application_publication
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        self.selected_ims_tm_application(application)?;
+        self.ims_tm
+            .claim(transaction, worker, now_tick, lease_ticks)
+    }
+
+    pub fn ims_tm_start(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        work: &WorkRecord,
+    ) -> Result<TmScheduleReceipt, HostProblem> {
+        self.verify_ims_tm_binding(application, &self.ims_tm.package_for_work(work)?)?;
+        self.ims_tm.start(invocation, work)
+    }
+
+    pub fn ims_tm_claim_retained(
+        &self,
+        application: &str,
+        generation: u64,
+        package_identity: &str,
+        transaction: &str,
+        worker: &str,
+        now_tick: u64,
+        lease_ticks: u64,
+    ) -> Result<Option<WorkRecord>, HostProblem> {
+        let binding = TmPackageBinding {
+            application: application.to_ascii_uppercase(),
+            generation,
+            package_identity: package_identity.into(),
+        };
+        self.verify_ims_tm_binding(application, &binding)?;
+        self.ims_tm.claim_retained(
+            application,
+            generation,
+            package_identity,
+            transaction,
+            worker,
+            now_tick,
+            lease_ticks,
+        )
+    }
+
+    pub fn ims_tm_call(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        call: TmCall,
+    ) -> Result<TmCallResult, HostProblem> {
+        self.verify_ims_tm_binding(
+            application,
+            &self.ims_tm.package_for_call(invocation, &call)?,
+        )?;
+        self.ims_tm.call(invocation, call)
+    }
+
+    pub fn ims_tm_cancel(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        message_id: &str,
+    ) -> Result<TmCancelReceipt, HostProblem> {
+        self.verify_ims_tm_binding(application, &self.ims_tm.package_for_message(message_id)?)?;
+        self.ims_tm.cancel(invocation, message_id)
+    }
+
+    fn selected_ims_tm_application(&self, application: &str) -> Result<(), HostProblem> {
+        let selected = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .selected_generation(application)
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        if selected.record().state != InstallState::Ready
+            || selected.package().sections.ims_tm.is_none()
+            || !self.ims_tm.selected_package_matches(
+                &selected.record().package,
+                selected.record().generation,
+                &selected.record().identity,
+            )?
+        {
+            return Err(HostProblem::NotFound);
+        }
+        let publication = self
+            .store
+            .get_provider_state(
+                APPLICATION_PUBLICATION_NAMESPACE,
+                &selected.record().package.to_ascii_uppercase(),
+            )
+            .map_err(store_error)?
+            .ok_or(HostProblem::NotFound)?;
+        let state: ApplicationPublicationState = serde_json::from_slice(&publication.payload)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if !state.complete || state.identity != selected.record().identity {
+            return Err(HostProblem::NotFound);
+        }
+        Ok(())
+    }
+
+    fn verify_ims_tm_binding(
+        &self,
+        application: &str,
+        binding: &TmPackageBinding,
+    ) -> Result<(), HostProblem> {
+        if !binding.application.eq_ignore_ascii_case(application) {
+            return Err(HostProblem::Unauthorized);
+        }
+        let retained = self
+            .applications_v2
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .installer
+            .generation(
+                &binding.application,
+                binding.generation,
+                &binding.package_identity,
+            )
+            .map_err(application_install_problem)?
+            .ok_or(HostProblem::NotFound)?;
+        let definitions = retained.package().sections.ims_tm.as_ref();
+        if retained.record().state != InstallState::Ready
+            || definitions.is_none()
+            || !self.ims_tm.retained_package_matches(
+                &binding.application,
+                binding.generation,
+                &binding.package_identity,
+                definitions.ok_or(HostProblem::NotFound)?,
+            )?
+        {
+            return Err(HostProblem::NotFound);
+        }
+        Ok(())
     }
 
     #[must_use]
@@ -1292,6 +1525,7 @@ impl ProductServer {
                 identity: expected.identity.clone(),
                 controllers: package.sections.batch_controllers.len(),
                 db2_catalog: db2_applicable,
+                ims_metadata: package.sections.ims_metadata.is_some(),
                 replayed: true,
             });
         }
@@ -1327,6 +1561,18 @@ impl ProductServer {
             self.persist_application_publication(&mut durable)?;
         }
 
+        if durable.state.ims != PublicationSectionState::Applied {
+            durable.state.ims = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self.apply_application_ims_metadata(&selected) {
+                durable.state.ims = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.ims = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
+
         self.commit_application_generation(&package)?;
         durable.state.complete = true;
         self.persist_application_publication(&mut durable)?;
@@ -1336,6 +1582,7 @@ impl ProductServer {
             identity: expected.identity.clone(),
             controllers,
             db2_catalog: db2_applicable,
+            ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
         })
     }
@@ -1402,6 +1649,7 @@ impl ProductServer {
                 identity: expected.identity.clone(),
                 controllers: package.sections.batch_controllers.len(),
                 db2_catalog: db2_applicable,
+                ims_metadata: package.sections.ims_metadata.is_some(),
                 replayed: true,
             });
         }
@@ -1435,6 +1683,17 @@ impl ProductServer {
             durable.state.db2 = PublicationSectionState::Applied;
             self.persist_application_publication(&mut durable)?;
         }
+        if durable.state.ims != PublicationSectionState::Applied {
+            durable.state.ims = PublicationSectionState::Applying;
+            self.persist_application_publication(&mut durable)?;
+            if let Err(problem) = self.apply_application_ims_metadata(&selected) {
+                durable.state.ims = PublicationSectionState::Failed;
+                self.persist_application_publication(&mut durable)?;
+                return Err(problem);
+            }
+            durable.state.ims = PublicationSectionState::Applied;
+            self.persist_application_publication(&mut durable)?;
+        }
         self.select_application_generation(&package.base.manifest.name, package.generation)?;
         durable.state.complete = true;
         self.persist_application_publication(&mut durable)?;
@@ -1444,6 +1703,7 @@ impl ProductServer {
             identity: expected.identity.clone(),
             controllers: package.sections.batch_controllers.len(),
             db2_catalog: db2_applicable,
+            ims_metadata: package.sections.ims_metadata.is_some(),
             replayed: false,
         })
     }
@@ -1466,6 +1726,26 @@ impl ProductServer {
             identity: selected.record().identity.clone(),
             controllers,
         })
+    }
+
+    fn apply_application_ims_metadata(
+        &self,
+        selected: &SelectedApplicationGeneration,
+    ) -> Result<(), HostProblem> {
+        let package = selected.package();
+        self.ims.publish_metadata_generation(
+            &package.base.manifest.name,
+            package.generation,
+            &selected.record().identity,
+            package.sections.ims_metadata.as_ref(),
+        )?;
+        self.ims_tm.publish_package_definitions(
+            &package.base.manifest.name,
+            package.generation,
+            &selected.record().identity,
+            package.sections.ims_tm.as_ref(),
+        )?;
+        Ok(())
     }
 
     fn apply_application_db2_catalog(
@@ -1721,7 +2001,8 @@ impl ProductServer {
                     }
                 }
             } else {
-                self.selected_application_v2(&expected)?;
+                let selected = self.selected_application_v2(&expected)?;
+                self.apply_application_ims_metadata(&selected)?;
             }
         }
         Ok(())
@@ -6177,6 +6458,7 @@ fn rollback_publication_state(
         } else {
             PublicationSectionState::NotApplicable
         },
+        ims: PublicationSectionState::Pending,
         complete: false,
     }
 }
@@ -6198,6 +6480,7 @@ fn install_publication_state(
         } else {
             PublicationSectionState::NotApplicable
         },
+        ims: PublicationSectionState::Pending,
         complete: false,
     }
 }
@@ -6206,6 +6489,8 @@ fn install_publication_state(
 mod tests {
     include!("product/bts_browse.rs");
     use super::*;
+    #[path = "ims_package_tests.rs"]
+    mod ims_package_tests;
     use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
@@ -9897,6 +10182,8 @@ mod tests {
                 sql_rows: Vec::new(),
                 ims_definitions: Vec::new(),
                 ims_rows: Vec::new(),
+                ims_metadata: None,
+                ims_tm: None,
                 mq_resources: Vec::new(),
                 batch_controllers: vec![BatchController {
                     name: "TRUSTED-CONTROLLER".into(),
@@ -10139,6 +10426,7 @@ mod tests {
                         action: PublicationAction::Install,
                         controllers: PublicationSectionState::Applied,
                         db2: PublicationSectionState::Applying,
+                        ims: PublicationSectionState::NotApplicable,
                         complete: false,
                     })
                     .unwrap(),

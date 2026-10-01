@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Integrate typed IMS database metadata with public Get Hold, hierarchy mutation, replay, authorization, and durable Memory/SQLite unit-of-work execution."

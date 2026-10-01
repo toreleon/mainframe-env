@@ -3,6 +3,25 @@ use super::*;
 
 impl DatabaseEngine {
     pub fn insert(&mut self, request: InsertRequest) -> Result<RecordView, EngineProblem> {
+        self.insert_internal(request, false)
+    }
+
+    /// Utility load can materialize index pointer rows; DL/I ISRT cannot.
+    pub(crate) fn insert_loaded(
+        &mut self,
+        request: InsertRequest,
+    ) -> Result<RecordView, EngineProblem> {
+        self.insert_internal(request, true)
+    }
+
+    fn insert_internal(
+        &mut self,
+        request: InsertRequest,
+        utility_load: bool,
+    ) -> Result<RecordView, EngineProblem> {
+        if is_index_database(self.definition.organization) && !utility_load {
+            return Err(EngineProblem::Unsupported);
+        }
         if self.records.len() >= self.limits.max_records {
             return Err(EngineProblem::LimitExceeded);
         }
@@ -72,12 +91,7 @@ impl DatabaseEngine {
         } else {
             let mut roots = self.roots.clone();
             roots.push(id);
-            let keyed = matches!(
-                self.definition.organization,
-                DatabaseOrganization::Hidam
-                    | DatabaseOrganization::Hisam
-                    | DatabaseOrganization::Shisam
-            );
+            let keyed = keyed_root_order(self.definition.organization);
             self.sort_ids(&mut roots, keyed);
             self.roots = roots;
         }
@@ -138,7 +152,10 @@ impl DatabaseEngine {
         updated.version = version;
         self.indexes = indexes;
         self.revision = revision;
-        position.held = None;
+        position.held = Some(HeldRecord {
+            id: record.id,
+            version,
+        });
         Ok(self.view(record.id))
     }
 
@@ -189,6 +206,8 @@ impl DatabaseEngine {
         self.records = records;
         self.roots = roots;
         self.indexes = indexes;
+        self.logical_links
+            .retain(|link| !removed.contains(&link.child));
         self.revision = revision;
         position.current = record.parent;
         position.held = None;

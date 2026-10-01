@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Execute all pinned IMS database organizations through typed generic metadata, retain cross-database logical child links, and update paired relationships atomically across provider rows."

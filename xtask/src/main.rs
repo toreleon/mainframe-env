@@ -10,6 +10,7 @@ mod cobol_differential;
 mod db2_statement_catalog;
 mod docs;
 mod evidence_seal;
+mod ims_assurance_matrix;
 mod ims_catalog;
 mod jcl_catalog;
 mod jcl_conformance;
@@ -198,6 +199,7 @@ enum XtaskCommand {
     Inventory(CheckArgs),
     MqMqiRegistry(CheckArgs),
     MqLicensedContract(CheckArgs),
+    ImsLicensedContract(CheckArgs),
     Evidence(EvidenceArgs),
     Coverage(CheckArgs),
     ApplicationPackages(CheckArgs),
@@ -236,6 +238,7 @@ enum XtaskCommand {
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
     ImsCatalog(CheckArgs),
+    ImsAssuranceMatrix(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
     WorkPackageSeal(WorkPackageSealArgs),
@@ -358,6 +361,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 "mq-licensed-contract",
                 args,
                 check_mq_licensed_contract(root)
+            )
+        }
+        XtaskCommand::ImsLicensedContract(args) => {
+            checked!(
+                "ims-licensed-contract",
+                args,
+                check_ims_licensed_contract(root)
             )
         }
         XtaskCommand::Evidence(args) => match (args.check, args.command) {
@@ -561,6 +571,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 ims_catalog::generate(root)
             }
         ),
+        XtaskCommand::ImsAssuranceMatrix(args) => {
+            checked!(
+                "ims-assurance-matrix",
+                args,
+                ims_assurance_matrix::check(root)
+            )
+        }
         XtaskCommand::RacfCatalog(args) => (
             "racf-catalog",
             args.check,
@@ -734,6 +751,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
 fn check_conformance(root: &Path) -> TaskResult {
     check_spec(root)?;
     ims_catalog::check(root)?;
+    ims_assurance_matrix::check(root)?;
     racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;
@@ -7930,6 +7948,43 @@ fn check_mq_licensed_contract(root: &Path) -> TaskResult {
             .status()
             .map_err(|error| format!("{label}: {error}"))?;
         require(status.success(), &format!("{label} failed"))?;
+    }
+    Ok(())
+}
+
+fn check_ims_licensed_contract(root: &Path) -> TaskResult {
+    for (instance, schema) in [
+        (
+            "conformance/0.14/oracles/ims-licensed-differential.json",
+            "conformance/0.14/schemas/ims-licensed-differential-adapter.schema.json",
+        ),
+        (
+            "conformance/0.14/fixtures/ims-licensed-differential-cases.json",
+            "conformance/0.14/schemas/ims-licensed-differential-fixtures.schema.json",
+        ),
+    ] {
+        let instance = root.join(instance);
+        let schema = root.join(schema);
+        validate_schema_instance(&json(&schema)?, &json(&instance)?, &instance)?;
+    }
+    let receipt_schema =
+        root.join("conformance/0.14/schemas/ims-licensed-differential-receipt.schema.json");
+    compile_draft_2020_12_schema(&json(&receipt_schema)?, &receipt_schema)?;
+    for tool in [
+        "conformance/0.14/tools/generate_ims_licensed_fixtures.py",
+        "conformance/0.14/tools/verify_ims_licensed_differential.py",
+    ] {
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(root.join(tool))
+            .arg("--check")
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("IMS licensed contract {tool}: {error}"))?;
+        require(
+            status.success(),
+            &format!("IMS licensed contract {tool} failed"),
+        )?;
     }
     Ok(())
 }

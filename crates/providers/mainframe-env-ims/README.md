@@ -43,6 +43,12 @@ protected transitions. `ImsMetadataCatalog` and
 contract, described by the Draft 2020-12
 [`metadata schema`](../../../conformance/0.14/schemas/ims-metadata.schema.json).
 
+Package publication retains at most 64 validated metadata generations per
+application in provider-owned versioned rows and atomically advances a separate
+selected-generation row. Repeated publication is idempotent, conflicts fail
+closed, and selecting a retained rollback generation uses the verified package
+identity and catalog.
+
 The `database` module exports the recovered in-memory engine foundation. It
 validates bounded hierarchy, field and index definitions, and owns deterministic
 GU/GN/GNP-style selection, caller-owned position and holds, insert, replace,
@@ -50,6 +56,21 @@ physical subtree delete, append-only GSAM, and secondary-index maintenance.
 It is isolated from `ims_providers`; it does not emit PCB statuses or persist
 its image. Metadata publication, host routing, authorization and UOW integration
 remain separate contracts.
+
+The engine is available through the existing `ImsService` and `ims_providers`
+route after `install_metadata`. The typed catalog selects database and PCB
+authority; separate versioned rows retain generic images and undo, while
+sessions and replay use the existing IMS rows. GU/GN/GNP and their Get Hold
+forms, ISRT/REPL/DLET, bulk load/unload, checkpoint, commit, and rollback use
+the bounded engine for all pinned data organizations. INDEX and PSINDEX are
+metadata-validated index databases and reject application data PCB scheduling.
+Logical child occurrences retain metadata-selected parent links in the existing
+database images; a child read includes the linked parent data, and paired
+parent deletion removes linked children in one provider-row CAS publication.
+Insertion identifies one logical parent with parent-segment field qualifiers.
+An unpaired parent with live children rejects deletion. Composite secondary
+indexes remain outside this route. Legacy and generic catalogs may coexist
+when their database and PSB names do not overlap.
 
 TM admission records a provider-row intent before adding work. An exact retry
 or `repair_schedules` repairs that bounded cross-interface gap without executing

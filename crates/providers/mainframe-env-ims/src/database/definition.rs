@@ -98,16 +98,6 @@ pub(super) fn validate_definition(
             return Err(EngineProblem::InvalidDefinition);
         }
     }
-    if !matches!(
-        definition.organization,
-        DatabaseOrganization::Hdam
-            | DatabaseOrganization::Hidam
-            | DatabaseOrganization::Hisam
-            | DatabaseOrganization::Shisam
-            | DatabaseOrganization::Gsam
-    ) {
-        return Err(EngineProblem::Unsupported);
-    }
     match definition.organization {
         DatabaseOrganization::Gsam
             if definition.segments.len() != 1
@@ -116,14 +106,40 @@ pub(super) fn validate_definition(
         {
             Err(EngineProblem::InvalidDefinition)
         }
-        DatabaseOrganization::Shisam if definition.segments.len() != 1 => {
+        DatabaseOrganization::Msdb
+        | DatabaseOrganization::Shisam
+        | DatabaseOrganization::Shsam
+        | DatabaseOrganization::Index
+        | DatabaseOrganization::Psindex
+            if definition.segments.len() != 1 =>
+        {
+            Err(EngineProblem::InvalidDefinition)
+        }
+        DatabaseOrganization::Shsam
+            if definition.segments[0].min_length != definition.segments[0].max_length =>
+        {
             Err(EngineProblem::InvalidDefinition)
         }
         DatabaseOrganization::Hdam
         | DatabaseOrganization::Hidam
         | DatabaseOrganization::Hisam
         | DatabaseOrganization::Shisam
+        | DatabaseOrganization::Phidam
+        | DatabaseOrganization::Dedb
+        | DatabaseOrganization::Index
+        | DatabaseOrganization::Msdb
             if definition.segments[0].key_field.is_none() =>
+        {
+            Err(EngineProblem::InvalidDefinition)
+        }
+        DatabaseOrganization::Gsam
+        | DatabaseOrganization::Hsam
+        | DatabaseOrganization::Index
+        | DatabaseOrganization::Msdb
+        | DatabaseOrganization::Psindex
+        | DatabaseOrganization::Shisam
+        | DatabaseOrganization::Shsam
+            if !definition.secondary_indexes.is_empty() =>
         {
             Err(EngineProblem::InvalidDefinition)
         }

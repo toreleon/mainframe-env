@@ -1,6 +1,6 @@
 use super::codec::{
     CATALOG_KEY, CATALOG_NAMESPACE, CONVERSATION_NAMESPACE, MESSAGE_NAMESPACE, OUTBOUND_NAMESPACE,
-    SESSION_NAMESPACE, delete, list, mutate, put, read, store_error,
+    REPLAY_NAMESPACE, SESSION_NAMESPACE, delete, list, mutate, put, read, store_error,
 };
 use super::contracts::{
     TmCall, TmConversationAction, TmDefinitionSet, TmDestination, TmInputMessage, TmLimits, TmPcb,
@@ -8,9 +8,9 @@ use super::contracts::{
 };
 use super::model::{
     CatalogRow, ConversationRow, ConversationStart, MessageRow, OutboundRow, OutputBuffer,
-    ReplayResult, SessionRow, TmCallResult, TmCancelReceipt, TmConversationView, TmEnqueueReceipt,
-    TmInstallReceipt, TmMessageState, TmOutboundMessage, TmPcbView, TmScheduleReceipt,
-    WorkDisposition, WorkPayload,
+    ReplayResult, ReplayRow, SessionRow, TmCallResult, TmCancelReceipt, TmConversationView,
+    TmEnqueueReceipt, TmInstallReceipt, TmMessageState, TmOutboundMessage, TmPcbView,
+    TmScheduleReceipt, WorkDisposition, WorkPayload,
 };
 use super::support::{
     call_replay, cancel_replay, digest, enqueue_replay, find_transaction, hex_digest,
@@ -65,6 +65,9 @@ impl TmService {
         let row = CatalogRow {
             definitions: definitions.clone(),
             next_sequence: 1,
+            package_binding: None,
+            application: None,
+            active: true,
         };
         mutate(
             self.store.as_ref(),
@@ -91,10 +94,25 @@ impl TmService {
         let now = self.check_invocation(invocation)?;
         message.validate(self.limits)?;
         let (catalog_version, mut catalog) = self.catalog()?.ok_or(HostProblem::NotFound)?;
+        if !catalog.active {
+            return Err(HostProblem::NotFound);
+        }
+        let request_digest = invocation_digest(
+            "mainframe-env.ims-tm-enqueue@1",
+            invocation,
+            &(catalog.package_binding.as_deref(), &message),
+        )?;
+        if let Some((_, replay)) = read::<ReplayRow>(
+            self.store.as_ref(),
+            REPLAY_NAMESPACE,
+            invocation.idempotency_key.as_str(),
+            self.limits.max_state_bytes,
+        )? && replay.request_digest != request_digest
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         let transaction = find_transaction(&catalog, &message.transaction)?.clone();
         self.authorize_transaction(invocation, &transaction, AccessIntent::Update)?;
-        let request_digest =
-            invocation_digest("mainframe-env.ims-tm-enqueue@1", invocation, &message)?;
         if let Some(replay) = self.replay(invocation, request_digest)? {
             return enqueue_replay(replay);
         }
@@ -123,6 +141,7 @@ impl TmService {
             &transaction,
             message.conversation_id.as_deref(),
             request_digest,
+            catalog.package_binding.as_deref(),
         )?;
         message.conversation_id = conversation_id.clone();
         let sequence = catalog.next_sequence;
@@ -147,6 +166,7 @@ impl TmService {
             request_digest,
             new_conversation,
             run_unit: None,
+            package_binding: catalog.package_binding.clone(),
         };
         mutate(
             self.store.as_ref(),
@@ -175,7 +195,6 @@ impl TmService {
         if max == 0 || max > self.limits.max_queued_messages {
             return Err(HostProblem::ResourceExhausted);
         }
-        let (_, catalog) = self.catalog()?.ok_or(HostProblem::NotFound)?;
         let mut repaired = 0;
         for (_, version, mut message) in list::<MessageRow>(
             self.store.as_ref(),
@@ -186,6 +205,7 @@ impl TmService {
             if repaired == max || message.state != TmMessageState::AdmissionPending {
                 continue;
             }
+            let catalog = self.catalog_for_binding(message.package_binding.as_deref())?;
             let transaction = find_transaction(&catalog, &message.message.transaction)?;
             self.ensure_work(&message, transaction)?;
             message.state = TmMessageState::Scheduled;
@@ -220,7 +240,10 @@ impl TmService {
         self.work_store
             .claim(
                 worker,
-                Some(&work_generation(transaction)?),
+                Some(&work_generation(
+                    transaction,
+                    catalog.package_binding.as_deref(),
+                )?),
                 now,
                 lease_ticks,
             )
@@ -248,19 +271,33 @@ impl TmService {
         if message.deadline_tick <= now {
             return Err(HostProblem::TimedOut);
         }
-        if message.state != TmMessageState::Scheduled
-            || payload.transaction != message.message.transaction
-            || message.principal != invocation.principal.id().as_str()
+        if payload.transaction != message.message.transaction {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        if message.principal != invocation.principal.id().as_str() {
+            return Err(HostProblem::Unauthorized);
+        }
+        let catalog = self.catalog_for_binding(message.package_binding.as_deref())?;
+        let transaction = find_transaction(&catalog, &message.message.transaction)?.clone();
+        if message.work_id != current_work.work_id
+            || current_work.required_generation
+                != work_generation(&transaction, message.package_binding.as_deref())?
+            || current_work.required_selector.as_str() != transaction.program_selector
+            || current_work.artifact.as_str() != transaction.artifact
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        let (_, catalog) = self.catalog()?.ok_or(HostProblem::NotFound)?;
-        let transaction = find_transaction(&catalog, &message.message.transaction)?.clone();
         self.authorize_transaction(invocation, &transaction, AccessIntent::Execute)?;
-        let request_digest =
-            invocation_digest("mainframe-env.ims-tm-schedule@1", invocation, &payload)?;
+        let request_digest = invocation_digest(
+            "mainframe-env.ims-tm-schedule@1",
+            invocation,
+            &(message.package_binding.as_deref(), &payload),
+        )?;
         if let Some(replay) = self.replay(invocation, request_digest)? {
             return schedule_replay(replay);
+        }
+        if message.state != TmMessageState::Scheduled {
+            return Err(HostProblem::IdempotencyConflict);
         }
         if self.session(invocation.run_unit_id.as_str())?.is_some() {
             return Err(HostProblem::IdempotencyConflict);
@@ -304,6 +341,7 @@ impl TmService {
                 .clone()
                 .ok_or(HostProblem::IdempotencyConflict)?,
             lease_epoch: current_work.lease_epoch,
+            package_binding: message.package_binding.clone(),
         };
         message.state = TmMessageState::InFlight;
         message.run_unit = Some(session.run_unit.clone());
@@ -355,9 +393,51 @@ impl TmService {
 
     pub fn call(&self, invocation: &Invocation, call: TmCall) -> Result<TmCallResult, HostProblem> {
         let now = self.check_invocation(invocation)?;
-        let (session_version, mut session) = self
-            .session(invocation.run_unit_id.as_str())?
-            .ok_or(HostProblem::NotFound)?;
+        let session = self.session(invocation.run_unit_id.as_str())?;
+        if session.is_none() {
+            if let Some((_, candidate)) = read::<ReplayRow>(
+                self.store.as_ref(),
+                REPLAY_NAMESPACE,
+                invocation.idempotency_key.as_str(),
+                self.limits.max_state_bytes,
+            )? && let Some(work) = candidate.work.as_ref()
+            {
+                let retained = self
+                    .work_store
+                    .get_work(&work.work_id)
+                    .map_err(work_error)?
+                    .ok_or(HostProblem::UnknownOutcome)?;
+                let payload: WorkPayload = serde_json::from_slice(&retained.payload)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                if payload.schema_version != WORK_PAYLOAD_SCHEMA {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                let (_, message) = self
+                    .message(&payload.message_id)?
+                    .ok_or(HostProblem::UnknownOutcome)?;
+                let digest = invocation_digest(
+                    "mainframe-env.ims-tm-call@1",
+                    invocation,
+                    &(message.package_binding.as_deref(), &call),
+                )?;
+                let replay = self
+                    .replay(invocation, digest)?
+                    .ok_or(HostProblem::UnknownOutcome)?;
+                if message.principal != invocation.principal.id().as_str()
+                    || message.work_id != work.work_id
+                {
+                    return Err(HostProblem::Unauthorized);
+                }
+                let catalog = self.catalog_for_binding(message.package_binding.as_deref())?;
+                let transaction = find_transaction(&catalog, &message.message.transaction)?;
+                call.validate(transaction.context, transaction, self.limits)?;
+                self.authorize_transaction(invocation, transaction, AccessIntent::Update)?;
+                self.apply_replay_work(replay.work.as_ref(), now)?;
+                return call_replay(replay);
+            }
+            return Err(HostProblem::NotFound);
+        }
+        let (session_version, mut session) = session.ok_or(HostProblem::NotFound)?;
         if session.principal != invocation.principal.id().as_str() {
             return Err(HostProblem::Unauthorized);
         }
@@ -372,7 +452,7 @@ impl TmService {
         if current_work.deadline_tick <= now {
             return Err(HostProblem::TimedOut);
         }
-        let (_, catalog) = self.catalog()?.ok_or(HostProblem::NotFound)?;
+        let catalog = self.catalog_for_binding(session.package_binding.as_deref())?;
         let transaction = find_transaction(&catalog, &session.transaction)?.clone();
         call.validate(transaction.context, &transaction, self.limits)?;
         let intent = if matches!(call, TmCall::GetUnique | TmCall::GetNext) {
@@ -381,7 +461,11 @@ impl TmService {
             AccessIntent::Update
         };
         self.authorize_transaction(invocation, &transaction, intent)?;
-        let request_digest = invocation_digest("mainframe-env.ims-tm-call@1", invocation, &call)?;
+        let request_digest = invocation_digest(
+            "mainframe-env.ims-tm-call@1",
+            invocation,
+            &(session.package_binding.as_deref(), &call),
+        )?;
         if let Some(replay) = self.replay(invocation, request_digest)? {
             self.apply_replay_work(replay.work.as_ref(), now)?;
             return call_replay(replay);
@@ -474,11 +558,14 @@ impl TmService {
     ) -> Result<TmCancelReceipt, HostProblem> {
         self.check_invocation(invocation)?;
         let (version, mut message) = self.message(message_id)?.ok_or(HostProblem::NotFound)?;
-        let (_, catalog) = self.catalog()?.ok_or(HostProblem::NotFound)?;
+        let catalog = self.catalog_for_binding(message.package_binding.as_deref())?;
         let transaction = find_transaction(&catalog, &message.message.transaction)?;
         self.authorize_transaction(invocation, transaction, AccessIntent::Control)?;
-        let request_digest =
-            invocation_digest("mainframe-env.ims-tm-cancel@1", invocation, &message_id)?;
+        let request_digest = invocation_digest(
+            "mainframe-env.ims-tm-cancel@1",
+            invocation,
+            &(message.package_binding.as_deref(), message_id),
+        )?;
         if let Some(replay) = self.replay(invocation, request_digest)? {
             return cancel_replay(replay);
         }
@@ -1028,6 +1115,7 @@ impl TmService {
         transaction: &TmTransactionDefinition,
         supplied: Option<&str>,
         request_digest: [u8; 32],
+        package_binding: Option<&str>,
     ) -> Result<(Option<String>, bool), HostProblem> {
         if !transaction.conversational {
             return if supplied.is_none() {
@@ -1046,6 +1134,7 @@ impl TmService {
             .ok_or(HostProblem::NotFound)?;
             if conversation.principal != invocation.principal.id().as_str()
                 || conversation.next_transaction != transaction.code
+                || conversation.package_binding.as_deref() != package_binding
             {
                 return Err(HostProblem::Unauthorized);
             }
@@ -1082,12 +1171,14 @@ impl TmService {
                     next_transaction: transaction.code.clone(),
                     spa: Vec::new(),
                     step: 0,
+                    package_binding: message.package_binding.clone(),
                 },
                 spa: Vec::new(),
             })),
             (false, Some((version, conversation)))
                 if conversation.principal == invocation.principal.id().as_str()
-                    && conversation.next_transaction == transaction.code =>
+                    && conversation.next_transaction == transaction.code
+                    && conversation.package_binding == message.package_binding =>
             {
                 let spa = conversation.spa.clone();
                 Ok(Some(ConversationStart {

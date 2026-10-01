@@ -3,6 +3,7 @@
 mod codec;
 mod contracts;
 mod model;
+mod package;
 mod service;
 mod support;
 
@@ -14,4 +15,5 @@ pub use model::{
     TmCallResult, TmCancelReceipt, TmConversationView, TmEnqueueReceipt, TmInstallReceipt,
     TmMessageState, TmOutboundMessage, TmPcbView, TmScheduleReceipt,
 };
+pub use package::TmPackageBinding;
 pub use service::TmService;

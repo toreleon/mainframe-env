@@ -15,8 +15,12 @@ mod clock;
 mod dataset;
 mod enterprise;
 mod ims;
+mod ims_applicability;
+mod ims_metadata;
 mod ims_pcb;
 mod ims_status;
+mod ims_system;
+mod ims_tm;
 mod mq_catalog;
 mod mq_context;
 mod mq_contract;
@@ -60,6 +64,18 @@ pub use ims::{
     ImsSsaRelationDescriptor, ims_ssa_boolean, ims_ssa_command_code, ims_ssa_relation,
     parse_ims_ssa,
 };
+pub use ims_applicability::{
+    IMS_CALL_APPLICABILITY, IMS_CALL_APPLICABILITY_RULES_SHA256, ImsApplicabilityProblem,
+    ImsCallApplicabilityDescriptor, ImsCallSite, ImsCallSyntax, ImsCallVariant,
+    ImsProcessingOptionClass, ImsSsaForm, validate_ims_call_site,
+};
+pub use ims_metadata::{
+    IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,
+    ImsDbLevel, ImsFieldMetadata, ImsLogicalRelationshipMetadata, ImsMetadataCatalog,
+    ImsMetadataIdentity, ImsMetadataLimits, ImsMetadataProblem, ImsPcbMetadata, ImsPsbMetadata,
+    ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
+    ImsTerminalPcbMetadata, validate_ims_metadata,
+};
 pub use ims_pcb::{
     IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
     IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,
@@ -71,6 +87,17 @@ pub use ims_status::{
     ImsStatusCategory, ImsStatusCode, ImsStatusContext, ImsStatusContextDescriptor,
     ImsStatusDescriptor, ImsStatusProblem, ims_status, ims_status_context, ims_status_contexts,
     resolve_ims_status,
+};
+pub use ims_system::{
+    ImsAcceptRow, ImsBufferPoolDefinition, ImsBufferPoolKind, ImsBufferStatistics,
+    ImsDedbAreaDefinition, ImsPcbAvailability, ImsPositionArea, ImsPositionKeyword, ImsPositionSsa,
+    ImsQClass, ImsStatisticsFamily, ImsStatisticsFormat, ImsStatisticsFunction, ImsStatusGroup,
+    ImsSystemCall, ImsSystemDirectory, ImsSystemRequest, ImsSystemResult,
+    ImsSystemRuntimeDefinition,
+};
+pub use ims_tm::{
+    TmAlternatePcbDefinition, TmDefinitionSet, TmDestination, TmExecutionContext, TmLimits,
+    TmTransactionDefinition,
 };
 pub use mq_catalog::{
     MQ_MQI_CALL_COUNT, MQ_MQI_CALL_IDENTITY_SET_SHA256, MQ_MQI_SOURCE_ROW_COUNT,

@@ -296,6 +296,8 @@ fn provider_replay_digests_share_the_host_journal_encoding_and_have_golden_ident
         checkpoint_id: Some("CHK00017".into()),
         max_segments: 19,
         mutation: Some(mutation("ims-golden", 5)),
+        system: None,
+        q_class: None,
     };
     let mq = MqRequest {
         operation: MqOperation::PutOne,

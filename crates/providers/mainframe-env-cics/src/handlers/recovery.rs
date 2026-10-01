@@ -369,6 +369,8 @@ fn syncpoint_ims(
                     idempotency_key: key,
                     transaction: Some(run.transaction.clone()),
                 }),
+                system: None,
+                q_class: None,
             }),
         },
     );

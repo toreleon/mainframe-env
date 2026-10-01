@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Bounded IMS CardDemo package execution and 25-row local handler closure with zero licensed coverage credit."

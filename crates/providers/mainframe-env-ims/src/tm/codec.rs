@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) const CATALOG_NAMESPACE: &str = "ims-tm-v1-catalog";
 pub(crate) const CATALOG_KEY: &str = "transactions";
+pub(crate) const PACKAGE_NAMESPACE: &str = "ims-tm-v1-package-definitions";
 pub(crate) const MESSAGE_NAMESPACE: &str = "ims-tm-v1-message";
 pub(crate) const SESSION_NAMESPACE: &str = "ims-tm-v1-session";
 pub(crate) const CONVERSATION_NAMESPACE: &str = "ims-tm-v1-conversation";
@@ -126,7 +127,10 @@ pub(crate) fn mutate(
     }
     store
         .mutate_provider_states_atomic(mutations)
-        .map_err(store_error)
+        .map_err(|problem| match problem {
+            StoreError::Infrastructure(_) => HostProblem::UnknownOutcome,
+            other => store_error(other),
+        })
 }
 
 pub(crate) fn store_error(problem: StoreError) -> HostProblem {

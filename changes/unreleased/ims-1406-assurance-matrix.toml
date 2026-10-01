@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a schema-checked IMS local assurance matrix and focused SAF read/replay denial regressions across existing provider foundations."

@@ -19,6 +19,11 @@ combinations outside their reviewed contexts. The TM contract validates its
 four core statuses against the same registry. These descriptors do not execute
 a DL/I call or grant coverage.
 
+The shared `mainframe-env.ims-metadata@1` contract owns versioned DBD, PSB, PCB,
+segment, field, index, relationship and sensitivity DTOs plus their bounded
+cross-reference validator and domain-separated digest. Packages and providers
+consume this one authority rather than translating between private schemas.
+
 Invariants: every request/result is bounded; mutations carry effect sequence
 and idempotency identity; capability resolution is deterministic; official and
 custom semantic namespaces cannot overlap; and no generated identity installs a

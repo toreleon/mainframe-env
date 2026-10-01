@@ -827,6 +827,9 @@ pub enum ImsOperation {
     GetUnique,
     GetNext,
     GetNextParent,
+    GetHoldUnique,
+    GetHoldNext,
+    GetHoldNextParent,
     Insert,
     Replace,
     Delete,
@@ -835,6 +838,7 @@ pub enum ImsOperation {
     Unload,
     Commit,
     Rollback,
+    System,
 }
 
 impl ImsOperation {
@@ -862,6 +866,10 @@ pub struct ImsRequest {
     pub checkpoint_id: Option<String>,
     pub max_segments: u32,
     pub mutation: Option<Mutation>,
+    /// Typed system-call operands. Present only for `ImsOperation::System`.
+    pub system: Option<crate::ImsSystemRequest>,
+    /// Q/LOCKCLASS reservation requested by a database Get call.
+    pub q_class: Option<crate::ImsQClass>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -877,6 +885,8 @@ pub struct ImsResult {
     pub segments: Vec<ImsSegment>,
     pub checkpoint_id: Option<String>,
     pub affected_segments: u64,
+    /// Typed output for a system call; absent for existing database/TM calls.
+    pub system: Option<crate::ImsSystemResult>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1198,7 +1208,22 @@ impl HostRequest {
                 Ok(())
             }
             Self::Ims(request) => {
-                if request.pcb == 0
+                if (request.operation == ImsOperation::System) != request.system.is_some()
+                    || request.q_class.is_some_and(|class| !class.is_valid())
+                    || request.q_class.is_some()
+                        && !matches!(
+                            request.operation,
+                            ImsOperation::GetUnique
+                                | ImsOperation::GetNext
+                                | ImsOperation::GetNextParent
+                                | ImsOperation::GetHoldUnique
+                                | ImsOperation::GetHoldNext
+                                | ImsOperation::GetHoldNextParent
+                        )
+                {
+                    return Err(HostProblem::Malformed);
+                }
+                if request.pcb == 0 && request.operation != ImsOperation::System
                     || request.segments.len() > limits.max_fields
                     || request.data.len() > limits.max_record_bytes
                     || request.qualifiers.len() > limits.max_fields
@@ -1225,6 +1250,9 @@ impl HostRequest {
                         .is_some_and(|id| id.is_empty() || id.len() > limits.max_name_bytes)
                 {
                     return Err(HostProblem::ResourceExhausted);
+                }
+                if let Some(system) = &request.system {
+                    system.validate(limits)?;
                 }
                 if request.operation.is_mutating() {
                     request
@@ -1576,6 +1604,14 @@ impl HostResult {
                                 .as_ref()
                                 .is_some_and(|key| key.len() > limits.max_record_bytes)
                     }) =>
+            {
+                Err(HostProblem::ResourceExhausted)
+            }
+            Self::Ims(result)
+                if result
+                    .system
+                    .as_ref()
+                    .is_some_and(|system| system.validate(limits).is_err()) =>
             {
                 Err(HostProblem::ResourceExhausted)
             }
