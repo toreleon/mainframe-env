@@ -21,6 +21,7 @@ mod mq_catalog;
 mod mq_context;
 mod mq_contract;
 mod mq_handles;
+mod mq_message_contract;
 pub mod mq_object_route;
 mod mq_validation;
 mod names;
@@ -91,6 +92,14 @@ pub use mq_handles::{
     MQ_MAX_HANDLE_SLOTS, MQHC_DEF_HCONN, MQHC_UNASSOCIATED_HCONN, MqConnectionId, MqHandle,
     MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHandleSharing, MqHconn,
     MqHmsg, MqHobj, MqHsub,
+};
+pub use mq_message_contract::{
+    MQ_MESSAGE_CONTRACT, MQ_MESSAGE_PENDING, MQ_MESSAGE_SOURCES, MqDeliveryOutcome,
+    MqDistributionItemResult, MqDistributionResult, MqExpiry, MqGetContract, MqGetDisposition,
+    MqGetMode, MqMessage, MqMessageDescriptor, MqMessageIdentifiers, MqMessageLimits,
+    MqMessageMatch, MqMessageOrdering, MqMessagePending, MqMessageProblem, MqMessageProperty,
+    MqMessageSource, MqPersistence, MqPriority, MqPropertyQuery, MqPropertyType, MqTruncation,
+    MqTruncationDisposition, MqWait,
 };
 pub use mq_validation::{
     MqArgument, MqArgumentValue, MqExecutionDisposition, MqPendingDisposition, MqStructureVersion,
