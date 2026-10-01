@@ -763,7 +763,7 @@ impl ProductServer {
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
         let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
-        program.bind_runtime(host.clone(), store.clone(), program_artifacts)?;
+        program.bind_product_runtime(host.clone(), store.clone(), program_artifacts, &cics)?;
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let batch = BatchService::open_with_checkpoint_store(
             host.clone(),

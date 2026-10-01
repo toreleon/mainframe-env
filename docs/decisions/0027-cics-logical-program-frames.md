@@ -348,6 +348,75 @@ unchanged pending child CALL and final original COBOL run completion. This
 proves explicit SYNCPOINT settlement only, not every implicit task-end or
 non-root/default ancestor recovery obligation.
 
+## Installed transfer target staging
+
+After schema-3 observed source intent, the embedding can stage an immutable
+local target in the same original CALL row. The existing CICS Transfer response
+carries optional `PROGRAM.SELECTION`, schema
+`mainframe-env.cics.program-selection@1`, with canonical MECPGD1 definition
+bytes. XCTL and current/ancestor HANDLE ABEND PROGRAM freeze the definition
+before existing outer replay and core result publication. Direct PROGRAM exits
+use the issuer frame's entry COMMAREA, not a nested leaf's area; the historical
+root-only retrieve fallback remains supported. This does not complete handler,
+channel or task-storage lifetime semantics.
+
+`attested_program_transfer_selection` is a read-only CICS adapter. The caller
+must obtain the source effect from the trusted core store and independently
+validate the source invocation. The adapter requires Completed canonical host
+result proof with matching owner/run/attempt/capability/key/sequence/deadline,
+the exact existing MECER003 replay tuple and observed Transfer payload, and
+canonical frozen definition bytes matching the immutable generation row.
+Only enabled local, non-Java, offset-zero executable artifacts are eligible.
+No latest-generation or generic program-name fallback is allowed. Missing,
+legacy, malformed and unavailable selections leave the original CALL unknown.
+Reserved selection outputs are also validated before retention classification.
+
+The pending CALL advances JSON schema 3/CAS 2 to schema 4/CAS 3 with `target`:
+selector, artifact, generation, content identity, invocation, context digest,
+checkpoint schema, canonical padded base64 checkpoint, checkpoint digest.
+The strict invocation DTO stores request/execution/run/parent/selector/artifact,
+principal/sorted grants, class/priority/deadline/trace/key/attempt, six resource
+limits, sorted schema/base64 bindings, sorted provider generations, audit,
+optional cancellation and live-probe presence. JSON follows the declared DTO
+field order, compact serde encoding, and BTreeMap ordering. Resource limits
+retain u64 effects/events and u32 frames. A caller must explicitly reinstall a
+trusted run-scoped live probe; no pointer or observed probe state is serialized.
+
+Existing installed-call length framing binds `installed-transfer-target@1`,
+CALL key, source execution, generation (big-endian u64), and definition content
+identity to deterministic target request/execution/trace/effect identities.
+`staged-invocation@1` frames the canonical DTO JSON; target metadata frames
+`installed-target-stage@1`, selector, artifact, generation, content identity,
+context digest, checkpoint schema and checkpoint digest. Receipt metadata uses
+`mainframe-env.cobol-call-receipt-metadata@4\0`, the unchanged prior owner/reply
+framing, then source-intent and target-metadata digests in that order. SHA-256
+digests are lowercase hex; definition/artifact identities retain `sha256:`.
+Receipt JSON is bounded at 64 MiB; invocation binding limits and checkpoint
+constructor limits remain independently enforced. Receipt 4 is pending-only
+and cannot carry a reply or completion tick. It retains explicit provider-row
+dependencies on the frozen definition generation and source CICS effect replay,
+alongside existing CALL/source/caller/run dependencies. Syntax-only checkpoint
+validation is protective retention metadata, never execution authorization.
+
+The stored MECP0012 image is exactly a fresh reference-machine constructor
+checkpoint: it precedes COBOL init operations, target instance admission and
+last-used instance state. Inherited invocation bindings preserve the entry
+COMMAREA even though unexecuted linkage storage is initially zero. Target
+execution is not registered and source Suspended/checkpoint/busy-instance
+authority is unchanged. A future consumer must revalidate source/core/result
+proof, exact artifact and constructor checkpoint, trusted controls and instance
+authority; acquire same-level CICS admission, perform owned handoff and execute
+the target before any caller restoration or terminal claim. Warm/cold task
+resources are not made durable by this staging phase.
+
+Readers retain legacy schema 1 and ordinary schema 2, and pending schema 3;
+unchanged ordinary writers still emit schema 2. Old readers reject schema 4.
+Downgrade requires draining or preserving pending 3/4 rows with a compatible
+reader and verified backup; never strip target/context/selection metadata or
+relabel a pending row as completed. Artifact removal is not authorized by this
+phase; unavailable immutable artifacts fail closed, not catalog replacement.
+No new coordinator, provider namespace, executable host contract or ledger.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline

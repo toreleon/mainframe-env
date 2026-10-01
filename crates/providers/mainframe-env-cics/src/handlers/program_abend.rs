@@ -85,6 +85,7 @@ pub(in crate::service) fn unwind(
         }
         None => response.payload = bounded(Vec::new())?,
     }
+    super::program_control::freeze_program_transfer(service, &mut response)?;
     Ok(Some(response))
 }
 

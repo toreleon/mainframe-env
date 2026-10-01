@@ -638,11 +638,23 @@ fn abend(
         b"suppressed".as_slice()
     };
     let payload = if disposition == CicsDisposition::Transfer {
-        run.retrieve.clone()
+        run.current_program
+            .effect_invocation
+            .bindings
+            .get("cics.commarea")
+            .map(|area| area.bytes().to_vec())
+            .unwrap_or_else(|| {
+                if run.current_program.logical_level == 1 {
+                    run.retrieve.clone()
+                } else {
+                    Vec::new()
+                }
+            })
     } else {
         code
     };
     let mut response = service.response(run, disposition, "ERROR", 27, 0, target, None, payload)?;
+    super::program_control::freeze_program_transfer(service, &mut response)?;
     if disposition == CicsDisposition::Abended {
         response.outputs.insert(
             "ABEND.DUMP".into(),

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Freeze immutable CICS PROGRAM/XCTL selections in existing effect replay and retain the attested target invocation and pre-instance-admission checkpoint in the original pending CALL. Strict schema-4 validation, context inheritance and exact-generation retention prevent catalog retargeting without falsely completing source handoff or admitting target execution."

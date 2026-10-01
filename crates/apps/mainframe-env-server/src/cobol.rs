@@ -40,6 +40,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 pub(crate) mod artifact;
 mod runtime;
 mod selected_link;
+mod staged_invocation;
 use artifact::{AdmittedProgram, admit_published_artifact};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
@@ -231,6 +232,7 @@ struct CobolProgram {
     artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     sequence: AtomicU64,
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
+    transfer_owner: OnceLock<std::sync::Weak<mainframe_env_cics::CicsService>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -243,6 +245,7 @@ impl CobolProgram {
             artifacts: OnceLock::new(),
             sequence: AtomicU64::new(1),
             control: OnceLock::new(),
+            transfer_owner: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -439,6 +442,7 @@ impl CobolProgram {
                     &machine,
                     &transfer,
                 )?;
+                self.stage_transfer_target(&invocation, identity, &machine, &transfer)?;
                 Err(HostProblem::UnknownOutcome)
             }
             // The durable child is suspended and its CALL/instance are still

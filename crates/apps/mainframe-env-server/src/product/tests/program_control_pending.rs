@@ -2,11 +2,14 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use mainframe_env_execution_api::{MachineDrive, MachineResume, Quantum};
+    use mainframe_env_store_api::{CheckpointRecord, ExecutionRecord};
 
     #[derive(Clone, Copy, Debug)]
     enum PendingControl {
         ProgramExit,
+        DirectProgramExit,
         Xctl,
         Suspend,
     }
@@ -19,6 +22,11 @@ mod tests {
     #[test]
     fn compiled_nested_xctl_remains_unknown_after_sqlite_reopen() {
         pending_control(None, PendingControl::Xctl);
+    }
+
+    #[test]
+    fn compiled_current_level_program_exit_stages_issuer_commarea_after_sqlite_reopen() {
+        pending_control(None, PendingControl::DirectProgramExit);
     }
 
     #[test]
@@ -39,6 +47,15 @@ mod tests {
     #[ignore = "requires fresh MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
     fn postgres_nested_xctl_remains_unknown_after_reopen() {
         pending_control(Some(required_postgres_route_url()), PendingControl::Xctl);
+    }
+
+    #[test]
+    #[ignore = "requires fresh MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+    fn postgres_current_level_program_exit_stages_issuer_commarea_after_reopen() {
+        pending_control(
+            Some(required_postgres_route_url()),
+            PendingControl::DirectProgramExit,
+        );
     }
 
     #[test]
@@ -64,6 +81,10 @@ mod tests {
             }
             PendingControl::Xctl => {
                 "EXEC CICS XCTL PROGRAM('PCEXIT') COMMAREA(DFHCOMMAREA) LENGTH(4) END-EXEC."
+            }
+            PendingControl::DirectProgramExit => {
+                "EXEC CICS HANDLE ABEND PROGRAM('PCEXIT') END-EXEC. \
+                 EXEC CICS ABEND ABCODE('U789') NODUMP END-EXEC."
             }
             PendingControl::Suspend => "EXEC CICS SUSPEND END-EXEC.",
         };
@@ -303,8 +324,26 @@ mod tests {
                 assert_eq!(mid_value["schema_version"], 2);
                 assert!(mid_value.get("transfer").is_none());
             } else {
-                assert_eq!(mid_receipt.version, 2);
-                assert_eq!(mid_value["schema_version"], 3);
+                assert_eq!(mid_receipt.version, 3);
+                assert_eq!(mid_value["schema_version"], 4);
+                let target = &mid_value["target"];
+                assert_eq!(target["selector"], "program:PCEXIT");
+                assert_eq!(target["generation"], 1);
+                assert_eq!(target["artifact"], exit.content_id().to_reference());
+                assert_eq!(
+                    target["checkpoint_schema"],
+                    "mainframe-env.reference-machine-checkpoint@12"
+                );
+                assert!(
+                    target["checkpoint"]
+                        .as_str()
+                        .is_some_and(|bytes| !bytes.is_empty())
+                );
+                assert!(
+                    target["context_digest"]
+                        .as_str()
+                        .is_some_and(|digest| digest.len() == 64)
+                );
                 let transfer = &mid_value["transfer"];
                 assert_eq!(transfer["selector"], "PCEXIT");
                 assert_eq!(transfer["schema"], "mainframe-env.cics.payload@1");
@@ -323,6 +362,63 @@ mod tests {
                 assert_eq!(
                     transfer["checkpoint_digest"],
                     hex_digest(&suspended[0].1.payload_digest)
+                );
+                assert_staged_target(&store, &invocation, target, &exit);
+                assert_transfer_selection(
+                    &server,
+                    &store,
+                    &invocation,
+                    mid_receipt,
+                    &suspended[0].0,
+                    &suspended[0].1,
+                    &exit,
+                );
+                // Publish a different latest generation and redirect the generic catalog.
+                // The retained transfer result must still select the original artifact.
+                let replacement = published_source_fixture(
+                    "PCEXIT",
+                    "IDENTIFICATION DIVISION. PROGRAM-ID. PCEXIT. PROCEDURE DIVISION. DISPLAY 'NEW'. GOBACK.",
+                );
+                server
+                    .artifacts
+                    .put_artifact(
+                        crate::cobol::artifact::published_artifact_record(&replacement).unwrap(),
+                    )
+                    .unwrap();
+                let mut definition = definitions[2].clone();
+                definition.generation = 2;
+                definition.artifact = ArtifactRef::new(
+                    replacement.content_id().to_reference(),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                definition.semantic_identity = replacement.semantic_id().to_reference();
+                server
+                    .cics
+                    .register_program_definitions(&[definition])
+                    .unwrap();
+                let catalog = store
+                    .get_provider_state("online-program", "PCEXIT")
+                    .unwrap()
+                    .unwrap();
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            version: catalog.version + 1,
+                            payload: replacement.content_id().to_reference().into_bytes(),
+                            ..catalog.clone()
+                        },
+                        Some(catalog.version),
+                    )
+                    .unwrap();
+                assert_transfer_selection(
+                    &server,
+                    &store,
+                    &invocation,
+                    mid_receipt,
+                    &suspended[0].0,
+                    &suspended[0].1,
+                    &exit,
                 );
             }
             runs = store.list_provider_state("cobol-run-state@1", 8).unwrap();
@@ -375,6 +471,25 @@ mod tests {
                 store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
                 receipts
             );
+            if !matches!(control, PendingControl::Suspend) {
+                let row = receipts
+                    .iter()
+                    .find(|row| {
+                        serde_json::from_slice::<Value>(&row.payload).unwrap()["target"].is_object()
+                    })
+                    .unwrap();
+                let value: Value = serde_json::from_slice(&row.payload).unwrap();
+                assert_staged_target(&store, &invocation, &value["target"], &exit);
+                assert_transfer_selection(
+                    &server,
+                    &store,
+                    &invocation,
+                    row,
+                    &suspended[0].0,
+                    &suspended[0].1,
+                    &exit,
+                );
+            }
             assert_eq!(
                 store.list_provider_state("cobol-run-state@1", 8).unwrap(),
                 runs
@@ -409,6 +524,187 @@ mod tests {
             }
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn assert_staged_target(
+        store: &Arc<dyn PlatformStore>,
+        caller: &Invocation,
+        target: &Value,
+        artifact: &PublishedArtifact,
+    ) {
+        let saved = &target["invocation"];
+        let limits = InvocationLimits::default();
+        let mut next = caller.clone();
+        next.request_id = RequestId::new(saved["request"].as_str().unwrap(), limits).unwrap();
+        next.execution_id = ExecutionId::new(saved["execution"].as_str().unwrap(), limits).unwrap();
+        next.parent_execution_id =
+            Some(ExecutionId::new(saved["parent"].as_str().unwrap(), limits).unwrap());
+        next.trace_id = TraceId::new(saved["trace"].as_str().unwrap(), limits).unwrap();
+        next.idempotency_key = IdempotencyKey::new(saved["key"].as_str().unwrap(), limits).unwrap();
+        next.selector = Selector::new("program:PCEXIT", limits).unwrap();
+        next.artifact = ArtifactRef::new(artifact.content_id().to_reference(), limits).unwrap();
+        next.audit_correlation = saved["audit"].as_str().unwrap().into();
+        next.bindings = saved["bindings"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| {
+                (
+                    key.clone(),
+                    BoundedPayload::new(
+                        value["schema"].as_str().unwrap(),
+                        STANDARD.decode(value["bytes"].as_str().unwrap()).unwrap(),
+                        limits,
+                    )
+                    .unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(saved["run"], caller.run_unit_id.as_str());
+        assert_eq!(saved["principal"], caller.principal.id().as_str());
+        assert_eq!(saved["deadline"], caller.deadline_tick);
+        assert_eq!(saved["priority"], caller.priority);
+        assert_eq!(saved["attempt"], caller.attempt);
+        assert_eq!(
+            saved["grants"],
+            serde_json::json!(
+                caller
+                    .principal
+                    .grants()
+                    .iter()
+                    .map(|id| id.as_str())
+                    .collect::<Vec<_>>()
+            )
+        );
+        assert_eq!(
+            saved["generations"],
+            serde_json::json!(
+                caller
+                    .provider_generations
+                    .iter()
+                    .map(|(id, generation)| (id.as_str(), generation))
+                    .collect::<BTreeMap<_, _>>()
+            )
+        );
+        for key in ["cics.session", "cics.transaction"] {
+            assert_eq!(next.bindings[key], caller.bindings[key]);
+        }
+        assert_eq!(next.bindings["cics.commarea"].bytes(), b"ROOT");
+        assert!(
+            store.get_execution(&next.execution_id).unwrap().is_none(),
+            "staging is not execution admission"
+        );
+        let mut fresh =
+            ReferenceMachine::from_binary(artifact.payload(), next, CodecLimits::default())
+                .unwrap();
+        let bytes = STANDARD
+            .decode(target["checkpoint"].as_str().unwrap())
+            .unwrap();
+        let checkpoint = BoundedPayload::new(
+            target["checkpoint_schema"].as_str().unwrap(),
+            bytes,
+            InvocationLimits {
+                max_payload_bytes: 32 * 1024 * 1024,
+                ..limits
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            fresh.checkpoint().unwrap(),
+            checkpoint,
+            "independent constructor image"
+        );
+        fresh.restore_checkpoint(&checkpoint).unwrap();
+        // Constructor checkpoints precede COBOL init operations; the retained
+        // call binding supplies ROOT when execution is eventually admitted.
+        assert_eq!(fresh.variable("DFHCOMMAREA").unwrap().bytes(), &[0; 4]);
+        assert_eq!(fresh.effect_sequence(), 0);
+    }
+
+    fn assert_transfer_selection(
+        server: &ProductServer,
+        store: &Arc<dyn PlatformStore>,
+        caller: &Invocation,
+        row: &ProviderStateRecord,
+        execution: &ExecutionRecord,
+        checkpoint: &CheckpointRecord,
+        artifact: &PublishedArtifact,
+    ) {
+        let mut source = caller.clone();
+        source.execution_id = execution.execution_id.clone();
+        source.parent_execution_id = Some(caller.execution_id.clone());
+        source.selector = execution.selector.clone();
+        source.artifact = execution.artifact.clone();
+        source.idempotency_key = IdempotencyKey::new(
+            format!("online-call-effect-{}", row.key),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let key = IdempotencyKey::new(
+            format!("{}:{}", source.idempotency_key, checkpoint.effect_sequence),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let effect = store.effect(&key).unwrap().unwrap();
+        let observed = mainframe_env_execution_api::Transfer {
+            selector: Selector::new("PCEXIT", InvocationLimits::default()).unwrap(),
+            payload: BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                b"ROOT".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            replace_frame: true,
+        };
+        let selection = server
+            .cics
+            .attested_program_transfer_selection(&source, &effect, &observed)
+            .unwrap();
+        assert_eq!(selection.generation, 1);
+        assert_eq!(
+            selection.artifact.as_str(),
+            artifact.content_id().to_reference()
+        );
+        let mut wrong = effect.clone();
+        wrong.result_digest = Some([0; 32]);
+        assert_eq!(
+            server
+                .cics
+                .attested_program_transfer_selection(&source, &wrong, &observed),
+            Err(HostProblem::UnknownOutcome)
+        );
+        wrong = effect.clone();
+        wrong.intent.owner = caller.execution_id.clone();
+        assert_eq!(
+            server
+                .cics
+                .attested_program_transfer_selection(&source, &wrong, &observed),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let mut wrong_transfer = observed.clone();
+        wrong_transfer.payload = BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"LEAF".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server
+                .cics
+                .attested_program_transfer_selection(&source, &effect, &wrong_transfer),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let descriptor = crate::cobol::retention::describe_cobol_retention_row(row).unwrap();
+        for (namespace, expected) in [
+            (
+                "cics-program-definition-v1",
+                "PCEXIT:00000000000000000001".to_string(),
+            ),
+            ("cics-effect-replay-v1", key.as_str().to_string()),
+        ] {
+            assert!(descriptor.dependencies.iter().any(|dependency| matches!(dependency,
+                crate::cobol::retention::CobolRetentionDependency::ProviderRow { namespace: ns, key } if ns == namespace && key == &expected)));
+        }
     }
 
     fn assert_task_fenced(

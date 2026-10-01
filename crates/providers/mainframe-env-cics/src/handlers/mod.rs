@@ -329,6 +329,7 @@ pub(super) fn post_event_outputs(
 }
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use journal_control::{JournalRecord, load as load_journals};
+pub(crate) use program_control::validate_transfer_selection;
 pub use program_control::{CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition};
 pub(super) use program_control::{
     ProgramLoadState, load_application_entries, load_program_definitions, load_program_loads,

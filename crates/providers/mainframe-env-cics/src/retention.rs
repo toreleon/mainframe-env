@@ -298,6 +298,8 @@ pub fn describe_cics_replay_row(
     }
     let replay = decode_cics_effect_replay(&row.payload, limits)
         .map_err(|_| CicsReplayValidationError::CorruptPayload)?;
+    crate::service::validate_transfer_selection(&replay.response)
+        .map_err(|_| CicsReplayValidationError::CorruptPayload)?;
     HostResult::Cics(replay.response.clone())
         .validate(HostLimits {
             max_name_bytes: 128,

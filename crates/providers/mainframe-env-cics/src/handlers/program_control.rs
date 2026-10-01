@@ -22,9 +22,12 @@ const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 mod invoke_application;
 mod load;
 mod release;
+mod transfer_selection;
 pub(in crate::service) use load::{
     ProgramLoadState, load_program_loads, release_task_program_loads,
 };
+pub(in crate::service) use transfer_selection::freeze as freeze_program_transfer;
+pub(crate) use transfer_selection::validate_response as validate_transfer_selection;
 
 /// One immutable installed program generation available to CICS program control.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -814,7 +817,7 @@ fn transfer(
     .then_some(payload.len());
     let payload = bounded(payload)?;
     if request.operation == CicsOperation::Xctl && service.lock()?.programs.contains(&target) {
-        return service.response(
+        let mut response = service.response(
             run,
             CicsDisposition::Transfer,
             "NORMAL",
@@ -823,7 +826,9 @@ fn transfer(
             Some(target),
             None,
             payload.bytes().to_vec(),
-        );
+        )?;
+        freeze_program_transfer(service, &mut response)?;
+        return Ok(response);
     }
     let host_request = if request.operation == CicsOperation::Link {
         HostRequest::Program(ProgramRequest::Link {
@@ -877,6 +882,7 @@ pub(in crate::service) fn validate_replay_response(
     request: &CicsRequest,
     response: CicsResponse,
 ) -> Result<CicsResponse, HostProblem> {
+    transfer_selection::validate_response(&response)?;
     let maximum = match request.operation {
         CicsOperation::Link => 32_763,
         CicsOperation::InvokeApplication => 24_576,

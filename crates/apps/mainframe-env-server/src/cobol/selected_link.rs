@@ -81,7 +81,7 @@ impl CobolProgram {
     }
 }
 
-fn encode_selected_call(values: &[Vec<u8>]) -> Result<BoundedPayload, HostProblem> {
+pub(super) fn encode_selected_call(values: &[Vec<u8>]) -> Result<BoundedPayload, HostProblem> {
     let mut bytes = u32::try_from(values.len())
         .map_err(|_| HostProblem::ResourceExhausted)?
         .to_be_bytes()

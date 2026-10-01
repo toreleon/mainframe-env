@@ -46,6 +46,33 @@ pub(in super::super) fn preserve_control_cursor_failure(
 }
 
 impl TransferIntent {
+    pub(in super::super) fn selector(&self) -> &str {
+        &self.selector
+    }
+    pub(in super::super) fn source_version(&self) -> u64 {
+        self.source_version
+    }
+    pub(super) fn checkpoint_sequence(&self) -> u64 {
+        self.checkpoint_sequence
+    }
+
+    pub(in super::super) fn matches(
+        &self,
+        source: &Invocation,
+        machine: &ReferenceMachine,
+        observed: &Transfer,
+    ) -> bool {
+        self.selector == observed.selector.as_str()
+            && self.schema == observed.payload.schema()
+            && self.bytes == observed.payload.bytes()
+            && self.source_selector == source.selector.as_str()
+            && self.source_artifact == source.artifact.as_str()
+            && self.source_attempt == source.attempt
+            && self.checkpoint_sequence == machine.effect_sequence()
+            && machine.checkpoint().is_some_and(|checkpoint| {
+                self.checkpoint_digest == format!("{:x}", Sha256::digest(checkpoint.bytes()))
+            })
+    }
     fn valid(&self) -> bool {
         valid_identity(&self.selector)
             && !self.selector.contains(':')
@@ -60,7 +87,6 @@ impl TransferIntent {
             && (1..=i64::MAX as u64).contains(&self.source_version)
             && valid_digest(&self.checkpoint_digest)
             && self.checkpoint_sequence > 0
-            && self.checkpoint_sequence <= u64::from(u32::MAX)
             && self.checkpoint_machine_schema == 1
             && self.checkpoint_schema == "mainframe-env.reference-machine-checkpoint@12"
     }
@@ -84,6 +110,17 @@ impl TransferIntent {
 }
 
 pub(super) fn valid_receipt_phase(record: &ProviderStateRecord, receipt: &Receipt) -> bool {
+    if let Some(target) = &receipt.target {
+        return receipt.schema_version == 4
+            && record.version == 3
+            && receipt.reply.is_none()
+            && receipt.completion_tick.is_none()
+            && receipt
+                .transfer
+                .as_ref()
+                .is_some_and(|intent| intent.valid())
+            && target.valid(receipt);
+    }
     match (receipt.schema_version, &receipt.transfer) {
         (2, None) => matches!(
             (

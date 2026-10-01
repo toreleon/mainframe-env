@@ -208,6 +208,7 @@ mod tests {
                 completion_tick: None,
                 reply: None,
                 transfer: None,
+                target: None,
             };
             receipt.metadata_digest = receipt_metadata_digest(&receipt);
             let row = ProviderStateRecord {
