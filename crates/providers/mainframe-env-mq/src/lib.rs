@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod delivery;
 mod host_context;
 mod message;
 mod message_handle;
@@ -10,6 +11,10 @@ mod object;
 mod object_service;
 mod retention;
 mod service;
+
+pub use delivery::{
+    MQ_DELIVERY_SCHEMA, MqDeliveryError, MqDeliveryGet, MqDeliveryKernel, MqDeliveryLimits,
+};
 
 pub use abi::mq_abi_library;
 pub use message_handle::{

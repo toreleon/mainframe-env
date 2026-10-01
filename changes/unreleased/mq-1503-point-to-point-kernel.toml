@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a bounded pure MQ point-to-point delivery kernel for local queues, browse, syncpoint, expiry, and strict persistent restart snapshots; public host and store integration remain pending."
