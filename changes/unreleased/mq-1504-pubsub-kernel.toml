@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a bounded pure MQ pub/sub kernel for catalog-backed subscriptions, callback control, retained publication requests, deterministic delivery, syncpoint staging, trigger state, and strict durable restart; host routes and SAF/store integration remain pending."

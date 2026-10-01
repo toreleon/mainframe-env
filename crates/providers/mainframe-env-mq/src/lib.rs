@@ -9,6 +9,7 @@ mod message;
 mod message_handle;
 mod object;
 mod object_service;
+mod pubsub;
 mod retention;
 mod service;
 
@@ -28,6 +29,12 @@ pub use object::{
     MqObjectDefinition, MqObjectError, MqObjectIdentity, MqObjectKind, MqObjectLimits,
     MqObjectLookup, MqObjectName, MqQueueManagerDefinition, MqResolution, MqResolvedTarget,
     MqSubscriptionDestination,
+};
+
+pub use pubsub::{
+    MQ_PUBSUB_SNAPSHOT_SCHEMA, MqCallbackControl, MqCallbackState, MqPubsubAuthorization,
+    MqPubsubError, MqPubsubEvent, MqPubsubKernel, MqPubsubLimits, MqPubsubResource,
+    MqSubscriptionHandles, MqSubscriptionMode,
 };
 
 pub use retention::{
