@@ -57,6 +57,16 @@ It is isolated from `ims_providers`; it does not emit PCB statuses or persist
 its image. Metadata publication, host routing, authorization and UOW integration
 remain separate contracts.
 
+The engine is available through the existing `ImsService` and `ims_providers`
+route after `install_metadata`. The typed catalog selects database and PCB
+authority; separate versioned rows retain generic images and undo, while
+sessions and replay use the existing IMS rows. GU/GN/GNP and their Get Hold
+forms, ISRT/REPL/DLET, bulk load/unload, checkpoint, commit, and rollback use
+the bounded engine for HDAM/HIDAM, HISAM/SHISAM, and GSAM definitions it can
+represent. Unsupported organizations, composite secondary indexes, and logical
+relationships are rejected at installation. Legacy and generic catalogs may
+coexist when their database and PSB names do not overlap.
+
 TM admission records a provider-row intent before adding work. An exact retry
 or `repair_schedules` repairs that bounded cross-interface gap without executing
 the application. Current-step nonexpress output is published at commit and

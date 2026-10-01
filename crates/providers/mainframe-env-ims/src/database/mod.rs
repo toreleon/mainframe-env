@@ -13,7 +13,7 @@ use std::fmt;
 pub use crate::metadata::ImsDatabaseOrganization as DatabaseOrganization;
 
 /// Explicit resource bounds for one database engine instance.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct EngineLimits {
     pub max_segments: usize,
     pub max_fields_per_segment: usize,
@@ -157,6 +157,13 @@ pub struct PcbPosition {
 }
 
 impl PcbPosition {
+    pub fn set_current(&mut self, id: RecordId) {
+        self.current = Some(id);
+        self.parentage = Some(id);
+        self.held = None;
+        self.after_end = false;
+    }
+
     pub fn current(&self) -> Option<RecordId> {
         self.current
     }
@@ -237,6 +244,16 @@ pub struct DatabaseEngine {
     revision: u64,
 }
 
+/// Durable row payload; byte-valued index keys are rebuilt from record data.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DatabaseEngineImage {
+    definition: DatabaseDefinition,
+    records: Vec<Record>,
+    roots: Vec<RecordId>,
+    next_id: u64,
+    revision: u64,
+}
+
 mod definition;
 mod navigation;
 mod store;
@@ -280,6 +297,201 @@ impl DatabaseEngine {
             .copied()
             .map(|id| self.view(id))
             .collect()
+    }
+
+    pub fn image(&self) -> DatabaseEngineImage {
+        DatabaseEngineImage {
+            definition: self.definition.clone(),
+            records: self.records.values().cloned().collect(),
+            roots: self.roots.clone(),
+            next_id: self.next_id,
+            revision: self.revision,
+        }
+    }
+
+    pub fn restore(
+        image: DatabaseEngineImage,
+        limits: EngineLimits,
+    ) -> Result<Self, EngineProblem> {
+        let mut engine = Self::new(image.definition, limits)?;
+        if image.records.len() > limits.max_records || image.roots.len() > limits.max_records {
+            return Err(EngineProblem::LimitExceeded);
+        }
+        for record in image.records {
+            if engine.records.insert(record.id, record).is_some() {
+                return Err(EngineProblem::InvalidData);
+            }
+        }
+        engine.roots = image.roots;
+        engine.next_id = image.next_id;
+        engine.revision = image.revision;
+        for (id, record) in &engine.records {
+            for (name, value) in engine.index_values(&record.segment, &record.data)? {
+                if let Some(value) = value {
+                    engine
+                        .indexes
+                        .get_mut(&name)
+                        .ok_or(EngineProblem::InvalidData)?
+                        .entry(value)
+                        .or_default()
+                        .insert(*id);
+                }
+            }
+        }
+        engine.validate_image()?;
+        Ok(engine)
+    }
+
+    /// Check a deserialized image before it is admitted from durable storage.
+    pub fn validate_image(&self) -> Result<(), EngineProblem> {
+        validate_definition(&self.definition, self.limits)?;
+        if self.records.len() > self.limits.max_records
+            || self.next_id == 0
+            || self.records.keys().any(|id| id.0 >= self.next_id)
+            || self.roots.len() > self.limits.max_records
+        {
+            return Err(EngineProblem::InvalidData);
+        }
+        let mut roots = BTreeSet::new();
+        for root in &self.roots {
+            if !roots.insert(*root)
+                || self
+                    .records
+                    .get(root)
+                    .is_none_or(|record| record.parent.is_some())
+            {
+                return Err(EngineProblem::InvalidData);
+            }
+        }
+        let mut ordered_roots = self.roots.clone();
+        let keyed = matches!(
+            self.definition.organization,
+            DatabaseOrganization::Hidam
+                | DatabaseOrganization::Hisam
+                | DatabaseOrganization::Shisam
+        );
+        self.sort_ids(&mut ordered_roots, keyed);
+        if ordered_roots != self.roots {
+            return Err(EngineProblem::InvalidData);
+        }
+        let mut reachable = BTreeSet::new();
+        let mut pending = self.roots.clone();
+        while let Some(id) = pending.pop() {
+            if !reachable.insert(id) {
+                return Err(EngineProblem::InvalidData);
+            }
+            let record = self.records.get(&id).ok_or(EngineProblem::InvalidData)?;
+            if record
+                .children
+                .iter()
+                .any(|child| !self.records.contains_key(child))
+            {
+                return Err(EngineProblem::InvalidData);
+            }
+            let mut children = record.children.clone();
+            self.sort_ids(&mut children, true);
+            if children != record.children {
+                return Err(EngineProblem::InvalidData);
+            }
+            for child in &record.children {
+                let descendant = self.records.get(child).ok_or(EngineProblem::InvalidData)?;
+                if descendant.parent != Some(id) {
+                    return Err(EngineProblem::InvalidData);
+                }
+            }
+            pending.extend(record.children.iter().copied());
+        }
+        if reachable.len() != self.records.len() {
+            return Err(EngineProblem::InvalidData);
+        }
+        let mut rebuilt = self.clone();
+        rebuilt.indexes = self
+            .definition
+            .secondary_indexes
+            .iter()
+            .map(|index| (index.name.clone(), BTreeMap::new()))
+            .collect();
+        for (id, record) in &self.records {
+            if record.id != *id
+                || id.0 == 0
+                || record.version == 0
+                || record.version > self.revision
+                || record.data.len() > self.limits.max_segment_bytes
+            {
+                return Err(EngineProblem::InvalidData);
+            }
+            let segment = self.segment(&record.segment)?;
+            self.validate_data(segment, &record.data)?;
+            match record.parent {
+                Some(parent) => {
+                    let parent_record = self
+                        .records
+                        .get(&parent)
+                        .ok_or(EngineProblem::InvalidData)?;
+                    if segment.parent.as_deref() != Some(parent_record.segment.as_str())
+                        || !parent_record.children.contains(id)
+                    {
+                        return Err(EngineProblem::InvalidData);
+                    }
+                }
+                None if !roots.contains(id) => return Err(EngineProblem::InvalidData),
+                None => {}
+            }
+            if record.children.len() > self.limits.max_children_per_parent
+                || record
+                    .children
+                    .iter()
+                    .copied()
+                    .collect::<BTreeSet<_>>()
+                    .len()
+                    != record.children.len()
+            {
+                return Err(EngineProblem::InvalidData);
+            }
+            for (name, value) in self.index_values(&record.segment, &record.data)? {
+                if let Some(value) = value {
+                    rebuilt
+                        .indexes
+                        .get_mut(&name)
+                        .ok_or(EngineProblem::InvalidData)?
+                        .entry(value)
+                        .or_default()
+                        .insert(*id);
+                }
+            }
+        }
+        if rebuilt.indexes != self.indexes {
+            return Err(EngineProblem::InvalidData);
+        }
+        Ok(())
+    }
+
+    pub fn path_to(&self, id: RecordId) -> Result<Vec<RecordView>, EngineProblem> {
+        self.record_path(id)
+            .map(|path| path.into_iter().map(|id| self.view(id)).collect())
+    }
+
+    pub fn ordered_records(&self) -> Vec<RecordView> {
+        self.hierarchy_order()
+            .into_iter()
+            .map(|id| self.view(id))
+            .collect()
+    }
+
+    pub fn validate_position(&self, position: &PcbPosition) -> Result<(), EngineProblem> {
+        if position
+            .current
+            .is_some_and(|id| !self.records.contains_key(&id))
+            || position
+                .parentage
+                .is_some_and(|id| !self.records.contains_key(&id))
+            || position
+                .held
+                .is_some_and(|held| position.current != Some(held.id) || held.version == 0)
+        {
+            return Err(EngineProblem::InvalidData);
+        }
+        Ok(())
     }
 
     /// A deterministic state identity used for failure/retry assertions.

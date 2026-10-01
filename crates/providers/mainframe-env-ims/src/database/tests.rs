@@ -8,6 +8,39 @@ fn field(name: &str, offset: usize, length: usize) -> FieldDefinition {
     }
 }
 
+#[test]
+fn restored_images_reject_orphaned_children_and_impossible_versions() {
+    let mut engine = DatabaseEngine::new(
+        definition(DatabaseOrganization::Hidam),
+        EngineLimits::default(),
+    )
+    .unwrap();
+    let root = insert(&mut engine, "ROOT", None, b"R1A");
+    insert(&mut engine, "CHILD", Some(root), b"C1B");
+    assert_eq!(
+        DatabaseEngine::restore(engine.image(), EngineLimits::default())
+            .unwrap()
+            .state_digest(),
+        engine.state_digest()
+    );
+
+    let mut orphan = serde_json::to_value(engine.image()).unwrap();
+    orphan["records"][0]["children"] = serde_json::json!([999]);
+    let orphan: DatabaseEngineImage = serde_json::from_value(orphan).unwrap();
+    assert_eq!(
+        DatabaseEngine::restore(orphan, EngineLimits::default()),
+        Err(EngineProblem::InvalidData)
+    );
+
+    let mut impossible = serde_json::to_value(engine.image()).unwrap();
+    impossible["records"][0]["version"] = serde_json::json!(0);
+    let impossible: DatabaseEngineImage = serde_json::from_value(impossible).unwrap();
+    assert_eq!(
+        DatabaseEngine::restore(impossible, EngineLimits::default()),
+        Err(EngineProblem::InvalidData)
+    );
+}
+
 fn segment(name: &str, parent: Option<&str>, key: &str) -> SegmentDefinition {
     SegmentDefinition {
         name: name.into(),
@@ -293,6 +326,10 @@ fn hold_guards_atomic_replace_delete_and_secondary_index_maintenance() {
             .is_empty()
     );
     assert_eq!(engine.lookup_index("ROOT-BY-KIND", b"Z").unwrap()[0].id, r1);
+    assert!(position.is_held());
+    engine.replace(&mut position, b"R1Y").unwrap();
+    assert_eq!(engine.lookup_index("ROOT-BY-KIND", b"Y").unwrap()[0].id, r1);
+    assert!(position.is_held());
 
     read(
         &engine,

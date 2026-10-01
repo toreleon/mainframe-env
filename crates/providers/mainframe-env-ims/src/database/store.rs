@@ -138,7 +138,10 @@ impl DatabaseEngine {
         updated.version = version;
         self.indexes = indexes;
         self.revision = revision;
-        position.held = None;
+        position.held = Some(HeldRecord {
+            id: record.id,
+            version,
+        });
         Ok(self.view(record.id))
     }
 

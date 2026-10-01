@@ -4,8 +4,8 @@
 
 pub mod database;
 mod metadata;
-pub mod recovery;
 mod metadata_publication;
+pub mod recovery;
 mod retention;
 mod service;
 mod tm;
