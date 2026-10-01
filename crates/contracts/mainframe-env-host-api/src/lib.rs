@@ -21,6 +21,7 @@ mod mq_catalog;
 mod mq_context;
 mod mq_contract;
 mod mq_handles;
+pub mod mq_object_route;
 mod mq_validation;
 mod names;
 mod registry;
