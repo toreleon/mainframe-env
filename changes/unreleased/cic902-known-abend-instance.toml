@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Make durably proven installed-child ABEND frames inactive without fabricating CALL success or reopening their instances. Strict instance schema 2 preserves child proof, retention dependencies and open-file fences; task cleanup remains owned and atomic. Legacy busy rows stay fenced, and transferred PROGRAM-exit run-owner handoff remains pending."

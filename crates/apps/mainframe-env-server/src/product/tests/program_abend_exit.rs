@@ -151,7 +151,7 @@ mod tests {
             run_rows = store.list_provider_state("cobol-run-state@1", 8).unwrap();
             assert_eq!(run_rows.len(), 1);
             let run: Value = serde_json::from_slice(&run_rows[0].payload).unwrap();
-            assert_eq!(run["active"], 1);
+            assert_eq!(run["active"], 0);
             assert_eq!(run["ended"], false);
             assert_eq!(run["programs"], serde_json::json!(["PELEAF"]));
             instance_rows = store
@@ -159,8 +159,12 @@ mod tests {
                 .unwrap();
             assert_eq!(instance_rows.len(), 1);
             let instance: Value = serde_json::from_slice(&instance_rows[0].payload).unwrap();
-            assert_eq!(instance["busy"], true);
+            assert_eq!(instance["schema_version"], 2);
+            assert_eq!(instance["busy"], false);
             assert_eq!(instance["open_files"], false);
+            assert_eq!(instance["abend"]["execution"], receipt["child_execution"]);
+            assert_eq!(instance["abend"]["owner_execution"], run["owner_execution"]);
+            assert!(instance["state"].is_null());
             protocol_rows = store
                 .list_provider_state("cobol-call-protocol@2", 8)
                 .unwrap();
@@ -187,8 +191,8 @@ mod tests {
                 .get_provider_state("online-machine-continuation", session.as_str())
                 .unwrap();
             // The selected exit is executable after reopen, but normal completion is
-            // not implemented: the abandoned child still owns a busy instance and
-            // the replacement execution does not carry the original run owner.
+            // not implemented: the replacement execution does not carry the
+            // original run owner. The known-abandoned instance is not reusable.
             // This is a diagnostic fence regression, NOT normal-completion credit.
             assert_eq!(
                 server.run_online_exchange(&session, &principal, "PEROOT", 3),

@@ -136,6 +136,51 @@ draining affected writers and retaining a compatible reader or restoring a
 verified pre-change backup, not silently rewriting replies. General/default
 condition ABEND and ancestor PROGRAM exit execution remain unaccepted.
 
+### Known-ABEND installed-instance disposition
+
+After the existing durable coordinator returns `ExecutionOutcome::Abend`, the
+installed executor validates the exact child's Failed execution and terminal
+Abend event, including execution/run/principal, selected program/artifact,
+attempt, event/version and terminal tick. It then atomically decrements only
+that run's active count and marks the leased instance inactive under both run
+and instance CAS versions. Generic Failed, cancellation, rejection, missing
+proof and unknown outcomes cannot enter this transition. A disposition failure
+returns UnknownOutcome, not a handleable successful return.
+
+Only this disposition writes instance JSON schema 2 in the existing
+`cobol-instance@1:<run-key>` namespace. Schema 2 is a non-reusable abandoned
+frame, not a normal last-used image: busy is false, saved state is absent, and
+the current open-file flag remains explicit. Its bounded proof binds root owner,
+child execution, terminal version/attempt, namespace, program, artifact and
+open-file flag with a domain-separated metadata digest. Its retention descriptor stays
+Active and protects both the exact root and child executions. The installed-call
+reservation is unchanged and pending; no completed CALL reply is fabricated.
+The existing installed-call digest framing hashes `mainframe-env.installed-call@1`
+plus a zero byte, then u64 big-endian length-prefixed fields in this order:
+`known-abend-instance@2`, namespace, program, artifact, root owner, child execution,
+terminal version (u64 big-endian), attempt (u32 big-endian) and open-file flag (one byte,
+zero or one). The golden vector uses namespace suffix 64 zero digits, program
+LEAF, artifact `sha256:` plus 64 `a` digits, root `root-execution`, child
+`child-execution`, version 9, attempt 1 and closed files; its digest is
+`14a03ab133ac156ecff00c2d6efd3e594d0672f059ca439e27b240cd1b7c2a27`.
+
+CALL and CANCEL cannot reset or reuse an abandoned instance. Owned run-unit
+completion may atomically remove it with the other instances only after all
+active counts and open-file obligations are clear and its exact durable Abend
+proof is revalidated. A surviving active or uncertain instance, foreign owner
+or stale CAS keeps the run fenced. This does not implicitly close files or
+back out handled CICS work. The compiled root PROGRAM exit still needs stable
+run-owner handoff after replacement; that independent requirement is not
+satisfied by marking a known abandoned child inactive.
+
+Schema-1 instances remain readable and normal/CANCEL-reset writes remain
+byte-compatible schema 1 (no new null field is emitted). Legacy busy rows are
+never reclassified on read. Unknown/mislabeled schemas and incomplete or corrupt
+proofs fail closed. Old readers reject schema 2. Downgrade requires drained
+writers and resolved abandoned frames plus a compatible reader or verified
+pre-change backup; never strip the proof, relabel the schema or turn pending
+installed calls into completed replies.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline

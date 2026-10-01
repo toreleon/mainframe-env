@@ -64,6 +64,8 @@ mod tests {
         let effect;
         let calls;
         let dataset;
+        let runs;
+        let instances;
         {
             let (server, store) = backend.open_server(settings.clone(), secrets.clone());
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
@@ -253,6 +255,20 @@ mod tests {
             calls = store.list_provider_state("cobol-call-replay@1", 8).unwrap();
             assert_eq!(calls.len(), 1);
             assert!(serde_json::from_slice::<Value>(&calls[0].payload).unwrap()["reply"].is_null());
+            runs = store.list_provider_state("cobol-run-state@1", 8).unwrap();
+            assert_eq!(runs.len(), 1);
+            assert_eq!(
+                serde_json::from_slice::<Value>(&runs[0].payload).unwrap()["active"],
+                1
+            );
+            instances = store
+                .list_provider_state(&format!("cobol-instance@1:{}", runs[0].key), 8)
+                .unwrap();
+            assert_eq!(instances.len(), 1);
+            let instance: Value = serde_json::from_slice(&instances[0].payload).unwrap();
+            assert_eq!(instance["busy"], true);
+            assert_eq!(instance["schema_version"], 1);
+            assert!(instance.get("abend").is_none());
             dataset = read_dataset(&server);
             assert_eq!(dataset, b"ONCE");
             retry(&server, &effect);
@@ -261,6 +277,16 @@ mod tests {
                 calls
             );
             assert_eq!(read_dataset(&server), dataset);
+            assert_eq!(
+                store.list_provider_state("cobol-run-state@1", 8).unwrap(),
+                runs
+            );
+            assert_eq!(
+                store
+                    .list_provider_state(&format!("cobol-instance@1:{}", runs[0].key), 8)
+                    .unwrap(),
+                instances
+            );
         }
         {
             let (server, store) = backend.open_server(settings, secrets);
@@ -274,6 +300,16 @@ mod tests {
                 calls
             );
             assert_eq!(read_dataset(&server), dataset);
+            assert_eq!(
+                store.list_provider_state("cobol-run-state@1", 8).unwrap(),
+                runs
+            );
+            assert_eq!(
+                store
+                    .list_provider_state(&format!("cobol-instance@1:{}", runs[0].key), 8)
+                    .unwrap(),
+                instances
+            );
             assert_eq!(
                 store
                     .effect(effect.idempotency_key.as_ref().unwrap())

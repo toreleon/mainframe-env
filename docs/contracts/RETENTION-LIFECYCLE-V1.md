@@ -127,6 +127,15 @@ The provider families have these codec-owned boundaries:
   remove every instance before publishing the terminal run/protocol state, and
   a leftover instance therefore protects the lifecycle rather than inheriting
   a guessed age.
+  Known-ABEND instance JSON schema 2 additionally binds the root owner and child's
+  terminal version/attempt and an open-file flag under its metadata digest.
+  It is inactive but non-reusable, still Active for retention, and adds that
+  root and child executions as dependencies. Task-end cleanup requires the exact durable
+  Failed/Abend proof and existing owner/run/instance CAS fences; an unresolved
+  call remains pending and protected. Normal schema-1 bytes are unchanged, and
+  legacy busy instances are not upgraded on read. Old readers reject schema 2;
+  downgrade requires drained writers and resolved frames with a compatible
+  reader or verified backup, never proof removal or schema relabeling.
   Fresh call protocols use JSON schema 3 in the existing protocol namespace;
   valid schema 2 remains readable. Schema 3 binds its unchanged owner/run-state,
   deadline and end-tick fields under the `protocol-metadata@3` digest domain.

@@ -402,11 +402,16 @@ impl CobolProgram {
                 response2: 0,
             }),
             ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
-            ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-ABEND".into(),
-                response: -1,
-                response2: 0,
-            }),
+            ExecutionOutcome::Abend(_) => {
+                lease
+                    .abended(store.as_ref(), &invocation, &machine)
+                    .map_err(|_| HostProblem::UnknownOutcome)?;
+                Err(HostProblem::Condition {
+                    name: "INSTALLED-CALL-ABEND".into(),
+                    response: -1,
+                    response2: 0,
+                })
+            }
             ExecutionOutcome::Rejected(problem) => Err(HostProblem::Condition {
                 name: format!("INSTALLED-CALL-REJECTED:{}", problem.public_message),
                 response: -2,
