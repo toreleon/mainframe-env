@@ -150,6 +150,49 @@ pub(crate) fn online_exchange_dependencies(
 }
 
 impl ProductServer {
+    /// Reuse validated online ownership for CICS task resources, not effect identity.
+    pub(super) fn restore_online_cics_run(
+        &self,
+        state: &OnlineExchangeState,
+        actor: Invocation,
+        session: &SessionId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        verify_run_owner(self.store.as_ref(), state)?;
+        if actor.execution_id.as_str() != state.execution_id
+            || actor.run_unit_id.as_str() != state.run_unit_id
+            || actor.principal.id().as_str() != state.principal
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let mut task = actor.clone();
+        if let Some(owner) = &state.run_owner {
+            if crate::cobol::program_run_owner(&actor)? != owner.execution {
+                return Err(HostProblem::UnknownOutcome);
+            }
+            if owner.execution != actor.execution_id.as_str() {
+                let id = ExecutionId::new(&owner.execution, InvocationLimits::default())
+                    .map_err(|_| HostProblem::UnknownOutcome)?;
+                let original = self
+                    .store
+                    .get_execution(&id)
+                    .map_err(|_| HostProblem::UnknownOutcome)?
+                    .ok_or(HostProblem::UnknownOutcome)?;
+                task.execution_id = id;
+                task.selector = original.selector;
+                task.artifact = original.artifact;
+            }
+        }
+        self.cics.restore_terminal_program_run(
+            task,
+            actor,
+            session,
+            &state.transaction,
+            state.commarea.clone(),
+            now_tick,
+        )
+    }
+
     pub(super) fn begin_online_exchange(
         &self,
         session: &SessionId,

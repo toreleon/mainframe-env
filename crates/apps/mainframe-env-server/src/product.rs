@@ -2003,13 +2003,7 @@ impl ProductServer {
                 let mut invocation = self.online_exchange_invocation(state)?;
                 self.restore_bridge_binding(&mut invocation)?;
                 continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
-                self.cics.restore_terminal_run(
-                    invocation.clone(),
-                    session,
-                    &state.transaction,
-                    state.commarea.clone(),
-                    now_tick,
-                )?;
+                self.restore_online_cics_run(state, invocation.clone(), session, now_tick)?;
                 CicsTerminalExecution {
                     invocation,
                     transaction: state.transaction.clone(),

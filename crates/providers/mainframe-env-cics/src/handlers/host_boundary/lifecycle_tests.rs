@@ -12,6 +12,7 @@ struct CleaningStore {
     inner: MemoryStore,
     pause: AtomicBool,
     fail: bool,
+    pause_namespace: &'static str,
     entered: Sender<()>,
     release: Mutex<Receiver<()>>,
 }
@@ -41,7 +42,7 @@ impl ProviderStateStore for CleaningStore {
         namespace: &str,
         key: &str,
     ) -> Result<Option<ProviderStateRecord>, StoreError> {
-        if namespace == "cics-bts-browse-v1" && self.pause.swap(false, Ordering::SeqCst) {
+        if namespace == self.pause_namespace && self.pause.swap(false, Ordering::SeqCst) {
             self.entered.send(()).unwrap();
             self.release
                 .lock()
@@ -131,6 +132,7 @@ fn cleanup_interleaving(operation: Cleanup, fail: bool) {
         inner: MemoryStore::new(Default::default()),
         pause: AtomicBool::new(false),
         fail,
+        pause_namespace: "cics-bts-browse-v1",
         entered,
         release: Mutex::new(release),
     });
@@ -226,6 +228,73 @@ fn cleanup_interleaving(operation: Cleanup, fail: bool) {
         );
         assert!(state.runs.is_empty());
     }
+}
+
+#[test]
+fn logical_frame_terminal_restore_rejects_a_session_changed_during_undo_read() {
+    let (entered, observed) = channel();
+    let (resume, release) = channel();
+    let store = Arc::new(CleaningStore {
+        inner: MemoryStore::new(Default::default()),
+        pause: AtomicBool::new(false),
+        fail: false,
+        pause_namespace: "cics-uow-undo",
+        entered,
+        release: Mutex::new(release),
+    });
+    let service = crate::service::tests::service(store.clone());
+    let root = crate::service::tests::invocation();
+    let session = SessionId::new("restore-race", 64).unwrap();
+    service
+        .launch_terminal(
+            root.clone(),
+            &session,
+            "MENU",
+            24,
+            80,
+            "race-csrf",
+            1,
+            10_000,
+        )
+        .unwrap();
+    store.pause.store(true, Ordering::SeqCst);
+    let worker_service = service.clone();
+    let worker_session = session.clone();
+    let worker_root = root.clone();
+    let worker = std::thread::spawn(move || {
+        worker_service.restore_terminal_run(worker_root, &worker_session, "MENU", Vec::new(), 2)
+    });
+    observed.recv_timeout(Duration::from_secs(10)).unwrap();
+    let changed = {
+        let mut state = service.lock().unwrap();
+        let mut changed = state.sessions[session.as_str()].clone();
+        let previous = changed.version;
+        changed.version += 1;
+        service
+            .persist_session(session.as_str(), &changed, Some(previous))
+            .unwrap();
+        state.sessions.insert(session.as_str().into(), changed);
+        store
+            .inner
+            .get_provider_state("cics-session", session.as_str())
+            .unwrap()
+    };
+    resume.send(()).unwrap();
+    assert_eq!(
+        worker.join().unwrap(),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(
+        store
+            .inner
+            .get_provider_state("cics-session", session.as_str())
+            .unwrap(),
+        changed
+    );
+    assert_eq!(
+        service.lock().unwrap().runs[&root.run_unit_id].invocation,
+        root
+    );
 }
 
 #[test]

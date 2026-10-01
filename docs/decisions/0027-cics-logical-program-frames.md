@@ -215,9 +215,49 @@ owner or relabeling V2 as V1.
 
 The compiled root PROGRAM exit now completes after cold reopen with the original
 owner COMMAREA and ABEND metadata; the pending child call remains unchanged.
-This closes only the COBOL run-owner handoff gap. CICS provider acquisition/UOW
-ownership across replacement, nearest non-root PROGRAM exits and general/default
-ancestor recovery remain separate acceptance obligations.
+This closes the COBOL run-owner handoff gap. The following CICS restoration
+boundary addresses acquisition/UOW ownership separately; nearest non-root PROGRAM
+exits and general/default ancestor recovery remain acceptance obligations.
+
+### Restored CICS task owner versus replacement actor
+
+The embedding restores an online replacement through
+`restore_terminal_program_run(task, actor, ...)`. It must independently attest
+the handoff before calling: the provider does not infer an owner from BTS or
+UOW rows. The product reuses exchange V2's validated original execution and
+exact Completed/HandoffCompleted proof. Only the original execution identity,
+selector and artifact come from core authority; permissions, generations and
+controls remain the validated current exchange scope, not a reconstruction of
+unpersisted original Invocation fields. V1 ordinary same-actor restoration
+remains supported without gaining transfer ownership.
+
+The existing Run invocation retains task identity for acquisitions/settlement;
+the current program frame retains actor identity for effects/audits. Both use
+the same run, principal, attempt and generations. Actor controls cannot widen
+the supplied task scope or alter execution-context/DPL outcome bindings. Warm
+restoration validates existing owner/principal/generations/attempt, retains task
+file updates, current records, browse cursors and channels, and replaces the
+root logical frame without inventing a LINK parent. Selector/artifact equality
+with a warm entry invocation is not an ownership predicate: executable admission
+legitimately resolves those fields after terminal launch.
+
+Cold restoration reloads the existing durable HANDLE and undo authorities; this
+does not add persistence for volatile cursors or channels. Session version is
+rechecked after the undo read, and existing idle-session/live-loan/cleanup fences
+and capacity checks precede volatile replacement. Failure cannot remove the
+existing task. The legacy restoration entry point delegates with task == actor.
+No codec, namespace or retention target is introduced. Distinct task/actor UOW
+rows use the existing MECU3 provenance and both-owner retention contract; root
+rows still use MECU2. Downgrade keeps the already documented V2/MECU3 drain and
+compatible-reader/verified-backup requirements, never stripping ownership.
+
+Compiled root HANDLE ABEND PROGRAM tests now acquire a pending BTS process
+before ABEND and commit or roll it back from the exit after SQLite/PostgreSQL
+physical reopen. They verify successful RESP, process visibility/removal,
+released acquisition, actual core effect actor, UOW actor/root provenance,
+unchanged pending child CALL and final original COBOL run completion. This
+proves explicit SYNCPOINT settlement only, not every implicit task-end or
+non-root/default ancestor recovery obligation.
 
 ## Source and acceptance
 

@@ -183,13 +183,7 @@ impl ProductServer {
             .get_execution(&invocation.execution_id)
             .map_err(store_error)?
             .ok_or(HostProblem::InfrastructureFailure)?;
-        self.cics.restore_terminal_run(
-            invocation,
-            session,
-            &exchange.transaction,
-            exchange.commarea,
-            now_tick,
-        )?;
+        self.restore_online_cics_run(&exchange, invocation, session, now_tick)?;
         if preserve_handle_state {
             let trace = self
                 .cics
@@ -393,13 +387,7 @@ impl ProductServer {
         let trace = self
             .cics
             .terminal_run_trace(session, previous.principal.id(), now_tick)?;
-        self.cics.restore_terminal_run(
-            next.clone(),
-            session,
-            &exchange.transaction,
-            payload.bytes().to_vec(),
-            now_tick,
-        )?;
+        self.restore_online_cics_run(exchange, next.clone(), session, now_tick)?;
         self.online_traces
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?

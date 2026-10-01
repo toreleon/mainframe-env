@@ -5,27 +5,63 @@ mod tests {
 
     #[test]
     fn compiled_program_exit_preserves_owner_area_and_completes_after_sqlite_reopen() {
-        program_exit(None);
+        program_exit(None, None);
     }
 
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
     fn postgres_compiled_program_exit_preserves_owner_area_and_completes_after_reopen() {
-        program_exit(Some(required_postgres_route_url()));
+        program_exit(Some(required_postgres_route_url()), None);
     }
 
-    fn program_exit(postgres: Option<String>) {
+    #[test]
+    fn compiled_program_exit_settles_original_bts_task_after_sqlite_reopen() {
+        program_exit(None, Some(false));
+        program_exit(None, Some(true));
+    }
+
+    #[test]
+    #[ignore = "requires fresh MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+    fn postgres_program_exit_commits_original_bts_task_after_reopen() {
+        program_exit(Some(required_postgres_route_url()), Some(false));
+    }
+
+    #[test]
+    #[ignore = "requires fresh MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18.6"]
+    fn postgres_program_exit_rolls_back_original_bts_task_after_reopen() {
+        program_exit(Some(required_postgres_route_url()), Some(true));
+    }
+
+    fn program_exit(postgres: Option<String>, settlement: Option<bool>) {
+        use mainframe_env_cics::bts_lifecycle::{
+            BtsLifecycleStore, BtsProcessTypeDefinition, BtsTransactionDefinition,
+        };
+        let acquire = if settlement.is_some() {
+            "EXEC CICS DEFINE PROCESS(PROC-X) PROCESSTYPE('TYPE') TRANSID('PE01') NOCHECK END-EXEC."
+        } else {
+            ""
+        };
         let caller = published_source_fixture(
             "PERoot",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. PERoot. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-AREA PIC X(4) VALUE 'LEAF'. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(8). PROCEDURE DIVISION USING DFHCOMMAREA. EXEC CICS HANDLE ABEND PROGRAM('PEEXIT') END-EXEC. EXEC CICS LINK PROGRAM('PELEAF') COMMAREA(CHILD-AREA) LENGTH(4) END-EXEC. STOP RUN.",
+            &format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. PERoot. DATA DIVISION. WORKING-STORAGE SECTION. 01 CHILD-AREA PIC X(4) VALUE 'LEAF'. 01 PROC-X PIC X(5) VALUE 'OWNER'. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(8). PROCEDURE DIVISION USING DFHCOMMAREA. {acquire} EXEC CICS HANDLE ABEND PROGRAM('PEEXIT') END-EXEC. EXEC CICS LINK PROGRAM('PELEAF') COMMAREA(CHILD-AREA) LENGTH(4) END-EXEC. STOP RUN."
+            ),
         );
         let leaf = published_source_fixture(
             "PELEAF",
             "IDENTIFICATION DIVISION. PROGRAM-ID. PELEAF. DATA DIVISION. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. EXEC CICS ABEND ABCODE('U789') NODUMP END-EXEC. GOBACK.",
         );
+        let settle = settlement.map_or(String::new(), |rollback| {
+            format!(
+                "EXEC CICS SYNCPOINT {} RESP(UOW-X) END-EXEC. EXEC CICS SUSPEND END-EXEC.",
+                if rollback { "ROLLBACK" } else { "" }
+            )
+        });
         let exit = published_source_fixture(
             "PEEXIT",
-            "IDENTIFICATION DIVISION. PROGRAM-ID. PEEXIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SEEN-AREA PIC X(8). 01 CODE-X PIC X(4). 01 ORIG-X PIC X(4). 01 FROM-X PIC X(8). 01 HERE-X PIC X(8). 01 LEVEL-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(8). PROCEDURE DIVISION USING DFHCOMMAREA. MOVE DFHCOMMAREA TO SEEN-AREA. EXEC CICS ASSIGN ABCODE(CODE-X) ORGABCODE(ORIG-X) ABPROGRAM(FROM-X) PROGRAM(HERE-X) LINKLEVEL(LEVEL-X) RESP(RESP-X) END-EXEC. EXEC CICS SUSPEND END-EXEC. GOBACK.",
+            &format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. PEEXIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SEEN-AREA PIC X(8). 01 CODE-X PIC X(4). 01 ORIG-X PIC X(4). 01 FROM-X PIC X(8). 01 HERE-X PIC X(8). 01 LEVEL-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. 01 UOW-X PIC S9(9) COMP VALUE -1. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(8). PROCEDURE DIVISION USING DFHCOMMAREA. MOVE DFHCOMMAREA TO SEEN-AREA. EXEC CICS ASSIGN ABCODE(CODE-X) ORGABCODE(ORIG-X) ABPROGRAM(FROM-X) PROGRAM(HERE-X) LINKLEVEL(LEVEL-X) RESP(RESP-X) END-EXEC. EXEC CICS SUSPEND END-EXEC. {settle} GOBACK."
+            ),
         );
         let root = std::env::temp_dir().join(format!(
             "mainframe-program-abend-exit-{}-{:?}-{}",
@@ -53,6 +89,28 @@ mod tests {
         {
             let (server, store) = backend.open_server(settings.clone(), secrets.clone());
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            if settlement.is_some() {
+                server
+                    .cics
+                    .register_bts_process_type(
+                        BtsProcessTypeDefinition::new("TYPE", "BTS.REPO", true).unwrap(),
+                    )
+                    .unwrap();
+                server
+                    .cics
+                    .register_bts_transaction(
+                        BtsTransactionDefinition::new("PE01", "PEROOT", true, false).unwrap(),
+                    )
+                    .unwrap();
+                server
+                    .racf
+                    .define_profile("BTSREPO", "BTS.REPO", "IBMUSER", None)
+                    .unwrap();
+                server
+                    .racf
+                    .permit("BTSREPO", "BTS.REPO", "IBMUSER", AccessIntent::Update)
+                    .unwrap();
+            }
             for name in ["PELEAF", "PEEXIT"] {
                 let resource = format!("CICS.PROGRAM.{name}");
                 server
@@ -151,6 +209,23 @@ mod tests {
             run_rows = store.list_provider_state("cobol-run-state@1", 8).unwrap();
             assert_eq!(run_rows.len(), 1);
             let run: Value = serde_json::from_slice(&run_rows[0].payload).unwrap();
+            if settlement.is_some() {
+                let exchange = server.online_exchange(&session).unwrap().unwrap();
+                let acquisition = BtsLifecycleStore::new(store.as_ref())
+                    .load_acquisition(&exchange.run_unit_id)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    acquisition.owner_execution,
+                    run["owner_execution"].as_str().unwrap()
+                );
+                assert!(
+                    BtsLifecycleStore::new(store.as_ref())
+                        .load_process("TYPE", "OWNER")
+                        .unwrap()
+                        .is_some()
+                );
+            }
             assert_eq!(run["active"], 0);
             assert_eq!(run["ended"], false);
             assert_eq!(run["programs"], serde_json::json!(["PELEAF"]));
@@ -187,6 +262,53 @@ mod tests {
             server
                 .run_online_exchange(&session, &principal, "PEROOT", 3)
                 .unwrap();
+            if let Some(rollback) = settlement {
+                inspect_exit(&server, &session, &exit);
+                let exchange = server.online_exchange(&session).unwrap().unwrap();
+                let saved = server
+                    .online_machine_continuation(&session)
+                    .unwrap()
+                    .unwrap();
+                let mut machine = ReferenceMachine::from_binary(
+                    exit.payload(),
+                    server.online_exchange_invocation(&exchange).unwrap(),
+                    CodecLimits::default(),
+                )
+                .unwrap();
+                machine.restore_checkpoint(&saved.checkpoint).unwrap();
+                assert_eq!(machine.variable("UOW-X").unwrap().bytes(), [0; 4]);
+                let authority = BtsLifecycleStore::new(store.as_ref());
+                assert!(
+                    !authority
+                        .load_acquisition(&exchange.run_unit_id)
+                        .unwrap()
+                        .unwrap()
+                        .is_held()
+                );
+                assert_eq!(
+                    authority.load_process("TYPE", "OWNER").unwrap().is_none(),
+                    rollback
+                );
+                let uows = store.list_provider_state("cics-uow", 8).unwrap();
+                assert_eq!(uows.len(), 1);
+                let descriptor = mainframe_env_cics::describe_cics_uow_row(&uows[0], None).unwrap();
+                let effect_key = mainframe_env_execution_api::IdempotencyKey::new(
+                    descriptor.effect_key.as_deref().unwrap(),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                let effect = store.effect(&effect_key).unwrap().unwrap();
+                assert_eq!(effect.execution_id.as_str(), exchange.execution_id);
+                assert_eq!(effect.intent.owner.as_str(), exchange.execution_id);
+                assert_eq!(
+                    descriptor.owner_execution.as_deref(),
+                    Some(exchange.execution_id.as_str())
+                );
+                assert_eq!(descriptor.task_owner_execution.as_deref(), serde_json::from_slice::<Value>(&run_rows[0].payload).unwrap()["owner_execution"].as_str());
+                server
+                    .run_online_exchange(&session, &principal, "PEROOT", 4)
+                    .unwrap();
+            }
             assert!(server.online_exchange(&session).unwrap().is_none());
             assert!(
                 server

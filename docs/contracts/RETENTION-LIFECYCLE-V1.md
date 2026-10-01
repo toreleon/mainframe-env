@@ -129,6 +129,11 @@ The provider families have these codec-owned boundaries:
   or new retention target is introduced. Older readers reject exchange V2;
   drain/reconcile affected transfers and retain a compatible reader or verified
   backup for rollback, never stripping ownership or relabeling the schema.
+  Online CICS restoration reuses that validated owner/handoff to retain BTS task
+  ownership while leaving effects attributed to the replacement actor. Its
+  explicit SYNCPOINT settlement uses existing MECU3 two-owner provenance; it
+  adds no retention namespace or guessed acquisition owner. Warm volatile
+  resource preservation is not new cold cursor/channel persistence authority.
 - Installed COBOL validates `cobol-call-replay@1`,
   `cobol-call-protocol@2`, `cobol-run-state@1`, `cobol-cancel@1`, and every
   bounded `cobol-instance@1:` namespace. Its descriptor enumerates both owner

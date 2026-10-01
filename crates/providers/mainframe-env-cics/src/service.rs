@@ -1075,42 +1075,14 @@ impl CicsService {
         retrieve: Vec<u8>,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        reject_reserved_nested_origin(&invocation)?;
-        validate_terminal_identity(transaction, 16)?;
-        if retrieve.len() > self.limits.max_screen_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let current = self.public_session(session, invocation.principal.id(), None, now_tick)?;
-        if current.run_unit != invocation.run_unit_id.as_str()
-            || current.transaction != transaction.to_ascii_uppercase()
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
-        let mut state = self.lock()?;
-        state.task_dispatch.require_idle_session(session.as_str())?;
-        state.runs.retain(|_, run| run.session != session.as_str());
-        if state.runs.len() + state.task_dispatch.absent_runs(&state.runs) >= self.limits.max_runs {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        state.runs.insert(
-            invocation.run_unit_id.clone(),
-            handlers::new_run_with_state(
-                invocation,
-                session.as_str(),
-                transaction,
-                "ME01",
-                "S001",
-                handlers::RunSeed {
-                    originating_task: current.run_unit,
-                    retrieve,
-                    undo,
-                    undo_version,
-                    handle_state: current.handle_state,
-                },
-            ),
-        );
-        Ok(())
+        self.restore_terminal_program_run(
+            invocation.clone(),
+            invocation,
+            session,
+            transaction,
+            retrieve,
+            now_tick,
+        )
     }
 
     pub fn claim_continuation(

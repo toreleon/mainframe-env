@@ -411,6 +411,41 @@ fn fixture() -> (Arc<CicsService>, Invocation) {
     (service, root)
 }
 
+#[test]
+fn logical_frame_terminal_restore_cannot_replace_a_live_program_loan() {
+    let (service, root) = fixture();
+    let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+    let actor = child(&root, 1);
+    let loan = ProgramLease::acquire(
+        &service,
+        &mut command,
+        "CHILD",
+        Some(actor.artifact.clone()),
+    )
+    .unwrap();
+    service.ensure_run(&actor).unwrap();
+    let session = SessionId::new("FRAME-SESSION", 64).unwrap();
+    assert_eq!(
+        service.restore_terminal_program_run(
+            root.clone(),
+            actor.clone(),
+            &session,
+            "MENU",
+            Vec::new(),
+            2
+        ),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(
+        service.lock().unwrap().runs[&root.run_unit_id]
+            .current_program
+            .effect_invocation,
+        actor
+    );
+    loan.finish().unwrap();
+    command.finish().unwrap();
+}
+
 fn child(parent: &Invocation, ordinal: usize) -> Invocation {
     let mut child = parent.clone();
     child.parent_execution_id = Some(parent.execution_id.clone());

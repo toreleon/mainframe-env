@@ -621,7 +621,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:2748a4fe100fc2796f069408289a3d56aff888cb41756450f9ba6ebdee188ef1",
+      "sha256": "sha256:4b3b5d5a767aed1ac14a803432d820c4821df6fd19e55a7006893f86fe6563d3",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -957,7 +957,7 @@
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:507578e1b73b434ebdee77427a06a610d7a36854dbcc9de58497af96c109fb1b",
+      "sha256": "sha256:e969ca6b2406fb887a6981cb2cb73fd8e4ac03abe70e6d73c66fb8fee136993e",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0
@@ -1402,7 +1402,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:7e363b0bce036e05ee62c52187c858bd53da13d8e64f6dea6ffcf7abf8fb4ad4",
+      "sha256": "sha256:9a1b54100af0a47d99236ba4b3d7bd10f6bb1907fc746b21e45ced5c94bb4595",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },
