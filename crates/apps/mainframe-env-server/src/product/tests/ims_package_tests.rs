@@ -248,6 +248,8 @@ fn carddemo_request(operation: ImsOperation, sequence: u64, data: Vec<u8>) -> Im
         qualifiers: Vec::new(),
         checkpoint_id: None,
         max_segments: 16,
+        system: None,
+        q_class: None,
         mutation: operation.is_mutating().then(|| Mutation {
             sequence,
             idempotency_key: IdempotencyKey::new(format!("carddemo-db-{sequence}"), limits)
