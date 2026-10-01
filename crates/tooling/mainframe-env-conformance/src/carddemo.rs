@@ -8725,6 +8725,8 @@ fn ims_request(
         checkpoint_id: checkpoint_id.map(str::to_string),
         max_segments: 64,
         mutation: mutation.transpose()?,
+        system: None,
+        q_class: None,
     })
 }
 

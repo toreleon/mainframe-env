@@ -18,7 +18,7 @@
     "ssa_classes": {"$ref": "#/$defs/classes"},
     "option_classes": {"$ref": "#/$defs/classes"},
     "profiles": {
-      "type": "object", "minProperties": 25, "maxProperties": 25,
+      "type": "object", "minProperties": 27, "maxProperties": 27,
       "additionalProperties": {
         "type": "object", "additionalProperties": false,
         "required": ["contexts", "pcb", "organizations", "options", "ssa", "sources"],

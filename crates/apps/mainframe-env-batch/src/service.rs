@@ -2860,6 +2860,8 @@ impl BatchService {
                     checkpoint_id,
                     max_segments,
                     mutation,
+                    system: None,
+                    q_class: None,
                 }),
             },
         );

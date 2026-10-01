@@ -57,7 +57,7 @@ pub(super) fn render(root: &Path) -> TaskResult<Vec<u8>> {
         .as_object()
         .ok_or("IMS applicability profiles must be an object")?;
     require(
-        profiles.len() == 25,
+        profiles.len() == 27,
         "IMS applicability profile count drifted",
     )?;
     let families = array(&rules, "families", &rules_path)?;

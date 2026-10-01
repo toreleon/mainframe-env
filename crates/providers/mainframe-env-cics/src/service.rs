@@ -4312,6 +4312,7 @@ mod tests {
                     segments: Vec::new(),
                     checkpoint_id: None,
                     affected_segments: 0,
+                    system: None,
                 })),
                 HostRequest::Mq(_) => Ok(HostResult::Mq(mainframe_env_host_api::MqResult {
                     completion_code: 0,

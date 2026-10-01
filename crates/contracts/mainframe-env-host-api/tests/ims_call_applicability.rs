@@ -185,6 +185,55 @@ fn deq_and_schedule_keep_pcb_options_in_their_own_profiles() {
 }
 
 #[test]
+fn pos_and_gscd_use_source_reviewed_contexts_pcbs_and_ssa_forms() {
+    let pos = ImsCallSite {
+        organization: Some("DEDB"),
+        ssa_form: ImsSsaForm::Qualified,
+        ..site(11, "POS")
+    };
+    assert!(validate_ims_call_site(&pos).is_ok());
+    assert_eq!(
+        validate_ims_call_site(&ImsCallSite {
+            context: ImsExecutionContext::DbBatch,
+            ..pos.clone()
+        }),
+        Err(ImsApplicabilityProblem::ForbiddenContext),
+    );
+    assert_eq!(
+        validate_ims_call_site(&ImsCallSite {
+            ssa_form: ImsSsaForm::Path,
+            ..pos
+        }),
+        Err(ImsApplicabilityProblem::ForbiddenSsaForm),
+    );
+
+    let gscd = ImsCallSite {
+        context: ImsExecutionContext::DbBatch,
+        pcb_kind: Some(ImsPcbKind::Io),
+        organization: None,
+        processing_option: None,
+        ..site(7, "GSCD")
+    };
+    assert!(validate_ims_call_site(&gscd).is_ok());
+    assert_eq!(
+        validate_ims_call_site(&ImsCallSite {
+            context: ImsExecutionContext::DbDc,
+            ..gscd.clone()
+        }),
+        Err(ImsApplicabilityProblem::ForbiddenContext),
+    );
+    assert!(
+        validate_ims_call_site(&ImsCallSite {
+            pcb_kind: Some(ImsPcbKind::Database),
+            organization: Some("HIDAM"),
+            processing_option: Some(ImsProcessingOptionClass::Read),
+            ..gscd
+        })
+        .is_ok()
+    );
+}
+
+#[test]
 fn every_family_and_profile_has_call_and_command_representatives() {
     for family in IMS_CALL_APPLICABILITY {
         for variant in family.variants {

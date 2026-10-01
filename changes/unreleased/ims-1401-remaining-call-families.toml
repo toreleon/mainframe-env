@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added typed IMS INIT/ACCEPT, INIT/QUERY, INIT/REFRESH, DEQ, GSCD, POS, and STAT calls with generated applicability validation, durable replay, and bounded IMS system state."

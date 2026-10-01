@@ -16,6 +16,7 @@
     "gsam-calls": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_retrieveinsertgsamdb.htm"
   },
   "organization_classes": {
+    "any-database": ["DEDB", "GSAM", "HDAM", "HIDAM", "HISAM", "HSAM", "INDEX", "MSDB", "PHDAM", "PHIDAM", "PSINDEX", "SHISAM", "SHSAM"],
     "full-function": ["HDAM", "HIDAM", "HISAM", "HSAM", "INDEX", "PHDAM", "PHIDAM", "PSINDEX", "SHISAM", "SHSAM"],
     "dedb": ["DEDB"],
     "msdb": ["MSDB"],
@@ -24,10 +25,13 @@
   },
   "context_classes": {
     "database": ["db-dc", "dbctl", "db-batch"],
+    "online-database": ["db-dc", "dbctl"],
+    "batch": ["db-batch", "tm-batch"],
     "all": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]
   },
   "ssa_classes": {
     "none": ["absent"],
+    "pos": ["absent", "unqualified", "qualified"],
     "database": ["absent", "unqualified", "qualified", "path", "concatenated-key"],
     "dedb": ["absent", "unqualified", "qualified", "path", "subset-pointer", "concatenated-key"],
     "msdb": ["absent", "unqualified", "qualified"],
@@ -63,10 +67,12 @@
     "replace-full-function": {"contexts": "database", "pcb": "database", "organizations": "full-function", "options": "replace", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb", "processing-options"]},
     "replace-dedb": {"contexts": "database", "pcb": "database", "organizations": "dedb", "options": "replace", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb", "processing-options"]},
     "replace-msdb": {"contexts": "database", "pcb": "database", "organizations": "msdb", "options": "replace", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb", "processing-options"]},
-    "dedb-position": {"contexts": "database", "pcb": "database", "organizations": "dedb", "options": "read", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb"]},
-    "deq-io": {"contexts": "all", "pcb": "io", "organizations": "none", "options": "none", "ssa": "none", "sources": ["comparison", "call-functions", "io-pcb"]},
+    "dedb-position": {"contexts": "online-database", "pcb": "database", "organizations": "dedb", "options": "read", "ssa": "pos", "sources": ["comparison", "call-functions", "database-pcb"]},
+    "deq-io": {"contexts": "database", "pcb": "io", "organizations": "none", "options": "none", "ssa": "none", "sources": ["comparison", "call-functions", "io-pcb"]},
     "deq-dedb": {"contexts": "database", "pcb": "database", "organizations": "dedb", "options": "read", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb"]},
     "system-io": {"contexts": "all", "pcb": "io", "organizations": "none", "options": "none", "ssa": "none", "sources": ["comparison", "call-functions", "io-pcb"]},
+    "gscd-io": {"contexts": "batch", "pcb": "io", "organizations": "none", "options": "none", "ssa": "none", "sources": ["comparison", "call-functions", "io-pcb"]},
+    "gscd-database": {"contexts": "batch", "pcb": "database", "organizations": "any-database", "options": "any-database", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb"]},
     "schedule": {"contexts": "all", "pcb": "none", "organizations": "none", "options": "none", "ssa": "none", "sources": ["comparison"]},
     "statistics": {"contexts": "database", "pcb": "database", "organizations": "full-function", "options": "any-database", "ssa": "none", "sources": ["comparison", "call-functions", "database-pcb"]}
   },
@@ -75,7 +81,7 @@
     [4, ["delete-full-function", "delete-dedb", "delete-msdb"]],
     [5, ["read-full-function", "read-dedb", "read-msdb", "read-gsam", "read-gsam-direct"]],
     [6, ["hold-full-function", "hold-dedb", "hold-msdb"]],
-    [7, ["system-io"]],
+    [7, ["gscd-io", "gscd-database"]],
     [8, ["insert-full-function", "insert-dedb", "insert-msdb", "insert-gsam"]],
     [9, ["load-full-function"]], [10, ["system-io"]], [11, ["dedb-position"]],
     [12, ["system-io"]], [13, ["system-io"]], [14, ["system-io"]],

@@ -4,7 +4,8 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, EffectRequest, EffectResult, EnterpriseAuthorizer,
     EnterpriseResource, EnterpriseResourceClass, HostProblem, HostProvider, HostRequest,
-    HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment, canonical_ims_request_digest,
+    HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment, ImsStatusGroup,
+    canonical_ims_request_digest,
 };
 use mainframe_env_store_api::{
     ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -23,6 +24,7 @@ use crate::retention::{
 use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 
 mod generic;
+mod system;
 mod utility_bridge;
 pub use generic::{ImsGenericLoadImage, ImsGenericLoadRecord};
 
@@ -37,6 +39,7 @@ pub(crate) const REPLAY_NAMESPACE: &str = "ims-v1-replay";
 const PENDING_NAMESPACE: &str = "ims-v1-unit-of-work";
 pub(crate) const GENERIC_DATABASE_NAMESPACE: &str = "ims-v1-generic-database";
 const GENERIC_PENDING_NAMESPACE: &str = "ims-v1-generic-unit-of-work";
+const SYSTEM_NAMESPACE: &str = "ims-v1-system";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ImsLimits {
@@ -160,6 +163,8 @@ struct Session {
     last: Option<SegmentLocation>,
     #[serde(default)]
     position: PcbPosition,
+    #[serde(default)]
+    system: system::SystemSession,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -199,6 +204,8 @@ pub(crate) struct RecordedResult {
     pub(crate) segments: Vec<(String, Option<Vec<u8>>, Vec<u8>)>,
     pub(crate) checkpoint_id: Option<String>,
     pub(crate) affected_segments: u64,
+    #[serde(default)]
+    pub(crate) system: Option<mainframe_env_host_api::ImsSystemResult>,
 }
 
 impl RecordedResult {
@@ -229,6 +236,7 @@ impl RecordedResult {
                 .collect(),
             checkpoint_id: result.checkpoint_id.clone(),
             affected_segments: result.affected_segments,
+            system: result.system.clone(),
         }
     }
 
@@ -247,6 +255,7 @@ impl RecordedResult {
                 .collect(),
             checkpoint_id: self.checkpoint_id.clone(),
             affected_segments: self.affected_segments,
+            system: self.system.clone(),
         }
     }
 }
@@ -266,6 +275,8 @@ struct State {
     pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseState>>>>,
     #[serde(default)]
     generic_pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseEngineImage>>>>,
+    #[serde(default)]
+    system: BTreeMap<String, Arc<system::SystemState>>,
 }
 
 impl State {
@@ -433,8 +444,17 @@ impl ImsService {
         if durable.state.metadata.is_some() {
             generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
         }
+        let system_resources = if request.operation == ImsOperation::System {
+            Some(system::resources(&durable.state, invocation, request)?)
+        } else {
+            None
+        };
         if let Some(authorizer) = &self.authorizer {
-            for resource in ims_resources(&durable.state, invocation, request)? {
+            for resource in if let Some(resources) = system_resources {
+                resources
+            } else {
+                ims_resources(&durable.state, invocation, request)?
+            } {
                 authorizer.authorize(invocation.principal.id(), &resource)?;
             }
         }
@@ -473,11 +493,16 @@ impl ImsService {
         }
         let mut next = durable.state.scoped_snapshot();
         let run = invocation.run_unit_id.as_str();
-        let result = if generic::is_generic(&next, run, request) {
+        let result = if request.operation == ImsOperation::System {
+            system::apply_request(&mut next, run, request, self.limits)?
+        } else if generic::is_generic(&next, run, request) {
             generic::apply_request(&mut next, run, request, self.limits)?
         } else {
             apply_request(&mut next, run, request, self.limits)?
         };
+        if request.operation != ImsOperation::System {
+            system::observe_database_call(&mut next, run, request, &result, self.limits)?;
+        }
         if invocation.service_class == ServiceClass::Batch
             && matches!(
                 request.operation,
@@ -728,6 +753,7 @@ fn load_or_migrate(
                 limits,
                 &mut versions,
             )?,
+            system: load_row_map(store, SYSTEM_NAMESPACE, 1, limits, &mut versions)?,
             sessions: load_row_map(
                 store,
                 SESSION_NAMESPACE,
@@ -790,6 +816,7 @@ fn ensure_row_namespaces_empty(store: &dyn ProviderStateStore) -> Result<(), Hos
         PENDING_NAMESPACE,
         GENERIC_DATABASE_NAMESPACE,
         GENERIC_PENDING_NAMESPACE,
+        SYSTEM_NAMESPACE,
     ] {
         if !store
             .list_provider_state(namespace, 1)
@@ -922,6 +949,14 @@ fn row_changes(
         GENERIC_PENDING_NAMESPACE,
         &current.generic_pending_undo,
         &next.generic_pending_undo,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        SYSTEM_NAMESPACE,
+        &current.system,
+        &next.system,
         versions,
         limits,
         &mut changes,
@@ -1182,6 +1217,7 @@ fn apply_request(
             }
             Ok(status("  "))
         }
+        ImsOperation::System => Err(HostProblem::Malformed),
     }
 }
 
@@ -1222,6 +1258,7 @@ fn schedule(
             current_root: None,
             last: None,
             position: PcbPosition::default(),
+            system: system::SystemSession::default(),
         }),
     );
     Ok(status("  "))
@@ -1559,6 +1596,7 @@ fn checkpoint(
         segments: Vec::new(),
         checkpoint_id: Some(id),
         affected_segments: 0,
+        system: None,
     })
 }
 
@@ -1642,6 +1680,7 @@ fn unload(state: &State, run: &str, request: &ImsRequest) -> Result<ImsResult, H
         segments,
         checkpoint_id: None,
         affected_segments: 0,
+        system: None,
     })
 }
 
@@ -1777,6 +1816,7 @@ fn status(status: &str) -> ImsResult {
         segments: Vec::new(),
         checkpoint_id: None,
         affected_segments: 0,
+        system: None,
     }
 }
 
@@ -1797,6 +1837,7 @@ fn segment(name: &str, parent_key: Option<Vec<u8>>, data: Vec<u8>) -> ImsResult 
         }],
         checkpoint_id: None,
         affected_segments: 0,
+        system: None,
     }
 }
 
@@ -1895,6 +1936,7 @@ fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
         return Err(HostProblem::ResourceExhausted);
     }
     generic::validate_state(state, limits)?;
+    system::validate_state(state, limits)?;
     if let (Some(legacy), Some(metadata)) = (&state.definitions, &state.metadata)
         && (legacy.databases.iter().any(|database| {
             metadata
@@ -2283,6 +2325,8 @@ mod tests {
                 idempotency_key: IdempotencyKey::new(format!("effect-{sequence}"), limits).unwrap(),
                 transaction: Some("IMS-TEST".into()),
             }),
+            system: None,
+            q_class: None,
         }
     }
 
@@ -2850,6 +2894,7 @@ mod tests {
             replay: BTreeMap::new(),
             pending_undo: BTreeMap::new(),
             generic_pending_undo: BTreeMap::new(),
+            system: BTreeMap::new(),
         };
         let legacy_payload = serde_json::to_vec(&legacy).unwrap();
         store

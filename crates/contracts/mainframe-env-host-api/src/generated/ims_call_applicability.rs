@@ -2,7 +2,7 @@
 // Call-site validation only; no executed, recovered, or differential credit.
 
 pub const IMS_CALL_APPLICABILITY_RULES_SHA256: &str =
-    "sha256:c7b2abd93786a7ebcc1e1211456c2d08ea6f299b8cf352c7e2c8822906f63598";
+    "sha256:a6dcad455b2e00e942792cfdb7e6bf7251dc0a2c8cabd95c9ca3da19b1d52ccf";
 pub const IMS_CALL_APPLICABILITY: &[ImsCallApplicabilityDescriptor] = &[
     ImsCallApplicabilityDescriptor {
         ordinal: 1,
@@ -70,9 +70,7 @@ pub const IMS_CALL_APPLICABILITY: &[ImsCallApplicabilityDescriptor] = &[
                 contexts: &[
                     ImsExecutionContext::DbDc,
                     ImsExecutionContext::Dbctl,
-                    ImsExecutionContext::Dcctl,
                     ImsExecutionContext::DbBatch,
-                    ImsExecutionContext::TmBatch,
                 ],
                 pcb_kind: Some(ImsPcbKind::Io),
                 organizations: &[],
@@ -448,26 +446,46 @@ pub const IMS_CALL_APPLICABILITY: &[ImsCallApplicabilityDescriptor] = &[
         call_names: &["GSCD"],
         command_names: &["GSCD"],
         executed: false,
-        variants: &[ImsCallVariant {
-            profile: "system-io",
-            contexts: &[
-                ImsExecutionContext::DbDc,
-                ImsExecutionContext::Dbctl,
-                ImsExecutionContext::Dcctl,
-                ImsExecutionContext::DbBatch,
-                ImsExecutionContext::TmBatch,
-            ],
-            pcb_kind: Some(ImsPcbKind::Io),
-            organizations: &[],
-            processing_options: &[],
-            ssa_forms: &[ImsSsaForm::Absent],
-            names: &[],
-            source_topics: &[
-                "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
-                "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_dlicallfunctions.htm",
-                "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingiopcb.htm",
-            ],
-        }],
+        variants: &[
+            ImsCallVariant {
+                profile: "gscd-io",
+                contexts: &[ImsExecutionContext::DbBatch, ImsExecutionContext::TmBatch],
+                pcb_kind: Some(ImsPcbKind::Io),
+                organizations: &[],
+                processing_options: &[],
+                ssa_forms: &[ImsSsaForm::Absent],
+                names: &[],
+                source_topics: &[
+                    "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+                    "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_dlicallfunctions.htm",
+                    "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingiopcb.htm",
+                ],
+            },
+            ImsCallVariant {
+                profile: "gscd-database",
+                contexts: &[ImsExecutionContext::DbBatch, ImsExecutionContext::TmBatch],
+                pcb_kind: Some(ImsPcbKind::Database),
+                organizations: &[
+                    "DEDB", "GSAM", "HDAM", "HIDAM", "HISAM", "HSAM", "INDEX", "MSDB", "PHDAM",
+                    "PHIDAM", "PSINDEX", "SHISAM", "SHSAM",
+                ],
+                processing_options: &[
+                    ImsProcessingOptionClass::Read,
+                    ImsProcessingOptionClass::Replace,
+                    ImsProcessingOptionClass::Insert,
+                    ImsProcessingOptionClass::Delete,
+                    ImsProcessingOptionClass::All,
+                    ImsProcessingOptionClass::ReadWithoutIntegrity,
+                ],
+                ssa_forms: &[ImsSsaForm::Absent],
+                names: &[],
+                source_topics: &[
+                    "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
+                    "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_dlicallfunctions.htm",
+                    "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_imsdbdbpcbmask.htm",
+                ],
+            },
+        ],
     },
     ImsCallApplicabilityDescriptor {
         ordinal: 8,
@@ -653,11 +671,7 @@ pub const IMS_CALL_APPLICABILITY: &[ImsCallApplicabilityDescriptor] = &[
         executed: false,
         variants: &[ImsCallVariant {
             profile: "dedb-position",
-            contexts: &[
-                ImsExecutionContext::DbDc,
-                ImsExecutionContext::Dbctl,
-                ImsExecutionContext::DbBatch,
-            ],
+            contexts: &[ImsExecutionContext::DbDc, ImsExecutionContext::Dbctl],
             pcb_kind: Some(ImsPcbKind::Database),
             organizations: &["DEDB"],
             processing_options: &[
@@ -667,7 +681,11 @@ pub const IMS_CALL_APPLICABILITY: &[ImsCallApplicabilityDescriptor] = &[
                 ImsProcessingOptionClass::All,
                 ImsProcessingOptionClass::ReadWithoutIntegrity,
             ],
-            ssa_forms: &[ImsSsaForm::Absent],
+            ssa_forms: &[
+                ImsSsaForm::Absent,
+                ImsSsaForm::Unqualified,
+                ImsSsaForm::Qualified,
+            ],
             names: &[],
             source_topics: &[
                 "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",

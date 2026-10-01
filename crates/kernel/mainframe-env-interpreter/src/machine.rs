@@ -4532,6 +4532,8 @@ impl ReferenceMachine {
                 checkpoint_id,
                 max_segments: 1,
                 mutation,
+                system: None,
+                q_class: None,
             }),
             PendingKind::Ims { target },
         )

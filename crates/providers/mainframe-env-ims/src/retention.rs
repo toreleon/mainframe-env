@@ -684,6 +684,7 @@ mod tests {
             segments: Vec::new(),
             checkpoint_id: None,
             affected_segments: 1,
+            system: None,
         }
     }
 
