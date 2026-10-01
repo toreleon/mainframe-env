@@ -6,6 +6,7 @@ mod abi;
 mod host_context;
 mod message;
 mod object;
+mod object_service;
 mod retention;
 mod service;
 

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Integrated the typed MQ object catalog with the existing queue service and versioned provider rows, including local alias routing and restart-safe queue-only migration; unsupported model and remote execution remains fail-closed."
