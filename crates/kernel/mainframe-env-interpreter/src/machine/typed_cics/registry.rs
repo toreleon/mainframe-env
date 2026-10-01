@@ -3,6 +3,7 @@ use super::*;
 pub(in crate::machine) fn operation_identities() -> Vec<OperationIdentity> {
     CICS_EXECUTABLE_DESCRIPTORS
         .iter()
+        .filter(|descriptor| descriptor.is_registered())
         .map(|descriptor| descriptor.identity())
         .collect()
 }
@@ -12,6 +13,9 @@ pub(in crate::machine) fn validate_module_operations(
 ) -> Result<(), MachineProblem> {
     let mut catalog = OperationCatalog::default();
     for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
+        if !descriptor.is_registered() {
+            continue;
+        }
         catalog
             .register(operation_schema(descriptor))
             .expect("unique typed CICS identity");

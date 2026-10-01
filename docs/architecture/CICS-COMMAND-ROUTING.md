@@ -133,6 +133,18 @@ compilations do not carry their command text across the executable boundary.
 `HANDLE ABEND` uses the same typed task dialect with a source label or bounded
 program-name input and mutually exclusive CANCEL/RESET actions; its provider
 continues to own authorization and durable active/canceled exit state.
+Synchronous child explicit ABEND searches the active logical-program loans for
+the nearest exit after restoring each caller, without inheriting its HANDLE
+stack. A child-local exit takes precedence; suspended stack entries do not.
+CANCEL bypasses all levels. Known propagation adds bounded `ABEND.CODE`
+(`mainframe-env.cics.abend-code@1`) alongside `ABEND.DUMP` to the retained
+LINK/INVOKE response, without COMMAREA copyback. Replay validates that control
+metadata and never reexecutes the child. An uncertain executor reply cannot
+become handler success. Task-level metadata survives root restoration and reopen;
+handled ABEND retains task resources but cancels still-protected START requests.
+This is explicit-ABEND LABEL proof, not general machine-fault handling, ancestor
+PROGRAM execution, in-flight child resume or full frame-slice acceptance; see
+ADR-0027 and the version status record.
 The typed local LINK subset binds PROGRAM and an optional COMMAREA before
 dispatch. COMMAREA is one input/output storage identity, so registering its
 return destination cannot replace the captured request bytes. Optional LENGTH

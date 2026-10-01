@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Unwind a source-defined unmatched child POP HANDLE default abend to the nearest active ancestor LABEL despite parent LINK RESP. Preserve local condition precedence and protected-START cancellation, validate origin metadata before recovery/replay, and retain pending installed calls across SQLite/PostgreSQL reopen without inventing an IBM abend code."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Keep unresolved installed Transfer, Invoke and Suspended outcomes unknown instead of allowing LINK RESP to consume them as normal returns. Fence further warm task dispatch, restoration and cleanup while preserving pending calls, busy instances and suspended child checkpoints across SQLite/PostgreSQL reopen. Replacement execution remains pending."

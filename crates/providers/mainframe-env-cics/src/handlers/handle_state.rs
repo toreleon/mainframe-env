@@ -80,7 +80,7 @@ impl HandleState {
         }
     }
 
-    fn apply(self, run: &mut Run) {
+    pub(super) fn apply(self, run: &mut Run) {
         run.handlers = self.handlers;
         run.aid_handlers = self.aid_handlers;
         run.ignored_conditions = self.ignored_conditions;
@@ -96,6 +96,11 @@ pub(super) fn persist_handle_state(
     run: &mut Run,
     previous: HandleState,
 ) -> Result<(), HostProblem> {
+    // Selected children cannot resume independently. Their specifications are
+    // local to the active lease; only the root session state survives restart.
+    if run.current_program.logical_level > 1 {
+        return Ok(());
+    }
     let result: Result<(), HostProblem> = (|| {
         let next_handle_state = HandleState::from_run(run);
         let mut state = service.lock()?;

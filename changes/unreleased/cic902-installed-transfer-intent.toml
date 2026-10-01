@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Retain observed installed PROGRAM/XCTL transfer intent in the original pending CALL reservation, bound to the exact suspended source and checkpoint. Strict schema-3 phase, bounds and digest validation preserves active retention and unknown replay; target admission, handoff and execution remain pending."

@@ -38,8 +38,24 @@ impl CobolProgram {
             vec![payload.bytes().to_vec()]
         };
         let call = encode_selected_call(&values)?;
+        let mut callee_parent = parent.clone();
+        if !callee_parent.bindings.contains_key("cics.commarea")
+            && callee_parent.bindings.len() >= InvocationLimits::default().max_bindings
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        // The child EIBCALEN describes this call, not the caller's entry COMMAREA.
+        callee_parent.bindings.insert(
+            "cics.commarea".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.commarea@1",
+                values.first().cloned().unwrap_or_default(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
         let result =
-            self.execute_installed_effect(parent, effect, program, &call, Some(selection))?;
+            self.execute_installed_effect(&callee_parent, effect, program, &call, Some(selection))?;
         let mut returned = decode_selected_result(&result)?;
         let mut bytes = if returned.is_empty() {
             payload.bytes().to_vec()
@@ -51,6 +67,10 @@ impl CobolProgram {
                 return Err(HostProblem::ProviderFailure);
             }
             bytes.truncate(payload.bytes().len());
+        } else if payload.schema() == "mainframe-env.cics.payload@1" {
+            // A larger callee linkage declaration cannot extend the caller's
+            // checked COMMAREA span, even when the child writes its entire area.
+            bytes.truncate(payload.bytes().len());
         }
         BoundedPayload::new(
             "mainframe-env.cics.payload@1",
@@ -61,7 +81,7 @@ impl CobolProgram {
     }
 }
 
-fn encode_selected_call(values: &[Vec<u8>]) -> Result<BoundedPayload, HostProblem> {
+pub(super) fn encode_selected_call(values: &[Vec<u8>]) -> Result<BoundedPayload, HostProblem> {
     let mut bytes = u32::try_from(values.len())
         .map_err(|_| HostProblem::ResourceExhausted)?
         .to_be_bytes()

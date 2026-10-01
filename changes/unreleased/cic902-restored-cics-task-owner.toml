@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Restore the original CICS task owner across validated root online PROGRAM/XCTL replacement while retaining replacement-actor effect provenance. BTS SYNCPOINT commit/rollback works after SQLite/PostgreSQL reopen; warm task resources survive replacement and stale sessions, live loans, widened scope or capacity failures preserve the existing task. No new durable schema or guessed legacy owner is introduced."

@@ -5,6 +5,7 @@ use super::{
     scope::OwnerIdentity,
     state::{self, ContainerDatatype, ContainerOwner, ContainerValue},
 };
+use crate::retention::ContainerReplay as Replay;
 use crate::service::handlers::bts_lifecycle::{self, BtsLifecycleStore, BtsProcess};
 use crate::service::{CicsService, Run};
 use mainframe_env_execution_api::BoundedPayload;
@@ -61,16 +62,6 @@ struct Capacity {
     replays: usize,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Replay {
-    schema_version: u8,
-    owner_execution: String,
-    owner_principal: String,
-    owner_run_unit: String,
-    digest: String,
-}
-
 fn store_problem(_: StoreError) -> HostProblem {
     HostProblem::InfrastructureFailure
 }
@@ -97,9 +88,19 @@ fn active_scope(
     read_only: bool,
 ) -> Result<Scope, HostProblem> {
     let lifecycle = BtsLifecycleStore::new(store);
+    let missing_scope = if read_only {
+        if matches!(selector, Selector::CurrentProcess) {
+            25
+        } else {
+            4
+        }
+    } else {
+        1
+    };
+    let missing_child = if read_only { 8 } else { 1 };
     let context = lifecycle
         .active_context(identity.run_unit, identity.execution, identity.principal)?
-        .ok_or_else(|| command::condition("INVREQ", 16, 1))?;
+        .ok_or_else(|| command::condition("INVREQ", 16, missing_scope))?;
     let process = lifecycle
         .load_process(&context.process_type, &context.process_name)?
         .ok_or(HostProblem::NotFound)?;
@@ -122,7 +123,7 @@ fn active_scope(
                 Selector::Current => context.activity_id.clone(),
                 Selector::Child(name) => {
                     if !state::valid_name(name, 16) {
-                        return Err(command::condition("ACTIVITYERR", 109, 1));
+                        return Err(command::condition("ACTIVITYERR", 109, missing_child));
                     }
                     if allow_self
                         && process
@@ -134,7 +135,7 @@ fn active_scope(
                     } else {
                         process
                             .child(&context.activity_id, name)
-                            .ok_or_else(|| command::condition("ACTIVITYERR", 109, 1))?
+                            .ok_or_else(|| command::condition("ACTIVITYERR", 109, missing_child))?
                             .id
                             .clone()
                     }
@@ -174,15 +175,25 @@ fn acquired_scope(
     store: &dyn ProviderStateStore,
     identity: OwnerIdentity<'_>,
     selector: Selector<'_>,
+    read_only: bool,
 ) -> Result<Scope, HostProblem> {
     let lifecycle = BtsLifecycleStore::new(store);
+    let missing_acquisition = if read_only {
+        if matches!(selector, Selector::AcquiredProcess) {
+            15
+        } else {
+            24
+        }
+    } else {
+        1
+    };
     let held = lifecycle
         .acquired_process_container_scope(
             identity.run_unit,
             identity.execution,
             identity.principal,
         )?
-        .ok_or_else(|| command::condition("INVREQ", 16, 1))?;
+        .ok_or_else(|| command::condition("INVREQ", 16, missing_acquisition))?;
     if matches!(selector, Selector::AcquiredProcess) && !held.permits_acqprocess() {
         // The pinned GET topic does not establish ACQPROCESS for a descendant acquisition.
         return Err(HostProblem::Unsupported);
@@ -222,7 +233,7 @@ fn resolve(
 ) -> Result<Scope, HostProblem> {
     match selector {
         Selector::AcquiredActivity | Selector::AcquiredProcess => {
-            acquired_scope(store, identity, selector)
+            acquired_scope(store, identity, selector, read_only)
         }
         _ => active_scope(store, identity, selector, allow_self, read_only),
     }
@@ -348,7 +359,7 @@ fn read_guarded(
     if before.owner != after.owner || before.process_version != after.process_version {
         return Err(HostProblem::UnknownOutcome);
     }
-    value.ok_or_else(|| command::condition("CONTAINERERR", 110, 1))
+    value.ok_or_else(|| command::condition("CONTAINERERR", 110, 10))
 }
 
 pub(super) fn invoke(
@@ -448,24 +459,24 @@ pub(super) fn invoke(
             {
                 return Err(command::condition("INVREQ", 16, 1));
             }
-            let maximum = command::number(request, "FLENGTH")?
-                .map(|value| {
-                    usize::try_from(value).map_err(|_| command::condition("LENGERR", 22, 1))
-                })
-                .transpose()?;
             if into {
+                // Only INTO reads FLENGTH. SET and NODATA return its actual
+                // value regardless of the receiving field's incoming bytes.
+                let maximum = command::number(request, "FLENGTH")?
+                    .map(|value| {
+                        usize::try_from(value.max(0))
+                            .map_err(|_| command::condition("LENGERR", 22, 11))
+                    })
+                    .transpose()?;
                 let capacity = command::number(request, "INTO.MAXLENGTH")?
                     .and_then(|value| usize::try_from(value).ok())
                     .ok_or(HostProblem::Malformed)?;
-                let copied = value
-                    .bytes
-                    .len()
-                    .min(capacity)
-                    .min(maximum.unwrap_or(capacity));
-                if copied < value.bytes.len() {
+                let maximum = maximum.unwrap_or(capacity);
+                let copied = value.bytes.len().min(capacity).min(maximum);
+                if maximum != value.bytes.len() || copied < value.bytes.len() {
                     response.condition = "LENGERR".into();
                     response.response = 22;
-                    response.response2 = 1;
+                    response.response2 = 11;
                 }
                 command::output(
                     &mut response,
@@ -693,11 +704,7 @@ fn mutate(
             .get_provider_state(REPLAY_NAMESPACE, replay_key)
             .map_err(store_problem)?
         {
-            let replay: Replay = serde_json::from_slice(&row.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if replay.schema_version != 1 {
-                return Err(HostProblem::InfrastructureFailure);
-            }
+            let replay = Replay::decode(&row).map_err(|_| HostProblem::InfrastructureFailure)?;
             return if replay.owner_execution == identity.execution
                 && replay.owner_principal == identity.principal
                 && replay.owner_run_unit == identity.run_unit

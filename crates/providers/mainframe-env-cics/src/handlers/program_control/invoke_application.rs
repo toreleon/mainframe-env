@@ -1,7 +1,7 @@
 use super::super::super::{CicsService, Run, argument_bytes, bounded};
 use super::{
     CicsApplicationEntryDefinition, CicsJavaStatus, condition, decimal_usize,
-    normalize_application_name, validate_program_artifact,
+    normalize_application_name, validate_commarea_reply, validate_program_artifact,
 };
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
@@ -101,6 +101,10 @@ pub(in crate::service) fn invoke(
         }
         payload = bounded(payload.bytes()[..length].to_vec())?;
     }
+    let commarea_limit = request
+        .arguments
+        .contains_key("COMMAREA")
+        .then_some(payload.bytes().len());
     service
         .authorize(
             run,
@@ -124,12 +128,18 @@ pub(in crate::service) fn invoke(
             }),
         }),
     );
+    if let Some(response) = super::super::program_abend::unwind(service, run, &result)? {
+        return Ok(response);
+    }
     let returned = match result {
         Ok(HostResult::Program(payload)) => payload,
         Err(HostProblem::NotFound) => return Err(condition("PGMIDERR", 27, 2)),
         Err(problem) => return Err(problem),
         Ok(_) => return Err(HostProblem::ProviderFailure),
     };
+    if let Some(limit) = commarea_limit {
+        validate_commarea_reply(&returned, limit)?;
+    }
     let mut response = service.response(
         run,
         CicsDisposition::Complete,

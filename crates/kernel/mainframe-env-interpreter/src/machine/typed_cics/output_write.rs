@@ -269,6 +269,17 @@ pub(in crate::machine) fn write_output(
     {
         return Err(MachineProblem::UnexpectedHostResult);
     }
+    if (operation == CicsOperation::GetContainer && name == "INTO"
+        || matches!(
+            operation,
+            CicsOperation::Link | CicsOperation::InvokeApplication
+        ) && name == "COMMAREA")
+        && let CicsTarget::Resolved(slot) = target
+    {
+        // Container retrieval and local program calls copy a prefix without blank padding.
+        // A host response must not exceed the checked receiving area.
+        return write_resolved_prefix(machine, slot, value.bytes());
+    }
     if matches!(
         name,
         "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD" | "RESULT"
@@ -327,6 +338,9 @@ fn write_resolved_prefix(
     value: &[u8],
 ) -> Result<(), MachineProblem> {
     let mut reference = resolved_slot(machine, slot)?;
+    if value.len() > reference.length {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
     reference.length = value.len();
     machine.write_reference(&reference, value)
 }
@@ -334,6 +348,76 @@ fn write_resolved_prefix(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_program_commarea_copies_only_returned_prefix_and_rejects_overlong_output() {
+        for operation in [CicsOperation::Link, CicsOperation::InvokeApplication] {
+            let (mut machine, slot) = super::super::tests::machine_with_alphanumeric_slot("OUT", 4);
+            machine.write("OUT", b"ZZZZ").unwrap();
+            let target = CicsTarget::Resolved(slot);
+            for (bytes, expected) in [(b"DA".as_slice(), b"DAZZ".as_slice()), (b"", b"DAZZ")] {
+                write_output(
+                    &mut machine,
+                    operation,
+                    "COMMAREA",
+                    &target,
+                    &payload("mainframe-env.cics.payload@1", bytes.to_vec()).unwrap(),
+                    None,
+                )
+                .unwrap();
+                assert_eq!(machine.read("OUT").unwrap(), expected);
+            }
+            assert_eq!(
+                write_output(
+                    &mut machine,
+                    operation,
+                    "COMMAREA",
+                    &target,
+                    &payload("mainframe-env.cics.payload@1", b"TOOLONG".to_vec()).unwrap(),
+                    None
+                ),
+                Err(MachineProblem::UnexpectedHostResult)
+            );
+            assert_eq!(machine.read("OUT").unwrap(), b"DAZZ");
+        }
+    }
+
+    #[test]
+    fn container_into_copies_only_returned_bytes_without_padding() {
+        let (mut machine, slot) = super::super::tests::machine_with_alphanumeric_slot("OUT", 4);
+        machine.write("OUT", b"ZZZZ").unwrap();
+        let target = CicsTarget::Resolved(slot);
+        for (bytes, expected) in [(b"DA".as_slice(), b"DAZZ".as_slice()), (b"", b"DAZZ")] {
+            write_output(
+                &mut machine,
+                CicsOperation::GetContainer,
+                "INTO",
+                &target,
+                &payload("mainframe-env.cics.payload@1", bytes.to_vec()).unwrap(),
+                None,
+            )
+            .unwrap();
+            assert_eq!(machine.read("OUT").unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn container_into_rejects_an_overlong_host_payload_without_writing() {
+        let (mut machine, slot) = super::super::tests::machine_with_alphanumeric_slot("OUT", 4);
+        machine.write("OUT", b"ZZZZ").unwrap();
+        assert_eq!(
+            write_output(
+                &mut machine,
+                CicsOperation::GetContainer,
+                "INTO",
+                &CicsTarget::Resolved(slot),
+                &payload("mainframe-env.cics.payload@1", b"TOOLONG".to_vec()).unwrap(),
+                None
+            ),
+            Err(MachineProblem::UnexpectedHostResult)
+        );
+        assert_eq!(machine.read("OUT").unwrap(), b"ZZZZ");
+    }
 
     #[test]
     fn bts_event_metadata_accepts_numeric_provider_payloads() {

@@ -176,6 +176,17 @@ not re-executed merely because journal encoding changes. The recovery worker
 establishes no generic exactly-once guarantee: it can finalize an intent only
 from an authoritative service-specific observation.
 
+CICS installed-program occurrences use the owned
+[`cics-program-v2:` identity](../decisions/0027-cics-logical-program-frames.md),
+binding the durable outer command, run unit, frame actor and bounded occurrence,
+not the volatile task-global host counter. This changes only nested program-key
+construction; canonical request/result bytes, outer effect keys and other
+nested subsystem keys are unchanged. Inputs remain separately fingerprinted,
+so changed inputs conflict under the original occurrence instead of choosing a
+second child. Fresh installed-call protocol schema 3 explicitly admits this
+domain; counter-era active protocol state cannot authorize it. Retained unknown
+calls are not redispatched to reconstruct a frame.
+
 ## Golden digests
 
 HostRequest::State(StateRequest::Get { key: "one" }): 150 preimage bytes,

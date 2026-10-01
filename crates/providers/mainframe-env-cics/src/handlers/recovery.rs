@@ -74,7 +74,12 @@ fn syncpoint(
             return Err(HostProblem::IdempotencyConflict);
         }
         if existing.metadata.as_ref().is_some_and(|metadata| {
-            metadata.owner_execution != run.invocation.execution_id.as_str()
+            metadata.owner_execution != run.current_program.effect_invocation.execution_id.as_str()
+                || metadata
+                    .task_owner_execution
+                    .as_deref()
+                    .unwrap_or(&metadata.owner_execution)
+                    != run.invocation.execution_id.as_str()
                 || metadata.owner_run_unit != run.invocation.run_unit_id.as_str()
         }) {
             return Err(HostProblem::IdempotencyConflict);
@@ -123,7 +128,18 @@ fn syncpoint(
                         transaction: run.transaction.clone(),
                         metadata: Some(UowRetentionMetadata {
                             effect_key: key.into(),
-                            owner_execution: run.invocation.execution_id.as_str().into(),
+                            owner_execution: run
+                                .current_program
+                                .effect_invocation
+                                .execution_id
+                                .as_str()
+                                .into(),
+                            task_owner_execution: (run
+                                .current_program
+                                .effect_invocation
+                                .execution_id
+                                != run.invocation.execution_id)
+                                .then(|| run.invocation.execution_id.as_str().into()),
                             owner_run_unit: run.invocation.run_unit_id.as_str().into(),
                             deadline_tick: retention_tick,
                             terminal_tick: None,
@@ -176,7 +192,15 @@ fn syncpoint(
                     transaction: run.transaction.clone(),
                     metadata: Some(UowRetentionMetadata {
                         effect_key: key.into(),
-                        owner_execution: run.invocation.execution_id.as_str().into(),
+                        owner_execution: run
+                            .current_program
+                            .effect_invocation
+                            .execution_id
+                            .as_str()
+                            .into(),
+                        task_owner_execution: (run.current_program.effect_invocation.execution_id
+                            != run.invocation.execution_id)
+                            .then(|| run.invocation.execution_id.as_str().into()),
                         owner_run_unit: run.invocation.run_unit_id.as_str().into(),
                         deadline_tick: uow_deadline,
                         terminal_tick,
@@ -273,7 +297,7 @@ fn syncpoint_db2(
         .ok_or(HostProblem::ResourceExhausted)?;
     let key = nested_key(run, run.host_sequence)?;
     let nested_invocation = invocation_with_nested_origin(
-        &run.invocation,
+        &run.current_program.effect_invocation,
         &key,
         run.outer_effect_key
             .as_deref()
@@ -281,12 +305,12 @@ fn syncpoint_db2(
     )?;
     let result = service.invoke_host(
         &nested_invocation,
-        run.invocation.deadline_tick.saturating_sub(1),
+        nested_invocation.deadline_tick.saturating_sub(1),
         false,
         EffectRequest {
             run_unit: run.invocation.run_unit_id.clone(),
             sequence: run.host_sequence,
-            deadline_tick: run.invocation.deadline_tick,
+            deadline_tick: nested_invocation.deadline_tick,
             idempotency_key: Some(key.clone()),
             request: HostRequest::Db2(Db2Request {
                 operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
@@ -336,7 +360,7 @@ fn syncpoint_ims(
         .ok_or(HostProblem::ResourceExhausted)?;
     let key = nested_key(run, run.host_sequence)?;
     let nested_invocation = invocation_with_nested_origin(
-        &run.invocation,
+        &run.current_program.effect_invocation,
         &key,
         run.outer_effect_key
             .as_deref()
@@ -344,12 +368,12 @@ fn syncpoint_ims(
     )?;
     let result = service.invoke_host(
         &nested_invocation,
-        run.invocation.deadline_tick.saturating_sub(1),
+        nested_invocation.deadline_tick.saturating_sub(1),
         false,
         EffectRequest {
             run_unit: run.invocation.run_unit_id.clone(),
             sequence: run.host_sequence,
-            deadline_tick: run.invocation.deadline_tick,
+            deadline_tick: nested_invocation.deadline_tick,
             idempotency_key: Some(key.clone()),
             request: HostRequest::Ims(ImsRequest {
                 operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
@@ -403,7 +427,7 @@ fn syncpoint_mq(
         .ok_or(HostProblem::ResourceExhausted)?;
     let key = nested_key(run, run.host_sequence)?;
     let nested_invocation = invocation_with_nested_origin(
-        &run.invocation,
+        &run.current_program.effect_invocation,
         &key,
         run.outer_effect_key
             .as_deref()
@@ -411,12 +435,12 @@ fn syncpoint_mq(
     )?;
     let result = service.invoke_host(
         &nested_invocation,
-        run.invocation.deadline_tick.saturating_sub(1),
+        nested_invocation.deadline_tick.saturating_sub(1),
         false,
         EffectRequest {
             run_unit: run.invocation.run_unit_id.clone(),
             sequence: run.host_sequence,
-            deadline_tick: run.invocation.deadline_tick,
+            deadline_tick: nested_invocation.deadline_tick,
             idempotency_key: Some(key.clone()),
             request: HostRequest::Mq(MqRequest {
                 operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {

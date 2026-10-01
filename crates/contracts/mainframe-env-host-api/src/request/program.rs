@@ -8,7 +8,7 @@ pub struct ProgramLinkSelection {
     pub artifact: ArtifactRef,
     /// Exact installed program generation selected by the caller.
     pub generation: u64,
-    /// Exact immutable application-entry content identity selected by the caller.
+    /// Exact immutable program-definition or application-entry identity selected by the caller.
     pub content_identity: String,
 }
 

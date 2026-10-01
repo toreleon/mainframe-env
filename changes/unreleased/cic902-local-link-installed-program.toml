@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Dispatch local CICS LINK to installed immutable program generations with checked COMMAREA copy-back, callee EIBCALEN, source-defined program conditions and durable replay."

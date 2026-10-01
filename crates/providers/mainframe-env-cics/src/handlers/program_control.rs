@@ -5,7 +5,7 @@ use super::{field, store_error};
 use mainframe_env_execution_api::{ArtifactRef, BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
-    HostRequest, HostResult, ProgramName, ProgramRequest,
+    HostRequest, HostResult, ProgramLinkSelection, ProgramName, ProgramRequest,
 };
 use mainframe_env_store_api::{
     ArtifactStore, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
@@ -22,9 +22,12 @@ const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 mod invoke_application;
 mod load;
 mod release;
+mod transfer_selection;
 pub(in crate::service) use load::{
     ProgramLoadState, load_program_loads, release_task_program_loads,
 };
+pub(in crate::service) use transfer_selection::freeze as freeze_program_transfer;
+pub(crate) use transfer_selection::validate_response as validate_transfer_selection;
 
 /// One immutable installed program generation available to CICS program control.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -765,12 +768,19 @@ fn transfer(
     if !matches!(target.len(), 1..=8) || !target.bytes().all(valid_program_character) {
         return Err(HostProblem::Malformed);
     }
-    service.authorize(
-        run,
-        "FACILITY",
-        &format!("CICS.PROGRAM.{target}"),
-        AccessIntent::Execute,
-    )?;
+    service
+        .authorize(
+            run,
+            "FACILITY",
+            &format!("CICS.PROGRAM.{target}"),
+            AccessIntent::Execute,
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized if request.operation == CicsOperation::Link => {
+                condition("NOTAUTH", 70, 101)
+            }
+            problem => problem,
+        })?;
     let program = ProgramName::new(target.clone(), 128).map_err(|_| HostProblem::Malformed)?;
     let mut payload = argument_bytes(request, "COMMAREA").unwrap_or_default();
     if let Some(length) = request.arguments.get("LENGTH") {
@@ -802,9 +812,12 @@ fn transfer(
         }
         payload.truncate(length);
     }
+    let commarea_limit = (request.operation == CicsOperation::Link
+        && request.arguments.contains_key("COMMAREA"))
+    .then_some(payload.len());
     let payload = bounded(payload)?;
     if request.operation == CicsOperation::Xctl && service.lock()?.programs.contains(&target) {
-        return service.response(
+        let mut response = service.response(
             run,
             CicsDisposition::Transfer,
             "NORMAL",
@@ -813,20 +826,35 @@ fn transfer(
             Some(target),
             None,
             payload.bytes().to_vec(),
-        );
+        )?;
+        freeze_program_transfer(service, &mut response)?;
+        return Ok(response);
     }
     let host_request = if request.operation == CicsOperation::Link {
         HostRequest::Program(ProgramRequest::Link {
             program,
             payload,
-            selection: None,
+            selection: local_link_selection(service, &target)?,
         })
     } else {
         HostRequest::Program(ProgramRequest::Xctl { program, payload })
     };
-    let payload = match service.nested(run, host_request)? {
-        HostResult::Program(payload) => payload.bytes().to_vec(),
-        _ => return Err(HostProblem::ProviderFailure),
+    let result = service.nested(run, host_request);
+    if let Some(response) = super::program_abend::unwind(service, run, &result)? {
+        return Ok(response);
+    }
+    let payload = match result {
+        Ok(HostResult::Program(payload)) => {
+            if let Some(limit) = commarea_limit {
+                validate_commarea_reply(&payload, limit)?;
+            }
+            payload.bytes().to_vec()
+        }
+        Err(HostProblem::NotFound) if request.operation == CicsOperation::Link => {
+            return Err(condition("PGMIDERR", 27, 1));
+        }
+        Err(problem) => return Err(problem),
+        Ok(_) => return Err(HostProblem::ProviderFailure),
     };
     let mut response = service.response(
         run,
@@ -842,12 +870,111 @@ fn transfer(
         None,
         payload.clone(),
     )?;
-    if request.operation == CicsOperation::Link {
+    if request.operation == CicsOperation::Link && request.arguments.contains_key("COMMAREA") {
         response
             .outputs
             .insert("COMMAREA".into(), bounded(payload)?);
     }
     Ok(response)
+}
+
+pub(in crate::service) fn validate_replay_response(
+    request: &CicsRequest,
+    response: CicsResponse,
+) -> Result<CicsResponse, HostProblem> {
+    transfer_selection::validate_response(&response)?;
+    let maximum = match request.operation {
+        CicsOperation::Link => 32_763,
+        CicsOperation::InvokeApplication => 24_576,
+        _ => return Ok(response),
+    };
+    if super::program_abend::validate_replay(&response)? {
+        return Ok(response);
+    }
+    if let Some(area) = request.arguments.get("COMMAREA") {
+        // Handled source conditions have no COMMAREA result to copy back.
+        if response.condition != "NORMAL" || response.response != 0 || response.response2 != 0 {
+            if response.condition == "NORMAL"
+                || response.response == 0
+                || response.outputs.contains_key("COMMAREA")
+                || response.payload.schema() != "mainframe-env.cics.payload@1"
+                || !response.payload.bytes().is_empty()
+            {
+                return Err(HostProblem::ProviderFailure);
+            }
+            return Ok(response);
+        }
+        let limit = match request.arguments.get("LENGTH") {
+            Some(length) => decimal_usize(length)
+                .filter(|length| (1..=maximum).contains(length))
+                .ok_or(HostProblem::ProviderFailure)?,
+            None => area.bytes().len(),
+        };
+        if limit > area.bytes().len() {
+            return Err(HostProblem::ProviderFailure);
+        }
+        let output = response
+            .outputs
+            .get("COMMAREA")
+            .ok_or(HostProblem::ProviderFailure)?;
+        validate_commarea_reply(output, limit)?;
+        validate_commarea_reply(&response.payload, limit)?;
+        if response.payload.bytes() != output.bytes() {
+            return Err(HostProblem::ProviderFailure);
+        }
+    }
+    Ok(response)
+}
+
+fn validate_commarea_reply(reply: &BoundedPayload, limit: usize) -> Result<(), HostProblem> {
+    if reply.schema() != "mainframe-env.cics.payload@1" || reply.bytes().len() > limit {
+        Err(HostProblem::ProviderFailure)
+    } else {
+        Ok(())
+    }
+}
+
+fn local_link_selection(
+    service: &CicsService,
+    target: &str,
+) -> Result<Option<ProgramLinkSelection>, HostProblem> {
+    let definition = service
+        .lock()?
+        .program_definitions
+        .get(target)
+        .and_then(|generations| generations.last_key_value())
+        .map(|(_, definition)| definition.clone());
+    let Some(definition) = definition else {
+        // Name-only compatibility hosts retain their existing dispatch authority.
+        return Ok(None);
+    };
+    if !definition.enabled {
+        return Err(condition("PGMIDERR", 27, 2));
+    }
+    if definition.remote
+        || definition.entry_offset != 0
+        || definition.java_status != CicsJavaStatus::NotJava
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    validate_program_artifact(
+        service
+            .artifacts
+            .get()
+            .ok_or_else(|| condition("PGMIDERR", 27, 3))?
+            .as_ref(),
+        &definition,
+    )
+    .map_err(|_| condition("PGMIDERR", 27, 3))?;
+    let content_identity = format!(
+        "sha256:{:x}",
+        Sha256::digest(encode_program_definition(&definition)?)
+    );
+    Ok(Some(ProgramLinkSelection {
+        artifact: definition.artifact,
+        generation: definition.generation,
+        content_identity,
+    }))
 }
 
 fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {

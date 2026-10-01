@@ -40,10 +40,24 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 pub(crate) mod artifact;
 mod runtime;
 mod selected_link;
+mod staged_invocation;
 use artifact::{AdmittedProgram, admit_published_artifact};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
 use runtime::with_compatible_runtime_services;
+
+/// Read the existing bounded COBOL run-owner binding, never a provider-row guess.
+pub(crate) fn program_run_owner(invocation: &Invocation) -> Result<String, HostProblem> {
+    replay::protocol_owner_execution(invocation)
+}
+
+/// Restore a previously attested durable owner without replacing another owner.
+pub(crate) fn restore_program_run_owner(
+    invocation: &mut Invocation,
+    owner: &str,
+) -> Result<(), HostProblem> {
+    replay::bind_run_owner(owner, &mut invocation.bindings)
+}
 
 /// An embedding can supply a logical clock and a run-scoped cancellation source.
 /// All nested invocations use the same source and inherited deadline/scope.
@@ -218,6 +232,7 @@ struct CobolProgram {
     artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     sequence: AtomicU64,
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
+    transfer_owner: OnceLock<std::sync::Weak<mainframe_env_cics::CicsService>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -230,6 +245,7 @@ impl CobolProgram {
             artifacts: OnceLock::new(),
             sequence: AtomicU64::new(1),
             control: OnceLock::new(),
+            transfer_owner: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -331,6 +347,7 @@ impl CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
+        invocation.cancellation_probe = parent.cancellation_probe.clone();
         let mut machine = ReferenceMachine::from_binary(
             executable.payload(),
             invocation.clone(),
@@ -372,7 +389,8 @@ impl CobolProgram {
         {
             return Err(HostProblem::UnknownOutcome);
         }
-        cursor_result?;
+        cursor_result
+            .map_err(|problem| replay::preserve_control_cursor_failure(&outcome, problem))?;
         match outcome {
             ExecutionOutcome::Completed(_) => {
                 let mut values = machine
@@ -401,31 +419,38 @@ impl CobolProgram {
                 response2: 0,
             }),
             ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
-            ExecutionOutcome::Abend(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-ABEND".into(),
-                response: -1,
-                response2: 0,
-            }),
+            ExecutionOutcome::Abend(_) => {
+                lease
+                    .abended(store.as_ref(), &invocation, &machine)
+                    .map_err(|_| HostProblem::UnknownOutcome)?;
+                Err(HostProblem::Condition {
+                    name: "INSTALLED-CALL-ABEND".into(),
+                    response: -1,
+                    response2: 0,
+                })
+            }
             ExecutionOutcome::Rejected(problem) => Err(HostProblem::Condition {
                 name: format!("INSTALLED-CALL-REJECTED:{}", problem.public_message),
                 response: -2,
                 response2: 0,
             }),
-            ExecutionOutcome::Suspended(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-SUSPENDED".into(),
-                response: -3,
-                response2: 0,
-            }),
-            ExecutionOutcome::Invoke(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-INVOKE".into(),
-                response: -4,
-                response2: 0,
-            }),
-            ExecutionOutcome::Transfer(_) => Err(HostProblem::Condition {
-                name: "INSTALLED-CALL-TRANSFER".into(),
-                response: -5,
-                response2: 0,
-            }),
+            ExecutionOutcome::Transfer(transfer) => {
+                replay::persist_transfer_intent(
+                    store.as_ref(),
+                    &invocation,
+                    identity,
+                    &machine,
+                    &transfer,
+                )?;
+                self.stage_transfer_target(&invocation, identity, &machine, &transfer)?;
+                Err(HostProblem::UnknownOutcome)
+            }
+            // The durable child is suspended and its CALL/instance are still
+            // unresolved. Without an owned continuation/replacement protocol,
+            // this cannot be a known condition a caller may handle as a return.
+            ExecutionOutcome::Suspended(_) | ExecutionOutcome::Invoke(_) => {
+                Err(HostProblem::UnknownOutcome)
+            }
         }
     }
 

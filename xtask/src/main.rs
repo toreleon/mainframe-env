@@ -8431,21 +8431,15 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
 }
 
 fn check_common_execution_route(root: &Path) -> TaskResult {
-    for directory in ["crates/apps", "crates/gateways"] {
-        let mut files = Vec::new();
-        collect_extension(&root.join(directory), OsStr::new("rs"), &mut files)?;
-        for file in files {
-            let source = read(&file)?;
-            require(
-                !source.contains(".drive("),
-                &format!(
-                    "{} drives a machine outside ExecutionCoordinator",
-                    file.display()
-                ),
-            )?;
-        }
-    }
-    Ok(())
+    let status = Command::new("python3")
+        .args(["-B", "tools/check_execution_route.py"])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("common execution route guard: {error}"))?;
+    require(
+        status.success(),
+        "common production execution route guard failed",
+    )
 }
 
 fn check_runtime_unit_gates(root: &Path) -> TaskResult {

@@ -9,11 +9,12 @@ use mainframe_env_store_api::{
     EffectRecord, EffectState, EventStore, ExecutionRecord, ExecutionState, OutboxRecord,
     PlatformStore, ProviderRetentionDependency, ProviderRetentionObservationDeletion,
     ProviderRetentionObservationSource, ProviderRetentionRow, ProviderStateArchiveDeletion,
-    ProviderStateArchiveDeletionWithCapacity, ProviderStateArchiveReplacement, ProviderStateRecord,
-    ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
-    RetentionArchivePruneOutcome, RetentionArchivePruneRequest, RetentionObservation,
-    RetentionObservationProof, RetentionPolicy, RetentionReconciliationReceipt, RetentionRequest,
-    RetentionStore, RetentionTarget, SaturationLevel, StoreError, WorkRecord, WorkState,
+    ProviderStateArchiveDeletionWithCapacity, ProviderStateArchiveReplacement,
+    ProviderStateIdentity, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
+    RetentionAgeReconciliation, RetentionArchive, RetentionArchivePruneOutcome,
+    RetentionArchivePruneRequest, RetentionObservation, RetentionObservationProof, RetentionPolicy,
+    RetentionReconciliationReceipt, RetentionRequest, RetentionStore, RetentionTarget,
+    SaturationLevel, StoreError, WorkRecord, WorkState,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -2990,6 +2991,199 @@ fn run_provider_dependency_rejects_same_run_unresolved_effect(store: &dyn Platfo
         })
         .unwrap();
     assert_eq!(archive.rows.len(), 1);
+}
+
+fn run_cics_nested_retention_rechecks_root_task_atomically(store: &dyn PlatformStore) {
+    for case in [
+        "missing",
+        "foreign",
+        "active",
+        "checkpoint",
+        "intent",
+        "unknown",
+        "oversized",
+        "terminal",
+    ] {
+        let child = ids(&format!("frame-child-{case}"));
+        let mut root = ids(&format!("frame-root-{case}"));
+        if case != "foreign" {
+            root.run = child.run.clone();
+        }
+        finish_execution(store, &child);
+        match case {
+            "missing" => {}
+            "active" => store.create_execution(execution(&root)).unwrap(),
+            _ => finish_execution(store, &root),
+        }
+        if case == "checkpoint" {
+            store.put_checkpoint(checkpoint(&root)).unwrap();
+        }
+        if matches!(case, "intent" | "unknown") {
+            let unresolved = effect(
+                &root,
+                &format!("frame-root-effect-{case}"),
+                EffectState::Intent,
+            );
+            store.record_intent(unresolved.clone()).unwrap();
+            if case == "unknown" {
+                store
+                    .record_result(
+                        &unresolved.key,
+                        EffectRecord {
+                            state: EffectState::UnknownOutcome,
+                            result_digest: Some([2; 32]),
+                            ..unresolved.clone()
+                        },
+                    )
+                    .unwrap();
+            }
+        }
+        let mut outer = effect(
+            &child,
+            &format!("frame-syncpoint-{case}"),
+            EffectState::Intent,
+        );
+        outer.intent.capability =
+            Some(CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap());
+        store.record_intent(outer.clone()).unwrap();
+        store
+            .record_result(
+                &outer.key,
+                EffectRecord {
+                    state: EffectState::Completed,
+                    result_digest: Some([2; 32]),
+                    resolved_tick: Some(10),
+                    ..outer.clone()
+                },
+            )
+            .unwrap();
+        let provenance = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: outer.key.as_str().into(),
+            version: 2,
+            payload: b"provider-validated-frame-uow".to_vec(),
+        };
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: 1,
+                    ..provenance.clone()
+                },
+                None,
+            )
+            .unwrap();
+        store
+            .put_provider_state(provenance.clone(), Some(1))
+            .unwrap();
+        let source = ProviderStateRecord {
+            namespace: "db2-v1-replay".into(),
+            key: format!("cics:{}:1", child.run.as_str()),
+            version: 1,
+            payload: b"provider-validated-nested-replay".to_vec(),
+        };
+        store.put_provider_state(source.clone(), None).unwrap();
+        let candidate = ProviderRetentionRow {
+            row: source.clone(),
+            owner_execution: Some(child.execution.clone()),
+            owner_run_unit: Some(child.run.clone()),
+            retention_tick: 10,
+            observation: None,
+            dependency: ProviderRetentionDependency::CicsNested {
+                provenance: provenance.clone(),
+                absent: vec![
+                    ProviderStateIdentity {
+                        namespace: "cics-uow-undo".into(),
+                        key: child.run.as_str().into(),
+                    },
+                    ProviderStateIdentity {
+                        namespace: "durable-effect".into(),
+                        key: source.key.clone(),
+                    },
+                ],
+                required_executions: vec![
+                    root.execution.clone();
+                    if case == "oversized" { 33 } else { 1 }
+                ],
+            },
+        };
+        let epoch = store.provider_state_retention_epoch().unwrap();
+        let archives = store
+            .retention_archives(RetentionTarget::Db2Replay, 64)
+            .unwrap();
+        let result = store.archive_provider_state_deletion(ProviderStateArchiveDeletion {
+            expected_epoch: epoch,
+            target: RetentionTarget::Db2Replay,
+            archived_tick: 20,
+            watermark_tick: 10,
+            rows: vec![candidate],
+        });
+        if case == "terminal" {
+            assert_eq!(result.unwrap().rows.len(), 1);
+            assert_eq!(
+                store
+                    .get_provider_state(&source.namespace, &source.key)
+                    .unwrap(),
+                None
+            );
+        } else {
+            assert_eq!(
+                result,
+                Err(if case == "oversized" {
+                    StoreError::IncompatibleVersion
+                } else {
+                    StoreError::Conflict
+                }),
+                "{case}"
+            );
+            assert_eq!(
+                store.provider_state_retention_epoch().unwrap(),
+                epoch,
+                "{case}"
+            );
+            assert_eq!(
+                store
+                    .retention_archives(RetentionTarget::Db2Replay, 64)
+                    .unwrap(),
+                archives,
+                "{case}"
+            );
+            assert_eq!(
+                store
+                    .get_provider_state(&source.namespace, &source.key)
+                    .unwrap(),
+                Some(source),
+                "{case}"
+            );
+        }
+        assert_eq!(
+            store
+                .get_provider_state(&provenance.namespace, &provenance.key)
+                .unwrap(),
+            Some(provenance)
+        );
+    }
+}
+
+#[test]
+fn memory_cics_nested_retention_rechecks_root_task_atomically() {
+    run_cics_nested_retention_rechecks_root_task_atomically(&MemoryStore::new(
+        StoreLimits::default(),
+    ));
+}
+
+#[test]
+fn sqlite_cics_nested_retention_rechecks_root_task_atomically() {
+    run_cics_nested_retention_rechecks_root_task_atomically(
+        &SqliteStateStore::open("sqlite::memory:", 1024 * 1024, 64).unwrap(),
+    );
+}
+
+#[test]
+#[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+fn postgres_cics_nested_retention_rechecks_root_task_atomically() {
+    let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL").unwrap();
+    let store = PostgresStateStore::open(&url, 1024 * 1024, 64).unwrap();
+    run_cics_nested_retention_rechecks_root_task_atomically(&store);
 }
 
 struct AuthorityReopenFixture {

@@ -13,7 +13,7 @@ use crate::console_retention::{
 };
 use mainframe_env_cics::{
     CicsReplayRetentionState, CicsUowDependencyState, describe_cics_replay_row,
-    describe_cics_uow_row,
+    describe_cics_uow_row, validate_cics_container_replay_row,
 };
 use mainframe_env_dataset::{
     DATASET_REPLAY_NAMESPACE, DatasetLimits, DatasetReplayDependencyState,
@@ -345,6 +345,26 @@ impl RetentionPlanner {
                     else {
                         continue;
                     };
+                    let effect = self
+                        .effect(&outer.row.key)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    let owner = outer
+                        .owner_execution
+                        .as_ref()
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    let execution = self
+                        .store
+                        .get_execution(owner)
+                        .map_err(store_problem)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    validate_cics_container_replay_row(
+                        &private,
+                        &outer.row,
+                        &effect,
+                        &execution,
+                        Default::default(),
+                    )
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
                     let capacity = self
                         .store
                         .get_provider_state("cics-container-capacity-v1", "global")
@@ -748,8 +768,7 @@ impl RetentionPlanner {
             ProviderRetentionDependency::None | ProviderRetentionDependency::DirectProduct => {
                 Ok(true)
             }
-            ProviderRetentionDependency::CoreEffect { .. }
-            | ProviderRetentionDependency::CicsNested { .. } => {
+            ProviderRetentionDependency::CoreEffect { .. } => {
                 let (Some(owner), Some(run)) = (
                     candidate.owner_execution.as_ref(),
                     candidate.owner_run_unit.as_ref(),
@@ -757,6 +776,23 @@ impl RetentionPlanner {
                     return Ok(false);
                 };
                 self.provider_execution_is_clear(owner, Some(run), safety)
+            }
+            ProviderRetentionDependency::CicsNested {
+                required_executions,
+                ..
+            } => {
+                let (Some(owner), Some(run)) = (
+                    candidate.owner_execution.as_ref(),
+                    candidate.owner_run_unit.as_ref(),
+                ) else {
+                    return Ok(false);
+                };
+                for required in std::iter::once(owner).chain(required_executions) {
+                    if !self.provider_execution_is_clear(required, Some(run), safety)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
             }
             ProviderRetentionDependency::ProviderGraph {
                 required_executions,
@@ -951,3 +987,6 @@ fn cobol_required_rows(
 
 #[cfg(test)]
 mod safety_tests;
+
+#[cfg(test)]
+mod container_tests;

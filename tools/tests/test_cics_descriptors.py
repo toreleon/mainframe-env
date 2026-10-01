@@ -16,6 +16,30 @@ SPEC.loader.exec_module(cics_descriptors)
 
 
 class CicsDescriptorTests(unittest.TestCase):
+    def test_executable_admission_projection_follows_typed_registration_changes(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        commands = [row for batch in contracts["batches"] for row in batch["commands"]]
+        admitted = {
+            row["contract"]["registry"]["runtime_operation"]
+            for row in commands
+            if row["contract"]["registry"]["readiness"] == "typed-runtime"
+            and row["contract"]["registry"]["advertised"]
+        }
+        rendered = cics_descriptors.render_ir_registry(ROOT, contracts)
+        projection = rendered.split("const CICS_REGISTERED_PLAN_OPERATIONS:", 1)[1]
+        self.assertEqual(projection.count("CicsPlanOperation::"), len(admitted))
+        self.assertEqual(len(admitted), 260)
+        self.assertNotIn("CicsPlanOperation::IssueCopy,", projection)
+        row = next(row for row in commands if row["label"] == "GET CONTAINER")
+        registration = row["contract"]["registry"]
+        self.assertEqual(registration["runtime_operation"], "GetContainer")
+        registration.update(readiness="unready", advertised=False, runtime_operation=None)
+        changed = cics_descriptors.render_ir_registry(ROOT, contracts)
+        projection = changed.split("const CICS_REGISTERED_PLAN_OPERATIONS:", 1)[1]
+        self.assertEqual(projection.count("CicsPlanOperation::"), 259)
+        self.assertNotIn("CicsPlanOperation::GetContainer,", projection)
+        self.assertIn("CicsPlanOperation::PutContainer,", projection)
+
     def test_paired_issue_end_markers_are_valueless_flags(self):
         contracts = cics_descriptors.build_contracts(ROOT)
         for label, companion in (

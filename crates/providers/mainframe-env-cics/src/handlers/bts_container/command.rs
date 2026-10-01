@@ -316,14 +316,27 @@ pub(in crate::service::handlers) fn invoke(
         )
     }) || !request.arguments.contains_key("CHANNEL")
         && !request.arguments.contains_key("TOCHANNEL")
-        && BtsLifecycleStore::new(service.store.as_ref())
-            .active_context(
-                run.invocation.run_unit_id.as_str(),
-                run.invocation.execution_id.as_str(),
-                run.invocation.principal.id().as_str(),
-            )?
-            .is_some())
+        && if operation == CicsOperation::GetContainer {
+            // Without CHANNEL, a current channel wins even if BTS is active.
+            // No current channel implies BTS, including its out-of-scope errors.
+            run.current_program.channel.is_none()
+        } else {
+            BtsLifecycleStore::new(service.store.as_ref())
+                .active_context(
+                    run.invocation.run_unit_id.as_str(),
+                    run.invocation.execution_id.as_str(),
+                    run.invocation.principal.id().as_str(),
+                )?
+                .is_some()
+        })
     {
+        if operation == CicsOperation::GetContainer
+            && request.arguments.contains_key("INTOCCSID")
+            && !request.arguments.contains_key("CHANNEL")
+            && run.current_program.channel.is_none()
+        {
+            return Err(condition("INVREQ", 16, 2));
+        }
         return super::bts::invoke(service, run, request);
     }
     if request.arguments.keys().any(|key| {

@@ -47,6 +47,7 @@ pub(crate) fn register_hir_operation(catalog: &mut OperationCatalog) {
     schema.required_attributes = [CICS_PLAN_ATTRIBUTE.into()].into_iter().collect();
     schema.allowed_effects = CICS_EXECUTABLE_DESCRIPTORS
         .iter()
+        .filter(|descriptor| descriptor.is_registered())
         .flat_map(|descriptor| descriptor.effects.iter().copied())
         .collect();
     schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
@@ -61,6 +62,9 @@ pub(crate) fn register_hir_operation(catalog: &mut OperationCatalog) {
 
 pub(crate) fn register_executable_operations(catalog: &mut OperationCatalog) {
     for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
+        if !descriptor.is_registered() {
+            continue;
+        }
         let mut schema = OperationSchema::pure(descriptor.identity(), 0, 0);
         schema.required_attributes = [CICS_PLAN_ATTRIBUTE.into()].into_iter().collect();
         schema.allowed_effects = descriptor.effects.iter().copied().collect();

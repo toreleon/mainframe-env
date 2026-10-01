@@ -5,6 +5,7 @@ use super::{
     scope::{self, ContainerSelector, OwnerIdentity},
     state::{self, ContainerDatatype, ContainerOwner, ContainerValue},
 };
+use crate::retention::ContainerReplay as Replay;
 use mainframe_env_host_api::{AccessIntent, HostProblem};
 use mainframe_env_store_api::{
     ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
@@ -23,16 +24,6 @@ struct Capacity {
     channels: usize,
     containers: usize,
     replays: usize,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Replay {
-    schema_version: u8,
-    owner_execution: String,
-    owner_principal: String,
-    owner_run_unit: String,
-    digest: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -257,11 +248,8 @@ impl<'a> ChannelPort<'a> {
                 .get_provider_state(REPLAY_NAMESPACE, &replay_key)
                 .map_err(store_problem)?
             {
-                let receipt: Replay = serde_json::from_slice(&row.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-                if receipt.schema_version != 1 {
-                    return Err(HostProblem::InfrastructureFailure);
-                }
+                let receipt =
+                    Replay::decode(&row).map_err(|_| HostProblem::InfrastructureFailure)?;
                 if receipt.owner_execution != self.identity.execution
                     || receipt.owner_principal != self.identity.principal
                     || receipt.owner_run_unit != self.identity.run_unit

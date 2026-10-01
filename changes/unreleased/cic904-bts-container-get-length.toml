@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Honor BTS GET CONTAINER output-only FLENGTH and exact unequal-length conditions; preserve untouched INTO bytes and reject overlong typed container responses."

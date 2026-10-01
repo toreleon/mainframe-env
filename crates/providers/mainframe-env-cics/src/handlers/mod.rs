@@ -26,6 +26,7 @@ mod file_tokens;
 mod file_unlock;
 mod handle_state;
 mod host_boundary;
+pub(in crate::service) use host_boundary::{SessionCleanupLease, TaskDispatch};
 mod interval;
 mod interval_control;
 mod issue_device;
@@ -39,7 +40,9 @@ mod limits;
 mod network_context;
 mod network_control;
 mod operator_control;
+mod program_abend;
 mod program_control;
+pub(in crate::service) use program_abend::PendingProgramAbend;
 mod queue_control;
 mod recovery;
 mod security_control;
@@ -141,8 +144,9 @@ fn bts_live(service: &CicsService, run: &Run, retention_tick: u64) -> Result<(),
 
 /// A selected program LINK retains its caller's run unit on nested RETURN.
 fn selected_link_return(run: &Run) -> bool {
-    run.invocation.parent_execution_id.is_some()
-        && run.invocation.bindings.contains_key("cobol.call.arguments")
+    run.current_program.logical_level > 1
+        || run.invocation.parent_execution_id.is_some()
+            && run.invocation.bindings.contains_key("cobol.call.arguments")
 }
 
 pub(super) fn authorize_and_describe(
@@ -325,12 +329,13 @@ pub(super) fn post_event_outputs(
 }
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use journal_control::{JournalRecord, load as load_journals};
-pub(super) use program_control::invoke as invoke_program_control;
+pub(crate) use program_control::validate_transfer_selection;
 pub use program_control::{CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition};
 pub(super) use program_control::{
     ProgramLoadState, load_application_entries, load_program_definitions, load_program_loads,
     validate_application_catalog,
 };
+pub(super) use program_control::{invoke as invoke_program_control, validate_replay_response};
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
 pub use signal_event::{CicsSignalCaptureSpec, CicsSignalEmission};

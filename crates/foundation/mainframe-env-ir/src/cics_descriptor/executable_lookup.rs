@@ -1,6 +1,9 @@
 use super::*;
 
-/// Resolves the executable descriptor for a decoded CICS plan operation.
+/// Resolves dialect metadata for a decoded CICS plan operation.
+///
+/// Reserved operations retain metadata for codec compatibility. Call
+/// [`CicsExecutableDescriptor::is_registered`] before admitting execution.
 #[must_use]
 pub const fn cics_executable_descriptor(
     operation: CicsPlanOperation,

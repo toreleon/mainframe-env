@@ -768,10 +768,11 @@ fn validate_cics(
     {
         return Err("CICS operation identity does not match its plan");
     }
-    exact_effects(
-        operation,
-        cics_executable_descriptor(plan.operation).effects,
-    )?;
+    let descriptor = cics_executable_descriptor(plan.operation);
+    if !descriptor.is_registered() {
+        return Err("CICS plan operation has no sealed executable registration");
+    }
+    exact_effects(operation, descriptor.effects)?;
     validate_slots(
         module,
         operation,
@@ -1400,6 +1401,61 @@ mod tests {
             verify_legal(module, &catalog, &profile),
             Err(crate::VerificationProblem::SemanticMismatch(_))
         ));
+    }
+
+    #[test]
+    fn unregistered_cics_plan_is_rejected_even_by_a_forged_semantic_catalog() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::IssueCopy,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::IssueTermId,
+                value: CicsOperandValue::Literal(b"T001".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let descriptor = cics_executable_descriptor(plan.operation);
+        for expected_operation in [None, Some(plan.operation)] {
+            let mut builder = ModuleBuilder::new(IrLimits::default());
+            let region = builder.add_region().unwrap();
+            let block = builder.add_block(region).unwrap();
+            builder
+                .add_operation(
+                    block,
+                    descriptor.identity(),
+                    Vec::new(),
+                    0,
+                    BTreeMap::from([("cics_plan".into(), Attribute::Bytes(bytes.clone()))]),
+                    descriptor.effects.to_vec(),
+                    Vec::new(),
+                    None,
+                )
+                .unwrap();
+            let mut catalog = OperationCatalog::default();
+            let mut schema = OperationSchema::pure(descriptor.identity(), 0, 0);
+            schema.required_attributes = BTreeSet::from(["cics_plan".into()]);
+            schema.allowed_effects = descriptor.effects.iter().copied().collect();
+            schema.semantic_contract =
+                OperationSemanticContract::CicsEffect(CicsOperationContract {
+                    plan_attribute: "cics_plan".into(),
+                    expected_operation,
+                    layout_definition_operation: None,
+                });
+            catalog.register(schema).unwrap();
+            let problem = verify_semantic_contracts(&builder.finish().unwrap(), &catalog)
+                .expect_err("reserved canonical plans must fail admission");
+            assert!(
+                problem
+                    .to_string()
+                    .contains("no sealed executable registration")
+            );
+        }
     }
 
     fn layout_attributes(

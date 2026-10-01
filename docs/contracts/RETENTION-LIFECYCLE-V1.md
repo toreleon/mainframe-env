@@ -107,10 +107,33 @@ The provider families have these codec-owned boundaries:
   exact nested outer-effect key, and request/result/binding digests. `MEDR1`
   and transitional `MEDR2` rows are protected unless an owning validator can
   attest them without redispatch.
-- CICS outer replay uses `MECER003`; CICS UOW uses exactly the supported
-  pending/terminal `MECU2` versions; undo rows are fully decoded. Legacy
+- CICS outer replay uses `MECER003`; CICS UOW uses the supported
+  pending/terminal `MECU2` and logical-frame `MECU3` versions; undo rows are fully decoded. Legacy
   `MECER001`/`MECER002` and `MECU1`, an unobserved terminal row, a pending UOW,
   or any live undo authority stay protected.
+  `MECU3` preserves the actual SYNCPOINT effect execution and adds one bounded,
+  distinct root task execution on the same run. BTS settlement uses the root;
+  core effect provenance uses the actor. Both executions remain core-retention
+  dependencies. Root writes retain byte-compatible `MECU2`, and reads do not
+  rewrite earlier generations. Partial, equal-owner, trailing or mislabeled V3
+  metadata fails closed. Older readers reject V3: downgrade requires drained
+  writers and a verified pre-V3 backup, or a retained compatible reader. Never
+  strip the task owner to pretend a V3 row is V2.
+- Online exchange ownership is decoded by the existing product codecs for
+  `online-exchange-v1` and `online-machine-continuation`. A valid V2 exchange
+  protects current and original run-owner executions; a staged MEOM4 transfer
+  also protects the prior and next executions. Legacy V1 protects only its
+  explicit current execution, never a guessed owner. Malformed rows or orphan
+  continuations set the unowned core-retention fence. Bounded scans and the
+  existing provider epoch guard remain authoritative; no guessed terminal age
+  or new retention target is introduced. Older readers reject exchange V2;
+  drain/reconcile affected transfers and retain a compatible reader or verified
+  backup for rollback, never stripping ownership or relabeling the schema.
+  Online CICS restoration reuses that validated owner/handoff to retain BTS task
+  ownership while leaving effects attributed to the replacement actor. Its
+  explicit SYNCPOINT settlement uses existing MECU3 two-owner provenance; it
+  adds no retention namespace or guessed acquisition owner. Warm volatile
+  resource preservation is not new cold cursor/channel persistence authority.
 - Installed COBOL validates `cobol-call-replay@1`,
   `cobol-call-protocol@2`, `cobol-run-state@1`, `cobol-cancel@1`, and every
   bounded `cobol-instance@1:` namespace. Its descriptor enumerates both owner
@@ -119,6 +142,32 @@ The provider families have these codec-owned boundaries:
   remove every instance before publishing the terminal run/protocol state, and
   a leftover instance therefore protects the lifecycle rather than inheriting
   a guessed age.
+  Known-ABEND instance JSON schema 2 additionally binds the root owner and child's
+  terminal version/attempt and an open-file flag under its metadata digest.
+  It is inactive but non-reusable, still Active for retention, and adds that
+  root and child executions as dependencies. Task-end cleanup requires the exact durable
+  Failed/Abend proof and existing owner/run/instance CAS fences; an unresolved
+  call remains pending and protected. Normal schema-1 bytes are unchanged, and
+  legacy busy instances are not upgraded on read. Old readers reject schema 2;
+  downgrade requires drained writers and resolved frames with a compatible
+  reader or verified backup, never proof removal or schema relabeling.
+  source-defined unmatched POP HANDLE recovery uses the same pending-call and
+  known-Abend fences. Its additive `ABEND.DEFAULT` origin in the existing CICS
+  replay reply adds no retention owner/namespace or completed CALL receipt;
+  empty `ABEND.CODE` attests no IBM code. Old readers reject this default reply.
+  Drain affected writers and retain a compatible reader or verified backup on
+  downgrade; never remove the origin marker or manufacture completion.
+  Fresh call protocols use JSON schema 3 in the existing protocol namespace;
+  valid schema 2 remains readable. Schema 3 binds its unchanged owner/run-state,
+  deadline and end-tick fields under the `protocol-metadata@3` digest domain.
+  Active/terminal row CAS versions and dependency graphs are unchanged. New
+  CICS program-occurrence keys require schema 3; legacy markers and active
+  schema-2 protocols stay fenced, not migrated on read. Pending installed calls
+  remain protected, and a cached new-key receipt with missing or corrupt
+  protocol authority cannot recreate it. Terminal publication preserves the
+  admitted generation. Older readers reject schema 3; downgrade requires
+  drained writers and a verified pre-change backup or a retained compatible
+  reader, never schema relabeling or digest rewriting.
 - Spool fully validates the canonical `mainframe-env.spool-state@2` job,
   replay versions, and artifact-empty purge state. Live, purge-pending,
   recovery-capable, or legacy rows without an exact no-owner sidecar are never
@@ -148,6 +197,11 @@ the store to recheck atomically:
   canonical Completed outer `host.cics.execute` effect, and absence fences for
   same-key core-effect and UOW undo recovery. Its safe age is the
   maximum of child resolution, UOW finalization, and outer-effect resolution.
+  Its bounded `required_executions` list (at most 32) includes any distinct root
+  task owner supplied by V3 provenance. Planning and all backend archive
+  transactions require each additional execution to be terminal on the exact
+  same run, with no checkpoint or intent/unknown effect. A planner observation
+  alone cannot authorize archival after a root recovery dependency appears.
 - `ProviderGraph` supplies bounded exact provider rows and additional terminal
   execution owners which must outlive an owned row, including the complete
   installed-COBOL parent/child lifecycle graph.

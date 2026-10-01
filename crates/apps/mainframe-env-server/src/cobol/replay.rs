@@ -4,6 +4,11 @@ use mainframe_env_store_api::{ProviderStateMutation, StoreError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod target;
+mod transfer;
+pub(super) use transfer::persist_transfer_intent;
+pub(super) use transfer::preserve_control_cursor_failure;
+
 use super::retention::{
     CALL_PROTOCOL_NAMESPACE, CALL_REPLAY_NAMESPACE, CobolRetentionDependency,
     CobolRetentionRowDescriptor, CobolRetentionRowKind, CobolRetentionState,
@@ -45,6 +50,10 @@ struct Receipt {
     metadata_digest: String,
     completion_tick: Option<u64>,
     reply: Option<Reply>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    transfer: Option<transfer::TransferIntent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    target: Option<target::TargetStage>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -71,7 +80,13 @@ enum DecodedProtocol {
 
 fn receipt_metadata_digest(receipt: &Receipt) -> String {
     let mut hash = Sha256::new();
-    hash.update(b"mainframe-env.cobol-call-receipt-metadata@2\0");
+    hash.update(if receipt.schema_version == 4 {
+        b"mainframe-env.cobol-call-receipt-metadata@4\0"
+    } else if receipt.schema_version == 3 {
+        b"mainframe-env.cobol-call-receipt-metadata@3\0"
+    } else {
+        b"mainframe-env.cobol-call-receipt-metadata@2\0"
+    });
     for field in [
         receipt.replay_key.as_bytes(),
         receipt.fingerprint.as_bytes(),
@@ -96,13 +111,23 @@ fn receipt_metadata_digest(receipt: &Receipt) -> String {
         }
         None => hash.update([0]),
     }
+    if let Some(transfer) = &receipt.transfer {
+        hash.update(transfer.metadata_digest().as_bytes());
+    }
+    if let Some(target) = &receipt.target {
+        hash.update(target.metadata_digest().as_bytes());
+    }
     format!("{:x}", hash.finalize())
 }
 
 fn protocol_metadata_digest(protocol: &CallProtocol) -> String {
     let ended = protocol.ended_tick.unwrap_or(0).to_be_bytes();
     digest(&[
-        b"protocol-metadata",
+        if protocol.schema_version == 3 {
+            b"protocol-metadata@3"
+        } else {
+            b"protocol-metadata"
+        },
         protocol.owner_execution.as_bytes(),
         protocol.owner_run_unit.as_bytes(),
         protocol.owner_principal.as_bytes(),
@@ -111,9 +136,12 @@ fn protocol_metadata_digest(protocol: &CallProtocol) -> String {
     ])
 }
 
-fn new_call_protocol(parent: &Invocation) -> Result<CallProtocol, HostProblem> {
+fn new_call_protocol(
+    parent: &Invocation,
+    outer_identity: bool,
+) -> Result<CallProtocol, HostProblem> {
     let mut protocol = CallProtocol {
-        schema_version: 2,
+        schema_version: if outer_identity { 3 } else { 2 },
         owner_execution: protocol_owner_execution(parent)?,
         owner_run_unit: parent.run_unit_id.as_str().into(),
         owner_principal: parent.principal.id().as_str().into(),
@@ -154,8 +182,25 @@ pub(super) fn bind_protocol_owner(
     bindings: &mut BTreeMap<String, BoundedPayload>,
 ) -> Result<(), HostProblem> {
     let owner = protocol_owner_execution(parent)?;
-    if bindings.contains_key(RUN_OWNER_BINDING) {
-        return Ok(());
+    bind_run_owner(&owner, bindings)
+}
+
+/// Restore an explicit owner without replacing a conflicting existing binding.
+pub(super) fn bind_run_owner(
+    owner: &str,
+    bindings: &mut BTreeMap<String, BoundedPayload>,
+) -> Result<(), HostProblem> {
+    if !valid_identity(owner) {
+        return Err(HostProblem::Malformed);
+    }
+    if let Some(binding) = bindings.get(RUN_OWNER_BINDING) {
+        return if binding.schema() == RUN_OWNER_BINDING_SCHEMA
+            && binding.bytes() == owner.as_bytes()
+        {
+            Ok(())
+        } else {
+            Err(HostProblem::IdempotencyConflict)
+        };
     }
     if bindings.len() >= InvocationLimits::default().max_bindings {
         return Err(HostProblem::ResourceExhausted);
@@ -164,7 +209,7 @@ pub(super) fn bind_protocol_owner(
         RUN_OWNER_BINDING.into(),
         BoundedPayload::new(
             RUN_OWNER_BINDING_SCHEMA,
-            owner.into_bytes(),
+            owner.as_bytes().to_vec(),
             InvocationLimits::default(),
         )
         .map_err(|_| HostProblem::ResourceExhausted)?,
@@ -187,6 +232,28 @@ fn identity(parent: &Invocation, effect: &EffectRequest) -> Result<String, HostP
         parent.execution_id.as_str().as_bytes(),
         key.as_str().as_bytes(),
     ]))
+}
+
+fn outer_program_identity(effect: &EffectRequest) -> Result<bool, HostProblem> {
+    let Some(key) = effect.idempotency_key.as_ref() else {
+        return Ok(false);
+    };
+    if !key.as_str().starts_with("cics-program-") {
+        return Ok(false);
+    }
+    let Some(digest) = key.as_str().strip_prefix("cics-program-v2:") else {
+        return Err(HostProblem::Unsupported);
+    };
+    if !valid_digest(digest)
+        || effect.sequence == 0
+        || !matches!(
+            &effect.request,
+            HostRequest::Program(ProgramRequest::Link { .. })
+        )
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(true)
 }
 
 fn fingerprint(
@@ -246,8 +313,11 @@ fn decode_receipt(
     record: &ProviderStateRecord,
 ) -> Result<DecodedReceipt, CobolRetentionValidationError> {
     validate_row_identity(record, CALL_REPLAY_NAMESPACE)?;
+    if record.payload.len() > 64 * 1024 * 1024 {
+        return Err(CobolRetentionValidationError::CorruptPayload);
+    }
     if let Ok(receipt) = serde_json::from_slice::<Receipt>(&record.payload)
-        && receipt.schema_version == 2
+        && matches!(receipt.schema_version, 2 | 3 | 4)
     {
         if !valid_digest(&receipt.fingerprint)
             || receipt.replay_key != record.key
@@ -268,14 +338,7 @@ fn decode_receipt(
                     || reply.schema.len() > 128
                     || reply.bytes.len() > InvocationLimits::default().max_payload_bytes
             })
-            || !matches!(
-                (
-                    record.version,
-                    receipt.reply.is_some(),
-                    receipt.completion_tick
-                ),
-                (1, false, None) | (2, true, Some(1..))
-            )
+            || !transfer::valid_receipt_phase(record, &receipt)
         {
             return Err(CobolRetentionValidationError::InconsistentState);
         }
@@ -333,6 +396,9 @@ pub(super) fn describe_call_replay_row(
             };
             let mut dependencies =
                 owner_dependencies(&receipt.owner_execution, &receipt.owner_run_unit);
+            if let Some(target) = &receipt.target {
+                dependencies.extend(target.dependencies(&receipt));
+            }
             dependencies.push(CobolRetentionDependency::Execution(receipt.child_execution));
             dependencies.push(provider_dependency(
                 CALL_PROTOCOL_NAMESPACE,
@@ -399,7 +465,7 @@ fn decode_protocol(
     }
     let protocol: CallProtocol = serde_json::from_slice(&record.payload)
         .map_err(|_| CobolRetentionValidationError::CorruptPayload)?;
-    if protocol.schema_version != 2
+    if !matches!(protocol.schema_version, 2 | 3)
         || !valid_identity(&protocol.owner_execution)
         || !valid_identity(&protocol.owner_run_unit)
         || !valid_identity(&protocol.owner_principal)
@@ -547,6 +613,15 @@ pub(super) fn retention_observation_tick(
 
 impl CobolProgram {
     pub(super) fn ensure_call_protocol(&self, parent: &Invocation) -> Result<(), HostProblem> {
+        self.ensure_call_protocol_identity(parent, false, true)
+    }
+
+    fn ensure_call_protocol_identity(
+        &self,
+        parent: &Invocation,
+        outer_identity: bool,
+        allow_create: bool,
+    ) -> Result<(), HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let key = protocol_key(parent.run_unit_id.as_str());
         let expected_owner = protocol_owner_execution(parent)?;
@@ -555,9 +630,10 @@ impl CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
             Some(record) => match decode_protocol(&record) {
-                Ok(DecodedProtocol::Legacy) => Ok(()),
+                Ok(DecodedProtocol::Legacy) if !outer_identity => Ok(()),
                 Ok(DecodedProtocol::Current(protocol))
-                    if protocol.owner_execution == expected_owner
+                    if (!outer_identity || protocol.schema_version == 3)
+                        && protocol.owner_execution == expected_owner
                         && protocol.owner_run_unit == parent.run_unit_id.as_str()
                         && protocol.owner_principal == parent.principal.id().as_str()
                         && protocol.run_state_key
@@ -574,7 +650,7 @@ impl CobolProgram {
                 }
                 _ => Err(HostProblem::UnknownOutcome),
             },
-            None if parent.attempt != 1 => Err(HostProblem::UnknownOutcome),
+            None if !allow_create || parent.attempt != 1 => Err(HostProblem::UnknownOutcome),
             None => {
                 // Version-1 calls never persisted ordinary program state. Their
                 // active run units cannot be continued by pretending this is the
@@ -590,7 +666,10 @@ impl CobolProgram {
                     namespace: CALL_PROTOCOL_NAMESPACE.into(),
                     key: key.clone(),
                     version: 1,
-                    payload: serde_json::to_vec(&new_call_protocol(parent)?)
+                    // Every freshly admitted run uses V3, including ordinary
+                    // COBOL calls preceding a CICS LINK. Existing V2 rows stay
+                    // readable but cannot authorize a new identity domain.
+                    payload: serde_json::to_vec(&new_call_protocol(parent, true)?)
                         .map_err(|_| HostProblem::InfrastructureFailure)?,
                 };
                 match store.put_provider_state(record, None) {
@@ -598,9 +677,10 @@ impl CobolProgram {
                     Err(StoreError::Conflict | StoreError::AlreadyExists) => {
                         match store.get_provider_state(CALL_PROTOCOL_NAMESPACE, &key) {
                             Ok(Some(record)) => match decode_protocol(&record) {
-                                Ok(DecodedProtocol::Legacy) => Ok(()),
+                                Ok(DecodedProtocol::Legacy) if !outer_identity => Ok(()),
                                 Ok(DecodedProtocol::Current(protocol))
-                                    if protocol.owner_execution == expected_owner
+                                    if (!outer_identity || protocol.schema_version == 3)
+                                        && protocol.owner_execution == expected_owner
                                         && protocol.owner_run_unit
                                             == parent.run_unit_id.as_str()
                                         && protocol.owner_principal
@@ -645,6 +725,10 @@ impl CobolProgram {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let key = identity(parent, effect)?;
         let fingerprint = fingerprint(parent, effect, program, payload)?;
+        let outer_identity = outer_program_identity(effect)?;
+        if outer_identity && effect.sequence > u64::from(parent.limits.max_effects) {
+            return Err(HostProblem::ResourceExhausted);
+        }
         let preflight = || match selection {
             Some(selection) => self.preflight_selected_program(program, selection),
             None => self.preflight_installed_program(
@@ -656,6 +740,9 @@ impl CobolProgram {
             .get_provider_state(CALL_REPLAY_NAMESPACE, &key)
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
+            if outer_identity {
+                self.ensure_call_protocol_identity(parent, true, false)?;
+            }
             let result = previous(record, &fingerprint, parent)?;
             preflight()?;
             if payload.schema() == "mainframe-env.program.input@1" {
@@ -664,7 +751,7 @@ impl CobolProgram {
             return Ok(result);
         }
         let admitted = preflight()?;
-        self.ensure_call_protocol(parent)?;
+        self.ensure_call_protocol_identity(parent, outer_identity, true)?;
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"
         } else {
@@ -686,6 +773,8 @@ impl CobolProgram {
             metadata_digest: String::new(),
             completion_tick: None,
             reply: None,
+            transfer: None,
+            target: None,
         };
         receipt.metadata_digest = receipt_metadata_digest(&receipt);
         let pending = ProviderStateRecord {
@@ -759,5 +848,363 @@ fn run_ended_problem() -> HostProblem {
         name: "COBOL-RUN-ENDED".into(),
         response: -9,
         response2: 0,
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+    use crate::cobol::hardening::{Fixture, TestRoot, call_payload, parent};
+    use mainframe_env_host_api::ProgramName;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::ProviderStateStore;
+
+    fn effect(parent: &Invocation, key: &str) -> EffectRequest {
+        EffectRequest {
+            run_unit: parent.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: parent.deadline_tick,
+            idempotency_key: Some(IdempotencyKey::new(key, InvocationLimits::default()).unwrap()),
+            request: HostRequest::Program(ProgramRequest::Link {
+                program: ProgramName::new("LEAF", 128).unwrap(),
+                payload: call_payload(&[]),
+                selection: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn outer_program_identity_legacy_protocols_fence_new_keys_and_keep_old_replies() {
+        for sqlite in [false, true] {
+            for generation in 0..3 {
+                for completed in [false, true] {
+                    let root = TestRoot::new();
+                    let url = format!("sqlite://{}?mode=rwc", root.0.join("state.db").display());
+                    let store: Arc<dyn PlatformStore> = if sqlite {
+                        Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap())
+                    } else {
+                        Arc::new(MemoryStore::new(Default::default()))
+                    };
+                    let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+                    fixture.install(
+                        "LEAF",
+                        "IDENTIFICATION DIVISION. PROGRAM-ID. LEAF. PROCEDURE DIVISION. GOBACK.",
+                    );
+                    let actor = parent();
+                    let old = effect(&actor, "cics:parent-run:17");
+                    let payload = call_payload(&[]);
+                    let reply = encode_cobol_call_result(&[]).unwrap();
+                    let record = ProviderStateRecord {
+                        namespace: CALL_REPLAY_NAMESPACE.into(), key: identity(&actor, &old).unwrap(), version: if completed { 2 } else { 1 },
+                        payload: serde_json::to_vec(&serde_json::json!({"schema_version":1, "fingerprint":fingerprint(&actor, &old, "LEAF", &payload).unwrap(), "child_execution":format!("online-call-execution-{}", identity(&actor, &old).unwrap()), "reply": if completed { Some(Reply { schema: reply.schema().into(), bytes: reply.bytes().to_vec() }) } else { None }})).unwrap(),
+                    };
+                    let mut initial = record.clone();
+                    initial.version = 1;
+                    store.put_provider_state(initial, None).unwrap();
+                    if completed {
+                        store.put_provider_state(record.clone(), Some(1)).unwrap();
+                    }
+                    let protocol = ProviderStateRecord {
+                        namespace: if generation == 0 {
+                            "cobol-call-protocol@1".into()
+                        } else {
+                            CALL_PROTOCOL_NAMESPACE.into()
+                        },
+                        key: protocol_key(actor.run_unit_id.as_str()),
+                        version: 1,
+                        payload: match generation {
+                            0 => b"installed-call@1".to_vec(),
+                            1 => b"installed-call@2".to_vec(),
+                            _ => serde_json::to_vec(&new_call_protocol(&actor, false).unwrap())
+                                .unwrap(),
+                        },
+                    };
+                    store.put_provider_state(protocol.clone(), None).unwrap();
+                    drop(fixture);
+                    drop(store);
+                    let store: Arc<dyn PlatformStore> = if sqlite {
+                        Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap())
+                    } else {
+                        // Memory has no reopen credit; use a fresh deterministic copy.
+                        let copy = Arc::new(MemoryStore::new(Default::default()));
+                        let mut initial = record.clone();
+                        initial.version = 1;
+                        copy.put_provider_state(initial, None).unwrap();
+                        if completed {
+                            copy.put_provider_state(record.clone(), Some(1)).unwrap();
+                        }
+                        copy.put_provider_state(protocol.clone(), None).unwrap();
+                        copy
+                    };
+                    let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+                    if !sqlite {
+                        fixture.install("LEAF", "IDENTIFICATION DIVISION. PROGRAM-ID. LEAF. PROCEDURE DIVISION. GOBACK.");
+                    }
+                    let new = effect(&actor, &format!("cics-program-v2:{}", "a".repeat(64)));
+                    assert_eq!(
+                        fixture
+                            .router
+                            .cobol
+                            .execute_installed_effect(&actor, &new, "LEAF", &payload, None),
+                        Err(HostProblem::UnknownOutcome)
+                    );
+                    assert_eq!(
+                        store.list_provider_state(CALL_REPLAY_NAMESPACE, 8).unwrap(),
+                        vec![record]
+                    );
+                    assert_eq!(
+                        store
+                            .get_provider_state(&protocol.namespace, &protocol.key)
+                            .unwrap(),
+                        Some(protocol)
+                    );
+                    assert_eq!(
+                        fixture
+                            .router
+                            .cobol
+                            .execute_installed_effect(&actor, &old, "LEAF", &payload, None),
+                        if completed {
+                            Ok(reply)
+                        } else {
+                            Err(HostProblem::UnknownOutcome)
+                        },
+                        "sqlite={sqlite} generation={generation} completed={completed}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn outer_program_identity_completed_replay_conflict_and_missing_protocol_after_sqlite_reopen() {
+        let root = TestRoot::new();
+        let url = format!(
+            "sqlite://{}?mode=rwc",
+            root.0.join("completed.db").display()
+        );
+        let actor = parent();
+        let request = effect(&actor, &format!("cics-program-v2:{}", "b".repeat(64)));
+        let payload = call_payload(&[]);
+        let expected;
+        let calls;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+            let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+            fixture.install(
+                "LEAF",
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LEAF. PROCEDURE DIVISION. GOBACK.",
+            );
+            // Ordinary admission before LINK must not create a counter-era run.
+            fixture.router.cobol.ensure_call_protocol(&actor).unwrap();
+            expected = fixture
+                .router
+                .cobol
+                .execute_installed_effect(&actor, &request, "LEAF", &payload, None)
+                .unwrap();
+            assert_eq!(
+                fixture
+                    .router
+                    .cobol
+                    .execute_installed_effect(&actor, &request, "LEAF", &payload, None),
+                Ok(expected.clone())
+            );
+            calls = store.list_provider_state(CALL_REPLAY_NAMESPACE, 8).unwrap();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0].version, 2);
+        }
+        let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+        assert_eq!(
+            fixture
+                .router
+                .cobol
+                .execute_installed_effect(&actor, &request, "LEAF", &payload, None),
+            Ok(expected)
+        );
+        let changed = call_payload(&[b"changed".to_vec()]);
+        let mut conflict = request.clone();
+        let HostRequest::Program(ProgramRequest::Link { payload, .. }) = &mut conflict.request
+        else {
+            unreachable!()
+        };
+        *payload = changed.clone();
+        assert_eq!(
+            fixture
+                .router
+                .cobol
+                .execute_installed_effect(&actor, &conflict, "LEAF", &changed, None),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let key = protocol_key(actor.run_unit_id.as_str());
+        let protocol = store
+            .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(CALL_PROTOCOL_NAMESPACE, &key, protocol.version)
+            .unwrap();
+        assert_eq!(
+            fixture.router.cobol.execute_installed_effect(
+                &actor,
+                &request,
+                "LEAF",
+                &call_payload(&[]),
+                None
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert!(
+            store
+                .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            store.list_provider_state(CALL_REPLAY_NAMESPACE, 8).unwrap(),
+            calls
+        );
+    }
+
+    #[test]
+    fn outer_program_identity_v3_digest_and_terminal_state_are_strict() {
+        let root = TestRoot::new();
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+        let actor = parent();
+        assert_eq!(
+            fixture
+                .router
+                .cobol
+                .ensure_call_protocol_identity(&actor, true, false),
+            Err(HostProblem::UnknownOutcome)
+        );
+        fixture
+            .router
+            .cobol
+            .ensure_call_protocol_identity(&actor, true, true)
+            .unwrap();
+        let key = protocol_key(actor.run_unit_id.as_str());
+        let row = store
+            .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let protocol: CallProtocol = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(protocol.schema_version, 3);
+        assert!(decode_protocol(&row).is_ok());
+        let mut old = protocol.clone();
+        old.schema_version = 2;
+        assert_ne!(protocol_metadata_digest(&old), protocol.metadata_digest);
+        for case in 0..5 {
+            let mut bad = protocol.clone();
+            match case {
+                0 => bad.schema_version = 2,
+                1 => bad.schema_version = 4,
+                2 => bad.owner_execution = "foreign".into(),
+                3 => bad.ended_tick = Some(0),
+                _ => bad.ended_tick = Some(100),
+            }
+            let mut record = row.clone();
+            record.payload = serde_json::to_vec(&bad).unwrap();
+            assert!(decode_protocol(&record).is_err(), "case {case}");
+        }
+        let mutation = protocol_terminal_mutation(store.as_ref(), &actor, 100)
+            .unwrap()
+            .unwrap();
+        let ProviderStateMutation::Put(write) = mutation else {
+            panic!("expected protocol put")
+        };
+        store
+            .put_provider_state(write.record, write.expected_version)
+            .unwrap();
+        let terminal = store
+            .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_call_protocol_row(&terminal).unwrap();
+        assert_eq!(descriptor.state, CobolRetentionState::Terminal);
+        assert_eq!(descriptor.terminal_tick, Some(100));
+        assert_eq!(
+            fixture
+                .router
+                .cobol
+                .ensure_call_protocol_identity(&actor, true, false),
+            Err(run_ended_problem())
+        );
+    }
+
+    #[test]
+    fn outer_program_identity_rejects_malformed_or_wrong_request_domains() {
+        let actor = parent();
+        let valid = effect(&actor, &format!("cics-program-v2:{}", "a".repeat(64)));
+        assert_eq!(outer_program_identity(&valid), Ok(true));
+        assert_eq!(
+            outer_program_identity(&effect(&actor, "cics:parent-run:1")),
+            Ok(false)
+        );
+        assert_eq!(
+            outer_program_identity(&effect(
+                &actor,
+                &format!("cics-program-v3:{}", "a".repeat(64))
+            )),
+            Err(HostProblem::Unsupported)
+        );
+        for case in 0..4 {
+            let mut bad = valid.clone();
+            match case {
+                0 => bad.sequence = 0,
+                1 => {
+                    bad.idempotency_key = Some(
+                        IdempotencyKey::new("cics-program-v2:short", InvocationLimits::default())
+                            .unwrap(),
+                    )
+                }
+                2 => {
+                    bad.idempotency_key = Some(
+                        IdempotencyKey::new(
+                            format!("cics-program-v2:{}", "A".repeat(64)),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    )
+                }
+                _ => {
+                    bad.request = HostRequest::Program(ProgramRequest::Cancel {
+                        programs: vec![ProgramName::new("LEAF", 128).unwrap()],
+                    })
+                }
+            }
+            assert_eq!(
+                outer_program_identity(&bad),
+                Err(HostProblem::Malformed),
+                "case {case}"
+            );
+        }
+        let root = TestRoot::new();
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
+        let mut oversized = valid;
+        oversized.sequence = u64::from(actor.limits.max_effects) + 1;
+        assert_eq!(
+            fixture.router.cobol.execute_installed_effect(
+                &actor,
+                &oversized,
+                "LEAF",
+                &call_payload(&[]),
+                None
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert!(
+            store
+                .list_provider_state(CALL_REPLAY_NAMESPACE, 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .list_provider_state(CALL_PROTOCOL_NAMESPACE, 8)
+                .unwrap()
+                .is_empty()
+        );
     }
 }

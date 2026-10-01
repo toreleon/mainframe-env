@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Validate local LINK COMMAREA reply schemas and passed spans before fresh or retained replies reach callers, sharing validation with INVOKE APPLICATION."

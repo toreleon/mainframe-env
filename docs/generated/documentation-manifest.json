@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 221,
+    "markdown_documents": 222,
     "navigation_groups": 5,
-    "normative_documents": 57,
+    "normative_documents": 58,
     "xtask_commands": 208
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 95,
-      "sha256": "sha256:84656413b6d4fc01b4c90722eafc7246d82341ed3bb456303158d5509d20c3f1",
+      "relative_links": 96,
+      "sha256": "sha256:7b2eff2df6159dd42345f00ae5834ed931f8ca65837c4ef53c57375f904a751e",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -361,7 +361,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 24,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:31abe3ef7b062b1c9a9dc4294bae8385e099a89271a2b9cce004a97c224f68ee",
+      "sha256": "sha256:33450905d5dab48df0e72226a5fcc58c68e3274cd331e3a19bb3e6ebfc8f208e",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -583,9 +583,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:7bc98ddde4958e291a50884315fb187ecba1b005e226532d426c26cdb8dd35ce",
+      "sha256": "sha256:39c55bdde6e2a748dba95e5e436c83eba4a6344b87ad98f529ec1d7cbe698451",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -621,7 +621,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:201cf7656f941ead6975c21971513049cfceda1e549ab9da8853a2e6eaf80608",
+      "sha256": "sha256:a795c945fa0701858febe260c98b150b86b102802b462695d3644af84c2e473c",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -951,10 +951,22 @@
       "xtask_commands": 1
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider and selected execution maintainers",
+      "path": "docs/decisions/0027-cics-logical-program-frames.md",
+      "relative_links": 0,
+      "scope": "local LINK and INVOKE APPLICATION on an existing task",
+      "sha256": "sha256:3ad6f70369f59e389774975de614ef91eb6d623e35d00b865fa1d5d67a94227c",
+      "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
+      "title": "ADR-0027: CICS task ownership across logical program frames",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 26,
-      "sha256": "sha256:7814b7dc1e8622f600c88a43c8b3ebb3c44bdb94be49c4528b801078005e28b5",
+      "relative_links": 27,
+      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1390,7 +1402,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 93,
-      "sha256": "sha256:73c9ae5905f5f1a10f77d896ccc8f904d38e48a100afe50038045d18e76e7395",
+      "sha256": "sha256:6c752e5db4671038a431dcaae74bf85afa9568b4a09aadc8f97c1f110d7efc4a",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 4
     },
@@ -2220,6 +2232,10 @@
           "path": "docs/decisions/0026-run-bundle.md"
         },
         {
+          "label": "ADR-0027: CICS task ownership across logical program frames",
+          "path": "docs/decisions/0027-cics-logical-program-frames.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2395,7 +2411,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:1bc898d0d807e0b4d782e834f7e290811797f0db4623f2b6d05cca3a7dc9cad1",
+  "registry_sha256": "sha256:0893d4e764711670f73b1121d1379876101de1b2869a877c985ef129e351dd09",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

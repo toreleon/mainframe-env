@@ -3,6 +3,8 @@ use super::*;
 use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite, StoreError};
 use serde::{Deserialize, Serialize};
 
+mod abend;
+
 use super::retention::{
     CALL_PROTOCOL_NAMESPACE, CANCEL_NAMESPACE, CobolRetentionRowDescriptor, CobolRetentionRowKind,
     CobolRetentionState, CobolRetentionValidationError, INSTANCE_NAMESPACE_PREFIX,
@@ -40,6 +42,8 @@ struct Instance {
     busy: bool,
     open_files: bool,
     state: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    abend: Option<abend::AbendProof>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -230,7 +234,7 @@ fn decode_instance(
 ) -> Result<Instance, CobolRetentionValidationError> {
     let value: Instance = serde_json::from_slice(&record.payload)
         .map_err(|_| CobolRetentionValidationError::CorruptPayload)?;
-    if value.schema_version != 1
+    if !abend::valid_instance(record, &value)
         || !valid_instance_namespace(&record.namespace)
         || !valid_program(&record.key)
         || record.version == 0
@@ -350,11 +354,22 @@ pub(super) fn describe_run_state_row(
 pub(super) fn describe_instance_row(
     record: &ProviderStateRecord,
 ) -> Result<CobolRetentionRowDescriptor, CobolRetentionValidationError> {
-    decode_instance(record)?;
+    let instance = decode_instance(record)?;
     let run_key = record
         .namespace
         .strip_prefix(INSTANCE_NAMESPACE_PREFIX)
         .ok_or(CobolRetentionValidationError::WrongNamespace)?;
+    let mut dependencies = vec![provider_dependency(RUN_STATE_NAMESPACE, run_key)];
+    if let Some(proof) = instance.abend {
+        if proof.owner_execution != proof.execution {
+            dependencies.push(super::retention::CobolRetentionDependency::Execution(
+                proof.owner_execution,
+            ));
+        }
+        dependencies.push(super::retention::CobolRetentionDependency::Execution(
+            proof.execution,
+        ));
+    }
     Ok(CobolRetentionRowDescriptor {
         namespace: record.namespace.clone(),
         key: record.key.clone(),
@@ -364,7 +379,7 @@ pub(super) fn describe_instance_row(
         owner_execution: None,
         owner_run_unit: None,
         terminal_tick: None,
-        dependencies: vec![provider_dependency(RUN_STATE_NAMESPACE, run_key)],
+        dependencies,
     })
 }
 
@@ -512,7 +527,7 @@ impl Lease {
         let mut instance = match existing {
             Some(record) => {
                 let value = load_instance(&record)?;
-                if value.busy {
+                if value.busy || value.abend.is_some() {
                     return Err(HostProblem::UnknownOutcome);
                 }
                 if !value.artifact.is_empty() && value.artifact != invocation.artifact.as_str() {
@@ -532,6 +547,7 @@ impl Lease {
                     busy: false,
                     open_files: false,
                     state: None,
+                    abend: None,
                 }
             }
         };
@@ -667,9 +683,9 @@ impl CobolProgram {
                 .map_err(|_| HostProblem::InfrastructureFailure)?
             {
                 let value = load_instance(&record)?;
-                // Recursive active CANCEL and implicit closing of open files are
-                // not implemented. Reject ALL targets before changing any target.
-                if value.busy || value.open_files {
+                // Recursive/abandoned-frame CANCEL and implicit closing of open
+                // files are not implemented. Validate all targets before writes.
+                if value.busy || value.open_files || value.abend.is_some() {
                     return Err(HostProblem::Unsupported);
                 }
                 let reset = Instance {
@@ -678,6 +694,7 @@ impl CobolProgram {
                     busy: false,
                     open_files: false,
                     state: None,
+                    abend: None,
                 };
                 writes.push(write(&namespace, &name, &reset, Some(record.version))?);
             }
@@ -768,6 +785,7 @@ impl CobolProgram {
             if value.busy || value.open_files {
                 return Err(HostProblem::Unsupported);
             }
+            abend::verify_for_cleanup(store.as_ref(), invocation, &record, &value)?;
             mutations.push(ProviderStateMutation::Delete {
                 namespace: namespace.clone(),
                 key: record.key,

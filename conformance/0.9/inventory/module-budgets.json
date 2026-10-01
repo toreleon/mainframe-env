@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6204,
+      "max_production_lines": 6008,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -108,7 +108,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3641,
+      "max_production_lines": 3392,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -174,19 +174,19 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3592,
+      "max_production_lines": 3393,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/postgres.rs",
-      "max_production_lines": 2238,
+      "max_production_lines": 1923,
       "responsibility": "The PostgreSQL adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, and atomic transactions.",
       "split_boundary": "Extract PostgreSQL retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 2098,
+      "max_production_lines": 1783,
       "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
       "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
@@ -398,6 +398,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/file_unlock.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/frame_tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/lifecycle_tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval_control/cancel.rs",
@@ -416,10 +418,12 @@
       "crates/providers/mainframe-env-cics/src/handlers/operator_control/active.rs",
       "crates/providers/mainframe-env-cics/src/handlers/operator_control/authority.rs",
       "crates/providers/mainframe-env-cics/src/handlers/operator_control/write.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_abend.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/release.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/transfer_selection.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control/temporary_storage.rs",
       "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
@@ -444,6 +448,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/storage_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_context.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_control/default_pop.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue/model.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_return.rs",

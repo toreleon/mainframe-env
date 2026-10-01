@@ -5776,7 +5776,19 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
             f"legacy_execution_options: {legacy_execution_options} "
             "},"
         )
-    lines.extend(["];"])
+    lines.extend([
+        "];",
+        "",
+        "/// Plan operations admitted by sealed typed application registrations.",
+        "pub(super) const CICS_REGISTERED_PLAN_OPERATIONS: &[CicsPlanOperation] = &[",
+    ])
+    lines.extend(
+        f"    CicsPlanOperation::{command['contract']['registry']['runtime_operation']},"
+        for command in commands
+        if command["contract"]["registry"]["readiness"] == "typed-runtime"
+        and command["contract"]["registry"]["advertised"]
+    )
+    lines.append("];")
     return "\n".join(lines) + "\n"
 
 

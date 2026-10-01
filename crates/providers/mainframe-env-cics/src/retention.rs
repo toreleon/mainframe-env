@@ -7,8 +7,174 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectRecord, EffectState, Pro
 use sha2::{Digest, Sha256};
 use std::fmt;
 
+mod container_replay {
+    //! Shared private container replay codec and retention ownership validation.
+
+    use super::{CicsReplayRetentionState, CicsReplayValidationError, describe_cics_replay_row};
+    use crate::service::CicsLimits;
+    use mainframe_env_execution_api::{
+        ExecutionId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
+    };
+    use mainframe_env_store_api::{EffectRecord, ExecutionRecord, ProviderStateRecord};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[serde(deny_unknown_fields)]
+    pub(crate) struct ContainerReplay {
+        pub(crate) schema_version: u8,
+        pub(crate) owner_execution: String,
+        pub(crate) owner_principal: String,
+        pub(crate) owner_run_unit: String,
+        pub(crate) digest: String,
+    }
+
+    impl ContainerReplay {
+        pub(crate) fn decode(row: &ProviderStateRecord) -> Result<Self, CicsReplayValidationError> {
+            if row.namespace != "cics-container-replay-v1" {
+                return Err(CicsReplayValidationError::WrongNamespace);
+            }
+            let limits = InvocationLimits::default();
+            let key_limits = InvocationLimits {
+                max_identity_bytes: 256,
+                ..limits
+            };
+            if row.version != 1 || IdempotencyKey::new(&row.key, key_limits).is_err() {
+                return Err(CicsReplayValidationError::InvalidIdentity);
+            }
+            if row.payload.len() > 4096 {
+                return Err(CicsReplayValidationError::CorruptPayload);
+            }
+            let replay: Self = serde_json::from_slice(&row.payload)
+                .map_err(|_| CicsReplayValidationError::CorruptPayload)?;
+            if replay.schema_version != 1
+                || ExecutionId::new(&replay.owner_execution, limits).is_err()
+                || RunUnitId::new(&replay.owner_run_unit, limits).is_err()
+                || PrincipalId::new(&replay.owner_principal, limits).is_err()
+                || replay.digest.len() != 64
+                || !replay
+                    .digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err(CicsReplayValidationError::CorruptPayload);
+            }
+            Ok(replay)
+        }
+    }
+
+    /// Validate a private container receipt against its fully decoded outer CICS
+    /// replay, completed core effect and terminal execution owner.
+    ///
+    /// This performs no mutation or age decision. Maintenance must also preserve
+    /// recovery dependencies and fence the exact rows during the archive transaction.
+    pub fn validate_cics_container_replay_row(
+        row: &ProviderStateRecord,
+        outer: &ProviderStateRecord,
+        effect: &EffectRecord,
+        execution: &ExecutionRecord,
+        limits: CicsLimits,
+    ) -> Result<(), CicsReplayValidationError> {
+        let replay = ContainerReplay::decode(row)?;
+        let descriptor = describe_cics_replay_row(outer, Some(effect), limits)?;
+        if descriptor.retention != CicsReplayRetentionState::Terminal || !execution.state.terminal()
+        {
+            return Err(CicsReplayValidationError::CoreEffectNotCompleted);
+        }
+        if row.key != outer.key
+            || descriptor.owner_execution.as_deref() != Some(replay.owner_execution.as_str())
+            || descriptor.owner_run_unit.as_deref() != Some(replay.owner_run_unit.as_str())
+            || execution.execution_id.as_str() != replay.owner_execution
+            || execution.run_unit_id.as_str() != replay.owner_run_unit
+            || execution.principal.as_str() != replay.owner_principal
+        {
+            return Err(CicsReplayValidationError::CoreEffectMismatch);
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn container_replay_codec_rejects_invalid_identity_bounds_and_trailing_bytes() {
+            let replay = ContainerReplay {
+                schema_version: 1,
+                owner_execution: "execution".into(),
+                owner_principal: "IBMUSER".into(),
+                owner_run_unit: "run".into(),
+                digest: "a".repeat(64),
+            };
+            let row = ProviderStateRecord {
+                namespace: "cics-container-replay-v1".into(),
+                key: "receipt".into(),
+                version: 1,
+                payload: serde_json::to_vec(&replay).unwrap(),
+            };
+            assert!(ContainerReplay::decode(&row).is_ok());
+            // The private writers admit keys up to 256 bytes. Maintenance still
+            // requires the matching outer/core identities under their own limits.
+            assert!(
+                ContainerReplay::decode(&ProviderStateRecord {
+                    key: "k".repeat(256),
+                    ..row.clone()
+                })
+                .is_ok()
+            );
+            for invalid in [
+                ProviderStateRecord {
+                    namespace: "other".into(),
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    key: String::new(),
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    key: "k".repeat(257),
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    version: 0,
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    payload: vec![b' '; 4097],
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    payload: [row.payload.as_slice(), b"{}"].concat(),
+                    ..row.clone()
+                },
+            ] {
+                assert!(ContainerReplay::decode(&invalid).is_err());
+            }
+            for field in [
+                "owner_execution",
+                "owner_principal",
+                "owner_run_unit",
+                "digest",
+            ] {
+                let mut value = serde_json::to_value(&replay).unwrap();
+                value[field] = "".into();
+                assert!(
+                    ContainerReplay::decode(&ProviderStateRecord {
+                        payload: serde_json::to_vec(&value).unwrap(),
+                        ..row.clone()
+                    })
+                    .is_err()
+                );
+            }
+        }
+    }
+}
+pub(crate) use container_replay::ContainerReplay;
+pub use container_replay::validate_cics_container_replay_row;
+
 pub(crate) const UOW_V1_MAGIC: &[u8; 5] = b"MECU1";
 pub(crate) const UOW_V2_MAGIC: &[u8; 5] = b"MECU2";
+pub(crate) const UOW_V3_MAGIC: &[u8; 5] = b"MECU3";
+
 const UNDO_V1_MAGIC: &[u8; 8] = b"MECUNDO1";
 const MAX_IDENTITY_BYTES: usize = 128;
 const MAX_TRANSACTION_BYTES: usize = 16;
@@ -132,6 +298,8 @@ pub fn describe_cics_replay_row(
     }
     let replay = decode_cics_effect_replay(&row.payload, limits)
         .map_err(|_| CicsReplayValidationError::CorruptPayload)?;
+    crate::service::validate_transfer_selection(&replay.response)
+        .map_err(|_| CicsReplayValidationError::CorruptPayload)?;
     HostResult::Cics(replay.response.clone())
         .validate(HostLimits {
             max_name_bytes: 128,
@@ -226,6 +394,8 @@ pub enum CicsUowCodecVersion {
     LegacyV1,
     /// Ownership- and age-aware row.
     RetentionV2,
+    /// Effect ownership plus a distinct root task owner for a linked frame.
+    ProgramFrameV3,
 }
 
 /// Exact durable state represented by a CICS unit-of-work row.
@@ -318,8 +488,10 @@ pub struct CicsUowRowDescriptor {
     pub transaction: String,
     /// Exact outer effect key bound into current metadata.
     pub effect_key: Option<String>,
-    /// Owning execution for a version-2 row.
+    /// Execution which issued the SYNCPOINT effect for an attributed row.
     pub owner_execution: Option<String>,
+    /// Distinct root task execution for a version-3 row; V2 has one unified owner.
+    pub task_owner_execution: Option<String>,
     /// Owning run unit for a version-2 row.
     pub owner_run_unit: Option<String>,
     /// Original conservative deadline lower bound.
@@ -374,6 +546,7 @@ impl std::error::Error for CicsUowValidationError {}
 pub(crate) struct UowRetentionMetadata {
     pub(crate) effect_key: String,
     pub(crate) owner_execution: String,
+    pub(crate) task_owner_execution: Option<String>,
     pub(crate) owner_run_unit: String,
     pub(crate) deadline_tick: u64,
     pub(crate) terminal_tick: Option<u64>,
@@ -432,7 +605,13 @@ pub fn describe_cics_uow_row(
     } else {
         CicsUowDependencyState::Clear
     };
-    let codec = if decoded.metadata.is_some() {
+    let codec = if decoded
+        .metadata
+        .as_ref()
+        .is_some_and(|metadata| metadata.task_owner_execution.is_some())
+    {
+        CicsUowCodecVersion::ProgramFrameV3
+    } else if decoded.metadata.is_some() {
         CicsUowCodecVersion::RetentionV2
     } else {
         CicsUowCodecVersion::LegacyV1
@@ -453,6 +632,10 @@ pub fn describe_cics_uow_row(
             .metadata
             .as_ref()
             .map(|metadata| metadata.owner_execution.clone()),
+        task_owner_execution: decoded
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.task_owner_execution.clone()),
         owner_run_unit: decoded
             .metadata
             .as_ref()
@@ -479,7 +662,12 @@ pub(crate) fn encode_uow(decoded: &DecodedUow) -> Result<Vec<u8>, CicsUowValidat
         return Ok(payload);
     };
     validate_metadata(decoded.state, metadata)?;
-    let mut payload = UOW_V2_MAGIC.to_vec();
+    let mut payload = if metadata.task_owner_execution.is_some() {
+        UOW_V3_MAGIC
+    } else {
+        UOW_V2_MAGIC
+    }
+    .to_vec();
     payload.push(decoded.state.byte());
     put_field(&mut payload, decoded.transaction.as_bytes())?;
     put_field(&mut payload, metadata.effect_key.as_bytes())?;
@@ -487,6 +675,9 @@ pub(crate) fn encode_uow(decoded: &DecodedUow) -> Result<Vec<u8>, CicsUowValidat
     put_field(&mut payload, metadata.owner_run_unit.as_bytes())?;
     payload.extend_from_slice(&metadata.deadline_tick.to_be_bytes());
     payload.extend_from_slice(&metadata.terminal_tick.unwrap_or(0).to_be_bytes());
+    if let Some(task_owner) = &metadata.task_owner_execution {
+        put_field(&mut payload, task_owner.as_bytes())?;
+    }
     Ok(payload)
 }
 
@@ -497,6 +688,8 @@ pub(crate) fn decode_uow(payload: &[u8]) -> Result<DecodedUow, CicsUowValidation
         CicsUowCodecVersion::LegacyV1
     } else if magic == UOW_V2_MAGIC {
         CicsUowCodecVersion::RetentionV2
+    } else if magic == UOW_V3_MAGIC {
+        CicsUowCodecVersion::ProgramFrameV3
     } else {
         return Err(CicsUowValidationError::CorruptPayload);
     };
@@ -505,10 +698,11 @@ pub(crate) fn decode_uow(payload: &[u8]) -> Result<DecodedUow, CicsUowValidation
     validate_transaction(&transaction)?;
     let metadata = match codec {
         CicsUowCodecVersion::LegacyV1 => None,
-        CicsUowCodecVersion::RetentionV2 => {
+        CicsUowCodecVersion::RetentionV2 | CicsUowCodecVersion::ProgramFrameV3 => {
             let metadata = UowRetentionMetadata {
                 effect_key: reader.text_field(MAX_IDENTITY_BYTES)?,
                 owner_execution: reader.text_field(MAX_IDENTITY_BYTES)?,
+                task_owner_execution: None,
                 owner_run_unit: reader.text_field(MAX_IDENTITY_BYTES)?,
                 deadline_tick: reader.u64()?,
                 terminal_tick: match reader.u64()? {
@@ -516,6 +710,10 @@ pub(crate) fn decode_uow(payload: &[u8]) -> Result<DecodedUow, CicsUowValidation
                     value => Some(value),
                 },
             };
+            let mut metadata = metadata;
+            if codec == CicsUowCodecVersion::ProgramFrameV3 {
+                metadata.task_owner_execution = Some(reader.text_field(MAX_IDENTITY_BYTES)?);
+            }
             validate_metadata(state, &metadata)?;
             Some(metadata)
         }
@@ -537,6 +735,10 @@ fn validate_metadata(
     if !valid_identity(&metadata.effect_key)
         || !valid_identity(&metadata.owner_execution)
         || !valid_identity(&metadata.owner_run_unit)
+        || metadata
+            .task_owner_execution
+            .as_ref()
+            .is_some_and(|owner| !valid_identity(owner) || owner == &metadata.owner_execution)
         || metadata.deadline_tick == 0
         || metadata.terminal_tick == Some(0)
         || metadata
@@ -706,5 +908,107 @@ impl<'a> RowReader<'a> {
 
     fn finished(&self) -> bool {
         self.at == self.payload.len()
+    }
+}
+
+#[cfg(test)]
+mod frame_uow_tests {
+    use super::*;
+
+    fn fixture(task: Option<&str>, terminal: bool) -> DecodedUow {
+        DecodedUow {
+            state: if terminal {
+                CicsUowState::Committed
+            } else {
+                CicsUowState::CommitPending
+            },
+            transaction: "MENU".into(),
+            metadata: Some(UowRetentionMetadata {
+                effect_key: "frame-syncpoint".into(),
+                owner_execution: "child-execution".into(),
+                task_owner_execution: task.map(str::to_string),
+                owner_run_unit: "shared-task".into(),
+                deadline_tick: 10,
+                terminal_tick: terminal.then_some(20),
+            }),
+        }
+    }
+
+    #[test]
+    fn frame_uow_codec_preserves_all_three_generations_and_root_bytes() {
+        let v2 = fixture(None, true);
+        let bytes = encode_uow(&v2).unwrap();
+        assert_eq!(&bytes[..5], b"MECU2");
+        assert_eq!(decode_uow(&bytes).unwrap(), v2);
+        assert_eq!(encode_uow(&decode_uow(&bytes).unwrap()).unwrap(), bytes);
+        let legacy = DecodedUow {
+            metadata: None,
+            ..v2.clone()
+        };
+        let bytes = encode_uow(&legacy).unwrap();
+        assert_eq!(&bytes[..5], b"MECU1");
+        assert_eq!(decode_uow(&bytes).unwrap(), legacy);
+        for terminal in [false, true] {
+            let expected = fixture(Some("root-execution"), terminal);
+            let bytes = encode_uow(&expected).unwrap();
+            assert_eq!(&bytes[..5], b"MECU3");
+            assert_eq!(decode_uow(&bytes).unwrap(), expected);
+            assert_eq!(encode_uow(&decode_uow(&bytes).unwrap()).unwrap(), bytes);
+            let row = ProviderStateRecord {
+                namespace: "cics-uow".into(),
+                key: "frame-syncpoint".into(),
+                version: if terminal { 2 } else { 1 },
+                payload: bytes,
+            };
+            let descriptor = describe_cics_uow_row(&row, None).unwrap();
+            assert_eq!(descriptor.codec, CicsUowCodecVersion::ProgramFrameV3);
+            assert_eq!(
+                descriptor.owner_execution.as_deref(),
+                Some("child-execution")
+            );
+            assert_eq!(
+                descriptor.task_owner_execution.as_deref(),
+                Some("root-execution")
+            );
+        }
+    }
+
+    #[test]
+    fn frame_uow_codec_rejects_partial_forged_or_mislabeled_metadata() {
+        assert!(encode_uow(&fixture(Some("child-execution"), true)).is_err());
+        assert!(encode_uow(&fixture(Some(""), true)).is_err());
+        assert!(encode_uow(&fixture(Some(&"X".repeat(MAX_IDENTITY_BYTES + 1)), true)).is_err());
+        let bytes = encode_uow(&fixture(Some("root-execution"), true)).unwrap();
+        for length in 0..bytes.len() {
+            assert!(
+                decode_uow(&bytes[..length]).is_err(),
+                "truncated at {length}"
+            );
+        }
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        assert!(decode_uow(&trailing).is_err());
+        let mut v2_label = bytes.clone();
+        v2_label[..5].copy_from_slice(b"MECU2");
+        assert!(decode_uow(&v2_label).is_err());
+        let mut v3_label = encode_uow(&fixture(None, true)).unwrap();
+        v3_label[..5].copy_from_slice(b"MECU3");
+        assert!(decode_uow(&v3_label).is_err());
+        let mut row = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "different-effect".into(),
+            version: 2,
+            payload: bytes,
+        };
+        assert_eq!(
+            describe_cics_uow_row(&row, None),
+            Err(CicsUowValidationError::InvalidIdentity)
+        );
+        row.key = "frame-syncpoint".into();
+        row.version = 1;
+        assert_eq!(
+            describe_cics_uow_row(&row, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
     }
 }

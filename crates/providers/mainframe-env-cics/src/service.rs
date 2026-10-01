@@ -187,10 +187,10 @@ struct Run {
     abend_handler: Option<handlers::AbendExit>,
     cancelled_abend_handler: Option<handlers::AbendExit>,
     handle_stack: Vec<handlers::HandleFrame>,
-    /// Latest explicit application ABEND for source-faithful ASSIGN outputs.
-    /// It is restored only from the versioned session handle-state authority;
-    /// machine-check diagnostics remain a separate unsupported context.
+    /// Latest explicit ABEND, from the session authority or an active program unwind.
     latest_abend: Option<handlers::AbendRecord>,
+    /// Volatile explicit ABEND unwinding through active synchronous program loans.
+    program_abend: Option<handlers::PendingProgramAbend>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
     file_updates: handlers::FileUpdateState,
@@ -255,6 +255,7 @@ type DocumentTemplates = BTreeMap<String, CicsDocumentTemplateDefinition>;
 struct State {
     sessions: BTreeMap<String, Session>,
     runs: BTreeMap<RunUnitId, Run>,
+    task_dispatch: handlers::TaskDispatch,
     maps: BTreeMap<(String, String), BmsMapDefinition>,
     programs: BTreeSet<String>,
     program_definitions: ProgramCatalog,
@@ -449,6 +450,7 @@ impl CicsService {
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
+                task_dispatch: Default::default(),
                 maps,
                 programs,
                 program_definitions,
@@ -591,6 +593,9 @@ impl CicsService {
             version: 1,
         };
         let mut state = self.lock()?;
+        state
+            .task_dispatch
+            .require_available_session(session.as_str())?;
         if state.sessions.len() >= self.limits.max_sessions {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -631,6 +636,9 @@ impl CicsService {
             .checked_add(idle_timeout_ticks)
             .ok_or(HostProblem::ResourceExhausted)?;
         let mut state = self.lock()?;
+        state
+            .task_dispatch
+            .require_available_session(session.as_str())?;
         let created = Session {
             rows,
             columns,
@@ -665,12 +673,14 @@ impl CicsService {
             "S001",
         );
         if state.sessions.len() >= self.limits.max_sessions
-            || state.runs.len() >= self.limits.max_runs
+            || state.runs.len() + state.task_dispatch.absent_runs(&state.runs)
+                >= self.limits.max_runs
         {
             return Err(HostProblem::ResourceExhausted);
         }
         if state.sessions.contains_key(session.as_str())
             || state.runs.contains_key(&invocation.run_unit_id)
+            || state.task_dispatch.active(&invocation.run_unit_id)
         {
             return Err(HostProblem::IdempotencyConflict);
         }
@@ -857,6 +867,9 @@ impl CicsService {
         next.input.replace(encoded)?;
         next.suspended = false;
         let mut state = self.lock()?;
+        state
+            .task_dispatch
+            .require_available_session(session.as_str())?;
         if state
             .sessions
             .get(session.as_str())
@@ -909,6 +922,9 @@ impl CicsService {
         next.run_unit = run_unit;
         next.transaction = resumed_transaction;
         let mut state = self.lock()?;
+        state
+            .task_dispatch
+            .require_available_session(session.as_str())?;
         if state
             .sessions
             .get(session.as_str())
@@ -919,61 +935,6 @@ impl CicsService {
         self.persist_session(session.as_str(), &next, Some(current.version))?;
         state.sessions.insert(session.as_str().into(), next.clone());
         Ok(terminal_snapshot(session.as_str(), &next))
-    }
-
-    pub fn disconnect_terminal(
-        &self,
-        session: &SessionId,
-        principal: &PrincipalId,
-        csrf_token: &str,
-        now_tick: u64,
-    ) -> Result<(), HostProblem> {
-        let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
-        let state = self.lock()?;
-        if state
-            .sessions
-            .get(session.as_str())
-            .is_none_or(|value| value.version != current.version)
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let runs = state
-            .runs
-            .values()
-            .filter(|run| run.session == session.as_str())
-            .cloned()
-            .collect::<Vec<_>>();
-        drop(state);
-        for run in &runs {
-            handlers::release_task_state(self, run)?;
-        }
-        let mut state = self.lock()?;
-        if state
-            .sessions
-            .get(session.as_str())
-            .is_none_or(|value| value.version != current.version)
-            || state
-                .runs
-                .values()
-                .filter(|run| run.session == session.as_str())
-                .map(|run| run.invocation.run_unit_id.as_str())
-                .collect::<BTreeSet<_>>()
-                != runs
-                    .iter()
-                    .map(|run| run.invocation.run_unit_id.as_str())
-                    .collect::<BTreeSet<_>>()
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        for run in &runs {
-            handlers::discard_task_starts(self, &mut state.interval_records, run)?;
-        }
-        self.store
-            .delete_provider_state("cics-session", session.as_str(), current.version)
-            .map_err(store_error)?;
-        state.sessions.remove(session.as_str());
-        state.runs.retain(|_, run| run.session != session.as_str());
-        Ok(())
     }
 
     pub fn tn3270_screen(
@@ -1050,13 +1011,16 @@ impl CicsService {
         }
         let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
         let mut state = self.lock()?;
+        state.task_dispatch.require_idle_session(session.as_str())?;
         if !state.sessions.contains_key(session.as_str()) {
             return Err(HostProblem::NotFound);
         }
-        if state.runs.len() >= self.limits.max_runs {
+        if state.runs.len() + state.task_dispatch.absent_runs(&state.runs) >= self.limits.max_runs {
             return Err(HostProblem::ResourceExhausted);
         }
-        if state.runs.contains_key(&invocation.run_unit_id) {
+        if state.runs.contains_key(&invocation.run_unit_id)
+            || state.task_dispatch.active(&invocation.run_unit_id)
+        {
             return Err(HostProblem::IdempotencyConflict);
         }
         let retrieve = invocation
@@ -1111,41 +1075,14 @@ impl CicsService {
         retrieve: Vec<u8>,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        reject_reserved_nested_origin(&invocation)?;
-        validate_terminal_identity(transaction, 16)?;
-        if retrieve.len() > self.limits.max_screen_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let current = self.public_session(session, invocation.principal.id(), None, now_tick)?;
-        if current.run_unit != invocation.run_unit_id.as_str()
-            || current.transaction != transaction.to_ascii_uppercase()
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
-        let mut state = self.lock()?;
-        state.runs.retain(|_, run| run.session != session.as_str());
-        if state.runs.len() >= self.limits.max_runs {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        state.runs.insert(
-            invocation.run_unit_id.clone(),
-            handlers::new_run_with_state(
-                invocation,
-                session.as_str(),
-                transaction,
-                "ME01",
-                "S001",
-                handlers::RunSeed {
-                    originating_task: current.run_unit,
-                    retrieve,
-                    undo,
-                    undo_version,
-                    handle_state: current.handle_state,
-                },
-            ),
-        );
-        Ok(())
+        self.restore_terminal_program_run(
+            invocation.clone(),
+            invocation,
+            session,
+            transaction,
+            retrieve,
+            now_tick,
+        )
     }
 
     pub fn claim_continuation(
@@ -1168,13 +1105,16 @@ impl CicsService {
         }
         let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
         let mut state = self.lock()?;
+        state.task_dispatch.require_idle_session(session.as_str())?;
         if !state.sessions.contains_key(session.as_str()) {
             return Err(HostProblem::NotFound);
         }
-        if state.runs.len() >= self.limits.max_runs {
+        if state.runs.len() + state.task_dispatch.absent_runs(&state.runs) >= self.limits.max_runs {
             return Err(HostProblem::ResourceExhausted);
         }
-        if state.runs.contains_key(&invocation.run_unit_id) {
+        if state.runs.contains_key(&invocation.run_unit_id)
+            || state.task_dispatch.active(&invocation.run_unit_id)
+        {
             return Err(HostProblem::IdempotencyConflict);
         }
         let current = state
@@ -1234,7 +1174,7 @@ impl CicsService {
     fn ensure_run(&self, invocation: &Invocation) -> Result<(), HostProblem> {
         reject_reserved_nested_origin(invocation)?;
         let mut state = self.lock()?;
-        if handlers::synchronize_current_program(&mut state.runs, invocation)? {
+        if handlers::synchronize_current_program(&mut state, invocation)? {
             return Ok(());
         }
         drop(state);
@@ -1395,6 +1335,9 @@ impl CicsService {
             .get(session.as_str())
             .cloned()
             .ok_or(HostProblem::NotFound)?;
+        state
+            .task_dispatch
+            .require_available_session(session.as_str())?;
         let mut next = current.clone();
         next.version += 1;
         next.aid = aid;
@@ -1469,199 +1412,7 @@ impl CicsService {
         effect: &EffectRequest,
         request: CicsRequest,
     ) -> Result<CicsResponse, HostProblem> {
-        if !request.operation.supported() {
-            return Err(HostProblem::Unsupported);
-        }
-        let replay_identity = if request.is_mutating() {
-            let mutation = request
-                .mutation
-                .as_ref()
-                .ok_or(HostProblem::MissingIdempotency)?;
-            if effect.idempotency_key.as_ref() != Some(&mutation.idempotency_key)
-                || mutation.sequence != effect.sequence
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            Some((
-                mutation.idempotency_key.clone(),
-                canonical_request_digest(&HostRequest::Cics(request.clone()))
-                    .map_err(|_| HostProblem::ResourceExhausted)?,
-            ))
-        } else {
-            None
-        };
-        let (replay_owner, replay_run_unit) = {
-            let state = self.lock()?;
-            let run = state
-                .runs
-                .get(&effect.run_unit)
-                .ok_or(HostProblem::Unauthorized)?;
-            (
-                run.invocation.execution_id.as_str().to_string(),
-                run.invocation.run_unit_id.as_str().to_string(),
-            )
-        };
-        if let Some((key, digest)) = replay_identity.as_ref()
-            && let Some(record) = self
-                .store
-                .get_provider_state("cics-effect-replay-v1", key.as_str())
-                .map_err(store_error)?
-        {
-            let replay = decode_cics_effect_replay(&record.payload, self.limits)?;
-            validate_cics_effect_replay_identity(
-                &replay,
-                key.as_str(),
-                &replay_owner,
-                &replay_run_unit,
-                effect.sequence,
-                *digest,
-            )?;
-            let replay = self
-                .finalize_effect_replay(record, replay, effect.deadline_tick)
-                .map_err(|_| HostProblem::UnknownOutcome)?;
-            return Ok(replay.response);
-        }
-        let mut run = self
-            .lock()?
-            .runs
-            .remove(&effect.run_unit)
-            .ok_or(HostProblem::Unauthorized)?;
-        run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
-        let operation = request.operation;
-        #[cfg(feature = "fault-injection")]
-        let after_mutation_file = matches!(
-            operation,
-            CicsOperation::Write | CicsOperation::Rewrite | CicsOperation::Delete
-        )
-        .then(|| argument_text(&request, "FILE").or_else(|_| argument_text(&request, "DATASET")))
-        .transpose()?
-        .map(|name| name.trim().to_ascii_uppercase());
-        let retention_tick = effect.deadline_tick.max(run.invocation.deadline_tick);
-        let result = self.invoke_run(&mut run, request, retention_tick);
-        // A suspended conversation has no completed reply for outer replay.
-        // Its provider receipt is committed with the source-visible event.
-        // Reissue then observes that receipt instead of consuming twice.
-        let result = match (&result, replay_identity.as_ref()) {
-            // A waiting CONVERSE has no result to replay until its peer frame arrives.
-            (Ok(response), Some(_)) if handlers::deferred_converse(operation, response) => result,
-            (Ok(response), Some((key, digest))) => {
-                let result_digest = handlers::cics_result_digest(response)?;
-                let mut replay = CicsEffectReplay {
-                    effect_key: Some(key.as_str().into()),
-                    owner_execution: Some(replay_owner.clone()),
-                    owner_run_unit: Some(replay_run_unit.clone()),
-                    sequence: Some(effect.sequence),
-                    deadline_tick: Some(retention_tick),
-                    resolution_tick: None,
-                    request_digest: *digest,
-                    result_digest: Some(result_digest),
-                    binding_digest: None,
-                    response: response.clone(),
-                };
-                replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
-                let payload = encode_cics_effect_replay(&replay)?;
-                match self.store.put_provider_state(
-                    ProviderStateRecord {
-                        namespace: "cics-effect-replay-v1".into(),
-                        key: key.as_str().into(),
-                        version: 1,
-                        payload,
-                    },
-                    None,
-                ) {
-                    Ok(()) => {
-                        if self
-                            .replay_unknown_after_persist
-                            .swap(false, Ordering::SeqCst)
-                        {
-                            Err(HostProblem::UnknownOutcome)
-                        } else {
-                            self.finalize_effect_replay(
-                                ProviderStateRecord {
-                                    namespace: "cics-effect-replay-v1".into(),
-                                    key: key.as_str().into(),
-                                    version: 1,
-                                    payload: encode_cics_effect_replay(&replay)?,
-                                },
-                                replay,
-                                retention_tick,
-                            )
-                            .map(|_| result)
-                            .unwrap_or(Err(HostProblem::UnknownOutcome))
-                        }
-                    }
-                    Err(StoreError::AlreadyExists | StoreError::Conflict) => {
-                        match self
-                            .store
-                            .get_provider_state("cics-effect-replay-v1", key.as_str())
-                            .map_err(store_error)?
-                        {
-                            Some(record) => {
-                                let replay =
-                                    decode_cics_effect_replay(&record.payload, self.limits)?;
-                                validate_cics_effect_replay_identity(
-                                    &replay,
-                                    key.as_str(),
-                                    &replay_owner,
-                                    &replay_run_unit,
-                                    effect.sequence,
-                                    *digest,
-                                )?;
-                                if replay.response != *response {
-                                    Err(HostProblem::IdempotencyConflict)
-                                } else {
-                                    self.finalize_effect_replay(record, replay, retention_tick)
-                                        .map(|_| result)
-                                        .unwrap_or(Err(HostProblem::UnknownOutcome))
-                                }
-                            }
-                            _ => Err(HostProblem::IdempotencyConflict),
-                        }
-                    }
-                    Err(_) => Err(HostProblem::UnknownOutcome),
-                }
-            }
-            _ => result,
-        };
-        #[cfg(feature = "fault-injection")]
-        let mutation_fault = result.is_ok() && self.consume_mutation_fault(operation)?;
-        #[cfg(feature = "fault-injection")]
-        let file_fault = if result.is_ok() {
-            match after_mutation_file {
-                Some(file) => {
-                    self.consume_file_fault(operation, &file, CicsFileFaultPoint::AfterMutation)?
-                }
-                None => false,
-            }
-        } else {
-            false
-        };
-        #[cfg(feature = "fault-injection")]
-        let result = if mutation_fault || file_fault {
-            Err(HostProblem::UnknownOutcome)
-        } else {
-            result
-        };
-        if run.trace.len() < 4096 {
-            run.trace.push(match &result {
-                Ok(response) => CicsTraceEntry {
-                    operation,
-                    outcome: response.condition.clone(),
-                    response: response.response,
-                    response2: response.response2,
-                    payload_bytes: response.payload.bytes().len(),
-                },
-                Err(problem) => CicsTraceEntry {
-                    operation,
-                    outcome: format!("{problem:?}"),
-                    response: -1,
-                    response2: 0,
-                    payload_bytes: 0,
-                },
-            });
-        }
-        self.lock()?.runs.insert(effect.run_unit.clone(), run);
-        result
+        self.invoke_task_command(effect, request)
     }
 
     fn finalize_effect_replay(
@@ -3641,6 +3392,272 @@ impl<'a> Reader<'a> {
 
 #[cfg(test)]
 mod tests {
+    fn activate_get_scope_process(cics: &CicsService, invocation: &Invocation) {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
+        let authority = BtsLifecycleStore::new(cics.store.as_ref());
+        let uow = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "SCOPE", uow).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "SCOPE", &root, "MAIN", "BTS1", principal, uow).unwrap(),
+                uow,
+                execution,
+                principal,
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "SCOPE",
+                uow,
+                execution,
+                principal,
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 7, "scope-checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "SCOPE", &root, 1, 7)
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"BTS!")),
+                ("OPTION.PROCESS".into(), cics_option()),
+            ]),
+            33,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 33), put)
+            .unwrap();
+    }
+
+    fn get_scope_rows(store: &dyn ProviderStateStore) -> Vec<ProviderStateRecord> {
+        [
+            "cics-bts-process-v1",
+            "cics-bts-acquisition-v1",
+            "cics-bts-activity-index-v1",
+            "cics-bts-activity-context-v1",
+            "cics-bts-container-pending-v1",
+            "cics-container-capacity-v1",
+            "cics-container-replay-v1",
+        ]
+        .into_iter()
+        .flat_map(|namespace| store.list_provider_state(namespace, 32).unwrap())
+        .collect()
+    }
+
+    #[test]
+    fn bts_get_container_missing_scopes_return_source_conditions_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        for (index, (selector, expected)) in [
+            (None, 4),
+            (Some(("ACTIVITY", cics_literal(b"MISSING"))), 4),
+            (Some(("OPTION.PROCESS", cics_option())), 25),
+            (Some(("OPTION.ACQPROCESS", cics_option())), 15),
+            (Some(("OPTION.ACQACTIVITY", cics_option())), 24),
+            (Some(("INTOCCSID", cics_decimal(37))), 2),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]);
+            if let Some((key, value)) = selector {
+                arguments.insert(key.into(), value);
+            }
+            let before = get_scope_rows(store.as_ref());
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 1);
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 1),
+                    get
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: expected,
+                })
+            );
+            assert_eq!(get_scope_rows(store.as_ref()), before);
+        }
+    }
+
+    #[test]
+    fn bts_get_container_missing_child_and_data_return_source_conditions_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        activate_get_scope_process(&cics, &invocation);
+        for (index, (selector, expected)) in [
+            (None, ("CONTAINERERR", 110, 10)),
+            (
+                Some(("OPTION.PROCESS", cics_option())),
+                ("CONTAINERERR", 110, 10),
+            ),
+            (
+                Some(("OPTION.ACQPROCESS", cics_option())),
+                ("CONTAINERERR", 110, 10),
+            ),
+            (
+                Some(("ACTIVITY", cics_literal(b"MISSING"))),
+                ("ACTIVITYERR", 109, 8),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"MISSING")),
+                ("FLENGTH".into(), cics_decimal(77)),
+                ("OPTION.NODATA".into(), cics_option()),
+            ]);
+            if let Some((key, value)) = selector {
+                arguments.insert(key.into(), value);
+            }
+            let before = get_scope_rows(store.as_ref());
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 1);
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 1),
+                    get
+                ),
+                Err(HostProblem::Condition {
+                    name: expected.0.into(),
+                    response: expected.1,
+                    response2: expected.2,
+                })
+            );
+            assert_eq!(get_scope_rows(store.as_ref()), before);
+        }
+    }
+
+    fn bts_get_length_fixture() -> (Arc<CicsService>, Invocation) {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        let run = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "ORDER", run).unwrap();
+        BtsLifecycleStore::new(store.as_ref())
+            .define_process(
+                BtsProcess::new("TYPE", "ORDER", &root, "MAIN", "BTS1", principal, run).unwrap(),
+                run,
+                execution,
+                principal,
+            )
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
+            .unwrap();
+        (cics, invocation)
+    }
+
+    #[test]
+    fn bts_get_container_into_unequal_lengths_return_exact_lengerr() {
+        let (cics, invocation) = bts_get_length_fixture();
+        for (index, maximum) in [Some(-1), Some(0), Some(2), Some(4), Some(8), None]
+            .into_iter()
+            .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(8)),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]);
+            if let Some(maximum) = maximum {
+                arguments.insert("FLENGTH".into(), cics_decimal(maximum));
+            }
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 2);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 2),
+                    get,
+                )
+                .unwrap();
+            let has_length = maximum.is_some();
+            let maximum = maximum.unwrap_or(8).max(0) as usize;
+            assert_eq!(
+                (
+                    &response.condition[..],
+                    response.response,
+                    response.response2
+                ),
+                if maximum == 4 {
+                    ("NORMAL", 0, 0)
+                } else {
+                    ("LENGERR", 22, 11)
+                }
+            );
+            assert_eq!(response.outputs["INTO"].bytes(), &b"DATA"[..maximum.min(4)]);
+            assert_eq!(response.outputs.contains_key("FLENGTH"), has_length);
+            if has_length {
+                assert_eq!(response.outputs["FLENGTH"].bytes(), b"4");
+            }
+        }
+    }
+
+    #[test]
+    fn bts_get_container_set_and_nodata_never_read_flength_contents() {
+        let (cics, invocation) = bts_get_length_fixture();
+        for (index, (set, length)) in [
+            (true, cics_decimal(-1)),
+            (false, cics_decimal(-1)),
+            (true, cics_literal(&[0xff])),
+            (false, cics_literal(&[0xff])),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FLENGTH".into(), length),
+                ("OPTION.ACQPROCESS".into(), cics_option()),
+            ]);
+            if set {
+                arguments.insert("SET".into(), cics_literal(b"PTR"));
+                arguments.insert("SET.MAXLENGTH".into(), cics_decimal(8));
+            } else {
+                arguments.insert("OPTION.NODATA".into(), cics_option());
+            }
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 2);
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 2),
+                    get,
+                )
+                .unwrap();
+            assert_eq!((response.response, response.response2), (0, 0));
+            assert_eq!(response.outputs["FLENGTH"].bytes(), b"4");
+            assert_eq!(
+                response.outputs.get("SET").map(|value| value.bytes()),
+                set.then_some(b"DATA".as_slice())
+            );
+            assert!(!response.outputs.contains_key("INTO"));
+        }
+    }
     use super::*;
     use crate::{CicsEventPostMode, CicsEventPurgeMode};
     use mainframe_env_execution_api::{
@@ -3942,6 +3959,11 @@ mod tests {
                 HostRequest::Program(ProgramRequest::Inquire { .. }) => {
                     Ok(HostResult::Program(bounded(Vec::new()).unwrap()))
                 }
+                HostRequest::Program(ProgramRequest::Link { payload, .. }) => {
+                    Ok(HostResult::Program(
+                        bounded(b"CHILD"[..payload.bytes().len().min(5)].to_vec()).unwrap(),
+                    ))
+                }
                 HostRequest::Program(_) => {
                     Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
                 }
@@ -4085,8 +4107,12 @@ mod tests {
         fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
             let outcome = match effect.request {
                 HostRequest::Program(request @ ProgramRequest::Link { .. }) => {
+                    let ProgramRequest::Link { ref payload, .. } = request else {
+                        unreachable!()
+                    };
+                    let reply = b"CHILD"[..payload.bytes().len().min(5)].to_vec();
                     self.seen.lock().unwrap().push(request);
-                    Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
+                    Ok(HostResult::Program(bounded(reply).unwrap()))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -4774,7 +4800,7 @@ mod tests {
         ))
     }
 
-    fn invocation() -> Invocation {
+    pub(in crate::service) fn invocation() -> Invocation {
         invocation_for("run", BTreeMap::new())
     }
 
@@ -4815,7 +4841,7 @@ mod tests {
         .unwrap()
     }
 
-    fn service(store: Arc<dyn ProviderStateStore>) -> Arc<CicsService> {
+    pub(in crate::service) fn service(store: Arc<dyn ProviderStateStore>) -> Arc<CicsService> {
         CicsService::open(authorities(), store, CicsLimits::default()).unwrap()
     }
 
@@ -7086,6 +7112,694 @@ mod tests {
                 .map(str::to_string)
                 .collect::<Vec<_>>();
             assert_eq!(CicsOperation::from_tokens(&tokens), Some(expected));
+        }
+    }
+
+    #[test]
+    fn local_link_maps_compatibility_host_missing_target_to_pgmiderr() {
+        struct MissingProgram {
+            descriptor: CapabilityDescriptor,
+        }
+        impl HostProvider for MissingProgram {
+            fn descriptor(&self) -> &CapabilityDescriptor {
+                &self.descriptor
+            }
+            fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+                assert!(matches!(
+                    effect.request,
+                    HostRequest::Program(ProgramRequest::Link {
+                        selection: None,
+                        ..
+                    })
+                ));
+                EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Err(HostProblem::NotFound),
+                }
+            }
+        }
+        let security = Arc::new(DenyExactSecurityClass {
+            descriptor: descriptor("host.security.authorize"),
+            denied_class: "NONE",
+            denied_resource: None,
+            seen: Arc::new(Mutex::new(Vec::new())),
+        }) as Arc<dyn HostProvider>;
+        let missing = Arc::new(MissingProgram {
+            descriptor: descriptor("host.program.invoke"),
+        }) as Arc<dyn HostProvider>;
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![security, missing], InvocationLimits::default())
+                    .unwrap(),
+            ),
+            HostLimits::default(),
+        ));
+        let cics = CicsService::open(
+            host,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&cics);
+        let link = request(
+            CicsOperation::Link,
+            BTreeMap::from([("PROGRAM".into(), cics_literal(b"ABSENT"))]),
+            1,
+        );
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+            Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 1
+            })
+        );
+    }
+
+    #[test]
+    fn installed_local_link_selects_latest_generation_and_replays_original_selection() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let links = Arc::new(Mutex::new(Vec::new()));
+        let cics = CicsService::open(
+            invoke_authorities(false, links.clone()),
+            store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        cics.bind_artifact_store(store.clone()).unwrap();
+        register_load_program(&cics, store.as_ref(), "LINKCHLD", 1, b"FIRST", 0);
+        let selected = register_load_program(&cics, store.as_ref(), "LINKCHLD", 2, b"SECOND", 0);
+        let (invocation, session) = registered(&cics);
+        let link = request(
+            CicsOperation::Link,
+            BTreeMap::from([
+                ("PROGRAM".into(), cics_literal(b"LINKCHLD")),
+                ("COMMAREA".into(), argument(b"REQUEST!")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let original_effect = effect(&invocation.run_unit_id, link.clone(), 1);
+        let response = cics.invoke(&original_effect, link.clone()).unwrap();
+        assert_eq!(response.response, 0);
+        let first_selection = match &links.lock().unwrap()[0] {
+            ProgramRequest::Link {
+                payload,
+                selection: Some(selection),
+                ..
+            } => {
+                assert_eq!(payload.bytes(), b"REQU");
+                assert_eq!(selection.artifact, selected);
+                assert_eq!(selection.generation, 2);
+                assert!(selection.content_identity.starts_with("sha256:"));
+                selection.clone()
+            }
+            other => panic!("expected selected LINK, got {other:?}"),
+        };
+        drop(cics);
+        let reopened = CicsService::open(
+            invoke_authorities(false, links.clone()),
+            store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        reopened.bind_artifact_store(store.clone()).unwrap();
+        reopened
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        register_load_program(&reopened, store.as_ref(), "LINKCHLD", 3, b"THIRD", 0);
+        assert_eq!(
+            reopened.invoke(&original_effect, link.clone()).unwrap(),
+            response
+        );
+        assert_eq!(links.lock().unwrap().len(), 1);
+        let next = request(CicsOperation::Link, link.arguments, 2);
+        reopened
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+            .unwrap();
+        let links = links.lock().unwrap();
+        let ProgramRequest::Link {
+            selection: Some(selection),
+            ..
+        } = &links[1]
+        else {
+            panic!("missing selection")
+        };
+        assert_eq!(selection.generation, 3);
+        assert_ne!(selection.content_identity, first_selection.content_identity);
+    }
+
+    #[test]
+    fn installed_local_link_rejects_disabled_unloadable_and_unsupported_targets_before_call() {
+        for case in ["disabled", "missing-artifact", "remote", "java", "offset"] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let links = Arc::new(Mutex::new(Vec::new()));
+            let cics = CicsService::open(
+                invoke_authorities(false, links.clone()),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            register_load_program(&cics, store.as_ref(), "LINKCHLD", 1, b"FIRST", 0);
+            let (artifact, semantic_identity) = install_program_artifact(store.as_ref(), b"SECOND");
+            cics.register_program_definitions(&[CicsProgramDefinition {
+                name: "LINKCHLD".into(),
+                generation: 2,
+                artifact: artifact.clone(),
+                semantic_identity,
+                entry_offset: u32::from(case == "offset"),
+                enabled: case != "disabled",
+                remote: case == "remote",
+                reload: false,
+                java_status: if case == "java" {
+                    CicsJavaStatus::Available
+                } else {
+                    CicsJavaStatus::NotJava
+                },
+            }])
+            .unwrap();
+            if case == "missing-artifact" {
+                store.delete_artifact(&artifact).unwrap();
+            }
+            let (invocation, _) = registered(&cics);
+            let link = request(
+                CicsOperation::Link,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"LINKCHLD"))]),
+                1,
+            );
+            let expected = match case {
+                "disabled" => HostProblem::Condition {
+                    name: "PGMIDERR".into(),
+                    response: 27,
+                    response2: 2,
+                },
+                "missing-artifact" => HostProblem::Condition {
+                    name: "PGMIDERR".into(),
+                    response: 27,
+                    response2: 3,
+                },
+                _ => HostProblem::Unsupported,
+            };
+            assert_eq!(
+                cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+                Err(expected),
+                "{case}"
+            );
+            assert!(links.lock().unwrap().is_empty(), "{case}");
+        }
+    }
+
+    #[test]
+    fn installed_local_link_program_denial_and_execution_control_prevent_dispatch() {
+        for case in ["denied", "cancelled", "expired"] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let links = Arc::new(Mutex::new(Vec::new()));
+            let (host, seen) = if case == "denied" {
+                deny_exact_class_authorities("FACILITY", Some("CICS.PROGRAM.LINKCHLD"))
+            } else {
+                (
+                    invoke_authorities(false, links.clone()),
+                    Arc::new(Mutex::new(Vec::new())),
+                )
+            };
+            let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            register_load_program(&cics, store.as_ref(), "LINKCHLD", 1, b"FIRST", 0);
+            let (invocation, _) = registered(&cics);
+            let link = request(
+                CicsOperation::Link,
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"LINKCHLD"))]),
+                1,
+            );
+            if case == "denied" {
+                assert_eq!(
+                    cics.invoke(&effect(&invocation.run_unit_id, link.clone(), 1), link),
+                    Err(HostProblem::Condition {
+                        name: "NOTAUTH".into(),
+                        response: 70,
+                        response2: 101
+                    })
+                );
+                assert!(
+                    seen.lock()
+                        .unwrap()
+                        .iter()
+                        .any(|(class, resource, _)| class == "FACILITY"
+                            && resource == "CICS.PROGRAM.LINKCHLD")
+                );
+                assert!(
+                    store
+                        .audit_records(&invocation.execution_id, 0, 16)
+                        .unwrap()
+                        .iter()
+                        .any(|record| record.decision == AuditDecision::Deny)
+                );
+            } else {
+                let result = cics.invoke_host(
+                    &invocation,
+                    if case == "expired" { 100 } else { 1 },
+                    case == "cancelled",
+                    effect(&invocation.run_unit_id, link, 1),
+                );
+                assert_eq!(
+                    result.outcome,
+                    Err(if case == "expired" {
+                        HostProblem::TimedOut
+                    } else {
+                        HostProblem::Cancelled
+                    })
+                );
+            }
+            assert!(links.lock().unwrap().is_empty());
+            assert!(
+                store
+                    .list_provider_state("cobol-call-replay@1", 8)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn invoke_application_handled_conditions_replay_without_commarea_output() {
+        for policy in [
+            CicsConditionPolicy::NoHandle,
+            CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            },
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let links = Arc::new(Mutex::new(Vec::new()));
+            let cics = CicsService::open(
+                invoke_authorities(false, links.clone()),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            let (invocation, session) = registered(&cics);
+            let mut request = request(
+                CicsOperation::InvokeApplication,
+                BTreeMap::from([
+                    ("APPLICATION".into(), cics_literal(b"MISSING")),
+                    ("OPERATION".into(), cics_literal(b"RUN")),
+                    ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                    ("COMMAREA".into(), task_value(b"AAAAzzzz")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]),
+                1,
+            );
+            request.condition_policy = policy;
+            let original_effect = effect(&invocation.run_unit_id, request.clone(), 1);
+            let first = cics.invoke(&original_effect, request.clone()).unwrap();
+            assert_eq!(
+                (first.condition.as_str(), first.response, first.response2),
+                ("APPNOTFOUND", 127, 3)
+            );
+            assert!(!first.outputs.contains_key("COMMAREA"));
+            assert!(first.payload.bytes().is_empty());
+            let rows = store
+                .list_provider_state("cics-effect-replay-v1", 8)
+                .unwrap();
+            let epoch = store.provider_state_retention_epoch().unwrap();
+            assert_eq!(
+                cics.invoke(&original_effect, request.clone()).unwrap(),
+                first
+            );
+            assert_eq!(store.provider_state_retention_epoch().unwrap(), epoch);
+            drop(cics);
+            let reopened = CicsService::open(
+                invoke_authorities(false, links.clone()),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            reopened
+                .register_run(invocation, &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(reopened.invoke(&original_effect, request).unwrap(), first);
+            assert_eq!(
+                store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap(),
+                rows
+            );
+            assert!(links.lock().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn invoke_application_replays_validate_legacy_and_current_commarea_outputs() {
+        program_replays_validate_legacy_and_current_commarea_outputs(true);
+    }
+
+    #[test]
+    fn local_link_replays_validate_legacy_and_current_commarea_outputs() {
+        program_replays_validate_legacy_and_current_commarea_outputs(false);
+    }
+
+    fn program_replays_validate_legacy_and_current_commarea_outputs(application: bool) {
+        for current in [false, true] {
+            for case in [
+                "short",
+                "empty",
+                "overlong",
+                "schema",
+                "payload-schema",
+                "missing",
+                "mismatch",
+                "condition",
+                "condition-data",
+                "maximum-length",
+                "excessive-length",
+                "negative-length",
+                "zero-length",
+                "missing-length",
+            ] {
+                let store = Arc::new(MemoryStore::new(Default::default()));
+                let links = Arc::new(Mutex::new(Vec::new()));
+                let cics = CicsService::open(
+                    invoke_authorities(false, links.clone()),
+                    store.clone(),
+                    CicsLimits::default(),
+                )
+                .unwrap();
+                let (invocation, _) = registered(&cics);
+                let mut arguments = if application {
+                    BTreeMap::from([
+                        ("APPLICATION".into(), cics_literal(b"PFXAPP")),
+                        ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                        ("OPERATION".into(), cics_literal(b"RUN")),
+                    ])
+                } else {
+                    BTreeMap::from([("PROGRAM".into(), cics_literal(b"APPCHLD"))])
+                };
+                arguments.extend([
+                    ("COMMAREA".into(), task_value(b"AAAAzzzz")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]);
+                let maximum = if application { 24_576 } else { 32_763 };
+                if matches!(case, "maximum-length" | "excessive-length") {
+                    let length = maximum + i64::from(case == "excessive-length");
+                    arguments.insert("COMMAREA".into(), task_value(&vec![b'A'; length as usize]));
+                    arguments.insert("LENGTH".into(), cics_decimal(length));
+                } else if matches!(case, "negative-length" | "zero-length") {
+                    arguments.insert(
+                        "LENGTH".into(),
+                        cics_decimal(if case == "negative-length" { -1 } else { 0 }),
+                    );
+                } else if case == "missing-length" {
+                    arguments.remove("LENGTH");
+                }
+                let request = request(
+                    if application {
+                        CicsOperation::InvokeApplication
+                    } else {
+                        CicsOperation::Link
+                    },
+                    arguments,
+                    1,
+                );
+                let bytes = match case {
+                    "empty" | "condition" => b"".as_slice(),
+                    "overlong" => b"CHILD",
+                    _ => b"OK",
+                };
+                let output = BoundedPayload::new(
+                    if case == "schema" {
+                        "mainframe-env.program.output@1"
+                    } else {
+                        "mainframe-env.cics.payload@1"
+                    },
+                    bytes.to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                let response = CicsResponse {
+                    disposition: CicsDisposition::Complete,
+                    condition: if case.starts_with("condition") {
+                        if application {
+                            "APPNOTFOUND"
+                        } else {
+                            "PGMIDERR"
+                        }
+                    } else {
+                        "NORMAL"
+                    }
+                    .into(),
+                    response: if case.starts_with("condition") {
+                        if application { 127 } else { 27 }
+                    } else {
+                        0
+                    },
+                    response2: if case.starts_with("condition") {
+                        if application { 3 } else { 1 }
+                    } else {
+                        0
+                    },
+                    applid: "MEAPPL".into(),
+                    sysid: "MESYS".into(),
+                    transaction: "MENU".into(),
+                    aid: 0,
+                    target: if case.starts_with("condition") {
+                        None
+                    } else {
+                        Some("APPCHLD".into())
+                    },
+                    next_transaction: None,
+                    payload: BoundedPayload::new(
+                        if case == "payload-schema" {
+                            "mainframe-env.program.output@1"
+                        } else {
+                            "mainframe-env.cics.payload@1"
+                        },
+                        if case == "mismatch" {
+                            b"XX".to_vec()
+                        } else {
+                            bytes.to_vec()
+                        },
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                    outputs: if matches!(case, "missing" | "condition") {
+                        BTreeMap::new()
+                    } else {
+                        BTreeMap::from([("COMMAREA".into(), output)])
+                    },
+                    unit_of_work: None,
+                };
+                let key = request.mutation.as_ref().unwrap().idempotency_key.as_str();
+                let mut replay = CicsEffectReplay {
+                    effect_key: current.then(|| key.to_string()),
+                    owner_execution: Some(invocation.execution_id.as_str().into()),
+                    owner_run_unit: current.then(|| invocation.run_unit_id.as_str().into()),
+                    sequence: current.then_some(1),
+                    deadline_tick: Some(100),
+                    resolution_tick: current.then_some(100),
+                    request_digest: canonical_request_digest(&HostRequest::Cics(request.clone()))
+                        .unwrap(),
+                    result_digest: current
+                        .then(|| handlers::cics_result_digest(&response).unwrap()),
+                    binding_digest: None,
+                    response,
+                };
+                if current {
+                    replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+                }
+                let stored = ProviderStateRecord {
+                    namespace: "cics-effect-replay-v1".into(),
+                    key: key.into(),
+                    version: if current { 2 } else { 1 },
+                    payload: encode_cics_effect_replay(&replay).unwrap(),
+                };
+                let mut initial = stored.clone();
+                initial.version = 1;
+                if current {
+                    replay.resolution_tick = None;
+                    replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+                    initial.payload = encode_cics_effect_replay(&replay).unwrap();
+                }
+                store.put_provider_state(initial, None).unwrap();
+                if current {
+                    store.put_provider_state(stored.clone(), Some(1)).unwrap();
+                }
+                let epoch = store.provider_state_retention_epoch().unwrap();
+                let result = cics.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 1),
+                    request,
+                );
+                if case == "condition" {
+                    let response = result.unwrap();
+                    assert_eq!(
+                        (response.response, response.response2),
+                        if application { (127, 3) } else { (27, 1) }
+                    );
+                    assert!(!response.outputs.contains_key("COMMAREA"));
+                } else if matches!(
+                    case,
+                    "short" | "empty" | "maximum-length" | "missing-length"
+                ) {
+                    assert_eq!(result.unwrap().outputs["COMMAREA"].bytes(), bytes);
+                } else {
+                    assert_eq!(
+                        result,
+                        Err(HostProblem::ProviderFailure),
+                        "{current} {case}"
+                    );
+                }
+                assert!(links.lock().unwrap().is_empty());
+                assert_eq!(
+                    store
+                        .get_provider_state("cics-effect-replay-v1", &stored.key)
+                        .unwrap(),
+                    Some(stored)
+                );
+                assert_eq!(store.provider_state_retention_epoch().unwrap(), epoch);
+            }
+        }
+    }
+
+    #[test]
+    fn invoke_application_checks_host_reply_schema_and_commarea_span() {
+        program_checks_host_reply_schema_and_commarea_span(true, true);
+    }
+
+    #[test]
+    fn local_link_checks_host_reply_schema_and_commarea_span() {
+        for selected in [false, true] {
+            program_checks_host_reply_schema_and_commarea_span(false, selected);
+        }
+    }
+
+    fn program_checks_host_reply_schema_and_commarea_span(application: bool, selected: bool) {
+        struct ReplyProgram {
+            descriptor: CapabilityDescriptor,
+            reply: BoundedPayload,
+            seen: ProgramLinkTrace,
+            selected: bool,
+        }
+        impl HostProvider for ReplyProgram {
+            fn descriptor(&self) -> &CapabilityDescriptor {
+                &self.descriptor
+            }
+            fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+                let HostRequest::Program(request @ ProgramRequest::Link { .. }) = effect.request
+                else {
+                    panic!("expected program link");
+                };
+                assert!(
+                    matches!(&request, ProgramRequest::Link { selection, .. } if selection.is_some() == self.selected)
+                );
+                self.seen.lock().unwrap().push(request);
+                EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Program(self.reply.clone())),
+                }
+            }
+        }
+        for (schema, bytes, length, accepted) in [
+            (
+                "mainframe-env.cics.payload@1",
+                b"OK".as_slice(),
+                Some(4),
+                true,
+            ),
+            ("mainframe-env.cics.payload@1", b"", Some(4), true),
+            ("mainframe-env.cics.payload@1", b"CHILD", Some(4), false),
+            ("mainframe-env.cics.payload@1", b"TOO-LONG!", None, false),
+            ("mainframe-env.program.output@1", b"OK", Some(4), false),
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let security = Arc::new(DenyExactSecurityClass {
+                descriptor: descriptor("host.security.authorize"),
+                denied_class: "NONE",
+                denied_resource: None,
+                seen: Arc::new(Mutex::new(Vec::new())),
+            }) as Arc<dyn HostProvider>;
+            let program = Arc::new(ReplyProgram {
+                descriptor: descriptor("host.program.invoke"),
+                reply: BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default())
+                    .unwrap(),
+                seen: seen.clone(),
+                selected,
+            }) as Arc<dyn HostProvider>;
+            let host = Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![security, program], InvocationLimits::default())
+                        .unwrap(),
+                ),
+                HostLimits::default(),
+            ));
+            let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            if selected {
+                cics.bind_artifact_store(store.clone()).unwrap();
+                let artifact =
+                    register_load_program(&cics, store.as_ref(), "APPCHLD", 1, b"FIRST", 0);
+                if application {
+                    cics.register_application_entries(&[CicsApplicationEntryDefinition {
+                        application: "PFXAPP".into(),
+                        platform: "LOCAL".into(),
+                        major_version: 1,
+                        minor_version: 0,
+                        micro_version: 0,
+                        operation: "RUN".into(),
+                        program: "APPCHLD".into(),
+                        program_generation: 1,
+                        program_artifact: artifact.clone(),
+                        application_identity: artifact.as_str().into(),
+                        available: true,
+                    }])
+                    .unwrap();
+                }
+            }
+            let (invocation, _) = registered(&cics);
+            let mut arguments = if application {
+                BTreeMap::from([
+                    ("APPLICATION".into(), cics_literal(b"PFXAPP")),
+                    ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                    ("OPERATION".into(), cics_literal(b"RUN")),
+                ])
+            } else {
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"APPCHLD"))])
+            };
+            arguments.insert("COMMAREA".into(), task_value(b"AAAAzzzz"));
+            if let Some(length) = length {
+                arguments.insert("LENGTH".into(), cics_decimal(length));
+            }
+            let request = request(
+                if application {
+                    CicsOperation::InvokeApplication
+                } else {
+                    CicsOperation::Link
+                },
+                arguments,
+                1,
+            );
+            let result = cics.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 1),
+                request,
+            );
+            if accepted {
+                let response = result.unwrap();
+                assert_eq!((response.response, response.response2), (0, 0));
+                assert_eq!(response.outputs["COMMAREA"].bytes(), bytes);
+            } else {
+                assert_eq!(
+                    result,
+                    Err(HostProblem::ProviderFailure),
+                    "{schema} {bytes:?} {length:?}"
+                );
+            }
+            assert_eq!(seen.lock().unwrap().len(), 1);
+            assert_eq!(
+                store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap()
+                    .len(),
+                usize::from(accepted)
+            );
         }
     }
 
@@ -21794,6 +22508,7 @@ mod tests {
         let healing_metadata = UowRetentionMetadata {
             effect_key: healing_key.clone(),
             owner_execution: issuer.execution_id.as_str().into(),
+            task_owner_execution: None,
             owner_run_unit: issuer.run_unit_id.as_str().into(),
             deadline_tick: 100,
             terminal_tick: Some(100),
@@ -21861,6 +22576,72 @@ mod tests {
                 .is_none()
         );
         assert!(store.get_work("cics-start:PROT0004").unwrap().is_none());
+    }
+
+    #[test]
+    fn default_pop_abend_discards_protected_start_but_resp_preserves_it() {
+        for respond in [false, true] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (issuer, _) = registered(&service);
+            service
+                .lock()
+                .unwrap()
+                .runs
+                .get_mut(&issuer.run_unit_id)
+                .unwrap()
+                .abend_handler = Some(AbendExit::Label("RECOVERY".into()));
+            let start = request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(b"POPSTART")),
+                    ("INTERVAL".into(), cics_decimal(0)),
+                    ("OPTION.PROTECT".into(), cics_option()),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+                .unwrap();
+            let mut pop = request(CicsOperation::PopHandle, BTreeMap::new(), 2);
+            if respond {
+                pop.condition_policy = CicsConditionPolicy::Respond {
+                    response_field: "RESP-X".into(),
+                    response2_field: None,
+                };
+            }
+            let response = service
+                .invoke(&effect(&issuer.run_unit_id, pop.clone(), 2), pop)
+                .unwrap();
+            assert_eq!(
+                response.disposition,
+                if respond {
+                    CicsDisposition::Complete
+                } else {
+                    CicsDisposition::Handler
+                }
+            );
+            assert_eq!(
+                response.target.as_deref(),
+                if respond { None } else { Some("RECOVERY") }
+            );
+            assert_eq!(
+                store
+                    .get_provider_state("cics-interval-start-v1", "POPSTART")
+                    .unwrap()
+                    .is_some(),
+                respond
+            );
+            assert!(store.get_work("cics-start:POPSTART").unwrap().is_none());
+        }
     }
 
     #[test]
@@ -31796,7 +32577,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(response.disposition, CicsDisposition::Complete);
-        assert_eq!(response.outputs["COMMAREA"].bytes(), b"CHILD");
+        assert_eq!(response.outputs["COMMAREA"].bytes(), b"CHIL");
 
         let missing_length = request(
             CicsOperation::Link,
@@ -39210,6 +39991,7 @@ mod tests {
                 metadata: Some(UowRetentionMetadata {
                     effect_key: "active-key".into(),
                     owner_execution: "execution-active".into(),
+                    task_owner_execution: None,
                     owner_run_unit: "run-active".into(),
                     deadline_tick: 200,
                     terminal_tick: None,
@@ -39245,6 +40027,7 @@ mod tests {
                 metadata: Some(UowRetentionMetadata {
                     effect_key: "undo-key".into(),
                     owner_execution: "execution-undo".into(),
+                    task_owner_execution: None,
                     owner_run_unit: "run-undo".into(),
                     deadline_tick: 300,
                     terminal_tick: Some(300),
@@ -53534,7 +54317,7 @@ mod tests {
             Err(HostProblem::Condition {
                 name: "CONTAINERERR".into(),
                 response: 110,
-                response2: 1
+                response2: 10
             })
         );
     }
@@ -53786,6 +54569,8 @@ mod tests {
         );
         cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
             .unwrap();
+        // A current channel still owns the implicit GET even when BTS is active.
+        activate_get_scope_process(&cics, &invocation);
         let get = request(
             CicsOperation::GetContainer,
             BTreeMap::from([
@@ -53799,6 +54584,23 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
             .unwrap();
         assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+        let explicit_bts = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("OPTION.PROCESS".into(), cics_option()),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            4,
+        );
+        let read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, explicit_bts.clone(), 4),
+                explicit_bts,
+            )
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"BTS!");
         let delete_current = request(
             CicsOperation::DeleteChannel,
             BTreeMap::from([("CHANNEL".into(), cics_literal(b"WORK"))]),
@@ -53833,7 +54635,7 @@ mod tests {
             Err(HostProblem::Condition {
                 name: "INVREQ".into(),
                 response: 16,
-                response2: 1,
+                response2: 4,
             })
         );
     }

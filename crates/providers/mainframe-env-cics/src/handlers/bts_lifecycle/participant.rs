@@ -28,7 +28,10 @@ pub(in crate::service) fn settle_recorded_uow(
     };
     authority.finish_run_uow(
         &metadata.owner_run_unit,
-        &metadata.owner_execution,
+        metadata
+            .task_owner_execution
+            .as_deref()
+            .unwrap_or(&metadata.owner_execution),
         principal,
         record.outcome == CicsUnitOfWorkOutcome::Committed,
     )
@@ -91,7 +94,228 @@ impl<'a> BtsLifecycleStore<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
+
+    fn seed_frame_reconciliation_restart(store: &dyn ProviderStateStore) {
+        let authority = BtsLifecycleStore::new(store);
+        let root = BtsLifecycleStore::root_id("TYPE", "RESTART", "FRAME-UOW").unwrap();
+        authority
+            .define_process(
+                BtsProcess::new(
+                    "TYPE",
+                    "RESTART",
+                    &root,
+                    "MAIN",
+                    "BTS1",
+                    "USER",
+                    "FRAME-UOW",
+                )
+                .unwrap(),
+                "FRAME-UOW",
+                "ROOT",
+                "USER",
+            )
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: "frame-pending-syncpoint".into(),
+                    version: 1,
+                    payload: crate::service::encode_uow(&UowRecord {
+                        finalized: false,
+                        outcome: CicsUnitOfWorkOutcome::Committed,
+                        transaction: "BTS1".into(),
+                        metadata: Some(crate::retention::UowRetentionMetadata {
+                            effect_key: "frame-pending-syncpoint".into(),
+                            owner_execution: "CHILD".into(),
+                            task_owner_execution: Some("ROOT".into()),
+                            owner_run_unit: "FRAME-UOW".into(),
+                            deadline_tick: 100,
+                            terminal_tick: None,
+                        }),
+                    })
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+    }
+
+    fn verify_frame_reconciliation_restart(store: std::sync::Arc<dyn ProviderStateStore>) {
+        use mainframe_env_execution_api::{IdempotencyKey, InvocationLimits};
+        let before = store
+            .get_provider_state("cics-uow", "frame-pending-syncpoint")
+            .unwrap()
+            .unwrap();
+        assert_eq!(&before.payload[..5], b"MECU3");
+        let service = crate::service::tests::service(store.clone());
+        let key = IdempotencyKey::new(&before.key, InvocationLimits::default()).unwrap();
+        service
+            .reconcile_unit_of_work(&key, CicsUnitOfWorkOutcome::Committed)
+            .unwrap();
+        let saved = store
+            .get_provider_state("cics-uow", &before.key)
+            .unwrap()
+            .unwrap();
+        let decoded = crate::service::decode_uow(&saved.payload).unwrap();
+        assert!(decoded.finalized);
+        assert_eq!(
+            decoded.metadata,
+            crate::service::decode_uow(&before.payload)
+                .unwrap()
+                .metadata
+        );
+        let authority = BtsLifecycleStore::new(store.as_ref());
+        let acquisition = authority.load_acquisition("FRAME-UOW").unwrap().unwrap();
+        assert_eq!(acquisition.owner_execution, "ROOT");
+        assert!(!acquisition.is_held());
+        assert!(
+            authority
+                .load_process("TYPE", "RESTART")
+                .unwrap()
+                .unwrap()
+                .pending_uow
+                .is_none()
+        );
+        drop(service);
+        let service = crate::service::tests::service(store.clone());
+        service
+            .reconcile_unit_of_work(&key, CicsUnitOfWorkOutcome::Committed)
+            .unwrap();
+        assert_eq!(
+            store.get_provider_state("cics-uow", &before.key).unwrap(),
+            Some(saved)
+        );
+        assert_eq!(
+            authority.load_acquisition("FRAME-UOW").unwrap(),
+            Some(acquisition)
+        );
+    }
+
+    #[test]
+    fn sqlite_frame_syncpoint_reconciliation_survives_backend_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-frame-uow-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("frame.db").display());
+        {
+            let store = SqliteStateStore::open(&url, 1024 * 1024, 64).unwrap();
+            seed_frame_reconciliation_restart(&store);
+        }
+        verify_frame_reconciliation_restart(std::sync::Arc::new(
+            SqliteStateStore::open(&url, 1024 * 1024, 64).unwrap(),
+        ));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_frame_syncpoint_reconciliation_survives_backend_reopen() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL").unwrap();
+        {
+            let store = PostgresStateStore::open(&url, 1024 * 1024, 64).unwrap();
+            seed_frame_reconciliation_restart(&store);
+        }
+        verify_frame_reconciliation_restart(std::sync::Arc::new(
+            PostgresStateStore::open(&url, 1024 * 1024, 64).unwrap(),
+        ));
+    }
+
+    #[test]
+    fn frame_syncpoint_reconciliation_settles_root_bts_owner_and_rejects_forgery() {
+        use crate::retention::UowRetentionMetadata;
+        use crate::service::{decode_uow, encode_uow};
+        use mainframe_env_execution_api::{IdempotencyKey, InvocationLimits};
+        use mainframe_env_store_api::ProviderStateRecord;
+        use std::sync::Arc;
+
+        for (commit, forged) in [(true, false), (false, false), (true, true)] {
+            let memory = Arc::new(MemoryStore::new(Default::default()));
+            let service = crate::service::tests::service(memory.clone());
+            let authority = BtsLifecycleStore::new(memory.as_ref());
+            let root = BtsLifecycleStore::root_id("TYPE", "FRAME", "UOW1").unwrap();
+            authority
+                .define_process(
+                    BtsProcess::new("TYPE", "FRAME", &root, "MAIN", "BTS1", "USER", "UOW1")
+                        .unwrap(),
+                    "UOW1",
+                    "ROOT",
+                    "USER",
+                )
+                .unwrap();
+            let outcome = if commit {
+                CicsUnitOfWorkOutcome::Committed
+            } else {
+                CicsUnitOfWorkOutcome::RolledBack
+            };
+            let record = UowRecord {
+                finalized: false,
+                outcome,
+                transaction: "BTS1".into(),
+                metadata: Some(UowRetentionMetadata {
+                    effect_key: "child-syncpoint".into(),
+                    owner_execution: "CHILD".into(),
+                    task_owner_execution: Some(if forged { "FOREIGN" } else { "ROOT" }.into()),
+                    owner_run_unit: "UOW1".into(),
+                    deadline_tick: 100,
+                    terminal_tick: None,
+                }),
+            };
+            let row = ProviderStateRecord {
+                namespace: "cics-uow".into(),
+                key: "child-syncpoint".into(),
+                version: 1,
+                payload: encode_uow(&record).unwrap(),
+            };
+            memory.put_provider_state(row.clone(), None).unwrap();
+            let before = authority.load_acquisition("UOW1").unwrap().unwrap();
+            let key = IdempotencyKey::new(&row.key, InvocationLimits::default()).unwrap();
+            if forged {
+                assert_eq!(
+                    service.reconcile_unit_of_work(&key, outcome),
+                    Err(HostProblem::IdempotencyConflict)
+                );
+                assert_eq!(authority.load_acquisition("UOW1").unwrap().unwrap(), before);
+                assert_eq!(
+                    memory.get_provider_state("cics-uow", &row.key).unwrap(),
+                    Some(row)
+                );
+                continue;
+            }
+            service.reconcile_unit_of_work(&key, outcome).unwrap();
+            let settled = authority.load_acquisition("UOW1").unwrap().unwrap();
+            assert_eq!(settled.owner_execution, "ROOT");
+            assert!(!settled.is_held());
+            let saved = memory
+                .get_provider_state("cics-uow", &row.key)
+                .unwrap()
+                .unwrap();
+            let decoded = decode_uow(&saved.payload).unwrap();
+            assert!(decoded.finalized);
+            let metadata = decoded.metadata.unwrap();
+            assert_eq!(metadata.owner_execution, "CHILD");
+            assert_eq!(metadata.task_owner_execution.as_deref(), Some("ROOT"));
+            let process = authority.load_process("TYPE", "FRAME").unwrap();
+            assert_eq!(process.is_some(), commit);
+            if let Some(process) = process {
+                assert!(process.pending_uow.is_none());
+            }
+            // Reconciliation is idempotent and never changes the root acquisition owner.
+            service.reconcile_unit_of_work(&key, outcome).unwrap();
+            assert_eq!(
+                memory.get_provider_state("cics-uow", &row.key).unwrap(),
+                Some(saved)
+            );
+            assert_eq!(
+                authority.load_acquisition("UOW1").unwrap().unwrap(),
+                settled
+            );
+        }
+    }
 
     #[test]
     fn syncpoint_publishes_and_releases_or_rolls_back_pending_process() {
