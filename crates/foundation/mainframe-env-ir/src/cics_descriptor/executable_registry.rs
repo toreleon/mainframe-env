@@ -1,10 +1,11 @@
 use super::*;
 
-/// Static executable facts owned by the typed CICS dialect.
+/// Static operation facts owned by the typed CICS dialect.
 ///
 /// Option direction and operation-specific plan shape remain owned by the
 /// CICS plan codec validator. Host request mapping and provider transitions
 /// deliberately do not belong in this descriptor.
+/// Reserved identities become executable only when [`Self::is_registered`] is true.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CicsExecutableDescriptor {
     /// Plan operation represented by this executable identity.
@@ -22,6 +23,14 @@ pub struct CicsExecutableDescriptor {
 }
 
 impl CicsExecutableDescriptor {
+    /// Reports whether the generated application registry admits this plan.
+    ///
+    /// Reserved codec identities alone do not grant execution readiness.
+    #[must_use]
+    pub fn is_registered(self) -> bool {
+        CICS_REGISTERED_PLAN_OPERATIONS.contains(&self.operation)
+    }
+
     /// Builds the checked generic IR identity for this descriptor.
     #[must_use]
     pub fn identity(self) -> OperationIdentity {

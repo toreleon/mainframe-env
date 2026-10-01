@@ -2126,11 +2126,16 @@ mod tests {
             operation_identities().into_iter().collect::<BTreeSet<_>>(),
             CICS_EXECUTABLE_DESCRIPTORS
                 .iter()
+                .filter(|descriptor| descriptor.is_registered())
                 .map(|descriptor| descriptor.identity())
                 .collect()
         );
         for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
             let identity = descriptor.identity();
+            if !descriptor.is_registered() {
+                assert_eq!(expected_operation(&identity), None);
+                continue;
+            }
             assert_eq!(expected_operation(&identity), Some(descriptor.operation));
             assert_eq!(expected_effects(descriptor.operation), descriptor.effects);
             let schema = operation_schema(descriptor);
@@ -2154,6 +2159,39 @@ mod tests {
                 })
             );
         }
+    }
+
+    #[test]
+    fn reserved_issue_copy_plan_cannot_enter_the_interpreter() {
+        let descriptor = cics_executable_descriptor(CicsPlanOperation::IssueCopy);
+        let plan = CicsEffectPlan {
+            operation: descriptor.operation,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::IssueTermId,
+                value: CicsOperandValue::Literal(b"T001".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        assert_eq!(expected_operation(&descriptor.identity()), None);
+        assert!(!super::super::supported_operations().contains(&descriptor.identity()));
+        assert!(matches!(
+            super::super::validate_module(&module(
+                descriptor.identity(),
+                &plan,
+                descriptor.effects.to_vec(),
+                false,
+                false,
+                |bytes| bytes,
+            )),
+            Err(MachineProblem::InvalidArtifact(_))
+        ));
     }
 
     #[test]

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reject reserved CICS plans without sealed typed registrations during identity lookup, compiler catalog construction, semantic verification, and interpreter admission."

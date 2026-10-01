@@ -7,7 +7,9 @@ mod security_entries;
 
 use super::*;
 
-/// Complete registry for the bounded typed CICS executable pilot.
+/// Dialect metadata, including reserved codec identities awaiting registration.
+///
+/// Executable catalogs must filter by [`CicsExecutableDescriptor::is_registered`].
 pub static CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 261] = [
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[0],
     base_entries::BASE_EXECUTABLE_DESCRIPTORS[1],

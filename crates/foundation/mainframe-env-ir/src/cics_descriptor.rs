@@ -20,15 +20,15 @@ use terminal_effects::{
 /// Runtime import required by every executable operation in this dialect.
 pub const CICS_RUNTIME_IMPORT: &str = "host.cics";
 
-/// Resolves an executable descriptor without accepting adjacent legacy CICS
-/// operation identities.
+/// Resolves a registered executable descriptor without accepting reserved,
+/// unready or adjacent legacy CICS operation identities.
 #[must_use]
 pub fn cics_executable_descriptor_for_identity(
     identity: &OperationIdentity,
 ) -> Option<&'static CicsExecutableDescriptor> {
     CICS_EXECUTABLE_DESCRIPTORS
         .iter()
-        .find(|descriptor| descriptor.matches_identity(identity))
+        .find(|descriptor| descriptor.matches_identity(identity) && descriptor.is_registered())
 }
 
 #[cfg(test)]
@@ -584,10 +584,32 @@ mod tests {
             );
             assert_eq!(
                 cics_executable_descriptor_for_identity(&descriptor.identity()),
-                Some(&descriptor)
+                descriptor.is_registered().then_some(&descriptor)
             );
             assert!(!descriptor.effects.is_empty());
             assert_eq!(descriptor.runtime_import, CICS_RUNTIME_IMPORT);
+        }
+    }
+
+    #[test]
+    fn reserved_issue_copy_identity_does_not_grant_executable_admission() {
+        let reserved = cics_executable_descriptor(CicsPlanOperation::IssueCopy);
+        assert!(!reserved.is_registered());
+        assert_eq!(
+            cics_executable_descriptor_for_identity(&reserved.identity()),
+            None
+        );
+        let registered = CICS_EXECUTABLE_DESCRIPTORS
+            .iter()
+            .filter(|descriptor| descriptor.is_registered())
+            .collect::<Vec<_>>();
+        assert_eq!(registered.len(), 260);
+        assert_eq!(CICS_REGISTERED_PLAN_OPERATIONS.len(), registered.len());
+        for descriptor in registered {
+            let runtime_operation = format!("{:?}", descriptor.operation);
+            let row = cics_application_registry_for_runtime_operation(&runtime_operation)
+                .expect("registered plan must have exactly one advertised application row");
+            assert_eq!(row.readiness, CicsApplicationHandlerReadiness::TypedRuntime);
         }
     }
 }

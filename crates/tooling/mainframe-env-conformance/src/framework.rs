@@ -385,9 +385,15 @@ mod tests {
         );
         for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
             let identity = descriptor.identity();
+            if !descriptor.is_registered() {
+                assert!(catalog.get(&identity).is_none());
+                assert!(!interpreter.contains(&identity));
+                assert_eq!(cics_executable_descriptor_for_identity(&identity), None);
+                continue;
+            }
             let schema = catalog
                 .get(&identity)
-                .expect("compiler registers every typed CICS descriptor");
+                .expect("compiler registers every sealed typed CICS descriptor");
             assert!(interpreter.contains(&identity));
             assert_eq!(
                 schema.allowed_effects,
