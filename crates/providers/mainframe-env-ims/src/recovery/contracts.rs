@@ -48,6 +48,7 @@ impl Default for RecoveryLimits {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RecoveryProblem {
     InvalidRequest,
+    Unauthorized,
     LimitExceeded,
     Unsupported,
     NotFound,

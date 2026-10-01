@@ -2,20 +2,21 @@
 //! authority and the existing deterministic IMS database engine.
 
 use super::contracts::{RecoveryLimits, RecoveryProblem, UtilityKind, UtilityPlan};
+use crate::ImsService;
 use crate::database::{
     DatabaseDefinition, DatabaseEngine, DatabaseOrganization, EngineLimits, EngineProblem,
     InsertRequest, RecordId,
 };
+use mainframe_env_execution_api::{IdempotencyKey, Invocation};
+use mainframe_env_host_api::AccessIntent;
 use mainframe_env_store_api::{
-    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    IdempotencyStore, ProviderStateRecord, ProviderStateStore, StoreError,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
-const ACTIVE_NAMESPACE: &str = "ims-recovery-v1-db-active";
 const STAGE_NAMESPACE: &str = "ims-recovery-v1-db-stage";
-const ACTIVE_SCHEMA: &str = "mainframe-env.ims-utility-database@1";
 const STAGE_SCHEMA: &str = "mainframe-env.ims-utility-stage@1";
 const IMAGE_DOMAIN: &str = "mainframe-env.ims-utility-image@1";
 const DELTA_DOMAIN: &str = "mainframe-env.ims-utility-delta@1";
@@ -105,7 +106,7 @@ impl UtilityImage {
         })
     }
 
-    fn canonicalized(&self, limits: RecoveryLimits) -> Result<Self, RecoveryProblem> {
+    pub(crate) fn canonicalized(&self, limits: RecoveryLimits) -> Result<Self, RecoveryProblem> {
         self.validate(limits)?;
         let mut children = vec![Vec::new(); self.records.len()];
         let mut roots = Vec::new();
@@ -188,7 +189,11 @@ impl UtilityDelta {
         }
     }
 
-    fn verify(&self, sequence: u64, previous_digest: [u8; 32]) -> Result<(), RecoveryProblem> {
+    pub(crate) fn verify(
+        &self,
+        sequence: u64,
+        previous_digest: [u8; 32],
+    ) -> Result<(), RecoveryProblem> {
         if self.sequence != sequence
             || self.previous_digest != previous_digest
             || self.digest != delta_digest(sequence, previous_digest, &self.change)
@@ -207,66 +212,14 @@ fn delta_digest(sequence: u64, previous: [u8; 32], change: &UtilityDeltaChange) 
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ActiveDatabase {
-    schema_version: String,
-    database: String,
-    generation: u64,
-    last_job_id: String,
-    image: UtilityImage,
-    image_digest: [u8; 32],
-    row_digest: [u8; 32],
-}
-
-impl ActiveDatabase {
-    fn seal(&mut self) {
-        self.row_digest = row_digest(
-            ACTIVE_SCHEMA,
-            &(
-                &self.schema_version,
-                &self.database,
-                self.generation,
-                &self.last_job_id,
-                &self.image,
-                self.image_digest,
-            ),
-        );
-    }
-    fn verify(&self, database: &str, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
-        if self.schema_version != ACTIVE_SCHEMA
-            || self.database != database
-            || self.generation == 0
-            || self.image.definition.name != database
-            || self.image.digest() != self.image_digest
-            || self.row_digest
-                != row_digest(
-                    ACTIVE_SCHEMA,
-                    &(
-                        &self.schema_version,
-                        &self.database,
-                        self.generation,
-                        &self.last_job_id,
-                        &self.image,
-                        self.image_digest,
-                    ),
-                )
-            || self.image.validate(limits).is_err()
-        {
-            return Err(RecoveryProblem::CorruptImage);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-struct StagedDatabase {
+pub(crate) struct StagedDatabase {
     schema_version: String,
     job_id: String,
-    plan: UtilityPlan,
-    expected_active_version: Option<u64>,
-    generation: u64,
-    image: UtilityImage,
-    image_digest: [u8; 32],
+    pub(crate) plan: UtilityPlan,
+    pub(crate) expected_active_version: Option<u64>,
+    pub(crate) generation: u64,
+    pub(crate) image: UtilityImage,
+    pub(crate) image_digest: [u8; 32],
     row_digest: [u8; 32],
 }
 
@@ -285,7 +238,7 @@ impl StagedDatabase {
             ),
         );
     }
-    fn verify(&self, job: &str, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
+    pub(crate) fn verify(&self, job: &str, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
         if self.schema_version != STAGE_SCHEMA
             || self.job_id != job
             || self.generation == 0
@@ -339,7 +292,10 @@ pub struct UtilityEngine;
 
 impl UtilityEngine {
     pub fn stage_initial_load(
-        store: &dyn ProviderStateStore,
+        service: &ImsService,
+        invocation: &Invocation,
+        application: &str,
+        package_identity: &str,
         job: &str,
         plan: UtilityPlan,
         image: UtilityImage,
@@ -348,21 +304,45 @@ impl UtilityEngine {
         if plan.kind != UtilityKind::InitialLoad || plan.expected_input_digest != image.digest() {
             return Err(RecoveryProblem::InvalidRequest);
         }
-        stage_image(store, job, plan, image, limits, false, None)
+        let (version, active) = service.utility_image(
+            invocation,
+            application,
+            package_identity,
+            &plan.database,
+            limits,
+            AccessIntent::Update,
+        )?;
+        if !active.records.is_empty() || active.definition != image.definition {
+            return Err(RecoveryProblem::Conflict);
+        }
+        stage_image(&*service.store, job, plan, image, limits, Some(version))
     }
 
     pub fn extract(
-        store: &dyn ProviderStateStore,
+        service: &ImsService,
+        invocation: &Invocation,
+        application: &str,
+        package_identity: &str,
         database: &str,
         limits: RecoveryLimits,
     ) -> Result<UtilityImage, RecoveryProblem> {
-        load_active(store, database, limits)?
-            .map(|(_, row)| row.image)
-            .ok_or(RecoveryProblem::NotFound)
+        service
+            .utility_image(
+                invocation,
+                application,
+                package_identity,
+                database,
+                limits,
+                AccessIntent::Read,
+            )
+            .map(|(_, image)| image)
     }
 
     pub fn stage_reorganization(
-        store: &dyn ProviderStateStore,
+        service: &ImsService,
+        invocation: &Invocation,
+        application: &str,
+        package_identity: &str,
         job: &str,
         plan: UtilityPlan,
         limits: RecoveryLimits,
@@ -370,23 +350,40 @@ impl UtilityEngine {
         if plan.kind != UtilityKind::Reorganize {
             return Err(RecoveryProblem::InvalidRequest);
         }
-        let (version, active) =
-            load_active(store, &plan.database, limits)?.ok_or(RecoveryProblem::NotFound)?;
-        if active.image_digest != plan.expected_input_digest {
+        let (version, active) = service.utility_image(
+            invocation,
+            application,
+            package_identity,
+            &plan.database,
+            limits,
+            AccessIntent::Update,
+        )?;
+        if active.digest() != plan.expected_input_digest {
             return Err(RecoveryProblem::Conflict);
         }
-        if active.image.definition.organization == DatabaseOrganization::Gsam {
+        if active.definition.organization == DatabaseOrganization::Gsam {
             return Err(RecoveryProblem::Unsupported);
         }
-        let reorganized = active.image.canonicalized(limits)?;
-        stage_image(store, job, plan, reorganized, limits, false, Some(version))
+        let reorganized = active.canonicalized(limits)?;
+        stage_image(
+            &*service.store,
+            job,
+            plan,
+            reorganized,
+            limits,
+            Some(version),
+        )
     }
 
     /// Rebuild one data set from a verified image copy and contiguous typed
     /// update log. Damaged active bytes may be replaced only at their exact
     /// shared-store version; no application-logic repair is inferred.
+    #[allow(clippy::too_many_arguments)]
     pub fn stage_database_recovery(
-        store: &dyn ProviderStateStore,
+        service: &ImsService,
+        invocation: &Invocation,
+        application: &str,
+        package_identity: &str,
         job: &str,
         plan: UtilityPlan,
         mut image_copy: UtilityImage,
@@ -412,83 +409,47 @@ impl UtilityEngine {
             image_copy.validate(limits)?;
             previous = log.digest;
         }
-        let expected_version = raw_active_version(store, &plan.database)?;
-        stage_image(store, job, plan, image_copy, limits, true, expected_version)
+        let expected_version = service.utility_raw_version(
+            invocation,
+            application,
+            package_identity,
+            &plan.database,
+            &image_copy.definition,
+        )?;
+        stage_image(
+            &*service.store,
+            job,
+            plan,
+            image_copy,
+            limits,
+            Some(expected_version),
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn publish(
-        store: &dyn ProviderStateStore,
+        service: &ImsService,
+        invocation: &Invocation,
+        application: &str,
+        package_identity: &str,
+        effects: &dyn IdempotencyStore,
+        key: &IdempotencyKey,
+        canonical_request_digest: [u8; 32],
         job: &str,
         database: &str,
         limits: RecoveryLimits,
     ) -> Result<UtilityPublishReceipt, RecoveryProblem> {
-        valid_job(job)?;
-        let stage = store
-            .get_provider_state(STAGE_NAMESPACE, job)
-            .map_err(read_error)?;
-        let Some(stage) = stage else {
-            let (_, active) =
-                load_active(store, database, limits)?.ok_or(RecoveryProblem::NotFound)?;
-            if active.last_job_id != job {
-                return Err(RecoveryProblem::NotFound);
-            }
-            return Ok(UtilityPublishReceipt {
-                generation: active.generation,
-                image_digest: active.image_digest,
-                replayed: true,
-            });
-        };
-        if stage.version != 1 || stage.payload.len() > limits.max_state_bytes {
-            return Err(RecoveryProblem::CorruptImage);
-        }
-        let row: StagedDatabase =
-            serde_json::from_slice(&stage.payload).map_err(|_| RecoveryProblem::CorruptImage)?;
-        row.verify(job, limits)?;
-        if row.plan.database != database {
-            return Err(RecoveryProblem::Conflict);
-        }
-        let current_version = raw_active_version(store, database)?;
-        if current_version != row.expected_active_version {
-            return Err(RecoveryProblem::Conflict);
-        }
-        let mut active = ActiveDatabase {
-            schema_version: ACTIVE_SCHEMA.into(),
-            database: database.into(),
-            generation: row.generation,
-            last_job_id: job.into(),
-            image: row.image,
-            image_digest: row.image_digest,
-            row_digest: [0; 32],
-        };
-        active.seal();
-        let payload =
-            serde_json::to_vec(&active).map_err(|_| RecoveryProblem::InfrastructureFailure)?;
-        if payload.len() > limits.max_state_bytes {
-            return Err(RecoveryProblem::LimitExceeded);
-        }
-        store
-            .mutate_provider_states_atomic(vec![
-                ProviderStateMutation::Put(ProviderStateWrite {
-                    record: ProviderStateRecord {
-                        namespace: ACTIVE_NAMESPACE.into(),
-                        key: database.into(),
-                        version: row.generation,
-                        payload,
-                    },
-                    expected_version: current_version,
-                }),
-                ProviderStateMutation::Delete {
-                    namespace: STAGE_NAMESPACE.into(),
-                    key: job.into(),
-                    expected_version: stage.version,
-                },
-            ])
-            .map_err(write_error)?;
-        Ok(UtilityPublishReceipt {
-            generation: row.generation,
-            image_digest: active.image_digest,
-            replayed: false,
-        })
+        service.publish_utility_stage(
+            invocation,
+            application,
+            package_identity,
+            effects,
+            key,
+            canonical_request_digest,
+            job,
+            database,
+            limits,
+        )
     }
 }
 
@@ -498,7 +459,6 @@ fn stage_image(
     plan: UtilityPlan,
     image: UtilityImage,
     limits: RecoveryLimits,
-    allow_corrupt_active: bool,
     expected_version: Option<u64>,
 ) -> Result<UtilityStageReceipt, RecoveryProblem> {
     valid_job(job)?;
@@ -507,14 +467,6 @@ fn stage_image(
         return Err(RecoveryProblem::InvalidRequest);
     }
     image.validate(limits)?;
-    let current = if allow_corrupt_active {
-        raw_active_version(store, &plan.database)?
-    } else {
-        load_active(store, &plan.database, limits)?.map(|(version, _)| version)
-    };
-    if current != expected_version {
-        return Err(RecoveryProblem::Conflict);
-    }
     let generation = expected_version
         .unwrap_or(0)
         .checked_add(1)
@@ -574,7 +526,7 @@ fn stage_image(
     })
 }
 
-fn apply_delta(
+pub(crate) fn apply_delta(
     image: &mut UtilityImage,
     change: &UtilityDeltaChange,
 ) -> Result<(), RecoveryProblem> {
@@ -606,10 +558,10 @@ fn apply_delta(
             }
             image.records.remove(*ordinal);
             for record in &mut image.records {
-                if let Some(parent) = &mut record.parent {
-                    if *parent > *ordinal {
-                        *parent -= 1;
-                    }
+                if let Some(parent) = &mut record.parent
+                    && *parent > *ordinal
+                {
+                    *parent -= 1;
                 }
             }
         }
@@ -617,44 +569,23 @@ fn apply_delta(
     Ok(())
 }
 
-fn load_active(
+pub(crate) fn load_stage(
     store: &dyn ProviderStateStore,
-    database: &str,
+    job: &str,
     limits: RecoveryLimits,
-) -> Result<Option<(u64, ActiveDatabase)>, RecoveryProblem> {
+) -> Result<StagedDatabase, RecoveryProblem> {
+    valid_job(job)?;
     let row = store
-        .get_provider_state(ACTIVE_NAMESPACE, database)
-        .map_err(read_error)?;
-    row.map(|row| {
-        if row.version == 0 || row.payload.len() > limits.max_state_bytes {
-            return Err(RecoveryProblem::CorruptImage);
-        }
-        let active: ActiveDatabase =
-            serde_json::from_slice(&row.payload).map_err(|_| RecoveryProblem::CorruptImage)?;
-        active.verify(database, limits)?;
-        if active.generation != row.version {
-            return Err(RecoveryProblem::CorruptImage);
-        }
-        Ok((row.version, active))
-    })
-    .transpose()
-}
-
-fn raw_active_version(
-    store: &dyn ProviderStateStore,
-    database: &str,
-) -> Result<Option<u64>, RecoveryProblem> {
-    store
-        .get_provider_state(ACTIVE_NAMESPACE, database)
+        .get_provider_state(STAGE_NAMESPACE, job)
         .map_err(read_error)?
-        .map(|row| {
-            if row.version == 0 {
-                Err(RecoveryProblem::CorruptImage)
-            } else {
-                Ok(row.version)
-            }
-        })
-        .transpose()
+        .ok_or(RecoveryProblem::NotFound)?;
+    if row.version != 1 || row.payload.len() > limits.max_state_bytes {
+        return Err(RecoveryProblem::CorruptImage);
+    }
+    let stage: StagedDatabase =
+        serde_json::from_slice(&row.payload).map_err(|_| RecoveryProblem::CorruptImage)?;
+    stage.verify(job, limits)?;
+    Ok(stage)
 }
 
 fn valid_job(job: &str) -> Result<(), RecoveryProblem> {

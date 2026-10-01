@@ -275,6 +275,9 @@ pub struct RecoveryTransition {
 }
 
 impl RecoveryTransition {
+    pub(crate) fn resource_mutations(&self) -> &[ProviderStateMutation] {
+        &self.resource_mutations
+    }
     pub fn replayed(&self) -> bool {
         self.replayed
     }

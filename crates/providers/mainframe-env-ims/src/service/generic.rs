@@ -24,7 +24,7 @@ pub struct ImsGenericLoadImage {
     pub records: Vec<ImsGenericLoadRecord>,
 }
 
-fn engine_limits(limits: ImsLimits) -> EngineLimits {
+pub(super) fn engine_limits(limits: ImsLimits) -> EngineLimits {
     EngineLimits {
         max_segments: limits.max_segments,
         max_fields_per_segment: ImsMetadataLimits::default().max_fields_per_segment,
@@ -37,7 +37,9 @@ fn engine_limits(limits: ImsLimits) -> EngineLimits {
     }
 }
 
-fn definition(database: &ImsDatabaseMetadata) -> Result<DatabaseDefinition, HostProblem> {
+pub(super) fn definition(
+    database: &ImsDatabaseMetadata,
+) -> Result<DatabaseDefinition, HostProblem> {
     let organization = database.organization;
     let mut remaining = database.segments.clone();
     let mut segments = Vec::new();
@@ -599,7 +601,7 @@ fn begin_unit(state: &mut State, run: &str, name: &str) -> Result<(), HostProble
     Ok(())
 }
 
-fn reset_positions(state: &mut State, database: &str, except: Option<&str>) {
+pub(super) fn reset_positions(state: &mut State, database: &str, except: Option<&str>) {
     let runs = state
         .sessions
         .keys()
@@ -925,7 +927,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{
         IMS_METADATA_SCHEMA_V1, ImsDatabaseOrganization, ImsDbLevel, ImsFieldMetadata,
@@ -944,7 +946,7 @@ mod tests {
 
     mod closure_tests;
 
-    fn catalog() -> ImsMetadataCatalog {
+    pub(crate) fn catalog() -> ImsMetadataCatalog {
         fn field(name: &str, offset: usize, sequence: bool) -> ImsFieldMetadata {
             ImsFieldMetadata {
                 name: Some(name.into()),
@@ -1001,7 +1003,7 @@ mod tests {
         }
     }
 
-    fn invocation(run: &str) -> Invocation {
+    pub(crate) fn invocation(run: &str) -> Invocation {
         let limits = InvocationLimits::default();
         let grants = ["host.ims.read", "host.ims.write"]
             .into_iter()
@@ -1028,7 +1030,7 @@ mod tests {
         .unwrap()
     }
 
-    fn request(
+    pub(crate) fn request(
         run: &str,
         op: ImsOperation,
         sequence: u64,

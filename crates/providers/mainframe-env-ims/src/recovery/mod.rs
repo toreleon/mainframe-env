@@ -3,7 +3,7 @@
 mod contracts;
 mod log_utilities;
 mod runtime;
-mod utilities;
+pub(crate) mod utilities;
 
 pub use contracts::*;
 pub use log_utilities::*;
@@ -16,5 +16,3 @@ mod log_utility_tests;
 mod runtime_tests;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod utility_tests;

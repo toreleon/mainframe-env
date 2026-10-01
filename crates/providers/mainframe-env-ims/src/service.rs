@@ -23,6 +23,7 @@ use crate::retention::{
 use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 
 mod generic;
+mod utility_bridge;
 pub use generic::{ImsGenericLoadImage, ImsGenericLoadRecord};
 
 const STATE_NAMESPACE: &str = "ims-state";
@@ -34,7 +35,7 @@ const SESSION_NAMESPACE: &str = "ims-v1-session-index";
 const CHECKPOINT_NAMESPACE: &str = "ims-v1-checkpoint";
 pub(crate) const REPLAY_NAMESPACE: &str = "ims-v1-replay";
 const PENDING_NAMESPACE: &str = "ims-v1-unit-of-work";
-const GENERIC_DATABASE_NAMESPACE: &str = "ims-v1-generic-database";
+pub(crate) const GENERIC_DATABASE_NAMESPACE: &str = "ims-v1-generic-database";
 const GENERIC_PENDING_NAMESPACE: &str = "ims-v1-generic-unit-of-work";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

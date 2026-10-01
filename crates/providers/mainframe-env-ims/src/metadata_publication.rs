@@ -52,6 +52,27 @@ struct SelectedGeneration {
 }
 
 impl ImsService {
+    /// Return the exact selected row to fence a database utility publication.
+    pub(crate) fn selected_metadata_selection_fence(
+        &self,
+        selected: &ImsMetadataGeneration,
+    ) -> Result<ProviderStateRecord, HostProblem> {
+        let row = self
+            .store
+            .get_provider_state(SELECTION_NAMESPACE, &selected.application)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let current = decode_selection(&row)?;
+        if current.application != selected.application
+            || current.generation != selected.generation
+            || current.package_identity != selected.package_identity
+            || current.metadata_identity.as_deref() != Some(selected.metadata_identity.as_str())
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(row)
+    }
+
     pub fn publish_metadata_generation(
         &self,
         application: &str,

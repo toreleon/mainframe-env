@@ -42,12 +42,11 @@ fn checkpoint_log_and_restart_are_persisted_without_duplicate_replay() {
         .mutate_provider_states_atomic(checkpoint.mutations())
         .unwrap();
     let reopened = RecoverySession::load(&store, "RUN001", limits).unwrap();
-    assert_eq!(
+    assert!(
         reopened
             .checkpoint("effect-1", symbolic(), [3; 32])
             .unwrap()
-            .replayed(),
-        true
+            .replayed()
     );
     let log = reopened
         .log(
