@@ -6892,7 +6892,7 @@ mod tests {
 
     #[test]
     fn compiled_installed_local_link_recovers_after_sqlite_restart() {
-        compiled_installed_program_commarea_recovers_after_restart(None, false);
+        compiled_installed_program_commarea_recovers_after_restart(None, false, false);
     }
 
     #[test]
@@ -6901,12 +6901,13 @@ mod tests {
         compiled_installed_program_commarea_recovers_after_restart(
             Some(required_postgres_route_url()),
             false,
+            false,
         );
     }
 
     #[test]
     fn compiled_invoke_application_commarea_recovers_after_sqlite_restart() {
-        compiled_installed_program_commarea_recovers_after_restart(None, true);
+        compiled_installed_program_commarea_recovers_after_restart(None, true, false);
     }
 
     #[test]
@@ -6915,12 +6916,29 @@ mod tests {
         compiled_installed_program_commarea_recovers_after_restart(
             Some(required_postgres_route_url()),
             true,
+            false,
+        );
+    }
+
+    #[test]
+    fn compiled_local_link_coordinator_replay_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(None, false, true);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_local_link_coordinator_replay_recovers_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            false,
+            true,
         );
     }
 
     fn compiled_installed_program_commarea_recovers_after_restart(
         postgres_url: Option<String>,
         application: bool,
+        coordinator_replay: bool,
     ) {
         use mainframe_env_cics::{
             CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition,
@@ -7068,6 +7086,137 @@ mod tests {
                     10_000,
                 )
                 .unwrap();
+            if coordinator_replay {
+                let mut replay = invocation.clone();
+                bind_compatible_runtime_services(&mut replay).unwrap();
+                replay.bindings.insert(
+                    "cics.transaction".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.transaction@1",
+                        b"LK01".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                );
+                let mut fresh = ReferenceMachine::from_binary(
+                    parent.payload(),
+                    replay.clone(),
+                    CodecLimits::default(),
+                )
+                .unwrap();
+                let coordinator = ExecutionCoordinator::durable(
+                    server.host.clone(),
+                    store.clone(),
+                    CoordinatorLimits::default(),
+                );
+                assert!(matches!(
+                    coordinator.execute_resumable_with_control(&mut fresh, &replay, || {
+                        server.program.observe_execution_control(&replay)
+                    }),
+                    ExecutionOutcome::Suspended(_)
+                ));
+                assert_eq!(fresh.variable("AREA-X").unwrap().bytes(), b"\0\x04OKzzzz");
+                let mut probe = ReferenceMachine::from_binary(
+                    parent.payload(),
+                    replay.clone(),
+                    CodecLimits::default(),
+                )
+                .unwrap();
+                let MachineDrive::HostCall(first_effect) = probe.drive(
+                    MachineResume::Start,
+                    Quantum::new(10_000, 16 * 1024 * 1024).unwrap(),
+                ) else {
+                    panic!("expected compiled LINK")
+                };
+                let key = first_effect.idempotency_key.as_ref().unwrap();
+                assert_eq!(probe.variable("AREA-X").unwrap().bytes(), b"AAAAzzzz");
+                let core_before = store.effect(key).unwrap().unwrap();
+                assert_eq!(core_before.state, EffectState::Completed);
+                let private_before = store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap();
+                let calls_before = store.list_provider_state("cobol-call-replay@1", 8).unwrap();
+                assert_eq!(calls_before.len(), 1);
+                drop(coordinator);
+                drop(server);
+                drop(store);
+                let (server, store) = backend.open_server(settings.clone(), secrets.clone());
+                server
+                    .cics
+                    .restore_terminal_run(replay.clone(), &session, "LK01", Vec::new(), 3)
+                    .unwrap();
+                let mut recovered = ReferenceMachine::from_binary(
+                    parent.payload(),
+                    replay.clone(),
+                    CodecLimits::default(),
+                )
+                .unwrap();
+                let coordinator = ExecutionCoordinator::durable(
+                    server.host.clone(),
+                    store.clone(),
+                    CoordinatorLimits::default(),
+                );
+                assert!(matches!(
+                    coordinator.execute_resumable_with_control(&mut recovered, &replay, || {
+                        server.program.observe_execution_control(&replay)
+                    }),
+                    ExecutionOutcome::Suspended(_)
+                ));
+                assert_eq!(
+                    recovered.variable("AREA-X").unwrap().bytes(),
+                    b"\0\x04OKzzzz"
+                );
+                assert_eq!(recovered.variable("FN-X").unwrap().bytes(), &[0x0e, 0x02]);
+                assert_eq!(store.effect(key).unwrap(), Some(core_before));
+                assert_eq!(
+                    store
+                        .list_provider_state("cics-effect-replay-v1", 8)
+                        .unwrap(),
+                    private_before
+                );
+                assert_eq!(
+                    store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
+                    calls_before
+                );
+                assert!(
+                    store
+                        .events(&replay.execution_id, 1, 128)
+                        .unwrap()
+                        .iter()
+                        .filter(|event| matches!(
+                            event.kind,
+                            LifecycleEventKind::EffectResult { sequence: 1 }
+                        ))
+                        .count()
+                        >= 2
+                );
+                // Resume a checkpoint after the replayed call, without executing the child again.
+                let checkpoint = store.get_checkpoint(&replay.execution_id).unwrap().unwrap();
+                let current_checkpoint = recovered.checkpoint().unwrap();
+                assert_eq!(checkpoint.payload, current_checkpoint.bytes());
+                let saved_checkpoint = BoundedPayload::new(
+                    current_checkpoint.schema(),
+                    checkpoint.payload,
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                recovered.restore_checkpoint(&saved_checkpoint).unwrap();
+                assert!(matches!(
+                    coordinator.execute_resumable_with_control(&mut recovered, &replay, || {
+                        server.program.observe_execution_control(&replay)
+                    }),
+                    ExecutionOutcome::Completed(_)
+                ));
+                assert_eq!(
+                    store.list_provider_state("cobol-call-replay@1", 8).unwrap(),
+                    calls_before
+                );
+                drop(coordinator);
+                drop(server);
+                drop(store);
+                std::fs::remove_dir_all(root).unwrap();
+                return;
+            }
             server
                 .run_online_exchange(&session, &principal, "LNKMAIN", 2)
                 .unwrap();

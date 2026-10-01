@@ -20,7 +20,6 @@ const PROGRAM_MAGIC: &[u8; 7] = b"MECPGD1";
 const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 
 mod invoke_application;
-pub(in crate::service) use invoke_application::validate_replay_response;
 mod load;
 mod release;
 pub(in crate::service) use load::{
@@ -810,6 +809,9 @@ fn transfer(
         }
         payload.truncate(length);
     }
+    let commarea_limit = (request.operation == CicsOperation::Link
+        && request.arguments.contains_key("COMMAREA"))
+    .then_some(payload.len());
     let payload = bounded(payload)?;
     if request.operation == CicsOperation::Xctl && service.lock()?.programs.contains(&target) {
         return service.response(
@@ -833,7 +835,12 @@ fn transfer(
         HostRequest::Program(ProgramRequest::Xctl { program, payload })
     };
     let payload = match service.nested(run, host_request) {
-        Ok(HostResult::Program(payload)) => payload.bytes().to_vec(),
+        Ok(HostResult::Program(payload)) => {
+            if let Some(limit) = commarea_limit {
+                validate_commarea_reply(&payload, limit)?;
+            }
+            payload.bytes().to_vec()
+        }
         Err(HostProblem::NotFound) if request.operation == CicsOperation::Link => {
             return Err(condition("PGMIDERR", 27, 1));
         }
@@ -860,6 +867,58 @@ fn transfer(
             .insert("COMMAREA".into(), bounded(payload)?);
     }
     Ok(response)
+}
+
+pub(in crate::service) fn validate_replay_response(
+    request: &CicsRequest,
+    response: CicsResponse,
+) -> Result<CicsResponse, HostProblem> {
+    let maximum = match request.operation {
+        CicsOperation::Link => 32_763,
+        CicsOperation::InvokeApplication => 24_576,
+        _ => return Ok(response),
+    };
+    if let Some(area) = request.arguments.get("COMMAREA") {
+        // Handled source conditions have no COMMAREA result to copy back.
+        if response.condition != "NORMAL" || response.response != 0 || response.response2 != 0 {
+            if response.condition == "NORMAL"
+                || response.response == 0
+                || response.outputs.contains_key("COMMAREA")
+                || response.payload.schema() != "mainframe-env.cics.payload@1"
+                || !response.payload.bytes().is_empty()
+            {
+                return Err(HostProblem::ProviderFailure);
+            }
+            return Ok(response);
+        }
+        let limit = match request.arguments.get("LENGTH") {
+            Some(length) => decimal_usize(length)
+                .filter(|length| (1..=maximum).contains(length))
+                .ok_or(HostProblem::ProviderFailure)?,
+            None => area.bytes().len(),
+        };
+        if limit > area.bytes().len() {
+            return Err(HostProblem::ProviderFailure);
+        }
+        let output = response
+            .outputs
+            .get("COMMAREA")
+            .ok_or(HostProblem::ProviderFailure)?;
+        validate_commarea_reply(output, limit)?;
+        validate_commarea_reply(&response.payload, limit)?;
+        if response.payload.bytes() != output.bytes() {
+            return Err(HostProblem::ProviderFailure);
+        }
+    }
+    Ok(response)
+}
+
+fn validate_commarea_reply(reply: &BoundedPayload, limit: usize) -> Result<(), HostProblem> {
+    if reply.schema() != "mainframe-env.cics.payload@1" || reply.bytes().len() > limit {
+        Err(HostProblem::ProviderFailure)
+    } else {
+        Ok(())
+    }
 }
 
 fn local_link_selection(

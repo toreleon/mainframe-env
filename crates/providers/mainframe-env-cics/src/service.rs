@@ -4208,6 +4208,11 @@ mod tests {
                 HostRequest::Program(ProgramRequest::Inquire { .. }) => {
                     Ok(HostResult::Program(bounded(Vec::new()).unwrap()))
                 }
+                HostRequest::Program(ProgramRequest::Link { payload, .. }) => {
+                    Ok(HostResult::Program(
+                        bounded(b"CHILD"[..payload.bytes().len().min(5)].to_vec()).unwrap(),
+                    ))
+                }
                 HostRequest::Program(_) => {
                     Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
                 }
@@ -4351,8 +4356,12 @@ mod tests {
         fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
             let outcome = match effect.request {
                 HostRequest::Program(request @ ProgramRequest::Link { .. }) => {
+                    let ProgramRequest::Link { ref payload, .. } = request else {
+                        unreachable!()
+                    };
+                    let reply = b"CHILD"[..payload.bytes().len().min(5)].to_vec();
                     self.seen.lock().unwrap().push(request);
-                    Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
+                    Ok(HostResult::Program(bounded(reply).unwrap()))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -7690,6 +7699,15 @@ mod tests {
 
     #[test]
     fn invoke_application_replays_validate_legacy_and_current_commarea_outputs() {
+        program_replays_validate_legacy_and_current_commarea_outputs(true);
+    }
+
+    #[test]
+    fn local_link_replays_validate_legacy_and_current_commarea_outputs() {
+        program_replays_validate_legacy_and_current_commarea_outputs(false);
+    }
+
+    fn program_replays_validate_legacy_and_current_commarea_outputs(application: bool) {
         for current in [false, true] {
             for case in [
                 "short",
@@ -7701,6 +7719,11 @@ mod tests {
                 "mismatch",
                 "condition",
                 "condition-data",
+                "maximum-length",
+                "excessive-length",
+                "negative-length",
+                "zero-length",
+                "missing-length",
             ] {
                 let store = Arc::new(MemoryStore::new(Default::default()));
                 let links = Arc::new(Mutex::new(Vec::new()));
@@ -7711,15 +7734,39 @@ mod tests {
                 )
                 .unwrap();
                 let (invocation, _) = registered(&cics);
-                let request = request(
-                    CicsOperation::InvokeApplication,
+                let mut arguments = if application {
                     BTreeMap::from([
                         ("APPLICATION".into(), cics_literal(b"PFXAPP")),
                         ("PLATFORM".into(), cics_literal(b"LOCAL")),
                         ("OPERATION".into(), cics_literal(b"RUN")),
-                        ("COMMAREA".into(), task_value(b"AAAAzzzz")),
-                        ("LENGTH".into(), cics_decimal(4)),
-                    ]),
+                    ])
+                } else {
+                    BTreeMap::from([("PROGRAM".into(), cics_literal(b"APPCHLD"))])
+                };
+                arguments.extend([
+                    ("COMMAREA".into(), task_value(b"AAAAzzzz")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]);
+                let maximum = if application { 24_576 } else { 32_763 };
+                if matches!(case, "maximum-length" | "excessive-length") {
+                    let length = maximum + i64::from(case == "excessive-length");
+                    arguments.insert("COMMAREA".into(), task_value(&vec![b'A'; length as usize]));
+                    arguments.insert("LENGTH".into(), cics_decimal(length));
+                } else if matches!(case, "negative-length" | "zero-length") {
+                    arguments.insert(
+                        "LENGTH".into(),
+                        cics_decimal(if case == "negative-length" { -1 } else { 0 }),
+                    );
+                } else if case == "missing-length" {
+                    arguments.remove("LENGTH");
+                }
+                let request = request(
+                    if application {
+                        CicsOperation::InvokeApplication
+                    } else {
+                        CicsOperation::Link
+                    },
+                    arguments,
                     1,
                 );
                 let bytes = match case {
@@ -7740,17 +7787,25 @@ mod tests {
                 let response = CicsResponse {
                     disposition: CicsDisposition::Complete,
                     condition: if case.starts_with("condition") {
-                        "APPNOTFOUND"
+                        if application {
+                            "APPNOTFOUND"
+                        } else {
+                            "PGMIDERR"
+                        }
                     } else {
                         "NORMAL"
                     }
                     .into(),
                     response: if case.starts_with("condition") {
-                        127
+                        if application { 127 } else { 27 }
                     } else {
                         0
                     },
-                    response2: if case.starts_with("condition") { 3 } else { 0 },
+                    response2: if case.starts_with("condition") {
+                        if application { 3 } else { 1 }
+                    } else {
+                        0
+                    },
                     applid: "MEAPPL".into(),
                     sysid: "MESYS".into(),
                     transaction: "MENU".into(),
@@ -7824,9 +7879,15 @@ mod tests {
                 );
                 if case == "condition" {
                     let response = result.unwrap();
-                    assert_eq!((response.response, response.response2), (127, 3));
+                    assert_eq!(
+                        (response.response, response.response2),
+                        if application { (127, 3) } else { (27, 1) }
+                    );
                     assert!(!response.outputs.contains_key("COMMAREA"));
-                } else if matches!(case, "short" | "empty") {
+                } else if matches!(
+                    case,
+                    "short" | "empty" | "maximum-length" | "missing-length"
+                ) {
                     assert_eq!(result.unwrap().outputs["COMMAREA"].bytes(), bytes);
                 } else {
                     assert_eq!(
@@ -7849,24 +7910,35 @@ mod tests {
 
     #[test]
     fn invoke_application_checks_host_reply_schema_and_commarea_span() {
+        program_checks_host_reply_schema_and_commarea_span(true, true);
+    }
+
+    #[test]
+    fn local_link_checks_host_reply_schema_and_commarea_span() {
+        for selected in [false, true] {
+            program_checks_host_reply_schema_and_commarea_span(false, selected);
+        }
+    }
+
+    fn program_checks_host_reply_schema_and_commarea_span(application: bool, selected: bool) {
         struct ReplyProgram {
             descriptor: CapabilityDescriptor,
             reply: BoundedPayload,
             seen: ProgramLinkTrace,
+            selected: bool,
         }
         impl HostProvider for ReplyProgram {
             fn descriptor(&self) -> &CapabilityDescriptor {
                 &self.descriptor
             }
             fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
-                let HostRequest::Program(
-                    request @ ProgramRequest::Link {
-                        selection: Some(_), ..
-                    },
-                ) = effect.request
+                let HostRequest::Program(request @ ProgramRequest::Link { .. }) = effect.request
                 else {
-                    panic!("expected immutable selected program");
+                    panic!("expected program link");
                 };
+                assert!(
+                    matches!(&request, ProgramRequest::Link { selection, .. } if selection.is_some() == self.selected)
+                );
                 self.seen.lock().unwrap().push(request);
                 EffectResult {
                     sequence: effect.sequence,
@@ -7899,6 +7971,7 @@ mod tests {
                 reply: BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default())
                     .unwrap(),
                 seen: seen.clone(),
+                selected,
             }) as Arc<dyn HostProvider>;
             let host = Arc::new(ScopedHostService::new(
                 Arc::new(
@@ -7908,33 +7981,50 @@ mod tests {
                 HostLimits::default(),
             ));
             let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
-            cics.bind_artifact_store(store.clone()).unwrap();
-            let artifact = register_load_program(&cics, store.as_ref(), "APPCHLD", 1, b"FIRST", 0);
-            cics.register_application_entries(&[CicsApplicationEntryDefinition {
-                application: "PFXAPP".into(),
-                platform: "LOCAL".into(),
-                major_version: 1,
-                minor_version: 0,
-                micro_version: 0,
-                operation: "RUN".into(),
-                program: "APPCHLD".into(),
-                program_generation: 1,
-                program_artifact: artifact.clone(),
-                application_identity: artifact.as_str().into(),
-                available: true,
-            }])
-            .unwrap();
+            if selected {
+                cics.bind_artifact_store(store.clone()).unwrap();
+                let artifact =
+                    register_load_program(&cics, store.as_ref(), "APPCHLD", 1, b"FIRST", 0);
+                if application {
+                    cics.register_application_entries(&[CicsApplicationEntryDefinition {
+                        application: "PFXAPP".into(),
+                        platform: "LOCAL".into(),
+                        major_version: 1,
+                        minor_version: 0,
+                        micro_version: 0,
+                        operation: "RUN".into(),
+                        program: "APPCHLD".into(),
+                        program_generation: 1,
+                        program_artifact: artifact.clone(),
+                        application_identity: artifact.as_str().into(),
+                        available: true,
+                    }])
+                    .unwrap();
+                }
+            }
             let (invocation, _) = registered(&cics);
-            let mut arguments = BTreeMap::from([
-                ("APPLICATION".into(), cics_literal(b"PFXAPP")),
-                ("PLATFORM".into(), cics_literal(b"LOCAL")),
-                ("OPERATION".into(), cics_literal(b"RUN")),
-                ("COMMAREA".into(), task_value(b"AAAAzzzz")),
-            ]);
+            let mut arguments = if application {
+                BTreeMap::from([
+                    ("APPLICATION".into(), cics_literal(b"PFXAPP")),
+                    ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                    ("OPERATION".into(), cics_literal(b"RUN")),
+                ])
+            } else {
+                BTreeMap::from([("PROGRAM".into(), cics_literal(b"APPCHLD"))])
+            };
+            arguments.insert("COMMAREA".into(), task_value(b"AAAAzzzz"));
             if let Some(length) = length {
                 arguments.insert("LENGTH".into(), cics_decimal(length));
             }
-            let request = request(CicsOperation::InvokeApplication, arguments, 1);
+            let request = request(
+                if application {
+                    CicsOperation::InvokeApplication
+                } else {
+                    CicsOperation::Link
+                },
+                arguments,
+                1,
+            );
             let result = cics.invoke(
                 &effect(&invocation.run_unit_id, request.clone(), 1),
                 request,
@@ -32668,7 +32758,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(response.disposition, CicsDisposition::Complete);
-        assert_eq!(response.outputs["COMMAREA"].bytes(), b"CHILD");
+        assert_eq!(response.outputs["COMMAREA"].bytes(), b"CHIL");
 
         let missing_length = request(
             CicsOperation::Link,
