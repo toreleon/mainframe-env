@@ -39,7 +39,7 @@ pub use retention::{
     CicsReplayCodecVersion, CicsReplayRetentionState, CicsReplayRowDescriptor,
     CicsReplayValidationError, CicsUndoRowDescriptor, CicsUowCodecVersion, CicsUowDependencyState,
     CicsUowRowDescriptor, CicsUowState, CicsUowValidationError, describe_cics_replay_row,
-    describe_cics_undo_row, describe_cics_uow_row,
+    describe_cics_undo_row, describe_cics_uow_row, validate_cics_container_replay_row,
 };
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,

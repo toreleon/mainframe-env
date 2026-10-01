@@ -5,7 +5,7 @@ use mainframe_env_store_api::{
     EffectIntentMetadata, ExecutionRecord, ExecutionState, ProviderStateRecord,
 };
 
-fn policy() -> RetentionPolicy {
+pub(super) fn policy() -> RetentionPolicy {
     RetentionPolicy {
         lifecycle_ticks: 1,
         idempotency_ticks: 1,
@@ -17,7 +17,10 @@ fn policy() -> RetentionPolicy {
     }
 }
 
-fn terminal_execution(store: &dyn PlatformStore, label: &str) -> (ExecutionId, RunUnitId) {
+pub(super) fn terminal_execution(
+    store: &dyn PlatformStore,
+    label: &str,
+) -> (ExecutionId, RunUnitId) {
     let limits = InvocationLimits::default();
     let execution = ExecutionId::new(format!("safety-{label}"), limits).unwrap();
     let run = RunUnitId::new(format!("safety-run-{label}"), limits).unwrap();
@@ -51,7 +54,7 @@ fn terminal_execution(store: &dyn PlatformStore, label: &str) -> (ExecutionId, R
     (execution, run)
 }
 
-fn unresolved_effect(owner: &ExecutionId, run: &RunUnitId, key: &str) -> EffectRecord {
+pub(super) fn unresolved_effect(owner: &ExecutionId, run: &RunUnitId, key: &str) -> EffectRecord {
     let limits = InvocationLimits::default();
     EffectRecord {
         execution_id: owner.clone(),

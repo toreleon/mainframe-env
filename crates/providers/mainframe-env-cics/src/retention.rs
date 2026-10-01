@@ -7,6 +7,170 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectRecord, EffectState, Pro
 use sha2::{Digest, Sha256};
 use std::fmt;
 
+mod container_replay {
+    //! Shared private container replay codec and retention ownership validation.
+
+    use super::{CicsReplayRetentionState, CicsReplayValidationError, describe_cics_replay_row};
+    use crate::service::CicsLimits;
+    use mainframe_env_execution_api::{
+        ExecutionId, IdempotencyKey, InvocationLimits, PrincipalId, RunUnitId,
+    };
+    use mainframe_env_store_api::{EffectRecord, ExecutionRecord, ProviderStateRecord};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[serde(deny_unknown_fields)]
+    pub(crate) struct ContainerReplay {
+        pub(crate) schema_version: u8,
+        pub(crate) owner_execution: String,
+        pub(crate) owner_principal: String,
+        pub(crate) owner_run_unit: String,
+        pub(crate) digest: String,
+    }
+
+    impl ContainerReplay {
+        pub(crate) fn decode(row: &ProviderStateRecord) -> Result<Self, CicsReplayValidationError> {
+            if row.namespace != "cics-container-replay-v1" {
+                return Err(CicsReplayValidationError::WrongNamespace);
+            }
+            let limits = InvocationLimits::default();
+            let key_limits = InvocationLimits {
+                max_identity_bytes: 256,
+                ..limits
+            };
+            if row.version != 1 || IdempotencyKey::new(&row.key, key_limits).is_err() {
+                return Err(CicsReplayValidationError::InvalidIdentity);
+            }
+            if row.payload.len() > 4096 {
+                return Err(CicsReplayValidationError::CorruptPayload);
+            }
+            let replay: Self = serde_json::from_slice(&row.payload)
+                .map_err(|_| CicsReplayValidationError::CorruptPayload)?;
+            if replay.schema_version != 1
+                || ExecutionId::new(&replay.owner_execution, limits).is_err()
+                || RunUnitId::new(&replay.owner_run_unit, limits).is_err()
+                || PrincipalId::new(&replay.owner_principal, limits).is_err()
+                || replay.digest.len() != 64
+                || !replay
+                    .digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err(CicsReplayValidationError::CorruptPayload);
+            }
+            Ok(replay)
+        }
+    }
+
+    /// Validate a private container receipt against its fully decoded outer CICS
+    /// replay, completed core effect and terminal execution owner.
+    ///
+    /// This performs no mutation or age decision. Maintenance must also preserve
+    /// recovery dependencies and fence the exact rows during the archive transaction.
+    pub fn validate_cics_container_replay_row(
+        row: &ProviderStateRecord,
+        outer: &ProviderStateRecord,
+        effect: &EffectRecord,
+        execution: &ExecutionRecord,
+        limits: CicsLimits,
+    ) -> Result<(), CicsReplayValidationError> {
+        let replay = ContainerReplay::decode(row)?;
+        let descriptor = describe_cics_replay_row(outer, Some(effect), limits)?;
+        if descriptor.retention != CicsReplayRetentionState::Terminal || !execution.state.terminal()
+        {
+            return Err(CicsReplayValidationError::CoreEffectNotCompleted);
+        }
+        if row.key != outer.key
+            || descriptor.owner_execution.as_deref() != Some(replay.owner_execution.as_str())
+            || descriptor.owner_run_unit.as_deref() != Some(replay.owner_run_unit.as_str())
+            || execution.execution_id.as_str() != replay.owner_execution
+            || execution.run_unit_id.as_str() != replay.owner_run_unit
+            || execution.principal.as_str() != replay.owner_principal
+        {
+            return Err(CicsReplayValidationError::CoreEffectMismatch);
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn container_replay_codec_rejects_invalid_identity_bounds_and_trailing_bytes() {
+            let replay = ContainerReplay {
+                schema_version: 1,
+                owner_execution: "execution".into(),
+                owner_principal: "IBMUSER".into(),
+                owner_run_unit: "run".into(),
+                digest: "a".repeat(64),
+            };
+            let row = ProviderStateRecord {
+                namespace: "cics-container-replay-v1".into(),
+                key: "receipt".into(),
+                version: 1,
+                payload: serde_json::to_vec(&replay).unwrap(),
+            };
+            assert!(ContainerReplay::decode(&row).is_ok());
+            // The private writers admit keys up to 256 bytes. Maintenance still
+            // requires the matching outer/core identities under their own limits.
+            assert!(
+                ContainerReplay::decode(&ProviderStateRecord {
+                    key: "k".repeat(256),
+                    ..row.clone()
+                })
+                .is_ok()
+            );
+            for invalid in [
+                ProviderStateRecord {
+                    namespace: "other".into(),
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    key: String::new(),
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    key: "k".repeat(257),
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    version: 0,
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    payload: vec![b' '; 4097],
+                    ..row.clone()
+                },
+                ProviderStateRecord {
+                    payload: [row.payload.as_slice(), b"{}"].concat(),
+                    ..row.clone()
+                },
+            ] {
+                assert!(ContainerReplay::decode(&invalid).is_err());
+            }
+            for field in [
+                "owner_execution",
+                "owner_principal",
+                "owner_run_unit",
+                "digest",
+            ] {
+                let mut value = serde_json::to_value(&replay).unwrap();
+                value[field] = "".into();
+                assert!(
+                    ContainerReplay::decode(&ProviderStateRecord {
+                        payload: serde_json::to_vec(&value).unwrap(),
+                        ..row.clone()
+                    })
+                    .is_err()
+                );
+            }
+        }
+    }
+}
+pub(crate) use container_replay::ContainerReplay;
+pub use container_replay::validate_cics_container_replay_row;
+
 pub(crate) const UOW_V1_MAGIC: &[u8; 5] = b"MECU1";
 pub(crate) const UOW_V2_MAGIC: &[u8; 5] = b"MECU2";
 const UNDO_V1_MAGIC: &[u8; 8] = b"MECUNDO1";

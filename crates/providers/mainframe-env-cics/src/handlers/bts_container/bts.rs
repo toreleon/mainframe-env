@@ -5,6 +5,7 @@ use super::{
     scope::OwnerIdentity,
     state::{self, ContainerDatatype, ContainerOwner, ContainerValue},
 };
+use crate::retention::ContainerReplay as Replay;
 use crate::service::handlers::bts_lifecycle::{self, BtsLifecycleStore, BtsProcess};
 use crate::service::{CicsService, Run};
 use mainframe_env_execution_api::BoundedPayload;
@@ -59,16 +60,6 @@ struct Capacity {
     channels: usize,
     containers: usize,
     replays: usize,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Replay {
-    schema_version: u8,
-    owner_execution: String,
-    owner_principal: String,
-    owner_run_unit: String,
-    digest: String,
 }
 
 fn store_problem(_: StoreError) -> HostProblem {
@@ -693,11 +684,7 @@ fn mutate(
             .get_provider_state(REPLAY_NAMESPACE, replay_key)
             .map_err(store_problem)?
         {
-            let replay: Replay = serde_json::from_slice(&row.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if replay.schema_version != 1 {
-                return Err(HostProblem::InfrastructureFailure);
-            }
+            let replay = Replay::decode(&row).map_err(|_| HostProblem::InfrastructureFailure)?;
             return if replay.owner_execution == identity.execution
                 && replay.owner_principal == identity.principal
                 && replay.owner_run_unit == identity.run_unit
