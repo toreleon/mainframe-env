@@ -5,12 +5,16 @@
 mod abi;
 mod host_context;
 mod message;
+mod message_handle;
 mod object;
 mod object_service;
 mod retention;
 mod service;
 
 pub use abi::mq_abi_library;
+pub use message_handle::{
+    MqBufferCodec, MqHandleKernel, MqHandleKernelOption, MqHandleKernelProblem,
+};
 
 pub use object::{
     MQ_OBJECT_CATALOG_SCHEMA, MQ_OBJECT_NAME_BYTES, MqAliasTarget, MqChannelRoute, MqCloseMode,

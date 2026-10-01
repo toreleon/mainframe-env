@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a bounded volatile MQ message-handle property kernel with registry-owned lifetimes and deterministic private buffer conversion; MQI routing, MQRFH2 wire encoding, and licensed credit remain pending."
