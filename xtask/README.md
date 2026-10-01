@@ -12,7 +12,8 @@ contract to the conformance package and is the only xtask gate that requires
 Non-goals include generating semantic pass results, running hidden fallback
 routes, and replacing selector-specific conformance tests.
 
-`cargo xtask docs` regenerates the documentation portal navigation and manifest;
+`cargo xtask docs` regenerates the documentation portal navigation, subsystem
+plan/prompt/dependency indexes, progress overview, and manifest;
 `cargo xtask docs --check` validates them without writing files, together with
 relative links and anchors, command examples, normative metadata, package
 topology, and public version truth.

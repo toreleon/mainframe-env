@@ -81,7 +81,7 @@ const RETAINED_RELEASE_TARGETS: [&str; 2] = ["aarch64-apple-darwin", "x86_64-unk
 const JES_ORACLE_CANDIDATE_DOMAIN: &[u8] = b"mainframe-env.jes-oracle-candidate@1\0";
 const JES_ORACLE_DERIVED_PATHS: [&str; 2] = [
     "conformance/0.8/evidence/jes-806-matrix.json",
-    "docs/delivery/coverage-versions/status/0.8.0.md",
+    "docs/delivery/subsystems/jes/execution-status.md",
 ];
 
 #[derive(Debug, Parser)]
@@ -3843,10 +3843,10 @@ fn check_cobol_reference_policy(root: &Path, spec: &CompiledSpec) -> TaskResult 
         )?;
     }
     for relative in [
-        "docs/prompts/coverage-versions/IMPLEMENT_0_4_0.md",
-        "docs/delivery/coverage-versions/0.4.0.md",
-        "docs/delivery/coverage-versions/0.4.0-local-assurance.md",
-        "docs/delivery/coverage-versions/status/0.4.0.md",
+        "docs/prompts/subsystems/cobol/IMPLEMENT_EXECUTION.md",
+        "docs/delivery/subsystems/cobol/execution-plan.md",
+        "docs/delivery/subsystems/cobol/local-assurance.md",
+        "docs/delivery/subsystems/cobol/execution-status.md",
     ] {
         let document = read(&root.join(relative))?;
         require(
@@ -3858,8 +3858,8 @@ fn check_cobol_reference_policy(root: &Path, spec: &CompiledSpec) -> TaskResult 
         )?;
     }
     for relative in [
-        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
-        "docs/delivery/coverage-versions/0.17.0.md",
+        "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
+        "docs/delivery/subsystems/certification/licensed-plan.md",
     ] {
         let document = read(&root.join(relative))?;
         require(
@@ -7545,12 +7545,11 @@ fn validate_public_version_truth(
             && row("Development baseline")?.contains(&format!("{released} tag")),
         "README Project status: development baseline disagrees with local versions",
     )?;
-    let dossier = read(&root.join("docs/delivery/coverage-versions/0.9.0.md"))?;
+    let dossier = read(&root.join("docs/delivery/subsystems/cics/application-api-plan.md"))?;
     require(
-        row("Next planned minor")?.contains(
-            "[0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md)",
-        ) && dossier.contains("Status: **Proposed**"),
-        "README Project status: next planned minor disagrees with 0.9 dossier",
+        row("Implementation progress")?
+            == "[Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md)",
+        "README Project status: implementation progress must use the subsystem overview",
     )?;
     require(
         row("Production readiness")? == "Not claimed"
@@ -7559,7 +7558,7 @@ fn validate_public_version_truth(
             && dossier.contains("licensed campaigns remain pending"),
         "README Project status: readiness or licensed status is unsupported",
     )?;
-    let acceptance_path = "docs/delivery/coverage-versions/status/0.9.0.md";
+    let acceptance_path = "docs/delivery/subsystems/cics/application-api-status.md";
     let acceptance = read(&root.join(acceptance_path))?;
     if acceptance.contains("Last integrated acceptance review: 2026-09-09")
         && acceptance.contains("RUN_MODE=full, SUCCESS, 2026-09-09")
@@ -7570,7 +7569,7 @@ fn validate_public_version_truth(
                 && status.contains("entry gate accepted")
                 && status.contains(acceptance_path)
                 && !status.contains("current pre-0.9 assessment is a **no-go"),
-            "README Project status: pre-0.9 entry decision disagrees with accepted status record (docs/delivery/coverage-versions/status/0.9.0.md)",
+            "README Project status: pre-0.9 entry decision disagrees with accepted status record (docs/delivery/subsystems/cics/application-api-status.md)",
         )?;
         let review = read(&root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"))?;
         require(
@@ -7579,7 +7578,7 @@ fn validate_public_version_truth(
                     "Status: **Complete review; broad 0.9.0 implementation was blocked at review**",
                 )
                 && review.contains("2026-09-09")
-                && review.contains("../delivery/coverage-versions/status/0.9.0.md"),
+                && review.contains("../delivery/subsystems/cics/application-api-status.md"),
             "pre-0.9 review: finding index must identify review-time disposition after accepted entry gate",
         )?;
     }
@@ -7590,13 +7589,13 @@ fn validate_public_version_truth(
             )),
         "README release/development identity is stale",
     )?;
-    let coverage = read(&root.join("docs/delivery/coverage-versions/README.md"))?;
+    let coverage = read(&root.join("docs/delivery/subsystems/README.md"))?;
     require(
         coverage.contains(&format!("current workspace is `{current}` {state_label}"))
             && coverage.contains(&format!("through {released} released")),
         "coverage index release/current identity is stale",
     )?;
-    let project = read(&root.join("docs/delivery/coverage-versions/GITHUB-PROJECT.md"))?;
+    let project = read(&root.join("docs/delivery/subsystems/GITHUB-PROJECT.md"))?;
     require(
         project.contains(&format!("| {current} | `{current}`"))
             && project.contains(&format!("| {released} | `{released}`")),
@@ -9056,9 +9055,9 @@ fn check_schemas(root: &Path) -> TaskResult {
         "JES pending completion policy weakened the fail-closed licensed adapter",
     )?;
     for relative in [
-        "docs/prompts/coverage-versions/IMPLEMENT_0_8_0.md",
-        "docs/delivery/coverage-versions/0.8.0.md",
-        "docs/delivery/coverage-versions/status/0.8.0.md",
+        "docs/prompts/subsystems/jes/IMPLEMENT_EXECUTION.md",
+        "docs/delivery/subsystems/jes/execution-plan.md",
+        "docs/delivery/subsystems/jes/execution-status.md",
     ] {
         let document = read(&root.join(relative))?;
         require(
@@ -9069,8 +9068,8 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
     }
     for relative in [
-        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
-        "docs/delivery/coverage-versions/0.17.0.md",
+        "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
+        "docs/delivery/subsystems/certification/licensed-plan.md",
     ] {
         let document = read(&root.join(relative))?;
         require(
@@ -9852,9 +9851,9 @@ fn check_dataset_reference_independence(root: &Path) -> TaskResult {
         "focused dataset conformance does not execute the independent reference simulation",
     )?;
     for relative in [
-        "docs/prompts/coverage-versions/IMPLEMENT_0_6_0.md",
-        "docs/delivery/coverage-versions/0.6.0.md",
-        "docs/delivery/coverage-versions/status/0.6.0.md",
+        "docs/prompts/subsystems/dataset/IMPLEMENT_DATA.md",
+        "docs/delivery/subsystems/dataset/data-plan.md",
+        "docs/delivery/subsystems/dataset/data-status.md",
     ] {
         let document = read(&root.join(relative))?;
         require(
@@ -9864,8 +9863,8 @@ fn check_dataset_reference_independence(root: &Path) -> TaskResult {
         )?;
     }
     for relative in [
-        "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
-        "docs/delivery/coverage-versions/0.17.0.md",
+        "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
+        "docs/delivery/subsystems/certification/licensed-plan.md",
     ] {
         let document = read(&root.join(relative))?;
         require(
@@ -12248,7 +12247,7 @@ fn check_coverage_program_status(root: &Path) -> TaskResult {
         "0.2 program status accepted-candidate digest drifted",
     )?;
     require(
-        root.join("docs/delivery/coverage-versions/status/0.2.0.md")
+        root.join("docs/delivery/subsystems/coverage/foundation-status.md")
             .is_file()
             && root
                 .join("conformance/0.2/schemas/program-status.schema.json")
@@ -12350,7 +12349,7 @@ fn check_workload_ledger_consistency(root: &Path) -> TaskResult {
                 == coverage["generated_catalog_credit"],
         "workload and coverage ledgers contradict",
     )?;
-    let markdown = read(&root.join("docs/delivery/coverage-versions/status/0.2.0.md"))?;
+    let markdown = read(&root.join("docs/delivery/subsystems/coverage/foundation-status.md"))?;
     for work_package in work_packages {
         let id = text(work_package, "id", &workload_path)?;
         let state = text(work_package, "state", &workload_path)?;
@@ -13950,6 +13949,7 @@ fn repository_digest_at_commit(root: &Path, commit: &str) -> TaskResult<String> 
 }
 
 fn repository_digest_excluded(relative: &Path) -> bool {
+    // Old Git trees retain version paths; current trees use subsystem paths.
     let relative_text = relative.to_string_lossy();
     relative.starts_with(".git")
         || relative.starts_with("target")
@@ -13965,8 +13965,10 @@ fn repository_digest_excluded(relative: &Path) -> bool {
         || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
         || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
         || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
+        || relative == Path::new("docs/delivery/subsystems/coverage/foundation-status.md")
         || relative == Path::new("conformance/0.6/evidence/dataset-certification.json")
         || relative == Path::new("docs/delivery/coverage-versions/status/0.6.0.md")
+        || relative == Path::new("docs/delivery/subsystems/dataset/data-status.md")
         || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
             && relative.extension() == Some(OsStr::new("json")))
 }
@@ -16227,8 +16229,8 @@ mod tests {
     }
 
     fn write_public_version_fixtures(root: &Path, current: &str, released: &str) {
-        fs::create_dir_all(root.join("docs/delivery/coverage-versions")).unwrap();
-        fs::create_dir_all(root.join("docs/delivery/coverage-versions/status")).unwrap();
+        fs::create_dir_all(root.join("docs/delivery/subsystems")).unwrap();
+        fs::create_dir_all(root.join("docs/delivery/subsystems/cics")).unwrap();
         fs::create_dir_all(root.join("docs/reviews")).unwrap();
         fs::create_dir_all(root.join(format!("release/{released}"))).unwrap();
         fs::write(root.join("VERSION"), format!("{current}\n")).unwrap();
@@ -16244,30 +16246,30 @@ mod tests {
         fs::write(
             root.join("README.md"),
             format!(
-                "## Project status\n\n| Item | Status |\n|---|---|\n| Latest published release | [{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), source bundle only |\n| Current workspace version | `{current}` (development) |\n| Development baseline | `{current}` after the {released} tag |\n| Next planned minor | [0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md) |\n| Production readiness | Not claimed |\n| Licensed differential status | Required campaigns remain pending where the release notes say so |\n\nThe original no-go was resolved on 2026-09-09; the entry gate accepted (docs/delivery/coverage-versions/status/0.9.0.md).\n"
+                "## Project status\n\n| Item | Status |\n|---|---|\n| Latest published release | [{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), source bundle only |\n| Current workspace version | `{current}` (development) |\n| Development baseline | `{current}` after the {released} tag |\n| Implementation progress | [Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md) |\n| Production readiness | Not claimed |\n| Licensed differential status | Required campaigns remain pending where the release notes say so |\n\nThe original no-go was resolved on 2026-09-09; the entry gate accepted (docs/delivery/subsystems/cics/application-api-status.md).\n"
             ),
         )
         .unwrap();
         fs::write(
-            root.join("docs/delivery/coverage-versions/0.9.0.md"),
+            root.join("docs/delivery/subsystems/cics/application-api-plan.md"),
             "Status: **Proposed**\nlicensed campaigns remain pending\n",
         )
         .unwrap();
         fs::write(
-            root.join("docs/delivery/coverage-versions/status/0.9.0.md"),
+            root.join("docs/delivery/subsystems/cics/application-api-status.md"),
             "Last integrated acceptance review: 2026-09-09\nRUN_MODE=full, SUCCESS, 2026-09-09\n",
         )
         .unwrap();
-        fs::write(root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"), "Status: **Complete review; broad 0.9.0 implementation was blocked at review**\n\n| Disposition at review |\n\n2026-09-09: [fix mapping](../delivery/coverage-versions/status/0.9.0.md).\n").unwrap();
+        fs::write(root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"), "Status: **Complete review; broad 0.9.0 implementation was blocked at review**\n\n| Disposition at review |\n\n2026-09-09: [fix mapping](../delivery/subsystems/cics/application-api-status.md).\n").unwrap();
         fs::write(
-            root.join("docs/delivery/coverage-versions/README.md"),
+            root.join("docs/delivery/subsystems/README.md"),
             format!(
                 "Status: through {released} released\nThe current workspace is `{current}` development.\n"
             ),
         )
         .unwrap();
         fs::write(
-            root.join("docs/delivery/coverage-versions/GITHUB-PROJECT.md"),
+            root.join("docs/delivery/subsystems/GITHUB-PROJECT.md"),
             format!("| {released} | `{released}` | released |\n| {current} | `{current}` | development |\n"),
         )
         .unwrap();

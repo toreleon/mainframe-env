@@ -29,7 +29,7 @@
         "excluded_derived_paths": {
           "const": [
             "conformance/0.8/evidence/jes-806-matrix.json",
-            "docs/delivery/coverage-versions/status/0.8.0.md"
+            "docs/delivery/subsystems/jes/execution-status.md"
           ]
         }
       }

@@ -23,6 +23,11 @@ environment. A skipped external test receives no evidence credit.
 
 ## Change workflow
 
+Find the owning phase in the [subsystem progress overview](docs/delivery/IMPLEMENTATION-STATUS.md)
+and read its plan and progress record. Update that record after bounded work;
+release versions remain compatibility metadata. Regenerate subsystem indexes
+and navigation with `cargo xtask docs`.
+
 1. Start from a clean branch and preserve unrelated user changes.
 2. Identify the owning contract, provider, schema, and recovery boundary before
    editing. For IBM language or subsystem semantics, first search and read the

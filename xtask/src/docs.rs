@@ -6,6 +6,8 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
+mod subsystems;
+
 type Result<T = ()> = std::result::Result<T, String>;
 
 const REGISTRY_PATH: &str = "docs/documentation-registry.json";
@@ -42,11 +44,16 @@ struct Registry {
     normative: BTreeSet<String>,
     navigation: Vec<NavigationGroup>,
     topology: PackageTopology,
+    subsystems: Vec<subsystems::Subsystem>,
 }
 
 pub(crate) fn run(root: &Path, check: bool, command: &ClapCommand) -> Result {
     let registry = registry(root)?;
     let mut documents = markdown_documents(root)?;
+    let generated = subsystems::generate(&registry.subsystems, &documents)?;
+    for (path, (_, expected)) in &generated {
+        documents.insert(path.clone(), expected.clone());
+    }
     validate_registry(root, &registry, &documents)?;
 
     let navigation = render_navigation(&registry.navigation)?;
@@ -77,7 +84,15 @@ pub(crate) fn run(root: &Path, check: bool, command: &ClapCommand) -> Result {
             portal.as_bytes(),
             expected_portal.as_bytes(),
             "documentation navigation is stale; run `cargo xtask docs`",
-        )
+        )?;
+        for (path, (actual, expected)) in &generated {
+            require_equal(
+                actual.as_bytes(),
+                expected.as_bytes(),
+                &format!("{path}: subsystem navigation is stale; run `cargo xtask docs`"),
+            )?;
+        }
+        Ok(())
     } else {
         fs::create_dir_all(
             root.join(MANIFEST_PATH)
@@ -88,14 +103,18 @@ pub(crate) fn run(root: &Path, check: bool, command: &ClapCommand) -> Result {
         fs::write(root.join(MANIFEST_PATH), manifest)
             .map_err(|error| format!("{MANIFEST_PATH}: {error}"))?;
         fs::write(root.join(PORTAL_PATH), expected_portal)
-            .map_err(|error| format!("{PORTAL_PATH}: {error}"))
+            .map_err(|error| format!("{PORTAL_PATH}: {error}"))?;
+        for (path, (_, expected)) in generated {
+            fs::write(root.join(&path), expected).map_err(|error| format!("{path}: {error}"))?;
+        }
+        Ok(())
     }
 }
 
 fn registry(root: &Path) -> Result<Registry> {
     let bytes =
         fs::read(root.join(REGISTRY_PATH)).map_err(|error| format!("{REGISTRY_PATH}: {error}"))?;
-    let source: Value =
+    let mut source: Value =
         serde_json::from_slice(&bytes).map_err(|error| format!("{REGISTRY_PATH}: {error}"))?;
     if source["schema_version"] != "mainframe-env.documentation-registry@1"
         || source["manifest_path"] != MANIFEST_PATH
@@ -129,6 +148,7 @@ fn registry(root: &Path) -> Result<Registry> {
     validate_repository_path(&topology.authority)?;
     validate_repository_path(&topology.package_map)?;
 
+    let subsystems = subsystems::parse(&source)?;
     let groups = source["navigation"]
         .as_array()
         .ok_or("documentation registry omits navigation")?;
@@ -160,6 +180,19 @@ fn registry(root: &Path) -> Result<Registry> {
             }
             entries.push((label.into(), path.into()));
         }
+        if let Some(flag) = group.get("subsystem_entries") {
+            if flag
+                .as_bool()
+                .ok_or("navigation subsystem_entries must be boolean")?
+            {
+                for (label, path) in subsystems::navigation(&subsystems) {
+                    if !paths.insert(path.clone()) {
+                        return Err(format!("navigation repeats subsystem target {path}"));
+                    }
+                    entries.push((label, path));
+                }
+            }
+        }
         let note = group
             .get("note")
             .and_then(Value::as_str)
@@ -170,11 +203,29 @@ fn registry(root: &Path) -> Result<Registry> {
             note,
         });
     }
+    source["navigation"] = Value::Array(
+        navigation
+            .iter()
+            .map(|group| {
+                let mut value = json!({
+                    "heading":group.heading,
+                    "entries":group.entries.iter().map(|(label, path)| {
+                        json!({"label":label,"path":path})
+                    }).collect::<Vec<_>>()
+                });
+                if let Some(note) = &group.note {
+                    value["note"] = Value::String(note.clone());
+                }
+                value
+            })
+            .collect(),
+    );
     Ok(Registry {
         source,
         normative,
         navigation,
         topology,
+        subsystems,
     })
 }
 
@@ -228,8 +279,12 @@ fn markdown_documents(root: &Path) -> Result<BTreeMap<String, String>> {
             .map_err(|_| "tracked Markdown path is not UTF-8")?
             .to_string();
         validate_repository_path(&path)?;
-        let text =
-            fs::read_to_string(root.join(&path)).map_err(|error| format!("{path}: {error}"))?;
+        let text = match fs::read_to_string(root.join(&path)) {
+            Ok(text) => text,
+            // A documentation migration can remove tracked files before staging.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(format!("{path}: {error}")),
+        };
         documents.insert(path, text);
     }
     if documents.is_empty() {
@@ -856,8 +911,8 @@ fn manifest(
                 "README.md",
                 "CHANGELOG.md",
                 "conformance/0.2/inventory/versions.json",
-                "docs/delivery/coverage-versions/README.md",
-                "docs/delivery/coverage-versions/GITHUB-PROJECT.md"
+                "docs/delivery/subsystems/README.md",
+                "docs/delivery/subsystems/GITHUB-PROJECT.md"
             ]
         },
         "package_topology":{
@@ -871,6 +926,8 @@ fn manifest(
             "xtask_subcommands_and_options":true,
             "normative_metadata":true,
             "generated_navigation":true,
+            "subsystem_ownership_and_dependencies":true,
+            "generated_subsystem_indexes":true,
             "public_version_truth":true
         },
         "counts":{
@@ -880,6 +937,7 @@ fn manifest(
             "xtask_commands":command_count
         },
         "navigation":registry.source["navigation"].clone(),
+        "subsystems":registry.source["subsystems"].clone(),
         "documents":rows
     });
     let mut bytes = serde_json::to_vec_pretty(&value).map_err(|error| error.to_string())?;
@@ -1006,5 +1064,38 @@ mod tests {
             replace_navigation(&portal, "## Current\n\n- entry").unwrap(),
             format!("before\n{NAVIGATION_BEGIN}\n## Current\n\n- entry\n{NAVIGATION_END}\nafter\n")
         );
+    }
+
+    #[test]
+    fn discovery_supports_unstaged_document_migrations() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-doc-migration-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .args(["init", "--quiet"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        fs::write(root.join("old.md"), "# Original\n").unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .args(["add", "old.md"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        fs::rename(root.join("old.md"), root.join("new.md")).unwrap();
+        assert_eq!(
+            markdown_documents(&root).unwrap(),
+            BTreeMap::from([("new.md".into(), "# Original\n".into())])
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

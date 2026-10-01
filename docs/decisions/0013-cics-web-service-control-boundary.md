@@ -29,4 +29,4 @@ is outside this bounded local service route; the implementation does not claim
 remote transport or licensed IBM equivalence.
 
 The eight exact IBM topic paths and SHA-256 identities are recorded in the
-[0.9.0 status](../delivery/coverage-versions/status/0.9.0.md).
+[0.9.0 status](../delivery/subsystems/cics/application-api-status.md).

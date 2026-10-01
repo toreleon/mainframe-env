@@ -908,7 +908,7 @@ rewritten when what it describes changes. The log below says what changed and
 when, so a reader who quoted an older revision can tell whether the number they
 quoted still stands. Dated *delivery* records are the opposite — those are
 corrected beneath the original sentence, never edited — and one such correction,
-in `docs/delivery/coverage-versions/status/0.2.0.md`, covers the same migration.
+in `docs/delivery/subsystems/coverage/foundation-status.md`, covers the same migration.
 
 **2026-09-07 (commits f41ab73..517892f) — PDF is retired as a source, and this
 file was rewritten to say so.** It was previously named

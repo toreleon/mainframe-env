@@ -12,7 +12,7 @@ conversation through partner control flows. A local effect receipt or carrier
 queue acceptance cannot establish the partner's outcome. The conversation-open
 lane already owns the versioned APPC/MRO ledger described in [ADR-0020](0020-conversation-peer-exchange-ledger.md).
 The pinned CICS TS 6.x sources-b row and SHA identities are recorded in the
-[0.9 status ledger](../delivery/coverage-versions/status/0.9.0.md).
+[0.9 status ledger](../delivery/subsystems/cics/application-api-status.md).
 
 ## Decision
 

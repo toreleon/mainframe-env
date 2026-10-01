@@ -1,7 +1,7 @@
 # Documentation portal
 
 This portal separates current operating guidance from normative architecture,
-versioned delivery records, and historical research. If two normative documents
+subsystem delivery records, and historical research. If two normative documents
 conflict, use the precedence order below and record the conflict rather than
 silently choosing one.
 
@@ -14,18 +14,19 @@ silently choosing one.
 | Build or test the workspace | [Verification strategy](delivery/VERIFICATION-STRATEGY.md) |
 | Operate the development server | [Core-server operations](runbooks/OPERATIONS.md) |
 | Understand the current release | [0.8 release notes](releases/0.8.md) |
-| Prepare work on 0.9.0 | [0.9.0 readiness status](delivery/coverage-versions/status/0.9.0.md) |
+| Track implementation progress | [Subsystem progress](delivery/IMPLEMENTATION-STATUS.md) |
+| Prepare CICS application API work | [CICS application API progress](delivery/subsystems/cics/application-api-status.md) |
 | Review pre-0.9 risks | [Pre-0.9 deep review](reviews/PRE-0.9.0-DEEP-REVIEW.md) |
 | Contribute or report security issues | [Contribution guide](../CONTRIBUTING.md) and [security policy](../SECURITY.md) |
 
 ## Normative precedence
 
 1. [Project charter](CHARTER.md)
-2. Accepted or frozen architecture documents in [`architecture/`](architecture/)
-3. Versioned contracts in [`contracts/`](contracts/)
-4. Accepted architecture decisions in [`decisions/`](decisions/)
-5. Delivery, verification, and release contracts in [`delivery/`](delivery/)
-6. Version-specific implementation prompts in [`prompts/`](prompts/)
+2. Accepted or frozen architecture documents in [`architecture/`](architecture)
+3. Versioned contracts in [`contracts/`](contracts)
+4. Accepted architecture decisions in [`decisions/`](decisions)
+5. Delivery, verification, and release contracts in [`delivery/`](delivery)
+6. Subsystem implementation prompts in [`prompts/`](prompts)
 7. Runbooks, release notes, research, and historical status records
 
 Machine-readable schemas, catalogs, and evidence under `conformance/` remain
@@ -104,13 +105,33 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
 - [Versioning and releases](delivery/VERSIONING-AND-RELEASES.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)
-- [IBM coverage release plans](delivery/coverage-versions/README.md)
-- [Db2 0.12 reuse spike](delivery/coverage-versions/0.12.0-reuse-spike.md)
-- [Db2 0.12 proposed status](delivery/coverage-versions/status/0.12.0.md)
-- [Parallel implementation plan](delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md)
-- [Implementation prompt index](prompts/coverage-versions/README.md)
 
-Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation.
+Implementation progress is organized by subsystem and phase. Release versions identify compatibility and historical evidence.
+
+## Subsystem progress
+
+- [Subsystem plans and acceptance contract](delivery/subsystems/README.md)
+- [Subsystem dependencies and concurrency](delivery/subsystems/DEPENDENCIES.md)
+- [Workload-profile track](delivery/subsystems/PROFILE-TRACK.md)
+- [Subsystem implementation prompts](prompts/subsystems/README.md)
+- [Project coordination and release history](delivery/subsystems/GITHUB-PROJECT.md)
+- [Coverage and conformance — Coverage authority](delivery/subsystems/coverage/foundation-status.md)
+- [COBOL — Grammar and types](delivery/subsystems/cobol/structure-status.md)
+- [COBOL — Execution semantics](delivery/subsystems/cobol/execution-status.md)
+- [RACF / SAF — Commands and authorization](delivery/subsystems/racf/security-status.md)
+- [Datasets / VSAM / AMS — Dataset services](delivery/subsystems/dataset/data-status.md)
+- [JCL — Converter and planner](delivery/subsystems/jcl/planning-status.md)
+- [JES2 and utilities — Jobs, spool and utilities](delivery/subsystems/jes/execution-status.md)
+- [CICS — Application API](delivery/subsystems/cics/application-api-status.md)
+- [CICS — SPI and FEPI](delivery/subsystems/cics/system-api-status.md)
+- [z/OSMF — REST portfolio](delivery/subsystems/zosmf/rest-status.md)
+- [Db2 — Engine and common SQL](delivery/subsystems/db2/core-status.md)
+- [Db2 — Complete programming surface](delivery/subsystems/db2/programming-plan.md)
+- [IMS — DB / TM programming surface](delivery/subsystems/ims/programming-status.md)
+- [IBM MQ — MQI programming surface](delivery/subsystems/mq/programming-status.md)
+- [Cross-resource integration — Transactions and recovery](delivery/subsystems/integration/transactions-status.md)
+- [Licensed certification — Differential certification](delivery/subsystems/certification/licensed-status.md)
+- [Licensed certification — Stable release promotion](delivery/subsystems/certification/stable-release-plan.md)
 
 ## Operations
 
@@ -137,14 +158,17 @@ Version-specific status files and review reports describe candidates at a point 
 
 [`documentation-registry.json`](documentation-registry.json) identifies every
 normative document, supplies the generated navigation above, and declares the
-checked manifest location. Each normative document must state its status,
+checked manifest location. It also owns subsystem phases, progress records,
+prompts, target releases, and completion dependencies. Subsystem navigation and
+indexes are generated from that mapping. Each normative document must state its status,
 owner, scope, and first applicable mainframe-env version near its title.
 
 Run `cargo xtask docs` after an intentional documentation change, then run
 `cargo xtask docs --check`. The check verifies the generated
 [`documentation-manifest.json`](generated/documentation-manifest.json), relative
 links and anchors, documented xtask subcommands and options, normative metadata,
-navigation, and the released/development version authorities.
+navigation, subsystem ownership and dependency consistency, and the
+released/development version authorities.
 
 ## Document status vocabulary
 

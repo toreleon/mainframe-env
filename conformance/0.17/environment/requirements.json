@@ -18,7 +18,7 @@
       "required_products": ["IBM Enterprise COBOL for z/OS 6.5", "Language Environment"],
       "required_capabilities": ["cobol.compile", "cobol.execute", "le.runtime", "capture.stdout", "capture.diagnostics"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": 153, "authority": "docs/delivery/coverage-versions/status/0.4.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": 153, "authority": "docs/delivery/subsystems/cobol/execution-status.md"},
       "blockers": ["licensed environment manifest missing", "protected runner attestation missing", "exact final candidate and artifacts missing"]
     },
     {
@@ -30,7 +30,7 @@
       "required_products": ["IBM z/OS 3.2 Security Server RACF", "SAF"],
       "required_capabilities": ["racf.command", "saf.racroute", "saf.audit", "capture.redacted-observation"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": 48, "authority": "docs/delivery/coverage-versions/status/0.5.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": 48, "authority": "docs/delivery/subsystems/racf/security-status.md"},
       "blockers": ["licensed environment manifest missing", "least-authority SAF profiles missing", "exact final candidate and artifacts missing"]
     },
     {
@@ -42,7 +42,7 @@
       "required_products": ["IBM z/OS 3.2 DFSMS", "Access Method Services"],
       "required_capabilities": ["dataset.allocate", "vsam.organizations", "ams.execute", "dataset.readback", "dataset.cleanup"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": 36, "authority": "docs/delivery/coverage-versions/status/0.6.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": 36, "authority": "docs/delivery/subsystems/dataset/data-status.md"},
       "blockers": ["licensed environment manifest missing", "disposable dataset namespace missing", "exact final candidate and artifacts missing"]
     },
     {
@@ -54,7 +54,7 @@
       "required_products": ["IBM z/OS 3.2 JES2"],
       "required_capabilities": ["jes.submit", "jes.control", "jes.spool-read", "jes.restart", "jes.topology"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": 16, "authority": "docs/delivery/coverage-versions/status/0.8.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": 16, "authority": "docs/delivery/subsystems/jes/execution-status.md"},
       "blockers": ["licensed environment manifest missing", "JES2 disposable classes and destinations missing", "exact final candidate and artifacts missing"]
     },
     {
@@ -78,7 +78,7 @@
       "required_products": ["IBM Db2 13 for z/OS"],
       "required_capabilities": ["db2.bind", "db2.sql", "db2.sql-pl", "db2.uow", "db2.catalog-readback"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/coverage-versions/0.13.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/subsystems/db2/programming-plan.md"},
       "blockers": ["licensed environment manifest missing", "retained Db2 documentation scope incomplete", "provider-lane fixture and adapter handoff missing"]
     },
     {
@@ -90,7 +90,7 @@
       "required_products": ["IBM IMS 15.6"],
       "required_capabilities": ["ims.psb", "ims.dli", "ims.checkpoint", "ims.restart", "ims.database-readback"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/coverage-versions/0.14.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/subsystems/ims/programming-plan.md"},
       "blockers": ["licensed environment manifest missing", "provider-lane fixture and adapter handoff missing", "exact final candidate and artifacts missing"]
     },
     {
@@ -102,7 +102,7 @@
       "required_products": ["IBM MQ 9.4 for z/OS"],
       "required_capabilities": ["mq.connect", "mq.mqi", "mq.syncpoint", "mq.restart", "mq.queue-readback"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/coverage-versions/0.15.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/subsystems/mq/programming-plan.md"},
       "blockers": ["licensed environment manifest missing", "one retained MQ topic is unavailable", "provider-lane fixture and adapter handoff missing"]
     },
     {
@@ -114,7 +114,7 @@
       "required_products": ["IBM z/OSMF 3.2"],
       "required_capabilities": ["zosmf.info", "zosmf.jobs", "zosmf.datasets", "zosmf.security", "zosmf.workflows"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/coverage-versions/0.11.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/subsystems/zosmf/rest-plan.md"},
       "blockers": ["licensed environment manifest missing", "operation-level backend ownership handoff missing", "exact final candidate and artifacts missing"]
     },
     {
@@ -131,7 +131,7 @@
       "required_products": ["IBM z/OS 3.2", "IBM CICS Transaction Server", "IBM Db2 for z/OS", "IBM IMS", "IBM MQ for z/OS"],
       "required_capabilities": ["transaction.syncpoint", "transaction.prepare-if-applicable", "transaction.commit", "transaction.rollback", "transaction.in-doubt", "transaction.recovery"],
       "required_identity_fields": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"],
-      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/coverage-versions/0.16.0.md"},
+      "recorded_pending": {"numerator": 0, "denominator": null, "authority": "docs/delivery/subsystems/integration/transactions-plan.md"},
       "blockers": ["0.16 participant composition not accepted", "shared licensed topology missing", "final ScenarioSpec and exact candidate missing"]
     }
   ]

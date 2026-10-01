@@ -1,140 +1,45 @@
-# 0.1 Greenfield Implementation Roadmap
+# Subsystem implementation roadmap
 
-Status: **Accepted by repository owner**
-Owner: **repository owner**
-Scope: **implementation sequence and acceptance boundaries**
-Applies from: **mainframe-env 0.1.0**
+Status: **Accepted delivery organization**
+Owner: **maintainers**
+Scope: **subsystem progress, dependency sequencing, and acceptance boundaries**
+Applies from: **mainframe-env 0.8.3 development**
 
-This roadmap replaces R2A as the active engineering sequence. It does not
-reinterpret historical R0–R2 evidence.
+Manage implementation by subsystem and phase using the
+[subsystem plans](subsystems/README.md), [progress overview](IMPLEMENTATION-STATUS.md),
+and [dependency map](subsystems/DEPENDENCIES.md). The documentation registry
+owns the mapping and generates navigation, prompt indexes, and progress views.
+COBOL structure/execution, CICS application/system APIs, and Db2 core/programming
+remain separate phases under their respective subsystem owners.
 
-The roadmap delivers the `0.1` release line. Every completed phase ends in the
-required Git commit from
-[Versioning, Phase Commits, and Release Gates](VERSIONING-AND-RELEASES.md).
+## Work sequencing
 
-## ME.V0 — Scope, oracle, and architecture freeze
+1. Select the owning subsystem phase and read its plan, progress record,
+   [execution contract](../prompts/subsystems/README.md#common-execution-contract),
+   source/catalog authorities, and consumed dependency receipts.
+2. Verify the phase's start gate. Private catalog, parser, fixture, and harness
+   preparation may proceed only within the existing plan's declared boundaries.
+3. Declare one bounded work package or slice in that phase's progress record,
+   including ownership, dependencies, exact scope, applicable gates, and candidate.
+4. Implement and run focused validation through the existing contract owners.
+   Integrate only after the consumed subsystem dependencies pass on the named
+   candidate; a version label or merged PR alone supplies no acceptance evidence.
+5. Update the phase's progress record and regenerate documentation. Preserve
+   work-package IDs, sealing trailers, target releases, licensed-pending
+   dispositions, and historical evidence identities.
 
-Deliver:
+## Acceptance and release boundaries
 
-- accept this charter and ADR set;
-- freeze 0.1 selectors and fixtures only;
-- create the out-of-scope exclusion manifest;
-- create current-workspace oracle commands;
-- approve package boundaries and dependency rules;
-- scaffold the independent Rust 2024 workspace; and
-- add architecture/profile checks before product implementation.
+The [common release contract](subsystems/README.md#common-release-contract)
+and phase-specific exit gates remain binding. Partial work does not complete
+an official row; unavailable licensed environments remain pending. Cross-resource
+integration and final certification consume accepted provider behavior and
+do not replace each provider's mutation, failure, and recovery evidence.
 
-Exit: every in-scope selector is assigned; no out-of-scope crate appears in the
-0.1 dependency plan.
+Release versions remain compatibility and publication identities. Promotion,
+tagging, publication, deployment, and compatibility claims retain their existing
+authorization and candidate requirements. Organizing work by subsystem does
+not expose later-release behavior in an earlier public profile.
 
-## ME.V1 — Foundation and contracts
-
-Deliver:
-
-- source bytes, encoding, identities, and provenance;
-- diagnostic/problem model and rendering adapter;
-- IR object model, verifier primitives, text/binary envelopes;
-- compiler stages and artifact contract;
-- execution context, outcomes, limits, events, and machine contract;
-- typed host services for dataset, terminal, program, spool/JES, security,
-  clock, audit, and CICS; and
-- store contracts plus bounded in-memory implementations.
-
-Exit: contract crates have no infrastructure or current-workspace dependencies;
-property/roundtrip/limit tests pass.
-
-## ME.V2 — COBOL compiler and reference interpreter
-
-Deliver:
-
-- fixed/free source, COPY expansion, lossless syntax, and typed AST;
-- semantic names, layouts, aliases, decimals, encoding, and control flow;
-- verified COBOL HIR and fully legalized Core MIR;
-- reference machine with storage, calls/frames, conditions, output,
-  cancellation, and bounds; and
-- accepted non-CICS COBOL fixtures through compile and execute.
-
-Exit: accepted COBOL fixtures pass differential semantics without using old
-implementation code.
-
-## ME.V3 — Dataset and RACF/security providers
-
-Deliver:
-
-- dataset/catalog model, DD bindings, record operations, statuses, and
-  transactional mutation needed by 0.1;
-- RACF identity, authentication, profile matching, SAF authorization, and
-  audit;
-- scoped host-service clients and centralized middleware;
-- SQLite persistence for local/restart tests; and
-- hostile, authorization, idempotency, cancellation, and failure suites.
-
-Exit: provider state is reachable only through typed services; restart and
-negative security fixtures pass.
-
-## ME.V4 — CICS runtime
-
-Deliver:
-
-- exact 0.1 CICS operation inventory;
-- typed terminal, file, program-control, condition, EIB, transaction, and
-  security contracts;
-- protocol-neutral session and suspension/resume state;
-- COBOL CICS lowering and interpreter dispatch;
-- isolated effect comparison and mutation safety; and
-- CardDemo/accepted CICS fixture parity.
-
-Exit: every accepted CICS operation has one typed route, provider, limits,
-conditions, audit, and exact differential evidence.
-
-## ME.V5 — JCL/JES batch
-
-Deliver:
-
-- JCL syntax, procedures, symbols, DD, conditions, and workflow plan;
-- JES job/step lifecycle, spool, cancellation, purge, and status;
-- all `EXEC PGM=` dispatch through `ProgramService`;
-- COBOL batch plus required 0.1 utilities implemented through the same execution
-  spine; and
-- job/dataset/security failure and restart behavior.
-
-Exit: accepted JCL/JES fixtures use one program path and one durable job
-authority.
-
-## ME.V6 — z/OSMF and durable single-node product
-
-Deliver:
-
-- Axum gateway and typed route adapters;
-- information, jobs, datasets, and accepted security/console routes;
-- central versioned configuration and readiness;
-- SQLx SQLite/PostgreSQL store adapters and object artifact storage;
-- append-only events, materialized state, effect intent/result, checkpoints,
-  backup/restore, and restart recovery;
-- bounded workload lanes, graceful shutdown, telemetry, and capacity runbook;
-  and
-- core-server profile closure.
-
-Exit: a single active worker pool runs the full 0.1 profile through durable
-interfaces and survives declared restart/failure scenarios.
-
-## ME.V7 — Certification and cutover
-
-Deliver:
-
-- full 0.1 differential and protocol compatibility pack;
-- fuzz/property/model/concurrency/security/resource evidence;
-- long-running mixed COBOL/CICS/JCL/z/OSMF load;
-- canary, default promotion, and rollback rehearsal;
-- public configuration and API documentation;
-- package ownership and release policy; and
-- removal/archive of the old implementation from production closure.
-
-Exit: mainframe-env is the sole default 0.1 authority, with no hidden fallback and no
-out-of-scope dependency in the shipped profile.
-
-## Work sequencing rule
-
-Do not implement later-phase abstractions speculatively. A phase may prepare
-only contracts required by its accepted 0.1 consumers. New scope requires an ADR
-and an updated profile manifest before implementation.
+The original [0.1 implementation roadmap](history/INITIAL-IMPLEMENTATION-ROADMAP.md)
+is retained as history; its ME.V0–ME.V7 phases do not describe current progress.
