@@ -1519,7 +1519,7 @@ impl CicsService {
             let replay = self
                 .finalize_effect_replay(record, replay, effect.deadline_tick)
                 .map_err(|_| HostProblem::UnknownOutcome)?;
-            return Ok(replay.response);
+            return handlers::validate_replay_response(&request, replay.response);
         }
         let mut run = self
             .lock()?
@@ -7616,6 +7616,347 @@ mod tests {
                     .list_provider_state("cobol-call-replay@1", 8)
                     .unwrap()
                     .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn invoke_application_handled_conditions_replay_without_commarea_output() {
+        for policy in [
+            CicsConditionPolicy::NoHandle,
+            CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            },
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let links = Arc::new(Mutex::new(Vec::new()));
+            let cics = CicsService::open(
+                invoke_authorities(false, links.clone()),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            let (invocation, session) = registered(&cics);
+            let mut request = request(
+                CicsOperation::InvokeApplication,
+                BTreeMap::from([
+                    ("APPLICATION".into(), cics_literal(b"MISSING")),
+                    ("OPERATION".into(), cics_literal(b"RUN")),
+                    ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                    ("COMMAREA".into(), task_value(b"AAAAzzzz")),
+                    ("LENGTH".into(), cics_decimal(4)),
+                ]),
+                1,
+            );
+            request.condition_policy = policy;
+            let original_effect = effect(&invocation.run_unit_id, request.clone(), 1);
+            let first = cics.invoke(&original_effect, request.clone()).unwrap();
+            assert_eq!(
+                (first.condition.as_str(), first.response, first.response2),
+                ("APPNOTFOUND", 127, 3)
+            );
+            assert!(!first.outputs.contains_key("COMMAREA"));
+            assert!(first.payload.bytes().is_empty());
+            let rows = store
+                .list_provider_state("cics-effect-replay-v1", 8)
+                .unwrap();
+            let epoch = store.provider_state_retention_epoch().unwrap();
+            assert_eq!(
+                cics.invoke(&original_effect, request.clone()).unwrap(),
+                first
+            );
+            assert_eq!(store.provider_state_retention_epoch().unwrap(), epoch);
+            drop(cics);
+            let reopened = CicsService::open(
+                invoke_authorities(false, links.clone()),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            reopened
+                .register_run(invocation, &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(reopened.invoke(&original_effect, request).unwrap(), first);
+            assert_eq!(
+                store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap(),
+                rows
+            );
+            assert!(links.lock().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn invoke_application_replays_validate_legacy_and_current_commarea_outputs() {
+        for current in [false, true] {
+            for case in [
+                "short",
+                "empty",
+                "overlong",
+                "schema",
+                "payload-schema",
+                "missing",
+                "mismatch",
+                "condition",
+                "condition-data",
+            ] {
+                let store = Arc::new(MemoryStore::new(Default::default()));
+                let links = Arc::new(Mutex::new(Vec::new()));
+                let cics = CicsService::open(
+                    invoke_authorities(false, links.clone()),
+                    store.clone(),
+                    CicsLimits::default(),
+                )
+                .unwrap();
+                let (invocation, _) = registered(&cics);
+                let request = request(
+                    CicsOperation::InvokeApplication,
+                    BTreeMap::from([
+                        ("APPLICATION".into(), cics_literal(b"PFXAPP")),
+                        ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                        ("OPERATION".into(), cics_literal(b"RUN")),
+                        ("COMMAREA".into(), task_value(b"AAAAzzzz")),
+                        ("LENGTH".into(), cics_decimal(4)),
+                    ]),
+                    1,
+                );
+                let bytes = match case {
+                    "empty" | "condition" => b"".as_slice(),
+                    "overlong" => b"CHILD",
+                    _ => b"OK",
+                };
+                let output = BoundedPayload::new(
+                    if case == "schema" {
+                        "mainframe-env.program.output@1"
+                    } else {
+                        "mainframe-env.cics.payload@1"
+                    },
+                    bytes.to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                let response = CicsResponse {
+                    disposition: CicsDisposition::Complete,
+                    condition: if case.starts_with("condition") {
+                        "APPNOTFOUND"
+                    } else {
+                        "NORMAL"
+                    }
+                    .into(),
+                    response: if case.starts_with("condition") {
+                        127
+                    } else {
+                        0
+                    },
+                    response2: if case.starts_with("condition") { 3 } else { 0 },
+                    applid: "MEAPPL".into(),
+                    sysid: "MESYS".into(),
+                    transaction: "MENU".into(),
+                    aid: 0,
+                    target: if case.starts_with("condition") {
+                        None
+                    } else {
+                        Some("APPCHLD".into())
+                    },
+                    next_transaction: None,
+                    payload: BoundedPayload::new(
+                        if case == "payload-schema" {
+                            "mainframe-env.program.output@1"
+                        } else {
+                            "mainframe-env.cics.payload@1"
+                        },
+                        if case == "mismatch" {
+                            b"XX".to_vec()
+                        } else {
+                            bytes.to_vec()
+                        },
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                    outputs: if matches!(case, "missing" | "condition") {
+                        BTreeMap::new()
+                    } else {
+                        BTreeMap::from([("COMMAREA".into(), output)])
+                    },
+                    unit_of_work: None,
+                };
+                let key = request.mutation.as_ref().unwrap().idempotency_key.as_str();
+                let mut replay = CicsEffectReplay {
+                    effect_key: current.then(|| key.to_string()),
+                    owner_execution: Some(invocation.execution_id.as_str().into()),
+                    owner_run_unit: current.then(|| invocation.run_unit_id.as_str().into()),
+                    sequence: current.then_some(1),
+                    deadline_tick: Some(100),
+                    resolution_tick: current.then_some(100),
+                    request_digest: canonical_request_digest(&HostRequest::Cics(request.clone()))
+                        .unwrap(),
+                    result_digest: current
+                        .then(|| handlers::cics_result_digest(&response).unwrap()),
+                    binding_digest: None,
+                    response,
+                };
+                if current {
+                    replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+                }
+                let stored = ProviderStateRecord {
+                    namespace: "cics-effect-replay-v1".into(),
+                    key: key.into(),
+                    version: if current { 2 } else { 1 },
+                    payload: encode_cics_effect_replay(&replay).unwrap(),
+                };
+                let mut initial = stored.clone();
+                initial.version = 1;
+                if current {
+                    replay.resolution_tick = None;
+                    replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+                    initial.payload = encode_cics_effect_replay(&replay).unwrap();
+                }
+                store.put_provider_state(initial, None).unwrap();
+                if current {
+                    store.put_provider_state(stored.clone(), Some(1)).unwrap();
+                }
+                let epoch = store.provider_state_retention_epoch().unwrap();
+                let result = cics.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 1),
+                    request,
+                );
+                if case == "condition" {
+                    let response = result.unwrap();
+                    assert_eq!((response.response, response.response2), (127, 3));
+                    assert!(!response.outputs.contains_key("COMMAREA"));
+                } else if matches!(case, "short" | "empty") {
+                    assert_eq!(result.unwrap().outputs["COMMAREA"].bytes(), bytes);
+                } else {
+                    assert_eq!(
+                        result,
+                        Err(HostProblem::ProviderFailure),
+                        "{current} {case}"
+                    );
+                }
+                assert!(links.lock().unwrap().is_empty());
+                assert_eq!(
+                    store
+                        .get_provider_state("cics-effect-replay-v1", &stored.key)
+                        .unwrap(),
+                    Some(stored)
+                );
+                assert_eq!(store.provider_state_retention_epoch().unwrap(), epoch);
+            }
+        }
+    }
+
+    #[test]
+    fn invoke_application_checks_host_reply_schema_and_commarea_span() {
+        struct ReplyProgram {
+            descriptor: CapabilityDescriptor,
+            reply: BoundedPayload,
+            seen: ProgramLinkTrace,
+        }
+        impl HostProvider for ReplyProgram {
+            fn descriptor(&self) -> &CapabilityDescriptor {
+                &self.descriptor
+            }
+            fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+                let HostRequest::Program(
+                    request @ ProgramRequest::Link {
+                        selection: Some(_), ..
+                    },
+                ) = effect.request
+                else {
+                    panic!("expected immutable selected program");
+                };
+                self.seen.lock().unwrap().push(request);
+                EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Program(self.reply.clone())),
+                }
+            }
+        }
+        for (schema, bytes, length, accepted) in [
+            (
+                "mainframe-env.cics.payload@1",
+                b"OK".as_slice(),
+                Some(4),
+                true,
+            ),
+            ("mainframe-env.cics.payload@1", b"", Some(4), true),
+            ("mainframe-env.cics.payload@1", b"CHILD", Some(4), false),
+            ("mainframe-env.cics.payload@1", b"TOO-LONG!", None, false),
+            ("mainframe-env.program.output@1", b"OK", Some(4), false),
+        ] {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let security = Arc::new(DenyExactSecurityClass {
+                descriptor: descriptor("host.security.authorize"),
+                denied_class: "NONE",
+                denied_resource: None,
+                seen: Arc::new(Mutex::new(Vec::new())),
+            }) as Arc<dyn HostProvider>;
+            let program = Arc::new(ReplyProgram {
+                descriptor: descriptor("host.program.invoke"),
+                reply: BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default())
+                    .unwrap(),
+                seen: seen.clone(),
+            }) as Arc<dyn HostProvider>;
+            let host = Arc::new(ScopedHostService::new(
+                Arc::new(
+                    RegistrySnapshot::new(1, vec![security, program], InvocationLimits::default())
+                        .unwrap(),
+                ),
+                HostLimits::default(),
+            ));
+            let cics = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+            cics.bind_artifact_store(store.clone()).unwrap();
+            let artifact = register_load_program(&cics, store.as_ref(), "APPCHLD", 1, b"FIRST", 0);
+            cics.register_application_entries(&[CicsApplicationEntryDefinition {
+                application: "PFXAPP".into(),
+                platform: "LOCAL".into(),
+                major_version: 1,
+                minor_version: 0,
+                micro_version: 0,
+                operation: "RUN".into(),
+                program: "APPCHLD".into(),
+                program_generation: 1,
+                program_artifact: artifact.clone(),
+                application_identity: artifact.as_str().into(),
+                available: true,
+            }])
+            .unwrap();
+            let (invocation, _) = registered(&cics);
+            let mut arguments = BTreeMap::from([
+                ("APPLICATION".into(), cics_literal(b"PFXAPP")),
+                ("PLATFORM".into(), cics_literal(b"LOCAL")),
+                ("OPERATION".into(), cics_literal(b"RUN")),
+                ("COMMAREA".into(), task_value(b"AAAAzzzz")),
+            ]);
+            if let Some(length) = length {
+                arguments.insert("LENGTH".into(), cics_decimal(length));
+            }
+            let request = request(CicsOperation::InvokeApplication, arguments, 1);
+            let result = cics.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 1),
+                request,
+            );
+            if accepted {
+                let response = result.unwrap();
+                assert_eq!((response.response, response.response2), (0, 0));
+                assert_eq!(response.outputs["COMMAREA"].bytes(), bytes);
+            } else {
+                assert_eq!(
+                    result,
+                    Err(HostProblem::ProviderFailure),
+                    "{schema} {bytes:?} {length:?}"
+                );
+            }
+            assert_eq!(seen.lock().unwrap().len(), 1);
+            assert_eq!(
+                store
+                    .list_provider_state("cics-effect-replay-v1", 8)
+                    .unwrap()
+                    .len(),
+                usize::from(accepted)
             );
         }
     }

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve caller bytes beyond INVOKE APPLICATION COMMAREA copy-back and validate fresh, current and legacy replay replies against the checked span."

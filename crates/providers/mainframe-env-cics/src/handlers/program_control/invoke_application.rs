@@ -5,8 +5,8 @@ use super::{
 };
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
-    AccessIntent, CicsDisposition, CicsRequest, CicsResponse, HostProblem, HostRequest, HostResult,
-    ProgramLinkSelection, ProgramName, ProgramRequest,
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
+    HostRequest, HostResult, ProgramLinkSelection, ProgramName, ProgramRequest,
 };
 
 pub(in crate::service) fn invoke(
@@ -101,6 +101,10 @@ pub(in crate::service) fn invoke(
         }
         payload = bounded(payload.bytes()[..length].to_vec())?;
     }
+    let commarea_limit = request
+        .arguments
+        .contains_key("COMMAREA")
+        .then_some(payload.bytes().len());
     service
         .authorize(
             run,
@@ -130,6 +134,9 @@ pub(in crate::service) fn invoke(
         Err(problem) => return Err(problem),
         Ok(_) => return Err(HostProblem::ProviderFailure),
     };
+    if let Some(limit) = commarea_limit {
+        validate_commarea_reply(&returned, limit)?;
+    }
     let mut response = service.response(
         run,
         CicsDisposition::Complete,
@@ -164,6 +171,55 @@ pub(in crate::service) fn invoke(
         )?,
     );
     Ok(response)
+}
+
+pub(in crate::service) fn validate_replay_response(
+    request: &CicsRequest,
+    response: CicsResponse,
+) -> Result<CicsResponse, HostProblem> {
+    if request.operation == CicsOperation::InvokeApplication
+        && let Some(area) = request.arguments.get("COMMAREA")
+    {
+        // Handled source conditions have no COMMAREA result to copy back.
+        if response.condition != "NORMAL" || response.response != 0 || response.response2 != 0 {
+            if response.condition == "NORMAL"
+                || response.response == 0
+                || response.outputs.contains_key("COMMAREA")
+                || response.payload.schema() != "mainframe-env.cics.payload@1"
+                || !response.payload.bytes().is_empty()
+            {
+                return Err(HostProblem::ProviderFailure);
+            }
+            return Ok(response);
+        }
+        let limit = match request.arguments.get("LENGTH") {
+            Some(length) => decimal_usize(length)
+                .filter(|length| matches!(*length, 1..=24_576))
+                .ok_or(HostProblem::ProviderFailure)?,
+            None => area.bytes().len(),
+        };
+        if limit > area.bytes().len() {
+            return Err(HostProblem::ProviderFailure);
+        }
+        let output = response
+            .outputs
+            .get("COMMAREA")
+            .ok_or(HostProblem::ProviderFailure)?;
+        validate_commarea_reply(output, limit)?;
+        validate_commarea_reply(&response.payload, limit)?;
+        if response.payload.bytes() != output.bytes() {
+            return Err(HostProblem::ProviderFailure);
+        }
+    }
+    Ok(response)
+}
+
+fn validate_commarea_reply(reply: &BoundedPayload, limit: usize) -> Result<(), HostProblem> {
+    if reply.schema() != "mainframe-env.cics.payload@1" || reply.bytes().len() > limit {
+        Err(HostProblem::ProviderFailure)
+    } else {
+        Ok(())
+    }
 }
 
 fn payload(request: &CicsRequest) -> Result<BoundedPayload, HostProblem> {

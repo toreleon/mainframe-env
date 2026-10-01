@@ -6892,28 +6892,57 @@ mod tests {
 
     #[test]
     fn compiled_installed_local_link_recovers_after_sqlite_restart() {
-        compiled_installed_local_link_recovers_after_restart(None);
+        compiled_installed_program_commarea_recovers_after_restart(None, false);
     }
 
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
     fn postgres_compiled_installed_local_link_recovers_after_restart() {
-        compiled_installed_local_link_recovers_after_restart(Some(required_postgres_route_url()));
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            false,
+        );
     }
 
-    fn compiled_installed_local_link_recovers_after_restart(postgres_url: Option<String>) {
-        use mainframe_env_cics::{CicsJavaStatus, CicsProgramDefinition};
-        use mainframe_env_execution_api::{MachineDrive, MachineResume, Quantum};
-        let parent = published_source_fixture(
-            "LNKMAIN",
-            concat!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. LNKMAIN. DATA DIVISION. WORKING-STORAGE SECTION. ",
-                "01 AREA-X PIC X(8) VALUE 'AAAAzzzz'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. ",
-                "01 FN-X PIC X(2). PROCEDURE DIVISION. ",
-                "EXEC CICS LINK PROGRAM('LNKCHLD') COMMAREA(AREA-X) LENGTH(4) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. ",
-                "MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN."
-            ),
+    #[test]
+    fn compiled_invoke_application_commarea_recovers_after_sqlite_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(None, true);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn postgres_compiled_invoke_application_commarea_recovers_after_restart() {
+        compiled_installed_program_commarea_recovers_after_restart(
+            Some(required_postgres_route_url()),
+            true,
         );
+    }
+
+    fn compiled_installed_program_commarea_recovers_after_restart(
+        postgres_url: Option<String>,
+        application: bool,
+    ) {
+        use mainframe_env_cics::{
+            CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition,
+        };
+        use mainframe_env_execution_api::{MachineDrive, MachineResume, Quantum};
+        let operation = if application {
+            CicsOperation::InvokeApplication
+        } else {
+            CicsOperation::Link
+        };
+        let command = if application {
+            "EXEC CICS INVOKE APPLICATION('PFXAPP') OPERATION('RUN') PLATFORM('LOCAL') COMMAREA(AREA-X) LENGTH(4) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. "
+        } else {
+            "EXEC CICS LINK PROGRAM('LNKCHLD') COMMAREA(AREA-X) LENGTH(4) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. "
+        };
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. LNKMAIN. DATA DIVISION. WORKING-STORAGE SECTION. \
+             01 AREA-X PIC X(8) VALUE 'AAAAzzzz'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. \
+             01 FN-X PIC X(2). PROCEDURE DIVISION. {command} \
+             MOVE EIBFN TO FN-X. EXEC CICS SUSPEND END-EXEC. STOP RUN."
+        );
+        let parent = published_source_fixture("LNKMAIN", &source);
         let child = published_source_fixture(
             "LNKCHLD",
             concat!(
@@ -7005,6 +7034,24 @@ mod tests {
                     java_status: CicsJavaStatus::NotJava,
                 }])
                 .unwrap();
+            if application {
+                server
+                    .cics
+                    .register_application_entries(&[CicsApplicationEntryDefinition {
+                        application: "PFXAPP".into(),
+                        platform: "LOCAL".into(),
+                        major_version: 1,
+                        minor_version: 0,
+                        micro_version: 0,
+                        operation: "RUN".into(),
+                        program: "LNKCHLD".into(),
+                        program_generation: 1,
+                        program_artifact: child_ref.clone(),
+                        application_identity: child_ref.as_str().into(),
+                        available: true,
+                    }])
+                    .unwrap();
+            }
             invocation = server
                 .cics_invocation("IBMUSER", "LK01", Some(parent_ref.clone()))
                 .unwrap();
@@ -7063,10 +7110,10 @@ mod tests {
                 Quantum::new(10_000, 16 * 1024 * 1024).unwrap(),
             ) {
                 MachineDrive::HostCall(effect) => effect,
-                other => panic!("expected original LINK, got {other:?}"),
+                other => panic!("expected original program invocation, got {other:?}"),
             };
             assert!(
-                matches!(original_effect.request, HostRequest::Cics(ref request) if request.operation == CicsOperation::Link)
+                matches!(original_effect.request, HostRequest::Cics(ref request) if request.operation == operation)
             );
             replay_invocation = replay;
         }
@@ -7089,7 +7136,14 @@ mod tests {
                 machine.variable("RESP2-X").unwrap().bytes(),
                 &0_i32.to_be_bytes()
             );
-            assert_eq!(machine.variable("FN-X").unwrap().bytes(), &[0x0e, 0x02]);
+            assert_eq!(
+                machine.variable("FN-X").unwrap().bytes(),
+                if application {
+                    &[0x0e, 0x10]
+                } else {
+                    &[0x0e, 0x02]
+                }
+            );
             server
                 .cics
                 .restore_terminal_run(replay_invocation, &session, "LK01", Vec::new(), 3)

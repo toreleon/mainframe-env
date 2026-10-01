@@ -325,12 +325,12 @@ pub(super) fn post_event_outputs(
 }
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use journal_control::{JournalRecord, load as load_journals};
-pub(super) use program_control::invoke as invoke_program_control;
 pub use program_control::{CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition};
 pub(super) use program_control::{
     ProgramLoadState, load_application_entries, load_program_definitions, load_program_loads,
     validate_application_catalog,
 };
+pub(super) use program_control::{invoke as invoke_program_control, validate_replay_response};
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
 pub use signal_event::{CicsSignalCaptureSpec, CicsSignalEmission};

@@ -20,6 +20,7 @@ const PROGRAM_MAGIC: &[u8; 7] = b"MECPGD1";
 const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 
 mod invoke_application;
+pub(in crate::service) use invoke_application::validate_replay_response;
 mod load;
 mod release;
 pub(in crate::service) use load::{

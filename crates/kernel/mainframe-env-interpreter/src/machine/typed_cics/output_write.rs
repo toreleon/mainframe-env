@@ -270,10 +270,13 @@ pub(in crate::machine) fn write_output(
         return Err(MachineProblem::UnexpectedHostResult);
     }
     if (operation == CicsOperation::GetContainer && name == "INTO"
-        || operation == CicsOperation::Link && name == "COMMAREA")
+        || matches!(
+            operation,
+            CicsOperation::Link | CicsOperation::InvokeApplication
+        ) && name == "COMMAREA")
         && let CicsTarget::Resolved(slot) = target
     {
-        // Container retrieval and LINK copy a prefix without blank padding.
+        // Container retrieval and local program calls copy a prefix without blank padding.
         // A host response must not exceed the checked receiving area.
         return write_resolved_prefix(machine, slot, value.bytes());
     }
@@ -347,34 +350,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn link_commarea_copies_only_returned_prefix_and_rejects_overlong_output() {
-        let (mut machine, slot) = super::super::tests::machine_with_alphanumeric_slot("OUT", 4);
-        machine.write("OUT", b"ZZZZ").unwrap();
-        let target = CicsTarget::Resolved(slot);
-        for (bytes, expected) in [(b"DA".as_slice(), b"DAZZ".as_slice()), (b"", b"DAZZ")] {
-            write_output(
-                &mut machine,
-                CicsOperation::Link,
-                "COMMAREA",
-                &target,
-                &payload("mainframe-env.cics.payload@1", bytes.to_vec()).unwrap(),
-                None,
-            )
-            .unwrap();
-            assert_eq!(machine.read("OUT").unwrap(), expected);
+    fn local_program_commarea_copies_only_returned_prefix_and_rejects_overlong_output() {
+        for operation in [CicsOperation::Link, CicsOperation::InvokeApplication] {
+            let (mut machine, slot) = super::super::tests::machine_with_alphanumeric_slot("OUT", 4);
+            machine.write("OUT", b"ZZZZ").unwrap();
+            let target = CicsTarget::Resolved(slot);
+            for (bytes, expected) in [(b"DA".as_slice(), b"DAZZ".as_slice()), (b"", b"DAZZ")] {
+                write_output(
+                    &mut machine,
+                    operation,
+                    "COMMAREA",
+                    &target,
+                    &payload("mainframe-env.cics.payload@1", bytes.to_vec()).unwrap(),
+                    None,
+                )
+                .unwrap();
+                assert_eq!(machine.read("OUT").unwrap(), expected);
+            }
+            assert_eq!(
+                write_output(
+                    &mut machine,
+                    operation,
+                    "COMMAREA",
+                    &target,
+                    &payload("mainframe-env.cics.payload@1", b"TOOLONG".to_vec()).unwrap(),
+                    None
+                ),
+                Err(MachineProblem::UnexpectedHostResult)
+            );
+            assert_eq!(machine.read("OUT").unwrap(), b"DAZZ");
         }
-        assert_eq!(
-            write_output(
-                &mut machine,
-                CicsOperation::Link,
-                "COMMAREA",
-                &target,
-                &payload("mainframe-env.cics.payload@1", b"TOOLONG".to_vec()).unwrap(),
-                None
-            ),
-            Err(MachineProblem::UnexpectedHostResult)
-        );
-        assert_eq!(machine.read("OUT").unwrap(), b"DAZZ");
     }
 
     #[test]
