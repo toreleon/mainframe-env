@@ -144,6 +144,14 @@ fn restart_selection_and_serde_reject_malformed_shapes() {
         Ok(())
     );
     assert_eq!(RestartSelection::Last.validate(limits), Ok(()));
+    assert_eq!(
+        RestartSelection::Timestamp("ABCD1234567890".into()).validate(limits),
+        Ok(())
+    );
+    assert_eq!(
+        RestartSelection::Timestamp("short".into()).validate(limits),
+        Err(RecoveryProblem::InvalidRequest)
+    );
     assert!(serde_json::from_str::<LogRequest>(r#"{"code":160,"data":[],"extra":1}"#).is_err());
     assert!(serde_json::from_str::<CheckpointImage>(r#"{"schema_version":"unknown"}"#).is_err());
 }

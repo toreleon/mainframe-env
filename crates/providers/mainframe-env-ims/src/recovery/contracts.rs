@@ -21,6 +21,7 @@ pub struct RecoveryLimits {
     pub max_backout_points: usize,
     pub max_utility_records: usize,
     pub max_utility_bytes: usize,
+    pub max_state_bytes: usize,
     pub max_database_name_bytes: usize,
 }
 
@@ -38,6 +39,7 @@ impl Default for RecoveryLimits {
             max_backout_points: 9,
             max_utility_records: 65_536,
             max_utility_bytes: 64 * 1_024 * 1_024,
+            max_state_bytes: 64 * 1_024 * 1_024,
             max_database_name_bytes: 64,
         }
     }
@@ -51,6 +53,7 @@ pub enum RecoveryProblem {
     NotFound,
     Conflict,
     CorruptImage,
+    InfrastructureFailure,
     UnknownOutcome,
 }
 
@@ -204,12 +207,19 @@ pub enum RestartSelection {
     Normal,
     Last,
     Id(String),
+    Timestamp(String),
 }
 
 impl RestartSelection {
     pub fn validate(&self, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
         if let Self::Id(id) = self
             && !valid_checkpoint_id(id, limits.max_checkpoint_id_bytes)
+        {
+            return Err(RecoveryProblem::InvalidRequest);
+        }
+        if let Self::Timestamp(timestamp) = self
+            && (timestamp.len() != 14
+                || !timestamp.bytes().all(|byte| byte.is_ascii_alphanumeric()))
         {
             return Err(RecoveryProblem::InvalidRequest);
         }
