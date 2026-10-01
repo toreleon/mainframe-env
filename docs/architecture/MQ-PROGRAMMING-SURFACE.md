@@ -28,8 +28,10 @@ call topics have matching retained HTML, including the re-pinned MQINQ topic
 `SSFKSJ_9.4.0/refdev/q101840_.html` (SHA-256
 `03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b`).
 The MQBUFMH spelling anomaly is recorded in the catalog, while `MQHMSG` is
-the sole published handle identity. The registry supplies identity data only;
-option legality and executable handlers remain pending.
+the sole published handle identity. The registry supplies identity data only.
+The additive validator now checks source-bound ordered signatures, structure
+identities and versions, option families and documented combinations without
+registering a handler; numeric wire legality and execution remain pending.
 
 ## Authority boundary
 
@@ -59,19 +61,24 @@ syncpoint owner. A forbidden context returns the exact MQ completion/reason
 condition without mutating queue-manager state. `MQCMIT` must never be exposed
 as a generic cross-subsystem commit.
 
-The provider recognizes the typed `mainframe-env.cics.execution-context@1`
-invocation binding. A direct `MQCMIT` or `MQBACK` in CICS returns MQCC 2 / MQRC
-2012 before authorization, replay, or queue state access. The existing CICS
-SYNCPOINT dispatch carries nested and outer effect-origin bindings; MQ replay
-validation binds them to the exact run, sequence, idempotency key, and outer
-effect before persistence. Partial or malformed provenance fails closed.
+The provider recognizes both the typed `mainframe-env.mq.host-context@1`
+binding and the existing typed `mainframe-env.cics.execution-context@1`
+binding. Direct `MQCMIT` and `MQBACK` calls are checked before authorization,
+replay, lock acquisition, or queue-state access. CICS returns MQCC 2 / MQRC
+2012; non-batch IMS and host-coordinator-owned contexts are rejected by the
+same source-bound matrix. The existing CICS SYNCPOINT dispatch carries nested
+and outer effect-origin bindings; MQ replay validation binds them to the exact
+run, sequence, idempotency key, and outer effect before persistence. Missing,
+contradictory, partial, or malformed provenance fails closed.
 
 `MqSyncpointCall`, `MqHostEnvironment`, and `MqSyncpointOwner` define the shared
 direct-call applicability matrix for `MQBACK`, `MQBEGIN`, and `MQCMIT`. Batch,
 IMS batch DL/I, and other queue-manager-owned bindings admit these calls. CICS
 and non-batch IMS reject application commit/backout; MQ client bindings also
 reject `MQBEGIN`. An external coordinator rejects all three direct calls with
-MQCC 2 / MQRC 2012. IMS and MQ client provider enforcement remain pending.
+MQCC 2 / MQRC 2012. The current provider route enforces this matrix for direct
+commit and backout in z/OS batch, IMS batch DL/I, CICS, IMS, MQI client and
+other bindings. `MQBEGIN` has no executable public request route yet.
 
 ## Object lifecycle kernel
 
@@ -85,9 +92,21 @@ names, corrupt rows, and unsupported schema versions before restoration.
 The existing queue service uses the same name rule for definitions, lookups,
 request queue selectors, and trigger programs. It removes permitted trailing
 blanks or a null ending significant data, preserves case, and rejects leading
-or embedded blanks before durable mutation. The object catalog has no host
-MQI handler integration yet; `Inquire` is an object capability identity, not
-MQINQ execution.
+or embedded blanks before durable mutation. The service persists the typed
+catalog in the shared provider-row store and routes the compatibility queue
+operations through local queues and aliases, including atomic migration from
+the legacy queue-only manifest. Dynamic, remote, topic, subscription, process,
+distribution-list and MQINQ execution remain fail-closed or pending.
+
+## Frozen object and message request contracts
+
+The host API now exposes a bounded, source-bound MQOPEN/MQCLOSE vocabulary for
+object lookup, access, context, dynamic names and close lifecycle. It also
+exposes bounded message descriptors, typed properties, identifier selection,
+browse/wait/truncation, grouping/segmentation, distribution outcomes and
+explicit duplicate or unknown states. These are non-executable contracts:
+unsupported forms and pending provider authorities stay explicit, and their
+presence grants no behavioral or licensed coverage.
 
 ## Coverage boundary
 

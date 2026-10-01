@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a bounded, symbolic MQOPEN and MQCLOSE object-route request contract with malformed-shape rejection and explicit unsupported and pending dispositions. Catalog resolution, authorization, handle binding, and execution remain pending."

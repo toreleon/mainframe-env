@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a bounded, typed MQ host handle registry with owner and connection scope checks, generation and epoch invalidation, CICS default and unassociated message-handle identities. This contract adds no MQI handlers or coverage credit."

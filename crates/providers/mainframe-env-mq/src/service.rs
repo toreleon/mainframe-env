@@ -16,7 +16,11 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::host_context::reject_host_owned_syncpoint;
 use crate::message::canonical_message_id;
-use crate::object::{canonical_definition, canonical_name as normalize, is_canonical_name};
+use crate::object::{
+    MqObjectCapability, MqObjectCatalog, canonical_definition, canonical_name as normalize,
+    is_canonical_name,
+};
+use crate::object_service::{legacy_catalog, local_definitions, local_target};
 use crate::retention::{
     MqReplayOwnerKind, mq_pending_replay_matches, prepare_mq_replay, resolve_mq_replay,
     validate_mq_recorded_result,
@@ -27,9 +31,15 @@ const STATE_KEY: &str = "queues";
 const ROW_STORE_SCHEMA: &str = "mainframe-env.mq-row-store@1";
 pub(crate) const OBJECT_ROW_SCHEMA: &str = "mainframe-env.mq-object-row@1";
 const QUEUE_NAMESPACE: &str = "mq-v1-queue";
+const CATALOG_NAMESPACE: &str = "mq-v1-object-catalog";
+const CATALOG_KEY: &str = "catalog";
 const HANDLE_NAMESPACE: &str = "mq-v1-handle-index";
 const PENDING_NAMESPACE: &str = "mq-v1-unit-of-work";
 pub(crate) const REPLAY_NAMESPACE: &str = "mq-v1-replay";
+
+#[path = "service_object_integration.rs"]
+mod object_integration;
+use object_integration::{encode_catalog_row, load_catalog_row};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqLimits {
@@ -171,6 +181,8 @@ impl RecordedResult {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 struct State {
     definitions: Option<Vec<MqQueueDefinition>>,
+    #[serde(skip)]
+    catalog: Option<Arc<MqObjectCatalog>>,
     queues: BTreeMap<String, Arc<Queue>>,
     handles: BTreeMap<String, Arc<BTreeMap<u32, String>>>,
     pending: BTreeMap<String, Arc<PendingUnit>>,
@@ -288,12 +300,14 @@ impl MqService {
                 serde_json::to_vec(&definitions).map_err(|_| HostProblem::ProviderFailure)?
             )
         );
+        let catalog = legacy_catalog(&definitions, self.limits)?;
         let mut durable = self.lock()?;
-        if let Some(current) = &durable.state.definitions {
-            if current != &definitions {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            return Ok(install_receipt(&definitions, identity, true));
+        if let Some(current) = &durable.state.catalog {
+            return if *current.as_ref() == catalog {
+                Ok(install_receipt(&definitions, identity, true))
+            } else {
+                Err(HostProblem::IdempotencyConflict)
+            };
         }
         let mut next = durable.state.scoped_snapshot();
         for definition in &definitions {
@@ -305,7 +319,8 @@ impl MqService {
                 }),
             );
         }
-        next.definitions = Some(definitions.clone());
+        next.catalog = Some(Arc::new(catalog));
+        validate_state(&next, self.limits)?;
         self.persist(&mut durable, next)?;
         Ok(install_receipt(&definitions, identity, false))
     }
@@ -380,7 +395,7 @@ impl MqService {
         let mut next = durable.state.scoped_snapshot();
         let result = apply_request(&mut next, run, request, self.limits)?;
         let uow = [MqOperation::Commit, MqOperation::Rollback].contains(&request.operation);
-        if uow && durable.state.definitions.is_none() && !durable.state.pending.contains_key(run) {
+        if uow && durable.state.catalog.is_none() && !durable.state.pending.contains_key(run) {
             return Ok(result);
         }
         if next.replay.len() >= self.limits.max_replays {
@@ -485,8 +500,9 @@ impl MqService {
     }
 
     pub fn queue_depth(&self, queue: &str) -> Result<usize, HostProblem> {
-        let queue = normalize(queue)?;
-        self.lock()?
+        let durable = self.lock()?;
+        let queue = resolve_named_queue(&durable.state, queue, MqOperation::Get)?.0;
+        durable
             .state
             .queues
             .get(&queue)
@@ -495,8 +511,9 @@ impl MqService {
     }
 
     pub fn queue_messages(&self, queue: &str) -> Result<Vec<Vec<u8>>, HostProblem> {
-        let queue = normalize(queue)?;
-        self.lock()?
+        let durable = self.lock()?;
+        let queue = resolve_named_queue(&durable.state, queue, MqOperation::Get)?.0;
+        durable
             .state
             .queues
             .get(&queue)
@@ -596,8 +613,9 @@ fn load_or_migrate(
             (STATE_NAMESPACE.into(), STATE_KEY.into()),
             manifest_record.version,
         )]);
-        let state = State {
+        let mut state = State {
             definitions: manifest.definitions,
+            catalog: load_catalog_row(store, limits, &mut versions)?,
             queues: load_row_map(
                 store,
                 QUEUE_NAMESPACE,
@@ -628,7 +646,40 @@ fn load_or_migrate(
             )?,
             next_handle: manifest.next_handle,
         };
+        let missing_catalog = state.catalog.is_none() && state.definitions.is_some();
+        if missing_catalog {
+            let catalog = legacy_catalog(state.definitions.as_ref().unwrap(), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            state.catalog = Some(Arc::new(catalog));
+        }
         validate_state(&state, limits)?;
+        let mut changes = Vec::new();
+        if missing_catalog {
+            let payload = encode_catalog_row(state.catalog.as_ref().unwrap())?;
+            changes.push(put_row_change(
+                CATALOG_NAMESPACE,
+                CATALOG_KEY,
+                payload,
+                &versions,
+                limits.max_state_bytes,
+            )?);
+        }
+        if state.definitions.is_some() {
+            let normalized = RowStoreManifest {
+                schema_version: ROW_STORE_SCHEMA.into(),
+                definitions: None,
+                next_handle: state.next_handle,
+            };
+            changes.push(put_row_change(
+                STATE_NAMESPACE,
+                STATE_KEY,
+                serde_json::to_vec(&normalized).map_err(|_| HostProblem::InfrastructureFailure)?,
+                &versions,
+                limits.max_state_bytes,
+            )?);
+        }
+        commit_row_changes(store, changes, &mut versions)?;
+        state.definitions = None;
         return Ok((state, versions));
     }
 
@@ -637,7 +688,13 @@ fn load_or_migrate(
     if legacy.next_handle == 0 {
         legacy.next_handle = 1;
     }
+    if let Some(definitions) = &legacy.definitions {
+        legacy.catalog = Some(Arc::new(
+            legacy_catalog(definitions, limits).map_err(|_| HostProblem::InfrastructureFailure)?,
+        ));
+    }
     validate_state(&legacy, limits)?;
+    legacy.definitions = None;
     ensure_row_namespaces_empty(store)?;
     let mut versions = RowVersions::from([(
         (STATE_NAMESPACE.into(), STATE_KEY.into()),
@@ -651,6 +708,7 @@ fn load_or_migrate(
 fn ensure_row_namespaces_empty(store: &dyn ProviderStateStore) -> Result<(), HostProblem> {
     for namespace in [
         QUEUE_NAMESPACE,
+        CATALOG_NAMESPACE,
         HANDLE_NAMESPACE,
         PENDING_NAMESPACE,
         REPLAY_NAMESPACE,
@@ -742,6 +800,29 @@ fn row_changes(
         limits,
         &mut changes,
     )?;
+    if current.catalog != next.catalog {
+        if let Some(catalog) = &next.catalog {
+            changes.push(put_row_change(
+                CATALOG_NAMESPACE,
+                CATALOG_KEY,
+                encode_catalog_row(catalog)?,
+                versions,
+                limits.max_state_bytes,
+            )?);
+        } else if let Some(version) = versions.get(&(CATALOG_NAMESPACE.into(), CATALOG_KEY.into()))
+        {
+            changes.push(RowChange {
+                namespace: CATALOG_NAMESPACE.into(),
+                key: CATALOG_KEY.into(),
+                next_version: None,
+                mutation: ProviderStateMutation::Delete {
+                    namespace: CATALOG_NAMESPACE.into(),
+                    key: CATALOG_KEY.into(),
+                    expected_version: *version,
+                },
+            });
+        }
+    }
     map_arc_row_changes(
         HANDLE_NAMESPACE,
         &current.handles,
@@ -904,9 +985,15 @@ fn mq_resources(
             queues.extend(pending.gets.iter().map(|(queue, _)| queue.clone()));
         }
         MqOperation::Commit | MqOperation::Rollback => return Ok(Vec::new()),
-        _ => {
-            queues.insert(resolve_queue(state, run, request)?);
-        }
+        _ => match resolve_queue_target(state, run, request) {
+            Ok((_, path)) => queues.extend(path),
+            Err(HostProblem::NotFound) if request.operation == MqOperation::Open => {
+                queues.insert(normalize(
+                    request.queue.as_deref().ok_or(HostProblem::Malformed)?,
+                )?);
+            }
+            Err(problem) => return Err(problem),
+        },
     }
     if queues.is_empty() {
         return Ok(vec![EnterpriseResource::new(
@@ -943,10 +1030,11 @@ fn open(
     request: &MqRequest,
     limits: MqLimits,
 ) -> Result<MqResult, HostProblem> {
-    let queue = normalize(request.queue.as_deref().ok_or(HostProblem::Malformed)?)?;
-    if !state.queues.contains_key(&queue) {
-        return Ok(condition(2, 2085));
-    }
+    let queue = match resolve_queue_target(state, run, request) {
+        Ok((queue, _)) if state.queues.contains_key(&queue) => queue,
+        Ok(_) | Err(HostProblem::NotFound) => return Ok(condition(2, 2085)),
+        Err(problem) => return Err(problem),
+    };
     let handle_count: usize = state.handles.values().map(|handles| handles.len()).sum();
     if handle_count >= limits.max_handles {
         return Err(HostProblem::ResourceExhausted);
@@ -1108,16 +1196,56 @@ fn rollback(state: &mut State, run: &str, limits: MqLimits) -> Result<MqResult, 
 }
 
 fn resolve_queue(state: &State, run: &str, request: &MqRequest) -> Result<String, HostProblem> {
-    if let Some(queue) = &request.queue {
-        return normalize(queue);
+    resolve_queue_target(state, run, request).map(|(target, _)| target)
+}
+
+fn resolve_queue_target(
+    state: &State,
+    run: &str,
+    request: &MqRequest,
+) -> Result<(String, Vec<String>), HostProblem> {
+    if request.operation != MqOperation::Open
+        && request.operation != MqOperation::PutOne
+        && let Some(handle) = request.handle
+    {
+        let target = state
+            .handles
+            .get(run)
+            .and_then(|handles| handles.get(&handle))
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
+        let mut path = vec![target.clone()];
+        if let Some(name) = &request.queue {
+            let (supplied, supplied_path) = resolve_named_queue(state, name, request.operation)?;
+            if supplied != target {
+                return Err(HostProblem::Malformed);
+            }
+            path.extend(supplied_path);
+        }
+        return Ok((target, path));
     }
-    let handle = request.handle.ok_or(HostProblem::Malformed)?;
-    state
-        .handles
-        .get(run)
-        .and_then(|handles| handles.get(&handle))
-        .cloned()
-        .ok_or(HostProblem::NotFound)
+    if request.operation == MqOperation::Close {
+        return Err(HostProblem::Malformed);
+    }
+    let name = request.queue.as_deref().ok_or(HostProblem::Malformed)?;
+    resolve_named_queue(state, name, request.operation)
+}
+
+fn resolve_named_queue(
+    state: &State,
+    name: &str,
+    operation: MqOperation,
+) -> Result<(String, Vec<String>), HostProblem> {
+    let name = normalize(name)?;
+    let Some(catalog) = &state.catalog else {
+        return Ok((name.clone(), vec![name]));
+    };
+    let capability = if operation == MqOperation::Get {
+        MqObjectCapability::Input
+    } else {
+        MqObjectCapability::Output
+    };
+    local_target(catalog, &name, capability)
 }
 
 fn success() -> MqResult {
@@ -1229,33 +1357,51 @@ fn validate_state(state: &State, limits: MqLimits) -> Result<(), HostProblem> {
     {
         return Err(HostProblem::InfrastructureFailure);
     }
-    match &state.definitions {
-        Some(definitions) => {
-            validate_definitions(definitions, limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            let defined = definitions
-                .iter()
-                .map(|definition| definition.name.clone())
-                .collect::<BTreeSet<_>>();
-            if defined != state.queues.keys().cloned().collect()
-                || definitions.iter().any(|definition| {
+    match (&state.catalog, &state.definitions) {
+        (Some(catalog), definitions) => {
+            if catalog.encode().is_err() || catalog.model_instances().next().is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let expected = local_definitions(catalog)
+                .map(|(name, trigger)| {
+                    (
+                        name.as_str().to_owned(),
+                        trigger.as_ref().map(|name| name.as_str().to_owned()),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>();
+            if expected.len() != state.queues.len()
+                || expected.iter().any(|(name, trigger)| {
                     state
                         .queues
-                        .get(&definition.name)
-                        .is_none_or(|queue| queue.trigger_program != definition.trigger_program)
+                        .get(name)
+                        .is_none_or(|queue| &queue.trigger_program != trigger)
                 })
+                || state.queues.keys().any(|name| !expected.contains_key(name))
             {
                 return Err(HostProblem::InfrastructureFailure);
             }
+            if let Some(definitions) = definitions {
+                validate_definitions(definitions, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                if legacy_catalog(definitions, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?
+                    != **catalog
+                {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+            }
         }
-        None if !state.queues.is_empty()
-            || !state.handles.is_empty()
-            || !state.pending.is_empty()
-            || !state.replay.is_empty() =>
+        (None, _)
+            if !state.queues.is_empty()
+                || !state.handles.is_empty()
+                || !state.pending.is_empty()
+                || !state.replay.is_empty() =>
         {
             return Err(HostProblem::InfrastructureFailure);
         }
-        None => {}
+        (None, Some(_)) => return Err(HostProblem::InfrastructureFailure),
+        (None, None) => {}
     }
     Ok(())
 }
@@ -1452,7 +1598,7 @@ mod tests {
 
     fn invocation(run: &str) -> Invocation {
         let limits = InvocationLimits::default();
-        Invocation::new(
+        let mut invocation = Invocation::new(
             RequestId::new(format!("request-{run}"), limits).unwrap(),
             ExecutionId::new(format!("execution-{run}"), limits).unwrap(),
             RunUnitId::new(run, limits).unwrap(),
@@ -1475,7 +1621,17 @@ mod tests {
             BTreeMap::new(),
             limits,
         )
-        .unwrap()
+        .unwrap();
+        bind_host_context(&mut invocation, b"other-bindings|queue-manager");
+        invocation
+    }
+
+    fn bind_host_context(invocation: &mut Invocation, value: &[u8]) {
+        let (binding, schema) = crate::host_context::host_context_contract();
+        invocation.bindings.insert(
+            binding.into(),
+            BoundedPayload::new(schema, value.to_vec(), InvocationLimits::default()).unwrap(),
+        );
     }
 
     fn request(operation: MqOperation, sequence: u64) -> MqRequest {
@@ -1610,6 +1766,9 @@ mod tests {
 
     fn cics_invocation(run: &str) -> Invocation {
         let mut invocation = invocation(run);
+        invocation
+            .bindings
+            .remove(crate::host_context::host_context_contract().0);
         let (binding, schema) = crate::host_context::cics_execution_context_contract();
         invocation.bindings.insert(
             binding.into(),
@@ -1649,6 +1808,296 @@ mod tests {
         )
         .unwrap();
         request
+    }
+
+    #[test]
+    fn attested_context_controls_direct_commit_and_backout_before_store_mutation() {
+        for operation in [MqOperation::Commit, MqOperation::Rollback] {
+            for (index, (binding, allowed)) in [
+                (b"zos-batch|queue-manager".as_slice(), true),
+                (b"zos-ims-batch-dli|queue-manager".as_slice(), true),
+                (b"mqi-client|queue-manager".as_slice(), true),
+                (b"other-bindings|queue-manager".as_slice(), true),
+                (b"zos-batch|host-coordinator".as_slice(), false),
+                (b"zos-ims-batch-dli|host-coordinator".as_slice(), false),
+                (b"zos-cics|host-coordinator".as_slice(), false),
+                (b"zos-ims|host-coordinator".as_slice(), false),
+                (b"mqi-client|host-coordinator".as_slice(), false),
+                (b"other-bindings|host-coordinator".as_slice(), false),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let store: Arc<dyn ProviderStateStore> =
+                    Arc::new(MemoryStore::new(Default::default()));
+                let service = MqService::open(store.clone(), Default::default()).unwrap();
+                service
+                    .install(vec![MqQueueDefinition {
+                        name: "HOST.Q".into(),
+                        trigger_program: None,
+                    }])
+                    .unwrap();
+                let run = format!("host-{operation:?}-{index}");
+                let mut invocation = invocation(&run);
+                let mut put = request(MqOperation::PutOne, 1);
+                put.queue = Some("HOST.Q".into());
+                put.message = b"pending".to_vec();
+                put.options = 2;
+                service.execute(&invocation, &put).unwrap();
+                let before_queue = store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap();
+                let before_pending = store.list_provider_state(PENDING_NAMESPACE, 8).unwrap();
+                let before_replay = store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap();
+                bind_host_context(&mut invocation, binding);
+                let direct = request(operation, 2);
+                let replay_key = direct.mutation.as_ref().unwrap().idempotency_key.as_str();
+                let result = service.execute(&invocation, &direct).unwrap();
+                if allowed {
+                    assert_eq!((result.completion_code, result.reason_code), (0, 0));
+                    assert!(
+                        store
+                            .get_provider_state(REPLAY_NAMESPACE, replay_key)
+                            .unwrap()
+                            .is_some()
+                    );
+                } else {
+                    assert_eq!((result.completion_code, result.reason_code), (2, 2012));
+                    assert!(
+                        store
+                            .get_provider_state(REPLAY_NAMESPACE, replay_key)
+                            .unwrap()
+                            .is_none()
+                    );
+                    assert!(service.lock().unwrap().state.pending.contains_key(&run));
+                    assert_eq!(
+                        store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap(),
+                        before_queue
+                    );
+                    assert_eq!(
+                        store.list_provider_state(PENDING_NAMESPACE, 8).unwrap(),
+                        before_pending
+                    );
+                    assert_eq!(
+                        store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap(),
+                        before_replay
+                    );
+                }
+                assert_eq!(
+                    service.queue_depth("HOST.Q"),
+                    Ok(usize::from(allowed && operation == MqOperation::Commit))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn missing_malformed_and_contradictory_contexts_leave_pending_and_replay_untouched() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store.clone(), Default::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "HOST.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let mut caller = invocation("malformed-host");
+        let mut put = request(MqOperation::PutOne, 1);
+        put.queue = Some("HOST.Q".into());
+        put.message = b"pending".to_vec();
+        put.options = 2;
+        service.execute(&caller, &put).unwrap();
+        let (binding, _) = crate::host_context::host_context_contract();
+        let (cics_binding, cics_schema) = crate::host_context::cics_execution_context_contract();
+        let before_queue = store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap();
+        let before_pending = store.list_provider_state(PENDING_NAMESPACE, 8).unwrap();
+        let before_replay = store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap();
+        for index in 0..7 {
+            let mut candidate = caller.clone();
+            match index {
+                0 => {
+                    candidate.bindings.remove(binding);
+                }
+                1 => {
+                    candidate.bindings.insert(
+                        binding.into(),
+                        BoundedPayload::new(
+                            "mainframe-env.mq.host-context@2",
+                            b"zos-batch|queue-manager".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    );
+                }
+                2 => bind_host_context(&mut candidate, b"zos-batch|unknown"),
+                3 => bind_host_context(&mut candidate, b"zos-cics|queue-manager"),
+                4 => bind_host_context(&mut candidate, b"zos-ims|queue-manager"),
+                5 => {
+                    candidate.bindings.insert(
+                        cics_binding.into(),
+                        BoundedPayload::new(
+                            cics_schema,
+                            b"local".to_vec(),
+                            InvocationLimits::default(),
+                        )
+                        .unwrap(),
+                    );
+                }
+                _ => {
+                    for (name, schema, value) in [
+                        (
+                            crate::retention::CICS_NESTED_EFFECT_ORIGIN_BINDING,
+                            crate::retention::CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                            b"cics:malformed-host:106".as_slice(),
+                        ),
+                        (
+                            crate::retention::CICS_OUTER_EFFECT_ORIGIN_BINDING,
+                            crate::retention::CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+                            b"outer-effect".as_slice(),
+                        ),
+                    ] {
+                        candidate.bindings.insert(
+                            name.into(),
+                            BoundedPayload::new(
+                                schema,
+                                value.to_vec(),
+                                InvocationLimits::default(),
+                            )
+                            .unwrap(),
+                        );
+                    }
+                }
+            }
+            let direct = request(MqOperation::Commit, 100 + index);
+            assert_eq!(
+                service.execute(&candidate, &direct),
+                Err(HostProblem::Malformed)
+            );
+            assert_eq!(
+                store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap(),
+                before_replay
+            );
+            assert_eq!(
+                store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap(),
+                before_queue
+            );
+            assert_eq!(
+                store.list_provider_state(PENDING_NAMESPACE, 8).unwrap(),
+                before_pending
+            );
+            assert!(
+                service
+                    .lock()
+                    .unwrap()
+                    .state
+                    .pending
+                    .contains_key("malformed-host")
+            );
+            assert_eq!(service.queue_depth("HOST.Q"), Ok(0));
+        }
+        caller.bindings.remove(binding);
+        caller.bindings.insert(
+            cics_binding.into(),
+            BoundedPayload::new(cics_schema, b"local".to_vec(), InvocationLimits::default())
+                .unwrap(),
+        );
+        let direct = request(MqOperation::Commit, 200);
+        let rejected = service.execute(&caller, &direct).unwrap();
+        assert_eq!((rejected.completion_code, rejected.reason_code), (2, 2012));
+        assert_eq!(
+            store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap(),
+            before_replay
+        );
+        assert_eq!(
+            store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap(),
+            before_queue
+        );
+        assert_eq!(
+            store.list_provider_state(PENDING_NAMESPACE, 8).unwrap(),
+            before_pending
+        );
+        let mut malformed_put = request(MqOperation::PutOne, 300);
+        malformed_put.queue = Some("HOST.Q".into());
+        malformed_put.message = b"must-not-write".to_vec();
+        caller.bindings.remove(cics_binding);
+        bind_host_context(&mut caller, b"zos-batch|unknown");
+        assert_eq!(
+            service.execute(&caller, &malformed_put),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap(),
+            before_queue
+        );
+        assert_eq!(
+            store.list_provider_state(PENDING_NAMESPACE, 8).unwrap(),
+            before_pending
+        );
+        assert_eq!(
+            store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap(),
+            before_replay
+        );
+    }
+
+    #[test]
+    fn selected_host_provider_rejects_ims_syncpoint_without_sqlite_row_changes() {
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap());
+        let service = MqService::open(store.clone(), Default::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "IMS.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let mut invocation = invocation("ims-host-route");
+        let mut put = request(MqOperation::PutOne, 1);
+        put.queue = Some("IMS.Q".into());
+        put.message = b"pending".to_vec();
+        put.options = 2;
+        service.execute(&invocation, &put).unwrap();
+        let before_queue = store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap();
+        let before_pending = store.list_provider_state(PENDING_NAMESPACE, 8).unwrap();
+        let before_replay = store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap();
+        let provider = mq_providers(service.clone(), InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.mq.write")
+            .unwrap();
+        let direct = request(MqOperation::Commit, 2);
+        let effect = EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 2,
+            deadline_tick: invocation.deadline_tick,
+            idempotency_key: direct
+                .mutation
+                .as_ref()
+                .map(|value| value.idempotency_key.clone()),
+            request: HostRequest::Mq(direct),
+        };
+        bind_host_context(&mut invocation, b"zos-ims|host-coordinator");
+        let result = provider.invoke(&invocation, effect.clone());
+        let Ok(HostResult::Mq(rejected)) = result.outcome else {
+            panic!("IMS direct commit must have an MQ context result");
+        };
+        assert_eq!((rejected.completion_code, rejected.reason_code), (2, 2012));
+        invocation
+            .bindings
+            .remove(crate::host_context::host_context_contract().0);
+        assert_eq!(
+            provider.invoke(&invocation, effect).outcome,
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            store.list_provider_state(QUEUE_NAMESPACE, 8).unwrap(),
+            before_queue
+        );
+        assert_eq!(
+            store.list_provider_state(PENDING_NAMESPACE, 8).unwrap(),
+            before_pending
+        );
+        assert_eq!(
+            store.list_provider_state(REPLAY_NAMESPACE, 8).unwrap(),
+            before_replay
+        );
+        assert_eq!(service.queue_depth("IMS.Q"), Ok(0));
     }
 
     #[test]
@@ -2285,6 +2734,7 @@ mod tests {
         ];
         let legacy = State {
             definitions: Some(definitions),
+            catalog: None,
             queues: BTreeMap::from([
                 (
                     "QUEUE.A".into(),

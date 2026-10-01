@@ -20,6 +20,10 @@ mod ims_status;
 mod mq_catalog;
 mod mq_context;
 mod mq_contract;
+mod mq_handles;
+mod mq_message_contract;
+pub mod mq_object_route;
+mod mq_validation;
 mod names;
 mod registry;
 mod request;
@@ -83,6 +87,24 @@ pub use mq_contract::{
     MqMqiContractDescriptor, MqMqiHandleAction, MqMqiHandleRole, MqMqiParameterDescriptor,
     MqMqiParameterDirection, MqMqiParameterRole, MqMqiSignatureStatus, MqMqiSourceSpellingAnomaly,
     MqMqiSourceStatus, mq_mqi_contract, mq_mqi_contract_by_label, mq_mqi_contracts,
+};
+pub use mq_handles::{
+    MQ_MAX_HANDLE_SLOTS, MQHC_DEF_HCONN, MQHC_UNASSOCIATED_HCONN, MqConnectionId, MqHandle,
+    MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHandleSharing, MqHconn,
+    MqHmsg, MqHobj, MqHsub,
+};
+pub use mq_message_contract::{
+    MQ_MESSAGE_CONTRACT, MQ_MESSAGE_PENDING, MQ_MESSAGE_SOURCES, MqDeliveryOutcome,
+    MqDistributionItemResult, MqDistributionResult, MqExpiry, MqGetContract, MqGetDisposition,
+    MqGetMode, MqMessage, MqMessageDescriptor, MqMessageIdentifiers, MqMessageLimits,
+    MqMessageMatch, MqMessageOrdering, MqMessagePending, MqMessageProblem, MqMessageProperty,
+    MqMessageSource, MqPersistence, MqPriority, MqPropertyQuery, MqPropertyType, MqTruncation,
+    MqTruncationDisposition, MqWait,
+};
+pub use mq_validation::{
+    MqArgument, MqArgumentValue, MqExecutionDisposition, MqPendingDisposition, MqStructureVersion,
+    MqValidationError, MqValidationProblem, MqValidationReport, MqValidationSource,
+    validate_mqi_call,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,

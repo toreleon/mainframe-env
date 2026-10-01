@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added source-bound MQI structure, parameter-shape, length, option-family, and documented combination validation across the 26 pinned call identities. Unstated numeric legality remains pending; no handler or conformance/licensed credit is added."

@@ -152,6 +152,16 @@ impl MqObjectCatalog {
         &self.queue_manager
     }
 
+    /// Definitions supplied by package topology, in stable namespace/name order.
+    pub fn definitions(&self) -> impl Iterator<Item = &MqObjectDefinition> {
+        self.objects.values()
+    }
+
+    /// Dynamic queues are part of the same authority as the static definitions.
+    pub fn model_instances(&self) -> impl Iterator<Item = &MqModelInstance> {
+        self.instances.values()
+    }
+
     pub fn kind(&self, lookup: &MqObjectLookup) -> Result<MqObjectKind, MqObjectError> {
         if matches!(lookup, MqObjectLookup::QueueManager) {
             return Ok(MqObjectKind::QueueManager);
