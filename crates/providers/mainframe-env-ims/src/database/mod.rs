@@ -12,6 +12,24 @@ use std::fmt;
 
 pub use crate::metadata::ImsDatabaseOrganization as DatabaseOrganization;
 
+pub(crate) fn is_index_database(organization: DatabaseOrganization) -> bool {
+    matches!(
+        organization,
+        DatabaseOrganization::Index | DatabaseOrganization::Psindex
+    )
+}
+
+pub(crate) fn keyed_root_order(organization: DatabaseOrganization) -> bool {
+    matches!(
+        organization,
+        DatabaseOrganization::Hidam
+            | DatabaseOrganization::Hisam
+            | DatabaseOrganization::Msdb
+            | DatabaseOrganization::Phidam
+            | DatabaseOrganization::Shisam
+    )
+}
+
 /// Explicit resource bounds for one database engine instance.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct EngineLimits {
@@ -229,6 +247,15 @@ struct Record {
     version: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub(crate) struct LogicalLink {
+    pub(crate) child: RecordId,
+    pub(crate) parent_database: String,
+    pub(crate) parent_segment: String,
+    pub(crate) parent: RecordId,
+    pub(crate) paired: bool,
+}
+
 type IndexValues = Vec<(String, Option<Vec<u8>>)>;
 
 /// Cloneable deterministic database image. Persistence remains owned by the
@@ -240,6 +267,7 @@ pub struct DatabaseEngine {
     records: BTreeMap<RecordId, Record>,
     roots: Vec<RecordId>,
     indexes: BTreeMap<String, BTreeMap<Vec<u8>, BTreeSet<RecordId>>>,
+    logical_links: BTreeSet<LogicalLink>,
     next_id: u64,
     revision: u64,
 }
@@ -250,11 +278,14 @@ pub struct DatabaseEngineImage {
     definition: DatabaseDefinition,
     records: Vec<Record>,
     roots: Vec<RecordId>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    logical_links: BTreeSet<LogicalLink>,
     next_id: u64,
     revision: u64,
 }
 
 mod definition;
+mod logical;
 mod navigation;
 mod store;
 
@@ -276,6 +307,7 @@ impl DatabaseEngine {
             records: BTreeMap::new(),
             roots: Vec::new(),
             indexes,
+            logical_links: BTreeSet::new(),
             next_id: 1,
             revision: 0,
         })
@@ -304,6 +336,7 @@ impl DatabaseEngine {
             definition: self.definition.clone(),
             records: self.records.values().cloned().collect(),
             roots: self.roots.clone(),
+            logical_links: self.logical_links.clone(),
             next_id: self.next_id,
             revision: self.revision,
         }
@@ -323,6 +356,7 @@ impl DatabaseEngine {
             }
         }
         engine.roots = image.roots;
+        engine.logical_links = image.logical_links;
         engine.next_id = image.next_id;
         engine.revision = image.revision;
         for (id, record) in &engine.records {
@@ -364,12 +398,7 @@ impl DatabaseEngine {
             }
         }
         let mut ordered_roots = self.roots.clone();
-        let keyed = matches!(
-            self.definition.organization,
-            DatabaseOrganization::Hidam
-                | DatabaseOrganization::Hisam
-                | DatabaseOrganization::Shisam
-        );
+        let keyed = keyed_root_order(self.definition.organization);
         self.sort_ids(&mut ordered_roots, keyed);
         if ordered_roots != self.roots {
             return Err(EngineProblem::InvalidData);
@@ -404,6 +433,7 @@ impl DatabaseEngine {
         if reachable.len() != self.records.len() {
             return Err(EngineProblem::InvalidData);
         }
+        self.validate_logical_links()?;
         let mut rebuilt = self.clone();
         rebuilt.indexes = self
             .definition
@@ -508,6 +538,7 @@ impl DatabaseEngine {
             self.revision,
             self.records.values().collect::<Vec<_>>(),
             &self.roots,
+            &self.logical_links,
             indexes,
         ))
         .expect("bounded database state has an infallible JSON representation");

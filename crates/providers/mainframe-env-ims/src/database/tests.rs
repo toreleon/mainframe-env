@@ -503,11 +503,63 @@ fn gsam_is_bounded_ordered_and_append_only() {
 }
 
 #[test]
-fn canonical_metadata_organization_rejects_unsupported_form() {
-    let mut unsupported = definition(DatabaseOrganization::Hidam);
-    unsupported.organization = crate::metadata::ImsDatabaseOrganization::Dedb;
-    assert!(matches!(
-        DatabaseEngine::new(unsupported, EngineLimits::default()),
-        Err(EngineProblem::Unsupported)
-    ));
+fn all_pinned_organizations_have_bounded_engine_or_index_only_behavior() {
+    use DatabaseOrganization::*;
+    let organizations = [
+        Dedb, Gsam, Hdam, Hidam, Hisam, Hsam, Index, Msdb, Phdam, Phidam, Psindex, Shisam, Shsam,
+    ];
+    for organization in organizations {
+        let mut descriptor = definition(organization);
+        descriptor.secondary_indexes.clear();
+        if matches!(organization, Gsam | Hsam | Shsam) {
+            descriptor.segments[0].key_field = None;
+        }
+        if matches!(organization, Gsam | Index | Msdb | Psindex | Shisam | Shsam) {
+            descriptor.segments.truncate(1);
+        }
+        if organization == Shsam {
+            descriptor.segments[0].max_length = descriptor.segments[0].min_length;
+        }
+        let mut engine = DatabaseEngine::new(descriptor, EngineLimits::default()).unwrap();
+        let before = engine.state_digest();
+        let first = engine.insert(InsertRequest {
+            segment: "ROOT".into(),
+            parent: None,
+            data: b"R2A".to_vec(),
+        });
+        if matches!(organization, Index | Psindex) {
+            assert_eq!(first, Err(EngineProblem::Unsupported));
+            assert_eq!(engine.state_digest(), before);
+            engine
+                .insert_loaded(InsertRequest {
+                    segment: "ROOT".into(),
+                    parent: None,
+                    data: b"R2A".to_vec(),
+                })
+                .unwrap();
+        } else {
+            first.unwrap();
+        }
+        engine
+            .insert_loaded(InsertRequest {
+                segment: "ROOT".into(),
+                parent: None,
+                data: b"R1B".to_vec(),
+            })
+            .unwrap();
+        let expected = if keyed_root_order(organization) {
+            b"R1B"
+        } else {
+            b"R2A"
+        };
+        assert_eq!(
+            engine.ordered_records()[0].data,
+            expected,
+            "{organization:?}"
+        );
+        assert_eq!(
+            DatabaseEngine::restore(engine.image(), EngineLimits::default()).unwrap(),
+            engine
+        );
+    }
 }

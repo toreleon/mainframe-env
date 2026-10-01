@@ -62,10 +62,15 @@ route after `install_metadata`. The typed catalog selects database and PCB
 authority; separate versioned rows retain generic images and undo, while
 sessions and replay use the existing IMS rows. GU/GN/GNP and their Get Hold
 forms, ISRT/REPL/DLET, bulk load/unload, checkpoint, commit, and rollback use
-the bounded engine for HDAM/HIDAM, HISAM/SHISAM, and GSAM definitions it can
-represent. Unsupported organizations, composite secondary indexes, and logical
-relationships are rejected at installation. Legacy and generic catalogs may
-coexist when their database and PSB names do not overlap.
+the bounded engine for all pinned data organizations. INDEX and PSINDEX are
+metadata-validated index databases and reject application data PCB scheduling.
+Logical child occurrences retain metadata-selected parent links in the existing
+database images; a child read includes the linked parent data, and paired
+parent deletion removes linked children in one provider-row CAS publication.
+Insertion identifies one logical parent with parent-segment field qualifiers.
+An unpaired parent with live children rejects deletion. Composite secondary
+indexes remain outside this route. Legacy and generic catalogs may coexist
+when their database and PSB names do not overlap.
 
 TM admission records a provider-row intent before adding work. An exact retry
 or `repair_schedules` repairs that bounded cross-interface gap without executing

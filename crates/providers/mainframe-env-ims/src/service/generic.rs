@@ -1,10 +1,12 @@
 use super::*;
 use crate::database::{
-    DatabaseDefinition, DatabaseEngine, DatabaseOrganization, EngineLimits, EngineProblem,
-    FieldDefinition, FieldPredicate, InsertRequest, ReadKind, ReadRequest, RecordView, Relation,
+    DatabaseDefinition, DatabaseEngine, EngineLimits, EngineProblem, FieldDefinition,
+    FieldPredicate, InsertRequest, ReadKind, ReadRequest, RecordView, Relation,
     SecondaryIndexDefinition, SegmentDefinition, SegmentSelector,
 };
-use crate::{ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata, ImsPcbMetadata};
+use crate::{ImsDatabaseMetadata, ImsDatabasePcbMetadata, ImsPcbMetadata};
+
+mod logical;
 
 /// Ordered bulk image; each parent refers to an earlier record by zero-based index.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -36,17 +38,7 @@ fn engine_limits(limits: ImsLimits) -> EngineLimits {
 }
 
 fn definition(database: &ImsDatabaseMetadata) -> Result<DatabaseDefinition, HostProblem> {
-    let organization = match database.organization {
-        ImsDatabaseOrganization::Hdam => DatabaseOrganization::Hdam,
-        ImsDatabaseOrganization::Hidam => DatabaseOrganization::Hidam,
-        ImsDatabaseOrganization::Hisam => DatabaseOrganization::Hisam,
-        ImsDatabaseOrganization::Shisam => DatabaseOrganization::Shisam,
-        ImsDatabaseOrganization::Gsam => DatabaseOrganization::Gsam,
-        _ => return Err(HostProblem::Unsupported),
-    };
-    if !database.logical_relationships.is_empty() {
-        return Err(HostProblem::Unsupported);
-    }
+    let organization = database.organization;
     let mut remaining = database.segments.clone();
     let mut segments = Vec::new();
     while !remaining.is_empty() {
@@ -345,11 +337,28 @@ pub(super) fn resources(
     } else {
         AccessIntent::Read
     };
-    for name in databases {
+    let connected = databases
+        .iter()
+        .map(|name| logical::related_databases(state, name))
+        .collect::<Result<Vec<_>, _>>()?;
+    for name in &databases {
         resources.push(EnterpriseResource::new(
             EnterpriseResourceClass::ImsDatabase,
             name,
             intent,
+        )?);
+    }
+    let related_intent = if request.operation == ImsOperation::Delete {
+        AccessIntent::Update
+    } else {
+        AccessIntent::Read
+    };
+    let connected = connected.into_iter().flatten().collect::<BTreeSet<_>>();
+    for name in connected.difference(&databases) {
+        resources.push(EnterpriseResource::new(
+            EnterpriseResourceClass::ImsDatabase,
+            name,
+            related_intent,
         )?);
     }
     Ok(resources)
@@ -555,7 +564,7 @@ fn read(
     match engine.read(&mut session.position, &read) {
         Ok(view) => Ok(ImsResult {
             status: "  ".into(),
-            segments: vec![segment_result(&engine, view)?],
+            segments: vec![logical::segment_result(state, limits, &engine, view)?],
             checkpoint_id: None,
             affected_segments: 0,
         }),
@@ -641,6 +650,23 @@ fn mutate(
     if !allowed(&pcb, &target, request.operation) {
         return Ok(status("AC"));
     }
+    if request.operation == ImsOperation::Delete {
+        let (count, images) = match logical::delete_cascade(state, limits, &name, &mut position) {
+            Ok(changed) => changed,
+            Err(logical::LogicalMutationError::Status(code)) => return Ok(status(code)),
+            Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
+        };
+        for (database, image) in images {
+            begin_unit(state, run, &database)?;
+            state
+                .generic_databases
+                .insert(database.clone(), Arc::new(image.image()));
+            reset_positions(state, &database, Some(run));
+        }
+        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).position =
+            position;
+        return Ok(affected(count as u64));
+    }
     let changed = match request.operation {
         ImsOperation::Insert => {
             let segment = engine
@@ -691,19 +717,27 @@ fn mutate(
             if segment.parent.is_some() && parent.is_none() {
                 return Ok(status("GP"));
             }
-            engine
-                .insert(InsertRequest {
-                    segment: target,
-                    parent,
-                    data: request.data.clone(),
-                })
-                .map(|view| {
+            let inserted = engine.insert(InsertRequest {
+                segment: target,
+                parent,
+                data: request.data.clone(),
+            });
+            match inserted {
+                Ok(view) => {
+                    match logical::link_insert(state, limits, &name, &view, request, &mut engine) {
+                        Ok(()) => {}
+                        Err(logical::LogicalMutationError::Status(code)) => {
+                            return Ok(status(code));
+                        }
+                        Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
+                    }
                     position.set_current(view.id);
-                    1usize
-                })
+                    Ok(1usize)
+                }
+                Err(problem) => Err(problem),
+            }
         }
         ImsOperation::Replace => engine.replace(&mut position, &request.data).map(|_| 1),
-        ImsOperation::Delete => engine.delete(&mut position),
         _ => unreachable!(),
     };
     let count = match changed {
@@ -714,10 +748,6 @@ fn mutate(
     state
         .generic_databases
         .insert(name, Arc::new(engine.image()));
-    if request.operation == ImsOperation::Delete {
-        let name = session_database(state, run)?;
-        reset_positions(state, &name, Some(run));
-    }
     Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).position = position;
     Ok(affected(count as u64))
 }
@@ -768,7 +798,7 @@ fn load(
             .map(|index| ids.get(index).copied().ok_or(HostProblem::Malformed))
             .transpose()?;
         let view = engine
-            .insert(InsertRequest {
+            .insert_loaded(InsertRequest {
                 segment: normalize(&record.segment),
                 parent,
                 data: record.data.clone(),
@@ -861,6 +891,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
             return Err(HostProblem::InfrastructureFailure);
         }
     }
+    logical::validate_links(state, limits)?;
     for pending in state.generic_pending_undo.values() {
         for (name, image) in pending.iter() {
             let engine = DatabaseEngine::restore((**image).clone(), engine_limits(limits))
@@ -897,8 +928,9 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
 mod tests {
     use super::*;
     use crate::{
-        IMS_METADATA_SCHEMA_V1, ImsDbLevel, ImsFieldMetadata, ImsPsbMetadata,
-        ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
+        IMS_METADATA_SCHEMA_V1, ImsDatabaseOrganization, ImsDbLevel, ImsFieldMetadata,
+        ImsLogicalRelationshipMetadata, ImsPsbMetadata, ImsSecondaryIndexMetadata,
+        ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
     };
     use mainframe_env_execution_api::{
         ArtifactRef, ExecutionId, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId,
@@ -909,6 +941,8 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
+
+    mod closure_tests;
 
     fn catalog() -> ImsMetadataCatalog {
         fn field(name: &str, offset: usize, sequence: bool) -> ImsFieldMetadata {

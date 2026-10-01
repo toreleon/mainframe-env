@@ -1,4 +1,4 @@
-//! Bounded durable IMS HIDAM hierarchy, PCB, DLI, and checkpoint authority.
+//! Bounded durable IMS database, PCB, DL/I, and checkpoint authority.
 
 #![forbid(unsafe_code)]
 
@@ -28,9 +28,9 @@ pub use retention::{
 };
 
 pub use service::{
-    ImsApplicationDefinition, ImsDatabaseDefinition, ImsInstallReceipt, ImsLimits, ImsLoadImage,
-    ImsLoadRoot, ImsPcbDefinition, ImsPsbDefinition, ImsReplayClock, ImsSegmentDefinition,
-    ImsService, ims_providers,
+    ImsApplicationDefinition, ImsDatabaseDefinition, ImsGenericLoadImage, ImsGenericLoadRecord,
+    ImsInstallReceipt, ImsLimits, ImsLoadImage, ImsLoadRoot, ImsPcbDefinition, ImsPsbDefinition,
+    ImsReplayClock, ImsSegmentDefinition, ImsService, ims_providers,
 };
 
 pub use tm::{
