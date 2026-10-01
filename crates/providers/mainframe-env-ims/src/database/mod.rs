@@ -268,6 +268,20 @@ impl DatabaseEngine {
         self.records.len()
     }
 
+    /// Read-only image projection used by bounded utility unload/reload.
+    pub fn definition(&self) -> &DatabaseDefinition {
+        &self.definition
+    }
+
+    /// Stable insertion-order views; parents precede children by record ID.
+    pub fn export_records(&self) -> Vec<RecordView> {
+        self.records
+            .keys()
+            .copied()
+            .map(|id| self.view(id))
+            .collect()
+    }
+
     /// A deterministic state identity used for failure/retry assertions.
     pub fn state_digest(&self) -> [u8; 32] {
         let indexes = self

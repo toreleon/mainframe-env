@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added bounded IMS load, extract, reorganization, database recovery, and typed log recovery utility transitions with staged CAS publication."
