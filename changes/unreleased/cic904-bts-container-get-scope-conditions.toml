@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Select GET CONTAINER's current channel before implicit BTS context and return the source-defined BTS missing-scope, acquisition, child and container conditions."

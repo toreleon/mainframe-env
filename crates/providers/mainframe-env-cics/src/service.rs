@@ -3641,6 +3641,157 @@ impl<'a> Reader<'a> {
 
 #[cfg(test)]
 mod tests {
+    fn activate_get_scope_process(cics: &CicsService, invocation: &Invocation) {
+        use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess, BtsReply};
+        let authority = BtsLifecycleStore::new(cics.store.as_ref());
+        let uow = invocation.run_unit_id.as_str();
+        let execution = invocation.execution_id.as_str();
+        let principal = invocation.principal.id().as_str();
+        let root = BtsLifecycleStore::root_id("TYPE", "SCOPE", uow).unwrap();
+        authority
+            .define_process(
+                BtsProcess::new("TYPE", "SCOPE", &root, "MAIN", "BTS1", principal, uow).unwrap(),
+                uow,
+                execution,
+                principal,
+            )
+            .unwrap();
+        authority
+            .mutate_process(
+                "TYPE",
+                "SCOPE",
+                uow,
+                execution,
+                principal,
+                "start",
+                [1; 32],
+                |process| {
+                    process.start(&root, None, true)?;
+                    process.checkpoint(&root, 1, 7, "scope-checkpoint")?;
+                    Ok(BtsReply::normal())
+                },
+            )
+            .unwrap();
+        cics.bind_bts_activity_context(&invocation.run_unit_id, "TYPE", "SCOPE", &root, 1, 7)
+            .unwrap();
+        let put = request(
+            CicsOperation::PutContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("FROM".into(), cics_literal(b"BTS!")),
+                ("OPTION.PROCESS".into(), cics_option()),
+            ]),
+            33,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 33), put)
+            .unwrap();
+    }
+
+    fn get_scope_rows(store: &dyn ProviderStateStore) -> Vec<ProviderStateRecord> {
+        [
+            "cics-bts-process-v1",
+            "cics-bts-acquisition-v1",
+            "cics-bts-activity-index-v1",
+            "cics-bts-activity-context-v1",
+            "cics-bts-container-pending-v1",
+            "cics-container-capacity-v1",
+            "cics-container-replay-v1",
+        ]
+        .into_iter()
+        .flat_map(|namespace| store.list_provider_state(namespace, 32).unwrap())
+        .collect()
+    }
+
+    #[test]
+    fn bts_get_container_missing_scopes_return_source_conditions_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        for (index, (selector, expected)) in [
+            (None, 4),
+            (Some(("ACTIVITY", cics_literal(b"MISSING"))), 4),
+            (Some(("OPTION.PROCESS", cics_option())), 25),
+            (Some(("OPTION.ACQPROCESS", cics_option())), 15),
+            (Some(("OPTION.ACQACTIVITY", cics_option())), 24),
+            (Some(("INTOCCSID", cics_decimal(37))), 2),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("INTO".into(), cics_literal(b"OUT")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]);
+            if let Some((key, value)) = selector {
+                arguments.insert(key.into(), value);
+            }
+            let before = get_scope_rows(store.as_ref());
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 1);
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 1),
+                    get
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: expected,
+                })
+            );
+            assert_eq!(get_scope_rows(store.as_ref()), before);
+        }
+    }
+
+    #[test]
+    fn bts_get_container_missing_child_and_data_return_source_conditions_without_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let cics = service(store.clone());
+        let (invocation, _) = registered(&cics);
+        activate_get_scope_process(&cics, &invocation);
+        for (index, (selector, expected)) in [
+            (None, ("CONTAINERERR", 110, 10)),
+            (
+                Some(("OPTION.PROCESS", cics_option())),
+                ("CONTAINERERR", 110, 10),
+            ),
+            (
+                Some(("OPTION.ACQPROCESS", cics_option())),
+                ("CONTAINERERR", 110, 10),
+            ),
+            (
+                Some(("ACTIVITY", cics_literal(b"MISSING"))),
+                ("ACTIVITYERR", 109, 8),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut arguments = BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"MISSING")),
+                ("FLENGTH".into(), cics_decimal(77)),
+                ("OPTION.NODATA".into(), cics_option()),
+            ]);
+            if let Some((key, value)) = selector {
+                arguments.insert(key.into(), value);
+            }
+            let before = get_scope_rows(store.as_ref());
+            let get = request(CicsOperation::GetContainer, arguments, index as u64 + 1);
+            assert_eq!(
+                cics.invoke(
+                    &effect(&invocation.run_unit_id, get.clone(), index as u64 + 1),
+                    get
+                ),
+                Err(HostProblem::Condition {
+                    name: expected.0.into(),
+                    response: expected.1,
+                    response2: expected.2,
+                })
+            );
+            assert_eq!(get_scope_rows(store.as_ref()), before);
+        }
+    }
+
     fn bts_get_length_fixture() -> (Arc<CicsService>, Invocation) {
         use handlers::bts_lifecycle::{BtsLifecycleStore, BtsProcess};
         let store = Arc::new(MemoryStore::new(Default::default()));
@@ -53648,7 +53799,7 @@ mod tests {
             Err(HostProblem::Condition {
                 name: "CONTAINERERR".into(),
                 response: 110,
-                response2: 1
+                response2: 10
             })
         );
     }
@@ -53900,6 +54051,8 @@ mod tests {
         );
         cics.invoke(&effect(&invocation.run_unit_id, put.clone(), 1), put)
             .unwrap();
+        // A current channel still owns the implicit GET even when BTS is active.
+        activate_get_scope_process(&cics, &invocation);
         let get = request(
             CicsOperation::GetContainer,
             BTreeMap::from([
@@ -53913,6 +54066,23 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, get.clone(), 2), get)
             .unwrap();
         assert_eq!(read.outputs["INTO"].bytes(), b"DATA");
+        let explicit_bts = request(
+            CicsOperation::GetContainer,
+            BTreeMap::from([
+                ("CONTAINER".into(), cics_literal(b"ITEM")),
+                ("OPTION.PROCESS".into(), cics_option()),
+                ("INTO".into(), cics_literal(b"OUT-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            4,
+        );
+        let read = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, explicit_bts.clone(), 4),
+                explicit_bts,
+            )
+            .unwrap();
+        assert_eq!(read.outputs["INTO"].bytes(), b"BTS!");
         let delete_current = request(
             CicsOperation::DeleteChannel,
             BTreeMap::from([("CHANNEL".into(), cics_literal(b"WORK"))]),
@@ -53947,7 +54117,7 @@ mod tests {
             Err(HostProblem::Condition {
                 name: "INVREQ".into(),
                 response: 16,
-                response2: 1,
+                response2: 4,
             })
         );
     }

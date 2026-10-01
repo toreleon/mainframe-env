@@ -13964,7 +13964,21 @@ mod tests {
             "01 SHORT-R PIC S9(9) COMP. 01 SHORT-R2 PIC S9(9) COMP. ",
             "01 ZERO-R PIC S9(9) COMP. 01 ZERO-R2 PIC S9(9) COMP. ",
             "01 LEN-RESP PIC S9(9) COMP. 01 LEN-RESP2 PIC S9(9) COMP. ",
+            "01 FAIL-X PIC X(4) VALUE 'FAIL'. 01 BAD-LEN PIC S9(9) COMP VALUE 77. ",
+            "01 CUR-R PIC S9(9) COMP. 01 CUR-R2 PIC S9(9) COMP. ",
+            "01 PROC-R PIC S9(9) COMP. 01 PROC-R2 PIC S9(9) COMP. ",
+            "01 ACQP-R PIC S9(9) COMP. 01 ACQP-R2 PIC S9(9) COMP. ",
+            "01 ACQA-R PIC S9(9) COMP. 01 ACQA-R2 PIC S9(9) COMP. ",
+            "01 CCSID-R PIC S9(9) COMP. 01 CCSID-R2 PIC S9(9) COMP. ",
+            "01 MISS-R PIC S9(9) COMP. 01 MISS-R2 PIC S9(9) COMP. ",
+            "01 CHILD-R PIC S9(9) COMP. 01 CHILD-R2 PIC S9(9) COMP. ",
+            "01 SCOPE-EIB PIC S9(9) COMP. 01 SCOPE-EIB2 PIC S9(9) COMP. ",
             "LINKAGE SECTION. 01 LINK-X PIC X(4). PROCEDURE DIVISION. ",
+            "EXEC CICS GET CONTAINER('MISSING') INTO(FAIL-X) FLENGTH(BAD-LEN) RESP(CUR-R) RESP2(CUR-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('MISSING') PROCESS INTO(FAIL-X) FLENGTH(BAD-LEN) RESP(PROC-R) RESP2(PROC-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('MISSING') ACQPROCESS INTO(FAIL-X) FLENGTH(BAD-LEN) RESP(ACQP-R) RESP2(ACQP-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('MISSING') ACQACTIVITY INTO(FAIL-X) FLENGTH(BAD-LEN) RESP(ACQA-R) RESP2(ACQA-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('MISSING') INTO(FAIL-X) FLENGTH(BAD-LEN) INTOCCSID(37) RESP(CCSID-R) RESP2(CCSID-R2) END-EXEC. ",
             "EXEC CICS DEFINE PROCESS('ORDER') PROCESSTYPE('TYPE') TRANSID('BT01') NOCHECK END-EXEC. ",
             "EXEC CICS SUSPEND END-EXEC. EXEC CICS PUT CONTAINER('P1') PROCESS FROM(DATA-X) END-EXEC. ",
             "EXEC CICS SUSPEND END-EXEC. EXEC CICS GET CONTAINER('P1') PROCESS INTO(PROC-X) FLENGTH(LEN-X) END-EXEC. ",
@@ -13975,6 +13989,9 @@ mod tests {
             "EXEC CICS GET CONTAINER('P1') PROCESS SET(PTR-X) FLENGTH(SET-LEN) END-EXEC. ",
             "SET ADDRESS OF LINK-X TO PTR-X. MOVE LINK-X TO SET-X. ",
             "EXEC CICS GET CONTAINER('P1') PROCESS NODATA FLENGTH(ND-LEN) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('MISSING') PROCESS INTO(FAIL-X) FLENGTH(BAD-LEN) RESP(MISS-R) RESP2(MISS-R2) END-EXEC. ",
+            "EXEC CICS GET CONTAINER('MISSING') ACTIVITY('MISSING') INTO(FAIL-X) FLENGTH(BAD-LEN) RESP(CHILD-R) RESP2(CHILD-R2) END-EXEC. ",
+            "MOVE EIBRESP TO SCOPE-EIB. MOVE EIBRESP2 TO SCOPE-EIB2. ",
             "EXEC CICS MOVE CONTAINER('P1') AS('A1') FROMPROCESS TOACTIVITY('CHILD') END-EXEC. ",
             "EXEC CICS GET CONTAINER('A1') ACTIVITY('CHILD') INTO(ACT-X) FLENGTH(LEN-X) END-EXEC. ",
             "EXEC CICS MOVE CONTAINER('A1') AS('P2') FROMACTIVITY('CHILD') TOPROCESS END-EXEC. ",
@@ -14198,6 +14215,35 @@ mod tests {
             assert_eq!(restored.variable("SHORT-X").unwrap().bytes(), b"DAYY");
             assert_eq!(restored.variable("ZERO-X").unwrap().bytes(), b"QQQQ");
             assert_eq!(restored.variable("SET-X").unwrap().bytes(), b"DATA");
+            assert_eq!(restored.variable("FAIL-X").unwrap().bytes(), b"FAIL");
+            assert_eq!(
+                restored.variable("BAD-LEN").unwrap().bytes(),
+                &77_i32.to_be_bytes()
+            );
+            for field in ["CUR-R", "PROC-R", "ACQP-R", "ACQA-R", "CCSID-R"] {
+                assert_eq!(
+                    restored.variable(field).unwrap().bytes(),
+                    &16_i32.to_be_bytes()
+                );
+            }
+            for (field, value) in [
+                ("CUR-R2", 4_i32),
+                ("PROC-R2", 25),
+                ("ACQP-R2", 15),
+                ("ACQA-R2", 24),
+                ("CCSID-R2", 2),
+                ("MISS-R", 110),
+                ("MISS-R2", 10),
+                ("CHILD-R", 109),
+                ("CHILD-R2", 8),
+                ("SCOPE-EIB", 109),
+                ("SCOPE-EIB2", 8),
+            ] {
+                assert_eq!(
+                    restored.variable(field).unwrap().bytes(),
+                    &value.to_be_bytes()
+                );
+            }
             for field in ["WIDE-LEN", "SHORT-LEN", "ZERO-LEN", "SET-LEN", "ND-LEN"] {
                 assert_eq!(
                     restored.variable(field).unwrap().bytes(),

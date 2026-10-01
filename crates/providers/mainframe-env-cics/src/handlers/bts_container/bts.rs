@@ -88,9 +88,19 @@ fn active_scope(
     read_only: bool,
 ) -> Result<Scope, HostProblem> {
     let lifecycle = BtsLifecycleStore::new(store);
+    let missing_scope = if read_only {
+        if matches!(selector, Selector::CurrentProcess) {
+            25
+        } else {
+            4
+        }
+    } else {
+        1
+    };
+    let missing_child = if read_only { 8 } else { 1 };
     let context = lifecycle
         .active_context(identity.run_unit, identity.execution, identity.principal)?
-        .ok_or_else(|| command::condition("INVREQ", 16, 1))?;
+        .ok_or_else(|| command::condition("INVREQ", 16, missing_scope))?;
     let process = lifecycle
         .load_process(&context.process_type, &context.process_name)?
         .ok_or(HostProblem::NotFound)?;
@@ -113,7 +123,7 @@ fn active_scope(
                 Selector::Current => context.activity_id.clone(),
                 Selector::Child(name) => {
                     if !state::valid_name(name, 16) {
-                        return Err(command::condition("ACTIVITYERR", 109, 1));
+                        return Err(command::condition("ACTIVITYERR", 109, missing_child));
                     }
                     if allow_self
                         && process
@@ -125,7 +135,7 @@ fn active_scope(
                     } else {
                         process
                             .child(&context.activity_id, name)
-                            .ok_or_else(|| command::condition("ACTIVITYERR", 109, 1))?
+                            .ok_or_else(|| command::condition("ACTIVITYERR", 109, missing_child))?
                             .id
                             .clone()
                     }
@@ -165,15 +175,25 @@ fn acquired_scope(
     store: &dyn ProviderStateStore,
     identity: OwnerIdentity<'_>,
     selector: Selector<'_>,
+    read_only: bool,
 ) -> Result<Scope, HostProblem> {
     let lifecycle = BtsLifecycleStore::new(store);
+    let missing_acquisition = if read_only {
+        if matches!(selector, Selector::AcquiredProcess) {
+            15
+        } else {
+            24
+        }
+    } else {
+        1
+    };
     let held = lifecycle
         .acquired_process_container_scope(
             identity.run_unit,
             identity.execution,
             identity.principal,
         )?
-        .ok_or_else(|| command::condition("INVREQ", 16, 1))?;
+        .ok_or_else(|| command::condition("INVREQ", 16, missing_acquisition))?;
     if matches!(selector, Selector::AcquiredProcess) && !held.permits_acqprocess() {
         // The pinned GET topic does not establish ACQPROCESS for a descendant acquisition.
         return Err(HostProblem::Unsupported);
@@ -213,7 +233,7 @@ fn resolve(
 ) -> Result<Scope, HostProblem> {
     match selector {
         Selector::AcquiredActivity | Selector::AcquiredProcess => {
-            acquired_scope(store, identity, selector)
+            acquired_scope(store, identity, selector, read_only)
         }
         _ => active_scope(store, identity, selector, allow_self, read_only),
     }
@@ -339,7 +359,7 @@ fn read_guarded(
     if before.owner != after.owner || before.process_version != after.process_version {
         return Err(HostProblem::UnknownOutcome);
     }
-    value.ok_or_else(|| command::condition("CONTAINERERR", 110, 1))
+    value.ok_or_else(|| command::condition("CONTAINERERR", 110, 10))
 }
 
 pub(super) fn invoke(
