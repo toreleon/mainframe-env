@@ -5,8 +5,12 @@
 mod abi;
 mod ast;
 mod catalog;
+mod create_index_syntax;
+mod create_view_syntax;
 mod expression_parser;
 mod generated_statement_catalog;
+mod insert_syntax;
+mod name_resolution;
 mod retention;
 mod service;
 mod statement;
