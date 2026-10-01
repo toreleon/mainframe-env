@@ -21,6 +21,7 @@ mod mq_catalog;
 mod mq_context;
 mod mq_contract;
 mod mq_handles;
+mod mq_validation;
 mod names;
 mod registry;
 mod request;
@@ -89,6 +90,11 @@ pub use mq_handles::{
     MQ_MAX_HANDLE_SLOTS, MQHC_DEF_HCONN, MQHC_UNASSOCIATED_HCONN, MqConnectionId, MqHandle,
     MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHandleSharing, MqHconn,
     MqHmsg, MqHobj, MqHsub,
+};
+pub use mq_validation::{
+    MqArgument, MqArgumentValue, MqExecutionDisposition, MqPendingDisposition, MqStructureVersion,
+    MqValidationError, MqValidationProblem, MqValidationReport, MqValidationSource,
+    validate_mqi_call,
 };
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
