@@ -55,6 +55,7 @@ pub(in crate::service) fn allocate_terminal_input(
 #[derive(Clone)]
 pub(in crate::service) struct CurrentProgramFrame {
     pub(in crate::service) effect_invocation: Invocation,
+    pub(in crate::service) program_occurrence: u64,
     pub(in crate::service) logical_level: u32,
     pub(in crate::service) invoking_program: Option<String>,
     pub(in crate::service) return_program: Option<String>,

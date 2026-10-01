@@ -3,6 +3,42 @@ use super::*;
 use mainframe_env_execution_api::{ArtifactRef, Principal, Selector};
 use mainframe_env_store::MemoryStore;
 
+#[test]
+fn logical_frame_program_identity_binds_outer_actor_and_occurrence_not_task_counter() {
+    let (service, root) = fixture();
+    let mut caller = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+    assert_eq!(
+        program_effect_key(&caller, 1),
+        Err(HostProblem::MissingIdempotency)
+    );
+    caller.outer_effect_key = Some("durable-outer".into());
+    let first = program_effect_key(&caller, 1).unwrap();
+    assert_eq!(
+        first.as_str(),
+        "cics-program-v2:90b1363efbb546b2b15a2fe9538d28dcc0d49957c1dbb05eeca80d033ad2ca5c"
+    );
+    caller.host_sequence = 98765;
+    assert_eq!(program_effect_key(&caller, 1).unwrap(), first);
+    assert_ne!(program_effect_key(&caller, 2).unwrap(), first);
+    assert_eq!(program_effect_key(&caller, 0), Err(HostProblem::Malformed));
+    caller.outer_effect_key = Some("second-outer".into());
+    assert_ne!(program_effect_key(&caller, 1).unwrap(), first);
+    caller.outer_effect_key = Some("durable-outer".into());
+    caller.current_program.program_occurrence = 1;
+    let actor = child(&root, 1);
+    let loan = ProgramLease::acquire(&service, &mut caller, "CHILD", Some(actor.artifact.clone()))
+        .unwrap();
+    service.ensure_run(&actor).unwrap();
+    let mut command = CommandLease::acquire(&service, &root.run_unit_id).unwrap();
+    command.current_program.program_occurrence = 999;
+    assert_ne!(program_effect_key(&command, 1).unwrap(), first);
+    command.finish().unwrap();
+    loan.finish().unwrap();
+    assert_eq!(caller.current_program.program_occurrence, 1);
+    assert_eq!(program_effect_key(&caller, 1).unwrap(), first);
+    caller.finish().unwrap();
+}
+
 fn explicit_abend(service: &CicsService, run: &mut Run, cancel: bool) -> CicsResponse {
     let mut arguments = BTreeMap::from([(
         "ABCODE".into(),

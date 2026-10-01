@@ -14,6 +14,39 @@ mod tests;
 
 const MAX_PROGRAM_LEVELS: usize = 16;
 
+/// A program occurrence belongs to its durable CICS command and frame actor,
+/// never to the volatile task-global host counter. Inputs are checked separately
+/// by the installed-call fingerprint, so changed inputs cannot choose a new key.
+fn program_effect_key(run: &Run, occurrence: u64) -> Result<IdempotencyKey, HostProblem> {
+    let outer = run
+        .outer_effect_key
+        .as_deref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    if occurrence == 0 {
+        return Err(HostProblem::Malformed);
+    }
+    let mut hash = Sha256::new();
+    hash.update(b"mainframe-env.cics-program-occurrence@2\0");
+    for field in [
+        run.invocation.run_unit_id.as_str().as_bytes(),
+        run.current_program
+            .effect_invocation
+            .execution_id
+            .as_str()
+            .as_bytes(),
+        outer.as_bytes(),
+    ] {
+        hash.update((field.len() as u64).to_be_bytes());
+        hash.update(field);
+    }
+    hash.update(occurrence.to_be_bytes());
+    IdempotencyKey::new(
+        format!("cics-program-v2:{:x}", hash.finalize()),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
+}
+
 /// Volatile exclusive loans for the current synchronous selected executor.
 /// Durable unknown-outcome authority remains the installed-call protocol.
 #[derive(Default)]
@@ -426,10 +459,28 @@ impl CicsService {
             .host_sequence
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
-        let key = request
-            .is_mutating()
-            .then(|| nested_key(run, run.host_sequence))
-            .transpose()?;
+        let (sequence, key) =
+            if matches!(&request, HostRequest::Program(ProgramRequest::Link { .. })) {
+                run.current_program.program_occurrence = run
+                    .current_program
+                    .program_occurrence
+                    .checked_add(1)
+                    .filter(|value| {
+                        *value
+                            <= u64::from(run.current_program.effect_invocation.limits.max_effects)
+                    })
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let sequence = run.current_program.program_occurrence;
+                (sequence, Some(program_effect_key(run, sequence)?))
+            } else {
+                (
+                    run.host_sequence,
+                    request
+                        .is_mutating()
+                        .then(|| nested_key(run, run.host_sequence))
+                        .transpose()?,
+                )
+            };
         let actor = run.current_program.effect_invocation.clone();
         let nested_invocation = key
             .as_ref()
@@ -455,7 +506,7 @@ impl CicsService {
         let invocation = nested_invocation.as_ref().unwrap_or(&actor);
         let effect = EffectRequest {
             run_unit: actor.run_unit_id.clone(),
-            sequence: run.host_sequence,
+            sequence,
             deadline_tick: actor.deadline_tick,
             idempotency_key: key,
             request,
@@ -556,6 +607,7 @@ impl CicsService {
         }
         let mut run = CommandLease::acquire(self, &effect.run_unit)?;
         run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
+        run.current_program.program_occurrence = 0;
         let operation = request.operation;
         #[cfg(feature = "fault-injection")]
         let after_mutation_file = matches!(

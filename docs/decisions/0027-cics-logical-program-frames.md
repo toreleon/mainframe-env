@@ -55,12 +55,37 @@ An unresolved installed call stays an unknown outcome requiring fenced
 reconciliation; it must never restart a child merely to reconstruct a frame.
 Completed outer replay returns its retained result without reentering the child.
 
-Nested program identities must bind the original outer effect and frame actor,
-with deterministic per-command sequencing. Before integration, compatibility
-tests must prove that legacy pending installed calls cannot escape their fence
-through a changed nested key. Any required owned protocol reader change must
-declare bounds, retention and rollback; no destructive migration is authorized.
-This ADR does not claim that those pending acceptance gates already pass.
+Nested program identity now binds the original durable outer command, root run
+unit, current frame actor and a per-command program occurrence. SHA-256 consumes
+`mainframe-env.cics-program-occurrence@2` plus a zero byte, then the root run
+unit, frame actor execution and outer command key UTF-8 fields in that order,
+each prefixed by its u64 big-endian byte length,
+then the u64 big-endian occurrence. The key is `cics-program-v2:` followed by
+64 lowercase hexadecimal digits. Occurrences start at one, reset only when an
+outer command actually dispatches, and cannot exceed the actor's `max_effects`.
+Restoring a caller frame restores its occurrence counter. The volatile global
+host counter and request inputs cannot select another program key; the existing
+installed-call fingerprint independently binds inputs and selected generation.
+Non-program nested effect keys are unchanged and remain a separate acceptance
+obligation. LINK, INVOKE APPLICATION and existing BTS, bridge and web-service
+program dispatch share this owned boundary, with no new coordinator or ledger.
+
+Fresh installed-call admission writes JSON protocol schema 3 in the existing
+`cobol-call-protocol@2` namespace, including ordinary COBOL admission which may
+precede a CICS LINK. Protocol metadata uses the existing framed digest algorithm
+with field domain `protocol-metadata@3`, preventing schema-only relabeling to
+the old digest domain. Row CAS versions remain 1 active / 2 terminal; owner,
+run-state, deadline and terminal retention dependencies are unchanged. Readers
+accept valid schema 2 and 3, but a new program key requires schema 3. Legacy
+protocol markers and active schema-2 runs therefore require drain/reconciliation
+before using the new domain. Cached old replies remain readable, and no row is
+rewritten merely on read. Replaying a retained new-key receipt requires an
+already present valid schema-3 protocol; it cannot recreate a missing protocol.
+Malformed, foreign, unknown-version and over-bound identities fail closed.
+Old readers reject schema 3. Downgrade requires drained writers and a verified
+pre-change backup, or a compatible reader retained through rollback; never strip
+the schema or relabel retained metadata. The status records focused warm/cold
+SQLite/PostgreSQL uncertainty proofs, not full program-family acceptance.
 
 Terminal lifecycle cleanup also owns an exclusive volatile session lease while
 releasing task resources outside the state mutex. Command/frame admission and
@@ -103,7 +128,7 @@ Outer LINK/INVOKE replies add bounded `ABEND.CODE` with schema
 validates their paired control disposition, target and payload without redispatch.
 Unhandled replies preserve the original code/dump in interpreter outcomes.
 Historical replies without the new output keep their existing interpretation.
-No new persisted protocol generation or in-flight restart is introduced. Known
+The ABEND repair itself introduces no new protocol generation or in-flight restart. Known
 child ABEND does not fabricate a completed installed-call reservation; that
 reservation remains protected by the existing recovery/retention fence. Older
 interpreters do not honor this additive code on LINK, so downgrade requires

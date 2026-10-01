@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bind nested CICS installed-program calls to the durable outer command, frame actor and bounded occurrence, preserving pending-call fences across warm retry and backend reopen. Fresh installed-call protocol schema 3 fences counter-era runs while retaining old cached replies; downgrade requires drained writers and a compatible reader or verified backup. Full v0.9 acceptance remains pending."

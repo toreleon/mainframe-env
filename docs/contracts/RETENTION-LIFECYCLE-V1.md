@@ -127,6 +127,17 @@ The provider families have these codec-owned boundaries:
   remove every instance before publishing the terminal run/protocol state, and
   a leftover instance therefore protects the lifecycle rather than inheriting
   a guessed age.
+  Fresh call protocols use JSON schema 3 in the existing protocol namespace;
+  valid schema 2 remains readable. Schema 3 binds its unchanged owner/run-state,
+  deadline and end-tick fields under the `protocol-metadata@3` digest domain.
+  Active/terminal row CAS versions and dependency graphs are unchanged. New
+  CICS program-occurrence keys require schema 3; legacy markers and active
+  schema-2 protocols stay fenced, not migrated on read. Pending installed calls
+  remain protected, and a cached new-key receipt with missing or corrupt
+  protocol authority cannot recreate it. Terminal publication preserves the
+  admitted generation. Older readers reject schema 3; downgrade requires
+  drained writers and a verified pre-change backup or a retained compatible
+  reader, never schema relabeling or digest rewriting.
 - Spool fully validates the canonical `mainframe-env.spool-state@2` job,
   replay versions, and artifact-empty purge state. Live, purge-pending,
   recovery-capable, or legacy rows without an exact no-owner sidecar are never
