@@ -121,7 +121,8 @@
       "source_topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm",
       "source_topic_sha256": "sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30",
       "applicability_profiles": [
-        "system-io"
+        "gscd-io",
+        "gscd-database"
       ],
       "input_profile": "independent-ims.schedule-code-get.v1",
       "scenario_class": "completed",
