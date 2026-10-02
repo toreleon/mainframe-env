@@ -851,3 +851,29 @@ with exact four pins in the worker's source receipt and reviewed architecture.
 All offline source credit remains zero. Actual selected-service publication,
 host attestation, cold incarnation/checkpoint/retention, participant and CardDemo
 acceptance remain required; only the licensed oracle is human-skipped.
+
+## Trusted producer review and next guard repairs
+
+N's read-only `MQ-1501.installed-batch-host-producer-design` is complete against
+sealed `1da5490c`, with external identity/source/design receipts and no new
+execution claims. It found two concrete safety gaps: factory installation can
+race runtime publication, and an exported typed-source MachineSnapshot can
+restore into a fresh unbound destination while silently dropping admission and
+aliases. Existing same-instance refusal and coordinator checkpoint=None do not
+cover that direct cross-instance API. Both remain outstanding, not waived.
+
+The next isolated N feature is `MQ-1501.typed-frame-state-guards`, based on sealed
+manager `3f758db2`. It owns narrow server setup serialization/typed control freeze
+and interpreter source-snapshot refusal plus focused legacy compatibility tests.
+It must preserve existing legacy behavior and bytes, cannot invent an accepted
+typed checkpoint schema or serialize executable handles, and does not own M's
+selected publication/UOW/receipt or O's numeric options. The manager retains
+actual admitted parent/artifact/original-call proof, same-store service bundle,
+processing-unit topology, explicit frame-session cleanup and public integration.
+
+M now has the sealed historical and reviewed-output prerequisites and manager's
+bounded existing-codec compatibility delta. Only committed sources are consumed;
+its earlier service receipts keep their actual pre-integration identity. Fresh
+composed service publication/replay checks are required before sealing that lane.
+All 26-call, security, persistence, recovery, participant and CardDemo gates stay
+active; the sole licensed oracle skip remains zero-credit.
