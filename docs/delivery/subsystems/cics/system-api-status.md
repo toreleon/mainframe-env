@@ -2739,3 +2739,26 @@ Only SPI-1001.region-cvda-numeric-bindings child is sealed here. All 269 SPI/
 acceptance remain pending, credit0. EVENT bounded source repair review has no
 actionable defect and awaits subsequent serialized integration; DATABASE has
 a report-only coordinate correction and PLATFORM seven qualification repairs.
+
+EVENT source integration is manager-owned after all 424 repair operations, all 38
+whole amended cases, 667 unchanged cases and independent no-defect review.
+Source final7d630da49d4564008dac31e992cfbde6cb45471b70304bfb50bb14366e8d4e44
+contains 19 rows, 267 options, 112 conditions, eight forms and 91 scoped domains
+with 319 members,
+544 obligations and 705 candidate cases. Five explicit START dependencies, distinct
+response receivers and isolated conditional command-authorization denial are
+source metadata. FEATUREKEY required VALUE versus example omission remains
+pending. All original 149 gaps and the precise conflict are retained. Manager
+whole-byte replay and 21-topic, 63-command pinned source consult are current source
+review, not runtime/license evidence. Existing schema/types/shared runtime and
+condition/security/UOW authorities remain unchanged. Only bounded source child
+SPI-1001.spi-event-source-contracts is sealed after actual integration gates;
+all six command gates and parent/application/route/recovery/licensed acceptance
+remain pending, credit0. Primary baseline
+ibm-cics-ts-6x-spi-command-bodies-2026-09-12; exact enrolled source pins remain
+in spi-event-policy.json.
+
+EVENT integrated candidate passes 31 generator and nine IR regressions and actual
+Draft202012 family instance validation. Private projection has 192 commands
+(153 SPI and 39 FEPI), 3240 operands and 5682 case candidates. Five of 18 enrolled
+family inputs remain unintegrated; all-family wave and runtime gates pending.
