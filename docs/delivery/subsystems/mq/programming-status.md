@@ -6,8 +6,8 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
-- Completion branch: `codex/v015-completion`
-- Completion-wave base: `2f5191be0ddd6a5aae32ce5f92aa94846b2f2c37`
+- Completion branch: `codex/mq-v015-continuation`
+- Continuation-wave base: `213ed878` (current main after PR #381 merged)
 
 This recovery ports lost commits `afe2b893`, `6026c4b9`, `2b7968e3`,
 `01eb5ebb`, `83223a6f`, and `972fab3a` onto current main. The first adds the identity-only registry for all 26 unique IBM MQ
@@ -197,3 +197,23 @@ checks passed. The licensed verifier remains `pending-external-licensed-receipt`
 at 0/26 because the required external IBM MQ 9.4 receipt and exact external pins
 are absent. The next implementation step is one manager-owned additive public
 request/result boundary before service integration.
+
+## Active continuation wave
+
+The manager uses Codex CLI directly, with at most three isolated workers plus
+the manager. This wave uses `gpt-6.1-sol`, high reasoning, goal mode, approval
+bypass and fast mode disabled. Previous wave settings above are historical.
+Workers read digest-verified retained HTML from the owner's raw archive through
+the repository offline reader; they do not refresh sources or spawn workers.
+
+| Lane | Declared slice | Exclusive implementation ownership |
+|---|---|---|
+| J | `MQ-1501.mqi-request-boundary` | Additive typed MQI request/result vocabulary and canonical encoding in host API new modules, with minimal facade export; all 26 identities stay source-bound, unsupported wire/status details explicit. Shared `HostRequest` dispatch and providers remain manager-owned. |
+| K | `MQ-1502.object-inquiry-kernel` | New bounded provider object-inquiry module, exact catalog-backed attributes supported by pinned MQINQ, with minimal facade export; unsupported selectors and MQSET remain explicit pending, no second catalog. |
+| L | `MQ-1505.delivery-checkpoint-kernel` | Delivery module and child codec modules only: strict live checkpoint preserving pending operations versus existing restart/backout snapshot policy, bounds, recovery and atomic malformed-input rejection. No private durable journal or provider service. |
+
+Each lane owns a unique change fragment, focused regression tests and a sealed
+feature commit. Facade-only overlaps are reconciled and re-sealed by the manager.
+Service, shared dispatch enums, documentation, evidence and public capability
+registration remain manager-owned. These prerequisites do not grant licensed
+credit or imply that all 26 calls are publicly executable.
