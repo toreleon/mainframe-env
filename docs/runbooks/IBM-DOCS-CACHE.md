@@ -79,7 +79,7 @@ coverage or licensed execution credit.
 The immutable 0.2 catalog index remains unchanged. Later zero-credit source
 sets are registered separately in a target-owned
 `conformance/<minor>/manifests/index.json`. The shared offline reader currently
-loads the 0.9 and 0.14 registries. Each registry row binds the exact manifest
+loads the 0.9, 0.14 and 0.15 registries. Each registry row binds the exact manifest
 bytes, topic-set digest, count, baseline, subsystem and scope while fixing
 `semantic_authority=false` and `coverage_credit=0`. The shared registry schema,
 offline reader, and xtask checker reject unregistered, missing, changed or
@@ -95,6 +95,24 @@ python3 -B conformance/tools/ibm_docs.py status --scope ims-programming-contract
 It pins only the reviewed SSA, PCB/status, get/position, processing-option and
 call-family topics needed by the declared IMS contract slices. It grants no
 behavioral or licensed differential credit.
+
+The separately identified 0.15 MQ programming-supplements scope is checked with:
+
+```bash
+python3 -B conformance/tools/ibm_docs.py status --scope mq-programming-supplements
+```
+
+It registers exactly 80 selected retained MQ 9.4 structure, field, constant,
+attribute and reason-reference topics under
+`ibm-mq-9.4-programming-supplements-2026-09-12`, with the existing pinned MQ TOC.
+The immutable 0.2 call baseline and its 26-call/27-position denominator remain
+unchanged. Required `last_modified` values come from hash-verified publication
+`lastModifiedDate` metadata, not archive fetch dates. The archive work run is
+still marked in-progress, has no independent browser-reproduction receipt, and
+predates the MQINQ issue337 re-pin. Heading, link and product metadata do not
+establish freshness, snapshot equivalence or semantic acceptance. Registration
+enables subsequent explicit review; all ten pending reason declarations remain
+pending and no numeric/layout, execution, licensed or coverage credit is granted.
 
 For a new CICS source corpus:
 

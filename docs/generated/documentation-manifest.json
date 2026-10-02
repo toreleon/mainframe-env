@@ -1522,7 +1522,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:96266d16120b89b8a982abb366d222a65e57bbdbabddee7a168a02831393fca4",
+      "sha256": "sha256:170e93507563c71b712b462795c3366ec8b056d2132515427aa41078d8f75fe7",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -1882,7 +1882,7 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:d69951b6da34cfbfc3f23bff27ddc5a470ff50a189d9bf8985a9edc467f0fb92",
+      "sha256": "sha256:d6598a49ad6b42e3ecb8cd65858febd8a20a4859daec14fe96c915b94afb4bf5",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },

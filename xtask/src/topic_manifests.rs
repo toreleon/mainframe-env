@@ -38,6 +38,12 @@ const LATER_REGISTRIES: &[LaterRegistry] = &[
         manifest_prefix: "conformance/0.14/manifests/",
         target_version: "0.14.0",
     },
+    LaterRegistry {
+        registry_path: "conformance/0.15/manifests/index.json",
+        manifest_directory: "conformance/0.15/manifests",
+        manifest_prefix: "conformance/0.15/manifests/",
+        target_version: "0.15.0",
+    },
 ];
 
 /// The one definition of `topic_manifest_digest`, stated the same way the
@@ -363,6 +369,226 @@ fn recompute(manifest: &Value, path: &Path) -> TaskResult<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct RegistryFixture(PathBuf);
+
+    impl Drop for RegistryFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn registry_015() -> (RegistryFixture, Value, Value, PathBuf, PathBuf) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = (0..64)
+            .find_map(|_| {
+                let path = std::env::temp_dir().join(format!(
+                    "mainframe-env-topic-registry-{}-{}",
+                    std::process::id(),
+                    NEXT.fetch_add(1, Ordering::Relaxed)
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => Some(path),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => None,
+                    Err(error) => panic!("registry fixture: {error}"),
+                }
+            })
+            .expect("bounded registry fixture allocation");
+        let fixture = RegistryFixture(root);
+        let repository = repository_root().expect("repository");
+        for schema in [
+            "conformance/0.2/schemas/topic-manifest.schema.json",
+            "conformance/0.9/schemas/topic-manifest-registry.schema.json",
+        ] {
+            let destination = fixture.0.join(schema);
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::copy(repository.join(schema), destination).unwrap();
+        }
+        let relative = "conformance/0.15/manifests/synthetic-topics.json";
+        let path = fixture.0.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let mut manifest = manifest(&[
+            ("pp/a.html", &"a".repeat(64)),
+            ("pp/b.html", &"b".repeat(64)),
+        ]);
+        for (field, value) in [
+            ("schema_version", json!("mainframe-env.topic-manifest@1")),
+            ("target_version", json!("0.15.0")),
+            ("baseline_id", json!("mq-synthetic-baseline")),
+            ("subsystem", json!("mq")),
+            ("product", json!("pp")),
+            ("book_label", json!("Synthetic review set")),
+            ("book_href", json!("pp/a.html")),
+            ("snapshot_date", json!("2026-01-01")),
+            (
+                "toc_url",
+                json!("https://www.ibm.com/docs/api/v1/toc/pp?lang=en"),
+            ),
+            ("toc_sha256", json!("c".repeat(64))),
+            (
+                "content_url_template",
+                json!(
+                    "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en"
+                ),
+            ),
+            ("topic_count", json!(2)),
+            ("total_bytes", json!(2)),
+            (
+                "topic_manifest_digest",
+                json!("4ab19e1be17658544a4ce6017c52548269441649e0d2f30728dec17e65e4c667"),
+            ),
+            ("coverage_credit", json!(0)),
+            ("retained_in_repository", json!(false)),
+        ] {
+            manifest[field] = value;
+        }
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+        let registry = json!({
+            "schema_version": "mainframe-env.topic-manifest-registry@1",
+            "target_version": "0.15.0", "semantic_authority": false, "coverage_credit": 0,
+            "manifests": [{
+                "scope_id": "mq-synthetic", "subsystem": "mq", "baseline_id": "mq-synthetic-baseline",
+                "manifest": relative,
+                "manifest_sha256": format!("sha256:{:x}", Sha256::digest(fs::read(&path).unwrap())),
+                "topic_count": 2,
+                "topic_manifest_sha256": "sha256:4ab19e1be17658544a4ce6017c52548269441649e0d2f30728dec17e65e4c667",
+                "semantic_authority": false, "coverage_credit": 0,
+            }]
+        });
+        let registry_path = path.parent().unwrap().join("index.json");
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        (fixture, manifest, registry, path, registry_path)
+    }
+
+    fn config_015() -> &'static LaterRegistry {
+        LATER_REGISTRIES
+            .iter()
+            .find(|config| config.target_version == "0.15.0")
+            .unwrap()
+    }
+
+    #[test]
+    fn later_015_uses_the_existing_schema_and_offline_checker() {
+        let (fixture, _, _, _, _) = registry_015();
+        check_later_registry(&fixture.0, config_015()).expect("registered synthetic scope");
+    }
+
+    #[test]
+    fn later_015_registry_pin_identity_and_credit_mutants_are_rejected() {
+        let (fixture, _, original, _, registry_path) = registry_015();
+        for (field, value) in [
+            (
+                "manifest_sha256",
+                json!(format!("sha256:{}", "0".repeat(64))),
+            ),
+            (
+                "topic_manifest_sha256",
+                json!(format!("sha256:{}", "0".repeat(64))),
+            ),
+            ("topic_count", json!(3)),
+            ("subsystem", json!("ims")),
+            ("baseline_id", json!("wrong-baseline")),
+            ("coverage_credit", json!(1)),
+            ("semantic_authority", json!(true)),
+            (
+                "manifest",
+                json!("conformance/0.14/manifests/synthetic-topics.json"),
+            ),
+            ("manifest", json!("conformance/0.15/manifests/missing.json")),
+        ] {
+            let mut registry = original.clone();
+            registry["manifests"][0][field] = value;
+            fs::write(
+                &registry_path,
+                serde_json::to_vec_pretty(&registry).unwrap(),
+            )
+            .unwrap();
+            assert!(
+                check_later_registry(&fixture.0, config_015()).is_err(),
+                "{field}"
+            );
+        }
+        for (field, value) in [
+            ("target_version", json!("0.14.0")),
+            ("semantic_authority", json!(true)),
+            ("coverage_credit", json!(1)),
+        ] {
+            let mut registry = original.clone();
+            registry[field] = value;
+            fs::write(
+                &registry_path,
+                serde_json::to_vec_pretty(&registry).unwrap(),
+            )
+            .unwrap();
+            assert!(
+                check_later_registry(&fixture.0, config_015()).is_err(),
+                "{field}"
+            );
+        }
+        for repeat_path in [false, true] {
+            let mut registry = original.clone();
+            let mut entry = registry["manifests"][0].clone();
+            if repeat_path {
+                entry["scope_id"] = json!("another-scope");
+            } else {
+                entry["manifest"] = json!("conformance/0.15/manifests/another.json");
+            }
+            registry["manifests"].as_array_mut().unwrap().push(entry);
+            fs::write(
+                &registry_path,
+                serde_json::to_vec_pretty(&registry).unwrap(),
+            )
+            .unwrap();
+            assert!(check_later_registry(&fixture.0, config_015()).is_err());
+        }
+    }
+
+    #[test]
+    fn later_015_manifest_mutants_fail_with_updated_file_binding() {
+        let (fixture, original, registry, path, registry_path) = registry_015();
+        for (field, value) in [
+            ("target_version", json!("0.14.0")),
+            ("subsystem", json!("ims")),
+            ("topic_manifest_digest", json!("0".repeat(64))),
+            ("coverage_credit", json!(1)),
+            ("retained_in_repository", json!(true)),
+            ("semantic_authority", json!(true)),
+            (
+                "topics",
+                json!([original["topics"][0].clone(), original["topics"][0].clone()]),
+            ),
+        ] {
+            let mut manifest = original.clone();
+            manifest[field] = value;
+            fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+            let mut updated = registry.clone();
+            updated["manifests"][0]["manifest_sha256"] = json!(format!(
+                "sha256:{:x}",
+                Sha256::digest(fs::read(&path).unwrap())
+            ));
+            fs::write(&registry_path, serde_json::to_vec_pretty(&updated).unwrap()).unwrap();
+            assert!(
+                check_later_registry(&fixture.0, config_015()).is_err(),
+                "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn later_015_unregistered_and_missing_paths_are_rejected() {
+        let (fixture, _, _, path, _) = registry_015();
+        let extra = path.with_file_name("unregistered.json");
+        fs::write(&extra, b"{}").unwrap();
+        assert!(check_later_registry(&fixture.0, config_015()).is_err());
+        fs::remove_file(extra).unwrap();
+        fs::remove_file(path).unwrap();
+        assert!(check_later_registry(&fixture.0, config_015()).is_err());
+    }
 
     fn manifest(topics: &[(&str, &str)]) -> Value {
         json!({

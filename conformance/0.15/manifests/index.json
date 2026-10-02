@@ -1,0 +1,19 @@
+{
+  "schema_version": "mainframe-env.topic-manifest-registry@1",
+  "target_version": "0.15.0",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "manifests": [
+    {
+      "scope_id": "mq-programming-supplements",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-programming-supplements-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-programming-supplements-topics.json",
+      "manifest_sha256": "sha256:7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a",
+      "topic_count": 80,
+      "topic_manifest_sha256": "sha256:d069fab04063e46679f542bc9b14f93f039ab4d623f18f3cba9447d524928f0b",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 from contextlib import redirect_stderr, redirect_stdout
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from copy import deepcopy
 import io
 import json
 import os
@@ -534,6 +535,11 @@ class CacheTests(unittest.TestCase):
         self.assertIn("ims-programming-contracts", scopes)
         self.assertIn("ims-database-contracts", scopes)
         self.assertIn("ims-tm-contracts", scopes)
+        self.assertIn("mq-programming-supplements", scopes)
+        supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
+        self.assertEqual(len(supplemental), 80)
+        self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
+                            for pin in supplemental))
         self.assertTrue(pins)
         self.assertTrue(tocs)
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
@@ -541,6 +547,119 @@ class CacheTests(unittest.TestCase):
             index_digest,
             "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
         )
+
+    def registry_015(self):
+        root, index, old_registry = self.source_repository()
+        old = json.loads(old_registry.read_text())
+        old_manifest = root / old["manifests"][0]["manifest"]
+        manifest = json.loads(old_manifest.read_text())
+        manifest["target_version"] = "0.15.0"
+        manifest["subsystem"] = "mq"
+        relative = "conformance/0.15/manifests/synthetic-topics.json"
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(manifest))
+        old["target_version"] = "0.15.0"
+        entry = old["manifests"][0]
+        entry["manifest"] = relative
+        entry["subsystem"] = "mq"
+        entry["manifest_sha256"] = "sha256:" + docs_api.digest(path.read_bytes())
+        registry = path.parent / "index.json"
+        registry.write_text(json.dumps(old))
+        return root, index, registry, path, old, manifest
+
+    def test_015_synthetic_scope_uses_shared_reader_without_other_body_caches(self):
+        root, index, registry, _, _, _ = self.registry_015()
+        with patch.object(docs_api, "REPOSITORY", root):
+            pins, tocs = ibm_docs.load_pins(index, registry)
+            selected, _ = ibm_docs.select(pins, tocs, "later-scope", None)
+        self.assertEqual(len(selected), 1)
+        self.assertTrue(any(scope.scope_id == "later-scope" and scope.target_version == "0.15.0"
+                            for scope in selected[0].scopes))
+        self.assertFalse(self.cache.exists())
+
+    def test_015_registry_identity_pin_and_credit_mutants_fail_closed(self):
+        root, _, registry, _, original, _ = self.registry_015()
+        mutations = [
+            ("manifest_sha256", "sha256:" + "0" * 64),
+            ("topic_manifest_sha256", "sha256:" + "0" * 64),
+            ("topic_count", 2), ("subsystem", "ims"),
+            ("baseline_id", "wrong-baseline"), ("coverage_credit", 1),
+            ("semantic_authority", True),
+            ("manifest", "conformance/0.14/manifests/synthetic-topics.json"),
+            ("manifest", "conformance/0.15/manifests/missing.json"),
+        ]
+        with patch.object(docs_api, "REPOSITORY", root):
+            for field, value in mutations:
+                document = deepcopy(original)
+                document["manifests"][0][field] = value
+                registry.write_text(json.dumps(document))
+                with self.subTest(field=field, value=value), self.assertRaises((ValueError, OSError)):
+                    ibm_docs.registered_sources(registry)
+            for field, value in [("target_version", "0.14.0"),
+                                 ("coverage_credit", 1), ("semantic_authority", True)]:
+                document = deepcopy(original)
+                document[field] = value
+                registry.write_text(json.dumps(document))
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    ibm_docs.registered_sources(registry)
+            for repeated_path in (False, True):
+                document = deepcopy(original)
+                other = deepcopy(document["manifests"][0])
+                if repeated_path:
+                    other["scope_id"] = "another-scope"
+                else:
+                    other["manifest"] = "conformance/0.15/manifests/another.json"
+                document["manifests"].append(other)
+                registry.write_text(json.dumps(document))
+                with self.subTest(repeated_path=repeated_path), self.assertRaises(ValueError):
+                    ibm_docs.registered_sources(registry)
+
+    def test_015_manifest_mutants_fail_even_with_updated_file_hash(self):
+        root, _, registry, path, registry_original, manifest_original = self.registry_015()
+        mutations = [("target_version", "0.14.0"), ("subsystem", "ims"),
+                     ("topic_count", 2), ("total_bytes", 1),
+                     ("topic_manifest_digest", "0" * 64),
+                     ("coverage_credit", 1), ("retained_in_repository", True)]
+        with patch.object(docs_api, "REPOSITORY", root):
+            for field, value in mutations:
+                manifest = deepcopy(manifest_original)
+                manifest[field] = value
+                path.write_text(json.dumps(manifest))
+                document = deepcopy(registry_original)
+                document["manifests"][0]["manifest_sha256"] = "sha256:" + docs_api.digest(path.read_bytes())
+                registry.write_text(json.dumps(document))
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    ibm_docs.registered_sources(registry)
+            for variant in ("duplicate", "duplicate-different-hash", "missing-date", "foreign"):
+                manifest = deepcopy(manifest_original)
+                if variant.startswith("duplicate"):
+                    row = deepcopy(manifest["topics"][0])
+                    if variant == "duplicate-different-hash":
+                        row["sha256"] = "0" * 64
+                    manifest["topics"].append(row)
+                elif variant == "missing-date":
+                    del manifest["topics"][0]["last_modified"]
+                else:
+                    manifest["topics"][0]["topic_path"] = "FOREIGN/ref/example.html"
+                path.write_text(json.dumps(manifest))
+                document = deepcopy(registry_original)
+                document["manifests"][0]["manifest_sha256"] = "sha256:" + docs_api.digest(path.read_bytes())
+                registry.write_text(json.dumps(document))
+                with self.subTest(variant=variant), self.assertRaises(ValueError):
+                    ibm_docs.registered_sources(registry)
+
+    def test_015_missing_and_unregistered_manifests_are_rejected(self):
+        root, _, registry, path, _, _ = self.registry_015()
+        extra = path.with_name("unregistered.json")
+        with patch.object(docs_api, "REPOSITORY", root):
+            extra.write_text("{}")
+            with self.assertRaisesRegex(ValueError, "unregistered or missing"):
+                ibm_docs.registered_sources(registry)
+            extra.unlink()
+            path.unlink()
+            with self.assertRaises(FileNotFoundError):
+                ibm_docs.registered_sources(registry)
 
 
 if __name__ == "__main__":

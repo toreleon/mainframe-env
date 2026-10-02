@@ -585,8 +585,12 @@ goal mode/bypass and no nested workers or orchestration skill:
 
 O sealed source registration at `86d2b18d` (80 topics, manifest SHA-256
 `7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a`);
-manager integration remains separate from that worker candidate's 27 reader and
-ten xtask tests. O now owns `MQ-1501.completion-wire-mapping`: explicit semantic
+the manager integrates the same source/reader/registry bytes after selected
+service commit `830f0164`. Fresh integration runs cover the 27 reader and ten
+xtask topic-manifest tests, plus exact offline selected-scope reproduction and
+formatting/docs/changelog/seal gates. Worker receipts remain separately bound.
+Registration grants no semantic or execution credit. O now owns
+`MQ-1501.completion-wire-mapping`: explicit semantic
 review of the three MQCC numeric values from supplemental topic `q090560_`,
 baseline `ibm-mq-9.4-programming-supplements-2026-09-12`, supporting original
 call rows `0001`–`0026`. It extends the existing normative status catalog/schema,
