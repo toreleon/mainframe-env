@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepared private SPI and FEPI source-map candidates through the shared mapper, preserving qualified-row gaps and zero behavioral credit."

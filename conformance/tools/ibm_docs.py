@@ -275,7 +275,9 @@ def baseline_sources(index: Path) -> list[tuple[Scope, dict, list[dict], str, st
 
 def registered_sources(
     registry: Path,
+    repository: Path | None = None,
 ) -> list[tuple[Scope, dict, list[dict], str, str]]:
+    repository = docs_api.REPOSITORY if repository is None else repository
     document = read_json(registry)
     entries = document.get("manifests")
     target_version = document.get("target_version")
@@ -292,7 +294,7 @@ def registered_sources(
     result = []
     scope_ids: set[str] = set()
     paths: set[str] = set()
-    prefix = str(registry.parent.relative_to(docs_api.REPOSITORY)) + "/"
+    prefix = str(registry.parent.relative_to(repository)) + "/"
     for entry in entries:
         scope_id = entry.get("scope_id")
         subsystem = entry.get("subsystem")
@@ -314,7 +316,7 @@ def registered_sources(
             raise ValueError(f"invalid or duplicate manifest in {registry}")
         scope_ids.add(scope_id)
         paths.add(relative)
-        path = docs_api.REPOSITORY / relative
+        path = repository / relative
         manifest_bytes = path.read_bytes()
         manifest = read_json(path)
         topics, toc_url, toc_sha256 = validate_manifest(
@@ -337,7 +339,7 @@ def registered_sources(
         scope = Scope(scope_id, subsystem, baseline, target_version, relative)
         result.append((scope, manifest, topics, toc_url, toc_sha256))
     present = {
-        str(path.relative_to(docs_api.REPOSITORY))
+        str(path.relative_to(repository))
         for path in registry.parent.glob("*.json")
         if path.name != "index.json"
     }

@@ -101,6 +101,16 @@ python3 -B conformance/tools/ibm_docs.py status --scope cics-spi-command-bodies
 python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-command-bodies
 ```
 
+The shared CICS mapper checks the private 0.10 projections and row-map candidates
+with `python3 -B tools/generate_cics_source_map.py --family spi --check`
+(or `--family fepi`). Add both `--toc <external-pinned-toc>` and
+`--cache <external-topic-cache>` to independently reproduce TOC/body headings
+and the bounded command-form fragment locators. Without those inputs the check
+validates committed bindings and canonical freshness only. Three qualified SPI
+row equivalences remain explicitly unresolved; map presence never grants
+grammar or execution authority. The default 0.9 application batches remain
+owned by the same generator and schema.
+
 The 0.14 IMS programming-contract scope is checked offline with:
 
 ```bash

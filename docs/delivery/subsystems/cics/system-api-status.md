@@ -4,8 +4,9 @@ Subsystem: **cics**
 Phase: **system-api**
 Target release: **0.10.0**
 
-Status: **SPI-1001 identity foundation retained; command-body pins registered;
-row maps, semantic review and application dependency pending; 0.10.0 remains Proposed**
+Status: **SPI-1001 identity foundation retained; command-body pins sealed;
+source-map candidates prepared with three qualified-row gaps; semantic review,
+shared gates and application dependency pending; 0.10.0 remains Proposed**
 
 - Branch: `codex/v010-spi-fepi-completion-20261002`
 - Dependency candidate reviewed: `213ed878ec138bdb2914330db6613559bffc5a86`
@@ -99,18 +100,122 @@ STATISTICS/RECORD. The SPI manifest retains the whole 277-topic System commands
 cohort; its ten additional topics grant no catalog row or behavioral credit.
 All 39 FEPI rows have 36 candidate bodies: list rows 0033 NODELIST, 0035
 POOLLIST and 0037 TARGETLIST share their respective SET command pages by explicit
-body syntax/options, preserving their distinct official identities. Row maps
-must still be registered and independently checked through shared source-map
-tooling before grammar/semantic work. Publication bodies remain outside Git.
+body syntax/options, preserving their distinct official identities. The following
+source-map candidate section records the new shared-tooling projection and its
+remaining gaps. Publication bodies remain outside Git.
 
 Focused validation passes: 25 offline-reader tests including scope/count and
 negative target-version binding, nine module-boundary tests, the shared xtask
 manifest test (including Draft 2020-12 validation of every new manifest/index),
 `cargo xtask schemas --check`, formatting, dependency policy, generated docs
-freshness and changelog validation. The exact artifact allowlist is sealed by
-the shared work-package generator before the dependent source-map slice. Source-set counts
+freshness and changelog validation. The shared work-package generator sealed
+the exact artifact allowlist at `385bd7b3b82329009ff4b16a8ad6f6430e17af87`,
+and its committed seal check passes with evidence digest
+`sha256:ed52073dfa0879feaa6cfe13d23ec8684d7572795a435456bbb51cc83f2a64ff`.
+This source-only slice receipt does not satisfy the aggregate module,
+architecture, application or licensed gates recorded below. Source-set counts
 never replace **269 SPI / 39 FEPI**; every behavioral gate remains **0/269 and
 0/39**, with `differential=pending`.
+
+## Declared source-map continuation
+
+`SPI-1001.command-source-maps` is the next serialized manager slice, dependent
+on the sealed command-body pin slice. It owns only the existing shared CICS
+source-map generator and schema owner (with a bounded helper and focused
+tests), generated 0.10 SPI/FEPI row maps and TOC projections, the shared xtask
+freshness binding, source-cache documentation, this status, a unique fragment
+and derived documentation. The demonstrated gap is that the generator accepts
+only the three 0.9 application batches, with no registered 0.10 row maps.
+Acceptance requires all 269/39 frozen rows exactly once, exact TOC and body-pin
+bindings, explicit label/form review, canonical digests, independent retained
+body verification and mutation rejection; existing application outputs must
+remain byte-identical. No routing, semantics or coverage is assigned.
+
+The resumed `SPI-1001.qualified-form-review` worker owns external
+`v010-20261002/qualified-forms/` only, on an isolated branch at the sealed pin
+candidate. Its exact rows are SPI 0148, 0158, 0181, 0182, 0189, 0200, 0201,
+0203, 0204, 0238, 0242, 0259, 0260, 0265 and FEPI 0033, 0035, 0037.
+It must search/read the now-pinned topics and verify body anchors, options and
+EIBFN markup for each non-exact mapping. Its gate is an independent
+source-backed locator disposition, preserving any unresolved equivalence;
+it cannot edit repository paths, derive runtime semantics or spawn workers.
+The manager retains exclusive shared-contract ownership.
+
+The same review worker may extend its read-only gate to
+`SPI-1001.qualified-cross-reference-review`: search only the 277 already pinned
+SPI topic bodies for explicit links naming the shorter PERFORM labels. Read
+the bounded matching SET DB2CONN, Threadsafe SPI commands, INQUIRE STATISTICS
+and SET STATISTICS topics plus the three candidate pages; no whole-cache or
+network expansion. Only an explicit pinned link/identity statement can resolve
+rows 0201, 0203 and 0204. Findings stay in the external qualified-form handoff.
+
+## Prepared source-map candidates and open gates
+
+The existing `tools/generate_cics_source_map.py` now accepts `--family spi`
+and `--family fepi` through a bounded helper, with the same shared schema owner
+and xtask bindings. Its default application batches and their committed bytes
+remain unchanged. Generated maps preserve all official labels, EIBFN alternates
+and distinct FEPI shared-code rows. They do not modify the identity-only Rust
+registry or install/advertise any handler.
+
+| Family | Accounted rows | Reviewed mappings / unresolved candidates | Distinct body pages | Mapping SHA-256 |
+|---|---|---|---|---|
+| SPI | 269/269 | 266 / 3 | 267 | `8192b67692ba0724738a8e024e8f83d72670794dff46bdabbbabd77fb241d70d` |
+| FEPI | 39/39 | 39 / 0 | 36 | `e9a0cd2343023a2d2f334eb2ac1eeaec856b79d7acc14ae6c96164e1d49be666` |
+
+TOC/body projection digests are
+`sha256:338b3c1cbff4b2424cf0e6b2a0873ab6d813be8b422c0cbaf3fc1afb0bd548f0`
+(SPI) and
+`sha256:ae30436aebc6600384f5a7f20f6d6fa7e9baed06871f40cb9a9fad2c6f45a150`
+(FEPI). The 17 non-exact row reviews retain 96 bounded hash/byte/anchor locators
+under `conformance/0.10/cics/command-form-locators.json`; no publication bodies
+or semantic rules are embedded. Every selected body, H1 and recorded fragment
+reproduces against retained pinned bytes through `--toc` plus `--cache`.
+
+The qualified candidates remain **unresolved**: SPI 0201 PERFORM SECURITY
+(`dfha8_performsecurity.html`, SHA-256
+`830d0abe3e41d8ded0a29d9692afa52c2466dc4a70f2dccdb5af8b62aabf86f2`),
+0203 PERFORM SSL (`dfha8_performssl.html`,
+`5179c5ec352f12fd973f0e702bfd8cafa4c70b2b73ac9f69b4182638805daff9`),
+and 0204 PERFORM STATISTICS (`dfha8_performstatistics.html`,
+`3732a301a401c5720c300be074876fe7f1b1392de3efb0011f6c19259b6b6130`).
+All three paths are below
+`SSJL4D_6.x/reference-system-programming/commands-spi/` in the registered SPI
+source-set baseline. Their H1 and syntax diagrams include REBUILD/RECORD;
+the shorter EIBFN row provides no joining link. An explicit pinned
+cross-reference or identity statement must establish equivalence before these
+rows can supply grammar authority. Prefix/filename similarity grants no credit.
+
+Nine focused source-map tests pass, including rehashed mutation rejection and
+forbidden promotion of a qualified candidate. The existing application mapper
+and offline reader tests exercised alongside this change preserve their
+expectations. Formatting, Draft 2020-12 compilation/validation of all five new
+source artifacts, both retained-body reproduction checks, and unchanged
+application-batch freshness pass. The required architecture run passes the
+production execution-route, participant, effect, persistence, storage, SAF,
+retention, descriptor and all source-map guards before stopping in the existing
+application source-review gate. Aggregate acceptance remains open:
+
+- The module gate fails on unchanged
+  `crates/apps/mainframe-env-batch/src/service.rs`: 7,404 production lines
+  versus its recorded 7,402 non-growing ceiling. File and inventory bytes
+  match fetched main; no unrelated budget refresh or batch change was made.
+- The architecture source-review gate initially lacked `dfhp37p.html` in its
+  configured cache. Its matching archive body was recovered locally. A bounded
+  sources-a repair verified/imported 171/173 selected pinned topics and found
+  two absent from both retained roots: `SSJL4D_6.x/fundamentals/connections/dfht1c0079.html`
+  (SHA-256 `cb6ff139ab0b7bb2832dc03dd4f53672181657f11d0740a417aab84819aaf254`,
+  3,031 bytes), and `SSJL4D_6.x/reference-applications/commands-api/dfhp4_codesassign.html`
+  (`ed02eedd2e152ff18c4fdc0a0d678cd53ed94e7cd198d369cba71224f3832359`,
+  25,657 bytes; application catalog row 0011 ASSIGN). The repaired sources-a
+  checker still reports the first missing topic. Restore those exact pinned
+  HTML bytes externally, or explicitly authorize a refresh under the cache
+  runbook; no refresh or review-receipt regeneration occurred.
+
+`SPI-1001.command-source-maps` is prepared but **unsealed** while these gates
+remain open. No generated `Work-Package=pass` trailer is claimed for this
+checkpoint. Parent SPI-1001 and Waves B–D remain pending; all behavioral and
+licensed credit stays zero.
 
 ## Current dependency review
 
@@ -244,9 +349,10 @@ remain **0/269 SPI and 0/39 FEPI**. The 0.9 public/runtime surface is unchanged.
 
 ## Next executable step
 
-Register and independently verify the 269-row SPI and 39-row FEPI maps through
-the shared source-map owner, retaining the three SPI PERFORM ambiguities until
-resolved from the now-pinned bodies. Declare bounded source-required context
-closure, then derive private SPI-1001 grammar/options/resource/condition and
-lifecycle contracts without routing or advertisement. Application acceptance
-and licensed gates remain prerequisites to their dependent integration waves.
+Finish the bounded qualified cross-reference review. Keep the source-map
+checkpoint private and unsealed until the three SPI row equivalences, required
+cache bodies and module gate are resolved. Then seal its exact allowlist before
+declaring source-required context closure and deriving private SPI-1001
+contracts. Application acceptance and licensed gates remain prerequisites to
+dependent runtime integration waves. Do not refresh sources or widen into
+unrelated application/batch implementation merely to clear these prerequisites.

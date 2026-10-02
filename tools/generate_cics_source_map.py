@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate zero-credit CICS application command-summary source maps.
+"""Generate zero-credit CICS command-topic source maps.
 
 The IBM table of contents is an external input.  The repository retains only a
 bounded projection of its command-summary children and a row-to-topic mapping;
@@ -744,9 +744,22 @@ def main() -> None:
         help="source-map batch to generate or check (default: sources-a)",
     )
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--family", choices=["application", "spi", "fepi"], default="application")
+    parser.add_argument("--cache", type=Path, help="external hash-verified topic cache for SPI/FEPI reproduction")
     args = parser.parse_args()
     try:
         body = read_toc(args.toc) if args.toc else None
+        if args.family != "application":
+            sys.modules.setdefault("generate_cics_source_map", sys.modules[__name__])
+            import cics_system_source_map as administrative
+
+            if args.batch != "sources-a":
+                raise SourceMapError("administrative family does not accept application batches")
+            administrative.run(ROOT, args.family, args.check, body, args.cache)
+            print(f"cics-source-map ({args.family}): {'pass' if args.check else 'generated'}")
+            return
+        if args.cache is not None:
+            raise SourceMapError("application batches do not accept administrative cache input")
         batch_ids = tuple(BATCHES) if args.batch == "all" else (args.batch,)
         if args.check:
             for batch_id in batch_ids:

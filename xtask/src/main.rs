@@ -8186,21 +8186,7 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         cics_source_map.is_file(),
         "CICS sources-a map generator is missing",
     )?;
-    let cics_source_map_schema =
-        root.join("conformance/0.9/schemas/cics-command-source-map.schema.json");
-    for relative in [
-        "conformance/0.9/cics/command-summary-topics.json",
-        "conformance/0.9/cics/application-api-sources-a-map.json",
-        "conformance/0.9/cics/application-api-sources-b-map.json",
-        "conformance/0.9/cics/application-api-sources-c-map.json",
-    ] {
-        let artifact = root.join(relative);
-        validate_schema_instance(
-            &json(&cics_source_map_schema)?,
-            &json(&artifact)?,
-            &artifact,
-        )?;
-    }
+    check_cics_source_map_schemas(root)?;
     let status = Command::new("python3")
         .arg("-B")
         .arg(&cics_source_map)
@@ -8210,6 +8196,19 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         .status()
         .map_err(|error| format!("CICS source-map freshness guard: {error}"))?;
     require(status.success(), "CICS source-map freshness guard failed")?;
+    for family in ["spi", "fepi"] {
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(&cics_source_map)
+            .args(["--family", family, "--check"])
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("CICS {family} source-map freshness guard: {error}"))?;
+        require(
+            status.success(),
+            &format!("CICS {family} source-map freshness guard failed"),
+        )?;
+    }
     let cics_source_corpus = root.join("conformance/0.9/tools/fetch_cics_application_sources.py");
     require(
         cics_source_corpus.is_file(),
@@ -8757,6 +8756,7 @@ fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
 }
 
 fn check_schemas(root: &Path) -> TaskResult {
+    check_cics_source_map_schemas(root)?;
     let files = versioned_schema_files(root)?;
     require(!files.is_empty(), "no evidence schemas found")?;
     for file in &files {
@@ -9300,6 +9300,25 @@ mod licensed_environment_schema_tests {
         let root = repository_root().expect("repository root");
         check_licensed_harness(&root).expect("CER-1701 synthetic harness");
     }
+}
+
+fn check_cics_source_map_schemas(root: &Path) -> TaskResult {
+    let schema = json(&root.join("conformance/0.9/schemas/cics-command-source-map.schema.json"))?;
+    for relative in [
+        "conformance/0.9/cics/command-summary-topics.json",
+        "conformance/0.9/cics/application-api-sources-a-map.json",
+        "conformance/0.9/cics/application-api-sources-b-map.json",
+        "conformance/0.9/cics/application-api-sources-c-map.json",
+        "conformance/0.10/cics/spi-command-topics.json",
+        "conformance/0.10/cics/spi-command-source-map.json",
+        "conformance/0.10/cics/fepi-command-topics.json",
+        "conformance/0.10/cics/fepi-command-source-map.json",
+        "conformance/0.10/cics/command-form-locators.json",
+    ] {
+        let artifact = root.join(relative);
+        validate_schema_instance(&schema, &json(&artifact)?, &artifact)?;
+    }
+    Ok(())
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
