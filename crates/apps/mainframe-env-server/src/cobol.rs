@@ -38,10 +38,12 @@ use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod artifact;
+mod mqi;
 mod runtime;
 mod selected_link;
 mod staged_invocation;
 use artifact::{AdmittedProgram, admit_published_artifact};
+pub use mqi::ProgramMqHostAdmission;
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
 use runtime::with_compatible_runtime_services;
@@ -233,6 +235,7 @@ struct CobolProgram {
     sequence: AtomicU64,
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
     transfer_owner: OnceLock<std::sync::Weak<mainframe_env_cics::CicsService>>,
+    mqi_host: OnceLock<Arc<dyn ProgramMqHostAdmission>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -246,6 +249,7 @@ impl CobolProgram {
             sequence: AtomicU64::new(1),
             control: OnceLock::new(),
             transfer_owner: OnceLock::new(),
+            mqi_host: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -575,12 +579,19 @@ impl CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
+        invocation.cancellation_probe = parent.cancellation_probe.clone();
+        let mqi_frame = self.admit_batch_mqi(&mut invocation)?;
         let mut machine = ReferenceMachine::from_binary(
             executable.payload(),
             invocation.clone(),
             CodecLimits::default(),
         )
         .map_err(|_| HostProblem::ProviderFailure)?;
+        if let Some(frame) = mqi_frame {
+            machine
+                .bind_mqi_program_frame(frame)
+                .map_err(|_| HostProblem::ProviderFailure)?;
+        }
         install_batch_environment(&mut machine, &input)?;
         let coordinator = ExecutionCoordinator::durable(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),

@@ -37,6 +37,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0029 (Db2)](0029-db2-core-participant-evolution.md) | versioned local Db2 core participant binding before mutating integration, preserving frozen CICS v1 | Proposed |
 | [0030](0030-mq-host-lifecycle-directory.md) | private volatile MQ lifecycle directory with explicit persisted restart fencing prerequisite | Proposed |
 | [0031](0031-mq-selected-service-authority.md) | one selected legacy/rich MQ service authority and strict same-store opener | Proposed |
+| [0032](0032-mq-program-machine-frame.md) | explicit installed-batch MQI frame and original machine connection effects | Proposed |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

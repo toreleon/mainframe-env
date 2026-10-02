@@ -734,3 +734,31 @@ receipt replay and fenced Unknown resolution. Warning/error output, opaque handl
 replay, nested CICS/IMS ownership and all remaining applicable contexts are not
 waived by a successful first ordinary batch flow. Public readiness, participant
 acceptance and full v0.15 completion remain unclaimed.
+
+The manager's `MQ-1501.typed-machine-connection-route` owns the first original
+typed machine effects for source rows `0008` MQCONN and `0012` MQDISC and an
+explicit installed-batch host-admission hook. A trusted configured factory, not
+application binding bytes, supplies frame ownership before effect construction.
+The ABI map translates only already-issued opaque connection tokens and never
+mints registry authority. Required checks cover exact original canonical effect,
+signature/storage/writeback validation, foreign/stale wire numbers, changed
+frame identity, uncertainty and old-route compatibility. Unsupported contexts
+and durable checkpoint/handle replay remain pending; the old snapshot schema
+must not silently lose this new volatile mapping. This prepares the actual host
+route without switching ProductServer registration or claiming MQ execution.
+
+This bounded handoff is implemented with nine focused interpreter regressions
+and five installed-batch admission regressions passing on the current candidate,
+with no failures or ignored tests. The compiled installed-program test uses real
+Memory/SQLite core journals and checks retained original Intent identity before
+test-provider dispatch; its fake MQ provider is not owned service/SAF evidence.
+Explicit BY REFERENCE is accepted; BY VALUE/CONTENT and other known unimplemented
+MQI signatures fail before effect construction. Unusable post-dispatch replies
+remain UnknownOutcome without application writeback. Legacy MQ method bytes are
+unchanged apart from child-module visibility, and the changed interpreter stays
+below its existing 11,940-production-line ceiling. Canonical/provider-row guards,
+four provider-row guard mutants, formatting, documentation and changelog checks
+pass. The previously diagnosed unrelated batch-service module ratchet violation
+(7,404 versus 7,402) is not waived or represented as a passing global module gate.
+Dependency policy reuses the d8a026ab receipt only after verifying its receipt
+hash and all 32 unchanged manifest/toolchain/policy input identities.
