@@ -911,6 +911,15 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "XOPSUPPORTST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE"] },
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "DISABLING", "DISCARDING", "ENABLED", "ENABLING"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "MODE", values: &["PROVIDER", "REQUESTER", "UNKNOWN"] },
+            CicsApplicationCvdaDomain { option: "MTOMNOXOPST", values: &["MTOMNOXOP", "NOMTOMNOXOP"] },
+            CicsApplicationCvdaDomain { option: "MTOMST", values: &["MTOM", "NOMTOM"] },
+            CicsApplicationCvdaDomain { option: "SENDMTOMST", values: &["NOSENDMTOM", "SAMESENDMTOM", "SENDMTOM"] },
+            CicsApplicationCvdaDomain { option: "XOPDIRECTST", values: &["NOXOPDIRECT", "XOPDIRECT"] },
+            CicsApplicationCvdaDomain { option: "XOPSUPPORTST", values: &["NOXOPSUPPORT", "XOPSUPPORT"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -957,6 +966,15 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "XOPSUPPORTST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE"] },
+                    CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "DISABLING", "DISCARDING", "ENABLED", "ENABLING"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "MODE", values: &["PROVIDER", "REQUESTER", "UNKNOWN"] },
+                    CicsApplicationCvdaDomain { option: "MTOMNOXOPST", values: &["MTOMNOXOP", "NOMTOMNOXOP"] },
+                    CicsApplicationCvdaDomain { option: "MTOMST", values: &["MTOM", "NOMTOM"] },
+                    CicsApplicationCvdaDomain { option: "SENDMTOMST", values: &["NOSENDMTOM", "SAMESENDMTOM", "SENDMTOM"] },
+                    CicsApplicationCvdaDomain { option: "XOPDIRECTST", values: &["NOXOPDIRECT", "XOPDIRECT"] },
+                    CicsApplicationCvdaDomain { option: "XOPSUPPORTST", values: &["NOXOPSUPPORT", "XOPSUPPORT"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

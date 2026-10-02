@@ -385,6 +385,11 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "XMLTRANSFORM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(32) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ATOMTYPE", values: &["CATEGORY", "COLLECTION", "FEED", "SERVICE", "UNKNOWN"] },
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE"] },
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "RESOURCETYPE", values: &["FILE", "NOTAPPLIC", "PROGRAM", "TSQUEUE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -423,6 +428,11 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "XMLTRANSFORM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(32) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ATOMTYPE", values: &["CATEGORY", "COLLECTION", "FEED", "SERVICE", "UNKNOWN"] },
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE"] },
+                    CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "RESOURCETYPE", values: &["FILE", "NOTAPPLIC", "PROGRAM", "TSQUEUE"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -885,6 +895,11 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TYPE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "APPENDCRLF", values: &["APPEND", "NOAPPEND"] },
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "DYNAMIC", "OVERRIDE"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["CREATESPI", "CSDAPI", "DYNAMIC", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "TEMPLATETYPE", values: &["EXIT", "FILE", "HFSFILE", "PDSMEMBER", "PROGRAM", "TDQ", "TSQ"] },
+            CicsApplicationCvdaDomain { option: "TYPE", values: &["BINARY", "EBCDIC"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -929,6 +944,11 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TYPE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "APPENDCRLF", values: &["APPEND", "NOAPPEND"] },
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "DYNAMIC", "OVERRIDE"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["CREATESPI", "CSDAPI", "DYNAMIC", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "TEMPLATETYPE", values: &["EXIT", "FILE", "HFSFILE", "PDSMEMBER", "PROGRAM", "TDQ", "TSQ"] },
+                    CicsApplicationCvdaDomain { option: "TYPE", values: &["BINARY", "EBCDIC"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

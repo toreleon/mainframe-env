@@ -149,6 +149,21 @@
             ],
             "required": false
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              59,
+              60,
+              61,
+              63
+            ]
+          }
         ]
       },
       "responses": [
@@ -834,7 +849,8 @@
         "The linked resource-definition summary for this resource type is unregistered (expected hash unknown). The primary attribute diagram supplies only bounded vocabulary/widths, not a complete attribute-string grammar or all install/replace failure ordering.",
         "CREATE/CSD diagnostic table entries shared by several resource types are not automatically applicable to this command. Preserve the encoded low/high-halfword diagnostic and message context; never guess a fixed RESP2 for n or flatten offset/keyword-qualified errors.",
         "Manager-owned extension request: a concrete32767-byte ATTRIBUTES case cannot fit the frozen case input4096-character string bound. Retain the32767-byte IBM ceiling and halfword ATTRLEN facts; add an existing typed storage/payload binding before an independent full-size candidate can be represented. No invented reference DSL or synthetic fixture is supplied.",
-        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createatomservice.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:ad5856d55532fff692cd825e232932ad7102ceaf606de2dbfbe2e5c676960f9f; parser17; raw command SVG sha256:248cbedf5591180b240f1b565dd4845ddc2d088c8cbfae63f6bd4106a8637124 shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged."
+        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createatomservice.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:ad5856d55532fff692cd825e232932ad7102ceaf606de2dbfbe2e5c676960f9f; parser17; raw command SVG sha256:248cbedf5591180b240f1b565dd4845ddc2d088c8cbfae63f6bd4106a8637124 shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged.",
+        "LOGMESSAGE has the explicit sender symbols LOG and NOLOG only. This finite membership addition does not resolve omitted LOGMESSAGE/LOG/NOLOG or above-line LOG geometry as a default; the prior default-meaning gap remains Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -981,6 +997,21 @@
               "NOLOG"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              60,
+              61,
+              62,
+              64
+            ]
           }
         ]
       },
@@ -1642,7 +1673,8 @@
         "CREATE/CSD diagnostic table entries shared by several resource types are not automatically applicable to this command. Preserve the encoded low/high-halfword diagnostic and message context; never guess a fixed RESP2 for n or flatten offset/keyword-qualified errors.",
         "Manager-owned extension request: a concrete32767-byte ATTRIBUTES case cannot fit the frozen case input4096-character string bound. Retain the32767-byte IBM ceiling and halfword ATTRLEN facts; add an existing typed storage/payload binding before an independent full-size candidate can be represented. No invented reference DSL or synthetic fixture is supplied.",
         "Supplemental diagnostic keyword table1044-1075 (dfha817.html, sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4) names TEMPLATE with keyword7 and TYPE with100, while this primary diagram18 names TEMPLATENAME and omits TYPE. Exact alias/keyword-number compatibility is Pending; neither spelling is promoted into additional EXEC operands or attribute grammar.",
-        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createdoctemplate.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:d43374d388e346e1c0e85dc79c266a9fafa10496487458800a14a36d23569e83; parser16; raw command SVG sha256:00202ad36c9bf8bb2ea55275a53c9a74f14677af009f2ec49cecddc013371cea shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged."
+        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createdoctemplate.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:d43374d388e346e1c0e85dc79c266a9fafa10496487458800a14a36d23569e83; parser16; raw command SVG sha256:00202ad36c9bf8bb2ea55275a53c9a74f14677af009f2ec49cecddc013371cea shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged.",
+        "LOGMESSAGE has the explicit sender symbols LOG and NOLOG only. This finite membership addition does not resolve omitted LOGMESSAGE/LOG/NOLOG or above-line LOG geometry as a default; the prior default-meaning gap remains Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -1789,6 +1821,21 @@
               "NOLOG"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              56,
+              57,
+              58,
+              60
+            ]
           }
         ]
       },
@@ -2386,7 +2433,8 @@
         "Manager-owned extension request: a concrete32767-byte ATTRIBUTES case cannot fit the frozen case input4096-character string bound. Retain the32767-byte IBM ceiling and halfword ATTRLEN facts; add an existing typed storage/payload binding before an independent full-size candidate can be represented. No invented reference DSL or synthetic fixture is supplied.",
         "Primary description33-35 permits replacing a disabled pipeline while condition79-80 says INVREQ/612 when it already exists. Whether612 is limited to a particular phase/state remains unspecified; preserve both primary claims without unconditional replacement success.",
         "Primary attribute diagram18 includes RESPWAIT but supplemental dfha817.html keyword table1516-1532 has no RESPWAIT entry. Its high-halfword keyword number is unknown; never synthesize it.",
-        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createpipeline.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:52e7643876583bb5ef0b45ca7565975e8ada8f3b5042305f16638f020cd03bfd; parser16; raw command SVG sha256:f6d5f1081e99c9e3c1a41223fb8f1bd1168f3131d2992a4e09271ad916e636dc shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged."
+        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createpipeline.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:52e7643876583bb5ef0b45ca7565975e8ada8f3b5042305f16638f020cd03bfd; parser16; raw command SVG sha256:f6d5f1081e99c9e3c1a41223fb8f1bd1168f3131d2992a4e09271ad916e636dc shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged.",
+        "LOGMESSAGE has the explicit sender symbols LOG and NOLOG only. This finite membership addition does not resolve omitted LOGMESSAGE/LOG/NOLOG or above-line LOG geometry as a default; the prior default-meaning gap remains Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -2533,6 +2581,21 @@
               "NOLOG"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              93,
+              94,
+              95,
+              97
+            ]
           }
         ]
       },
@@ -3310,7 +3373,8 @@
         "Independent CREATE URIMAP invalid HOSTCODEPAGE/CHARACTERSET literal-pair candidate remains Pending: supplemental diagnostic630 establishes the trigger but the unregistered resource/encoding contexts do not supply an actionable incompatible pair. Do not choose a supposedly invalid pair from inference.",
         "Primary attribute diagram31 includes ATOMSERVICE but supplemental dfha817.html keyword table2186-2242 has no ATOMSERVICE entry. Its high-halfword keyword number remains unknown; no inferred alias or number.",
         "URIMAP DESCRIPTION diagnostic gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createurimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:17b48e240e4974608db0cb877bf3349089f54c2f8837c3e74aa64a07c296f448; parser18-19 includes DESCRIPTION, but complete SSJL4D_6.x/reference-system-programming/commands-spi/dfha817.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4; parser2186-2242 has no DESCRIPTION entry. Generic low406/419 predicates at49-52,124-128 do not establish the URIMAP high-halfword keyword. Both pins remain retained; command applicability, complete attribute fixture and isolated admission precedence remain Pending, with no sibling keyword number inferred.",
-        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createurimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:17b48e240e4974608db0cb877bf3349089f54c2f8837c3e74aa64a07c296f448; parser17; raw command SVG sha256:3548751e5c053edc5ea5799c2b77e505a535251da7915c84e8d33f01b092e1d8 shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged."
+        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createurimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:17b48e240e4974608db0cb877bf3349089f54c2f8837c3e74aa64a07c296f448; parser17; raw command SVG sha256:3548751e5c053edc5ea5799c2b77e505a535251da7915c84e8d33f01b092e1d8 shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged.",
+        "LOGMESSAGE has the explicit sender symbols LOG and NOLOG only. This finite membership addition does not resolve omitted LOGMESSAGE/LOG/NOLOG or above-line LOG geometry as a default; the prior default-meaning gap remains Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -3457,6 +3521,21 @@
               "NOLOG"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              55,
+              56,
+              57,
+              59
+            ]
           }
         ]
       },
@@ -4050,7 +4129,8 @@
         "Syntax includes LOGMESSAGE and LOG/NOLOG, but condition list omits the INVREQ/7 stated by other CREATE bodies. Do not import that condition from another resource command.",
         "Manager-owned extension request: a concrete32767-byte ATTRIBUTES case cannot fit the frozen case input4096-character string bound. Retain the32767-byte IBM ceiling and halfword ATTRLEN facts; add an existing typed storage/payload binding before an independent full-size candidate can be represented. No invented reference DSL or synthetic fixture is supplied.",
         "Primary attribute diagram18 includes ARCHIVEFILE but supplemental dfha817.html keyword table2243-2260 has no ARCHIVEFILE entry. Its high-halfword keyword number remains unknown; no inferred alias or number.",
-        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createwebservice.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:0345ad12d5b5aec02d4e35232444c11c162c17d1ce1b17c758b9f347320d6d85; parser16; raw command SVG sha256:f4abfa3e962a7b7546229bcc00fb7c4955e29c4aa97e695ea5a1660999e8d0d7 shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged."
+        "Narrow LOG notation/default gap: primary SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createwebservice.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:0345ad12d5b5aec02d4e35232444c11c162c17d1ce1b17c758b9f347320d6d85; parser16; raw command SVG sha256:f4abfa3e962a7b7546229bcc00fb7c4955e29c4aa97e695ea5a1660999e8d0d7 shows LOG above the main path at y=-18.128 with an empty bypass and NOLOG/LOGMESSAGE below. This is a geometry observation only. Exact omitted-LOGMESSAGE/default interpretation remains unresolved without a committed hash-pinned CICS syntax-notation context; no default or omission runtime outcome is inferred. Specified LOG/NOLOG facts and broader ATTRIBUTES/default gaps remain unchanged.",
+        "LOGMESSAGE has the explicit sender symbols LOG and NOLOG only. This finite membership addition does not resolve omitted LOGMESSAGE/LOG/NOLOG or above-line LOG geometry as a default; the prior default-meaning gap remains Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -6312,13 +6392,187 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ATOMTYPE",
+                  "values": [
+                    "CATEGORY",
+                    "COLLECTION",
+                    "FEED",
+                    "SERVICE",
+                    "UNKNOWN"
+                  ],
+                  "source_lines": [
+                    47,
+                    50,
+                    51,
+                    54,
+                    57,
+                    61,
+                    65
+                  ]
+                },
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "OVERRIDE"
+                  ],
+                  "source_lines": [
+                    79,
+                    81,
+                    82,
+                    84,
+                    86,
+                    88,
+                    90
+                  ]
+                },
+                {
+                  "option": "ENABLESTATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    115,
+                    118,
+                    119,
+                    122
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "BUNDLE",
+                    "CREATESPI",
+                    "CSDAPI",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    125,
+                    127,
+                    128,
+                    130,
+                    132,
+                    135
+                  ]
+                },
+                {
+                  "option": "RESOURCETYPE",
+                  "values": [
+                    "FILE",
+                    "NOTAPPLIC",
+                    "PROGRAM",
+                    "TSQUEUE"
+                  ],
+                  "source_lines": [
+                    147,
+                    152,
+                    153,
+                    155,
+                    159,
+                    161
+                  ]
+                }
+              ]
             },
             "source_lines": [
               15,
               17,
               43,
               46
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ATOMTYPE",
+            "values": [
+              "CATEGORY",
+              "COLLECTION",
+              "FEED",
+              "SERVICE",
+              "UNKNOWN"
+            ],
+            "source_lines": [
+              47,
+              50,
+              51,
+              54,
+              57,
+              61,
+              65
+            ]
+          },
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE"
+            ],
+            "source_lines": [
+              79,
+              81,
+              82,
+              84,
+              86,
+              88,
+              90
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              115,
+              118,
+              119,
+              122
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "BUNDLE",
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              125,
+              127,
+              128,
+              130,
+              132,
+              135
+            ]
+          },
+          {
+            "option": "RESOURCETYPE",
+            "values": [
+              "FILE",
+              "NOTAPPLIC",
+              "PROGRAM",
+              "TSQUEUE"
+            ],
+            "source_lines": [
+              147,
+              152,
+              153,
+              155,
+              159,
+              161
             ]
           }
         ]
@@ -6868,7 +7122,8 @@
         "START/NEXT/END are expressly supported by this body, but linked dfha80w.html has no committed expected pin. Bare resource syntax, AT positioning, NEXT receiver direction, browse ownership/cleanup and omitted generic conditions are unresolved. Only the closed named form is declared; union browse operands remain unresolved. Named selector must not be required across browse forms.",
         "Linked auditing-resource-signature.html and resourcesigtable.html are unregistered (expected hashes unknown). Retain the primary signature-agent domains, user/source widths and ABSTIME outputs; CHANGEAGREL is four digits but its storage layout/byte ceiling is unstated.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "ATOMTYPE UNKNOWN and RESOURCETYPE NOTAPPLIC are source-named receiver values, not fabricated success/failure responses. Cross-field eligibility of FILE/PROGRAM/TSQUEUE versus CATEGORY/SERVICE and the actual independently seeded receiver outcome remain command-specific; membership does not choose a case verdict (primary lines 47-68 and 147-163). This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -7491,13 +7746,191 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "APPENDCRLF",
+                  "values": [
+                    "APPEND",
+                    "NOAPPEND"
+                  ],
+                  "source_lines": [
+                    38,
+                    42,
+                    43,
+                    46
+                  ]
+                },
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "DYNAMIC",
+                    "OVERRIDE"
+                  ],
+                  "source_lines": [
+                    54,
+                    56,
+                    57,
+                    59,
+                    61,
+                    63,
+                    65,
+                    67
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "DYNAMIC",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    112,
+                    114,
+                    115,
+                    117,
+                    120,
+                    122
+                  ]
+                },
+                {
+                  "option": "TEMPLATETYPE",
+                  "values": [
+                    "EXIT",
+                    "FILE",
+                    "HFSFILE",
+                    "PDSMEMBER",
+                    "PROGRAM",
+                    "TDQ",
+                    "TSQ"
+                  ],
+                  "source_lines": [
+                    148,
+                    151,
+                    152,
+                    155,
+                    157,
+                    160,
+                    163,
+                    166,
+                    169
+                  ]
+                },
+                {
+                  "option": "TYPE",
+                  "values": [
+                    "BINARY",
+                    "EBCDIC"
+                  ],
+                  "source_lines": [
+                    176,
+                    179,
+                    180,
+                    181
+                  ]
+                }
+              ]
             },
             "source_lines": [
               14,
               16,
               89,
               92
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "APPENDCRLF",
+            "values": [
+              "APPEND",
+              "NOAPPEND"
+            ],
+            "source_lines": [
+              38,
+              42,
+              43,
+              46
+            ]
+          },
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "DYNAMIC",
+              "OVERRIDE"
+            ],
+            "source_lines": [
+              54,
+              56,
+              57,
+              59,
+              61,
+              63,
+              65,
+              67
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "DYNAMIC",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              112,
+              114,
+              115,
+              117,
+              120,
+              122
+            ]
+          },
+          {
+            "option": "TEMPLATETYPE",
+            "values": [
+              "EXIT",
+              "FILE",
+              "HFSFILE",
+              "PDSMEMBER",
+              "PROGRAM",
+              "TDQ",
+              "TSQ"
+            ],
+            "source_lines": [
+              148,
+              151,
+              152,
+              155,
+              157,
+              160,
+              163,
+              166,
+              169
+            ]
+          },
+          {
+            "option": "TYPE",
+            "values": [
+              "BINARY",
+              "EBCDIC"
+            ],
+            "source_lines": [
+              176,
+              179,
+              180,
+              181
             ]
           }
         ]
@@ -8126,7 +8559,8 @@
         "Linked auditing-resource-signature.html and resourcesigtable.html are unregistered (expected hashes unknown). Retain the primary signature-agent domains, user/source widths and ABSTIME outputs; CHANGEAGREL is four digits but its storage layout/byte ceiling is unstated.",
         "TYPE diagram14 uses cvda, heading176 uses data-area, prose178 says CVDA. Preserve common fullword CVDA output as a bounded prose fact; exact source-layout compatibility remains Pending.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "TYPE has BINARY/EBCDIC receiver membership from primary lines 176-181 despite the data-area heading; the existing diagram/prose layout conflict gap remains. TEMPLATETYPE names EXIT/FILE/HFSFILE/PDSMEMBER/PROGRAM/TDQ/TSQ from lines 148-171; these are CVDA symbols, not implicit named-resource selectors or aliases for other operands. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -8789,13 +9223,291 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "OVERRIDE"
+                  ],
+                  "source_lines": [
+                    41,
+                    43,
+                    44,
+                    46,
+                    48,
+                    50,
+                    52
+                  ]
+                },
+                {
+                  "option": "ENABLESTATUS",
+                  "values": [
+                    "DISABLED",
+                    "DISABLING",
+                    "DISCARDING",
+                    "ENABLED",
+                    "ENABLING"
+                  ],
+                  "source_lines": [
+                    77,
+                    78,
+                    79,
+                    81,
+                    85,
+                    88,
+                    91
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "BUNDLE",
+                    "CREATESPI",
+                    "CSDAPI",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    95,
+                    97,
+                    98,
+                    100,
+                    102,
+                    105
+                  ]
+                },
+                {
+                  "option": "MODE",
+                  "values": [
+                    "PROVIDER",
+                    "REQUESTER",
+                    "UNKNOWN"
+                  ],
+                  "source_lines": [
+                    112,
+                    114,
+                    115,
+                    118,
+                    121
+                  ]
+                },
+                {
+                  "option": "MTOMNOXOPST",
+                  "values": [
+                    "MTOMNOXOP",
+                    "NOMTOMNOXOP"
+                  ],
+                  "source_lines": [
+                    136,
+                    138,
+                    139,
+                    141
+                  ]
+                },
+                {
+                  "option": "MTOMST",
+                  "values": [
+                    "MTOM",
+                    "NOMTOM"
+                  ],
+                  "source_lines": [
+                    143,
+                    145,
+                    146,
+                    148
+                  ]
+                },
+                {
+                  "option": "SENDMTOMST",
+                  "values": [
+                    "NOSENDMTOM",
+                    "SAMESENDMTOM",
+                    "SENDMTOM"
+                  ],
+                  "source_lines": [
+                    159,
+                    161,
+                    162,
+                    164,
+                    167
+                  ]
+                },
+                {
+                  "option": "XOPDIRECTST",
+                  "values": [
+                    "NOXOPDIRECT",
+                    "XOPDIRECT"
+                  ],
+                  "source_lines": [
+                    189,
+                    191,
+                    192,
+                    195
+                  ]
+                },
+                {
+                  "option": "XOPSUPPORTST",
+                  "values": [
+                    "NOXOPSUPPORT",
+                    "XOPSUPPORT"
+                  ],
+                  "source_lines": [
+                    198,
+                    201,
+                    202,
+                    204
+                  ]
+                }
+              ]
             },
             "source_lines": [
               15,
               17,
               38,
               40
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE"
+            ],
+            "source_lines": [
+              41,
+              43,
+              44,
+              46,
+              48,
+              50,
+              52
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "DISABLING",
+              "DISCARDING",
+              "ENABLED",
+              "ENABLING"
+            ],
+            "source_lines": [
+              77,
+              78,
+              79,
+              81,
+              85,
+              88,
+              91
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "BUNDLE",
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              95,
+              97,
+              98,
+              100,
+              102,
+              105
+            ]
+          },
+          {
+            "option": "MODE",
+            "values": [
+              "PROVIDER",
+              "REQUESTER",
+              "UNKNOWN"
+            ],
+            "source_lines": [
+              112,
+              114,
+              115,
+              118,
+              121
+            ]
+          },
+          {
+            "option": "MTOMNOXOPST",
+            "values": [
+              "MTOMNOXOP",
+              "NOMTOMNOXOP"
+            ],
+            "source_lines": [
+              136,
+              138,
+              139,
+              141
+            ]
+          },
+          {
+            "option": "MTOMST",
+            "values": [
+              "MTOM",
+              "NOMTOM"
+            ],
+            "source_lines": [
+              143,
+              145,
+              146,
+              148
+            ]
+          },
+          {
+            "option": "SENDMTOMST",
+            "values": [
+              "NOSENDMTOM",
+              "SAMESENDMTOM",
+              "SENDMTOM"
+            ],
+            "source_lines": [
+              159,
+              161,
+              162,
+              164,
+              167
+            ]
+          },
+          {
+            "option": "XOPDIRECTST",
+            "values": [
+              "NOXOPDIRECT",
+              "XOPDIRECT"
+            ],
+            "source_lines": [
+              189,
+              191,
+              192,
+              195
+            ]
+          },
+          {
+            "option": "XOPSUPPORTST",
+            "values": [
+              "NOXOPSUPPORT",
+              "XOPSUPPORT"
+            ],
+            "source_lines": [
+              198,
+              201,
+              202,
+              204
             ]
           }
         ]
@@ -9333,7 +10045,8 @@
         "Linked auditing-resource-signature.html and resourcesigtable.html are unregistered (expected hashes unknown). Retain the primary signature-agent domains, user/source widths and ABSTIME outputs; CHANGEAGREL is four digits but its storage layout/byte ceiling is unstated.",
         "Body permits START/NEXT/END but lists no END/ILLOGIC conditions. Generic browse exception authority is unregistered; no borrowed response numbers from sibling inquiries.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: CHANGEAGREL,RESPWAIT. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: CHANGEAGREL,RESPWAIT. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "ENABLESTATUS receiver membership includes ENABLING, DISABLING and DISCARDING as well as ENABLED/DISABLED (primary lines 77-94); these additional observations are not SET PIPELINE sender values. MTOM and XOP domains describe their separate documented states; their conditional receiver meanings and actual transition/completion bindings remain Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -10476,13 +11189,431 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ANALYZERSTAT",
+                  "values": [
+                    "ANALYZER",
+                    "NOANALYZER"
+                  ],
+                  "source_lines": [
+                    36,
+                    39,
+                    40,
+                    43
+                  ]
+                },
+                {
+                  "option": "ATTLS",
+                  "values": [
+                    "AWARE",
+                    "NOTAWARE"
+                  ],
+                  "source_lines": [
+                    80,
+                    84,
+                    85,
+                    88
+                  ]
+                },
+                {
+                  "option": "AUTHENTICATE",
+                  "values": [
+                    "BASICAUTH",
+                    "NOAUTHENTIC"
+                  ],
+                  "source_lines": [
+                    90,
+                    94,
+                    95,
+                    101
+                  ]
+                },
+                {
+                  "option": "AVAILSTATUS",
+                  "values": [
+                    "AVAILABLE",
+                    "NONE",
+                    "UNAVAILABLE"
+                  ],
+                  "source_lines": [
+                    104,
+                    107,
+                    108,
+                    113,
+                    118
+                  ]
+                },
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "DYNAMIC",
+                    "OVERRIDE",
+                    "SYSTEM"
+                  ],
+                  "source_lines": [
+                    130,
+                    132,
+                    133,
+                    135,
+                    137,
+                    139,
+                    141,
+                    143,
+                    145
+                  ]
+                },
+                {
+                  "option": "ENABLESTATUS",
+                  "values": [
+                    "DISABLED",
+                    "DISABLEDHOST",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    182,
+                    185,
+                    186,
+                    189,
+                    192
+                  ]
+                },
+                {
+                  "option": "HOSTTYPE",
+                  "values": [
+                    "HOSTNAME",
+                    "IPV4",
+                    "IPV6",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    225,
+                    228,
+                    229,
+                    233,
+                    235,
+                    237
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "BUNDLE",
+                    "CREATESPI",
+                    "CSDAPI",
+                    "DYNAMIC",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    241,
+                    243,
+                    244,
+                    246,
+                    248,
+                    251,
+                    253
+                  ]
+                },
+                {
+                  "option": "IPFAMILY",
+                  "values": [
+                    "IPV4",
+                    "IPV6",
+                    "UNKNOWN"
+                  ],
+                  "source_lines": [
+                    260,
+                    262,
+                    263,
+                    265,
+                    267
+                  ]
+                },
+                {
+                  "option": "REDIRECTTYPE",
+                  "values": [
+                    "NONE",
+                    "PERMANENT",
+                    "TEMPORARY"
+                  ],
+                  "source_lines": [
+                    342,
+                    347,
+                    348,
+                    351,
+                    355
+                  ]
+                },
+                {
+                  "option": "SCHEME",
+                  "values": [
+                    "HTTP",
+                    "HTTPS",
+                    "IIOP",
+                    "JMS"
+                  ],
+                  "source_lines": [
+                    358,
+                    361,
+                    362,
+                    364,
+                    366,
+                    368
+                  ]
+                },
+                {
+                  "option": "USAGE",
+                  "values": [
+                    "ATOM",
+                    "CLIENT",
+                    "JVMSERVER",
+                    "PIPELINE",
+                    "SERVER"
+                  ],
+                  "source_lines": [
+                    402,
+                    405,
+                    406,
+                    411,
+                    415,
+                    420,
+                    426
+                  ]
+                },
+                {
+                  "option": "VALIDATEHOST",
+                  "values": [
+                    "VALIDATEWARN",
+                    "VALIDATEYES"
+                  ],
+                  "source_lines": [
+                    437,
+                    440,
+                    441,
+                    444
+                  ]
+                }
+              ]
             },
             "source_lines": [
               14,
               16,
               399,
               401
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ANALYZERSTAT",
+            "values": [
+              "ANALYZER",
+              "NOANALYZER"
+            ],
+            "source_lines": [
+              36,
+              39,
+              40,
+              43
+            ]
+          },
+          {
+            "option": "ATTLS",
+            "values": [
+              "AWARE",
+              "NOTAWARE"
+            ],
+            "source_lines": [
+              80,
+              84,
+              85,
+              88
+            ]
+          },
+          {
+            "option": "AUTHENTICATE",
+            "values": [
+              "BASICAUTH",
+              "NOAUTHENTIC"
+            ],
+            "source_lines": [
+              90,
+              94,
+              95,
+              101
+            ]
+          },
+          {
+            "option": "AVAILSTATUS",
+            "values": [
+              "AVAILABLE",
+              "NONE",
+              "UNAVAILABLE"
+            ],
+            "source_lines": [
+              104,
+              107,
+              108,
+              113,
+              118
+            ]
+          },
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "DYNAMIC",
+              "OVERRIDE",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              130,
+              132,
+              133,
+              135,
+              137,
+              139,
+              141,
+              143,
+              145
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "DISABLEDHOST",
+              "ENABLED"
+            ],
+            "source_lines": [
+              182,
+              185,
+              186,
+              189,
+              192
+            ]
+          },
+          {
+            "option": "HOSTTYPE",
+            "values": [
+              "HOSTNAME",
+              "IPV4",
+              "IPV6",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              225,
+              228,
+              229,
+              233,
+              235,
+              237
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "BUNDLE",
+              "CREATESPI",
+              "CSDAPI",
+              "DYNAMIC",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              241,
+              243,
+              244,
+              246,
+              248,
+              251,
+              253
+            ]
+          },
+          {
+            "option": "IPFAMILY",
+            "values": [
+              "IPV4",
+              "IPV6",
+              "UNKNOWN"
+            ],
+            "source_lines": [
+              260,
+              262,
+              263,
+              265,
+              267
+            ]
+          },
+          {
+            "option": "REDIRECTTYPE",
+            "values": [
+              "NONE",
+              "PERMANENT",
+              "TEMPORARY"
+            ],
+            "source_lines": [
+              342,
+              347,
+              348,
+              351,
+              355
+            ]
+          },
+          {
+            "option": "SCHEME",
+            "values": [
+              "HTTP",
+              "HTTPS",
+              "IIOP",
+              "JMS"
+            ],
+            "source_lines": [
+              358,
+              361,
+              362,
+              364,
+              366,
+              368
+            ]
+          },
+          {
+            "option": "USAGE",
+            "values": [
+              "ATOM",
+              "CLIENT",
+              "JVMSERVER",
+              "PIPELINE",
+              "SERVER"
+            ],
+            "source_lines": [
+              402,
+              405,
+              406,
+              411,
+              415,
+              420,
+              426
+            ]
+          },
+          {
+            "option": "VALIDATEHOST",
+            "values": [
+              "VALIDATEWARN",
+              "VALIDATEYES"
+            ],
+            "source_lines": [
+              437,
+              440,
+              441,
+              444
             ]
           }
         ]
@@ -11404,7 +12535,8 @@
         "URIMAP primary14 calls the selector data-value, while399-401 says Returns. Union and named-form direction remain unresolved; do not silently promote a receiver alias or guessed browse direction. Other application/platform/operation/version fields explicitly return data despite diagram data-value, so their output facts follow the option prose.",
         "ATTLS is marked6.3 (80-89); VALIDATEHOST is beta (436-451). Release applicability remains Pending. Numeric PORT(NO) and complete cipher/SSL domains/layout remain unmodeled.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "ATTLS is marked 6.3 at primary line 80; VALIDATEHOST is preceded by beta at line 436. These qualifiers do not establish applicability to every TS6.x version or a licensed runtime. ANALYZERSTAT explicitly lists ANALYZER/NOANALYZER at lines 36-45 but describes other usages as forced to NO at lines 46-47; no separate NO encoding or alias equivalence is inferred. HOSTTYPE lines 239-240 use URIMAP(usage-name) notation for the NOTAPPLIC predicate; exact predicate spelling/compatibility remains Pending. The scoped AUTHENTICATE/AVAILSTATUS/HOSTTYPE/IPFAMILY/REDIRECTTYPE/SCHEME/USAGE/VALIDATEHOST member sets retain their source-specific usage/context restrictions; membership supplies no universal receiver result. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -12403,13 +13535,251 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "DYNAMIC",
+                    "OVERRIDE"
+                  ],
+                  "source_lines": [
+                    52,
+                    54,
+                    55,
+                    57,
+                    59,
+                    61,
+                    63,
+                    65
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "BUNDLE",
+                    "CREATESPI",
+                    "CSDAPI",
+                    "DYNAMIC",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    92,
+                    94,
+                    95,
+                    97,
+                    99,
+                    102,
+                    104
+                  ]
+                },
+                {
+                  "option": "PGMINTERFACE",
+                  "values": [
+                    "CHANNEL",
+                    "COMMAREA",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    158,
+                    160,
+                    161,
+                    163,
+                    165
+                  ]
+                },
+                {
+                  "option": "STATE",
+                  "values": [
+                    "DISABLED",
+                    "DISABLING",
+                    "DISCARDING",
+                    "INITING",
+                    "INSERVICE",
+                    "UNUSABLE",
+                    "UPDATING"
+                  ],
+                  "source_lines": [
+                    177,
+                    179,
+                    180,
+                    183,
+                    187,
+                    191,
+                    193,
+                    196,
+                    199
+                  ]
+                },
+                {
+                  "option": "VALIDATIONST",
+                  "values": [
+                    "NOVALIDATION",
+                    "VALIDATION"
+                  ],
+                  "source_lines": [
+                    207,
+                    209,
+                    210,
+                    212
+                  ]
+                },
+                {
+                  "option": "XOPDIRECTST",
+                  "values": [
+                    "NOXOPDIRECT",
+                    "XOPDIRECT"
+                  ],
+                  "source_lines": [
+                    224,
+                    226,
+                    227,
+                    231
+                  ]
+                },
+                {
+                  "option": "XOPSUPPORTST",
+                  "values": [
+                    "NOXOPSUPPORT",
+                    "XOPSUPPORT"
+                  ],
+                  "source_lines": [
+                    235,
+                    238,
+                    239,
+                    242
+                  ]
+                }
+              ]
             },
             "source_lines": [
               15,
               18,
               214,
               216
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "DYNAMIC",
+              "OVERRIDE"
+            ],
+            "source_lines": [
+              52,
+              54,
+              55,
+              57,
+              59,
+              61,
+              63,
+              65
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "BUNDLE",
+              "CREATESPI",
+              "CSDAPI",
+              "DYNAMIC",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              92,
+              94,
+              95,
+              97,
+              99,
+              102,
+              104
+            ]
+          },
+          {
+            "option": "PGMINTERFACE",
+            "values": [
+              "CHANNEL",
+              "COMMAREA",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              158,
+              160,
+              161,
+              163,
+              165
+            ]
+          },
+          {
+            "option": "STATE",
+            "values": [
+              "DISABLED",
+              "DISABLING",
+              "DISCARDING",
+              "INITING",
+              "INSERVICE",
+              "UNUSABLE",
+              "UPDATING"
+            ],
+            "source_lines": [
+              177,
+              179,
+              180,
+              183,
+              187,
+              191,
+              193,
+              196,
+              199
+            ]
+          },
+          {
+            "option": "VALIDATIONST",
+            "values": [
+              "NOVALIDATION",
+              "VALIDATION"
+            ],
+            "source_lines": [
+              207,
+              209,
+              210,
+              212
+            ]
+          },
+          {
+            "option": "XOPDIRECTST",
+            "values": [
+              "NOXOPDIRECT",
+              "XOPDIRECT"
+            ],
+            "source_lines": [
+              224,
+              226,
+              227,
+              231
+            ]
+          },
+          {
+            "option": "XOPSUPPORTST",
+            "values": [
+              "NOXOPSUPPORT",
+              "XOPSUPPORT"
+            ],
+            "source_lines": [
+              235,
+              238,
+              239,
+              242
             ]
           }
         ]
@@ -13055,7 +14425,8 @@
         "Body permits START/NEXT/END but lists no END/ILLOGIC conditions. Generic browse exception authority is unregistered; no borrowed response numbers from sibling inquiries.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
         "Unstated valued operand storage ceilings: CCSID,CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
-        "Primary level strings include4.3 while numeric mapping/minimum-release lists omit3 (WEBSERVICE129-157; XMLTRANSFORM103-124). Preserve each published field domain without synthesizing numeric3 from a string; cross-field/release consistency remains Pending."
+        "Primary level strings include4.3 while numeric mapping/minimum-release lists omit3 (WEBSERVICE129-157; XMLTRANSFORM103-124). Preserve each published field domain without synthesizing numeric3 from a string; cross-field/release consistency remains Pending.",
+        "STATE includes the full source-listed receiver states DISABLED/DISABLING/DISCARDING/INITING/INSERVICE/UNUSABLE/UPDATING (primary lines 177-200); DISABLED/DISABLING are restricted to bundle-defined resources. PGMINTERFACE NOTAPPLIC is for a requester (lines 158-166), and XOPDIRECTST depends on support and validation state (lines 224-245). Finite membership does not erase these predicates or grant update/completion/restart credit. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -13638,13 +15009,133 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "DREPAPI",
+                    "DYNAMIC"
+                  ],
+                  "source_lines": [
+                    54,
+                    56,
+                    57,
+                    59
+                  ]
+                },
+                {
+                  "option": "ENABLESTATUS",
+                  "values": [
+                    "DISABLED",
+                    "DISABLING",
+                    "DISCARDING",
+                    "ENABLED",
+                    "ENABLING"
+                  ],
+                  "source_lines": [
+                    77,
+                    78,
+                    79,
+                    81,
+                    83,
+                    85,
+                    89
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "BUNDLE",
+                    "DYNAMIC"
+                  ],
+                  "source_lines": [
+                    91,
+                    93,
+                    94,
+                    96
+                  ]
+                },
+                {
+                  "option": "VALIDATIONST",
+                  "values": [
+                    "NOVALIDATION",
+                    "VALIDATION"
+                  ],
+                  "source_lines": [
+                    125,
+                    128,
+                    129,
+                    131
+                  ]
+                }
+              ]
             },
             "source_lines": [
               15,
               17,
               142,
               144
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "DREPAPI",
+              "DYNAMIC"
+            ],
+            "source_lines": [
+              54,
+              56,
+              57,
+              59
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "DISABLING",
+              "DISCARDING",
+              "ENABLED",
+              "ENABLING"
+            ],
+            "source_lines": [
+              77,
+              78,
+              79,
+              81,
+              83,
+              85,
+              89
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "BUNDLE",
+              "DYNAMIC"
+            ],
+            "source_lines": [
+              91,
+              93,
+              94,
+              96
+            ]
+          },
+          {
+            "option": "VALIDATIONST",
+            "values": [
+              "NOVALIDATION",
+              "VALIDATION"
+            ],
+            "source_lines": [
+              125,
+              128,
+              129,
+              131
             ]
           }
         ]
@@ -14153,7 +15644,8 @@
         "Body permits START/NEXT/END but lists no END/ILLOGIC conditions. Generic browse exception authority is unregistered; no borrowed response numbers from sibling inquiries.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
         "Unstated valued operand storage ceilings: CHANGEAGREL. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
-        "Primary level strings include4.3 while numeric mapping/minimum-release lists omit3 (WEBSERVICE129-157; XMLTRANSFORM103-124). Preserve each published field domain without synthesizing numeric3 from a string; cross-field/release consistency remains Pending."
+        "Primary level strings include4.3 while numeric mapping/minimum-release lists omit3 (WEBSERVICE129-157; XMLTRANSFORM103-124). Preserve each published field domain without synthesizing numeric3 from a string; cross-field/release consistency remains Pending.",
+        "XMLTRANSFORM CHANGEAGENT is DREPAPI/DYNAMIC and INSTALLAGENT is BUNDLE/DYNAMIC (primary lines 54-60 and 91-97); no generic CREATE/CSD/GRPLIST agent symbols from sibling resources are admitted. ENABLESTATUS includes source-listed transitional receiver states (lines 77-90), not SET XMLTRANSFORM mutations. Conditional observation/state binding remains Pending. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -14260,6 +15752,19 @@
               "SCAN"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACTION",
+            "values": [
+              "SCAN"
+            ],
+            "source_lines": [
+              66,
+              69,
+              70
+            ]
           }
         ]
       },
@@ -14840,7 +16345,8 @@
         "IBM SAF class/profile/permission mapping, denial audit format and durable product audit are not established by these pins. Command security requires XCMD plus transaction CMDSEC(YES) or system CMDSEC(ALWAYS); null class/pattern is a source gap, not an authorization exemption.",
         "These SSJL4D_6.x bodies are a pinned 2026 source snapshot, not proof of every TS6.x release, caller context or licensed execution. Selected product route, deadlines/cancellation, failure ordering, backend parity, physical restart and licensed differential gates remain Pending.",
         "Command-specific lock ordering and concurrent output snapshot guarantees are unstated. Use existing shared CICS resource/effect/UOW/work/retention authorities only; do not invent a parallel coordinator, resource store or replay ledger.",
-        "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW."
+        "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
+        "ACTION contains the sole sender symbol SCAN (primary lines 66-71). This singleton membership supplies no completion, deferred-failure, installation, retry or recovery verdict beyond the unchanged PERFORM PIPELINE source contract. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -14957,6 +16463,21 @@
               "ENABLESTATUS"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              26,
+              27,
+              28,
+              33
+            ]
           }
         ]
       },
@@ -15310,7 +16831,8 @@
         "These SSJL4D_6.x bodies are a pinned 2026 source snapshot, not proof of every TS6.x release, caller context or licensed execution. Selected product route, deadlines/cancellation, failure ordering, backend parity, physical restart and licensed differential gates remain Pending.",
         "Command-specific lock ordering and concurrent output snapshot guarantees are unstated. Use existing shared CICS resource/effect/UOW/work/retention authorities only; do not invent a parallel coordinator, resource store or replay ledger.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: ATOMSERVICE. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: ATOMSERVICE. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "ENABLESTATUS sender membership is DISABLED/ENABLED only (primary lines 26-34); no transitional receiver-state name from another INQUIRE command is accepted by this membership addition. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -15417,6 +16939,19 @@
               "NEWCOPY"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "COPY",
+            "values": [
+              "NEWCOPY"
+            ],
+            "source_lines": [
+              53,
+              55,
+              56
+            ]
           }
         ]
       },
@@ -15936,7 +17471,8 @@
         "IBM SAF class/profile/permission mapping, denial audit format and durable product audit are not established by these pins. Command security requires XCMD plus transaction CMDSEC(YES) or system CMDSEC(ALWAYS); null class/pattern is a source gap, not an authorization exemption.",
         "These SSJL4D_6.x bodies are a pinned 2026 source snapshot, not proof of every TS6.x release, caller context or licensed execution. Selected product route, deadlines/cancellation, failure ordering, backend parity, physical restart and licensed differential gates remain Pending.",
         "Command-specific lock ordering and concurrent output snapshot guarantees are unstated. Use existing shared CICS resource/effect/UOW/work/retention authorities only; do not invent a parallel coordinator, resource store or replay ledger.",
-        "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW."
+        "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
+        "COPY has the sole sender symbol NEWCOPY (primary lines 53-61). Existing mandatory COPY/NEWCOPY alternatives and all cases remain unchanged; no PHASEIN, absence/default interpretation or admission rule is inferred from another COPY command. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -16064,6 +17600,21 @@
               "ENABLESTATUS"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              51,
+              52,
+              53,
+              55
+            ]
           }
         ]
       },
@@ -16611,7 +18162,8 @@
         "Command-specific lock ordering and concurrent output snapshot guarantees are unstated. Use existing shared CICS resource/effect/UOW/work/retention authorities only; do not invent a parallel coordinator, resource store or replay ledger.",
         "RESPWAIT is data-area in14,57 but Specifies an input value in58-60; source establishes input direction but no binary extent. Do not copy the INQUIRE field or assume fullword storage.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: RESPWAIT. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: RESPWAIT. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "ENABLESTATUS sender membership is DISABLED/ENABLED only (primary lines 51-56), excluding the additional INQUIRE PIPELINE transitional observations from this sender domain. Request acceptance versus actual drain/completion remains governed by the unchanged lifecycle contract. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -16790,6 +18342,36 @@
               "TEMPORARY"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              49,
+              51,
+              52,
+              55
+            ]
+          },
+          {
+            "option": "REDIRECTTYPE",
+            "values": [
+              "NONE",
+              "PERMANENT",
+              "TEMPORARY"
+            ],
+            "source_lines": [
+              74,
+              78,
+              79,
+              82,
+              86
+            ]
           }
         ]
       },
@@ -17563,7 +19145,8 @@
         "URIMAP is data-area in15 with no separate selector option description or byte ceiling. Its exact direction/storage binding remains unresolved; command name alone is not direction authority.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
         "Unstated valued operand storage ceilings: URIMAP. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
-        "Disabled-plus-redirection interaction remains Pending. SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_seturimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:8e05e01bc4909868868907ab8370ab8b9bd9a757db2014429a5108fe5e73e16f; parser55-62 prevents application access for DISABLED and describes a current-request diagnostic;74-89 separately describes redirection301/302. SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireurimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:76d3bb2ce9c4fc088a06cecfd4907103557a88d0e80dca6ee86c6da62fd5ce13; parser182-197 distinguishes disabled mapping and disabled virtual host. These pins do not establish HTTP outcome or licensed admission/completion precedence for a simultaneous disable and redirect request; no such result is inferred. Redirection candidates instead isolate enabled/available mapping and virtual host."
+        "Disabled-plus-redirection interaction remains Pending. SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_seturimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:8e05e01bc4909868868907ab8370ab8b9bd9a757db2014429a5108fe5e73e16f; parser55-62 prevents application access for DISABLED and describes a current-request diagnostic;74-89 separately describes redirection301/302. SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireurimap.html; ibm-cics-ts-6x-spi-command-bodies-2026-09-12; sha256:76d3bb2ce9c4fc088a06cecfd4907103557a88d0e80dca6ee86c6da62fd5ce13; parser182-197 distinguishes disabled mapping and disabled virtual host. These pins do not establish HTTP outcome or licensed admission/completion precedence for a simultaneous disable and redirect request; no such result is inferred. Redirection candidates instead isolate enabled/available mapping and virtual host.",
+        "ENABLESTATUS sender membership is DISABLED/ENABLED and REDIRECTTYPE is NONE/PERMANENT/TEMPORARY (primary lines 49-62 and 74-89). Their presence and finite values do not settle simultaneous disable/redirection error precedence; the existing isolated redirection fixtures and pending combined-operation gap remain unchanged. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -18118,6 +19701,21 @@
             ],
             "required": false
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "VALIDATIONST",
+            "values": [
+              "NOVALIDATION",
+              "VALIDATION"
+            ],
+            "source_lines": [
+              35,
+              38,
+              39,
+              41
+            ]
+          }
         ]
       },
       "responses": [
@@ -18472,7 +20070,8 @@
         "Command-specific lock ordering and concurrent output snapshot guarantees are unstated. Use existing shared CICS resource/effect/UOW/work/retention authorities only; do not invent a parallel coordinator, resource store or replay ledger.",
         "WEBSERVICE(name) width is unstated here. CREATE defines8 characters, INQUIRE permits32; do not silently apply either ceiling to SET without a common name authority.",
         "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
-        "Unstated valued operand storage ceilings: WEBSERVICE. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule."
+        "Unstated valued operand storage ceilings: WEBSERVICE. Null is an unresolved IBM byte bound, not unlimited input or a runtime allocation rule.",
+        "VALIDATIONST sender membership is NOVALIDATION/VALIDATION only (primary lines 35-42); no inferred generic YES/NO domain, XOP mutation or receiver result is introduced. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     },
     {
@@ -18590,6 +20189,21 @@
               "VALIDATIONST"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "VALIDATIONST",
+            "values": [
+              "NOVALIDATION",
+              "VALIDATION"
+            ],
+            "source_lines": [
+              32,
+              35,
+              36,
+              38
+            ]
           }
         ]
       },
@@ -18995,7 +20609,8 @@
         "IBM SAF class/profile/permission mapping, denial audit format and durable product audit are not established by these pins. Command security requires XCMD plus transaction CMDSEC(YES) or system CMDSEC(ALWAYS); null class/pattern is a source gap, not an authorization exemption.",
         "These SSJL4D_6.x bodies are a pinned 2026 source snapshot, not proof of every TS6.x release, caller context or licensed execution. Selected product route, deadlines/cancellation, failure ordering, backend parity, physical restart and licensed differential gates remain Pending.",
         "Command-specific lock ordering and concurrent output snapshot guarantees are unstated. Use existing shared CICS resource/effect/UOW/work/retention authorities only; do not invent a parallel coordinator, resource store or replay ledger.",
-        "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW."
+        "Primary body does not settle a general implicit-syncpoint/rollback rule. Keep both unresolved rather than assuming all administrative mutations join or roll back with the caller UOW.",
+        "VALIDATIONST sender membership is NOVALIDATION/VALIDATION only (primary lines 32-48); membership does not resolve authorization, concurrent work, schema validation failure or unknown-outcome redispatch beyond the unchanged lifecycle/security contract. This pass uses the current frozen @1 finite-domain vocabulary, schema sha256:719edd27ae0b6bcc3fba82689b6f9c4f39f815c4bcdad45ceac2aabdfaf273eb; prior no-domain-enrichment wording records the older repair only. Numeric encodings, executable alias equivalence, full value-dependent/context/version typing and all six readiness gates remain Pending. Parent and existing named-form domains are private source facts, not executable Conformance IR, a production value mapper or case-driven behavior."
       ]
     }
   ]

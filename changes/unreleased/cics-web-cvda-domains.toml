@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add independently reviewed CICS WEB symbolic CVDA domains to the private typed grammar projection while retaining version qualifiers and pending execution gates."

@@ -69,6 +69,19 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(32) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ANALYZERSTAT", values: &["ANALYZER", "NOANALYZER"] },
+            CicsApplicationCvdaDomain { option: "ATTLS", values: &["AWARE", "NOTAWARE"] },
+            CicsApplicationCvdaDomain { option: "AUTHENTICATE", values: &["BASICAUTH", "NOAUTHENTIC"] },
+            CicsApplicationCvdaDomain { option: "AVAILSTATUS", values: &["AVAILABLE", "NONE", "UNAVAILABLE"] },
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "DYNAMIC", "OVERRIDE", "SYSTEM"] },
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "DISABLEDHOST", "ENABLED"] },
+            CicsApplicationCvdaDomain { option: "HOSTTYPE", values: &["HOSTNAME", "IPV4", "IPV6", "NOTAPPLIC"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "DYNAMIC", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "IPFAMILY", values: &["IPV4", "IPV6", "UNKNOWN"] },
+            CicsApplicationCvdaDomain { option: "REDIRECTTYPE", values: &["NONE", "PERMANENT", "TEMPORARY"] },
+            CicsApplicationCvdaDomain { option: "SCHEME", values: &["HTTP", "HTTPS", "IIOP", "JMS"] },
+            CicsApplicationCvdaDomain { option: "USAGE", values: &["ATOM", "CLIENT", "JVMSERVER", "PIPELINE", "SERVER"] },
+            CicsApplicationCvdaDomain { option: "VALIDATEHOST", values: &["VALIDATEWARN", "VALIDATEYES"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -139,6 +152,19 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(32) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ANALYZERSTAT", values: &["ANALYZER", "NOANALYZER"] },
+                    CicsApplicationCvdaDomain { option: "ATTLS", values: &["AWARE", "NOTAWARE"] },
+                    CicsApplicationCvdaDomain { option: "AUTHENTICATE", values: &["BASICAUTH", "NOAUTHENTIC"] },
+                    CicsApplicationCvdaDomain { option: "AVAILSTATUS", values: &["AVAILABLE", "NONE", "UNAVAILABLE"] },
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "DYNAMIC", "OVERRIDE", "SYSTEM"] },
+                    CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "DISABLEDHOST", "ENABLED"] },
+                    CicsApplicationCvdaDomain { option: "HOSTTYPE", values: &["HOSTNAME", "IPV4", "IPV6", "NOTAPPLIC"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "DYNAMIC", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "IPFAMILY", values: &["IPV4", "IPV6", "UNKNOWN"] },
+                    CicsApplicationCvdaDomain { option: "REDIRECTTYPE", values: &["NONE", "PERMANENT", "TEMPORARY"] },
+                    CicsApplicationCvdaDomain { option: "SCHEME", values: &["HTTP", "HTTPS", "IIOP", "JMS"] },
+                    CicsApplicationCvdaDomain { option: "USAGE", values: &["ATOM", "CLIENT", "JVMSERVER", "PIPELINE", "SERVER"] },
+                    CicsApplicationCvdaDomain { option: "VALIDATEHOST", values: &["VALIDATEWARN", "VALIDATEYES"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -231,6 +257,13 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "XOPSUPPORTST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "DYNAMIC", "OVERRIDE"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "DYNAMIC", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "PGMINTERFACE", values: &["CHANNEL", "COMMAREA", "NOTAPPLIC"] },
+            CicsApplicationCvdaDomain { option: "STATE", values: &["DISABLED", "DISABLING", "DISCARDING", "INITING", "INSERVICE", "UNUSABLE", "UPDATING"] },
+            CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
+            CicsApplicationCvdaDomain { option: "XOPDIRECTST", values: &["NOXOPDIRECT", "XOPDIRECT"] },
+            CicsApplicationCvdaDomain { option: "XOPSUPPORTST", values: &["NOXOPSUPPORT", "XOPSUPPORT"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -283,6 +316,13 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "XOPSUPPORTST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "DYNAMIC", "OVERRIDE"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "CREATESPI", "CSDAPI", "DYNAMIC", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "PGMINTERFACE", values: &["CHANNEL", "COMMAREA", "NOTAPPLIC"] },
+                    CicsApplicationCvdaDomain { option: "STATE", values: &["DISABLED", "DISABLING", "DISCARDING", "INITING", "INSERVICE", "UNUSABLE", "UPDATING"] },
+                    CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
+                    CicsApplicationCvdaDomain { option: "XOPDIRECTST", values: &["NOXOPDIRECT", "XOPDIRECT"] },
+                    CicsApplicationCvdaDomain { option: "XOPSUPPORTST", values: &["NOXOPSUPPORT", "XOPSUPPORT"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -336,6 +376,10 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "XSDBIND", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(255) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["DREPAPI", "DYNAMIC"] },
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "DISABLING", "DISCARDING", "ENABLED", "ENABLING"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "DYNAMIC"] },
+            CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -378,6 +422,10 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "XSDBIND", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(255) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["DREPAPI", "DYNAMIC"] },
+                    CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "DISABLING", "DISCARDING", "ENABLED", "ENABLING"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["BUNDLE", "DYNAMIC"] },
+                    CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -446,6 +494,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "SCAN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ACTION", values: &["SCAN"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -607,6 +656,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -709,6 +759,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "COPY", values: &["NEWCOPY"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -912,39 +963,6 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["DISABLED", "ENABLED", "ENABLESTATUS"]],
-        forms: &[
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0223",
-        family: "spi-event-policy",
-        label: "SET EVENTPROCESS",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_seteventprocess.html",
-        source_sha256: "sha256:f3cfcf0e00206bd45478b796c7bcee8c5935649e31b65a8a3122260d19d13d46",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "DRAIN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "EPSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "STARTED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "STOPPED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-        ],
-        cvda_domains: &[
-            CicsApplicationCvdaDomain { option: "EPSTATUS", values: &["DRAIN", "STARTED", "STOPPED"] },
-        ],
-        cvda_numeric_domains: &[
-        ],
-        required_options: &[],
-        alternative_groups: &[
-            CicsApplicationOptionAlternative { members: &["DRAIN", "EPSTATUS", "STARTED", "STOPPED"], required: true },
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[&["DRAIN", "EPSTATUS", "STARTED", "STOPPED"]],
         forms: &[
         ],
         constraint_status: CicsApplicationConstraintStatus::Pending,

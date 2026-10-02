@@ -406,6 +406,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "URIMAP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::BoundedAmbiguity, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
+            CicsApplicationCvdaDomain { option: "REDIRECTTYPE", values: &["NONE", "PERMANENT", "TEMPORARY"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -468,6 +470,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -500,6 +503,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "XMLTRANSFORM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
         ],
         cvda_numeric_domains: &[
         ],
