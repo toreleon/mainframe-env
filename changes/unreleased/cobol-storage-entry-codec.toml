@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Freeze bounded canonical COBOL storage-entry identities separately from CICS task/UOW ownership; runtime scope writers and LINK storage acceptance remain pending."

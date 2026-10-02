@@ -41,6 +41,7 @@ pub(crate) mod artifact;
 mod runtime;
 mod selected_link;
 mod staged_invocation;
+mod storage_scope;
 use artifact::{AdmittedProgram, admit_published_artifact};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;

@@ -849,3 +849,88 @@ No official row, Recovered, licensed or parent completion credit is assigned.
 The user retained CICSMESSAGE's internal execution requirement on 2026-10-02.
 Its 263-row identity and all six required pending gates remain unchanged; the
 source-only public-admission proposal does not grant execution or recovery.
+
+### Bounded live LINK entry attestation (2026-10-02)
+
+`CIC-902.program-task.frames.link-entry-attestation` assigns the finished BTS
+worker a fresh checkout at `195f3fb5` for the missing live entry trust boundary.
+It owns only CICS `handlers/host_boundary.rs` (private command-origin and selected
+loan bookkeeping plus helper registration), new `host_boundary/link_entry.rs`
+and `link_entry/tests.rs`, and one public re-export in `handlers/mod.rs` and
+`lib.rs`. The manager owns every server scope/instance/CALL/retention writer,
+public schema/codec, registry, generator, documentation and integration edit.
+Before semantics, read pinned LINK row0138 and calling flow/rules. Preserve prior
+BTS worktree/handoffs unchanged, use no nested workers or source refresh.
+
+Freeze a nonserializable, private-field `CicsLocalLinkEntryAttestation` and a
+read-only `CicsService::attest_local_link_entry(source, target, selection)` result.
+The existing thread-confined task claim must prove the currently active canonical
+CICS operation is LINK, its selected program loan is top/current, exact parent
+source actor and frozen selection, exact target artifact/program/parent/root run
+and principal, existing CICS logical level, matching control/resource envelope,
+no outstanding child command and no foreign actor or uncertain task. Capture
+typed command origin in the existing claim; never infer it from EIBFN, names,
+payload schema or an idempotency prefix. Capture the actual selected tuple in the
+existing loan; an artifact alone is insufficient. Direct test-only acquisition
+without origin/selection must not gain attestation. Keep prior command/loan test
+call shapes compatible and all existing admission/restoration/unknown fences.
+
+The token exposes documented read-only source/target/root invocations, selection
+and logical level; it has no constructor, serde, durable token, mutation, actor
+admission, target execution, source retirement, cleanup, cached reply or coverage
+permission. Getter creation must leave task/claim/row bytes unchanged. Expected
+negative proofs include wrong source/target/context/selection/thread/depth/origin,
+unknown/ended task, unselected/manual loan, child command outstanding and expired
+loan. Source references and focused old frame/claim/restoration/uncertainty tests
+plus module/format/dependency checks are required; all targets cleaned. This is
+a bounded live authority prerequisite, not the LINK storage repair: both compiled
+red diagnostics, durable scope binding, native CALL inheritance, cursor/cleanup
+atomicity, recovered and licensed/parent acceptance remain pending.
+
+### Bounded executed native-return witness (2026-10-02)
+
+`CIC-902.program-task.frames.normal-program-return` assigns the finished read-only
+storage-design worker a fresh checkout at `195f3fb5`. It owns interpreter
+`machine.rs` only for a private volatile return marker, constructor/restore/drive
+hooks and re-export; `machine/completion.rs` for the successful terminal-step
+helper; new `machine/normal_return.rs` and `normal_return/tests.rs`; and `lib.rs`
+for the public type re-export. The live LINK worker's provider paths are disjoint.
+The manager retains all snapshots/codecs, server scope/instance/CALL writers,
+retention, shared contracts, status, generators, registries and integration.
+
+Freeze `InstalledProgramReturnKind::{Goback, ExitProgram}` and a nonserializable,
+private-field `InstalledProgramReturn` with read-only invocation, kind,
+program-counter and executed-step getters. `ReferenceMachine::attest_installed_program_return`
+must require the actual successful drive terminal step, exact live machine marker
+and supported closed retained-state/resource shape. PC alone, an unexecuted
+constructor/quantum boundary, fallthrough/halt, STOP RUN, EXIT METHOD/FUNCTION,
+CICS RETURN, abnormal/cancel/timeout/host results and restored checkpoints do not
+create this witness. Successful restore invalidates any prior live marker; no
+snapshot/MECP version or durable exit witness is written. Getters preserve bytes.
+This witnesses only an executed normal language return; manager must separately
+validate exact core Completed/journal/attempt/checkpoint and atomic scope close.
+Before semantics read hash-verified calling flow/rules; use focused success,
+pre-execution/stale/restore/control/resource negatives and existing affected
+lifecycle tests, format/module/API/dependency gates and clean targets. No router,
+instance cleanup, dispatch, parent/recovered/licensed credit or ceiling increase.
+
+### Manager-owned storage-entry codec (2026-10-02)
+
+`CIC-902.program-task.frames.storage-entry-codec` owns new server
+`cobol/storage_scope.rs` and its tests, one `cobol.rs` module registration,
+ADR-0029, its unique fragment and manager-generated documentation. It freezes
+immutable scope creation separately from transient native CALL entry. The bounded
+canonical `mainframe-env.cobol.storage-entry@1` binding retains the actual core
+run, root execution and principal; root/LINK scope and member digests never become
+core run IDs. Exact actor/parent/CALL occurrence, selector/artifact/attempt and
+frozen selection are validated with no name-derived entry classification.
+Canonical syntax and hashes provide integrity only: live entry/source lease,
+root core authority, reservation/exit/close and retention must be independently
+validated by future serialized writers. No active row/protocol is upgraded,
+no writer/routing/storage behavior is enabled and both compiled red tests remain
+pending. Reserve RunState3, Instance3, CallProtocol4 and ordinary scope Receipt5
+for the later atomic writer; existing Transfer3/4 stay unchanged. These are
+manager reservations, not accepted migration or recovered evidence. Focused
+canonical vectors, rehashed foreign/phase/selection/context mutations, immutable
+creation/native inheritance and bounded/pure binding checks plus mandatory gates
+must precede sealing. Source calling flow/rules baseline and LINK row0138 apply.

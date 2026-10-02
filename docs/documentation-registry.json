@@ -62,6 +62,7 @@
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
     "docs/decisions/0028-explicit-bts-set-loan-lifetime.md",
+    "docs/decisions/0029-cobol-storage-entry-identity.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -292,6 +293,10 @@
         {
           "label": "ADR-0028: Explicit BTS SET loan lifetime",
           "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md"
+        },
+        {
+          "label": "ADR-0029: COBOL storage-entry identity",
+          "path": "docs/decisions/0029-cobol-storage-entry-identity.md"
         },
         {
           "label": "Decision index and template",

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 225,
+    "markdown_documents": 226,
     "navigation_groups": 6,
-    "normative_documents": 59,
+    "normative_documents": 60,
     "xtask_commands": 212
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 115,
-      "sha256": "sha256:97bae6b91dc9278323476fa6c78329aa917c8cbef76b29bb73b256a1c17990b8",
+      "relative_links": 116,
+      "sha256": "sha256:ae61b973c20cd3dc39dc9ab8edf5b15261f0f7771d7dd66e7c1e2a94844c7ebb",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -975,10 +975,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "Selected execution and CICS task maintainers",
+      "path": "docs/decisions/0029-cobol-storage-entry-identity.md",
+      "relative_links": 0,
+      "scope": "language storage identity, before atomic instance admission and close",
+      "sha256": "sha256:ef8cf86c4bf660afef972e3d5680b69462aad81b62dc849513e30159be4b2f8f",
+      "status": "Proposed; private codec prerequisite; runtime writers disabled",
+      "title": "ADR-0029: COBOL storage-entry identity within one CICS task",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 28,
-      "sha256": "sha256:245c3772246658bf0ffc5039909d712b83fd5656c9f68f35b6848c2bfc38a082",
+      "relative_links": 29,
+      "sha256": "sha256:4a9e4734f5d06fd1e9071a511dcfe02f15f2c391536013d3c3eb374d5537787e",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1278,7 +1290,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:20540ed5927a52a9c7c266586cb6d9ba93d7ec14f2b1d8ffe20d055c428e8c30",
+      "sha256": "sha256:5d6047fb7b7f0ffc9f7901a0ec587ca3198bc7b407500d7f295968e16f6a0db2",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },
@@ -2268,6 +2280,10 @@
           "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md"
         },
         {
+          "label": "ADR-0029: COBOL storage-entry identity",
+          "path": "docs/decisions/0029-cobol-storage-entry-identity.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2516,7 +2532,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:c9ccb736e55ad58a7500d3007727c195e0243c0c066eecead52a71a58c0205ca",
+  "registry_sha256": "sha256:746b60282b689133e9760d917d914d17b0d8f0ccc70b857c2e2fe9c9b36f3123",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
