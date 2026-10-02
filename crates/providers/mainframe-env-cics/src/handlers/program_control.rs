@@ -27,6 +27,7 @@ pub(in crate::service) use load::{
     ProgramLoadState, load_program_loads, release_task_program_loads,
 };
 pub(in crate::service) use transfer_selection::freeze as freeze_program_transfer;
+pub(in crate::service) use transfer_selection::validate_frozen_selection;
 pub(crate) use transfer_selection::validate_response as validate_transfer_selection;
 
 /// One immutable installed program generation available to CICS program control.

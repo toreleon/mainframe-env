@@ -417,6 +417,36 @@ relabel a pending row as completed. Artifact removal is not authorized by this
 phase; unavailable immutable artifacts fail closed, not catalog replacement.
 No new coordinator, provider namespace, executable host contract or ledger.
 
+### Same-level synchronous task admission prerequisite
+
+The next bounded manager contract uses the existing task claim and top program
+loan for an attested installed Transfer. The embedding must independently prove
+the retained canonical source command/result, original pending CALL, frozen
+immutable selection, trusted source invocation and live source/target instance
+ownership before requesting admission. A constructor image or integrity digest
+alone is insufficient. Cold busy rows never recreate the synchronous loan.
+
+At admission, the top loan and current task actor must exactly match the source
+on the current executor thread, with no command outstanding. The target has the
+source execution as its durable parent while retaining the same CICS logical
+level and original invoking/return programs. Root task identity and shared
+file/UOW/BTS resources remain owned by the original task. Principal, grants,
+provider generations, live controls, service class and resource/deadline limits
+cannot widen. Frozen program generation/artifact/content identity must match the
+retained immutable definition; no latest-generation or name-only fallback.
+The target's entry COMMAREA/current channel come from the independently attested
+Transfer and admitted invocation. This loan provides no shared virtual memory.
+
+Only the existing top loan actor is rebound. The source cannot reenter commands
+or be restored as the running frame after replacement. The original outer
+program loan still owns caller restoration after known target completion.
+Unknown outcomes and abnormal unwinding retain the existing uncertain-session
+fence; no terminal receipt, source retirement or target redispatch is inferred.
+The separate original-CALL/instance contract must bind exact CAS versions and
+cross-authority handoff proof before this helper can be connected to execution.
+No durable codec number, new namespace, coordinator, routing or full-frame
+acceptance is introduced by this volatile prerequisite.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline

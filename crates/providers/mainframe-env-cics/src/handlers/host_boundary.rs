@@ -12,6 +12,8 @@ mod lifecycle_tests;
 #[path = "host_boundary/frame_tests.rs"]
 mod tests;
 
+mod replacement;
+
 const MAX_PROGRAM_LEVELS: usize = 16;
 
 /// A program occurrence belongs to its durable CICS command and frame actor,

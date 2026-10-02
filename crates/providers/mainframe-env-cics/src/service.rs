@@ -6549,7 +6549,7 @@ mod tests {
         (artifact, semantic_identity)
     }
 
-    fn register_load_program(
+    pub(in crate::service) fn register_load_program(
         cics: &CicsService,
         store: &dyn ArtifactStore,
         name: &str,

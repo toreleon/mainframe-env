@@ -526,6 +526,48 @@ authorities, status, conformance bindings and integration; workers have disjoint
 server implementation or external review ownership. The licensed-run waiver
 keeps differential pending with zero credit and does not waive local acceptance.
 
+### Declared v0.9 integration prerequisites after the UOW repair
+
+`CIC-902.program-task.frames.same-level-claim` is the next serialized manager
+slice for rows 0097/0263. It extends only the existing synchronous task claim
+and top program loan in `handlers/host_boundary.rs` and a bounded private child.
+The caller must independently attest the canonical source Transfer, frozen
+selection, source/target instances and existing pending CALL before executing.
+Admission preserves root task, logical level, invoking/return program and shared
+resources, rebinds only the exact non-widening target actor, and fences unknown
+outcomes without reconstructing a cold loan. Focused wrong actor/thread,
+selection/control/context, nested replacement, shared state and uncertain-result
+checks plus existing logical-frame regressions are required. Durable CALL/instance
+handoff remains a separate prerequisite; no full frame or application acceptance
+is granted by this helper.
+The exact manager allowlist includes the host-boundary replacement module/tests,
+the existing program-control frozen-selection validator/export, one test helper
+visibility change in `service.rs`, ADR-0027, this status, a unique fragment,
+derived documentation and the two added handler paths in the reviewed module
+inventory. No module ceiling or exemption is increased.
+
+`SPI-1006.host-api-doc-prerequisite` owns documentation only for non-generated
+Rust modules below `crates/contracts/mainframe-env-host-api/src/`, excluding
+`lib.rs`, `generated/` and `canonical/generated.rs`. An isolated CLI worker must
+measure the current missing-doc diagnostics once, document existing contracts
+accurately, preserve all non-comment Rust tokens and wire semantics, and reduce
+the host API count to its existing 1,128 ceiling or below. The manager exclusively
+owns any downward policy update, generated artifacts, facade, status and integration.
+Acceptance is a retained diagnostic inventory, meaningful documentation review,
+non-comment token comparison, focused rustdoc/format gates and mandatory policy.
+Execution API semantic/ABI changes remain a separate manager lane. No ceiling increase, lint suppression,
+semantic expansion, source refresh or subsystem credit is permitted.
+
+`SPI-1006.execution-api-doc-prerequisite` assigns a second isolated worker
+comments only in `mainframe-env-execution-api/src/context.rs`, `machine.rs`,
+`effects.rs` and `participant.rs`, if present; all generators, generated code,
+facades, schemas and ABI changes remain manager-owned. Measure the actual
+missing-doc inventory, document existing controls/lifecycles/participant behavior
+without changing tokens, and reduce the execution API to its existing 176 ceiling
+or below. The same focused rustdoc/token/format/policy and cleanup gates apply;
+any lowered ratchet is integrated only by the manager. Neither documentation
+lane changes semantics or grants CICS command coverage.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001
