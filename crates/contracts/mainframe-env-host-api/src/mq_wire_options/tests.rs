@@ -2,6 +2,8 @@ use super::*;
 use crate::mq_mqi::*;
 use crate::*;
 
+mod full_get;
+
 struct Bindings {
     zos: bool,
     unit: Option<MqMqiUnitOfWork>,

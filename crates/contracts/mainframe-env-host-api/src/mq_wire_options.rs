@@ -5,7 +5,9 @@
 //! MQMD1/2. This consumes already decoded typed fields, not wire memory or pointers.
 //! A successful request still requires live registry, coordinator and service admission.
 
+mod full_get;
 mod generated;
+pub use full_get::{MqWireFullGet, get_full};
 #[cfg(test)]
 mod tests;
 

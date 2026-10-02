@@ -1325,6 +1325,30 @@ oracle is skipped with zero credit; full v0.15 acceptance remains incomplete.
 
 ## Typed frame setup and source-snapshot guards
 
+### Complete descriptor numeric GET prerequisite
+
+The additive complete `MqWireFullGet`/`get_full` constructor preserves every
+MQMD1/2 signed/fixed-byte field and explicit structure character profile without
+partial descriptor projection. It delegates to the sole existing numeric GMO1
+control decoder, independently observed queue defaults and actual local-unit
+port. First profile is remove/no-wait with optional accepted truncation; binary
+zero MsgId/CorrelId are wildcards, both nonzero fields match by default, and MD2
+group/sequence/offset do not become additional selectors. Representation success
+does not legalize diagnostic descriptor values for the selected native profile.
+No effect dispatch, handle minting, outcome generation or queue mutation is added.
+
+Fresh focused24 wire-constructor Rust tests (four new) and20 Python tooling/policy
+tests pass, zero ignored. Actual guards/four namespace mutants/module966/34/4/1,
+fresh combined global API docs70/386/0/931/72, fmt/normaldocs/check/changelog pass.
+An initial external input verifier used a different receipt-schema key and stopped
+before tests; the corrected exact32input d8 dependency proof passes separately.
+It remains a reused dependency receipt, not fresh cargo-deny/CI acceptance. Actual
+pre-run input identities and failed receipt are external; Cargo target is cleaned.
+Offline retained-first search/read verifies original MQGETrow0015/q101830_ and
+supplemental q096715_/q097395_/q097390_, baseline2026-09-12, zero source credit.
+Compiled OPEN/GET forwarding, exact complete writeback and all other nonlicensed
+parent acceptance remain required; licensed oracle alone skipped0/26.
+
 `MQ-1501.typed-frame-state-guards` integrates sealed worker `7f7f9b04`.
 A common setup mutex serializes factory/control/runtime publication, prechecks
 all runtime fields and freezes typed setup. It preserves the legacy first

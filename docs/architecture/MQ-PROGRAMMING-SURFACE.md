@@ -349,6 +349,21 @@ actual HCONN. NEW_MSG_ID clears only the requested ID to select the existing
 generator intent; NEW_CORREL_ID remains pending. No ID or outcome is generated.
 The returned structures are not wire layouts and do not reconstruct opaque handles.
 
+The additive `MqWireFullGet`/`get_full` adapter retains the complete MQMD1/2
+observation and explicit structure character encoding, while reusing this same
+numeric GMO1 decoder and binding/unit rules. Its first profile is remove/no-wait,
+optional accepted truncation, and explicit or platform-default syncpoint. GMO1
+matches both nonzero binary MsgId and CorrelId; binary-zero fields are wildcards.
+MD2 group/sequence/offset remain exact observations, not additional selectors.
+All signed/fixed-byte fields survive, even diagnostic values that the selected
+service subsequently refuses. There is no partial descriptor conversion, new
+option namespace, outcome generation or handle authority. Native field legality,
+configured queue defaults, actual SAF, original intent and provider admission
+remain separate. Source: original MQGETrow0015 `q101830_21–48`, supplemental
+`q096715_1269–1381` and `q097395_1389–1482` under baseline2026-09-12.
+Compiled OPEN/GET forwarding and complete result writeback remain required;
+this translator alone is not compiled/native full-call acceptance.
+
 The integration-owned `MqWireBindings` port supplies queue-manager platform,
 already admitted unit/cursor, clock conversion and independently checked queue
 defaults. Zero option words require confirmation that cluster/read-ahead,
