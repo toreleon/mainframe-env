@@ -25,6 +25,9 @@ class MqMqiRegistryTests(unittest.TestCase):
             mq_registry.CONTRACT_OUTPUT_PATH,
             mq_registry.wire.MANIFEST,
             mq_registry.wire.OUTPUT,
+            mq_registry.raw_layout.OUTPUT,
+            Path("conformance/0.15/manifests/mq-point-layout-sources-topics.json"),
+            Path("crates/foundation/mainframe-env-encoding/src/codepage.rs"),
         ]:
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)

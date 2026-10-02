@@ -36,6 +36,8 @@ def historical_sha(path):
             'identity_authority', 'behavioral_coverage_credit', 'licensed_execution_credit', 'calls'}
     if 'wire_options' in catalog:
         keys.add('wire_options')
+    if 'raw_layout' in catalog:
+        keys.add('raw_layout')
     if set(catalog) != keys:
         raise ValueError('historical MQ catalog root fields differ')
     if 'wire_options' in catalog:

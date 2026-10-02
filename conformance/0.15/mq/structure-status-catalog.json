@@ -1672,5 +1672,2193 @@
         "fragment_sha256": "00347d255ded10f299e5877c010392bbcef6b6f7eceb2302e40d8092af401418"
       }
     ]
+  },
+  "raw_layout": {
+    "schema_version": "mainframe-env.mq-raw-layout-projection@1",
+    "semantic_execution_credit": 0,
+    "historical_catalog_sha256": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448",
+    "wire_options_projection_sha256": "4d55b1d825762ff4319215185fb240513ab97b0b9b8ff25192b1b0bab12b9d1c",
+    "sources": [
+      {
+        "scope_id": "mq-programming-supplements",
+        "baseline_id": "ibm-mq-9.4-programming-supplements-2026-09-12",
+        "topic_manifest": {
+          "path": "conformance/0.15/manifests/mq-programming-supplements-topics.json",
+          "sha256": "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a"
+        }
+      },
+      {
+        "scope_id": "mq-point-layout-sources",
+        "baseline_id": "ibm-mq-9.4-point-layout-sources-2026-09-12",
+        "topic_manifest": {
+          "path": "conformance/0.15/manifests/mq-point-layout-sources-topics.json",
+          "sha256": "128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa"
+        }
+      }
+    ],
+    "elementary": {
+      "long_bytes": 4,
+      "cobol_long_min": -999999999,
+      "cobol_long_max": 999999999,
+      "source": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q093580_.html",
+        "topic_sha256": "1a1331bd92ace9131d7f47dfd9ee20209507d691d3c75fabe56f6cdc0c227fc0",
+        "first_line": 148,
+        "last_line": 153,
+        "fragment_sha256": "4b9f4ea0be6b619989018afc292cfd80a79f87619a2cc24de023911d7db035d9"
+      }
+    },
+    "integer_order": {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103960_.html",
+      "topic_sha256": "3f0c9bc640af526d4329e211ababb6115745e2c95673bd6b0edbadfbb8d12662",
+      "first_line": 3,
+      "last_line": 11,
+      "fragment_sha256": "74dae2e604a93b4f36a143fb9ffea16243ea680223a5bfd6d0561c0bac511eaf"
+    },
+    "structure_rules": {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q093630_.html",
+      "topic_sha256": "eccc7e6d5744b26e7cc49eceb3d3628ac5e5263ac8cf5634d69760b0a79856ca",
+      "first_line": 138,
+      "last_line": 154,
+      "fragment_sha256": "d3cb0f851cfb0dddad5c78f655972943a09ef5221e5001a1271ef4166695a1dd"
+    },
+    "layouts": [
+      {
+        "kind": "Od1",
+        "family": "MQOD",
+        "version": 1,
+        "identifier": "OD  ",
+        "prefix_bytes": 168,
+        "c_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+          "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+          "first_line": 149,
+          "last_line": 155,
+          "fragment_sha256": "f8f4789a1357058fbf6753692cf425135593b15a558fcbc78d49731934027cef"
+        },
+        "cobol_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+          "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+          "first_line": 186,
+          "last_line": 198,
+          "fragment_sha256": "95c276dc52be1b7f70e37c0323489f20ab473f40c37671e0e63841fe8d88c32a"
+        },
+        "fields": [
+          {
+            "name": "StrucId",
+            "kind": "characters",
+            "width": 4,
+            "offset": 0,
+            "c_line": 149,
+            "cobol_line": 186,
+            "initial": {
+              "kind": "identifier",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 38,
+                "last_line": 41,
+                "fragment_sha256": "605bacae7f4cdb5adbea7305c34ead6aaa567f537f470bc443bc970d69f2f604"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Version",
+            "kind": "long",
+            "width": 4,
+            "offset": 4,
+            "c_line": 150,
+            "cobol_line": 188,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 42,
+                "last_line": 45,
+                "fragment_sha256": "1c7c720bd9561e3955af04b139a04a0b75ad2bd2970326d0e2e9a42ca1d98dc4"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "ObjectType",
+            "kind": "long",
+            "width": 4,
+            "offset": 8,
+            "c_line": 151,
+            "cobol_line": 190,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 46,
+                "last_line": 49,
+                "fragment_sha256": "90e33a790b417ba2f52c8a8e484962fc20c9c984a809edaf32d32ea82f840f92"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "ObjectName",
+            "kind": "characters",
+            "width": 48,
+            "offset": 12,
+            "c_line": 152,
+            "cobol_line": 192,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 50,
+                "last_line": 53,
+                "fragment_sha256": "cbcbb1cf651cb5ea41bdcb5f8109a6c0da5290ff17fb2adefb42b002a91d2770"
+              }
+            },
+            "writeback": "dynamic-open",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098105_.html",
+              "topic_sha256": "7acbad5c09e077c5c73e0552924d354fc478a8c59cb7ee0b5f7a5e1996734db2",
+              "first_line": 98,
+              "last_line": 101,
+              "fragment_sha256": "8dbbc6fd938e9685f0c2526b56ffd6539043f80af8f8d12217dbf49bc261f6d5"
+            }
+          },
+          {
+            "name": "ObjectQMgrName",
+            "kind": "characters",
+            "width": 48,
+            "offset": 60,
+            "c_line": 153,
+            "cobol_line": 194,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 54,
+                "last_line": 57,
+                "fragment_sha256": "cf7b1a58ee03b82c362d292921f5cbbe2dd178d95c2cdec7fec8173434cb059c"
+              }
+            },
+            "writeback": "dynamic-open",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098105_.html",
+              "topic_sha256": "7acbad5c09e077c5c73e0552924d354fc478a8c59cb7ee0b5f7a5e1996734db2",
+              "first_line": 148,
+              "last_line": 151,
+              "fragment_sha256": "4aac763c7b983d83ee81f85c9308db11bfb76848af1806931f80261587b36bf2"
+            }
+          },
+          {
+            "name": "DynamicQName",
+            "kind": "characters",
+            "width": 48,
+            "offset": 108,
+            "c_line": 154,
+            "cobol_line": 196,
+            "initial": {
+              "kind": "environment",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 58,
+                "last_line": 62,
+                "fragment_sha256": "d1bf567410a039e207c45ad6e68c9dd76b3c40aa6944e55bc206648b87381fc6"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "AlternateUserId",
+            "kind": "characters",
+            "width": 12,
+            "offset": 156,
+            "c_line": 155,
+            "cobol_line": 198,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+                "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+                "first_line": 63,
+                "last_line": 66,
+                "fragment_sha256": "f19d7d3114eb44920aa9b6bc14914f1f1880a157b62ab7f432b06e6a1fc13832"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          }
+        ]
+      },
+      {
+        "kind": "Md1",
+        "family": "MQMD",
+        "version": 1,
+        "identifier": "MD  ",
+        "prefix_bytes": 324,
+        "c_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+          "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+          "first_line": 208,
+          "last_line": 235,
+          "fragment_sha256": "65203dbefac37b7a646348c5bcc50f8f1c3014d971b968cf3b4f255923b160b5"
+        },
+        "cobol_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+          "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+          "first_line": 248,
+          "last_line": 294,
+          "fragment_sha256": "3913fe2d953ab1c2c7e3a2eadead3a989297c907e53658fdca2f354d25787a7a"
+        },
+        "fields": [
+          {
+            "name": "StrucId",
+            "kind": "characters",
+            "width": 4,
+            "offset": 0,
+            "c_line": 208,
+            "cobol_line": 248,
+            "initial": {
+              "kind": "identifier",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 77,
+                "last_line": 80,
+                "fragment_sha256": "9111cbd33daf272e659742fb0985c5801d01e6f7733666afb1766e2f8af17103"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Version",
+            "kind": "long",
+            "width": 4,
+            "offset": 4,
+            "c_line": 209,
+            "cobol_line": 250,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 81,
+                "last_line": 84,
+                "fragment_sha256": "db9462bc1ac11768ecbac4981402586a1494909719ccb8ffa85713bff8e14bbb"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Report",
+            "kind": "long",
+            "width": 4,
+            "offset": 8,
+            "c_line": 210,
+            "cobol_line": 252,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 85,
+                "last_line": 88,
+                "fragment_sha256": "cf8da8f0ebf5913f6b0478b57746ce130417532b490fb12f5cb5bd0ede09d8df"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 525,
+              "last_line": 530,
+              "fragment_sha256": "a5c96bf61e7d77a39ed3635e78f22e4a6d7120541d7deef94db2275f8643cfd4"
+            }
+          },
+          {
+            "name": "MsgType",
+            "kind": "long",
+            "width": 4,
+            "offset": 12,
+            "c_line": 211,
+            "cobol_line": 254,
+            "initial": {
+              "kind": "long",
+              "value": 8,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 89,
+                "last_line": 92,
+                "fragment_sha256": "bf4ab2e720e8ffedb63685a09a8b38f390afe369a5f5273bb07f6f8ed847a6a1"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 572,
+              "last_line": 577,
+              "fragment_sha256": "9e50bf409d14818ea62d98e09cb8af9f12f3329d7e30b1b63e60d186c71d3114"
+            }
+          },
+          {
+            "name": "Expiry",
+            "kind": "long",
+            "width": 4,
+            "offset": 16,
+            "c_line": 212,
+            "cobol_line": 256,
+            "initial": {
+              "kind": "long",
+              "value": -1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 93,
+                "last_line": 96,
+                "fragment_sha256": "4997fb0d8004cf119e654554c5065389eaa3901f498fdd75c948ef9cfc48a6eb"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 689,
+              "last_line": 694,
+              "fragment_sha256": "f62eff46600e5db9dac525652ad14d8a1c8e2e0f241a9d60699f15ac33c6398e"
+            }
+          },
+          {
+            "name": "Feedback",
+            "kind": "long",
+            "width": 4,
+            "offset": 20,
+            "c_line": 213,
+            "cobol_line": 258,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 97,
+                "last_line": 100,
+                "fragment_sha256": "2dc186c3c21b0737c2b1ef85fcf7f94a90973b5bb1937934f65f14279ffda250"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 894,
+              "last_line": 899,
+              "fragment_sha256": "4dbd3bd7ac6d5750e60ec246b42ec30c6b803d26df463062625aae0709902239"
+            }
+          },
+          {
+            "name": "Encoding",
+            "kind": "long",
+            "width": 4,
+            "offset": 24,
+            "c_line": 214,
+            "cobol_line": 260,
+            "initial": {
+              "kind": "environment",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 101,
+                "last_line": 104,
+                "fragment_sha256": "ba92ff64dc7071302d5af63f609a132a326a2ac5c0a0ccedb2c8f1abd01abde8"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 918,
+              "last_line": 923,
+              "fragment_sha256": "6c82051a1b18d1045a2a11522cf2b5300341a4b393d9885715b07f82d1a8bd37"
+            }
+          },
+          {
+            "name": "CodedCharSetId",
+            "kind": "long",
+            "width": 4,
+            "offset": 28,
+            "c_line": 215,
+            "cobol_line": 262,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 105,
+                "last_line": 108,
+                "fragment_sha256": "492b50ef1f7f4890e1720e2f4eba73ec1e755e40c596293c01b443defcd3ff90"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 994,
+              "last_line": 999,
+              "fragment_sha256": "88ccceeb37cd9127f1d3a7bc03186e21fa846414715508d390d22648452c018f"
+            }
+          },
+          {
+            "name": "Format",
+            "kind": "characters",
+            "width": 8,
+            "offset": 32,
+            "c_line": 217,
+            "cobol_line": 264,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 109,
+                "last_line": 112,
+                "fragment_sha256": "6882ffaf45272e126c0c715ea59d88c1867eb3aefb494cea1d333a2a81d7cb4b"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1218,
+              "last_line": 1223,
+              "fragment_sha256": "7736c630c5286fa7f25ca6767cc5dd45774f3896cac11457704cd8607542f76f"
+            }
+          },
+          {
+            "name": "Priority",
+            "kind": "long",
+            "width": 4,
+            "offset": 40,
+            "c_line": 218,
+            "cobol_line": 266,
+            "initial": {
+              "kind": "long",
+              "value": -1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 113,
+                "last_line": 116,
+                "fragment_sha256": "5945f8dd1744fb0cb50d099660a1ec12919937eb6c59114064130417c5796eef"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1271,
+              "last_line": 1276,
+              "fragment_sha256": "81f713d8b5a807ae73d0c99715d2afce3384835162d7023d57fb125ba112d89b"
+            }
+          },
+          {
+            "name": "Persistence",
+            "kind": "long",
+            "width": 4,
+            "offset": 44,
+            "c_line": 219,
+            "cobol_line": 268,
+            "initial": {
+              "kind": "long",
+              "value": 2,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 117,
+                "last_line": 120,
+                "fragment_sha256": "7ed041e137f6ccc31da085a98dc400ee803d1918e504006d015cb528cb9d31ef"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1334,
+              "last_line": 1339,
+              "fragment_sha256": "64a8029bf1fdec464cfe42d3381ead2634efb8c40661e40fd2f1c10ed07bec9d"
+            }
+          },
+          {
+            "name": "MsgId",
+            "kind": "bytes",
+            "width": 24,
+            "offset": 48,
+            "c_line": 220,
+            "cobol_line": 270,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 121,
+                "last_line": 124,
+                "fragment_sha256": "0bdf7ebdd5e4144a67d8540376449bea8e06095473928d6c330163250f9a73b9"
+              }
+            },
+            "writeback": "get-put",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1425,
+              "last_line": 1434,
+              "fragment_sha256": "e8d46b24e15c0e2bed0a0f33d5fb76521669fd8c586412173b8401494e9c01a0"
+            }
+          },
+          {
+            "name": "CorrelId",
+            "kind": "bytes",
+            "width": 24,
+            "offset": 72,
+            "c_line": 221,
+            "cobol_line": 272,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 125,
+                "last_line": 128,
+                "fragment_sha256": "d06c6572f1f988440ee4a179b55968677f7945eeab6f022660b6e71a957560eb"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1477,
+              "last_line": 1482,
+              "fragment_sha256": "a2738b358aac933dbbe347ddfa144f4ec504878d69db6990c3e3e6a83d14e554"
+            }
+          },
+          {
+            "name": "BackoutCount",
+            "kind": "long",
+            "width": 4,
+            "offset": 96,
+            "c_line": 222,
+            "cobol_line": 274,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 129,
+                "last_line": 132,
+                "fragment_sha256": "5554ee1d9be7c50f31cdd7d05145136b15d8205334da54b4bf2dc11e828e485d"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1507,
+              "last_line": 1512,
+              "fragment_sha256": "a3dd37485e3f75e128ae0066f9ae11c1e030f6db5b2272e7682c9d5e59c5e7e9"
+            }
+          },
+          {
+            "name": "ReplyToQ",
+            "kind": "characters",
+            "width": 48,
+            "offset": 100,
+            "c_line": 223,
+            "cobol_line": 276,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 133,
+                "last_line": 136,
+                "fragment_sha256": "141ed3d8821d7390f571ba51159212b446ad2bfb3e29a5e97fee63898725bdff"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1542,
+              "last_line": 1547,
+              "fragment_sha256": "4030a7e8c7a040ac4da0c7c24e355bc4523eb28a794c44ca2fe5f4ae5cadf119"
+            }
+          },
+          {
+            "name": "ReplyToQMgr",
+            "kind": "characters",
+            "width": 48,
+            "offset": 148,
+            "c_line": 224,
+            "cobol_line": 278,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 137,
+                "last_line": 140,
+                "fragment_sha256": "347ed9442d30fdf37d472afc8f68c4e18c6cfa712ddd547253444037af679a14"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1568,
+              "last_line": 1573,
+              "fragment_sha256": "1ccb90c396dee511c6aac43b872e225bad80f997f345c0433b04524ecbc2c30a"
+            }
+          },
+          {
+            "name": "UserIdentifier",
+            "kind": "characters",
+            "width": 12,
+            "offset": 196,
+            "c_line": 225,
+            "cobol_line": 280,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 141,
+                "last_line": 144,
+                "fragment_sha256": "b6c3fcc8a4fc7fab5c840f314bc9ccf366018d64f442290fc4d6729495f45b23"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1619,
+              "last_line": 1624,
+              "fragment_sha256": "d27893fe4689b2fe39a3efd39c0b1779194fb0464df4e3930a148181f8297438"
+            }
+          },
+          {
+            "name": "AccountingToken",
+            "kind": "bytes",
+            "width": 32,
+            "offset": 208,
+            "c_line": 226,
+            "cobol_line": 282,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 145,
+                "last_line": 148,
+                "fragment_sha256": "4bb6c55b43242c7dbe943abddbcbdad2af5a32d343cc08c50ff607f9e6f71d38"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1703,
+              "last_line": 1708,
+              "fragment_sha256": "93032aa24843dc151acc01469f5a204e8c492fb41b29f6b7d5fcc9800934610b"
+            }
+          },
+          {
+            "name": "ApplIdentityData",
+            "kind": "characters",
+            "width": 32,
+            "offset": 240,
+            "c_line": 227,
+            "cobol_line": 284,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 149,
+                "last_line": 152,
+                "fragment_sha256": "127a40f774e24950538cbee9bbf65459b4a6ff5188bb1d6a284a6efe37a2b1d7"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1736,
+              "last_line": 1741,
+              "fragment_sha256": "08271e01f356d8723d556750cd85536f38e20ea3b76def8e836fad03da86b3bf"
+            }
+          },
+          {
+            "name": "PutApplType",
+            "kind": "long",
+            "width": 4,
+            "offset": 272,
+            "c_line": 229,
+            "cobol_line": 286,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 153,
+                "last_line": 156,
+                "fragment_sha256": "948aa4d7d672c61086428933960ed98447e550a6e281717368a893cbda2b29cd"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1822,
+              "last_line": 1827,
+              "fragment_sha256": "a4a2adaaed59060900d7c442625883db3eddb80991e444a63581c06a8ef1fce3"
+            }
+          },
+          {
+            "name": "PutApplName",
+            "kind": "characters",
+            "width": 28,
+            "offset": 276,
+            "c_line": 231,
+            "cobol_line": 288,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 157,
+                "last_line": 160,
+                "fragment_sha256": "3478eadd713c0db50036453b0d2634dc67aa19180081b2362a458bcb5c37f117"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1876,
+              "last_line": 1881,
+              "fragment_sha256": "dfaeff68e85da7b8bcc0cc2b01920fede0576250b2b85cd500b717fc1853bfd0"
+            }
+          },
+          {
+            "name": "PutDate",
+            "kind": "characters",
+            "width": 8,
+            "offset": 304,
+            "c_line": 233,
+            "cobol_line": 290,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 161,
+                "last_line": 164,
+                "fragment_sha256": "6b105ef23d834af2b4893d7134799c8cf06467fd5f040a5d3d1040ae73d46833"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1904,
+              "last_line": 1909,
+              "fragment_sha256": "c3c4ce7e382c858190f4a27fd707afb111c10ddc4f6d2a19fc22e29ab16949ed"
+            }
+          },
+          {
+            "name": "PutTime",
+            "kind": "characters",
+            "width": 8,
+            "offset": 312,
+            "c_line": 234,
+            "cobol_line": 292,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 165,
+                "last_line": 168,
+                "fragment_sha256": "9eeb2e2205e8d44a859d04e2ad61090eb7b3fa5f7ceee24c65549fbfd2ebd352"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1937,
+              "last_line": 1942,
+              "fragment_sha256": "f9ad6f669e1e758c2159d96c4eb0c323161e90a9a93eead4a9c1f7bfc07a6222"
+            }
+          },
+          {
+            "name": "ApplOriginData",
+            "kind": "characters",
+            "width": 4,
+            "offset": 320,
+            "c_line": 235,
+            "cobol_line": 294,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 169,
+                "last_line": 172,
+                "fragment_sha256": "3ea1ae79c375cd0635109ae0c6c7dba461f87c64fa4798151d47cedc49abc95a"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1954,
+              "last_line": 1959,
+              "fragment_sha256": "e154fd1367331d71995b5f4bc58b5809dc0298b89b13a40c045ae6573666e723"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "Md2",
+        "family": "MQMD",
+        "version": 2,
+        "identifier": "MD  ",
+        "prefix_bytes": 364,
+        "c_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+          "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+          "first_line": 208,
+          "last_line": 242,
+          "fragment_sha256": "a8cfeb87e92604dd787a9e33f882e217b13d3e7c2385bc448219c324abcce5e7"
+        },
+        "cobol_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+          "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+          "first_line": 248,
+          "last_line": 304,
+          "fragment_sha256": "79d2cfc01cf5d684a4425ae308811507752b5eb402ed049a900eba9fe22527c2"
+        },
+        "fields": [
+          {
+            "name": "StrucId",
+            "kind": "characters",
+            "width": 4,
+            "offset": 0,
+            "c_line": 208,
+            "cobol_line": 248,
+            "initial": {
+              "kind": "identifier",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 77,
+                "last_line": 80,
+                "fragment_sha256": "9111cbd33daf272e659742fb0985c5801d01e6f7733666afb1766e2f8af17103"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Version",
+            "kind": "long",
+            "width": 4,
+            "offset": 4,
+            "c_line": 209,
+            "cobol_line": 250,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 81,
+                "last_line": 84,
+                "fragment_sha256": "db9462bc1ac11768ecbac4981402586a1494909719ccb8ffa85713bff8e14bbb"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Report",
+            "kind": "long",
+            "width": 4,
+            "offset": 8,
+            "c_line": 210,
+            "cobol_line": 252,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 85,
+                "last_line": 88,
+                "fragment_sha256": "cf8da8f0ebf5913f6b0478b57746ce130417532b490fb12f5cb5bd0ede09d8df"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 525,
+              "last_line": 530,
+              "fragment_sha256": "a5c96bf61e7d77a39ed3635e78f22e4a6d7120541d7deef94db2275f8643cfd4"
+            }
+          },
+          {
+            "name": "MsgType",
+            "kind": "long",
+            "width": 4,
+            "offset": 12,
+            "c_line": 211,
+            "cobol_line": 254,
+            "initial": {
+              "kind": "long",
+              "value": 8,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 89,
+                "last_line": 92,
+                "fragment_sha256": "bf4ab2e720e8ffedb63685a09a8b38f390afe369a5f5273bb07f6f8ed847a6a1"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 572,
+              "last_line": 577,
+              "fragment_sha256": "9e50bf409d14818ea62d98e09cb8af9f12f3329d7e30b1b63e60d186c71d3114"
+            }
+          },
+          {
+            "name": "Expiry",
+            "kind": "long",
+            "width": 4,
+            "offset": 16,
+            "c_line": 212,
+            "cobol_line": 256,
+            "initial": {
+              "kind": "long",
+              "value": -1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 93,
+                "last_line": 96,
+                "fragment_sha256": "4997fb0d8004cf119e654554c5065389eaa3901f498fdd75c948ef9cfc48a6eb"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 689,
+              "last_line": 694,
+              "fragment_sha256": "f62eff46600e5db9dac525652ad14d8a1c8e2e0f241a9d60699f15ac33c6398e"
+            }
+          },
+          {
+            "name": "Feedback",
+            "kind": "long",
+            "width": 4,
+            "offset": 20,
+            "c_line": 213,
+            "cobol_line": 258,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 97,
+                "last_line": 100,
+                "fragment_sha256": "2dc186c3c21b0737c2b1ef85fcf7f94a90973b5bb1937934f65f14279ffda250"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 894,
+              "last_line": 899,
+              "fragment_sha256": "4dbd3bd7ac6d5750e60ec246b42ec30c6b803d26df463062625aae0709902239"
+            }
+          },
+          {
+            "name": "Encoding",
+            "kind": "long",
+            "width": 4,
+            "offset": 24,
+            "c_line": 214,
+            "cobol_line": 260,
+            "initial": {
+              "kind": "environment",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 101,
+                "last_line": 104,
+                "fragment_sha256": "ba92ff64dc7071302d5af63f609a132a326a2ac5c0a0ccedb2c8f1abd01abde8"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 918,
+              "last_line": 923,
+              "fragment_sha256": "6c82051a1b18d1045a2a11522cf2b5300341a4b393d9885715b07f82d1a8bd37"
+            }
+          },
+          {
+            "name": "CodedCharSetId",
+            "kind": "long",
+            "width": 4,
+            "offset": 28,
+            "c_line": 215,
+            "cobol_line": 262,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 105,
+                "last_line": 108,
+                "fragment_sha256": "492b50ef1f7f4890e1720e2f4eba73ec1e755e40c596293c01b443defcd3ff90"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 994,
+              "last_line": 999,
+              "fragment_sha256": "88ccceeb37cd9127f1d3a7bc03186e21fa846414715508d390d22648452c018f"
+            }
+          },
+          {
+            "name": "Format",
+            "kind": "characters",
+            "width": 8,
+            "offset": 32,
+            "c_line": 217,
+            "cobol_line": 264,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 109,
+                "last_line": 112,
+                "fragment_sha256": "6882ffaf45272e126c0c715ea59d88c1867eb3aefb494cea1d333a2a81d7cb4b"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1218,
+              "last_line": 1223,
+              "fragment_sha256": "7736c630c5286fa7f25ca6767cc5dd45774f3896cac11457704cd8607542f76f"
+            }
+          },
+          {
+            "name": "Priority",
+            "kind": "long",
+            "width": 4,
+            "offset": 40,
+            "c_line": 218,
+            "cobol_line": 266,
+            "initial": {
+              "kind": "long",
+              "value": -1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 113,
+                "last_line": 116,
+                "fragment_sha256": "5945f8dd1744fb0cb50d099660a1ec12919937eb6c59114064130417c5796eef"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1271,
+              "last_line": 1276,
+              "fragment_sha256": "81f713d8b5a807ae73d0c99715d2afce3384835162d7023d57fb125ba112d89b"
+            }
+          },
+          {
+            "name": "Persistence",
+            "kind": "long",
+            "width": 4,
+            "offset": 44,
+            "c_line": 219,
+            "cobol_line": 268,
+            "initial": {
+              "kind": "long",
+              "value": 2,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 117,
+                "last_line": 120,
+                "fragment_sha256": "7ed041e137f6ccc31da085a98dc400ee803d1918e504006d015cb528cb9d31ef"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1334,
+              "last_line": 1339,
+              "fragment_sha256": "64a8029bf1fdec464cfe42d3381ead2634efb8c40661e40fd2f1c10ed07bec9d"
+            }
+          },
+          {
+            "name": "MsgId",
+            "kind": "bytes",
+            "width": 24,
+            "offset": 48,
+            "c_line": 220,
+            "cobol_line": 270,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 121,
+                "last_line": 124,
+                "fragment_sha256": "0bdf7ebdd5e4144a67d8540376449bea8e06095473928d6c330163250f9a73b9"
+              }
+            },
+            "writeback": "get-put",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1425,
+              "last_line": 1434,
+              "fragment_sha256": "e8d46b24e15c0e2bed0a0f33d5fb76521669fd8c586412173b8401494e9c01a0"
+            }
+          },
+          {
+            "name": "CorrelId",
+            "kind": "bytes",
+            "width": 24,
+            "offset": 72,
+            "c_line": 221,
+            "cobol_line": 272,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 125,
+                "last_line": 128,
+                "fragment_sha256": "d06c6572f1f988440ee4a179b55968677f7945eeab6f022660b6e71a957560eb"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1477,
+              "last_line": 1482,
+              "fragment_sha256": "a2738b358aac933dbbe347ddfa144f4ec504878d69db6990c3e3e6a83d14e554"
+            }
+          },
+          {
+            "name": "BackoutCount",
+            "kind": "long",
+            "width": 4,
+            "offset": 96,
+            "c_line": 222,
+            "cobol_line": 274,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 129,
+                "last_line": 132,
+                "fragment_sha256": "5554ee1d9be7c50f31cdd7d05145136b15d8205334da54b4bf2dc11e828e485d"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1507,
+              "last_line": 1512,
+              "fragment_sha256": "a3dd37485e3f75e128ae0066f9ae11c1e030f6db5b2272e7682c9d5e59c5e7e9"
+            }
+          },
+          {
+            "name": "ReplyToQ",
+            "kind": "characters",
+            "width": 48,
+            "offset": 100,
+            "c_line": 223,
+            "cobol_line": 276,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 133,
+                "last_line": 136,
+                "fragment_sha256": "141ed3d8821d7390f571ba51159212b446ad2bfb3e29a5e97fee63898725bdff"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1542,
+              "last_line": 1547,
+              "fragment_sha256": "4030a7e8c7a040ac4da0c7c24e355bc4523eb28a794c44ca2fe5f4ae5cadf119"
+            }
+          },
+          {
+            "name": "ReplyToQMgr",
+            "kind": "characters",
+            "width": 48,
+            "offset": 148,
+            "c_line": 224,
+            "cobol_line": 278,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 137,
+                "last_line": 140,
+                "fragment_sha256": "347ed9442d30fdf37d472afc8f68c4e18c6cfa712ddd547253444037af679a14"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1568,
+              "last_line": 1573,
+              "fragment_sha256": "1ccb90c396dee511c6aac43b872e225bad80f997f345c0433b04524ecbc2c30a"
+            }
+          },
+          {
+            "name": "UserIdentifier",
+            "kind": "characters",
+            "width": 12,
+            "offset": 196,
+            "c_line": 225,
+            "cobol_line": 280,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 141,
+                "last_line": 144,
+                "fragment_sha256": "b6c3fcc8a4fc7fab5c840f314bc9ccf366018d64f442290fc4d6729495f45b23"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1619,
+              "last_line": 1624,
+              "fragment_sha256": "d27893fe4689b2fe39a3efd39c0b1779194fb0464df4e3930a148181f8297438"
+            }
+          },
+          {
+            "name": "AccountingToken",
+            "kind": "bytes",
+            "width": 32,
+            "offset": 208,
+            "c_line": 226,
+            "cobol_line": 282,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 145,
+                "last_line": 148,
+                "fragment_sha256": "4bb6c55b43242c7dbe943abddbcbdad2af5a32d343cc08c50ff607f9e6f71d38"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1703,
+              "last_line": 1708,
+              "fragment_sha256": "93032aa24843dc151acc01469f5a204e8c492fb41b29f6b7d5fcc9800934610b"
+            }
+          },
+          {
+            "name": "ApplIdentityData",
+            "kind": "characters",
+            "width": 32,
+            "offset": 240,
+            "c_line": 227,
+            "cobol_line": 284,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 149,
+                "last_line": 152,
+                "fragment_sha256": "127a40f774e24950538cbee9bbf65459b4a6ff5188bb1d6a284a6efe37a2b1d7"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1736,
+              "last_line": 1741,
+              "fragment_sha256": "08271e01f356d8723d556750cd85536f38e20ea3b76def8e836fad03da86b3bf"
+            }
+          },
+          {
+            "name": "PutApplType",
+            "kind": "long",
+            "width": 4,
+            "offset": 272,
+            "c_line": 229,
+            "cobol_line": 286,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 153,
+                "last_line": 156,
+                "fragment_sha256": "948aa4d7d672c61086428933960ed98447e550a6e281717368a893cbda2b29cd"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1822,
+              "last_line": 1827,
+              "fragment_sha256": "a4a2adaaed59060900d7c442625883db3eddb80991e444a63581c06a8ef1fce3"
+            }
+          },
+          {
+            "name": "PutApplName",
+            "kind": "characters",
+            "width": 28,
+            "offset": 276,
+            "c_line": 231,
+            "cobol_line": 288,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 157,
+                "last_line": 160,
+                "fragment_sha256": "3478eadd713c0db50036453b0d2634dc67aa19180081b2362a458bcb5c37f117"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1876,
+              "last_line": 1881,
+              "fragment_sha256": "dfaeff68e85da7b8bcc0cc2b01920fede0576250b2b85cd500b717fc1853bfd0"
+            }
+          },
+          {
+            "name": "PutDate",
+            "kind": "characters",
+            "width": 8,
+            "offset": 304,
+            "c_line": 233,
+            "cobol_line": 290,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 161,
+                "last_line": 164,
+                "fragment_sha256": "6b105ef23d834af2b4893d7134799c8cf06467fd5f040a5d3d1040ae73d46833"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1904,
+              "last_line": 1909,
+              "fragment_sha256": "c3c4ce7e382c858190f4a27fd707afb111c10ddc4f6d2a19fc22e29ab16949ed"
+            }
+          },
+          {
+            "name": "PutTime",
+            "kind": "characters",
+            "width": 8,
+            "offset": 312,
+            "c_line": 234,
+            "cobol_line": 292,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 165,
+                "last_line": 168,
+                "fragment_sha256": "9eeb2e2205e8d44a859d04e2ad61090eb7b3fa5f7ceee24c65549fbfd2ebd352"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1937,
+              "last_line": 1942,
+              "fragment_sha256": "f9ad6f669e1e758c2159d96c4eb0c323161e90a9a93eead4a9c1f7bfc07a6222"
+            }
+          },
+          {
+            "name": "ApplOriginData",
+            "kind": "characters",
+            "width": 4,
+            "offset": 320,
+            "c_line": 235,
+            "cobol_line": 294,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 169,
+                "last_line": 172,
+                "fragment_sha256": "3ea1ae79c375cd0635109ae0c6c7dba461f87c64fa4798151d47cedc49abc95a"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 1954,
+              "last_line": 1959,
+              "fragment_sha256": "e154fd1367331d71995b5f4bc58b5809dc0298b89b13a40c045ae6573666e723"
+            }
+          },
+          {
+            "name": "GroupId",
+            "kind": "bytes",
+            "width": 24,
+            "offset": 324,
+            "c_line": 236,
+            "cobol_line": 296,
+            "initial": {
+              "kind": "nulls",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 176,
+                "last_line": 179,
+                "fragment_sha256": "2cdbf0eb5a626ab3e3cb62cec6ef38cfeae00ab834211534c92fb337851177f2"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 2001,
+              "last_line": 2006,
+              "fragment_sha256": "f02c9f978b2b11fa9c7392bf635fd90cd477d943cb7636e4e872cab1bf047faf"
+            }
+          },
+          {
+            "name": "MsgSeqNumber",
+            "kind": "long",
+            "width": 4,
+            "offset": 348,
+            "c_line": 237,
+            "cobol_line": 298,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 180,
+                "last_line": 183,
+                "fragment_sha256": "a55c309b20a6255f5a0762a2a2db35185f25b01a6c4e6b60029777fb426993e1"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 2028,
+              "last_line": 2033,
+              "fragment_sha256": "fbc1df29b17abe607ec6833d09c00a918b85b2e9d1337fcde228343ccb526e63"
+            }
+          },
+          {
+            "name": "Offset",
+            "kind": "long",
+            "width": 4,
+            "offset": 352,
+            "c_line": 239,
+            "cobol_line": 300,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 184,
+                "last_line": 187,
+                "fragment_sha256": "60a1e462597227b099b7e4e7b51a42dc21c2eeae6905573ef4a7e8a9c82287a7"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 2050,
+              "last_line": 2055,
+              "fragment_sha256": "811cd68ab8ad3c7d0629c9476a383da3b9e24ccd1254af769e4799f754e1f353"
+            }
+          },
+          {
+            "name": "MsgFlags",
+            "kind": "long",
+            "width": 4,
+            "offset": 356,
+            "c_line": 241,
+            "cobol_line": 302,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 188,
+                "last_line": 191,
+                "fragment_sha256": "a0d2a8583226c4b7718bdf97060bf3d05dcbdae8078bcd31371ae3f06cd4cd7d"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 2218,
+              "last_line": 2221,
+              "fragment_sha256": "d5d09a26c88c03664c04a9861cad04019cd0fbcdb97f66cba8c1564b3f41b976"
+            }
+          },
+          {
+            "name": "OriginalLength",
+            "kind": "long",
+            "width": 4,
+            "offset": 360,
+            "c_line": 242,
+            "cobol_line": 304,
+            "initial": {
+              "kind": "long",
+              "value": -1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q097390_.html",
+                "topic_sha256": "57354bc889449b82a1d3324b3b4f777fdc2dbdf7919d04784115c7fbbd87446d",
+                "first_line": 192,
+                "last_line": 195,
+                "fragment_sha256": "f6a008835079a7f2558f968ac0bd490354e171a0a1906cb1e0e33ae933bb112f"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+              "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+              "first_line": 2262,
+              "last_line": 2266,
+              "fragment_sha256": "5d824539711f28925505047cfd679b6d270dc27f30a6ce9756097746a78ee75c"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "Gmo1",
+        "family": "MQGMO",
+        "version": 1,
+        "identifier": "GMO ",
+        "prefix_bytes": 72,
+        "c_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+          "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+          "first_line": 115,
+          "last_line": 122,
+          "fragment_sha256": "9bd1b42d731c295da86e1c3726f8ae4ac1d06aeb0be5a34c68b04fc633400c45"
+        },
+        "cobol_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+          "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+          "first_line": 150,
+          "last_line": 162,
+          "fragment_sha256": "13f9c2e55223bfbfb0e99baf329a989cfe2be61387f95f707d066e4920f1b16b"
+        },
+        "fields": [
+          {
+            "name": "StrucId",
+            "kind": "characters",
+            "width": 4,
+            "offset": 0,
+            "c_line": 115,
+            "cobol_line": 150,
+            "initial": {
+              "kind": "identifier",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 30,
+                "last_line": 33,
+                "fragment_sha256": "2034d964b1fcc90522bfb690d32cb73553e682cfd1e06b81492b89e8974ece01"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Version",
+            "kind": "long",
+            "width": 4,
+            "offset": 4,
+            "c_line": 116,
+            "cobol_line": 152,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 34,
+                "last_line": 37,
+                "fragment_sha256": "fc62e7617b8a8e356bcaed374446d6eab6b333b4c6ddcbfd7aa5126dd6c675f8"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Options",
+            "kind": "long",
+            "width": 4,
+            "offset": 8,
+            "c_line": 117,
+            "cobol_line": 154,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 38,
+                "last_line": 41,
+                "fragment_sha256": "a246649ef4982e220ff1be8f7e8fc6ccda0e8c068abd5786e370631de2a59985"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "WaitInterval",
+            "kind": "long",
+            "width": 4,
+            "offset": 12,
+            "c_line": 119,
+            "cobol_line": 156,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 42,
+                "last_line": 45,
+                "fragment_sha256": "7a3c6034b9df5a6ac5d489961bfbbbf7acd30abde7cd91fb920d05a5c1afc561"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Signal1",
+            "kind": "signal-slot",
+            "width": 4,
+            "offset": 16,
+            "c_line": 120,
+            "cobol_line": 158,
+            "initial": {
+              "kind": "environment",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 46,
+                "last_line": 49,
+                "fragment_sha256": "dd6504a3b9544c4f2d8fe4f8b5ac270a47d255d0d1225b95a9011067894501c4"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Signal2",
+            "kind": "long",
+            "width": 4,
+            "offset": 20,
+            "c_line": 121,
+            "cobol_line": 160,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 50,
+                "last_line": 53,
+                "fragment_sha256": "8e270895b84f04acfd3305958eb47f000e5d597d7cdfef8185e220b350549aaa"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "ResolvedQName",
+            "kind": "characters",
+            "width": 48,
+            "offset": 24,
+            "c_line": 122,
+            "cobol_line": 162,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q096710_.html",
+                "topic_sha256": "d96320615bbdb1fc993894150d553f1963fbdc29439775bba5ec13b7d35591fd",
+                "first_line": 54,
+                "last_line": 57,
+                "fragment_sha256": "717bff5a6e2a7ca1ef24f7c578f8fd0a40f3f895fb092749aafabbc11ff8415a"
+              }
+            },
+            "writeback": "get",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q096715_.html",
+              "topic_sha256": "a1c3fa0544e420f8bc1ce1dfeffb891df435e85a64108c378ac59a48dbd14af3",
+              "first_line": 1260,
+              "last_line": 1268,
+              "fragment_sha256": "bc521218bff192a4bf7056e626cb42db87beab9396113665f898b32c10e0a891"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "Pmo1",
+        "family": "MQPMO",
+        "version": 1,
+        "identifier": "PMO ",
+        "prefix_bytes": 128,
+        "c_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+          "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+          "first_line": 131,
+          "last_line": 146,
+          "fragment_sha256": "3b3a1da5d0b8dbb1e594cd11783b50727bd280a54991d45212affc57817b4e2a"
+        },
+        "cobol_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+          "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+          "first_line": 170,
+          "last_line": 188,
+          "fragment_sha256": "5cadee8d695341ae9b163ab9493039c88025a4f0a1391e355bad759d084eee44"
+        },
+        "fields": [
+          {
+            "name": "StrucId",
+            "kind": "characters",
+            "width": 4,
+            "offset": 0,
+            "c_line": 131,
+            "cobol_line": 170,
+            "initial": {
+              "kind": "identifier",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 31,
+                "last_line": 34,
+                "fragment_sha256": "4e3e2d70ecbbaae085c7e384fa5cda1746ea11143c7bc25321f96174c585e47f"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Version",
+            "kind": "long",
+            "width": 4,
+            "offset": 4,
+            "c_line": 132,
+            "cobol_line": 172,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 35,
+                "last_line": 38,
+                "fragment_sha256": "e79a7990f89d3d7e63d1365f2d242339a70de1a96e7d0ba1418cb8d8b65d6453"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Options",
+            "kind": "long",
+            "width": 4,
+            "offset": 8,
+            "c_line": 133,
+            "cobol_line": 174,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 39,
+                "last_line": 42,
+                "fragment_sha256": "cd958495f273c1ab782b7f42d8ab6a2896fec1fc631591ce742bf4b4066fde5e"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Timeout",
+            "kind": "long",
+            "width": 4,
+            "offset": 12,
+            "c_line": 135,
+            "cobol_line": 176,
+            "initial": {
+              "kind": "long",
+              "value": -1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 43,
+                "last_line": 45,
+                "fragment_sha256": "0475179f0b2df94a648b2a82c3cdcc0a15def62ddde23c5be72bbf32554314e6"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Context",
+            "kind": "alias",
+            "width": 4,
+            "offset": 16,
+            "c_line": 136,
+            "cobol_line": 178,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 46,
+                "last_line": 49,
+                "fragment_sha256": "e2f25fa690e55808591940090a50012d148eeb8030ed87ab624ddc16a44f235d"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "KnownDestCount",
+            "kind": "long",
+            "width": 4,
+            "offset": 20,
+            "c_line": 137,
+            "cobol_line": 180,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 50,
+                "last_line": 53,
+                "fragment_sha256": "1e9f89cbace4836bf050e2a1d02ce55bc959e1826bef7eccc72552b4973f209a"
+              }
+            },
+            "writeback": "put-count-other",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098655_.html",
+              "topic_sha256": "a7eded650391ad55c27d0f39576afd66b4ad855ef2b84e512ee28bb0329245a3",
+              "first_line": 393,
+              "last_line": 402,
+              "fragment_sha256": "12ae896923b1f827f2022bcd89921cb8de32a602788f9f8d444465b4fa5ecd0f"
+            }
+          },
+          {
+            "name": "UnknownDestCount",
+            "kind": "long",
+            "width": 4,
+            "offset": 24,
+            "c_line": 139,
+            "cobol_line": 182,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 54,
+                "last_line": 57,
+                "fragment_sha256": "cfbae500b7d7a052229fb093bb5f09a8ac2a20fd77364f2159664a7524324d3d"
+              }
+            },
+            "writeback": "put-count-other",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098655_.html",
+              "topic_sha256": "a7eded650391ad55c27d0f39576afd66b4ad855ef2b84e512ee28bb0329245a3",
+              "first_line": 403,
+              "last_line": 412,
+              "fragment_sha256": "95ce9da9f5e00a50819b3b27acc3319334088a81d3b854bffa921840fde4340d"
+            }
+          },
+          {
+            "name": "InvalidDestCount",
+            "kind": "long",
+            "width": 4,
+            "offset": 28,
+            "c_line": 141,
+            "cobol_line": 184,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 58,
+                "last_line": 61,
+                "fragment_sha256": "7af6ab8b2fa6e9c02bc27c4dce7ea0c6f8b619bebac8cf52ec6b4728ae9b7c31"
+              }
+            },
+            "writeback": "put-count-other",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098655_.html",
+              "topic_sha256": "a7eded650391ad55c27d0f39576afd66b4ad855ef2b84e512ee28bb0329245a3",
+              "first_line": 413,
+              "last_line": 422,
+              "fragment_sha256": "bc93d76f220f7a6e0dda65b5e2c96de274644836de2b2ce125e83d456ca07d6c"
+            }
+          },
+          {
+            "name": "ResolvedQName",
+            "kind": "characters",
+            "width": 48,
+            "offset": 32,
+            "c_line": 143,
+            "cobol_line": 186,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 62,
+                "last_line": 65,
+                "fragment_sha256": "717bff5a6e2a7ca1ef24f7c578f8fd0a40f3f895fb092749aafabbc11ff8415a"
+              }
+            },
+            "writeback": "single-queue-put",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098655_.html",
+              "topic_sha256": "a7eded650391ad55c27d0f39576afd66b4ad855ef2b84e512ee28bb0329245a3",
+              "first_line": 424,
+              "last_line": 431,
+              "fragment_sha256": "6fe9145b4e71cc74c85387a44bd8c410401695e35a2952a81df0578833e936b3"
+            }
+          },
+          {
+            "name": "ResolvedQMgrName",
+            "kind": "characters",
+            "width": 48,
+            "offset": 80,
+            "c_line": 145,
+            "cobol_line": 188,
+            "initial": {
+              "kind": "blanks",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q098650_.html",
+                "topic_sha256": "c99d87157c81e102e8ace2807770009f8db11cb87b7fa4753db54dc344c0432a",
+                "first_line": 66,
+                "last_line": 69,
+                "fragment_sha256": "ab2ee64c8ce57233c150446dd8b255668d325dfa5aff52e19d1e0410d72992b2"
+              }
+            },
+            "writeback": "single-queue-put",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q098655_.html",
+              "topic_sha256": "a7eded650391ad55c27d0f39576afd66b4ad855ef2b84e512ee28bb0329245a3",
+              "first_line": 432,
+              "last_line": 447,
+              "fragment_sha256": "39ed272c033b71c6f773d7b7bcae2860e44f352a9b67e23c33258ce0d18bcab4"
+            }
+          }
+        ]
+      }
+    ],
+    "identifier_sources": [
+      {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q092060_.html",
+        "topic_sha256": "ddcad734a32bbd1f5ebc502c3875dd321d0bb315622c8f668361332609d469c2",
+        "first_line": 8,
+        "last_line": 12,
+        "fragment_sha256": "336f1cbf089a9e57e4e46c21725e39594a3fea7940f460734c6b312f94480163"
+      },
+      {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q091870_.html",
+        "topic_sha256": "79a4e9042df87c6dfc593778d88685ad806bd1b9aa3e5de706e8e72a52954011",
+        "first_line": 8,
+        "last_line": 12,
+        "fragment_sha256": "ff4c7d644e47bd9745c90f324178c218f7e0c3cc7e7f5af81aab4ffd4e1aa465"
+      },
+      {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q091510_.html",
+        "topic_sha256": "86ef3c5ff17c60f85a46ddd0952c43603681b8720d87fa7b0393fc9f5baedd08",
+        "first_line": 8,
+        "last_line": 12,
+        "fragment_sha256": "d86cd2b74578545c2680df583dfe703a55d3e03a85efd4d576bb3dcaaadd3b0a"
+      },
+      {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q092190_.html",
+        "topic_sha256": "c2dcece7a4a74d2ac4c0b518a844d5c560523ccaf8cd8eb24417bc3d3620593f",
+        "first_line": 8,
+        "last_line": 12,
+        "fragment_sha256": "5723ed82e5a261f1fc81a644e62d0a5fb9b2ee8d428c5f0cb26819419ea3f698"
+      }
+    ],
+    "signal_policy": {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q096715_.html",
+      "topic_sha256": "a1c3fa0544e420f8bc1ce1dfeffb891df435e85a64108c378ac59a48dbd14af3",
+      "first_line": 1205,
+      "last_line": 1259,
+      "fragment_sha256": "9a6ec7f07f43917dcca040ff3c44c6896593b90cdb85c93cf236d1f3ded06ac9"
+    },
+    "body_encoding_policy": {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+      "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+      "first_line": 896,
+      "last_line": 924,
+      "fragment_sha256": "d31e025c2c03bbbd1e20de698dd6b82dcddd2ba4358a16e7e28aa3bf4b701ff3"
+    },
+    "character_policy": {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q098100_.html",
+      "topic_sha256": "6d1ab894ea7500963cdeca6d32580201fa4d2554e0ff40358cae16d4003474f5",
+      "first_line": 25,
+      "last_line": 29,
+      "fragment_sha256": "ac81287cd0fc4471b330ea74863247cf3257cab988c0061deaa4df573f64e5f2"
+    },
+    "owned_character_table": {
+      "path": "crates/foundation/mainframe-env-encoding/src/codepage.rs",
+      "sha256": "6c6c12887914a33dd1cdbffa975230a8fe6a4e6bb384ca66bd433e660264291f"
+    },
+    "descriptor_output_policy": {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q097395_.html",
+      "topic_sha256": "c5fd0e3ba3d2148d0e1bb41693bf5cc2307a50bf36827fa798bb2d6ba0e1b451",
+      "first_line": 3,
+      "last_line": 5,
+      "fragment_sha256": "2d1a9d1da26c226706e6f02a1771dcadb353e3c69d10492740cf41e47b548a70"
+    }
   }
 }

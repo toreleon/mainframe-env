@@ -18,7 +18,8 @@
     "behavioral_coverage_credit",
     "licensed_execution_credit",
     "calls",
-    "wire_options"
+    "wire_options",
+    "raw_layout"
   ],
   "properties": {
     "schema_version": {"const": "mainframe-env.mq-structure-status-catalog@2"},
@@ -34,6 +35,7 @@
     "behavioral_coverage_credit": {"const": 0},
     "licensed_execution_credit": {"const": 0},
     "wire_options": {"$ref": "#/$defs/wire-options"},
+    "raw_layout": {"$ref": "#/$defs/raw-layout"},
     "calls": {
       "type": "array",
       "minItems": 26,
@@ -42,6 +44,333 @@
     }
   },
   "$defs": {
+    "raw-locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "topic_sha256",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "raw-initial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value",
+        "source"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "long",
+            "identifier",
+            "blanks",
+            "nulls",
+            "environment"
+          ]
+        },
+        "value": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "source": {
+          "$ref": "#/$defs/raw-locator"
+        }
+      }
+    },
+    "raw-field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "width",
+        "offset",
+        "c_line",
+        "cobol_line",
+        "initial",
+        "writeback",
+        "writeback_source"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]+$"
+        },
+        "kind": {
+          "enum": [
+            "long",
+            "characters",
+            "bytes",
+            "alias",
+            "signal-slot"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 48
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 364
+        },
+        "c_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "cobol_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "initial": {
+          "$ref": "#/$defs/raw-initial"
+        },
+        "writeback": {
+          "enum": [
+            "input",
+            "get",
+            "get-put",
+            "dynamic-open",
+            "put-count-other",
+            "single-queue-put"
+          ]
+        },
+        "writeback_source": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/raw-locator"
+            }
+          ]
+        }
+      }
+    },
+    "raw-layout-descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "family",
+        "version",
+        "identifier",
+        "prefix_bytes",
+        "c_declaration",
+        "cobol_declaration",
+        "fields"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "Od1",
+            "Md1",
+            "Md2",
+            "Gmo1",
+            "Pmo1"
+          ]
+        },
+        "family": {
+          "enum": [
+            "MQOD",
+            "MQMD",
+            "MQGMO",
+            "MQPMO"
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 4
+        },
+        "prefix_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 364
+        },
+        "c_declaration": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "cobol_declaration": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 29,
+          "items": {
+            "$ref": "#/$defs/raw-field"
+          }
+        }
+      }
+    },
+    "raw-layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "semantic_execution_credit",
+        "historical_catalog_sha256",
+        "wire_options_projection_sha256",
+        "sources",
+        "elementary",
+        "integer_order",
+        "structure_rules",
+        "layouts",
+        "identifier_sources",
+        "signal_policy",
+        "body_encoding_policy",
+        "character_policy",
+        "owned_character_table",
+        "descriptor_output_policy"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.mq-raw-layout-projection@1"
+        },
+        "semantic_execution_credit": {
+          "const": 0
+        },
+        "historical_catalog_sha256": {
+          "const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"
+        },
+        "wire_options_projection_sha256": {
+          "const": "4d55b1d825762ff4319215185fb240513ab97b0b9b8ff25192b1b0bab12b9d1c"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope_id",
+              "baseline_id",
+              "topic_manifest"
+            ],
+            "properties": {
+              "scope_id": {
+                "enum": [
+                  "mq-programming-supplements",
+                  "mq-point-layout-sources"
+                ]
+              },
+              "baseline_id": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "topic_manifest": {
+                "$ref": "#/$defs/file-binding"
+              }
+            }
+          }
+        },
+        "elementary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "long_bytes",
+            "cobol_long_min",
+            "cobol_long_max",
+            "source"
+          ],
+          "properties": {
+            "long_bytes": {
+              "const": 4
+            },
+            "cobol_long_min": {
+              "const": -999999999
+            },
+            "cobol_long_max": {
+              "const": 999999999
+            },
+            "source": {
+              "$ref": "#/$defs/raw-locator"
+            }
+          }
+        },
+        "integer_order": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "structure_rules": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "layouts": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/raw-layout-descriptor"
+          }
+        },
+        "identifier_sources": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/raw-locator"
+          }
+        },
+        "signal_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "body_encoding_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "character_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "owned_character_table": {
+          "$ref": "#/$defs/file-binding"
+        },
+        "descriptor_output_policy": {
+          "$ref": "#/$defs/raw-locator"
+        }
+      }
+    }
+,
     "wire-options": {
       "type": "object", "additionalProperties": false,
       "required": ["baseline_id", "scope_id", "topic_manifest", "historical_catalog_sha256", "semantic_execution_credit", "facts", "corroboration"],

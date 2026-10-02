@@ -28,6 +28,7 @@ mod mq_handles;
 mod mq_message_contract;
 pub mod mq_mqi;
 pub mod mq_object_route;
+pub mod mq_raw_layout;
 pub mod mq_status;
 mod mq_validation;
 pub mod mq_wire_options;

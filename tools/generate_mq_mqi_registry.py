@@ -13,6 +13,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mq_wire_options as wire
+import mq_raw_layout as raw_layout
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -642,6 +643,7 @@ def check(root: Path = ROOT) -> None:
         (OUTPUT_PATH, render(root)),
         (CONTRACT_OUTPUT_PATH, render_contract(root)),
         (wire.OUTPUT, wire.render(root)),
+        (raw_layout.OUTPUT, raw_layout.render(root)),
     ]:
         output = root / output_path
         if not output.is_file() or output.read_text() != expected:
@@ -652,9 +654,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--cache", type=Path, help="offline selected supplemental fact reproduction")
+    parser.add_argument("--layout-cache", type=Path, help="offline point-layout source cache")
     args = parser.parse_args()
     if args.cache:
         wire.verify_source(ROOT, args.cache)
+    if args.layout_cache:
+        if not args.cache:
+            parser.error("--layout-cache requires --cache for the existing supplemental scope")
+        raw_layout.verify_source(ROOT, {
+            "mq-programming-supplements": args.cache,
+            "mq-point-layout-sources": args.layout_cache,
+        })
     if args.check:
         check(ROOT)
     else:
@@ -662,6 +672,7 @@ def main() -> int:
             (OUTPUT_PATH, render(ROOT)),
             (CONTRACT_OUTPUT_PATH, render_contract(ROOT)),
             (wire.OUTPUT, wire.render(ROOT)),
+            (raw_layout.OUTPUT, raw_layout.render(ROOT)),
         ]:
             output = ROOT / output_path
             output.parent.mkdir(parents=True, exist_ok=True)

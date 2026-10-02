@@ -6,6 +6,21 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+Checked raw COBOL prefixes now retain every MQOD1/MQMD1/MQMD2/GMO1/PMO1
+field byte and actual capacity, with explicit trusted integer/character encoding.
+The independent raw-layout projection is generated from the existing single
+structure/status catalog and hash-bound supplemental/layout sources, preserving
+the original call, status, wire-option and canonical identities. Observed-field
+writeback checks complete preflight before one bounded copy, preserving omitted,
+undefined and suffix bytes; numeric aliases and Signal1 remain observations,
+not executable handles or pointers. No defaults, names, counts or descriptors
+are fabricated. Original rows `0006/0015/0019/0020/0021` and the
+`ibm-mq-9.4-programming-supplements-2026-09-12` /
+`ibm-mq-9.4-point-layout-sources-2026-09-12` pinned declarations are the source
+boundary. Full typed MQMD representation, installed memory/alias routing and
+real provider execution still require composition; this contract earns no
+additional call or licensed execution credit.
+
 The typed machine now emits MQCMIT/MQBACK for an independently admitted ordinary
 batch/local-MQ frame. Its live-token UOW lookup is a read-only assertion, not
 authority reconstructed from bindings or an application integer. Original

@@ -34,6 +34,58 @@ identities and versions, option families and documented combinations without
 registering a handler. The bounded numeric adapter below admits its reviewed
 point-to-point subset; other numeric forms and execution remain pending.
 
+## Private pointer-free raw layout projection
+
+The same structure/status catalog retains private `@2` framing and adds an
+independent `mainframe-env.mq-raw-layout-projection@1` projection. Its digest is
+separate from the frozen original call/signature identity and the accepted
+wire-options projection; neither historical digest nor canonical bytes changes.
+The existing registry generator emits every field identity, width, offset and
+reviewed initial observation. Initial observations are reference facts, never
+missing-input defaults or scalar legality permits.
+
+`mainframe-env-host-api::mq_raw_layout` captures complete MQOD1 (168 bytes),
+MQMD1 (324), MQMD2 (364), GMO1 (72) and PMO1 (128) prefixes. Lengths derive from
+the COBOL declarations and joined C byte/character types, not platform-dependent
+CURRENT_LENGTH macros. Version, identifier and complete capacity are checked;
+opaque identifiers and all other input fields remain exact. The embedding must
+explicitly select normal/big or reversed/little integers and ASCII-compatible
+or the existing owned CP037 identifier profile. Other encodings reject.
+Character observations remain raw encoded bytes. CP037 is an owned embedding
+choice, not a claim that MQ mandates CCSID37. MQMD.Encoding describes the body,
+never the structure's encoding. Raw signed 32-bit observations are retained even
+outside COBOL PIC S9(9); scalar use/writeback separately checks that reviewed range.
+
+Writeback preflights a bounded field batch and the exact captured capacity/prefix
+before one copy. Only explicit source-defined output fields may change. Omitted,
+unchanged or undefined fields retain input bytes; suffix bytes stay untouched.
+Actual observations and platform/model/single-queue applicability must come from
+the trusted adapter/service. No status determines output synthesis or mutation
+permission. PMO destination counts cannot be written on z/OS; GMO Signal1 remains
+an opaque slot and SET_SIGNAL pointer behavior is unsupported. Conditional PUT
+correlation/context/group output updates remain pending in this bounded substrate.
+The API does not generate names, counts, message IDs, descriptor fields or expiry
+clock scaling. Captured numeric Context is an alias observation, never HOBJ
+authority. The eventual registry bridge must supply live handles, including the
+actual retained HCONN for PUT1, independently of names or options.
+
+Complete MQMD projection into the current typed message descriptor rejects with
+`DescriptorRepresentationPending`: Report, MsgType, Feedback, body encoding/CCSID,
+backout/reply/context/origin and OriginalLength lack lossless typed fields. The
+manager must add source-bound typed fields and their full canonical/replay support
+before using these observations as durable GET results. These non-Serde raw structs
+do not create an alternate effect journal or bypass canonical result bounds.
+
+Sources are the MQ9.4 original baseline `ibm-mq-9.4-mqi-2026-08-31`, rows
+0006/0015/0019/0020/0021, the existing programming supplement baseline
+`ibm-mq-9.4-programming-supplements-2026-09-12` (declarations q098100_, q097390_,
+q096710_, q098650_ and their field/constant topics), and the separate
+`ibm-mq-9.4-point-layout-sources-2026-09-12` elementary/COBOL/encoding topics
+q093580_, q093600_, q093630_, q103960_. Exact source pins and fragment locators
+remain in the single catalog. Offline checks validate artifact closure; optional
+cache-backed generation reproduces the selected facts. Reference review provides
+zero execution/licensed credit and no refresh or same-browser capture claim.
+
 ## Authority boundary
 
 `mainframe-env-mq` is the one owned semantic authority for queue managers,
