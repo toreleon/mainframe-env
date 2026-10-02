@@ -17,6 +17,7 @@ mod pubsub;
 mod retention;
 mod service;
 mod service_mqi_intent;
+mod trusted_batch_embedding;
 
 pub use delivery::{
     MQ_DELIVERY_SCHEMA, MqDeliveryError, MqDeliveryGet, MqDeliveryKernel, MqDeliveryLimits,
@@ -51,4 +52,7 @@ pub use retention::{
 
 pub use service::{
     MqInstallReceipt, MqLimits, MqQueueDefinition, MqReplayClock, MqService, mq_providers,
+};
+pub use trusted_batch_embedding::{
+    MqTrustedBatchFrame, MqTrustedBatchRelationship, MqTrustedBatchRoot, MqTrustedBatchRuntime,
 };

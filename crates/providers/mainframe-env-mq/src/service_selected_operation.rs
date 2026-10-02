@@ -35,6 +35,8 @@ pub(in crate::service) mod receipt;
 pub(in crate::service) mod rows;
 #[path = "service_selected_operation/transition.rs"]
 mod transition;
+#[path = "service_selected_operation/trusted_embedding.rs"]
+mod trusted_embedding;
 
 use ownership::Control;
 

@@ -154,6 +154,57 @@ and historical-handle adoption support remains pending.
 
 ## Sources and acceptance boundary
 
+### Deliberate Rust trusted-host facet
+
+`MqTrustedBatchRuntime` is an explicit privileged Rust embedding facet over one
+selected `MqService`, its same physical `Arc<dyn PlatformStore>`, mandatory
+enterprise authorizer/clock and frozen provider/host/MQI profiles. Opening uses
+only the strict existing reader and rejects absent, legacy, corrupt or mismatched
+rich state. It does not normalize, initialize, migrate, select a public provider
+or add a second queue, store, codec, journal or authorization authority.
+
+Its closed nonSerde/nonClone runtime/root/frame objects expose no numeric lease,
+handle, owner or mutable Invocation constructor. `admit_root` deliberately chooses
+ordinary `ZosBatch/QueueManager`; this is PRIVILEGED HOST SETUP, not application
+binding attestation. The actual server factory must first independently validate
+genuine original installed admission, core/CALL/store/control and topology. A
+root still requires parentNone; a real installed child is never forged into a
+root. Missing MQ binding is allowed only through frozen explicit mode; every
+present MQ/CICS/IMS/client/host-owned contradiction remains a failure. Original
+Invocations and pending effects are never rewritten.
+
+`prepare_same_task_child` requires this exact runtime and opaque live parent,
+original child, explicit trusted SAME TASK CALL selection and the existing
+directory's probe/lineage/nonwidening checks. Separate subtasks remain unsupported.
+Child objects retain the same original root. Read-only context/current-unit
+projections and dispatch reuse the existing service methods and sole authority
+mutex. Dispatch consumes one validated original occurrence, checks its exact
+frozen limits and retains original actor/core/SAF/audit/UOW/control/receipt/replay
+composition. Matching IDs, bindings, projections or possession of a frame is
+neither host attestation nor a SAF/participant permit. UnitOwner@1 and historical
+canonical/replay/storage bytes remain unchanged.
+
+Explicit preparation abort is child-only and unavailable after any dispatch
+attempt. Normal nonfinal child return removes only its volatile frame, preserving
+handles/pending work and surviving parent references. Lifecycle methods require
+exclusive access and revoke their wrapper once; every other wrapper still needs
+fresh directory validation. An unclassified/abnormal lifecycle operation fences
+the same runtime under its sole mutex, revokes the wrapper and retains all work
+for recovery, returning UnknownOutcome. Root/final task-end is unsupported. A
+dispatch reporting UnknownOutcome also revokes its wrapper while retaining its
+directory reference, so it cannot infer a normal return. Drop
+performs no MQDISC, commit, backout, row deletion, detached work or task-end
+decision. Failed new-root preparation reclaims only its new empty process through
+the existing registry/directory guard, never another task or durable work.
+
+This facet supplies a deliberate cross-crate direction without provider dependencies
+on interpreter/server. Actual installed producer/session bridging, route
+registration, normalization, coordinator completion/outbox/Unknown recovery,
+checkpoint/retention, final task-end, participant, all26 and CardDemo acceptance
+remain separately required. Provider-private physical-backend fixture tests do
+not establish any of those claims. Source review and licensed execution credit
+remain zero; only the human's licensed-oracle exception is applied.
+
 ### Private same-task child ownership
 
 `MQ-1505.selected-batch-child-ownership` adds a checked provider-private

@@ -6,6 +6,19 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The deliberately privileged Rust `MqTrustedBatchRuntime/Root/Frame` facet now
+opens only existing strict rich state and retains one selected service, physical
+store, mandatory SAF/clock and frozen limits. It preserves exact unbound original
+roots and checked opaque same-task child lineage; it cannot attest application
+bindings or fabricate an installed host proof. Original dispatch reuses core,
+SAF/audit/UOW/CAS/receipt/replay authority. Preparation abort and normal nonfinal
+child return are explicit and once-only; uncertainty fences/retains, and Drop
+makes no durable decision. Worker `f80e9a12`, ADR0032 and original rows
+`0001/0007/0008/0009/0012` define this provider slice. Its inherited batch-module
+failure is not relabeled; the manager composes the separately committed downward
+ratchet repair. Actual installed producer, deliberate normalization/selection,
+final task-end/checkpoint/retention/participant/full26/CardDemo remain pending.
+
 The complete MQMD VALUE primitive now retains every version-one/two signed
 MQLONG and fixed character/byte field, with a separate explicit structure
 character profile and no invented v2 fields. Projection uses the one generated
