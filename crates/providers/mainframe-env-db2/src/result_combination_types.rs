@@ -16,9 +16,13 @@
 //! No generic nullability override can establish CASE or COALESCE semantics.
 //! LOB/XML/ROWID/distinct types cannot enter through the existing resolved-type
 //! authority; their combination remains pending, not universally invalid IBM.
-//! Character/graphic, datetime strings and FLOAT(n) aliases require further
-//! attributes or source-backed alias binding. Storage byte widths alone do not
-//! prove FLOAT alias equivalence. No shared lexer/expression fences are changed.
+//! Character/graphic and datetime strings require further attributes/context.
+//! The type resolver canonicalizes FLOAT(n) to REAL/DOUBLE using SQL0050:
+//! db2z_sql_createtable.html, 874327 bytes,
+//! 104cc7fd0f43e804819da99c18887de60983cad8fa78b7d550ffaf63dfd299d6,
+//! lines 220..227. The retained Float shape still requires alias binding if it
+//! reaches this kernel; byte width alone proves no equivalence. No lexer or
+//! expression fences are changed.
 
 use crate::{
     Db2AssignmentCompatibility, Db2AstLimits, Db2BuiltInDataType, Db2BuiltInType,
@@ -1219,26 +1223,21 @@ mod tests {
             }
         }
         for precision in [1, 21, 22, 53] {
-            let alias = syntax_type(
-                Db2BuiltInType::Float,
-                vec![precision],
-                false,
-                Db2Nullability::NotNull,
-            )
-            .unwrap();
+            // A retained unresolved shape must not bypass the alias guard.
+            // Public FLOAT syntax now resolves to REAL/DOUBLE before this route.
+            let alias = S::Float { precision };
             assert_eq!(
-                run(&[Some(alias.clone())], Some(Context::OperandRules))
+                validate_single_shape(&alias, span("x", 0, 1))
                     .unwrap_err()
                     .code,
                 Code::FloatAliasBindingRequired
             );
-            let integer = resolved(&S::Integer, Db2Nullability::NotNull);
-            for types in [
-                [Some(alias.clone()), Some(integer.clone())],
-                [Some(integer), Some(alias)],
-            ] {
+            for (left, right) in [(&alias, &S::Integer), (&S::Integer, &alias)] {
                 assert_eq!(
-                    run(&types, Some(Context::OperandRules)).unwrap_err().code,
+                    combine_pair(left, right, span("x,x", 2, 3))
+                        .err()
+                        .unwrap()
+                        .code,
                     Code::FloatAliasBindingRequired
                 );
             }
