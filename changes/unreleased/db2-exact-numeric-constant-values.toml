@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add private bounded exact Db2 INTEGER/BIGINT/DECIMAL natural literal materialization through the existing classifier and DecimalValue primitive, preserving natural type, precision/scale and original spans without evaluation, conversion, persistence or licensed credit."
