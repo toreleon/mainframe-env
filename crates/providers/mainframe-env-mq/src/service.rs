@@ -207,10 +207,10 @@ struct RowStoreManifest {
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ObjectRow<T> {
-    schema_version: String,
-    object_key: String,
-    value: T,
+pub(crate) struct ObjectRow<T> {
+    pub(crate) schema_version: String,
+    pub(crate) object_key: String,
+    pub(crate) value: T,
 }
 
 type RowVersions = BTreeMap<(String, String), u64>;
@@ -891,7 +891,10 @@ fn map_arc_row_changes<T: Serialize>(
     Ok(())
 }
 
-fn encode_object_row<T: Serialize>(key: &str, value: &T) -> Result<Vec<u8>, HostProblem> {
+pub(crate) fn encode_object_row<T: Serialize>(
+    key: &str,
+    value: &T,
+) -> Result<Vec<u8>, HostProblem> {
     serde_json::to_vec(&ObjectRow {
         schema_version: OBJECT_ROW_SCHEMA.into(),
         object_key: key.into(),
