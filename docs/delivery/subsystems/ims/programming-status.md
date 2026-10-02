@@ -6,6 +6,27 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root prior-commit source integration — 2026-10-03
+
+Root composes source-only worker `b5f6c48a49a2c1024bc261257f03a726847cc8d1`
+onto `65a86cb844e8e83c468aa88baf5fa594a522c718` with the same exact five
+declared paths below. Manager independently verifies the one-topic manifest,
+all thirteen prior registry rows/manifests, exact retained-first/archive fallback,
+TOC leaf, 41 original packet identities, 23 source-reader regressions and 14
+source-only gates. Main also executes the registered ROLB search and complete
+186-line bounded read of the verified topic. No IBM body enters Git.
+
+Status insertion and generated manifest conflicts preserve every complete
+U/V, SHISAM and TM declaration; only normal docs generation updates hashes.
+The source manifest, registry and fragment remain worker-byte-exact. Root checks
+changed docs/check, changelog/check, coverage/check, formatting and the exact
+five-path generated/committed seal, then cleans this checkout's Cargo target.
+No unchanged runtime, PostgreSQL, whole-cache or known CICS infrastructure test
+is repeated. Original source-reader and policy receipts retain their identities.
+The source registration grants zero runtime/IR/official/HUMAN/licensed/participant
+credit; prior-commit TM recovery, shared ADR0031/0033, human rules and parent
+v0.14 remain incomplete. No source refresh or shared-store approval is inferred.
+
 ## Root primary-level position integration — 2026-10-03
 
 Root composes worker `9dc8a36d7df11f83659b7f973c47950382180b28` onto
@@ -60,6 +81,63 @@ runtime, PostgreSQL or known CICS source-prerequisite exploration is repeated.
 This finite fixed-layout fence does not complete the remaining organization,
 U/V, shared TM/raw CALL, official/HUMAN or parent v0.14 obligations. Licensed IBM
 certification remains excluded; OSS dependency/license policy remains required.
+
+## IMS-1404.tm-prior-commit-source-registration (source-only declaration, 2026-10-03)
+
+Target **0.14.0**, exact clean base `7cb46bc8f8e25f999bdae5d9d555facbf54c307a`,
+branch `codex/v014-tm-prior-commit-sources-20261003`. Register only the retained
+IMS 15.6 prior-commit backout topic in a separate offline source scope:
+`ims-tm-prior-commit-backout`, baseline
+`ibm-ims-15.6-tm-prior-commit-backout-2026-09-11`. The retained topic-path file is
+absent; the immutable archive matches SHA-256
+`38fab0bbc03546ddaf2cfecbb92c0a19631f32c79eb24f29ba25ffe56b639b23`, 21,191 bytes.
+The existing IMS 15.6 TOC matches
+`aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618`, including
+the selected product/topic leaf. Snapshot 2026-09-11 identifies the retained
+archive baseline, not a new fetch; Last-Modified was not recorded.
+
+Exact maximum allowlist declared before registration:
+
+- `conformance/0.14/manifests/ims-tm-prior-commit-backout-topics.json`
+- `conformance/0.14/manifests/index.json`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-tm-prior-commit-sources-20261003.toml`
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+The existing source registry, schema and offline reader remain the owners.
+Preserve all thirteen existing manifest bytes/registry entries, catalog rows
+0017/0018/0020/0021 and the 25 mandatory denominator. Planned checks are exact
+scope status/search/full bounded reads, source-reader regression, schema/spec,
+IMS catalog/assurance and coverage inventory, normal docs generation/check,
+changelog, formatting and mandatory offline dependency/license/supply-chain
+policy, followed by the exact generated feature seal and committed check.
+External receipts live in `tm-prior-commit-source/` under the shared worker
+receipt root. Previous unregistered reader failure and all completed TM packets
+retain their original identities. This supplement earns zero runtime, IR,
+official, HUMAN, participant or licensed credit. ADR0031/0033 and shared store,
+raw CALL and actual TM recovery admission remain unapproved; parent v0.14 stays
+active/incomplete.
+
+Source review/results: the existing importer imported exactly one topic and one
+TOC into the new task-scoped external cache; status verified both, ROLB and
+express searches each matched one topic, and one bounded read returned all 186
+plain-text lines. Lines 3–23 distinguish prior-commit backout, continuation and
+GSAM/token exclusions; 69–82 distinguish PURGed express output from unfinished
+output; 83–120 distinguish terminal ROLL from contextual ROLB continuation;
+121–149 separate MPP/transaction-oriented BMP input-area/history conditions from
+batch restrictions; 150–179 distinguish prior-commit ROLS and terminal U3303.
+These are source locators, not a generic Batch/TM mapping or raw ABI admission.
+
+All 23 offline source-reader regressions passed (zero failures/skips), as did
+schema/spec, IMS catalog/assurance, coverage/inventory, changelog, offline deny,
+license-notice and offline supply-chain checks. Two external receipt-script
+setup errors were preserved with zero credit and repaired without reader edits;
+the successful registered read has distinct inputs from the historical exit 2.
+Source and policy sequences ended in checkout-local cargo clean with target
+absent. Final normal docs generation/check, formatting, five-path generated
+Complete seal, committed check and Git-derived identities are recorded in the
+new external `tm-prior-commit-source/handoff.md` and `callback.json`. Prior
+runtime/design/fail-first/reader receipts retain their original identities.
 
 ## IMS-1404.tm-output-identity-local-order (finite runtime declaration, 2026-10-03)
 

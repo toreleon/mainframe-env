@@ -146,6 +146,17 @@
       "topic_manifest_sha256": "sha256:f50d0ca77232e353343bfc37bd9b02fef87d20c6bb5926becc5c8e1ef09e55a0",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-tm-prior-commit-backout",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-tm-prior-commit-backout-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-tm-prior-commit-backout-topics.json",
+      "manifest_sha256": "sha256:25daee880b3e293f9a4e5f43e5d458077298b0137e1f16c4ae198695c80cea65",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:b58649136d3fcb9d8a426eafd588f28ca2a4996974a229dba05b08f4964ed857",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
