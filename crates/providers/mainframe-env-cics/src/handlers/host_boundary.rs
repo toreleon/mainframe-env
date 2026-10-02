@@ -1,6 +1,6 @@
 use super::super::*;
 use super::handle_state::HandleState;
-use mainframe_env_host_api::ProgramRequest;
+use mainframe_env_host_api::{ProgramLinkSelection, ProgramRequest};
 use std::ops::{Deref, DerefMut};
 use std::thread::ThreadId;
 
@@ -12,7 +12,9 @@ mod lifecycle_tests;
 #[path = "host_boundary/frame_tests.rs"]
 mod tests;
 
+mod link_entry;
 mod replacement;
+pub use link_entry::CicsLocalLinkEntryAttestation;
 
 const MAX_PROGRAM_LEVELS: usize = 16;
 
@@ -143,6 +145,7 @@ struct TaskClaim {
     thread: ThreadId,
     session: String,
     commands: usize,
+    command_origin: Option<CicsOperation>,
     loans: Vec<ChildAdmission>,
 }
 
@@ -152,6 +155,7 @@ struct ChildAdmission {
     artifact: Option<mainframe_env_execution_api::ArtifactRef>,
     actor: Option<Invocation>,
     handles: HandleState,
+    entry: Option<link_entry::SelectedEntry>,
 }
 
 fn command_ready(state: &State, run_unit: &RunUnitId) -> Result<(), HostProblem> {
@@ -237,10 +241,20 @@ pub(super) fn admit_frame(state: &mut State, invocation: &Invocation) -> Result<
 struct CommandLease<'a> {
     service: &'a CicsService,
     task: Option<Run>,
+    previous_origin: Option<CicsOperation>,
 }
 
 impl<'a> CommandLease<'a> {
+    #[cfg(test)]
     fn acquire(service: &'a CicsService, run_unit: &RunUnitId) -> Result<Self, HostProblem> {
+        Self::acquire_with_origin(service, run_unit, None)
+    }
+
+    fn acquire_with_origin(
+        service: &'a CicsService,
+        run_unit: &RunUnitId,
+        origin: Option<CicsOperation>,
+    ) -> Result<Self, HostProblem> {
         let mut state = service.lock()?;
         command_ready(&state, run_unit)?;
         let task = state
@@ -255,12 +269,16 @@ impl<'a> CommandLease<'a> {
                 thread: std::thread::current().id(),
                 session: task.session.clone(),
                 commands: 0,
+                command_origin: None,
                 loans: Vec::new(),
             });
+        let previous_origin = claim.command_origin;
+        claim.command_origin = origin;
         claim.commands += 1;
         Ok(Self {
             service,
             task: Some(task),
+            previous_origin,
         })
     }
 
@@ -282,6 +300,7 @@ impl<'a> CommandLease<'a> {
             return Err(HostProblem::InfrastructureFailure);
         }
         claim.commands -= 1;
+        claim.command_origin = self.previous_origin;
         if claim.commands == 0 {
             state.task_dispatch.claims.remove(&run_unit);
         }
@@ -324,11 +343,22 @@ struct ProgramLease<'a> {
 }
 
 impl<'a> ProgramLease<'a> {
+    #[cfg(test)]
     fn acquire(
         service: &'a CicsService,
         caller: &'a mut Run,
         program: &str,
         artifact: Option<mainframe_env_execution_api::ArtifactRef>,
+    ) -> Result<Self, HostProblem> {
+        Self::acquire_selected(service, caller, program, artifact, None)
+    }
+
+    fn acquire_selected(
+        service: &'a CicsService,
+        caller: &'a mut Run,
+        program: &str,
+        artifact: Option<mainframe_env_execution_api::ArtifactRef>,
+        selection: Option<ProgramLinkSelection>,
     ) -> Result<Self, HostProblem> {
         let mut state = service.lock()?;
         let run_unit = &caller.invocation.run_unit_id;
@@ -355,6 +385,16 @@ impl<'a> ProgramLease<'a> {
             artifact,
             actor: None,
             handles: HandleState::from_run(caller),
+            entry: selection.map(|selection| link_entry::SelectedEntry {
+                origin: claim.command_origin,
+                source_execution_id: caller
+                    .current_program
+                    .effect_invocation
+                    .execution_id
+                    .clone(),
+                source_level: caller.current_program.logical_level,
+                selection,
+            }),
         });
         let mut task = caller.clone();
         task.current_program.logical_level += 1;
@@ -522,11 +562,12 @@ impl CicsService {
         let loan = match &effect.request {
             HostRequest::Program(ProgramRequest::Link {
                 program, selection, ..
-            }) => Some(ProgramLease::acquire(
+            }) => Some(ProgramLease::acquire_selected(
                 self,
                 run,
                 program.as_str(),
                 selection.as_ref().map(|selected| selected.artifact.clone()),
+                selection.clone(),
             )?),
             _ => None,
         };
@@ -619,7 +660,8 @@ impl CicsService {
                 .map_err(|_| HostProblem::UnknownOutcome)?;
             return handlers::validate_replay_response(&request, replay.response);
         }
-        let mut run = CommandLease::acquire(self, &effect.run_unit)?;
+        let mut run =
+            CommandLease::acquire_with_origin(self, &effect.run_unit, Some(request.operation))?;
         run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
         run.current_program.program_occurrence = 0;
         let operation = request.operation;

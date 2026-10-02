@@ -488,6 +488,43 @@ busy rows, prove a source transfer disposition or create a completed CALL reply.
 This prerequisite preserves the existing schemas and unsupported runtime result;
 source-state snapshot authority and durable CALL/instance phases remain separate.
 
+### Read-only local LINK entry observation
+
+The existing task claim now captures the active canonical CICS operation and
+restores its prior value after nested commands. Each selected program loan also
+captures its actual immutable selection, source actor and entry level. A manual
+or unselected loan has no such observation authority. This volatile bookkeeping
+adds no durable codec or owner namespace.
+
+`attest_local_link_entry(source, target, selection)` observes the current top
+loan without assigning its actor or changing task/provider bytes. It requires
+actual typed LINK origin, original source before entry COMMAREA enrichment,
+exact selected tuple/program/artifact/parent/root run/principal, executor thread,
+lower level and no outstanding command. Known foreign actors, uncertain sessions,
+pending program ABEND, missing/expired loans and nonlocal/malformed CICS context
+fail closed. Target grants, generations, attempt, service/priority, audit and
+live controls agree with the source; deadlines/resource bounds cannot widen.
+Every CICS binding except bounded typed entry COMMAREA remains unchanged.
+
+The token exposes root/source/target invocations, selection and level with
+private fields and no constructor/serde. It is an immutable observation, not a
+retained loan or dispatch, storage-reset, replacement, cleanup, cached-reply or
+recovery permission. The embedding must independently validate exact child
+construction, actual LINK payload and immutable executable, current core/control
+and instance/CALL CAS authority, then revalidate live admission at its write
+boundary. If the provider has a replay clock it checks elapsed target deadline;
+otherwise current time remains the embedding's authority. Other subsystem
+bindings are not attested here. No cold busy row can reconstruct this loan.
+
+The bounded helper requires focused production command/loan-path observation,
+identity/selection/control/thread/command/depth/origin/uncertainty negatives,
+read purity, original source nesting/restoration, known replay without redispatch
+and expired/cold loan rejection. These supplement future compiled selected-product
+scope proofs; storage diagnostics, native CALL/subloan behavior, durable closure,
+backend reopen and full family acceptance remain pending. Earlier exploratory
+Rust 1.98 Clippy checks failed on unchanged host MQ/CICS code outside this slice;
+aggregate lint acceptance remains pending, with no suppression or policy change.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline

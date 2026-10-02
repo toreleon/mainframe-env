@@ -388,6 +388,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/frame_tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/lifecycle_tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/replacement.rs",
       "crates/providers/mainframe-env-cics/src/handlers/host_boundary/replacement/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/interval.rs",

@@ -934,3 +934,15 @@ manager reservations, not accepted migration or recovered evidence. Focused
 canonical vectors, rehashed foreign/phase/selection/context mutations, immutable
 creation/native inheritance and bounded/pure binding checks plus mandatory gates
 must precede sealing. Source calling flow/rules baseline and LINK row0138 apply.
+
+The storage-entry codec prerequisite is sealed at `1715bf60` with eight focused
+checks and six independent canonical vectors, mandatory gates passing and no
+runtime writer enabled. Immutable creation also retains creator selector,
+artifact and attempt when native CALL changes the entry actor.
+
+The LINK-entry worker returned exact five-path patch `708b50de…a69b8e9`.
+The manager reviewed the full production/test diff and pinned LINK body, then
+applied it serially plus its two exact module-inventory registrations with no
+ceiling changes. Manager integrated checks pass: 37 focused tests (10 new and 27 existing), no ignores, plus mandatory module/API/schema/format/docs/changelog/dependency gates. Its exploratory Rust 1.98
+Clippy findings are unchanged host MQ/CICS code outside this bounded API;
+aggregate lint stays pending, without new suppression or policy change.

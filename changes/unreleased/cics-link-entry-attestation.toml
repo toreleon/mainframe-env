@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Observe typed live local CICS LINK selection and source/target controls without admitting an actor or granting storage cleanup; scoped runtime and recovered acceptance remain pending."
