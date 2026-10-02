@@ -225,7 +225,7 @@ fn setup(service: &ImsService, paired: bool) {
         execute(
             service,
             parent,
-            &request(parent, ImsOperation::Insert, 2, &["PROOT"], b"P1A")
+            &parent_request(ImsOperation::Insert, 2, &["PROOT"], b"P1A")
         )
         .status,
         "  "
@@ -255,13 +255,19 @@ fn insert_child(service: &ImsService, sequence: u64) -> ImsRequest {
 
 fn hold_parent(service: &ImsService, sequence: u64) {
     let run = "parent-run";
-    let mut hold = request(run, ImsOperation::GetHoldUnique, sequence, &["PROOT"], b"");
+    let mut hold = parent_request(ImsOperation::GetHoldUnique, sequence, &["PROOT"], b"");
     hold.qualifiers.push(ImsQualifier {
         segment: "PROOT".into(),
         field: "PKEY".into(),
         value: b"P1".to_vec(),
     });
     assert_eq!(execute(service, run, &hold).status, "  ");
+}
+
+fn parent_request(op: ImsOperation, sequence: u64, segments: &[&str], data: &[u8]) -> ImsRequest {
+    let mut request = request("parent-run", op, sequence, segments, data);
+    request.pcb = 2;
+    request
 }
 
 #[test]
@@ -312,7 +318,7 @@ fn logical_child_requires_resolved_parent_and_tracks_parent_replace() {
         execute(
             &service,
             "parent-run",
-            &request("parent-run", ImsOperation::Replace, 7, &[], b"P1Z")
+            &parent_request(ImsOperation::Replace, 7, &[], b"P1Z")
         )
         .status,
         "  "
@@ -342,7 +348,7 @@ fn unpaired_parent_delete_fails_without_partial_mutation() {
         execute(
             &service,
             "parent-run",
-            &request("parent-run", ImsOperation::Delete, 5, &[], b"")
+            &parent_request(ImsOperation::Delete, 5, &[], b"")
         )
         .status,
         "GP"
@@ -379,7 +385,7 @@ fn paired_delete_rolls_back_both_databases_and_reopens_from_sqlite() {
             execute(
                 &service,
                 "parent-run",
-                &request("parent-run", ImsOperation::Delete, 6, &[], b"")
+                &parent_request(ImsOperation::Delete, 6, &[], b"")
             )
             .affected_segments,
             2
@@ -412,7 +418,7 @@ fn paired_delete_rolls_back_both_databases_and_reopens_from_sqlite() {
         execute(
             &service,
             "parent-run",
-            &request("parent-run", ImsOperation::Delete, 11, &[], b""),
+            &parent_request(ImsOperation::Delete, 11, &[], b""),
         );
         execute(
             &service,
@@ -506,7 +512,7 @@ fn paired_multi_database_write_is_atomic_when_store_capacity_is_exhausted() {
     assert!(matches!(
         service.execute(
             &invocation("parent-run"),
-            &request("parent-run", ImsOperation::Delete, 6, &[], b"")
+            &parent_request(ImsOperation::Delete, 6, &[], b"")
         ),
         Err(HostProblem::ResourceExhausted)
     ));

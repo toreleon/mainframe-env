@@ -859,3 +859,131 @@ change. Neither unrelated finding is represented as a passing gate. The docs
 manifest is regenerated for this appended section. The manager owns integration;
 licensed certification remains excluded and **0/25 pending**, mixed-resource
 closure stays in v0.16, and no release promotion is claimed.
+
+## IMS-1403.pcb-sensitivity (local implementation slice, 2026-10-02)
+
+Parent: IMS-1403. Entry candidate: `213ed878ec138bdb2914330db6613559bffc5a86`.
+The independent current acceptance audit is the external
+`v014-completion-20261002/acceptance-audit/audit-report.md`. This slice repairs
+the existing typed `ImsRequest` / `ImsService` / `ims_providers` metadata route;
+it adds no request shape, store, lock service, coordinator, or participant claim.
+IBM-observable selection and sensitivity remain provider-owned semantics.
+The existing host ABI, enterprise SAF and provider-row/CAS/replay authorities
+are consumed; their historical licensed-pending dispositions remain unchanged.
+
+Exact catalog identities are `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005`
+(GU/GN/GNP), `:0006` (GHU/GHN/GHNP), and selected-PCB hold/update interactions
+with `:0004` (DLET), `:0008` (ISRT) and `:0015` (REPL). Basic `:0002` CHKP
+and local rollback must invalidate every PCB position; the manager owns the
+basic checkpoint regression. Mandatory local obligations: select the requested
+DB PCB and SAF database before observation; independent position, parentage and
+hold state; explicit insensitive/invalid-PCB/no-read-option conditions with no
+protected output or database mutation; targetless GN/GNP data sensitivity;
+exact success, AC/AM/GE/GB/GP failure positions; replay without advancement;
+rollback, historical readers, corrupt-map rejection and fresh-connection reopen.
+Contexts are the existing full-function DB call route with typed DB PCBs and
+SENSEG/PROCOPT metadata. Non-DB PCBs and unavailable key-feedback output remain
+explicitly unsupported, not required-operation passes. Secondary/composite
+access paths, SSA operands and recovery operands are separate slices.
+
+Backends: Memory and SQLite, including a newly opened SQLite connection.
+Owners: generic PCB/read/resource resolution, bounded PCB helper/tests, minimal
+Session field/reader changes. Manager-authorized shared integration is necessary
+in the system database-call observer: status and Q reservations currently use
+the scheduled PCB and must use the requested PCB's database and position.
+CHKP must retain the manager's commit-before-saving behavior and clear the whole
+position map; rollback and database-image resets must clear affected positions.
+
+Source contexts: IMS 15.6 `ibm-ims-15.6-programming-contracts-2026-09-11`:
+`ims_imsdbdbpcbmask.htm` (699a551e0c2804db26725d0997be3b1f9fdc91379a69f490c8e509d76fcc61b3),
+`ims_gughucall.htm` (0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9),
+`ims_gnghncall.htm` (063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4),
+`ims_gnpghnpcall.htm` (6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762),
+`ims_currentpos.htm` (07aafcddb9b30591eef1da5ad50bfe8bc3c1e9b9e9e51b56b27d39bf6adf5673).
+Metadata baseline `ibm-ims-15.6-metadata-contracts-2026-09-11`:
+`ims_psbgendlipcbstmt.htm` (0dad54edd1a9940ca9a6988e06412836ff35a706cc2e1f7fbd36eb14fa02cfba),
+`ims_psbgensensegstmt.htm` (baf8ed5e7ad87faf1ba02801da3479385ba5b4b5fc74474ca051d32d3014ebf4).
+Each manifest SHA and byte count matched the retained raw archive; repository
+plain-text parser reads and `ibm_docs.py search/read` also used the existing
+ims-1403/ims-1402 reader caches. No network refresh or whole-cache audit.
+The pinned status explanation index links the retained IMS 15.6 `msgs/ac.htm`
+(46e5eedc042e9d0bd38cb19888095e6ba12a53125ee965794fb6470e8bc7b30b),
+`msgs/am.htm` (42b40782940d170e9a7b10d090a22be7ec6470d38ec9ac349c386df14c31e88f),
+`msgs/gb.htm` (727e6569e1d5eb64cf06269901547ce0fbeb5649646ad5e7237a4f06a4b050f0),
+and `msgs/gp.htm` (2de6e4ba34084fe32a0a0b493f06b11f7ad420d5c37a20b5adaeb0c1e3c6ef8d).
+These bounded supplemental archive identities were hash-verified and parsed
+offline; they are reference review, not registered execution evidence.
+
+Before implementation: add failing two-PCB and explicit/targetless restricted
+SENSEG tests, then repair and verify focused backend/security/replay/reader
+regressions, strict package Clippy/fmt and affected mandatory gates. Official
+credit remains **0/25** for every gate; local tests and correct forbidden-context
+rejections do not close official required execution. Licensed differential and
+mixed-resource closure remain pending outside this slice.
+
+Implementation: every DB request selects `request.pcb` for metadata, SAF,
+navigation and mutation-position binding. `session.pcb` and `session.position`
+retain their historical scheduled-PCB meaning; the bounded `pcb_positions` map
+contains only other DB PCBs. Missing historical maps mean no position on those
+other PCBs. Readers reject duplicate/noncanonical/zero/out-of-range/alternate
+PCB keys, an entry duplicating the scheduled PCB, malformed position/hold
+shapes and live dangling occurrences. Historical checkpoint positions may
+reference older images, but their map identities and intrinsic shapes are
+validated. These remain existing v1 object rows, not a new store or schema
+reader. New Q reservations retain an optional PCB identity; historical entries
+without it retain their scheduled-PCB interpretation.
+
+Rollback restriction: stop admission and drain sessions, checkpoints, UOWs and
+Q reservations before running an older binary, or restore a consistent
+pre-upgrade backup including all provider/replay/checkpoint references. Older
+readers ignore additive map/PCB fields and cannot preserve other-PCB positions;
+live writer downgrade is unsupported. Do not delete maps to simulate migration.
+
+The minimal engine integration supplies a visibility predicate to the existing
+navigation selection authority, rather than moving through hidden occurrences
+and accidentally retaining their position or parentage on failure. Absent
+explicit SENSEG names return AC; incompatible processing options return AM;
+both preserve position and emit no protected data. Targetless GN/GNP skip
+insensitive and key-only segments. Explicit key-only retrieval establishes
+position and suppresses segment bytes; key-feedback output has no existing
+typed result field and remains pending, without official execution credit.
+GNP parent-qualification mismatch returns GE with unchanged position, while
+absent parentage or a target at/above the parent remains GP.
+
+The authorized observer integration binds status, Q reservation location and
+modified/current flags to the selected PCB. CHKP retains the manager-specified
+pending-undo removal, clears every PCB position and Q reservation, and stores
+the post-CHKP session. Basic checkpoint tests remain manager-owned. Rollback
+and image replacement clear the affected maps; deletion preserves an unrelated
+same-database PCB position while rejecting dangling occurrences. Existing
+logical-route fixtures were corrected to explicitly request parent PCB 2;
+they had previously relied on the scheduled-PCB selection defect.
+
+Additional source: `ibm-ims-15.6-recovery-utilities-2026-09-11`,
+`ims_basicchkpcall.htm` (1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a):
+commit changes and lose position. The position-reset integration also affects
+`:0009` (LOAD) under the existing administrative route; no new utility behavior
+or utility conformance claim is made.
+
+Verification on the unchanged runtime diff: fail-first tests reproduced both
+selection and hidden-segment defects; focused typed-provider Memory/SQLite
+tests cover holds, replay, failure positions, SAF-before-observation, rollback,
+fresh SQLite connections and historical/corrupt readers. The full IMS package
+passes, as do strict scoped Clippy (`--no-deps -- -D warnings`), formatting,
+IMS catalog/matrix, spec, changelog, dependency/license/supply-chain policy and
+execution/effect/provider-row/durable/security/retention/participant guards.
+External command receipts are in `v014-completion-20261002/ims-pcb-sensitivity`.
+
+Aggregate limits are explicit: dependency-inclusive Clippy stops on unchanged
+MQ host-API warnings. `architecture-fast` stops on the configured CICS reader
+locator for `SSJL4D_6.x/fundamentals/connections/dfht1c0079.html`; the retained
+root and SHA archive lack the expected manifest body at 3,031 bytes and
+`cb6ff139ab0b7bb2832dc03dd4f53672181657f11d0740a417aab84819aaf254`,
+so that exact CICS snapshot is unavailable in the specified local caches.
+A separate module-boundary diagnostic finds the unchanged batch service at
+7,404 lines against its 7,402-line ceiling; the entry IMS service also already
+exceeds its recorded ceiling. No unrelated cache refresh, ratchet weakening or
+global suite was performed. The shared official IMS conformance selector still
+rejects because its product driver registry is absent; rejection earns no pass.
+This slice does not close those manager-owned aggregate gates, the IMS-1403
+parent, the 0.14 exit gate, licensed certification or mixed-resource recovery.

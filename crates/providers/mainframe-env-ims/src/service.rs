@@ -163,6 +163,8 @@ struct Session {
     last: Option<SegmentLocation>,
     #[serde(default)]
     position: PcbPosition,
+    #[serde(default, deserialize_with = "generic::pcb::read_positions")]
+    pcb_positions: BTreeMap<u16, PcbPosition>,
     #[serde(default)]
     system: system::SystemSession,
 }
@@ -1258,6 +1260,7 @@ fn schedule(
             current_root: None,
             last: None,
             position: PcbPosition::default(),
+            pcb_positions: BTreeMap::new(),
             system: system::SystemSession::default(),
         }),
     );

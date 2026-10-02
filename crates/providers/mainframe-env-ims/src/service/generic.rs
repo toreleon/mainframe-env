@@ -8,6 +8,7 @@ use crate::{ImsDatabaseMetadata, ImsDatabasePcbMetadata, ImsPcbMetadata};
 
 mod load_image;
 mod logical;
+pub(super) mod pcb;
 
 /// Ordered bulk image; each parent refers to an earlier record by zero-based index.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -209,16 +210,20 @@ fn scheduled_pcb<'a>(
     }
 }
 
-fn session_pcb<'a>(state: &'a State, run: &str) -> Result<&'a ImsDatabasePcbMetadata, HostProblem> {
+fn session_pcb<'a>(
+    state: &'a State,
+    run: &str,
+    number: u16,
+) -> Result<&'a ImsDatabasePcbMetadata, HostProblem> {
     let session = state.sessions.get(run).ok_or(HostProblem::NotFound)?;
     if !session.generic {
         return Err(HostProblem::NotFound);
     }
-    scheduled_pcb(state, &session.psb, session.pcb).map(|(_, pcb)| pcb)
+    scheduled_pcb(state, &session.psb, number).map(|(_, pcb)| pcb)
 }
 
-fn session_database(state: &State, run: &str) -> Result<String, HostProblem> {
-    Ok(normalize(&session_pcb(state, run)?.database))
+fn session_database(state: &State, run: &str, number: u16) -> Result<String, HostProblem> {
+    Ok(normalize(&session_pcb(state, run, number)?.database))
 }
 
 pub(super) fn is_generic(state: &State, run: &str, request: &ImsRequest) -> bool {
@@ -307,30 +312,23 @@ pub(super) fn resources(
                     .psb
                     .as_deref()
                     .map(normalize)
-                    .or_else(|| session_database(state, run).ok())
+                    .or_else(|| session_database(state, run, request.pcb).ok())
                     .ok_or(HostProblem::NotFound)?,
             );
         }
-        ImsOperation::Commit | ImsOperation::Rollback | ImsOperation::Checkpoint => {
+        ImsOperation::Commit | ImsOperation::Rollback => {
             if let Some(pending) = state.generic_pending_undo.get(run) {
                 databases.extend(pending.keys().cloned());
             }
             if let Some(pending) = state.pending_undo.get(run) {
                 databases.extend(pending.keys().cloned());
             }
-            if request.operation == ImsOperation::Checkpoint
-                && let Ok(name) = session_database(state, run)
-            {
-                databases.insert(name);
-            }
         }
-        ImsOperation::Terminate => {
-            if let Ok(name) = session_database(state, run) {
-                databases.insert(name);
-            }
+        ImsOperation::Terminate | ImsOperation::Checkpoint => {
+            databases.extend(pcb::session_databases(state, run)?);
         }
         _ => {
-            databases.insert(session_database(state, run)?);
+            databases.insert(session_database(state, run, request.pcb)?);
         }
     }
     if databases.is_empty()
@@ -407,6 +405,7 @@ pub(super) fn apply_request(
                     current_root: None,
                     last: None,
                     position: PcbPosition::default(),
+                    pcb_positions: BTreeMap::new(),
                     system: system::SystemSession::default(),
                 }),
             );
@@ -446,7 +445,7 @@ pub(super) fn apply_request(
                 }
             }
             if let Some(session) = state.sessions.get_mut(run) {
-                Arc::make_mut(session).position = PcbPosition::default();
+                pcb::clear_positions(Arc::make_mut(session));
             }
             Ok(status("  "))
         }
@@ -567,16 +566,29 @@ fn read(
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
-    let pcb = session_pcb(state, run)?.clone();
+    let pcb = session_pcb(state, run, request.pcb)?.clone();
     let engine = restored(state, &normalize(&pcb.database), limits)?;
     let read = read_request(request, &engine)?;
-    if let Some(target) = &read.target
-        && !allowed(&pcb, target, request.operation)
-    {
-        return Ok(status("AC"));
+    if let Some(code) = pcb::read_status(&pcb, request, &read) {
+        return Ok(status(code));
     }
     let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
-    match engine.read(&mut session.position, &read) {
+    let mut position = pcb::position(session, request.pcb);
+    let parent_qualification = pcb::gnp_target_below_parent(&engine, &position, &read);
+    let outcome = engine.read_visible(&mut position, &read, |segment| {
+        read.target.is_some()
+            || (allowed(&pcb, segment, request.operation) && !pcb::key_only(&pcb, segment))
+    });
+    pcb::set_position(session, request.pcb, position);
+    match outcome {
+        Ok(_)
+            if read
+                .target
+                .as_deref()
+                .is_some_and(|target| pcb::key_only(&pcb, target)) =>
+        {
+            Ok(status("  "))
+        }
         Ok(view) => Ok(ImsResult {
             status: "  ".into(),
             segments: vec![logical::segment_result(state, limits, &engine, view)?],
@@ -584,6 +596,7 @@ fn read(
             affected_segments: 0,
             system: None,
         }),
+        Err(EngineProblem::PathMismatch) if parent_qualification => Ok(status("GE")),
         Err(problem) => Ok(status(engine_status(problem))),
     }
 }
@@ -616,18 +629,7 @@ fn begin_unit(state: &mut State, run: &str, name: &str) -> Result<(), HostProble
 }
 
 pub(super) fn reset_positions(state: &mut State, database: &str, except: Option<&str>) {
-    let runs = state
-        .sessions
-        .keys()
-        .filter(|run| except != Some(run.as_str()))
-        .filter(|run| session_database(state, run).as_deref() == Ok(database))
-        .cloned()
-        .collect::<Vec<_>>();
-    for run in runs {
-        if let Some(session) = state.sessions.get_mut(&run) {
-            Arc::make_mut(session).position = PcbPosition::default();
-        }
-    }
+    pcb::reset_database_positions(state, database, except);
 }
 
 fn mutate(
@@ -636,15 +638,13 @@ fn mutate(
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
-    let pcb = session_pcb(state, run)?.clone();
+    let pcb = session_pcb(state, run, request.pcb)?.clone();
     let name = normalize(&pcb.database);
     let mut engine = restored(state, &name, limits)?;
-    let mut position = state
-        .sessions
-        .get(run)
-        .ok_or(HostProblem::NotFound)?
-        .position
-        .clone();
+    let mut position = pcb::position(
+        state.sessions.get(run).ok_or(HostProblem::NotFound)?,
+        request.pcb,
+    );
     let target = if request.operation == ImsOperation::Insert {
         request
             .segments
@@ -664,7 +664,7 @@ fn mutate(
             .clone()
     };
     if !allowed(&pcb, &target, request.operation) {
-        return Ok(status("AC"));
+        return Ok(status("AM"));
     }
     if request.operation == ImsOperation::Delete {
         let (count, images) = match logical::delete_cascade(state, limits, &name, &mut position) {
@@ -678,9 +678,13 @@ fn mutate(
                 .generic_databases
                 .insert(database.clone(), Arc::new(image.image()));
             reset_positions(state, &database, Some(run));
+            pcb::reset_deleted_positions(state, run, request.pcb, &database, limits)?;
         }
-        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).position =
-            position;
+        pcb::set_position(
+            Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+            request.pcb,
+            position,
+        );
         return Ok(affected(count as u64));
     }
     let changed = match request.operation {
@@ -764,7 +768,11 @@ fn mutate(
     state
         .generic_databases
         .insert(name, Arc::new(engine.image()));
-    Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).position = position;
+    pcb::set_position(
+        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+        request.pcb,
+        position,
+    );
     Ok(affected(count as u64))
 }
 
@@ -781,13 +789,14 @@ fn checkpoint(
     if state.checkpoints.len() >= limits.max_checkpoints && !state.checkpoints.contains_key(&id) {
         return Err(HostProblem::ResourceExhausted);
     }
-    let session = state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?;
-    // CHKP commits the run's database work and loses database position. Save
-    // only that post-checkpoint state; replay must not commit later work again.
-    Arc::make_mut(session).position = PcbPosition::default();
-    state.checkpoints.insert(id.clone(), session.clone());
     state.pending_undo.remove(run);
     state.generic_pending_undo.remove(run);
+    // Preserve the basic checkpoint boundary across all selected DB PCBs.
+    let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
+    pcb::clear_positions(session);
+    state
+        .checkpoints
+        .insert(id.clone(), Arc::new(session.clone()));
     Ok(ImsResult {
         status: "  ".into(),
         segments: Vec::new(),
@@ -842,7 +851,7 @@ fn unload(
         .psb
         .as_deref()
         .map(normalize)
-        .or_else(|| session_database(state, run).ok())
+        .or_else(|| session_database(state, run, request.pcb).ok())
         .ok_or(HostProblem::NotFound)?;
     let engine = restored(state, &name, limits)?;
     let segments = engine
@@ -878,7 +887,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
                 .sessions
                 .values()
                 .chain(state.checkpoints.values())
-                .all(|session| !session.generic)
+                .all(|session| !session.generic && session.pcb_positions.is_empty())
         {
             Ok(())
         } else {
@@ -936,24 +945,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
             }
         }
     }
-    for session in state.sessions.values().filter(|session| session.generic) {
-        let pcb = scheduled_pcb(state, &session.psb, session.pcb)
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .1;
-        if state
-            .generic_databases
-            .contains_key(&normalize(&pcb.database))
-        {
-            let engine = restored(state, &normalize(&pcb.database), limits)?;
-            engine
-                .validate_position(&session.position)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-        }
-    }
-    for session in state.checkpoints.values().filter(|session| session.generic) {
-        scheduled_pcb(state, &session.psb, session.pcb)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-    }
+    pcb::validate_sessions(state, limits)?;
     Ok(())
 }
 

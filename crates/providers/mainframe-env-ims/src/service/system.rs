@@ -26,6 +26,8 @@ pub(super) struct SystemSession {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct Reservation {
     owner: String,
+    #[serde(default)]
+    pcb: Option<u16>,
     class: u8,
     current: bool,
     modified: bool,
@@ -660,7 +662,10 @@ pub(super) fn observe_database_call(
 ) -> Result<(), HostProblem> {
     if matches!(
         request.operation,
-        ImsOperation::Commit | ImsOperation::Rollback | ImsOperation::Terminate
+        ImsOperation::Commit
+            | ImsOperation::Rollback
+            | ImsOperation::Terminate
+            | ImsOperation::Checkpoint
     ) {
         if let Some(row) = state.system.get_mut(ROW_KEY) {
             Arc::make_mut(row)
@@ -681,11 +686,16 @@ pub(super) fn observe_database_call(
     let Some(session) = state.sessions.get(run).cloned() else {
         return Ok(());
     };
+    let selected_pcb = if session.generic {
+        request.pcb
+    } else {
+        session.pcb
+    };
     let session_system =
         &mut Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).system;
     session_system
         .statuses
-        .insert(session.pcb, result.status.clone());
+        .insert(selected_pcb, result.status.clone());
     session_system.last_database_call = true;
     let is_get = matches!(
         request.operation,
@@ -703,13 +713,11 @@ pub(super) fn observe_database_call(
     if class.is_some_and(|class| !class.is_valid()) {
         return Err(HostProblem::Malformed);
     }
-    let (database, _, _) = metadata_pcb(state, &session.psb, session.pcb)?;
+    let (database, _, _) = metadata_pcb(state, &session.psb, selected_pcb)?;
     let database = normalize(database);
     let location = if session.generic {
-        state
-            .sessions
-            .get(run)
-            .and_then(|session| session.position.current())
+        generic::pcb::position(&session, selected_pcb)
+            .current()
             .map(|id| serde_json::to_string(&id).map_err(|_| HostProblem::InfrastructureFailure))
             .transpose()?
     } else {
@@ -724,11 +732,9 @@ pub(super) fn observe_database_call(
     };
     if is_get && result.status == "  " {
         let row = system_state(state);
-        for reservation in row
-            .reservations
-            .values_mut()
-            .filter(|reservation| reservation.owner == run)
-        {
+        for reservation in row.reservations.values_mut().filter(|reservation| {
+            reservation.owner == run && reservation.pcb.unwrap_or(session.pcb) == selected_pcb
+        }) {
             reservation.current = false;
         }
         if let (Some(class), Some(location)) = (class, location) {
@@ -747,6 +753,7 @@ pub(super) fn observe_database_call(
                 key,
                 Reservation {
                     owner: run.into(),
+                    pcb: Some(selected_pcb),
                     class: class.byte(),
                     current: true,
                     modified: false,
@@ -762,7 +769,11 @@ pub(super) fn observe_database_call(
         for reservation in Arc::make_mut(row)
             .reservations
             .values_mut()
-            .filter(|reservation| reservation.owner == run && reservation.current)
+            .filter(|reservation| {
+                reservation.owner == run
+                    && reservation.current
+                    && reservation.pcb.unwrap_or(session.pcb) == selected_pcb
+            })
         {
             reservation.modified = true;
         }
@@ -783,6 +794,15 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
         || row.reservations.values().any(|reservation| {
             !state.sessions.contains_key(&reservation.owner)
                 || ImsQClass::new(reservation.class).is_none()
+                || reservation.pcb.is_some_and(|number| {
+                    usize::from(number) > limits.max_pcbs
+                        || state
+                            .sessions
+                            .get(&reservation.owner)
+                            .is_none_or(|session| {
+                                metadata_pcb(state, &session.psb, number).is_err()
+                            })
+                })
         })
     {
         return Err(HostProblem::ResourceExhausted);

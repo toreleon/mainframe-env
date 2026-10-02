@@ -22,6 +22,7 @@ static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
 
 mod basic_checkpoint_tests;
 mod closure_tests;
+mod pcb_tests;
 
 pub(crate) fn catalog() -> ImsMetadataCatalog {
     fn field(name: &str, offset: usize, sequence: bool) -> ImsFieldMetadata {

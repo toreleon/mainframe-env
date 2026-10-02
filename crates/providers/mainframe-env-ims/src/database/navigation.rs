@@ -1,11 +1,36 @@
 use super::*;
 use std::cmp::Ordering;
 
+impl PcbPosition {
+    /// Check intrinsic retained PCB invariants without requiring a checkpoint's
+    /// historical occurrences to exist in the current live database image.
+    pub(crate) fn valid_retained_shape(&self) -> bool {
+        !self.current.is_some_and(|id| id.0 == 0)
+            && !self.parentage.is_some_and(|id| id.0 == 0)
+            && !self
+                .held
+                .is_some_and(|held| held.version == 0 || self.current != Some(held.id))
+            && (!self.after_end
+                || (self.current.is_none() && self.parentage.is_none() && self.held.is_none()))
+    }
+}
+
 impl DatabaseEngine {
     pub fn read(
         &self,
         position: &mut PcbPosition,
         request: &ReadRequest,
+    ) -> Result<RecordView, EngineProblem> {
+        self.read_visible(position, request, |_| true)
+    }
+
+    /// The PCB adapter filters candidates before selection, preserving the same
+    /// navigation and failure-position authority as an unrestricted engine read.
+    pub(crate) fn read_visible(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        visible: impl Fn(&str) -> bool,
     ) -> Result<RecordView, EngineProblem> {
         if request.hold && self.definition.organization == DatabaseOrganization::Gsam {
             return Err(EngineProblem::Unsupported);
@@ -18,10 +43,10 @@ impl DatabaseEngine {
             ReadKind::Unique => {
                 let root = &self.definition.segments[0].name;
                 let target = request.target.as_deref().unwrap_or(root);
-                order
-                    .iter()
-                    .copied()
-                    .find(|id| self.matches(*id, Some(target), &request.path))
+                order.iter().copied().find(|id| {
+                    visible(&self.records[id].segment)
+                        && self.matches(*id, Some(target), &request.path)
+                })
             }
             ReadKind::Next => {
                 let start = if next.after_end {
@@ -31,10 +56,10 @@ impl DatabaseEngine {
                         .and_then(|current| order.iter().position(|id| *id == current))
                         .map_or(0, |index| index + 1)
                 };
-                order[start..]
-                    .iter()
-                    .copied()
-                    .find(|id| self.matches(*id, request.target.as_deref(), &request.path))
+                order[start..].iter().copied().find(|id| {
+                    visible(&self.records[id].segment)
+                        && self.matches(*id, request.target.as_deref(), &request.path)
+                })
             }
             ReadKind::NextInParent => {
                 let parent = next.parentage.ok_or(EngineProblem::ParentageRequired)?;
@@ -55,10 +80,10 @@ impl DatabaseEngine {
                             .position(|id| *id == current)
                     })
                     .map_or(parent_index + 1, |offset| parent_index + 2 + offset);
-                order[start..stop]
-                    .iter()
-                    .copied()
-                    .find(|id| self.matches(*id, request.target.as_deref(), &request.path))
+                order[start..stop].iter().copied().find(|id| {
+                    visible(&self.records[id].segment)
+                        && self.matches(*id, request.target.as_deref(), &request.path)
+                })
             }
         };
         let Some(id) = selected else {

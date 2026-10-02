@@ -160,6 +160,7 @@ pub struct ReadRequest {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct HeldRecord {
     id: RecordId,
     version: u64,
@@ -167,6 +168,7 @@ struct HeldRecord {
 
 /// Position and parentage owned by one future DB PCB adapter.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PcbPosition {
     current: Option<RecordId>,
     parentage: Option<RecordId>,
