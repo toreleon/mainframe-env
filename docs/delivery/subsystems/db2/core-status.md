@@ -4,7 +4,7 @@ Subsystem: **db2**
 Phase: **core**
 Target release: **0.12.0**
 
-Status: **Proposed — reuse observations, statement identities, lexer, AST primitives, transaction, host-reference, dynamic syntax, common expressions, prepared cursor syntax, SELECT core, CREATE TABLE subset, and common type compatibility recovered**
+Status: **In progress — resumed original lane on current main for the declared second wave**
 
 This recovery slice starts from `origin/main` commit `26437e2c`. This file is
 program control, not product conformance or licensed execution evidence.
@@ -31,6 +31,45 @@ making changes because the CLI account rejected `gpt-6.1-sol`.
 
 These declarations grant no row, execution or coverage credit. Implementation
 remains paused; the conflict repair does not complete v0.12 or waive its gates.
+
+## Resumed implementation on 2026-10-02
+
+The user resumed the original goal after PR #380 merged. The candidate branch
+`codex/continue-v012-20261002` starts from current `origin/main` at
+`213ed878e`. It consumes the reviewed recovered parser/type modules and the
+subsystem documentation layout. The historical pause above is superseded by
+this resumption. Worker configuration is Codex CLI 0.160.0, `gpt-6.1-sol`, high
+reasoning, goals enabled, fast mode disabled and default service tier.
+
+Four isolated worktrees implement the existing second-wave slices. Each worker
+owns only its named Rust module and one unique changelog fragment. Shared
+exports, status, provider documentation, catalog obligations and derived
+documentation remain manager-owned. Each feature is verified and sealed with
+its own ID before another feature starts.
+
+| Slice | Mandatory bounded obligations before acceptance |
+|---|---|
+| `DB2-1201.insert-values-syntax` | Preserve target/columns and row boundaries; accept expression, DEFAULT and NULL values in parenthesized rows; enforce unique columns, uniform widths and explicit column width; reject column references inside VALUES expressions, qualified column-list extensions, nonparenthesized rows, INCLUDE/OVERRIDING/fullselect/CTE/host arrays/isolation/QUERYNO/FOR-n-ROWS and malformed or trailing input. |
+| `DB2-1201.create-index-common-syntax` | Preserve uniqueness modes and explicit/default key ordering; enforce at most 64 distinct unqualified column keys and configured bounds; reject expression/XML/auxiliary/BUSINESS_TIME/INCLUDE/physical/partition/storage forms and malformed or trailing input. |
+| `DB2-1201.create-view-common-syntax` | Preserve name/result columns/SELECT core and explicit/default CHECK OPTION; enforce known result width, unique columns and required names for unnamed/duplicate projections; reject wildcard widths requiring catalog binding, host variables/parameters, CTE/fullselect extensions and unsupported functions/clauses. Catalog-dependent validity and CHECK OPTION applicability remain pending. |
+| `DB2-1202.schema-qualification` | Use explicit bounded static/dynamic run/bind/define/invoke context, preserve qualified names, classify missing context and unsupported synonym/SQL-path/EXPLAIN/catalog/authorization resolution explicitly, and never infer an application-specific name rule. |
+
+These are pure syntax/qualification kernels with no host route, catalog/store
+mutation, authorization, SQLCA, transaction or backend integration. Applicable
+acceptance is focused positive/negative/span/bounds matrices, the affected Db2
+package test/check, Rust 1.95 compatibility, catalog/format/diff gates, changelog
+validation and exact-path feature sealing. Memory-only tests grant no durable
+or official row credit. Manager surface-integration slices follow these four
+seals; broad execution still requires the exact common/deferred freeze.
+
+The four current pinned topic hashes are unchanged from the original declaration:
+INSERT `5411a1a3404556e93aacca6bc0c1b6cd04ec9db4717abb70a4f2eff93805ce30`,
+CREATE INDEX `33c93323290bf2768d4107445cdb8c473b797741444ca697c80f4f9d46b32a91`,
+CREATE VIEW `2e5f8b1f122d42ee5fceb45bff571596b834a287ae5dba17fbed4b40f9230a26`,
+and name resolution `a1e2b49f72cd742e3d5a4866417ba9acf30dccca8091d0b48a1483ec50019f8d`.
+Their exact manifest byte counts and hashes were verified in the supplied raw
+archive and read with the shared plain-text parser. The ordinary cache reader
+still lacks a verified Db2 TOC; no network refresh or source credit is inferred.
 
 ## Dependency gate
 
