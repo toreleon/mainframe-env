@@ -1634,3 +1634,130 @@ without ignores. Current inputs retain their prior product-fact digest; no form
 facts are invented. Synthetic form projection preserves direction and excludes
 source-line/case metadata. Mandatory policy/shape/architecture/docs gates precede
 this bounded infrastructure seal; all administrative execution credit stays zero.
+
+## Independent FILE and FEPI resource input review
+
+Two source CLI workers completed and cleaned their targets, retaining unsealed
+owned inputs after normal shared Git index denial. FILE contains four rows,139
+operand facts,91 condition records and166 case candidates; FEPI resource/list
+contains fourteen distinct rows,178 operand facts,210 condition records and213
+case candidates. These are review candidates, not accepted command behavior.
+
+Before cross-worker review dispatch, manager declares
+`SPI-1001.spi-file-contract-review` and `SPI-1001.fepi-resource-contract-review`.
+Each owns only its external review handoff/receipts and a clean isolated checkout
+from the form-infrastructure candidate; no tracked writes or source input repair
+is delegated. FILE review covers rows0012/0072/0127/0224 and all166 candidates;
+FEPI review covers rows0008/0010/0011/0017/0019/0020/0022/0023/0024/0032/0033/0035/0036/0037
+and all213 candidates. Each retained reviewer session is different from that
+input's producer. Exact owned input hashes and complete source inventories are
+frozen by the external launch contract. Dependencies are terminal producer
+handoffs and the passed shared schema/form gates; source bodies must again be
+consulted via pinned offline search/read for independent expectations.
+
+Review requires every operand/constraint/response/lifecycle/security/audit/gap
+and concrete case input/expectation, including all fixed-size arrays, to be
+accounted for. Compare primary and contextual authority, identify overclaims,
+wrong bounds/directions/conditions/ordering/rollback/event routing, variant
+identity collapse, unsafe incomplete fixtures and unsupported source claims.
+FILE's exact syncpoint and ordered/deferred/ignored attribute effects, retained
+locks/BUNDLE constraints and restart/IOERR preservation must remain precise.
+FEPI's named/list and browse directions, per-item successes, async request versus
+attainment, CSZX/EXCEPTIONQ loss, and SET NODE174 versus index176 conflict stay
+explicit. Structural schema pass is not semantic proof. No guessed form/CVDA/SAF
+closure, selected-product route, runtime/license credit or parent completion is
+allowed. Manager reviews full independent reports and repairs/integrates one
+input slice at a time; all common authority and candidate sealing stays serial.
+
+Manager also declares dependency-ready `SPI-1001.spi-program-forms` before CLI
+dispatch, based on the passed form-infrastructure candidate. Exclusive tracked
+ownership is the existing families/spi-program.json only (relative to
+conformance/0.10/cics); original four rows0026/0084/0155/0241 and all reviewed
+primary pins remain unchanged. The worker may add source-reviewed form-specific
+constraints/directions and independent grammar candidate cases supported by the
+new optional bounded form fields, keeping unreviewed AT/browse/generic-context
+facts explicit. It must not guess forms, collapse source variants, infer a
+synthetic runtime status profile as the full IBM command, or promote readiness.
+Full grammar/CVDA/context/authorization/selected-route/recovery remain Pending.
+The current private PROGRAM observation has no handler/route, and no shared
+IR/compiler/host/provider/schema/generator/status changes are delegated.
+Acceptance binds complete offline source reads, exact inherited fact/pin
+compatibility, source-backed per-form closed constraints/selectors/directions,
+independent malformed/boundary cases, current schema/generator/IR and mandatory
+manager integration gates. The worker owns only its input and external handoff;
+all integration and generated products stay serial. This is the seventh live
+CLI slot after two producers ended and two independent reviewers took their slots.
+
+Manager declares bounded read-only `SPI-1001.spi-row-link-review` before dispatch
+for the three still-unresolved SPI equivalences0201/0203/0204. Its only ownership
+is an external review report/receipts and read-only isolated checkout. Earlier
+wide qualification reviews remain preserved and must not be rerun. This review
+tests a distinct safe alternative: inspect the exact retained official catalog
+row's raw HTML links and the pinned candidate body's syntax/cross-reference
+roles, preserving hash/product/version. A direct published catalog-row link to
+the exact command topic or explicit pinned identity equivalence could establish
+a join; names, prefix similarity, EIBFN, body keywords or mandatory-action guesses
+alone cannot. No shared source-map/locator/manifest/code edits, repins, refresh,
+licensed execution or mapping acceptance is delegated. If this evidence is
+absent, retain unresolved status and exact smallest external authority needed.
+Manager independently verifies any proposed bounded proof through the existing
+source-map/form-locator owners and gates before integration. This eighth CLI
+slot remains within the requested ceiling and earns no behavioral credit.
+
+Manager declares source-repair followups SPI-1001.spi-file-review-repair and
+SPI-1001.fepi-resource-review-repair before retained CLI session dispatch.
+FILE owns only families/spi-file.json, rows0012/0072/0127/0224 and existing
+166 candidate cases; repair independent findings SPI-FILE-R1/R2/R3/R4. FEPI
+owns only families/fepi-resources.json and fepi-pool-list.json, fourteen
+previously declared rows and213 cases; repair FEPI-R1/R2/R3. Each writes only
+its isolated terminal producer workspace and new external repair handoff.
+The original handoffs and source hashes are frozen; no shared schema, generator,
+IR/compiler/provider/security/status or generated authority is delegated.
+Dependencies are terminal producer and independent review, reviewed retained
+primary/context source pins, and passed common constraints. Require pinned
+Python search/read before any repair, concrete independent fixtures and bounded
+source facts; preserve unresolved contradictions, timing, variants, SAF/UOW/
+recovery, licensed and selected-route gates. Manager and separate reviewers
+verify changed facts before serial integration and required gates. All
+308 identities remain; no execution acceptance or v0.9 acceptance is claimed.
+
+SPI-1001.spi-program-forms manager review preserves all97 inherited union
+operands,47 condition records and89 existing cases exactly. Four named forms
+retain93 form operand facts, with17 new independent grammar/boundary candidates
+(106 PROGRAM cases). Only the named INQUIRE application-context operands refine
+union input-output to output; OPERATION remains a64-character receiver. PROGRAM
+is required within named forms; STATUS remains optional. START/AT/NEXT/END forms
+are absent and unresolved. Source baseline ibm-cics-ts-6x-spi-command-bodies-
+2026-09-12, official rows0026/0084/0155/0241, exact dfha8_createprogram,
+dfha8_discardprogram, dfha8_inquireprogram and dfha8_setprogram topic pins remain
+unchanged. Common-format dfhp4_apiformat and CVDA dfha80x are supplemental
+reference only. All constraints stay Pending and behavioral/license credit0.
+Two retained CLI producers now repair four FILE and three FEPI independent
+findings; the other producer handoffs await independent review and integration.
+
+Manager declares four dependency-ready read-only cross-worker reviews before
+CLI dispatch: SPI-1001.spi-csd-contract-review (25 CSD rows,475 cases),
+SPI-1001.spi-monitoring-contract-review (21 monitoring/control rows,768 cases),
+SPI-1001.spi-region-contract-review (25 region/UOW rows,868 cases), and
+SPI-1001.fepi-session-contract-review (19 FEPI conversation/data rows,779 cases).
+Exact row sets are the existing enrolled family cohorts; final producer workfile
+hashes are frozen by external launch manifests, not their possibly stale indexes.
+Each owns only its external review handoff and a separate clean read-only
+checkout. No tracked repair or shared schema/IR/generator/registry/status write
+is delegated. Every property, operand, constraint, response, lifecycle/security/
+audit/UOW/recovery fact, gap and concrete candidate fixture/expectation requires
+independent pinned search/read and relational review; no silent case sampling.
+Source conflicts and insufficient fixtures become actionable pending findings,
+not runtime passes. Exact source/hash/line coverage, scope preservation and
+changed-input recommendations are acceptance requirements for these reports.
+Separate retained reviewer sessions differ from each input producer. Manager
+owns serial repair/integration, actual schema and mandatory gates and sealing;
+all source/execution/recovery/licensed/parent and application acceptance stays
+pending. Together with two repair workers this uses six actual CLI slots.
+
+Named PROGRAM forms pass23 generator checks, seven IR regressions and the
+actual Rust Draft202012 family instance checker on this integration candidate.
+The generated grammar digest changes for four explicit named forms; all parent
+and form readiness remains Pending. Union174 operand facts remain unchanged,
+and239 source-review candidates are not execution evidence. Mandatory gates
+precede this bounded slice seal.

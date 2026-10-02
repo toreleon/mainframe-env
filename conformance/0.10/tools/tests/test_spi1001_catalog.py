@@ -151,6 +151,8 @@ class AdministrativeGrammarTests(unittest.TestCase):
 
     def form_fixture(self):
         family = copy.deepcopy(self.family)
+        for command in family["commands"]:
+            command["grammar"].pop("forms", None)
         grammar = family["commands"][0]["grammar"]
         shape = copy.deepcopy(grammar)
         grammar["forms"] = [{"id": "named", "selector_options": ["PROGRAM"],
@@ -158,11 +160,15 @@ class AdministrativeGrammarTests(unittest.TestCase):
         return family
 
     def test_absent_and_empty_forms_retain_the_prior_product_fact_preimage(self) -> None:
-        family = copy.deepcopy(self.family)
-        family["commands"][0]["grammar"]["forms"] = []
-        self.assertEqual(self.project(), self.project(family))
-        self.assertEqual(catalog_tool.render_grammar_facts(self.project()),
-                         catalog_tool.render_grammar_facts(self.project(family)))
+        absent = copy.deepcopy(self.family)
+        for command in absent["commands"]:
+            command["grammar"].pop("forms", None)
+        empty = copy.deepcopy(absent)
+        for command in empty["commands"]:
+            command["grammar"]["forms"] = []
+        self.assertEqual(self.project(absent), self.project(empty))
+        self.assertEqual(catalog_tool.render_grammar_facts(self.project(absent)),
+                         catalog_tool.render_grammar_facts(self.project(empty)))
 
     def test_form_projection_preserves_direction_and_ignores_source_line_metadata(self) -> None:
         family = self.form_fixture()
@@ -207,7 +213,10 @@ class AdministrativeGrammarTests(unittest.TestCase):
                          ["0026", "0084", "0155", "0241"])
         self.assertEqual(sum(len(fact["grammar"]["options"]) for fact in facts), 97)
         rendered = catalog_tool.render_grammar_facts(facts).decode()
-        self.assertEqual(rendered.count("CicsApplicationConstraintStatus::Pending"), 4)
+        self.assertEqual(sum(len(fact["grammar"].get("forms", [])) for fact in facts), 4)
+        self.assertEqual(sum(len(form["grammar"]["options"])
+                             for fact in facts for form in fact["grammar"]["forms"]), 93)
+        self.assertEqual(rendered.count("CicsApplicationConstraintStatus::Pending"), 8)
         self.assertIn("CicsApplicationOptionDescriptor", rendered)
         self.assertNotIn("runtime_operation", rendered)
         self.assertNotIn("handler_id", rendered)

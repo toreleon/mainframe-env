@@ -163,6 +163,164 @@
               "RESP"
             ]
           }
+        ],
+        "forms": [
+          {
+            "id": "named",
+            "selector_options": [
+              "PROGRAM"
+            ],
+            "grammar": {
+              "options": [
+                {
+                  "name": "ATTRIBUTES",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 32767,
+                  "source_lines": [
+                    30,
+                    32,
+                    60,
+                    61,
+                    68
+                  ]
+                },
+                {
+                  "name": "ATTRLEN",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 2,
+                  "source_lines": [
+                    70,
+                    71,
+                    72,
+                    73
+                  ]
+                },
+                {
+                  "name": "LOG",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    76,
+                    77
+                  ]
+                },
+                {
+                  "name": "LOGMESSAGE",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    74,
+                    75
+                  ]
+                },
+                {
+                  "name": "NOHANDLE",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    24,
+                    25,
+                    26,
+                    27,
+                    28
+                  ]
+                },
+                {
+                  "name": "NOLOG",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    78,
+                    79
+                  ]
+                },
+                {
+                  "name": "PROGRAM",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    80,
+                    81,
+                    82
+                  ]
+                },
+                {
+                  "name": "RESP",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    24,
+                    25,
+                    26,
+                    27,
+                    28
+                  ]
+                },
+                {
+                  "name": "RESP2",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    24,
+                    25,
+                    26,
+                    27,
+                    28
+                  ]
+                }
+              ],
+              "required": [
+                "ATTRIBUTES",
+                "PROGRAM"
+              ],
+              "exclusive": [
+                [
+                  "LOG",
+                  "LOGMESSAGE",
+                  "NOLOG"
+                ]
+              ],
+              "dependencies": [
+                {
+                  "option": "ATTRLEN",
+                  "requires": [
+                    "ATTRIBUTES"
+                  ]
+                },
+                {
+                  "option": "RESP2",
+                  "requires": [
+                    "RESP"
+                  ]
+                }
+              ],
+              "alternative_groups": []
+            },
+            "source_lines": [
+              15,
+              16,
+              24,
+              25,
+              60,
+              68,
+              70,
+              74,
+              80,
+              81,
+              82
+            ]
+          }
         ]
       },
       "responses": [
@@ -597,6 +755,62 @@
               ]
             }
           ]
+        },
+        {
+          "id": "create-program.named-form-grammar-candidates",
+          "gates": [
+            "recognized",
+            "validated"
+          ],
+          "cases": [
+            {
+              "id": "named-bare-program",
+              "input": {
+                "source_text": "EXEC CICS CREATE PROGRAM ATTRIBUTES(A) ATTRLEN(0) END-EXEC"
+              },
+              "expected": "Reject the missing PROGRAM argument in named CREATE syntax; PROGRAM is an input value, not a bare resource clause. Do not invent an IBM RESP2 for this grammar failure.",
+              "source_lines": [
+                15,
+                80,
+                81,
+                82
+              ]
+            },
+            {
+              "id": "named-bare-attributes",
+              "input": {
+                "source_text": "EXEC CICS CREATE PROGRAM('PROGA') ATTRIBUTES ATTRLEN(0) END-EXEC"
+              },
+              "expected": "Reject the missing ATTRIBUTES argument even with ATTRLEN zero; zero makes its value unused, not its clause or argument optional.",
+              "source_lines": [
+                16,
+                29,
+                30,
+                31,
+                32,
+                60,
+                66,
+                67,
+                68,
+                69
+              ]
+            },
+            {
+              "id": "named-resp2-without-resp",
+              "input": {
+                "source_text": "EXEC CICS CREATE PROGRAM('PROGA') ATTRIBUTES(A) ATTRLEN(0) RESP2(R2) END-EXEC",
+                "R2_storage_bytes": 4
+              },
+              "expected": "Reject RESP2 without RESP before installation, per the common-format prerequisite. Supplemental dfhp4_apiformat.html lines 53-60 and 81-85 establish the dependency and receiver; no CREATE/CSD attribute diagnostic is assigned to this top-level grammar failure.",
+              "source_lines": [
+                24,
+                25,
+                26,
+                27,
+                28
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
@@ -611,7 +825,8 @@
         "General primary-addressing restrictions additionally apply: dfhp4_apiformat.html, above, parser lines 97-105. Detailed allowed/forbidden DPL, BTS, exit and other execution contexts not stated here remain unresolved, not inapplicable.",
         "Unregistered linked contexts SSJL4D_6.x/system-programming/intro/dfha808.html (general CREATE), dfha8lr.html (ATTRIBUTES) and the PROGRAM resource-attribute topic: no committed expected SHA was found for the first two in the current manifests and their expected host topic-path files are absent. No missing/mismatched pinned-body claim or refresh is made. Exact omitted ATTRLEN behavior, default attributes, value dependencies/exclusions, replacement partial-failure/restart details and applicable full CREATE/CSD diagnostics need separately reviewed pins.",
         "The CREATE/CSD table has generic entries for many unrelated resource types. Only the error encoding, generic syntax diagnostics and PROGRAM keyword table were reviewed; do not apply every table entry to PROGRAM. JVMPROFILE appears in this command syntax but is marked obsolete in the supplementary keyword table; retain that source tension for compiler compatibility review.",
-        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases."
+        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases.",
+        "The named form is a source fact for the explicit named-resource syntax only; its positive PROGRAM selector does not select parsing, dispatch, admission or a runtime route. It is not exhaustive grammar. All parent and form readiness stays Pending, including numeric CVDA domains, aliases, value-dependent/context/version restrictions, SAF and output layouts. Source-review case candidates are not executable Conformance IR or verdicts."
       ]
     },
     {
@@ -698,6 +913,89 @@
             "option": "RESP2",
             "requires": [
               "RESP"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "id": "named",
+            "selector_options": [
+              "PROGRAM"
+            ],
+            "grammar": {
+              "options": [
+                {
+                  "name": "NOHANDLE",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                  ]
+                },
+                {
+                  "name": "PROGRAM",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    40,
+                    42,
+                    43
+                  ]
+                },
+                {
+                  "name": "RESP",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                  ]
+                },
+                {
+                  "name": "RESP2",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                  ]
+                }
+              ],
+              "required": [
+                "PROGRAM"
+              ],
+              "exclusive": [],
+              "dependencies": [
+                {
+                  "option": "RESP2",
+                  "requires": [
+                    "RESP"
+                  ]
+                }
+              ],
+              "alternative_groups": []
+            },
+            "source_lines": [
+              15,
+              17,
+              18,
+              40,
+              42,
+              43
             ]
           }
         ]
@@ -1004,6 +1302,44 @@
               ]
             }
           ]
+        },
+        {
+          "id": "discard-program.named-form-grammar-candidates",
+          "gates": [
+            "recognized",
+            "validated"
+          ],
+          "cases": [
+            {
+              "id": "named-missing-program",
+              "input": {
+                "source_text": "EXEC CICS DISCARD RESP(R) END-EXEC",
+                "R_storage_bytes": 4
+              },
+              "expected": "Reject the missing named PROGRAM clause before removal; common RESP does not replace the required resource operand.",
+              "source_lines": [
+                15,
+                17,
+                18,
+                40,
+                42,
+                43
+              ]
+            },
+            {
+              "id": "named-bare-program",
+              "input": {
+                "source_text": "EXEC CICS DISCARD PROGRAM END-EXEC"
+              },
+              "expected": "Reject the missing PROGRAM argument; the named DISCARD syntax requires its 8-character input operand and does not establish a bare resource form.",
+              "source_lines": [
+                15,
+                40,
+                42,
+                43
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
@@ -1017,7 +1353,8 @@
         "The source does not specify internal lock ordering, cancellation/deadline outcomes, audit saturation, journal failures, backup/restore or full restart guarantees. Resolve these through the existing CICS state, canonical effect/UOW, coordinator and versioned persistence contracts, with source-backed operation limits; do not infer universal rollback or idempotent redispatch.",
         "General primary-addressing restrictions additionally apply: dfhp4_apiformat.html, above, parser lines 97-105. Detailed allowed/forbidden DPL, BTS, exit and other execution contexts not stated here remain unresolved, not inapplicable.",
         "Linked general discard context SSJL4D_6.x/system-programming/intro/dfha80z.html has no expected SHA in the current committed manifests; expected host topic-path file is absent. Resolve syncpoint, undo/catalog/restart, audit and precise bundle-LIBRARY /301 eligibility with reviewed pins before runtime acceptance.",
-        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases."
+        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases.",
+        "The named form is a source fact for the explicit named-resource syntax only; its positive PROGRAM selector does not select parsing, dispatch, admission or a runtime route. It is not exhaustive grammar. All parent and form readiness stays Pending, including numeric CVDA domains, aliases, value-dependent/context/version restrictions, SAF and output layouts. Source-review case candidates are not executable Conformance IR or verdicts."
       ]
     },
     {
@@ -1676,6 +2013,644 @@
               "RESP"
             ]
           }
+        ],
+        "forms": [
+          {
+            "id": "named",
+            "selector_options": [
+              "PROGRAM"
+            ],
+            "grammar": {
+              "options": [
+                {
+                  "name": "APIST",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    110,
+                    111
+                  ]
+                },
+                {
+                  "name": "APPLICATION",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 64,
+                  "source_lines": [
+                    143,
+                    144,
+                    145,
+                    151,
+                    152,
+                    153,
+                    156,
+                    157
+                  ]
+                },
+                {
+                  "name": "APPLMAJORVER",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    151,
+                    152,
+                    153,
+                    158,
+                    159,
+                    160,
+                    161,
+                    162
+                  ]
+                },
+                {
+                  "name": "APPLMICROVER",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    151,
+                    152,
+                    153,
+                    168,
+                    169,
+                    170,
+                    171,
+                    172
+                  ]
+                },
+                {
+                  "name": "APPLMINORVER",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    151,
+                    152,
+                    153,
+                    163,
+                    164,
+                    165,
+                    166,
+                    167
+                  ]
+                },
+                {
+                  "name": "CEDFSTATUS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    173,
+                    174
+                  ]
+                },
+                {
+                  "name": "CHANGEAGENT",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    187,
+                    188
+                  ]
+                },
+                {
+                  "name": "CHANGEAGREL",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    206,
+                    207
+                  ]
+                },
+                {
+                  "name": "CHANGETIME",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    209,
+                    210
+                  ]
+                },
+                {
+                  "name": "CHANGEUSRID",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    213,
+                    214
+                  ]
+                },
+                {
+                  "name": "COBOLTYPE",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    215,
+                    216
+                  ]
+                },
+                {
+                  "name": "CONCURRENCY",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    232,
+                    233
+                  ]
+                },
+                {
+                  "name": "COPY",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    265,
+                    266
+                  ]
+                },
+                {
+                  "name": "DATALOCATION",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    280,
+                    281
+                  ]
+                },
+                {
+                  "name": "DEFINESOURCE",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    290,
+                    291
+                  ]
+                },
+                {
+                  "name": "DEFINETIME",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    294,
+                    295
+                  ]
+                },
+                {
+                  "name": "DYNAMSTATUS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    297,
+                    298
+                  ]
+                },
+                {
+                  "name": "ENTRYPOINT",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    311,
+                    312
+                  ]
+                },
+                {
+                  "name": "EXECKEY",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    320,
+                    321
+                  ]
+                },
+                {
+                  "name": "EXECUTIONSET",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    332,
+                    333
+                  ]
+                },
+                {
+                  "name": "HOLDSTATUS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    347,
+                    348
+                  ]
+                },
+                {
+                  "name": "INSTALLAGENT",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    356,
+                    357
+                  ]
+                },
+                {
+                  "name": "INSTALLTIME",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    374,
+                    375
+                  ]
+                },
+                {
+                  "name": "INSTALLUSRID",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    377,
+                    378
+                  ]
+                },
+                {
+                  "name": "JVMCLASS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 255,
+                  "source_lines": [
+                    16,
+                    379,
+                    380
+                  ]
+                },
+                {
+                  "name": "JVMPROFILE",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    382,
+                    383
+                  ]
+                },
+                {
+                  "name": "JVMSERVER",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    386,
+                    387
+                  ]
+                },
+                {
+                  "name": "LANGDEDUCED",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    389,
+                    390
+                  ]
+                },
+                {
+                  "name": "LANGUAGE",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    412,
+                    413
+                  ]
+                },
+                {
+                  "name": "LENGTH",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    433,
+                    434
+                  ]
+                },
+                {
+                  "name": "LIBRARY",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    438,
+                    439
+                  ]
+                },
+                {
+                  "name": "LIBRARYDSN",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 44,
+                  "source_lines": [
+                    16,
+                    450,
+                    451
+                  ]
+                },
+                {
+                  "name": "LOADPOINT",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    16,
+                    461,
+                    462
+                  ]
+                },
+                {
+                  "name": "LPASTATUS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    465,
+                    466
+                  ]
+                },
+                {
+                  "name": "NOHANDLE",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    19,
+                    20,
+                    21,
+                    22,
+                    23,
+                    24
+                  ]
+                },
+                {
+                  "name": "OPERATION",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 64,
+                  "source_lines": [
+                    16,
+                    476,
+                    477
+                  ]
+                },
+                {
+                  "name": "PLATFORM",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 64,
+                  "source_lines": [
+                    151,
+                    152,
+                    153,
+                    481,
+                    482,
+                    483,
+                    484,
+                    485
+                  ]
+                },
+                {
+                  "name": "PROGRAM",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    486,
+                    487
+                  ]
+                },
+                {
+                  "name": "PROGTYPE",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    489,
+                    490
+                  ]
+                },
+                {
+                  "name": "REMOTENAME",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    16,
+                    499,
+                    500
+                  ]
+                },
+                {
+                  "name": "REMOTESYSTEM",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    504,
+                    505
+                  ]
+                },
+                {
+                  "name": "REPLICATION",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    510,
+                    511
+                  ]
+                },
+                {
+                  "name": "RESCOUNT",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    518,
+                    519
+                  ]
+                },
+                {
+                  "name": "RESIDENCY",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    524,
+                    525
+                  ]
+                },
+                {
+                  "name": "RESP",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    19,
+                    20,
+                    21,
+                    22,
+                    23,
+                    24
+                  ]
+                },
+                {
+                  "name": "RESP2",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    19,
+                    20,
+                    21,
+                    22,
+                    23,
+                    24
+                  ]
+                },
+                {
+                  "name": "RUNTIME",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    531,
+                    532
+                  ]
+                },
+                {
+                  "name": "SHARESTATUS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    553,
+                    554
+                  ]
+                },
+                {
+                  "name": "STATUS",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    566,
+                    567
+                  ]
+                },
+                {
+                  "name": "TRANSID",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    573,
+                    574
+                  ]
+                },
+                {
+                  "name": "USECOUNT",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    16,
+                    582,
+                    583
+                  ]
+                }
+              ],
+              "required": [
+                "PROGRAM"
+              ],
+              "exclusive": [],
+              "dependencies": [
+                {
+                  "option": "RESP2",
+                  "requires": [
+                    "RESP"
+                  ]
+                }
+              ],
+              "alternative_groups": []
+            },
+            "source_lines": [
+              15,
+              16,
+              19,
+              20,
+              28,
+              29,
+              143,
+              151,
+              158,
+              163,
+              168,
+              476,
+              481,
+              486,
+              487,
+              488
+            ]
+          }
         ]
       },
       "responses": [
@@ -2181,6 +3156,169 @@
               ]
             }
           ]
+        },
+        {
+          "id": "inquire-program.named-form-grammar-candidates",
+          "gates": [
+            "recognized",
+            "validated"
+          ],
+          "cases": [
+            {
+              "id": "named-missing-program",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE STATUS(S) END-EXEC",
+                "S_storage_bytes": 4
+              },
+              "expected": "Reject the missing PROGRAM clause for named inquiry. STATUS is optional output and cannot stand in for the required resource input. No browse result or IBM RESP2 is inferred.",
+              "source_lines": [
+                15,
+                16,
+                28,
+                29,
+                486,
+                487,
+                488,
+                566,
+                567
+              ]
+            },
+            {
+              "id": "named-bare-program",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM STATUS(S) END-EXEC",
+                "S_storage_bytes": 4
+              },
+              "expected": "Reject the missing PROGRAM argument in named syntax. This candidate does not determine legal bare START/END resource clauses or NEXT syntax.",
+              "source_lines": [
+                15,
+                16,
+                486,
+                487,
+                488
+              ]
+            },
+            {
+              "id": "named-eight-character-no-receivers",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('ABCDEFGH') END-EXEC",
+                "resource_state": "installed eligible public PROGRAM; authorized issuer"
+              },
+              "expected": "The named syntax and 8-character input boundary require no STATUS or other optional receiver. This is a grammar candidate only, not a successful runtime or route verdict.",
+              "source_lines": [
+                15,
+                16,
+                28,
+                29,
+                486,
+                487,
+                488
+              ]
+            },
+            {
+              "id": "named-operation-receiver-64",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('PROGA') OPERATION(OP) END-EXEC",
+                "OP_storage_bytes": 64,
+                "resource_state": "installed eligible public PROGRAM; not application entry point"
+              },
+              "expected": "The writable 64-character receiver meets OPERATION storage needs; the documented non-entry-point result is 64 blanks. OPERATION is output despite its data-value heading; no invented numeric output codec is asserted.",
+              "source_lines": [
+                16,
+                476,
+                477,
+                478,
+                479,
+                480
+              ]
+            },
+            {
+              "id": "named-operation-receiver-63",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('PROGA') OPERATION(OP) END-EXEC",
+                "OP_storage_bytes": 63,
+                "resource_state": "installed eligible public PROGRAM; not application entry point"
+              },
+              "expected": "The independently declared receiver is too short for the documented 64-character output. A future compiler/adapter must reject the undersized receiver instead of writing beyond it; no command-body RESP2 is assigned to this boundary.",
+              "source_lines": [
+                16,
+                476,
+                477,
+                478,
+                479,
+                480
+              ]
+            },
+            {
+              "id": "named-application-literal-receiver",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('PROGA') APPLICATION('APPX') END-EXEC",
+                "resource_state": "installed public application entry point"
+              },
+              "expected": "Reject a constant in the named APPLICATION receiver position; this form returns application identity rather than selecting an input application. Supplemental dfhp4_apiformat.html lines 17-21 requires a data-area for received data; START inputs are a separate unresolved form.",
+              "source_lines": [
+                16,
+                143,
+                144,
+                151,
+                152,
+                153
+              ]
+            },
+            {
+              "id": "named-major-version-receiver-4",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('PROGA') APPLMAJORVER(MAJ) END-EXEC",
+                "MAJ_storage_bytes": 4,
+                "resource_state": "installed public PROGRAM; not application entry point"
+              },
+              "expected": "A writable fullword receiver meets the documented major-version storage width; the non-entry-point result is -1. Signed encoding and adapter output codec remain Pending.",
+              "source_lines": [
+                16,
+                151,
+                152,
+                153,
+                158,
+                159,
+                160,
+                161,
+                162
+              ]
+            },
+            {
+              "id": "named-major-version-receiver-3",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('PROGA') APPLMAJORVER(MAJ) END-EXEC",
+                "MAJ_storage_bytes": 3
+              },
+              "expected": "Reject an independently declared receiver shorter than the fullword output before any write; do not treat APPLMAJORVER as an input version selector in named inquiry or assign an invented IBM condition.",
+              "source_lines": [
+                16,
+                151,
+                152,
+                153,
+                158,
+                159,
+                160
+              ]
+            },
+            {
+              "id": "named-resp2-without-resp",
+              "input": {
+                "source_text": "EXEC CICS INQUIRE PROGRAM('PROGA') RESP2(R2) END-EXEC",
+                "R2_storage_bytes": 4
+              },
+              "expected": "Reject RESP2 without RESP, per supplemental dfhp4_apiformat.html lines 53-60 and 81-85. No inquiry result, missing-resource condition or runtime verdict is implied by this syntax-only candidate.",
+              "source_lines": [
+                19,
+                20,
+                21,
+                22,
+                23,
+                24
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
@@ -2195,7 +3333,9 @@
         "General primary-addressing restrictions additionally apply: dfhp4_apiformat.html, above, parser lines 97-105. Detailed allowed/forbidden DPL, BTS, exit and other execution contexts not stated here remain unresolved, not inapplicable.",
         "Linked SSJL4D_6.x/system-programming/intro/dfha80w.html has no committed expected SHA in the current manifests and expected host topic-path file is absent. START/NEXT/END are declared flags from the command prose; AT shape/direction, PROGRAM receiver role on NEXT, exact required/exclusion/dependency groups, browse context completeness and resource-check timing remain unresolved. PROGRAM direction=input describes the established single-inquiry form only; the shared compiler must not treat this as complete browse typing.",
         "ABSTIME storage widths for CHANGETIME/DEFINETIME/INSTALLTIME and the encoding/width of the four-digit CHANGEAGREL are not stated as bytes here; null is deliberate. FORMATTIME and signature context must be reviewed if needed for exact receiver encoding.",
-        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases."
+        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases.",
+        "The named form is a source fact for the explicit named-resource syntax only; its positive PROGRAM selector does not select parsing, dispatch, admission or a runtime route. It is not exhaustive grammar. All parent and form readiness stays Pending, including numeric CVDA domains, aliases, value-dependent/context/version restrictions, SAF and output layouts. Source-review case candidates are not executable Conformance IR or verdicts.",
+        "Named INQUIRE requires PROGRAM as an input value of at most 8 characters and permits the source-declared optional receivers without making STATUS mandatory (lines 15-16, 28-34, 486-488). APPLICATION, APPLMAJORVER, APPLMINORVER, APPLMICROVER and PLATFORM are outputs in this form (lines 151-172, 481-485); their union input-output facts are retained for START context inputs. No START/AT/NEXT/END form is projected: dfha80w.html has no committed expected pin, so bare PROGRAM clauses, NEXT receiver direction, AT argument placement/shape and exact browse required/exclusion/dependency groups remain Pending. Absence from the named form is not rejection of a legal browse command."
       ]
     },
     {
@@ -2590,6 +3730,402 @@
             "option": "RESP2",
             "requires": [
               "RESP"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "id": "named",
+            "selector_options": [
+              "PROGRAM"
+            ],
+            "grammar": {
+              "options": [
+                {
+                  "name": "CEDF",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    50
+                  ]
+                },
+                {
+                  "name": "CEDFSTATUS",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    50,
+                    51
+                  ]
+                },
+                {
+                  "name": "COPY",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    62,
+                    63
+                  ]
+                },
+                {
+                  "name": "DISABLED",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    191
+                  ]
+                },
+                {
+                  "name": "DPLSUBSET",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    100
+                  ]
+                },
+                {
+                  "name": "ENABLED",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    191
+                  ]
+                },
+                {
+                  "name": "EXECUTIONSET",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    100,
+                    101
+                  ]
+                },
+                {
+                  "name": "FULLAPI",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    100
+                  ]
+                },
+                {
+                  "name": "JVM",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    168
+                  ]
+                },
+                {
+                  "name": "JVMCLASS",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 255,
+                  "source_lines": [
+                    15,
+                    122,
+                    123
+                  ]
+                },
+                {
+                  "name": "JVMPROFILE",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    15,
+                    128,
+                    129
+                  ]
+                },
+                {
+                  "name": "NEWCOPY",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    62
+                  ]
+                },
+                {
+                  "name": "NOCEDF",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    50
+                  ]
+                },
+                {
+                  "name": "NOHANDLE",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                  ]
+                },
+                {
+                  "name": "NOJVM",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    168
+                  ]
+                },
+                {
+                  "name": "NOREPLICATOR",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    160
+                  ]
+                },
+                {
+                  "name": "OPERATION",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 64,
+                  "source_lines": [
+                    15,
+                    140,
+                    141
+                  ]
+                },
+                {
+                  "name": "PHASEIN",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    62
+                  ]
+                },
+                {
+                  "name": "PRIVATE",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    178
+                  ]
+                },
+                {
+                  "name": "PROGRAM",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 8,
+                  "source_lines": [
+                    15,
+                    156,
+                    157
+                  ]
+                },
+                {
+                  "name": "REPLICATION",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    160,
+                    161
+                  ]
+                },
+                {
+                  "name": "REPLICATOR",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    160
+                  ]
+                },
+                {
+                  "name": "RESP",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                  ]
+                },
+                {
+                  "name": "RESP2",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                  ]
+                },
+                {
+                  "name": "RUNTIME",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    168,
+                    169
+                  ]
+                },
+                {
+                  "name": "SHARED",
+                  "value_shape": "flag",
+                  "direction": "none",
+                  "source_max_value_bytes": null,
+                  "source_lines": [
+                    15,
+                    178
+                  ]
+                },
+                {
+                  "name": "SHARESTATUS",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    178,
+                    179
+                  ]
+                },
+                {
+                  "name": "STATUS",
+                  "value_shape": "value",
+                  "direction": "input",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    191,
+                    192
+                  ]
+                },
+                {
+                  "name": "VERSION",
+                  "value_shape": "value",
+                  "direction": "output",
+                  "source_max_value_bytes": 4,
+                  "source_lines": [
+                    15,
+                    204,
+                    205
+                  ]
+                }
+              ],
+              "required": [
+                "PROGRAM"
+              ],
+              "exclusive": [
+                [
+                  "CEDF",
+                  "CEDFSTATUS",
+                  "NOCEDF"
+                ],
+                [
+                  "COPY",
+                  "NEWCOPY",
+                  "PHASEIN"
+                ],
+                [
+                  "DPLSUBSET",
+                  "EXECUTIONSET",
+                  "FULLAPI"
+                ],
+                [
+                  "NOREPLICATOR",
+                  "REPLICATION",
+                  "REPLICATOR"
+                ],
+                [
+                  "JVM",
+                  "NOJVM",
+                  "RUNTIME"
+                ],
+                [
+                  "PRIVATE",
+                  "SHARED",
+                  "SHARESTATUS"
+                ],
+                [
+                  "DISABLED",
+                  "ENABLED",
+                  "STATUS"
+                ]
+              ],
+              "dependencies": [
+                {
+                  "option": "JVM",
+                  "requires": [
+                    "JVMCLASS"
+                  ]
+                },
+                {
+                  "option": "RESP2",
+                  "requires": [
+                    "RESP"
+                  ]
+                }
+              ],
+              "alternative_groups": []
+            },
+            "source_lines": [
+              14,
+              15,
+              17,
+              18,
+              50,
+              62,
+              100,
+              122,
+              128,
+              140,
+              156,
+              160,
+              168,
+              178,
+              191,
+              204
             ]
           }
         ]
@@ -3565,6 +5101,70 @@
               ]
             }
           ]
+        },
+        {
+          "id": "set-program.named-form-grammar-candidates",
+          "gates": [
+            "recognized",
+            "validated"
+          ],
+          "cases": [
+            {
+              "id": "named-bare-program",
+              "input": {
+                "source_text": "EXEC CICS SET PROGRAM ENABLED END-EXEC"
+              },
+              "expected": "Reject the missing PROGRAM argument; the bare ENABLED CVDA alias does not make the named resource operand a flag.",
+              "source_lines": [
+                14,
+                15,
+                156,
+                157,
+                158,
+                159,
+                191,
+                197,
+                198
+              ]
+            },
+            {
+              "id": "named-jvm-alias-missing-class",
+              "input": {
+                "source_text": "EXEC CICS SET PROGRAM('PROGA') JVM END-EXEC",
+                "resource_state": "installed eligible local non-bundle PROGRAM"
+              },
+              "expected": "The source-backed bare JVM alias requires JVMCLASS; do not synthesize a class. This independently concrete alias case violates the presence dependency; if issued to CICS the documented response is INVREQ/23. It does not make JVMCLASS mandatory for NOJVM or every RUNTIME value.",
+              "source_lines": [
+                15,
+                122,
+                125,
+                126,
+                168,
+                172,
+                173,
+                250,
+                251
+              ]
+            },
+            {
+              "id": "named-bare-version",
+              "input": {
+                "source_text": "EXEC CICS SET PROGRAM('PROGA') ENABLED VERSION END-EXEC"
+              },
+              "expected": "Reject the missing VERSION output argument. VERSION is a receiver rather than a bare selector; COPY is not mandatory merely because VERSION is requested, and no VERSION-to-COPY presence dependency is introduced.",
+              "source_lines": [
+                15,
+                191,
+                197,
+                198,
+                204,
+                205,
+                206,
+                207,
+                208
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
@@ -3581,7 +5181,8 @@
         "API and CONCURRENCY are not SET options; INQUIRE PROGRAM, same baseline, parser lines 120-124 and 258-264, requires redefinition/reinstallation to change them. Do not add competing mutable SET fields merely because CREATE accepts the attributes.",
         "Value-dependent RUNTIME(JVM) => JVMCLASS is in preconditions/cases; schema dependencies can only express option presence. VERSION => COPY would be incorrect: without COPY its receiver remains unchanged. A value presence dependency must never be used to narrow a source-permitted form.",
         "OPERATION removal by space is stated at lines 153-155, alongside restrictions on a previously SPI-set entry point at lines 145-147; the exact override/removal interaction is unresolved. Successful removal, repeated mutation and warm-restart cases require explicit reviewed context rather than guessed behavior.",
-        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases."
+        "Cases use bounded fixture resource names and descriptive preconditions only; neither cases nor source/catalog/obligation IDs may select production handlers. No case is an executable Conformance IR verdict. Ambiguous /301 operation predicates and invalid OPERATION character fixtures remain pending source closure rather than nominal passing cases.",
+        "The named form is a source fact for the explicit named-resource syntax only; its positive PROGRAM selector does not select parsing, dispatch, admission or a runtime route. It is not exhaustive grammar. All parent and form readiness stays Pending, including numeric CVDA domains, aliases, value-dependent/context/version restrictions, SAF and output layouts. Source-review case candidates are not executable Conformance IR or verdicts."
       ]
     }
   ]

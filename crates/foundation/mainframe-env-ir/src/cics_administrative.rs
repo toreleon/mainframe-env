@@ -273,10 +273,42 @@ mod tests {
     fn unresolved_inquire_browse_is_not_promoted_to_complete_typing() {
         let inquire = program_contract("0155");
         assert!(inquire.required_options.is_empty());
-        assert!(
-            inquire.forms.is_empty(),
-            "unresolved browse must not acquire guessed forms"
+        assert_eq!(inquire.forms.len(), 1, "browse forms remain unresolved");
+        let named = &inquire.forms[0];
+        assert_eq!(named.id, "named");
+        assert_eq!(named.selector_options, &["PROGRAM"]);
+        assert_eq!(named.required_options, &["PROGRAM"]);
+        assert_eq!(
+            named.constraint_status,
+            CicsApplicationConstraintStatus::Pending
         );
+        assert!(
+            !named
+                .options
+                .iter()
+                .any(|option| matches!(option.name, "START" | "AT" | "NEXT" | "END"))
+        );
+        for name in [
+            "APPLICATION",
+            "APPLMAJORVER",
+            "APPLMINORVER",
+            "APPLMICROVER",
+            "PLATFORM",
+        ] {
+            let receiver = named
+                .options
+                .iter()
+                .find(|option| option.name == name)
+                .expect("named application-context receiver");
+            assert_eq!(receiver.direction, CicsApplicationOptionDirection::Output);
+            let union = inquire
+                .options
+                .iter()
+                .find(|option| option.name == name)
+                .expect("union retains browse context inputs");
+            assert_eq!(union.direction, CicsApplicationOptionDirection::InputOutput);
+        }
+        assert!(!named.required_options.contains(&"STATUS"));
         let at = inquire
             .options
             .iter()
