@@ -583,10 +583,52 @@ goal mode/bypass and no nested workers or orchestration skill:
   audited transaction. No fabricated intent, private journal, SAF permission,
   UOW minting, public selection or core completion is supplied by this boundary.
 
+O sealed source registration at `86d2b18d` (80 topics, manifest SHA-256
+`7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a`);
+manager integration remains separate from that worker candidate's 27 reader and
+ten xtask tests. O now owns `MQ-1501.completion-wire-mapping`: explicit semantic
+review of the three MQCC numeric values from supplemental topic `q090560_`,
+baseline `ibm-mq-9.4-programming-supplements-2026-09-12`, supporting original
+call rows `0001`–`0026`. It extends the existing normative status catalog/schema,
+generator/verifier and typed status API, with narrow status tooling/tests/docs.
+Existing symbolic canonical bytes, call-page reason provenance, all ten pending
+reason declarations, callback notification role and 26/27 denominator remain
+unchanged. Source reproduction, negative mutation/schema checks, admitted and
+pending pair conversions plus canonical goldens are required before sealing.
+This mapping does not calculate outcomes or advertise handlers/ABI readiness.
+
 N exclusively owns the rich-state/delivery-row helpers and provider-row contract;
 O owns supplemental manifests/shared reader/xtask registry and cache runbook;
 M owns the new private intent-binding module and narrow effect-replay note.
 Minimal facade hooks and generated-doc overlaps are reconciled by the manager.
+
+The manager's next `MQ-1505.selected-service-authority` slice replaces the
+service's legacy-only mutex with one discriminated legacy/rich authority and
+adds a private strict selected opener. It derives provider/core views from the
+same PlatformStore Arc, requires an authorizer and trusted clock, and blocks
+legacy sequential service operations on a selected instance. Existing public
+legacy constructors/bytes/migration stay unchanged. Rows `0001`, `0007`, `0008`,
+`0009`, `0015`, `0020`, `0021` retain their pinned context/lifecycle/delivery
+authorities; the state selection adds no IBM status or wire constants. Memory
+and SQLite strict v1/v2 selection, physical reopen, corruption/mixed-state and
+wrong-fence refusal without writes, mandatory policy dependencies, same-store
+views, rejected legacy bypasses and affected legacy regressions are required.
+The manager owns service.rs, new service_selection.rs/tests, ADR 0031 and its
+registry/navigation, one fragment and freshness. Other lanes must not edit this
+union. No automatic conversion, result/replay publication, UOW owner, host
+attestation, accepted participant or public MQI readiness is claimed by selection.
+
+This selected-authority implementation passed 55 service regressions (six new
+selection tests) and seven affected object-service integration tests on the
+manager candidate. Memory and SQLite exercise v1/v2, populated/empty queues,
+exact records/replay preservation and physical reopen. Selected legacy calls and
+legacy provider registration are blocked; old constructors/registrations retain
+their previous behavior. Initial empty-install test input was invalid and hit
+the existing capacity guard; the repaired test uses a valid definition and proves
+the selected route refusal. Row guard/four mutants, formatting, docs/changelog
+and affected module ceilings (service 1120/1331, selection 115/1200) passed.
+No dependencies, schema or canonical bytes changed. The strict opener stores one
+authority and grants no connection, UOW, mutation, recovery or SAF permission.
 
 The manager owns actual selected service/ABI/host admission, separately durable
 UOW ownership, SAF/security context and audit/replay composition, participant

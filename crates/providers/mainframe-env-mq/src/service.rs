@@ -48,6 +48,10 @@ pub(crate) mod legacy_delivery_import;
 #[path = "service_rich_state.rs"]
 mod rich_state;
 
+#[path = "service_selection.rs"]
+mod selection;
+use selection::LegacyAccess;
+
 #[path = "service_object_integration.rs"]
 mod object_integration;
 use object_integration::{encode_catalog_row, load_catalog_row};
@@ -240,7 +244,9 @@ pub trait MqReplayClock: Send + Sync {
 pub struct MqService {
     store: Arc<dyn ProviderStateStore>,
     limits: MqLimits,
-    durable: Mutex<DurableState>,
+    durable: Mutex<rich_state::StoredAuthority>,
+    // Selected composition derives both trait views from this same Arc.
+    selected_store: Option<Arc<dyn mainframe_env_store_api::PlatformStore>>,
     unknown_after_persist: AtomicBool,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
     replay_clock: Option<Arc<dyn MqReplayClock>>,
@@ -291,7 +297,11 @@ impl MqService {
         Ok(Arc::new(Self {
             store,
             limits,
-            durable: Mutex::new(DurableState { versions, state }),
+            durable: Mutex::new(rich_state::StoredAuthority::Legacy(DurableState {
+                versions,
+                state,
+            })),
+            selected_store: None,
             unknown_after_persist: AtomicBool::new(false),
             authorizer,
             replay_clock,
@@ -538,10 +548,15 @@ impl MqService {
             .ok_or(HostProblem::NotFound)
     }
 
-    fn lock(&self) -> Result<MutexGuard<'_, DurableState>, HostProblem> {
-        self.durable
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)
+    fn lock(&self) -> Result<LegacyAccess<'_>, HostProblem> {
+        if self.selected_store.is_some() {
+            return Err(HostProblem::Unsupported);
+        }
+        LegacyAccess::new(
+            self.durable
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        )
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
@@ -1077,6 +1092,11 @@ pub fn mq_providers(
     service: Arc<MqService>,
     limits: InvocationLimits,
 ) -> Vec<Arc<dyn HostProvider>> {
+    // Selected composition cannot advertise the legacy sequential route or
+    // typed MQI readiness before its composed participant proof.
+    if service.selected_store.is_some() {
+        return Vec::new();
+    }
     ["host.mq.read", "host.mq.write"]
         .into_iter()
         .map(|capability| {

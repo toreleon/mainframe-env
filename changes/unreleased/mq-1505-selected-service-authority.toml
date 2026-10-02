@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added strict private MQ service selection over one legacy/rich authority and the same platform store, requiring authorization and a trusted clock while preventing legacy sequential routes or premature handler readiness on selected instances."
