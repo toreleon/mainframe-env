@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Admitted source-reviewed MQCONN/MQCONNX WARNING/ALREADY_CONNECTED connection output in the existing typed result contract and lossless historical replay codec without granting live handle, owner or dispatch authority."

@@ -5,6 +5,9 @@
 //! (MQGMO fields, lines 674–686). Both truncation reasons are WARNING in
 //! the unchanged call table. Conversion and property size-reporting forms
 //! without a lossless typed output remain unsupported here.
+//! Rows0008/0009 q101760_/q101770_ also define WARNING/ALREADY_CONNECTED
+//! with a returned connection (MQCONN usage271, CONNX return76–78). Shape
+//! admission never proves that this is the actual prior live connection.
 
 use super::*;
 use crate::MqTruncationDisposition as T;
@@ -50,6 +53,9 @@ pub(super) fn validate(
                 output,
                 limits,
             );
+        }
+        (MqCompletion::Warning, "MQRC_ALREADY_CONNECTED", MqMqiOutput::Connected(_)) => {
+            matches!(call, MqMqiCall::Connect | MqMqiCall::ConnectExtended)
         }
         (
             MqCompletion::Warning,

@@ -1,5 +1,7 @@
 use super::*;
 
+mod connection_warning;
+
 #[test]
 fn reviewed_get_preserves_status_complete_truncation_failure_and_full_payload_identity() {
     for (completion, reason, disposition, message, cursor) in [

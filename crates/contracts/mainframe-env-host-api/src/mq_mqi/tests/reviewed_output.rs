@@ -1,6 +1,8 @@
 use super::*;
 use crate::mq_status::{MqCompletion, MqReviewedStatus, MqStatusProblem};
 
+mod connection_warning;
+
 fn observed(
     completion: i64,
     reason: i64,

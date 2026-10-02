@@ -6,6 +6,16 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The existing reviewed-output contract now retains MQCONN/MQCONNX's exact
+`MQCC_WARNING/MQRC_ALREADY_CONNECTED` pairing with its defined connection output.
+Other warning/failure output pairings remain closed. The existing strict replay
+codec preserves its full canonical identity but reconstructs only historical
+non-executable handles; registry lifetime/owner checks remain independent.
+Original MQ 9.4 rows `0008/0009`, MQCONN usage line 271 and MQCONNX return lines
+76–78 define this source review. Selected provider reuse of its actual prior
+connection and compiled warning writeback still need composition; no token,
+duplicate connection, SAF permit or additional execution credit is fabricated.
+
 Installed executable frames now forward read-only profile and current-unit
 observations through one exact-Invocation, pre/post-callback revocation guard.
 Panic revokes transport and returns protected Unknown without retry or cleanup;
