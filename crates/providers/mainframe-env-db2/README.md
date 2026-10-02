@@ -179,6 +179,18 @@ floating, DECFLOAT and nonnumeric conversions remain distinct from datatype
 incompatibility. This surface does not establish binder/default applicability,
 evaluate expressions, assign host memory or implement typed cells/catalogs.
 
+The finite DECFLOAT assignment surface separately consumes opaque exact numeric
+literal proofs and resolved DECFLOAT(16/34) targets with seven caller-explicit
+rounding modes and an explicit policy-origin context. A private pinned decimal
+standards primitive supplies rounding; owned results retain coefficient/exponent,
+sign, target precision/nullability, source proof/span and inexact observation,
+not primitive types or wire bytes. Zero quantum and trailing zeros are preserved
+when precision fits; negative zero already canonicalized by exact source proofs
+cannot be reconstructed. Context records caller intent, not integrated package/
+register selection. The old context-free exact assignment API keeps its DECFLOAT
+fence. HFP, special/exponent SQL literals, general conversion/arithmetic, SQLCA,
+default applicability, catalog/cells and actual SQL execution remain pending.
+
 The natural string-literal surface accepts an original located apostrophe,
 X character-hex or BX binary constant under explicit Unicode UTF-8 source
 context. Opaque owned proofs decode escaped delimiters/hex exactly once and

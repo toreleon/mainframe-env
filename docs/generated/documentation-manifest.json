@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 226,
+    "markdown_documents": 227,
     "navigation_groups": 6,
     "normative_documents": 60,
     "xtask_commands": 211
@@ -258,7 +258,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
       "relative_links": 1,
-      "sha256": "sha256:0f5f96eb82a0a9d40a6dfcb742a0fa1f790fd180c6b926e73a988bd4d4234f01",
+      "sha256": "sha256:f8eef7e76d23ad4b8c74c102b4640c7e8a759019ded8c6b28d8bd3fc24f3f1a9",
       "title": "mainframe-env-db2",
       "xtask_commands": 2
     },
@@ -1394,8 +1394,16 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
       "relative_links": 3,
-      "sha256": "sha256:dc6a2eef50426dabae9114f6034a85d741b34a78ef03a464060a1c8075a9b694",
+      "sha256": "sha256:bbf66d9e902d06d7de4297dfaeff1908128080235b24a97deae54ce276a4b17d",
       "title": "Db2 — Engine and common SQL progress",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/db2/decfloat-primitive-decision.md",
+      "relative_links": 1,
+      "sha256": "sha256:db4aee97b473239b509d94bc69d243fb3c5286aad56e8f00c6a5b2aff1869d9e",
+      "title": "Finite DECFLOAT assignment primitive",
       "xtask_commands": 0
     },
     {

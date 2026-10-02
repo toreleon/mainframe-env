@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose finite Db2 DECFLOAT assignment from opaque exact numeric proofs with seven explicit rounding modes, owned quantum/provenance and independent public vectors; package/register selection, ordinary value closure and licensed differential remain pending."

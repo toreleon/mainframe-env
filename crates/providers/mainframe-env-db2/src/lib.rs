@@ -85,6 +85,11 @@ pub use numeric_constant_types::{
     Db2NumericConstantError, Db2NumericConstantErrorCode, Db2NumericConstantLimits,
     Db2NumericConstantType, classify_db2_located_numeric_operand, classify_db2_numeric_constant,
 };
+pub use numeric_constant_values::decfloat_assignment::{
+    Db2AssignedFiniteDecFloat, Db2DecFloatAssignmentError, Db2DecFloatAssignmentErrorCode,
+    Db2DecFloatRounding, Db2DecFloatRoundingContext, Db2DecFloatRoundingMode,
+    Db2FiniteDecFloatSign, assign_db2_finite_decfloat_constant,
+};
 pub use numeric_constant_values::{
     Db2AssignedNumericConstant, Db2AssignedNumericValue, Db2MaterializedNumericConstant,
     Db2NumericAssignmentConversion, Db2NumericAssignmentError, Db2NumericAssignmentErrorCode,

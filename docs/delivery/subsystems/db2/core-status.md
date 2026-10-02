@@ -910,6 +910,44 @@ tests do not use binder results to generate expected values or locations. The
 tested production bytes are unchanged by the final documentation reconciliation;
 generated hashes are checked again before the public feature seal and cleanup.
 
+The manager declares `DB2-1202.finite-decfloat-surface`, parent DB2-1202, to
+expose the separately sealed finite assignment adapter. Exact ownership is root
+`lib.rs` exports, new `tests/finite_decfloat_assignment.rs`, provider README,
+this status, unique `changes/unreleased/db2-finite-decfloat-surface.toml` and
+normal generated documentation manifest. Main read all 1135 module lines,
+the complete 120-line dependency decision and 188-line handoff, then verified
+unchanged final blobs and the one-edge Cargo diff. New dependency policy passed
+fresh on the worker's final pinned graph; the discarded transient offline lock
+update is excluded from evidence. The manager must regenerate the stale shared
+docs manifest for the new decision before public acceptance.
+
+Independent public vectors require all seven modes on both signs/tie parities,
+exact 34-digit-target assignment, 16-digit carry/inexact versus discarded zeros,
+zero/scale quantum, owned original UTF-8/CRLF operands/nullable target, explicit
+origins and status isolation, compatibility/wrong-target diagnostics and the
+unchanged old exact-assignment fence. Public exports must discharge all private
+reachability warnings. Focused/package/Rust/MSRV, strict scoped Clippy, formatting,
+applicable final-graph policy/catalog/changelog/docs and private/public exact
+seals precede cleanup. This finite literal adapter remains distinct from HFP,
+special/exponent DECFLOAT literals, general conversion/arithmetic, actual package/
+register selection, default admission, SQLCA, catalog/cells or SQL execution.
+No backend/durable/security/UOW route changes; official and licensed gates remain
+pending with no revised denominator or owner-rule acceptance.
+
+The imported private feature is `f2b6e071` (worker `b47d4e95`); its exact
+six-path seal remains unchanged. The public candidate passes five independent
+tests and the combined package's 362 unit + 101 integration tests, zero failures
+or ignored tests. Rust 1.98/1.95 all-target/all-feature locked checks, strict
+scoped Clippy (`--no-deps -D warnings`), formatting, both catalog checks,
+changelog and regenerated documentation checks pass. Normal generation includes
+the new primitive decision and resolves the private worker's stale-manifest
+limitation. Unchanged final Cargo/policy inputs reuse that worker's actual fresh
+deny/supply-chain/license receipt identity, not a newly claimed execution.
+The final status-only reconciliation changes no tested production or test bytes;
+documentation hashes are regenerated and checked before the public exact seal
+and cleanup. Licensed Db2 differential remains pending: the user confirmed no
+licensed environment is configured and authorized continued implementation.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
