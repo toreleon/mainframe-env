@@ -6,6 +6,65 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1401.sequential-isrt-position-sources (source-only leaf declared, 2026-10-03)
+
+Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51`; target **0.14.0**. Register only
+three retained IMS 15.6 HTML pins in scope `ims-sequential-isrt-position`, baseline
+`ibm-ims-15.6-sequential-isrt-position-2026-09-11`. The source registry and existing
+offline reader remain the owners. Preserve the twelve existing manifest bytes
+and registry rows, all prior Proposed ADRs and root's F integration fixture repair.
+
+Exact five-path allowlist, declared before source registration:
+
+- `conformance/0.14/manifests/ims-sequential-isrt-position-topics.json`
+- `conformance/0.14/manifests/index.json`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-sequential-isrt-position-sources-20261003.toml`
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+Reverify the selected topic metadata/body hashes, retained topic paths first,
+archive fallback, run identity and TOC/product binding. Import only those three
+topics and their TOC into the external task cache with the existing reader;
+search the registered scope and read all 215/34/36 plain-text lines, using two
+bounded ISRT reads. The archive run is in progress; snapshot/run creation is
+2026-09-11, while II was fetched 2026-09-12T00:17:12Z. No HTTP Last-Modified was
+retained. This supplement claims neither whole-corpus nor browser reproduction.
+
+Affected gates: existing source-reader regression suite; registered manifests,
+schema/spec, IMS catalog/assurance and coverage inventory consumers; normal docs
+generation/check, changelog, fmt and offline deny/license-notice/supply-chain
+policy. Every sequence cleans this checkout's Cargo target; actual candidate
+inputs and receipts stay external under `sequential-isrt-source-pins/`.
+
+The exact three-topic set independently reproduces SHA-256
+`f50d0ca77232e353343bfc37bd9b02fef87d20c6bb5926becc5c8e1ef09e55a0`, 33,864
+HTML bytes. All three retained paths are absent; selected archive bodies and
+metadata verify exactly. The existing reader imports four verified cache entries
+(three topics plus TOC), returns three ISRT search matches and reads all 285
+lines. Applicable locators in `SSEPH2_15.6.0` are
+`com.ibm.ims156.doc.apr/ims_isrtcall.htm`:129–166 (unique/nonunique/unkeyed insert
+rules), 202–213 (GE and missing-parent PCB level feedback);
+`com.ibm.ims156.doc.apg/ims_posafterisrt.htm`:3–16 (successful continuation after
+the inserted occurrence), 29–31 (II before the duplicate); and
+`com.ibm.ims156.doc.mc/msgs/ii.htm`:4–30 (II positioning and broader causes,
+including sentinel FF). These are reference facts, not new accepted/runtime rules.
+The source-reader regression executes 23 tests, all passing with no skips;
+manifest/schema/spec, IMS catalog/assurance and coverage/inventory consumers pass.
+Existing twelve manifest bytes and registry rows independently remain unchanged.
+Final changed documentation/packaging and offline policy gates precede the exact
+generated leaf seal/check; no runtime or backend suite is authorized here.
+
+Catalog context stays `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0008` (ISRT
+call; exact committed locator `html-table:comparison;row:8;command:ISRT command`),
+with the unchanged 25 mandatory rows. This source-only leaf prepares later
+II-before-duplicate and failed ISRT positioning review; it is not prerequisite
+evidence for the parallel positive HISAM default-LAST runtime leaf. It changes
+no runtime, accepted IR rule or HUMAN authority and earns zero execution,
+IR/HUMAN/official/licensed coverage credit. FIRST/HERE/F/L-on-ISRT, sentinel FF
+and general failed searches remain unfinished runtime classes. Raw CALL/TM
+ADR0031/0033 approvals remain unanswered; licensed certification is excluded.
+Parent IMS/full v0.14 remains active and incomplete.
+
 ## Root F integration declaration — 2026-10-03
 
 Root consumes worker `31fd19d85d95cbf4c6f591dc11aaf72f00db522f` from the same

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Register three digest-pinned IMS 15.6 ISRT, position-after-ISRT and II archive topics as a separate zero-credit source scope without runtime or acceptance changes."

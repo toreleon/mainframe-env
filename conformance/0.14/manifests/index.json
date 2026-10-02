@@ -135,6 +135,17 @@
       "topic_manifest_sha256": "sha256:f99728026ed7f14fcc8e104678bc55939581af2defee68385bc3bf35b170e8b9",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-sequential-isrt-position",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-sequential-isrt-position-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-sequential-isrt-position-topics.json",
+      "manifest_sha256": "sha256:23033fc88b00cccac2f855f86876788365f268ecad0f71d4a4e5e363f9bf4e8c",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:f50d0ca77232e353343bfc37bd9b02fef87d20c6bb5926becc5c8e1ef09e55a0",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
