@@ -529,7 +529,7 @@ fn validate_core_effect(
     Ok(())
 }
 
-fn origin_for(
+pub(crate) fn origin_for(
     invocation: &Invocation,
     key: &str,
     sequence: u64,

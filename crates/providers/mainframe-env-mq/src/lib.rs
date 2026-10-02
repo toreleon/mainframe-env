@@ -7,6 +7,7 @@ mod delivery;
 mod host_context;
 mod message;
 mod message_handle;
+mod mqi_admission;
 mod object;
 pub mod object_inquiry;
 mod object_service;

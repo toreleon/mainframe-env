@@ -15,9 +15,9 @@ const CICS_EXECUTION_CONTEXT_BINDING: &str = "cics.execution-context";
 const CICS_EXECUTION_CONTEXT_SCHEMA: &str = "mainframe-env.cics.execution-context@1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct AttestedHostContext {
-    environment: MqHostEnvironment,
-    owner: MqSyncpointOwner,
+pub(crate) struct AttestedHostContext {
+    pub(crate) environment: MqHostEnvironment,
+    pub(crate) owner: MqSyncpointOwner,
 }
 
 impl AttestedHostContext {
@@ -69,10 +69,11 @@ impl AttestedHostContext {
     }
 }
 
-pub(crate) fn reject_host_owned_syncpoint(
+/// One decoder for both legacy service calls and additive MQI admission.
+/// Binding provenance must already come from the host; decoding is not attestation.
+pub(crate) fn decode_host_context(
     invocation: &Invocation,
-    request: &MqRequest,
-) -> Result<Option<MqResult>, HostProblem> {
+) -> Result<Option<AttestedHostContext>, HostProblem> {
     let context = invocation
         .bindings
         .get(MQ_HOST_CONTEXT_BINDING)
@@ -115,24 +116,33 @@ pub(crate) fn reject_host_owned_syncpoint(
     if nested != outer || (nested && !cics) {
         return Err(HostProblem::Malformed);
     }
+    Ok(context.or_else(|| {
+        cics.then_some(AttestedHostContext {
+            environment: MqHostEnvironment::ZosCics,
+            owner: MqSyncpointOwner::HostCoordinator,
+        })
+    }))
+}
+
+pub(crate) fn reject_host_owned_syncpoint(
+    invocation: &Invocation,
+    request: &MqRequest,
+) -> Result<Option<MqResult>, HostProblem> {
+    let context = decode_host_context(invocation)?;
     let call = match request.operation {
         MqOperation::Commit => MqSyncpointCall::Commit,
         MqOperation::Rollback => MqSyncpointCall::Back,
         _ => return Ok(None),
     };
-    if nested {
+    if invocation
+        .bindings
+        .contains_key(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+    {
         // The owning CICS coordinator dispatches this internal participant
         // action. Retention checks its exact nested and outer effect origins.
         return Ok(None);
     }
-    let context = context
-        .or_else(|| {
-            cics.then_some(AttestedHostContext {
-                environment: MqHostEnvironment::ZosCics,
-                owner: MqSyncpointOwner::HostCoordinator,
-            })
-        })
-        .ok_or(HostProblem::Malformed)?;
+    let context = context.ok_or(HostProblem::Malformed)?;
     match mq_syncpoint_context_disposition(call, context.environment, context.owner) {
         MqContextDisposition::Allowed => Ok(None),
         MqContextDisposition::Rejected {
