@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepared the pending IMS transaction participant with bounded local mutation, failure, replay and SQLite process-restart tests; admission remains blocked on audit, lease, cancellation and integration guarantees."

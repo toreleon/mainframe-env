@@ -633,7 +633,7 @@
       "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
       "relative_links": 0,
       "scope": "provider-neutral transaction participant capabilities and obligations",
-      "sha256": "sha256:0296920878168ec84636b9387536909fff42699bd1898d11ea67d3aec48af115",
+      "sha256": "sha256:5c8c63398e8ecd14343baf62c9cccf0d84b6a37bcb2b34af3b1b04a597ed79d9",
       "status": "Frozen early additive INT-1601 prerequisite",
       "title": "Transaction participant contract, version 1",
       "xtask_commands": 0
@@ -1418,7 +1418,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-status.md",
       "relative_links": 0,
-      "sha256": "sha256:a9ec8c3cbc0fb314c8ac7b204d4c51d6e9bcbd52dd294bc223562ba6e4bc8d9e",
+      "sha256": "sha256:bf5a711149f6aeca463edc41e832594fe88960068e25ae339cc1c7c5c45653e2",
       "title": "Cross-resource integration — Transactions and recovery progress",
       "xtask_commands": 0
     },
