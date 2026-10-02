@@ -146,6 +146,20 @@ Equal bindings, parent IDs or run/principal alone cannot establish that relation
 Separate subtasks, clients, CICS and IMS cannot inherit this batch processing unit.
 Root minting/binding still refuses every `parentSome` Invocation.
 
+The private explicit-context plane admits an original unbound parent without
+inserting `mq.host-context` into its Invocation. The trusted embedding separately
+selects ordinary `ZosBatch/QueueManager` configuration against the same selected
+service/store. Explicit mint/bind freezes that mode in an opaque process lease;
+the existing binding-only methods cannot upgrade it or fall back to it. Present
+MQ/CICS bindings still use the single decoder and must match; malformed bindings,
+client/IMS/host-owned contexts and contradictory CICS origins fail closed.
+Checked same-task children inherit only their live parent's frozen mode. A
+bounded directory-issued proof ties scope context to the exact original snapshot
+and owner under the sole authority mutex. Neither this private parameter nor
+decoding application JSON is host attestation. Original CALL/core/effect digests,
+child actor attribution, UnitOwner@1 and replay bytes remain unchanged. The real
+cross-crate producer/session bridge and public acceptance remain separately owned.
+
 The directory checks the actual child linkage, distinct execution, exact
 run/principal/grants/generations/attempt, shared physical cancellation probe,
 live controls and non-widening deadline/resource limits before bounded frame

@@ -6,6 +6,18 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+An explicit private trusted-host context plane now admits an unchanged original
+ordinary batch parent even when its MQ binding is absent. The opaque directory
+freezes binding-only versus explicit mode; old routes never fall back. Present
+malformed/conflicting MQ or CICS contexts, foreign/stale parent/probe and widened
+child controls still fail closed. One bounded directory proof carries the exact
+original Invocation and owner to strict effect admission, without rewriting
+core/CALL, envelope, SAF, audit, UOW or replay identities. Same-task child-first
+CONNECT, parent CMIT/BACK and cold-incarnation fences are covered on Memory and
+SQLite private fixtures. Original MQ 9.4 rows `0001/0007/0008/0009/0012` remain
+the source boundary. The actual installed same-service producer, public trusted
+embedding bridge and shared participant acceptance remain separate obligations.
+
 The checked raw-layout contract now includes MQCNO version 1's twelve-byte
 StrucId/Version/Options prefix. Exact options zero or 32 decode only with a
 separately supplied ordinary owned nonshared profile; options cannot select

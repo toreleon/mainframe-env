@@ -3,6 +3,8 @@
 use super::*;
 use crate::mqi_lifecycle::{BatchChildBinding, InstalledBatchRelationship};
 
+#[path = "batch_child/explicit_context.rs"]
+mod explicit_context;
 #[path = "batch_child/first_connect.rs"]
 mod first_connect;
 

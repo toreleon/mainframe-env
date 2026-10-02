@@ -124,6 +124,23 @@ pub(crate) fn decode_host_context(
     }))
 }
 
+/// Private trusted host configuration, never a fallback for a binding route.
+/// Reuse the single decoder so every present contradiction remains an error.
+pub(crate) fn explicit_batch_context(
+    invocation: &Invocation,
+    explicit: AttestedHostContext,
+) -> Result<AttestedHostContext, HostProblem> {
+    if explicit.environment != MqHostEnvironment::ZosBatch
+        || explicit.owner != MqSyncpointOwner::QueueManager
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    if decode_host_context(invocation)?.is_some_and(|bound| bound != explicit) {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(explicit)
+}
+
 pub(crate) fn reject_host_owned_syncpoint(
     invocation: &Invocation,
     request: &MqRequest,

@@ -19,6 +19,7 @@
 //! 26 identities/27 source positions (offline manifest-hash-verified review).
 
 use crate::host_context::decode_host_context;
+use crate::mqi_lifecycle::DirectoryHostContext;
 use crate::retention::{MqReplayOwnerKind, origin_for};
 use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::mq_mqi::*;
@@ -41,6 +42,7 @@ pub(crate) struct MqMqiServiceScope<'a> {
     original: MqMqiEffectOccurrence<'a>,
     provider: &'a CapabilityDescriptor,
     host_limits: HostLimits,
+    directory_context: Option<DirectoryHostContext>,
 }
 
 impl<'a> MqMqiServiceScope<'a> {
@@ -57,7 +59,23 @@ impl<'a> MqMqiServiceScope<'a> {
             original,
             provider,
             host_limits,
+            directory_context: None,
         }
+    }
+
+    /// Proof must come from the same locked directory's exact original frame.
+    /// It supplies context only; no binding or original occurrence is rewritten.
+    pub(crate) fn for_directory_dispatch(
+        invocation: &'a Invocation,
+        owner: MqHandleOwner,
+        original: MqMqiEffectOccurrence<'a>,
+        provider: &'a CapabilityDescriptor,
+        host_limits: HostLimits,
+        context: DirectoryHostContext,
+    ) -> Self {
+        let mut scope = Self::for_host_dispatch(invocation, owner, original, provider, host_limits);
+        scope.directory_context = Some(context);
+        scope
     }
 }
 
@@ -246,7 +264,10 @@ pub(crate) fn admit_mqi<'a>(
     )?;
     effect.validate(scope.host_limits)?;
     let host_request_digest = canonical_request_digest(&effect.request)?;
-    let context = decode_host_context(invocation)?.ok_or(HostProblem::Malformed)?;
+    let context = match &scope.directory_context {
+        Some(proof) => proof.require(invocation, scope.owner)?,
+        None => decode_host_context(invocation)?.ok_or(HostProblem::Malformed)?,
+    };
     if envelope.context.owner != scope.owner
         || scope.owner.environment != context.environment
         || envelope.context.syncpoint_owner != context.owner

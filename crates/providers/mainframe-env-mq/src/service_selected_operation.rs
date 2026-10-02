@@ -25,6 +25,8 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectState};
 mod authorization;
 #[path = "service_selected_operation/batch_child.rs"]
 mod batch_child;
+#[path = "service_selected_operation/explicit_context.rs"]
+mod explicit_context;
 #[path = "service_selected_operation/ownership.rs"]
 mod ownership;
 #[path = "service_selected_operation/receipt.rs"]
@@ -160,12 +162,14 @@ impl MqService {
             let logical = runtime
                 .directory
                 .logical_batch_owner(frame, invocation, now)?;
-            let scope = MqMqiServiceScope::for_host_dispatch(
+            let context = runtime.directory.context_for(frame, invocation, now)?;
+            let scope = MqMqiServiceScope::for_directory_dispatch(
                 invocation,
                 owner,
                 original,
                 provider,
                 host_limits,
+                context,
             );
             let admission = admit_mqi(&scope, invocation, now)?;
             let admitted = match &admission {

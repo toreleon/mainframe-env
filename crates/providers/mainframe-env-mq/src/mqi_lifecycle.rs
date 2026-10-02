@@ -22,7 +22,10 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 mod batch_child;
+mod context;
 pub(crate) use batch_child::{BatchChildBinding, InstalledBatchRelationship, LogicalBatchOwner};
+use context::ContextMode;
+pub(crate) use context::DirectoryHostContext;
 
 static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
 const MAX_PROCESSES: usize = 256;
@@ -61,6 +64,7 @@ pub(crate) struct FrameLease {
 struct Process {
     principal: PrincipalId,
     context: AttestedHostContext,
+    mode: ContextMode,
 }
 struct Frame {
     invocation: Invocation,
@@ -111,7 +115,16 @@ impl MqLifecycleDirectory {
         admitted: &Invocation,
         now: u64,
     ) -> Result<ProcessLease, HostProblem> {
-        let (_, context) = inspect(admitted, now)?;
+        self.mint_process_in_mode(admitted, now, ContextMode::Binding)
+    }
+
+    fn mint_process_in_mode(
+        &mut self,
+        admitted: &Invocation,
+        now: u64,
+        mode: ContextMode,
+    ) -> Result<ProcessLease, HostProblem> {
+        let (_, context) = inspect_in_mode(admitted, now, mode)?;
         if admitted.parent_execution_id.is_some() {
             return Err(HostProblem::Unauthorized);
         }
@@ -128,6 +141,7 @@ impl MqLifecycleDirectory {
             Process {
                 principal: admitted.principal.id().clone(),
                 context,
+                mode,
             },
         );
         self.next_process = next;
@@ -143,8 +157,21 @@ impl MqLifecycleDirectory {
         admitted: &Invocation,
         now: u64,
     ) -> Result<FrameLease, HostProblem> {
-        let (bytes, context) = inspect(admitted, now)?;
+        self.bind_root_in_mode(process, admitted, now, ContextMode::Binding)
+    }
+
+    fn bind_root_in_mode(
+        &mut self,
+        process: ProcessLease,
+        admitted: &Invocation,
+        now: u64,
+        mode: ContextMode,
+    ) -> Result<FrameLease, HostProblem> {
+        let (bytes, context) = inspect_in_mode(admitted, now, mode)?;
         self.process(process, admitted, context)?;
+        if self.processes[&process.process].mode != mode {
+            return Err(HostProblem::Unauthorized);
+        }
         if admitted.parent_execution_id.is_some() {
             return Err(HostProblem::Unauthorized);
         }
@@ -216,7 +243,7 @@ impl MqLifecycleDirectory {
         admitted: &Invocation,
         now: u64,
     ) -> Result<MqHandleOwner, HostProblem> {
-        let (_, context) = inspect(admitted, now)?;
+        let (_, context) = inspect_in_mode(admitted, now, self.mode_for(lease))?;
         let frame = self.frame(lease)?;
         self.process(
             ProcessLease {
@@ -439,6 +466,14 @@ fn within(
 }
 
 fn inspect(invocation: &Invocation, now: u64) -> Result<(usize, AttestedHostContext), HostProblem> {
+    inspect_in_mode(invocation, now, ContextMode::Binding)
+}
+
+fn inspect_in_mode(
+    invocation: &Invocation,
+    now: u64,
+    mode: ContextMode,
+) -> Result<(usize, AttestedHostContext), HostProblem> {
     if invocation.cancellation_requested() {
         return Err(HostProblem::Cancelled);
     }
@@ -506,7 +541,7 @@ fn inspect(invocation: &Invocation, now: u64) -> Result<(usize, AttestedHostCont
         count(binding.schema().as_bytes(), limits.max_identity_bytes)?;
         count(binding.bytes(), limits.max_payload_bytes)?;
     }
-    let context = decode_host_context(invocation)?.ok_or(HostProblem::Malformed)?;
+    let context = mode.resolve(invocation)?;
     Ok((bytes, context))
 }
 

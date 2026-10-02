@@ -84,11 +84,12 @@ impl MqLifecycleDirectory {
             return Err(HostProblem::Unsupported);
         }
         let owner = self.owner_for(parent, admitted_parent, now)?;
-        let (bytes, context) = inspect(child, now)?;
-        let parent_context = decode_host_context(admitted_parent)?;
+        let mode = self.mode_for(parent);
+        let (bytes, context) = inspect_in_mode(child, now, mode)?;
+        let (_, parent_context) = inspect_in_mode(admitted_parent, now, mode)?;
         if context.environment != MqHostEnvironment::ZosBatch
             || context.owner != MqSyncpointOwner::QueueManager
-            || parent_context != Some(context)
+            || parent_context != context
             || child.parent_execution_id.as_ref() != Some(&admitted_parent.execution_id)
             || child.execution_id == admitted_parent.execution_id
             || child.run_unit_id != admitted_parent.run_unit_id

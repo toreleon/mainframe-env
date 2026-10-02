@@ -64,6 +64,9 @@ impl Fixture {
         Self::from_store(store)
     }
     fn from_store(store: Arc<dyn PlatformStore>) -> Self {
+        Self::with_context(store, false)
+    }
+    fn with_context(store: Arc<dyn PlatformStore>, explicit: bool) -> Self {
         let legacy = MqService::open(store.clone(), MqLimits::default()).unwrap();
         legacy
             .install(vec![MqQueueDefinition {
@@ -88,7 +91,14 @@ impl Fixture {
             ArtifactRef::new("artifact", l).unwrap(),
             Principal::new(
                 PrincipalId::new("TEST", l).unwrap(),
-                BTreeSet::from([CapabilityId::new("host.mq.write", l).unwrap()]),
+                if explicit {
+                    BTreeSet::from([
+                        CapabilityId::new("host.mq.write", l).unwrap(),
+                        CapabilityId::new("host.program.invoke", l).unwrap(),
+                    ])
+                } else {
+                    BTreeSet::from([CapabilityId::new("host.mq.write", l).unwrap()])
+                },
                 l,
             )
             .unwrap(),
@@ -99,15 +109,19 @@ impl Fixture {
             IdempotencyKey::new("invocation", l).unwrap(),
             1,
             ResourceLimits::default(),
-            BTreeMap::from([(
-                "mq.host-context".into(),
-                BoundedPayload::new(
-                    "mainframe-env.mq.host-context@1",
-                    b"zos-batch|queue-manager".to_vec(),
-                    l,
-                )
-                .unwrap(),
-            )]),
+            if explicit {
+                BTreeMap::new()
+            } else {
+                BTreeMap::from([(
+                    "mq.host-context".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.mq.host-context@1",
+                        b"zos-batch|queue-manager".to_vec(),
+                        l,
+                    )
+                    .unwrap(),
+                )])
+            },
             l,
         )
         .unwrap()
@@ -123,8 +137,21 @@ impl Fixture {
             clock.clone(),
         )
         .unwrap();
-        let process = service.mint_selected_process(&inv).unwrap();
-        let (frame, owner) = service.bind_selected_root(process, &inv).unwrap();
+        let (frame, owner) = if explicit {
+            let process = service
+                .mint_selected_process_explicit(
+                    &inv,
+                    crate::host_context::AttestedHostContext {
+                        environment: MqHostEnvironment::ZosBatch,
+                        owner: MqSyncpointOwner::QueueManager,
+                    },
+                )
+                .unwrap();
+            service.bind_selected_root_explicit(process, &inv).unwrap()
+        } else {
+            let process = service.mint_selected_process(&inv).unwrap();
+            service.bind_selected_root(process, &inv).unwrap()
+        };
         let provider = CapabilityDescriptor {
             capability: CapabilityId::new("host.mq.write", l).unwrap(),
             provider_id: "mainframe-env-mq".into(),
