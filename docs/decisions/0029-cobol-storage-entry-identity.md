@@ -106,6 +106,62 @@ never redispatch. CICS native command subloans, RETURN propagation, batch-file
 exclusions, CANCEL/ABEND, task-end ownership and retention remain separate
 required contracts. The existing 256-member root bound is not reset per LINK.
 
+## Scoped row reader contract before writer rollout
+
+The serialized manager lane adds strict RunState3 and Instance3 readers in the
+existing root namespace. The runtime still cannot create, migrate, acquire or
+close those rows. Existing writers reject the new generations. Retention
+recognizes canonical generation-3 records and preserves the actual root/core
+run owner, root protocol, scope creators and busy original CALL dependencies.
+Malformed, reordered, duplicate, oversized and foreign records fail closed.
+No pending row recreates a live source lease or a normal-return witness.
+
+RunState3 retains the immutable root entry, root-derived member/frame/receipt
+bounds, a scope-creator map, exact member index and unique original CALL keys.
+Every LINK scope requires its own busy creator member and a parent exactly one
+logical level higher; native entry actors cannot replace scope creation. The
+index includes exact member row versions, full payload digests, active flags
+and charges. Complete bounded member validation rejects missing, extra,
+duplicate, stale, foreign or differently owned rows. Instance3 retains the
+immutable scope-creator entry even after its transient native owner becomes
+idle; its key, artifact, root, size and phase agree with the root index.
+
+The existing 256-member bound applies across the root, with at most 16 scopes
+and the root's smaller declared frame bound. Busy members reserve the root's
+per-execution storage allowance; idle members charge actual retained payload
+bytes. The unmanaged top machine reserves its full declared allowance. This
+bounds member storage by 257 times that allowance; it does not claim a new
+single-execution storage entitlement. The shared store's actual capacity still
+applies. A checksum does not authorize widened bounds: live admission must
+compare them with the trusted root invocation.
+
+CALL history has one root-wide monotonic allowance capped by the root's
+max_effects. Each unique original key reserves max_output_bytes plus 128 KiB
+for bounded close metadata. Scope close cannot replenish that allowance or
+erase keys. The future reservation transaction must validate existing indexed
+CALL rows and atomically publish the new key/charge, pending original receipt,
+root/member updates and exact source CAS; this reader implements only pure
+in-memory charge preparation. Combined maximum storage and receipt charges
+must fit the positive signed durable range. JSON bodies are capped at 64 MiB
+before generation-3 deserialization; tighter store/payload limits still apply.
+
+RunState3 orders schema_version, root, max_member_bytes, max_scopes, max_calls,
+max_receipt_bytes, calls, receipt_charge, root_charge, active, charged_bytes,
+scopes, members, ended_tick and metadata_digest. Member values order scope,
+program, artifact, row_version, payload_digest, charged_bytes and busy.
+Instance3 orders schema_version, run_key, scope_entry, max_state_bytes, program,
+artifact, owner, initial, state and metadata_digest. Nulls are explicit; maps
+and CALL sets have sorted canonical keys. Metadata uses the existing
+mainframe-env.installed-call@1 domain, framing scoped-run-metadata@3 or
+scoped-instance-metadata@3, row key and compact JSON with empty digest. Full
+payload references use ordinary SHA-256. Independent Python vectors freeze
+root and busy-member encodings; hashes provide integrity, not execution trust.
+
+These reader/retention and bound checks do not fix the compiled storage routes.
+Runtime admission, live source-version adoption, original CALL5 proof, terminal
+checkpoint publication, atomic close and task-end/recovery remain pending.
+No public registration, official gate or parent completion is granted.
+
 ## Source authority and acceptance
 
 Catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0138` LINK, command-body baseline

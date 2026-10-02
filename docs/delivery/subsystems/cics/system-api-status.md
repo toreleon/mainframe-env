@@ -956,3 +956,70 @@ plus mandatory module/API/schema/format/architecture/docs/changelog/dependency
 gates. Core completion currently persists its terminal events without a final
 machine checkpoint; the future atomic scope writer must independently bind
 the live terminal state and core authority. No writer or acceptance is enabled.
+
+### Scoped storage runtime and independent regression wave (2026-10-02)
+
+The return witness is sealed at `a86065a1` with 17 new and six affected existing
+checks, mandatory gates passing. `CIC-902.program-task.frames.scoped-storage`
+is the manager's serialized runtime lane. It owns existing server instance,
+CALL replay, selected LINK construction, retention and storage-entry authorities;
+all schema/registry/facade/generator/status edits stay with the manager. Extend
+existing root namespaces and the reserved generations; preserve core task/UOW/run,
+root-wide member bounds, exact source lease/CAS adoption, pending/unknown fences
+and atomic scope reservation/normal close. No shadow dispatcher or owner ledger.
+No runtime implementation or recovery acceptance is claimed by this declaration.
+
+`CIC-902.program-task.frames.scoped-storage-regressions` assigns the existing
+compiled diagnostic worker an isolated checkout from exact sealed `a86065a1`.
+It owns only new `product/tests/program_storage_scope.rs`; the manager owns
+its test-only `product.rs` registration. Use the existing actual compiled
+selected CICS route with artifact-bound programs and SQLite, no host-result mocks.
+Independently assert two LINK entries to MID, each making two pure native CALLs
+to LEAF: native working storage persists within each MID scope, local storage
+refreshes each entry, and the second LINK starts fresh. Also assert a higher
+native LEAF before/after those lower scopes retains its own working bytes.
+These extend the two retained simple diagnostics instead of duplicating them.
+A nested LINK case may be added only if existing route support permits an actual
+proof. Start with executable red diagnostics, retain expected failures accurately
+and add no runtime, schema, coverage, source refresh or ignored-test credit.
+Read hash-verified calling flow/rules plus LINK row0138 before expectations.
+Run exact selected tests with fault-injection feature required by registration,
+module/format/dependency checks; clean targets and retain external receipts.
+No nested workers, other edits, shared authorities, commit bypass or acceptance
+changes. The manager integrates only after the runtime contract makes them pass.
+
+### Scoped terminal checkpoint runtime lane (2026-10-02)
+
+`CIC-902.program-task.frames.scoped-terminal-checkpoint` assigns the finished
+return-witness worker an isolated checkout from sealed `a86065a1`. It owns
+execution-api `machine.rs` for one default optional `completion_checkpoint`
+method; interpreter `coordinator.rs` plus new `coordinator/completion.rs` and
+its tests for completion checkpoint construction/publication; interpreter
+`machine.rs` and `machine/completion.rs` for the opt-in reference implementation.
+The manager owns all store/schema/server/status/generator changes. The checkpoint
+must accompany the exact Completed event in the existing core atomic journal
+commit, preserving the preceding Completing transition. Generic machines keep
+the default None behavior. ReferenceMachine opts in only after a successful
+live native-return observation with the typed scoped storage-entry binding.
+No terminal checkpoint substitutes for a live source lease, admits actors,
+restores the volatile witness or makes terminal execution resumable.
+The manager's future scope close must fence missing/unavailable checkpoints.
+No checkpoint schema/version or shared store contract change is authorized.
+Tests prove default compatibility, actual GOBACK/EXIT PROGRAM captured bytes,
+constructor/restored/unscoped/abnormal exclusions, publication failure atomicity
+and selected SQLite reopen. PostgreSQL is mandatory at runtime acceptance;
+retain an explicit pending gate if unavailable rather than crediting an ignore.
+Use source search/read before semantics, affected existing coordinator tests and
+module/API/format/schema/docs/dependency gates; clean targets and external receipts.
+No ceiling increase, suppression, nested workers, source refresh or acceptance
+change. Internal CICSMESSAGE and licensed requirements remain pending.
+
+The manager's scoped row reader child remains private and unsealed. It extends
+the existing root retention reader with RunState3/Instance3 integrity, immutable
+scope creators, exact member version/payload index, root-wide 256-member/16-scope
+and monotonic original-CALL receipt charges. Reader hashes provide no live source
+or execution authority. Independent Python root/member vectors accompany focused
+mutations; the earlier ten scoped, eight entry and four retention checks passed
+before the later original-CALL identity/creator-member changes. Current-input integrated checks pass: ten scoped, eight entry and four existing
+retention tests, zero ignores, plus mandatory module/API/schema/format/architecture/
+docs/changelog/dependency gates; historical receipts remain separate. Runtime writers remain off.

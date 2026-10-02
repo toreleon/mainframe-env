@@ -398,6 +398,92 @@ impl Entry {
         self.scope.logical_level
     }
 
+    /// Inspect immutable creation metadata without granting invocation authority.
+    pub(super) fn creation_identity(&self) -> (&str, &str, &str, Option<&str>) {
+        (
+            &self.scope.root_execution,
+            &self.scope.task_run,
+            &self.scope.principal,
+            self.scope.parent_scope.as_deref(),
+        )
+    }
+
+    pub(super) fn same_scope(&self, other: &Self) -> bool {
+        self.scope == other.scope
+    }
+
+    pub(super) fn is_creator(&self) -> bool {
+        matches!(self.kind, EntryKind::Root | EntryKind::CicsLink)
+    }
+
+    pub(super) fn actor_identity(&self) -> (&str, &str, &str, u32) {
+        (&self.execution, &self.program, &self.artifact, self.attempt)
+    }
+
+    pub(super) fn call_key(&self) -> Option<&str> {
+        self.call_key.as_deref()
+    }
+
+    /// Validate a stored entry's syntax/integrity, never live or core authority.
+    pub(super) fn validate_stored(&self) -> Result<(), HostProblem> {
+        self.scope.validate()?;
+        if self.schema_version != 1
+            || !retention::valid_identity(&self.execution)
+            || !valid_program(&self.program)
+            || !valid_content(&self.artifact)
+            || self.attempt == 0
+            || self.attempt != self.scope.owner_attempt
+            || self.metadata_digest != self.expected_metadata()?
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        match self.kind {
+            EntryKind::Root
+                if self.scope.parent_scope.is_none()
+                    && self.execution == self.scope.root_execution
+                    && self.source_execution.is_none()
+                    && self.call_key.is_none()
+                    && self.scope.owner_selector == format!("program:{}", self.program)
+                    && self.scope.owner_artifact == self.artifact =>
+            {
+                Ok(())
+            }
+            EntryKind::NativeCall | EntryKind::CicsLink => {
+                let call = self
+                    .call_key
+                    .as_deref()
+                    .ok_or(HostProblem::UnknownOutcome)?;
+                let source = self
+                    .source_execution
+                    .as_deref()
+                    .ok_or(HostProblem::UnknownOutcome)?;
+                if !retention::valid_digest(call)
+                    || !retention::valid_identity(source)
+                    || source == self.execution
+                    || self.execution != child_execution(call)
+                    || self.kind == EntryKind::NativeCall
+                        && self.scope.owner_execution == self.execution
+                    || self.kind == EntryKind::CicsLink
+                        && (self.scope.owner_execution != self.execution
+                            || self.scope.owner_selector != format!("program:{}", self.program)
+                            || self.scope.owner_artifact != self.artifact
+                            || self.scope.source_execution.as_deref() != Some(source)
+                            || self.scope.creation_call.as_deref() != Some(call)
+                            || self
+                                .scope
+                                .selection
+                                .as_ref()
+                                .is_none_or(|s| s.artifact != self.artifact))
+                {
+                    Err(HostProblem::UnknownOutcome)
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Err(HostProblem::UnknownOutcome),
+        }
+    }
+
     pub(super) fn member_key(&self, program: &str) -> Result<String, HostProblem> {
         self.scope.validate()?;
         if !valid_program(program) {
