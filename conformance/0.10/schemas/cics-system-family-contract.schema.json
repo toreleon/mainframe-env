@@ -14,7 +14,10 @@
     "family": {
       "enum": [
         "spi-program",
-        "fepi-pool"
+        "fepi-pool",
+        "spi-file",
+        "fepi-resources",
+        "fepi-pool-list"
       ]
     },
     "runtime_binding": {

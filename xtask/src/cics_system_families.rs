@@ -8,12 +8,27 @@ use std::path::Path;
 const SCHEMA: &str = "conformance/0.10/schemas/cics-system-family-contract.schema.json";
 const DIRECTORY: &str = "conformance/0.10/cics/families";
 const MAX_ARTIFACT_BYTES: u64 = 4 * 1024 * 1024;
-const FAMILIES: [&str; 2] = ["spi-program", "fepi-pool"];
+const FAMILIES: [&str; 5] = [
+    "spi-program",
+    "fepi-pool",
+    "spi-file",
+    "fepi-resources",
+    "fepi-pool-list",
+];
 
 fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
     match family {
         "spi-program" => Ok(("spi", &["0026", "0084", "0155", "0241"])),
         "fepi-pool" => Ok(("fepi", &["0001", "0007", "0009", "0018", "0021", "0034"])),
+        "spi-file" => Ok(("spi", &["0012", "0072", "0127", "0224"])),
+        "fepi-resources" => Ok((
+            "fepi",
+            &[
+                "0008", "0010", "0011", "0017", "0019", "0020", "0022", "0023", "0024", "0032",
+                "0033", "0036", "0037",
+            ],
+        )),
+        "fepi-pool-list" => Ok(("fepi", &["0035"])),
         _ => Err(format!("unknown CICS system family {family}")),
     }
 }
@@ -295,9 +310,16 @@ mod tests {
     }
 
     #[test]
-    fn exact_spi_and_fepi_cohorts_validate_without_semantic_claims() {
-        assert_eq!(valid("spi-program", &fixture("spi-program")).unwrap(), 4);
-        assert_eq!(valid("fepi-pool", &fixture("fepi-pool")).unwrap(), 6);
+    fn declared_cohorts_validate_without_semantic_claims() {
+        for (family, count) in [
+            ("spi-program", 4),
+            ("fepi-pool", 6),
+            ("spi-file", 4),
+            ("fepi-resources", 13),
+            ("fepi-pool-list", 1),
+        ] {
+            assert_eq!(valid(family, &fixture(family)).unwrap(), count);
+        }
     }
 
     #[test]

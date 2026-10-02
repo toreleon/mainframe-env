@@ -29,6 +29,9 @@ FAMILY_PATH = Path("conformance/0.10/cics/families")
 FAMILY_ROWS = {
     "spi-program": ("spi", ["0026", "0084", "0155", "0241"]),
     "fepi-pool": ("fepi", ["0001", "0007", "0009", "0018", "0021", "0034"]),
+    "spi-file": ("spi", ["0012", "0072", "0127", "0224"]),
+    "fepi-resources": ("fepi", ["0008", "0010", "0011", "0017", "0019", "0020", "0022", "0023", "0024", "0032", "0033", "0036", "0037"]),
+    "fepi-pool-list": ("fepi", ["0035"]),
 }
 GRAMMAR_DOMAIN = b"mainframe-env.cics-administrative-grammar@1\0"
 SCHEMA_VERSION = "mainframe-env.cics-spi-fepi-identity-catalog@1"

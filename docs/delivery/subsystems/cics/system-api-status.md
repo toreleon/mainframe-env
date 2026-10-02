@@ -1448,3 +1448,77 @@ Browse/value forms, exact SAF policy, syncpoint/rollback, detailed asynchronous
 work, concurrency and restart remain explicit. No runtime or official verdict
 is installed; all ten grammar completeness statuses remain Pending. Mandatory
 source/instance/generator/IR/policy gates precede this bounded input seal.
+
+## First PROGRAM state implementation slice
+
+Manager declares `SPI-1001.program-status-observation` before CLI dispatch, from
+sealed POOL/family candidate 6732a26979cd060862993581a43325cb62e2e298. The independent
+runtime-binding review selects named PROGRAM STATUS as the smallest next path,
+but trusted issuer/namespace/SAF/output/selected-route admission remain pending.
+This dependency-ready implementation first supplies its private state observation
+primitive inside the existing ProgramControl/CICS State owner.
+
+Worker exclusively owns new program_control/administrative_status.rs and its
+owned tests.rs. Manager owns and seeds the parent module registration and exact
+handler inventory path, and later integrates facades/status/fragment/docs/gates.
+Frozen API returns a private ProgramStatusObservation enum: Definition containing
+one complete owned existing CicsProgramDefinition, NameOnly for compatibility
+registration without a typed definition, or NotCatalogued for absence from this
+program catalog only. It uses the existing normalization and one State mutex,
+selects the same latest generation as current LOAD/transfer, and fails closed on
+corrupt key/name/generation metadata. It introduces no second resource state,
+persistence codec, status mutation, host operation, permission, response mapping,
+public route or globally authoritative missing-resource result.
+
+Acceptance requires true/false availability and exact generation/identity
+snapshots, no host/load/store/UOW mutation, name-only distinction, bounded project
+name policy, owned snapshot independence, corrupt metadata rejection, concurrent
+registration coherence and unchanged-store service reconstruction. These are
+private primitive tests, not selected-product-route, physical-restart or IBM
+command execution credit. SPI row 0155 dfha8_inquireprogram.html establishes
+STATUS and no-load behavior; existing immutable catalog codec/state contracts
+remain authoritative. A later serialized manager slice binds real policy/context,
+typed compiler/plan/host/output and selected-route proofs; full grammar, all
+command gates and licensed acceptance remain pending. No v0.9 work is resumed.
+
+## Source-ready family cohort enrollment
+
+Manager declares `SPI-1001.family-cohort-enrollment` before implementation.
+Enrollment adds three bounded private cohorts to the existing schema/validator/
+generator owner: SPI FILE rows 0012/0072/0127/0224; FEPI resource rows
+0008/0010/0011/0017/0019/0020/0022/0023/0024/0032/0033/0036/0037; and separate
+FEPI SET POOLLIST row 0035. All have reviewed mapped command-body pins. The
+existing six-row POOL contract remains a partial cohort; row 0035 is SET
+POOLLIST, not SET PROPERTYSET, and must not be deduplicated into row 0034.
+Likewise NODE/NODELIST and TARGET/TARGETLIST retain separate official rows
+while sharing their reviewed command bodies. Source mappings supply locators,
+never command behavior, and enrollment creates no new runtime authority.
+
+Manager exclusively owns the family schema enum, xtask cohort tables, existing
+generator cohort tables and synthetic validation expectations, a unique fragment,
+this status and derived docs. The current IR and identity bytes remain unchanged
+while new inputs are absent. Explicit selected-family checking requires its
+file; the general schema gate validates only actually present inputs, without
+claiming that all enrolled families or SPI-1001 are complete. Default explicit
+family checking requires every enrolled cohort and will remain pending until
+their files exist and pass. Acceptance covers exact mapped/pinned distinct
+identities, declared-cohort synthetic shape validation, malformed/missing input
+rejection and mandatory infrastructure gates, with zero semantic credit.
+
+The next disjoint CLI source slices, dispatched only after this enrollment
+commit passes, are `SPI-1001.spi-file-contract` (only families/spi-file.json)
+and `SPI-1001.fepi-resource-contracts` (only families/fepi-resources.json and
+families/fepi-pool-list.json). Source-reviewed option/constraint/condition/
+lifecycle/SAF/audit/UOW/recovery facts and independent case candidates must be
+derived through pinned offline search/read; explicit unresolved contexts stay
+pending. Both own only their new normative JSON and external handoffs; all shared
+facades, schemas, generators, state, dispatch, status and registration stay with
+the manager. No source refresh, handler/readiness/route, generic success, licensed
+execution or parent coverage is delegated. The independent PROGRAM state worker
+continues owning its two private implementation files without shared edits.
+
+Cohort enrollment passes ten focused validator tests (including all five
+synthetic cohorts), 19 current generator tests and seven unchanged IR contract
+checks, with no ignores. Current two inputs pass exact linkage; absent future
+inputs remain pending. Identity/grammar output bytes do not change until a
+reviewed input is added. Mandatory gates precede this infrastructure seal.
