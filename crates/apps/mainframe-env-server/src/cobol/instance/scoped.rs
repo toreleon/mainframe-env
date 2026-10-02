@@ -9,6 +9,7 @@ use crate::cobol::storage_scope::Entry;
 use std::collections::BTreeMap;
 
 mod live;
+mod reservation;
 mod terminal;
 #[cfg(test)]
 mod tests;

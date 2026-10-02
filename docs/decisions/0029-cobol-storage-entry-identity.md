@@ -190,6 +190,25 @@ Tests use real atomic MemoryStore mutations for coupled rollback, known version
 adoption and committed-but-unacknowledged publication; fixtures earn no selected
 product-route, recovered, licensed or parent credit.
 
+## Pure reservation postimage preparation
+
+The private helper accepts the actual root/source/target invocations, canonical
+Entry bindings, explicit root absence or exact existing row, complete indexed
+members and selected INITIAL metadata. It preserves native scope and idle state,
+introduces a new LINK creator scope and busy member, and prepares exact root and
+target CAS writes. Busy targets, changed artifact/INITIAL metadata, reused CALL
+keys, malformed or incomplete observations and signed version/storage/receipt or
+root-wide member/scope/frame limits reject without mutating inputs. Existing
+unrelated members and the managed source retain exact bytes and index versions.
+
+These proposals neither publish nor supply admission authority. The serialized
+factory must validate original indexed CALL rows, canonical core intent/control,
+real LINK origin/selection and current live source ownership, then couple the
+original pending CALL, protocol, root/member and source CAS in one transaction.
+It must advance the managed source index to the fence's staged version, refresh
+root metadata and validate the complete combined postimage before publication.
+No control inheritance, lease, normal close or recovery follows from this helper.
+
 ## Exact live terminal observation
 
 The serialized scope owner observes a completed managed member only while its

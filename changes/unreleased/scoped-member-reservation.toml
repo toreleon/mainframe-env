@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepare bounded scoped native CALL and LINK member reservations with exact CAS postimages and retained idle state, keeping runtime admission and publication private and pending."

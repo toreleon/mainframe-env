@@ -1152,3 +1152,29 @@ Terminal observation current-input checks: five exact live/store/control tests
 plus seventeen native-return and ten capture regressions pass with zero ignores.
 The private observer writes no state; mandatory policy gates precede its bounded
 seal. Full scoped admission/close and application gates stay pending.
+
+The reservation worker's full production and twenty-test diff has been reviewed.
+The manager reconciles its two owned files while preserving the later live and
+terminal module registrations. It remains pure postimage preparation: runtime
+writers are off, and complete combined source-index CAS validation plus original
+CALL/core/control/selection authority remain manager factory obligations. Current
+integrated tests and mandatory gates precede its bounded seal.
+
+### Actual scoped factory context review (2026-10-02)
+
+`CIC-902.program-task.frames.scoped-factory-context-review` delegates read-only
+analysis in an isolated checkout at sealed `e850db51`. The worker owns only an
+external bounded handoff; all repository paths, schemas, routing, status and
+factory implementations remain manager-owned. It must trace actual online and
+batch selected-program Invocation construction, core admission, original native
+CALL and CICS LINK source preservation, child limits/grants/audit/deadline/control,
+and interpreter storage/handler cleanup. Identify concrete hooks and authority
+checks for the existing live/reservation/terminal primitives; do not invent a
+shadow dispatcher or claim execution. Cite exact current file/line and pinned
+flow/rules/LINK source review, preserve repository bytes, and return a bounded
+plan with remaining blockers. No build, edits, nested workers, source refresh,
+licensed run, commit, push or parent completion is authorized.
+
+Reservation current-input checks: twenty focused tests pass with zero ignores.
+The helper writes no store state; mandatory gates precede its bounded seal.
+Actual admission/close and all application acceptance gates remain pending.
