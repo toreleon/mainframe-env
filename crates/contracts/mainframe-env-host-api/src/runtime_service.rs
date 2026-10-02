@@ -1,24 +1,36 @@
 use crate::{HostProblem, RuntimeServiceKind, RuntimeServiceName};
 use std::collections::BTreeMap;
 
+/// Version identifier for exact namespace/name/ABI runtime-service registration.
 pub const RUNTIME_SERVICE_REGISTRY_CONTRACT: &str = "mainframe-env.runtime-service-registry@1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Typed runtime-service selection key and its request/response schema identities.
 pub struct RuntimeServiceDescriptor {
+    /// Namespace distinguishing Language Environment from host extension services.
     pub kind: RuntimeServiceKind,
+    /// Validated service name within the selected namespace.
     pub name: RuntimeServiceName,
+    /// Nonzero exact ABI version; resolution has no implicit version fallback.
     pub abi_version: u16,
+    /// Nonempty request schema identity, bounded by the constructor's schema byte ceiling.
     pub request_schema: String,
+    /// Nonempty response schema identity, bounded by the constructor's schema byte ceiling.
     pub response_schema: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Bounded immutable runtime-service registry keyed by namespace, name and ABI version.
+/// The registry stores descriptors; resolving one does not execute the service.
 pub struct RuntimeServiceRegistry {
     entries: BTreeMap<(RuntimeServiceKind, RuntimeServiceName, u16), RuntimeServiceDescriptor>,
     max_entries: usize,
 }
 
 impl RuntimeServiceRegistry {
+    /// Own descriptors within positive entry and schema-byte ceilings.
+    /// Returns `Malformed` for zero ceilings or duplicate keys; invalid descriptors or capacity
+    /// overflow return `ResourceExhausted`.
     pub fn new(
         descriptors: impl IntoIterator<Item = RuntimeServiceDescriptor>,
         max_entries: usize,
@@ -54,6 +66,7 @@ impl RuntimeServiceRegistry {
     }
 
     #[must_use]
+    /// Borrow the descriptor for an exact namespace/name/ABI tuple, or `None` if absent.
     pub fn resolve(
         &self,
         kind: RuntimeServiceKind,
@@ -64,6 +77,7 @@ impl RuntimeServiceRegistry {
     }
 
     #[must_use]
+    /// Return the fixed registry capacity chosen at construction.
     pub fn max_entries(&self) -> usize {
         self.max_entries
     }

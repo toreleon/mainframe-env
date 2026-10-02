@@ -9,55 +9,105 @@ mod parse;
 /// Typed CICS operations admitted at the host request boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
+    /// End a BTS container browse and release its cursor.
     BtsEndBrowseContainer,
+    /// Select the next container from a BTS browse.
     BtsGetNextContainer,
+    /// Request metadata for a BTS container.
     BtsInquireContainer,
+    /// Start a browse over BTS containers.
     BtsStartBrowseContainer,
+    /// End a BTS event browse.
     BtsEndBrowseEvent,
+    /// Select the next event from a BTS browse.
     BtsGetNextEvent,
+    /// Request metadata for a BTS event.
     BtsInquireEvent,
+    /// Start a browse over BTS events.
     BtsStartBrowseEvent,
+    /// End a BTS timer browse.
     BtsEndBrowseTimer,
+    /// Request metadata for a BTS timer.
     BtsInquireTimer,
+    /// Start a browse over BTS timers.
     BtsStartBrowseTimer,
+    /// Start a browse over BTS activities.
     BtsStartBrowseActivity,
+    /// Select the next activity from a BTS browse.
     BtsGetNextActivity,
+    /// End a BTS activity browse.
     BtsEndBrowseActivity,
+    /// Request metadata for a BTS activity identity.
     BtsInquireActivity,
+    /// Start a browse over BTS processes.
     BtsStartBrowseProcess,
+    /// Select the next process from a BTS browse.
     BtsGetNextProcess,
+    /// End a BTS process browse.
     BtsEndBrowseProcess,
+    /// Request metadata for a BTS process.
     BtsInquireProcess,
+    /// Acquire a BTS activity by its identity.
     AcquireActivityId,
+    /// Acquire a named BTS process.
     AcquireProcess,
+    /// Cancel the acquired BTS activity.
     CancelAcqActivity,
+    /// Cancel the acquired BTS process.
     CancelAcqProcess,
+    /// Cancel a named BTS activity.
     CancelActivity,
+    /// Check the state of the acquired BTS activity.
     CheckAcqActivity,
+    /// Check the state of the acquired BTS process.
     CheckAcqProcess,
+    /// Check a named BTS activity and its completion state.
     CheckActivity,
+    /// Define a named child BTS activity.
     DefineActivity,
+    /// Define a BTS process and its root activity.
     DefineProcess,
+    /// Delete a named BTS activity.
     DeleteActivity,
+    /// Reset the acquired BTS process.
     ResetAcqProcess,
+    /// Reset a named BTS activity.
     ResetActivity,
+    /// Resume the acquired BTS activity.
     ResumeAcqActivity,
+    /// Resume the acquired BTS process.
     ResumeAcqProcess,
+    /// Resume a named BTS activity.
     ResumeActivity,
+    /// Run the acquired BTS activity.
     RunAcqActivity,
+    /// Run the acquired BTS process.
     RunAcqProcess,
+    /// Run a named BTS activity.
     RunActivity,
+    /// Run the selected BTS transaction identity.
     RunTransId,
+    /// Delete a named channel and its associated containers.
     DeleteChannel,
+    /// Delete a container from the selected channel or BTS context.
     DeleteContainer,
+    /// Retrieve bounded container contents through the ordinary storage form.
     GetContainer,
+    /// Retrieve container contents through the 64-bit storage form.
     GetContainer64,
+    /// Move a container between selected contexts.
     MoveContainer,
+    /// Store container bytes through the ordinary storage form.
     PutContainer,
+    /// Store container bytes through the 64-bit storage form.
     PutContainer64,
+    /// Query a named channel's metadata.
     QueryChannel,
+    /// Suspend the acquired BTS activity.
     SuspendAcqActivity,
+    /// Suspend the acquired BTS process.
     SuspendAcqProcess,
+    /// Suspend a named BTS activity.
     SuspendActivity,
     /// Allocate one task-owned mapped APPC or MRO conversation.
     AllocateConversation,
@@ -89,6 +139,7 @@ pub enum CicsOperation {
     GdsWaitConversation,
     /// Confirm terminal output and observe one peer EOC or SIGNAL indicator.
     WaitTerminal,
+    /// Request abnormal termination using the supplied command operands.
     Abend,
     /// Fetch the next completed child token owned by this parent task.
     FetchAny,
@@ -124,6 +175,7 @@ pub enum CicsOperation {
     Address,
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
+    /// Request the current absolute-time output.
     Asktime,
     /// Remove editing characters from one numeric field in place.
     BifDeedit,
@@ -131,6 +183,7 @@ pub enum CicsOperation {
     BifDigest,
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
+    /// Request the selected task or environment attributes.
     Assign,
     /// Cancel one unhonored local interval-control START request.
     Cancel,
@@ -220,7 +273,9 @@ pub enum CicsOperation {
     WriteTemporaryStorage,
     /// Acquire or wait for one task enqueue resource.
     Enq,
+    /// End a file-control browse.
     EndBrowse,
+    /// Format an absolute time into selected date/time outputs.
     FormatTime,
     /// Convert a 64-byte architected date-time string to packed absolute time.
     ConvertTime,
@@ -232,6 +287,7 @@ pub enum CicsOperation {
     Getmain,
     /// Admit a checked non-LE AMODE(64) virtual allocation request.
     Getmain64,
+    /// Install or change the task's abnormal-termination handler.
     HandleAbend,
     /// Install or deactivate one bounded set of terminal AID handlers.
     HandleAid,
@@ -239,6 +295,7 @@ pub enum CicsOperation {
     HandleCondition,
     /// Ignore one bounded set of reviewed EIBRESP conditions for this program level.
     IgnoreCondition,
+    /// Dispatch the general inquiry form distinguished from specific BTS inquiry heads.
     Inquire,
     /// Select and invoke one installed application operation.
     InvokeApplication,
@@ -246,6 +303,7 @@ pub enum CicsOperation {
     Load,
     /// Release one prior program LOAD ownership level.
     Release,
+    /// Link to a program with a return to the caller.
     Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
@@ -263,8 +321,11 @@ pub enum CicsOperation {
     Signon,
     /// Restore the terminal default identity without changing this task principal.
     Signoff,
+    /// Read a file record with the supplied identifier and access controls.
     Read,
+    /// Read the next file record through a browse context.
     ReadNext,
+    /// Read the previous file record through a browse context.
     ReadPrev,
     /// Reposition an active file browse without replacing its cursor.
     ResetBrowse,
@@ -272,13 +333,19 @@ pub enum CicsOperation {
     ReadTransientData,
     /// Remove one atomic child without deleting or resetting it.
     RemoveSubevent,
+    /// Receive terminal input through a selected BMS map.
     ReceiveMap,
     /// Receive one 8775 partition input message and identify its partition.
     ReceivePartn,
+    /// Retrieve data associated with an interval-control start.
     Retrieve,
+    /// Return from the current logical program level or task.
     Return,
+    /// Replace a record through a file update context.
     Rewrite,
+    /// Send bounded text bytes to the terminal.
     SendText,
+    /// Send terminal fields using a selected BMS map.
     SendMap,
     /// Send BMS device controls, directly or into a logical message.
     SendControl,
@@ -308,23 +375,41 @@ pub enum CicsOperation {
     IssueAbend,
     /// APPC basic GDS ISSUE ABEND conversation flow.
     GdsIssueAbend,
+    /// Select the mapped-conversation confirmation control command.
     IssueConfirmation,
+    /// Select the basic-conversation confirmation command with GDS return codes.
     GdsIssueConfirmation,
+    /// Select the mapped-conversation error control command.
     IssueError,
+    /// Select the basic-conversation error command with GDS return codes.
     GdsIssueError,
+    /// Select the mapped-conversation prepare control command.
     IssuePrepare,
+    /// Select the basic-conversation prepare command with GDS return codes.
     GdsIssuePrepare,
+    /// Select the basic-conversation signal command with GDS return codes.
     GdsIssueSignal,
+    /// Select the mapped-conversation signal control command.
     IssueSignal,
+    /// Retained COPY command identity; `supported` rejects this operation.
     IssueCopy,
+    /// Select the terminal disconnect control command.
     IssueDisconnect,
+    /// Select the conversation end-of-file control command.
     IssueEndfile,
+    /// Select the terminal end-of-output control command.
     IssueEndoutput,
+    /// Select the terminal end-of-data-set control command.
     IssueEods,
+    /// Select the erase-all-unprotected terminal control command.
     IssueEraseAup,
+    /// Select the terminal load control command.
     IssueLoad,
+    /// Select the terminal pass control command.
     IssuePass,
+    /// Select the terminal print control command.
     IssuePrint,
+    /// Select the terminal reset control command.
     IssueReset,
     /// Complete and dispatch the active BMS logical message.
     SendPage,
@@ -332,6 +417,7 @@ pub enum CicsOperation {
     SendPartnset,
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
+    /// Request a file status change through the existing file-control boundary.
     SetFileStatus,
     /// Close one task-owned CICS spool report.
     SpoolClose,
@@ -361,6 +447,7 @@ pub enum CicsOperation {
     StartAttach,
     /// Start one local transaction under a selected 3270 bridge exit.
     StartBrexit,
+    /// Start a file-control browse with the supplied positioning operands.
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
@@ -372,6 +459,7 @@ pub enum CicsOperation {
     WaitCics,
     /// Suspend the principal supported logical unit until a SIGNAL arrives.
     WaitSignal,
+    /// Request an explicit unit-of-work commit or rollback.
     Syncpoint,
     /// Typed CICS web-service-control command InvokeService.
     InvokeService,
@@ -441,8 +529,11 @@ pub enum CicsOperation {
     VerifyPhrase,
     /// Verify a bounded BasicAuth, JWT, or registered Kerberos token through SAF.
     VerifyToken,
+    /// Write a file record through the typed command boundary.
     Write,
+    /// Append data to the selected transient-data queue.
     WriteTransientData,
+    /// Transfer program control without returning to the current logical level.
     Xctl,
 }
 
@@ -969,26 +1060,43 @@ impl CicsOperation {
     }
 
     #[must_use]
+    /// Whether the boundary admits this operation identity.
+    /// Currently excludes `IssueCopy`; admission alone does not prove every operand form or
+    /// provider path.
     pub const fn supported(self) -> bool {
         !matches!(self, Self::IssueCopy)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Condition handling selected by the caller for this command.
+/// The response form names caller fields; it does not contain response values.
 pub enum CicsConditionPolicy {
+    /// Use the task's default condition handling.
     Default,
+    /// Request suppression of normal condition-handler transfer.
     NoHandle,
+    /// Return condition codes to caller-selected response fields.
     Respond {
+        /// Caller field name receiving the primary signed response code.
         response_field: String,
+        /// Optional caller field name receiving the secondary signed response code.
         response2_field: Option<String>,
     },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned CICS command operands and condition policy.
+/// Argument values carry bounded bytes and schema identities. The command provider interprets
+/// each operand; mutation replay metadata is required for state-changing requests.
 pub struct CicsRequest {
+    /// Command identity selecting operand interpretation and state-change classification.
     pub operation: CicsOperation,
+    /// Owned operand payloads keyed by command argument name; at most `max_fields` entries.
     pub arguments: BTreeMap<String, BoundedPayload>,
+    /// Caller-selected condition handling and optional response field destinations.
     pub condition_policy: CicsConditionPolicy,
+    /// Replay identity required when `is_mutating` is true, including TOKEN-producing reads.
     pub mutation: Option<Mutation>,
 }
 
@@ -1018,37 +1126,63 @@ impl CicsRequest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Control-flow disposition returned by the command provider.
 pub enum CicsDisposition {
+    /// Command completed and execution can continue.
     Complete,
     /// A default-handled condition completed without transferring control.
     Ignored,
+    /// Execution must suspend pending a later continuation.
     Suspended,
+    /// Transfer control to the returned target.
     Transfer,
+    /// Transfer control to a selected handler.
     Handler,
+    /// Return control from the current program or task context.
     Returned,
+    /// Execution ended with an abnormal-termination disposition.
     Abended,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Explicit completed unit-of-work disposition, when supplied by a command reply.
 pub enum CicsUnitOfWorkOutcome {
+    /// The command reports a committed unit of work.
     Committed,
+    /// The command reports a rolled-back unit of work.
     RolledBack,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// CICS command reply combining condition codes, control flow and owned output bytes.
+/// `HostResult::validate` bounds names, payload and aggregate output bytes; the disposition
+/// remains distinct from the condition and from any unit-of-work outcome.
 pub struct CicsResponse {
+    /// Control-flow action to apply after observing the response.
     pub disposition: CicsDisposition,
+    /// Condition name bounded by `max_name_bytes`.
     pub condition: String,
+    /// Primary signed response code returned by the command.
     pub response: i32,
+    /// Secondary signed response code returned by the command.
     pub response2: i32,
+    /// Application identifier supplied by the provider, bounded by `max_name_bytes`.
     pub applid: String,
+    /// System identifier supplied by the provider, bounded by `max_name_bytes`.
     pub sysid: String,
+    /// Current transaction identifier supplied by the provider.
     pub transaction: String,
+    /// Raw terminal attention identifier byte.
     pub aid: u8,
+    /// Optional control-transfer or handler target, bounded by `max_name_bytes`.
     pub target: Option<String>,
+    /// Optional transaction selected for a subsequent task.
     pub next_transaction: Option<String>,
+    /// Owned bounded reply bytes with an explicit schema identity; at most `max_state_bytes`.
     pub payload: BoundedPayload,
+    /// Named output payloads; both individual and aggregate bytes are bounded by `max_state_bytes`.
     pub outputs: BTreeMap<String, BoundedPayload>,
+    /// Optional explicit commit/rollback disposition; absence makes no such assertion.
     pub unit_of_work: Option<CicsUnitOfWorkOutcome>,
 }
 

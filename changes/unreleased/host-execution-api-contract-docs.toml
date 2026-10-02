@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Document existing host and execution API bounds, ownership, replay and uncertainty contracts, and lower their documentation ratchets and split dataset records behind stable exports without changing runtime or wire behavior."

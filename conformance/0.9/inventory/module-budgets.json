@@ -54,9 +54,9 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2283,
-      "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
-      "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
+      "max_production_lines": 2218,
+      "responsibility": "Owned shared host request and response records retain stable re-exports; dataset, program, CICS and Db2 request families have private owners.",
+      "split_boundary": "Continue moving security, IMS and MQ records or shared validation behind the same stable request exports."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",

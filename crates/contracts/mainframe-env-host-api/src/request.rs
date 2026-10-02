@@ -13,16 +13,27 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
+mod dataset;
+pub use dataset::{DatasetRequest, DatasetResult};
+
 mod db2;
 pub use db2::{Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Resource ceilings for host request and result validation.
+/// Byte limits count encoded bytes, not characters; providers may impose tighter limits.
 pub struct HostLimits {
+    /// Maximum encoded byte length for bounded names and identifiers.
     pub max_name_bytes: usize,
+    /// Maximum bytes in one record, key, message or comparable record payload.
     pub max_record_bytes: usize,
+    /// Maximum record or bounded listing count admitted by host validation.
     pub max_records: usize,
+    /// Maximum count of fields, operands or qualifiers where the contract checks a field bound.
     pub max_fields: usize,
+    /// Maximum number of supplemental audit key/value pairs.
     pub max_audit_fields: usize,
+    /// Maximum bytes for state values and other payloads checked against the state byte ceiling.
     pub max_state_bytes: usize,
 }
 impl Default for HostLimits {
@@ -40,81 +51,135 @@ impl Default for HostLimits {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Storage organization carried by the dataset contract.
+/// A variant identifies the requested layout; provider capabilities determine availability.
 pub enum DatasetOrganization {
+    /// Sequential record dataset.
     Sequential,
+    /// Directory of named members in a partitioned dataset.
     Partitioned,
+    /// Extended partitioned dataset with member generations.
     PartitionedExtended,
+    /// Records addressed by an embedded key.
     KeySequenced,
+    /// Records addressed by entry position or relative byte address.
     EntrySequenced,
+    /// Records addressed by relative record number.
     Relative,
+    /// Relative records with variable-length payloads.
     VariableRelative,
+    /// Byte-addressed linear dataset.
     Linear,
 }
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+/// Logical record representation carried in dataset attributes.
+/// These tags do not themselves implement physical blocking or spanning.
 pub enum RecordFormat {
+    /// Fixed-length logical records.
     Fixed,
+    /// Fixed-length records grouped into blocks.
     FixedBlocked,
+    /// Standard blocked fixed-length format tag.
     FixedBlockedStandard,
+    /// Variable-length logical records.
     Variable,
+    /// Variable-length records grouped into blocks.
     VariableBlocked,
+    /// Variable-length records that may span blocks.
     VariableSpanned,
+    /// Blocked variable-length format permitting spanning.
     VariableBlockedSpanned,
+    /// Record structure supplied by the access method or caller.
     Undefined,
+    /// Line-oriented record representation.
     Line,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Comparison used to position a keyed dataset browse relative to supplied key bytes.
 pub enum KeyRelation {
+    /// Select an exact key match.
     Equal,
+    /// Select a key strictly greater than the supplied key.
     Greater,
+    /// Select an equal key or the first greater key.
     GreaterOrEqual,
+    /// Select a key strictly less than the supplied key.
     Less,
+    /// Select an equal key or the first lesser key.
     LessOrEqual,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Requested read-lock behavior, subject to the dataset provider and access mode.
 pub enum DatasetReadLockMode {
     #[default]
+    /// Use the provider-selected default lock behavior.
     Default,
+    /// Request a read lock.
     Lock,
+    /// Request a lock retained beyond the read.
     KeptLock,
+    /// Request a read without acquiring a lock.
     NoLock,
+    /// Request the provider-supported ignore-lock mode.
     IgnoreLock,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Optional lock and wait controls accompanying a dataset read.
 pub struct DatasetReadControl {
+    /// Requested lock behavior for this read.
     pub lock: DatasetReadLockMode,
+    /// Optional wait choice; `None` leaves selection to the provider.
     pub wait: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Selects the reel or unit form of a dataset close request.
 pub enum DatasetReelUnit {
+    /// Select reel-oriented close handling.
     Reel,
+    /// Select unit-oriented close handling.
     Unit,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Close options passed to the dataset provider for applicability checks.
 pub struct DatasetCloseControl {
+    /// Optional reel or unit close form.
     pub reel_or_unit: Option<DatasetReelUnit>,
+    /// Request close without rewinding.
     pub no_rewind: bool,
+    /// Request media removal handling.
     pub removal: bool,
+    /// Request the provider's close-lock behavior.
     pub lock: bool,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Requested access level for a resource authorization decision.
 pub enum AccessIntent {
+    /// Read resource contents.
     Read,
+    /// Execute the named resource.
     Execute,
+    /// Update existing resource contents.
     Update,
+    /// Request control-level resource access.
     Control,
+    /// Request alter-level resource access.
     Alter,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned reference to a credential resolved by the security provider.
+/// The string identifies a secret; callers should not place credential bytes in it.
 pub struct SecretRef(String);
 
 impl SecretRef {
+    /// Own a nonempty credential reference within `max_name_bytes`.
+    /// Returns `Malformed` for an empty, oversized or whitespace-containing value.
     pub fn new(value: impl Into<String>, limits: HostLimits) -> Result<Self, HostProblem> {
         let value = value.into();
         if value.is_empty()
@@ -127,22 +192,35 @@ impl SecretRef {
         }
     }
     #[must_use]
+    /// Borrow the retained reference string without resolving the secret.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Logical dataset layout and optional character-encoding metadata.
+/// Keyed layouts require a nonempty key wholly within the logical record.
 pub struct DatasetAttributes {
+    /// Requested record-addressing organization.
     pub organization: DatasetOrganization,
+    /// Requested logical record representation.
     pub record_format: RecordFormat,
+    /// Nonzero logical record length in bytes, bounded by `max_record_bytes`.
     pub logical_record_length: u32,
+    /// Optional zero-based byte offset of the embedded key.
     pub key_offset: Option<u32>,
+    /// Optional nonzero key length in bytes; supplied together with `key_offset`.
     pub key_length: Option<u32>,
+    /// Optional nonzero coded character set identifier; absence carries no explicit encoding
+    /// choice.
     pub ccsid: Option<u16>,
 }
 
 impl DatasetAttributes {
+    /// Check record size, paired key bounds and nonzero optional CCSID.
+    /// A key is required exactly for the key-sequenced organization; invalid layouts return
+    /// `Malformed`.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         if self.logical_record_length == 0
             || self.logical_record_length as usize > limits.max_record_bytes
@@ -167,13 +245,20 @@ impl DatasetAttributes {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Replay identity for a host mutation, with an optional transaction association.
+/// The outer effect must carry the same sequence and idempotency key.
 pub struct Mutation {
+    /// Nonzero effect sequence used to correlate and validate replay metadata.
     pub sequence: u64,
+    /// Stable identity for replay protection of this mutation.
     pub idempotency_key: IdempotencyKey,
+    /// Optional nonempty transaction identity bounded by `max_name_bytes`.
     pub transaction: Option<String>,
 }
 
 impl Mutation {
+    /// Check the nonzero sequence and optional transaction-name bound.
+    /// Outer key/sequence agreement is checked by `EffectRequest::validate`.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         if self.sequence == 0
             || self
@@ -188,630 +273,366 @@ impl Mutation {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DatasetRequest {
-    Capabilities,
-    List {
-        pattern: String,
-        start: Option<DatasetName>,
-        max_items: u32,
-    },
-    Attributes {
-        dataset: DatasetName,
-    },
-    Describe {
-        dataset: DatasetName,
-    },
-    Diagnose {
-        dataset: DatasetName,
-    },
-    ResolveCatalog {
-        name: DatasetName,
-    },
-    ListCatalog {
-        pattern: String,
-        start: Option<DatasetName>,
-        max_items: u32,
-    },
-    ListVolumes {
-        start: Option<String>,
-        max_items: u32,
-    },
-    ListLocks {
-        dataset: DatasetName,
-        now_tick: u64,
-        max_items: u32,
-    },
-    TvsStatus {
-        transaction: String,
-        owner: PrincipalId,
-    },
-    ListMembers {
-        dataset: DatasetName,
-        start: Option<MemberName>,
-        max_items: u32,
-    },
-    ReadMemberGeneration {
-        dataset: DatasetName,
-        member: MemberName,
-        relative: i32,
-        max_records: u32,
-    },
-    Read {
-        dataset: DatasetName,
-        member: Option<MemberName>,
-        key: Option<Vec<u8>>,
-        max_records: u32,
-        control: DatasetReadControl,
-    },
-    ReadGeneric {
-        dataset: DatasetName,
-        key_prefix: Vec<u8>,
-        max_records: u32,
-    },
-    ReadConcatenation {
-        datasets: Vec<DatasetName>,
-        member: Option<MemberName>,
-        max_records: u32,
-    },
-    ReadRelative {
-        dataset: DatasetName,
-        record_number: u64,
-    },
-    ReadRba {
-        dataset: DatasetName,
-        rba: u64,
-        max_bytes: u32,
-    },
-    ReadSequential {
-        dataset: DatasetName,
-        member: Option<MemberName>,
-        start: Option<u64>,
-        reverse: bool,
-        max_records: u32,
-    },
-    Snapshot {
-        dataset: DatasetName,
-        max_records: u32,
-        max_members: u32,
-    },
-    Create {
-        dataset: DatasetName,
-        attributes: DatasetAttributes,
-        mutation: Mutation,
-    },
-    Define {
-        dataset: DatasetName,
-        definition: Box<DatasetDefinition>,
-        mutation: Mutation,
-    },
-    Alter {
-        dataset: DatasetName,
-        definition: Box<DatasetDefinition>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    SetLifecycle {
-        dataset: DatasetName,
-        state: DatasetLifecycleState,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    RecordBackup {
-        dataset: DatasetName,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    Restore {
-        dataset: DatasetName,
-        snapshot: Box<DatasetSnapshot>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    DefineCatalog {
-        catalog: DatasetName,
-        kind: CatalogKind,
-        mutation: Mutation,
-    },
-    SetCatalogConnection {
-        catalog: DatasetName,
-        connected: bool,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    DefineAlias {
-        alias: DatasetName,
-        target: DatasetName,
-        mutation: Mutation,
-    },
-    DefineMemberAlias {
-        dataset: DatasetName,
-        alias: MemberName,
-        target: MemberName,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    WriteMemberGeneration {
-        dataset: DatasetName,
-        member: MemberName,
-        records: Vec<Vec<u8>>,
-        program_object: bool,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    DeleteMemberGeneration {
-        dataset: DatasetName,
-        member: MemberName,
-        generation: u64,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    AcquireLock {
-        dataset: DatasetName,
-        target: DatasetLockTarget,
-        owner: PrincipalId,
-        mode: DatasetLockMode,
-        now_tick: u64,
-        lease_ticks: u64,
-        transaction: Option<String>,
-        mutation: Mutation,
-    },
-    ReleaseLock {
-        dataset: DatasetName,
-        lock_id: String,
-        owner: PrincipalId,
-        mutation: Mutation,
-    },
-    BeginTvs {
-        transaction: String,
-        owner: PrincipalId,
-        mutation: Mutation,
-    },
-    StageTvs {
-        transaction: String,
-        owner: PrincipalId,
-        operation: TvsRecordOperation,
-        mutation: Mutation,
-    },
-    CompleteTvs {
-        transaction: String,
-        owner: PrincipalId,
-        commit: bool,
-        mutation: Mutation,
-    },
-    ReconcileTvs {
-        transaction: String,
-        owner: PrincipalId,
-        committed: bool,
-        mutation: Mutation,
-    },
-    Write {
-        dataset: DatasetName,
-        member: Option<MemberName>,
-        records: Vec<Vec<u8>>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    Append {
-        dataset: DatasetName,
-        member: Option<MemberName>,
-        records: Vec<Vec<u8>>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    Truncate {
-        dataset: DatasetName,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    RewriteRecord {
-        dataset: DatasetName,
-        key: Vec<u8>,
-        record: Vec<u8>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    DeleteRecord {
-        dataset: DatasetName,
-        key: Vec<u8>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    WriteRelative {
-        dataset: DatasetName,
-        record_number: u64,
-        record: Vec<u8>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    DeleteRelative {
-        dataset: DatasetName,
-        record_number: u64,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    WriteRba {
-        dataset: DatasetName,
-        rba: u64,
-        data: Vec<u8>,
-        expected_version: Option<u64>,
-        mutation: Mutation,
-    },
-    DefineAlternateIndex {
-        base: DatasetName,
-        index: DatasetName,
-        key_offset: u32,
-        key_length: u32,
-        allow_duplicates: bool,
-        upgrade: bool,
-        mutation: Mutation,
-    },
-    BuildAlternateIndex {
-        base: DatasetName,
-        index: DatasetName,
-        mutation: Mutation,
-    },
-    DefinePath {
-        path: DatasetName,
-        index: DatasetName,
-        mutation: Mutation,
-    },
-    DefineGenerationGroup {
-        base: DatasetName,
-        limit: u32,
-        scratch: bool,
-        empty: bool,
-        mutation: Mutation,
-    },
-    CreateGeneration {
-        base: DatasetName,
-        attributes: DatasetAttributes,
-        records: Vec<Vec<u8>>,
-        mutation: Mutation,
-    },
-    ResolveGeneration {
-        base: DatasetName,
-        relative: i32,
-    },
-    Rename {
-        from: DatasetName,
-        to: DatasetName,
-        mutation: Mutation,
-    },
-    Delete {
-        dataset: DatasetName,
-        member: Option<MemberName>,
-        expected_version: Option<u64>,
-        purge: bool,
-        current_date: Option<u32>,
-        mutation: Mutation,
-    },
-    StartBrowse {
-        dataset: DatasetName,
-        key: Vec<u8>,
-        relation: KeyRelation,
-    },
-    /// Reposition an existing browse cursor for one dataset.
-    ResetBrowse {
-        /// Dataset owning the cursor.
-        dataset: DatasetName,
-        /// Cursor identity returned by STARTBR.
-        cursor: String,
-        /// Target record key for the new browse position.
-        key: Vec<u8>,
-        /// Comparison used to select the new position.
-        relation: KeyRelation,
-    },
-    ReadNext {
-        dataset: DatasetName,
-        cursor: String,
-        reverse: bool,
-        control: DatasetReadControl,
-    },
-    EndBrowse {
-        dataset: DatasetName,
-        cursor: String,
-    },
-    Close {
-        dataset: DatasetName,
-        cursor: Option<String>,
-        control: DatasetCloseControl,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DatasetResult {
-    Capabilities {
-        capabilities: DatasetProviderCapabilities,
-    },
-    Listed {
-        names: Vec<DatasetName>,
-        more: bool,
-    },
-    Members {
-        names: Vec<MemberName>,
-        more: bool,
-    },
-    Attributes {
-        attributes: DatasetAttributes,
-        version: u64,
-    },
-    Description(Box<DatasetDescription>),
-    Diagnostics {
-        diagnostics: Vec<DatasetDiagnostic>,
-    },
-    Catalog(CatalogResolution),
-    CatalogEntries {
-        entries: Vec<CatalogListEntry>,
-        more: bool,
-    },
-    Volumes {
-        volumes: Vec<crate::DatasetVolumeDescription>,
-        more: bool,
-    },
-    Locks {
-        locks: Vec<DatasetLockReceipt>,
-    },
-    Tvs(TvsUnitOfWorkReceipt),
-    Snapshot {
-        snapshot: Box<DatasetSnapshot>,
-        version: u64,
-    },
-    Records {
-        records: Vec<Vec<u8>>,
-        identities: Vec<Vec<u8>>,
-        version: u64,
-    },
-    MemberGeneration {
-        records: Vec<Vec<u8>>,
-        identities: Vec<Vec<u8>>,
-        generation: u64,
-        program_object: bool,
-        version: u64,
-    },
-    Rba {
-        data: Vec<u8>,
-        record: bool,
-        rba: u64,
-        next_rba: u64,
-        version: u64,
-    },
-    Created {
-        version: u64,
-    },
-    Mutated {
-        version: u64,
-    },
-    Browse {
-        cursor: String,
-        record: Option<Vec<u8>>,
-        identity: Option<Vec<u8>>,
-        key: Option<Vec<u8>>,
-    },
-    Generation {
-        dataset: DatasetName,
-        absolute_generation: u32,
-        version: u64,
-    },
-    Condition {
-        name: String,
-        status: String,
-    },
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+/// Namespace used when resolving a named, versioned runtime service.
 pub enum RuntimeServiceKind {
+    /// Language Environment runtime-service namespace.
     LanguageEnvironment,
+    /// Site or host extension runtime-service namespace.
     HostExtension,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Exact runtime-service lookup key, including a nonzero ABI version.
 pub struct RuntimeServiceSelector {
+    /// Runtime-service namespace used in the exact lookup key.
     pub kind: RuntimeServiceKind,
+    /// Validated runtime-service name within the selected namespace.
     pub name: RuntimeServiceName,
+    /// Nonzero ABI version selected explicitly; lookup does not choose a newer version.
     pub abi_version: u16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Job-scoped spool operations using owned record bytes and explicit replay metadata.
 pub enum SpoolRequest {
+    /// Append bounded records to a job-owned spool file.
     Append {
+        /// Validated job identity owning the spool file or artifacts.
         job: JobName,
+        /// Nonempty job-relative spool file identifier bounded by `max_name_bytes`.
         file: String,
+        /// Owned logical record bytes; count and individual lengths are host-bounded.
         records: Vec<Vec<u8>>,
+        /// Replay sequence/key and optional transaction for this state change.
         mutation: Mutation,
     },
+    /// List spool files owned by a job.
     List {
+        /// Validated job identity owning the spool file or artifacts.
         job: JobName,
     },
+    /// Read a bounded range of spool records.
     Read {
+        /// Validated job identity owning the spool file or artifacts.
         job: JobName,
+        /// Nonempty job-relative spool file identifier bounded by `max_name_bytes`.
         file: String,
+        /// Zero-based starting record position for the requested spool range.
         start: u64,
+        /// Positive requested record ceiling, at most `max_records`.
         max_records: u32,
     },
+    /// Seal a spool file against further append operations.
     Seal {
+        /// Validated job identity owning the spool file or artifacts.
         job: JobName,
+        /// Nonempty job-relative spool file identifier bounded by `max_name_bytes`.
         file: String,
+        /// Replay sequence/key and optional transaction for this state change.
         mutation: Mutation,
     },
+    /// Request deletion of a job's spool artifacts.
     Purge {
+        /// Validated job identity owning the spool file or artifacts.
         job: JobName,
+        /// Replay sequence/key and optional transaction for this state change.
         mutation: Mutation,
     },
 }
 
+/// Version identifier for the typed spool request contract.
 pub const SPOOL_REQUEST_CONTRACT: &str = "mainframe-env.spool-request@2";
+/// Version identifier for spool results including incomplete purge reporting.
 pub const SPOOL_RESULT_CONTRACT: &str = "mainframe-env.spool-result@2";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Bounded metadata for one job-owned spool file.
 pub struct SpoolFileSummary {
+    /// Nonempty job-relative spool file identifier bounded by `max_name_bytes`.
     pub file: String,
+    /// Total records reported for this spool file.
     pub record_count: u64,
+    /// Total payload bytes reported for this spool file.
     pub byte_count: u64,
+    /// Whether further append operations are prohibited for this file.
     pub sealed: bool,
+    /// Provider-observed version associated with the returned data or mutation.
     pub version: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
+/// Spool replies distinguishing applied mutations, reads and pending artifact deletion.
 pub enum SpoolResult {
+    /// Applied or replayed spool mutation with its version.
     Mutated {
+        /// Provider-observed version associated with the returned data or mutation.
         version: u64,
+        /// Whether the provider recognized a previously applied mutation identity.
         replayed: bool,
     },
+    /// Spool file summaries for the selected job.
     Files {
+        /// Bounded file summaries returned for the selected job.
         files: Vec<SpoolFileSummary>,
     },
+    /// One bounded page of spool record bytes.
     Records {
+        /// Owned logical record bytes; count and individual lengths are host-bounded.
         records: Vec<Vec<u8>>,
+        /// Whether additional entries remain after this page.
         more: bool,
+        /// Provider-observed version associated with the returned data or mutation.
         version: u64,
     },
+    /// Deletion is incomplete and artifacts remain.
     PurgePending {
+        /// Positive count of artifacts still awaiting deletion.
         remaining_artifacts: u64,
     },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned terminal field metadata and uninterpreted display or input bytes.
+/// Host validation bounds field count, name and value length; the terminal provider checks layout.
 pub struct TerminalField {
+    /// Nonempty field identifier bounded by `max_name_bytes`.
     pub name: String,
+    /// Row coordinate interpreted by the terminal provider.
     pub row: u16,
+    /// Column coordinate interpreted by the terminal provider.
     pub column: u16,
+    /// Field capacity in bytes; validation rejects longer values.
     pub length: u16,
+    /// Whether the field is marked as modified input.
     pub modified: bool,
+    /// Whether the terminal should treat the field value as sensitive.
     pub secret: bool,
+    /// Owned field bytes no longer than the declared capacity or `max_record_bytes`.
     pub value: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Session-scoped terminal operations carrying explicit geometry, input and display fields.
 pub enum TerminalRequest {
+    /// Open a session with explicit screen geometry.
     Open {
+        /// Validated terminal session identity.
         session: SessionId,
+        /// Requested terminal row count.
         rows: u16,
+        /// Requested terminal column count.
         columns: u16,
     },
+    /// Write display fields and optional cursor placement.
     Write {
+        /// Validated terminal session identity.
         session: SessionId,
+        /// Whether to clear the existing display before applying fields.
         erase: bool,
+        /// Optional row/column cursor position interpreted by the terminal provider.
         cursor: Option<(u16, u16)>,
+        /// Owned fields subject to the host field-count and field-value bounds.
         fields: Vec<TerminalField>,
     },
+    /// Read the session's current input payload.
     Read {
+        /// Validated terminal session identity.
         session: SessionId,
     },
+    /// Supply an attention identifier and modified field values.
     Input {
+        /// Validated terminal session identity.
         session: SessionId,
+        /// Raw attention identifier byte accompanying terminal input.
         aid: u8,
+        /// Owned fields subject to the host field-count and field-value bounds.
         fields: Vec<TerminalField>,
     },
+    /// Release a terminal session.
     Release {
+        /// Validated terminal session identity.
         session: SessionId,
     },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Typed security operations that separate credential resolution, identity checks and
+/// authorization.
 pub enum SecurityRequest {
+    /// Authenticate a principal through a secret reference.
     Authenticate {
+        /// Principal identity to authenticate.
         user: PrincipalId,
+        /// Reference resolved by the security provider to obtain credentials.
         credential_reference: SecretRef,
     },
     /// Validate a non-login execution identity from durable security state.
     /// This request never carries or resolves a credential.
     /// It is distinct from credential authentication.
     ValidatePrincipal {
+        /// Principal identity whose retained validity or access is checked.
         principal: PrincipalId,
     },
+    /// Check a principal's access to a named resource.
     Authorize {
+        /// Principal identity whose retained validity or access is checked.
         principal: PrincipalId,
+        /// Resource class presented to the security provider.
         class: String,
+        /// Validated resource name for the authorization check.
         resource: ResourceName,
+        /// Requested resource access level.
         intent: AccessIntent,
     },
+    /// Submit a typed audit event.
     Audit(AuditEvent),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Security-provider disposition without exposing credential material.
 pub enum SecurityDecision {
+    /// The requested security check succeeded.
     Allow,
+    /// The requested access was denied.
     Deny,
+    /// The referenced security identity or resource was not found.
     NotFound,
+    /// Credential verification failed.
     InvalidCredentials,
+    /// The checked credential or identity has expired.
     Expired,
+    /// The checked identity or authority was revoked.
     Revoked,
+    /// The checked identity is locked.
     Locked,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned audit metadata with a hashed resource identity and bounded field count.
 pub struct AuditEvent {
+    /// Audit action identifier supplied by the caller.
     pub action: String,
+    /// Hashed resource identity for the audit record, rather than raw resource contents.
     pub resource_hash: String,
+    /// Audit decision label supplied by the caller.
     pub decision: String,
+    /// Supplemental audit pairs; the count is bounded by `max_audit_fields`.
     pub fields: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Version-aware operations on host-owned opaque state bytes.
 pub enum StateRequest {
+    /// Read an optional value and its state version.
     Get {
+        /// Owned key identifying the host state value.
         key: String,
     },
+    /// Store owned bytes with an optional version precondition.
     Put {
+        /// Owned key identifying the host state value.
         key: String,
+        /// Owned opaque state bytes bounded by `max_state_bytes`.
         value: Vec<u8>,
+        /// Optional compare-and-update precondition on the current version.
         expected_version: Option<u64>,
+        /// Replay sequence/key and optional transaction for this state change.
         mutation: Mutation,
     },
+    /// Remove a state value with an optional version precondition.
     Delete {
+        /// Owned key identifying the host state value.
         key: String,
+        /// Optional compare-and-update precondition on the current version.
         expected_version: Option<u64>,
+        /// Replay sequence/key and optional transaction for this state change.
         mutation: Mutation,
     },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Typed operation selector for the IMS host request contract.
+/// Provider applicability and scheduling rules are separate from this selector.
 pub enum ImsOperation {
+    /// Schedule the selected program specification block.
     Schedule,
+    /// Terminate the scheduled context.
     Terminate,
+    /// Retrieve a segment using the supplied path and qualifiers.
     GetUnique,
+    /// Retrieve the next segment in sequence.
     GetNext,
+    /// Retrieve the next segment within the parent context.
     GetNextParent,
+    /// Retrieve a selected segment with hold intent.
     GetHoldUnique,
+    /// Retrieve the next segment with hold intent.
     GetHoldNext,
+    /// Retrieve the next segment under a parent with hold intent.
     GetHoldNextParent,
+    /// Insert supplied segment bytes.
     Insert,
+    /// Replace segment bytes in the selected context.
     Replace,
+    /// Delete a selected segment.
     Delete,
+    /// Request a checkpoint with an optional identifier.
     Checkpoint,
+    /// Load the requested IMS context.
     Load,
+    /// Unload the requested IMS context.
     Unload,
+    /// Commit the current unit of work.
     Commit,
+    /// Roll back the current unit of work.
     Rollback,
+    /// Dispatch the attached typed system-service request.
     System,
 }
 
 impl ImsOperation {
     #[must_use]
+    /// Whether this selector requires mutation replay metadata.
+    /// Only `Unload` is classified as non-mutating; read selectors also retain replay metadata.
     pub const fn is_mutating(self) -> bool {
         !matches!(self, Self::Unload)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Segment/field selector carrying an owned comparison value.
 pub struct ImsQualifier {
+    /// Nonempty segment name bounded by `max_name_bytes`.
     pub segment: String,
+    /// Nonempty field name bounded by `max_name_bytes`.
     pub field: String,
+    /// Owned comparison bytes bounded by `max_record_bytes`.
     pub value: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned IMS call operands with explicit segment bounds and optional replay metadata.
+/// Non-system calls require a nonzero PCB selector; only system calls carry `system`.
 pub struct ImsRequest {
+    /// Typed IMS call to dispatch.
     pub operation: ImsOperation,
+    /// Optional program specification block name, bounded by `max_name_bytes`.
     pub psb: Option<String>,
+    /// PCB selector; host validation requires it to be nonzero for non-system calls.
     pub pcb: u16,
+    /// Ordered segment names identifying the requested path, bounded by `max_fields`.
     pub segments: Vec<String>,
+    /// Owned segment bytes bounded by `max_record_bytes`, without implicit text decoding.
     pub data: Vec<u8>,
+    /// Field/value qualifiers, bounded by `max_fields`.
     pub qualifiers: Vec<ImsQualifier>,
+    /// Optional nonempty checkpoint identifier bounded by `max_name_bytes`.
     pub checkpoint_id: Option<String>,
+    /// Positive returned-segment ceiling, at most `max_records`.
     pub max_segments: u32,
+    /// Replay metadata required when the operation is classified as mutating.
     pub mutation: Option<Mutation>,
     /// Typed system-call operands. Present only for `ImsOperation::System`.
     pub system: Option<crate::ImsSystemRequest>,
@@ -820,62 +641,101 @@ pub struct ImsRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One returned segment with optional parent identity and uninterpreted record bytes.
 pub struct ImsSegment {
+    /// Nonempty returned segment name bounded by `max_name_bytes`.
     pub name: String,
+    /// Optional parent identity bytes bounded by `max_record_bytes`.
     pub parent_key: Option<Vec<u8>>,
+    /// Owned segment bytes bounded by `max_record_bytes`, without implicit text decoding.
     pub data: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// IMS reply with a two-byte status string and bounded returned segments.
 pub struct ImsResult {
+    /// Two-byte provider status string; interpreted according to the IMS call.
     pub status: String,
+    /// Returned segment records bounded by `max_records`.
     pub segments: Vec<ImsSegment>,
+    /// Optional nonempty checkpoint identifier bounded by `max_name_bytes`.
     pub checkpoint_id: Option<String>,
+    /// Provider-reported count of affected segments.
     pub affected_segments: u64,
     /// Typed output for a system call; absent for existing database/TM calls.
     pub system: Option<crate::ImsSystemResult>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Operation selector for the replay-protected MQ host boundary.
 pub enum MqOperation {
+    /// Open a queue and obtain a provider handle.
     Open,
+    /// Receive a bounded message through a handle.
     Get,
+    /// Send a message through an open handle.
     Put,
+    /// Send a message using a queue name without retaining a handle.
     PutOne,
+    /// Close a provider-issued handle.
     Close,
+    /// Commit the MQ unit of work.
     Commit,
+    /// Roll back the MQ unit of work.
     Rollback,
 }
 
 impl MqOperation {
     #[must_use]
+    /// Whether this selector requires mutation replay metadata.
+    /// Every operation in this MQ boundary is classified as mutating.
     pub const fn is_mutating(self) -> bool {
         true
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned MQ operands with explicit receive bounds and replay metadata.
+/// Host validation requires mutation metadata for every request in this contract.
 pub struct MqRequest {
+    /// Typed MQ call to dispatch.
     pub operation: MqOperation,
+    /// Optional nonempty queue name bounded by `max_name_bytes`.
     pub queue: Option<String>,
+    /// Optional handle issued by the provider for the selected context.
     pub handle: Option<u32>,
+    /// Raw signed option bits interpreted for the selected MQ operation.
     pub options: i32,
+    /// Owned message bytes bounded by `max_record_bytes`.
     pub message: Vec<u8>,
+    /// Optional exact 24-byte message identity.
     pub message_id: Option<Vec<u8>>,
+    /// Optional exact 24-byte correlation identity.
     pub correlation_id: Option<Vec<u8>>,
+    /// Requested receive wait duration in logical ticks.
     pub wait_ticks: u64,
+    /// Positive receive capacity in bytes, at most `max_record_bytes`.
     pub max_message_bytes: u32,
+    /// Required replay sequence/key for this MQ request.
     pub mutation: Option<Mutation>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// MQ completion codes, optional handle and owned message data returned by a provider.
 pub struct MqResult {
+    /// Provider-returned signed MQ completion code.
     pub completion_code: i32,
+    /// Provider-returned signed MQ reason code.
     pub reason_code: i32,
+    /// Optional handle issued by the provider for the selected context.
     pub handle: Option<u32>,
+    /// Owned message bytes bounded by `max_record_bytes`.
     pub message: Vec<u8>,
+    /// Optional exact 24-byte message identity.
     pub message_id: Option<Vec<u8>>,
+    /// Optional exact 24-byte correlation identity.
     pub correlation_id: Option<Vec<u8>>,
+    /// Optional bounded program name supplied by trigger processing.
     pub trigger_program: Option<String>,
 }
 
@@ -886,24 +746,39 @@ mod program;
 pub use program::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned request dispatched under a built-in host capability.
+/// Local shape validation does not establish provider support or resource authorization.
 pub enum HostRequest {
+    /// Dataset access and catalog operation.
     Dataset(DatasetRequest),
+    /// Program control operation.
     Program(ProgramRequest),
+    /// Job-owned spool operation.
     Spool(SpoolRequest),
+    /// Terminal session operation.
     Terminal(TerminalRequest),
+    /// Security identity, access or audit operation.
     Security(SecurityRequest),
+    /// Clock value selection.
     Clock(ClockRequest),
+    /// Opaque host state operation.
     State(StateRequest),
     /// Typed CICS command with its command-owned validation and replay identity.
     /// Mutation identity is checked before provider dispatch.
     Cics(CicsRequest),
+    /// Relational statement or cursor operation.
     Db2(Db2Request),
+    /// IMS segment or system-service operation.
     Ims(ImsRequest),
+    /// MQ handle, message or transaction operation.
     Mq(MqRequest),
 }
 
 impl HostRequest {
     #[must_use]
+    /// Return the built-in capability used for provider selection and invocation grants.
+    /// This does not check resource-level authorization. Panics if `limits` rejects the built-in
+    /// identity.
     pub fn required_capability(&self, limits: InvocationLimits) -> CapabilityId {
         let name = match self {
             Self::Dataset(
@@ -954,6 +829,8 @@ impl HostRequest {
     }
 
     #[must_use]
+    /// Whether the request requires an outer idempotency key.
+    /// Includes stateful program control and subsystem operations classified as mutations.
     pub fn is_mutating(&self) -> bool {
         matches!(
             self,
@@ -1011,6 +888,8 @@ impl HostRequest {
     }
 
     #[must_use]
+    /// Borrow payload-level replay metadata when this request carries it.
+    /// Some mutating program requests have only the outer effect key and return `None` here.
     pub fn mutation(&self) -> Option<&Mutation> {
         match self {
             Self::Dataset(
@@ -1064,6 +943,9 @@ impl HostRequest {
         }
     }
 
+    /// Check locally enforced payload shapes and resource bounds.
+    /// Provider-specific operand applicability, readiness and authorization are checked at
+    /// dispatch.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
             Self::Dataset(request) => validate_dataset(request, limits),
@@ -1241,24 +1123,41 @@ impl HostRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Typed successful host reply.
+/// Provider failures and uncertain outcomes are carried by `EffectResult::outcome`.
 pub enum HostResult {
+    /// Dataset access and catalog reply.
     Dataset(DatasetResult),
+    /// Program control schema-tagged bounded reply bytes.
     Program(BoundedPayload),
+    /// Job-owned spool reply.
     Spool(SpoolResult),
+    /// Terminal session schema-tagged bounded reply bytes.
     Terminal(BoundedPayload),
+    /// Security decision.
     Security(SecurityDecision),
+    /// Clock value formatted by the clock provider.
     Clock(String),
+    /// Opaque host state value and version.
     State {
+        /// Optional owned state bytes; absence represents no returned value.
         value: Option<Vec<u8>>,
+        /// Provider-observed version associated with the returned data or mutation.
         version: u64,
     },
+    /// CICS command response and control disposition.
     Cics(CicsResponse),
+    /// Relational statement or cursor reply.
     Db2(Db2Result),
+    /// IMS segment or system-service reply.
     Ims(ImsResult),
+    /// MQ handle, message or transaction reply.
     Mq(MqResult),
 }
 
 impl HostResult {
+    /// Check locally enforced reply bounds and structural relationships.
+    /// Does not interpret subsystem status codes as execution success or failure.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
             Self::Dataset(DatasetResult::Description(description)) => {
@@ -1590,15 +1489,24 @@ impl HostResult {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Invocation-scoped effect envelope with a deadline and replay identity.
+/// Mutating requests require an outer key even when their payload has no `Mutation` field.
 pub struct EffectRequest {
+    /// Run-unit identity that must match the active invocation before dispatch.
     pub run_unit: RunUnitId,
+    /// Nonzero effect sequence used to correlate and validate replay metadata.
     pub sequence: u64,
+    /// Nonzero logical deadline; dispatch rejects when the current tick reaches it.
     pub deadline_tick: u64,
+    /// Outer replay key required for mutating requests; must match payload metadata when present.
     pub idempotency_key: Option<IdempotencyKey>,
+    /// Owned typed request carried by this envelope.
     pub request: HostRequest,
 }
 
 impl EffectRequest {
+    /// Require a nonzero sequence/deadline and validate the typed payload.
+    /// For mutations, require an outer key and reject disagreement with payload replay metadata.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         if self.sequence == 0 || self.deadline_tick == 0 {
             return Err(HostProblem::Malformed);
@@ -1619,12 +1527,17 @@ impl EffectRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Sequence-bound reply that separates successful data from typed host failures.
 pub struct EffectResult {
+    /// Nonzero effect sequence used to correlate and validate replay metadata.
     pub sequence: u64,
+    /// Successful typed reply or failure; uncertainty is preserved as `UnknownOutcome`.
     pub outcome: Result<HostResult, HostProblem>,
 }
 
 impl EffectResult {
+    /// Require the expected nonzero sequence and validate either reply data or structured failure
+    /// fields.
     pub fn validate(&self, expected_sequence: u64, limits: HostLimits) -> Result<(), HostProblem> {
         if self.sequence == 0 || self.sequence != expected_sequence {
             return Err(HostProblem::Malformed);
@@ -2230,27 +2143,49 @@ fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), H
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Typed rejection, failure or uncertainty at the host boundary.
+/// `UnknownOutcome` requires reconciliation rather than assuming the effect did not occur.
 pub enum HostProblem {
+    /// The envelope or payload violates its structural contract.
     Malformed,
+    /// No supported implementation is available for the request.
     Unsupported,
+    /// A specific provider capability is unavailable, with explanatory detail.
     UnsupportedCapability {
+        /// Bounded nonempty identity of the unsupported capability.
         capability: String,
+        /// Nonempty explanatory text bounded by `max_state_bytes`.
         detail: String,
     },
+    /// The requested resource was not found.
     NotFound,
+    /// A named subsystem condition with primary and secondary response codes.
     Condition {
+        /// Nonempty condition name bounded by `max_name_bytes`.
         name: String,
+        /// Primary signed subsystem response code.
         response: i32,
+        /// Secondary signed subsystem response code.
         response2: i32,
     },
+    /// The invocation lacks the required authority.
     Unauthorized,
+    /// Cancellation prevented the requested operation.
     Cancelled,
+    /// The logical deadline was reached.
     TimedOut,
+    /// A request, reply or provider resource exceeds an admitted bound.
     ResourceExhausted,
+    /// The selected provider is unavailable or fails its contract.
     ProviderFailure,
+    /// Host infrastructure failed while dispatching the effect.
     InfrastructureFailure,
+    /// A replay-protected operation has no required idempotency identity.
     MissingIdempotency,
+    /// Replay metadata disagrees with an existing identity or outer envelope.
     IdempotencyConflict,
+    /// Whether the effect took place cannot be established.
+    /// Reconcile durable state before deciding whether a retry is safe.
     UnknownOutcome,
 }
 impl fmt::Display for HostProblem {

@@ -568,6 +568,36 @@ or below. The same focused rustdoc/token/format/policy and cleanup gates apply;
 any lowered ratchet is integrated only by the manager. Neither documentation
 lane changes semantics or grants CICS command coverage.
 
+The bounded `CIC-902.program-task.frames.same-level-claim` prerequisite is sealed
+at `7e0bb0816c48cea67bd7db599efca0b7aaa868fc`: five new helper regressions,
+19 existing frame regressions and four selected pending-route tests pass. Four
+ignored PostgreSQL/staging selectors earn no credit. Architecture, formatting,
+documentation, changelog and dependency policy checks pass; target artifacts are
+removed. Durable CALL/instance handoff and runtime wiring remain pending.
+
+The manager's documentation candidate integrates the two comment-only worker
+patches and lowers the existing policy to the measured counts: host API 2,074 to
+1,119 and execution API 303 to 32. Independent lexical review preserves every
+non-comment token in all 15 affected modules. The remaining diagnostics stay
+explicitly ratcheted; no ceiling increase, ABI change or subsystem credit is
+introduced. The documentation exposed a fixed module-size failure in the host
+request parent: the manager moves the existing dataset request/result declarations
+unchanged into `request/dataset.rs`, preserving stable exports and lowering the
+parent ceiling from 2,283 to 2218. The private child remains below 1,200
+lines. Integration uses the full existing public-API checker and required
+format/documentation/module/dependency gates, without runtime campaigns for
+comments alone.
+
+`CIC-902.program-task.frames.versioned-source-handoff` is the next serialized
+manager prerequisite, owning the existing interpreter coordinator and a bounded
+private child plus focused selected-store regressions. Before any terminal or
+journal mutation it must reject an absent, stale, foreign or non-suspended source,
+including exact source selector/artifact/run/principal/attempt. Existing journal
+and core CAS remain authoritative. This method alone grants no target admission,
+CALL receipt, instance lease or automatic redispatch. Its exact allowlist and
+source-backed durable CALL/instance contract are reviewed separately before
+runtime wiring; workers may submit read-only designs only for those shared owners.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001

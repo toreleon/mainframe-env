@@ -45,6 +45,9 @@ impl AuditedEffectResult {
     }
 }
 
+/// Invocation-scoped dispatch through an immutable provider snapshot.
+/// Enforces grants, replay metadata, deadlines, exact generations and canonical byte budgets;
+/// returns an effect together with its mandatory audit record.
 pub struct ScopedHostService {
     registry: Arc<RegistrySnapshot>,
     limits: HostLimits,
@@ -52,6 +55,7 @@ pub struct ScopedHostService {
 
 impl ScopedHostService {
     #[must_use]
+    /// Retain a shared provider snapshot and fixed host validation limits for dispatch.
     pub fn new(registry: Arc<RegistrySnapshot>, limits: HostLimits) -> Self {
         Self { registry, limits }
     }
@@ -71,6 +75,11 @@ impl ScopedHostService {
         Ok(())
     }
 
+    /// Consume one invocation-bound request at the supplied logical tick.
+    /// Reject cancellation, expired deadlines or missing grants before provider dispatch.
+    /// Validate reply sequence and budgets, preserving unknown outcomes and unusable successful
+    /// mutation replies as uncertainty. The returned audit record must be persisted before
+    /// consumption.
     pub fn invoke(
         &self,
         invocation: &Invocation,
@@ -188,6 +197,8 @@ impl ScopedHostService {
     }
 
     #[must_use]
+    /// Whether an identity is valid and selects an installed ready provider.
+    /// Does not check invocation grants, exact required generations or resource-level authority.
     pub fn capability_ready(&self, capability: &str) -> bool {
         mainframe_env_execution_api::CapabilityId::new(
             capability,
