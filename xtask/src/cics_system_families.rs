@@ -1,7 +1,11 @@
 //! Source-bound private family contracts, with no runtime or verdict authority.
 use crate::{TaskResult, array, json, require, text, validate_schema_instance};
+use mainframe_env_ir::{
+    CICS_APPLICATION_CONDITION_AUTHORITY_SHA256, CICS_APPLICATION_CONDITION_NAMES,
+};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -255,6 +259,7 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
             .eq(expected_rows.iter().map(String::as_str)),
         "CICS family row identity/order mismatch",
     )?;
+    let condition_codes = condition_codes(root)?;
     let mut operations = BTreeSet::new();
     for command in commands {
         let row = text(command, "official_row", path)?;
@@ -323,6 +328,17 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
                 )?;
             }
         }
+        for response in array(command, "responses", path)? {
+            let condition = text(response, "condition", path)?;
+            require(
+                condition_codes
+                    .get(condition)
+                    .is_some_and(|code| response["resp"].as_i64() == Some(*code)),
+                &format!(
+                    "CICS family response name/code differs from EIBRESP authority: {row} {condition}"
+                ),
+            )?;
+        }
         let obligations = array(command, "obligations", path)?;
         require(
             !obligations.is_empty(),
@@ -353,6 +369,68 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
         }
     }
     Ok(commands.len())
+}
+
+// Read the common application authority; do not introduce a second response table.
+fn condition_codes(root: &Path) -> TaskResult<BTreeMap<String, i64>> {
+    let path = root.join("conformance/0.9/generated/cics-application-command-contracts.json");
+    let contracts = json(&path)?;
+    validate_condition_codes(root, &contracts["condition_name_authority"], &path)
+}
+
+fn validate_condition_codes(
+    root: &Path,
+    authority: &Value,
+    path: &Path,
+) -> TaskResult<BTreeMap<String, i64>> {
+    require(
+        authority["profile"] == "cics-eibresp-condition-name@1"
+            && authority["table_id"] == "dfhp4au__table_nt5_kw4_b1c"
+            && authority["conditions_sha256"] == CICS_APPLICATION_CONDITION_AUTHORITY_SHA256,
+        "CICS common condition authority identity/digest differs",
+    )?;
+    let manifest_path =
+        root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
+    let manifest = json(&manifest_path)?;
+    let pin = array(&manifest, "topics", &manifest_path)?
+        .iter()
+        .find(|topic| {
+            topic["topic_path"] == "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
+        })
+        .ok_or("CICS common EIBRESP topic is not pinned")?;
+    require(
+        authority["topic_path"] == pin["topic_path"]
+            && authority["topic_sha256"]
+                == format!("sha256:{}", text(pin, "sha256", &manifest_path)?),
+        "CICS common EIBRESP source pin differs",
+    )?;
+    let conditions = array(authority, "conditions", path)?;
+    require(
+        conditions.len() == CICS_APPLICATION_CONDITION_NAMES.len(),
+        "CICS common condition authority count differs",
+    )?;
+    let mut codes = BTreeMap::new();
+    let mut pairs = Vec::new();
+    for (condition, expected_name) in conditions.iter().zip(CICS_APPLICATION_CONDITION_NAMES) {
+        let name = text(condition, "name", path)?;
+        let code = condition["code"]
+            .as_i64()
+            .ok_or("CICS condition code is not an integer")?;
+        require(
+            name == *expected_name && (0..=255).contains(&code),
+            "CICS common condition authority name/order/code differs",
+        )?;
+        pairs.push(serde_json::json!([name, code]));
+        codes.insert(name.to_string(), code);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.cics-condition-name-authority@1\0pairs\0");
+    digest.update(serde_json::to_vec(&pairs).map_err(|error| error.to_string())?);
+    require(
+        format!("sha256:{:x}", digest.finalize()) == CICS_APPLICATION_CONDITION_AUTHORITY_SHA256,
+        "CICS common condition authority records/digest differ",
+    )?;
+    Ok(codes)
 }
 
 fn validate_cvda_numeric_encoding(root: &Path, domain: &Value, path: &Path) -> TaskResult {
@@ -547,6 +625,65 @@ mod tests {
 
     fn valid(family: &str, value: &Value) -> TaskResult<usize> {
         validate(&root(), family, value, Path::new("synthetic-family.json"))
+    }
+
+    fn response(condition: &str, resp: i64, resp2: Value) -> Value {
+        json!({"condition":condition,"resp":resp,"resp2":resp2,
+            "trigger":"Synthetic source-contract validation fixture only",
+            "source_lines":[1]})
+    }
+
+    #[test]
+    fn response_name_code_pairs_reject_wrong_codes_and_unknown_aliases() {
+        for family in ["spi-program", "fepi-session-data"] {
+            for bad in [
+                response("INVREQ", 17, json!(1)),
+                response("NOTFOUND", 13, json!(1)),
+            ] {
+                let mut value = fixture(family);
+                value["commands"][0]["responses"] = json!([bad]);
+                let error = valid(family, &value).unwrap_err();
+                assert!(error.contains("response name/code differs from EIBRESP authority"));
+            }
+        }
+    }
+
+    #[test]
+    fn response_identity_does_not_choose_resp2_or_resolve_opposed_conditions() {
+        let mut value = fixture("spi-program");
+        value["commands"][0]["responses"] = json!([
+            response("INVREQ", 16, Value::Null),
+            response("NORMAL", 0, json!(60)),
+            response("INVREQ", 16, json!(60)),
+        ]);
+        let original = value.clone();
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        assert_eq!(value, original);
+        assert!(value["commands"][0]["responses"][0]["resp2"].is_null());
+    }
+
+    #[test]
+    fn common_response_authority_rejects_tampered_records_order_digest_and_pin() {
+        let path = root().join("conformance/0.9/generated/cics-application-command-contracts.json");
+        let authority = json(&path).unwrap()["condition_name_authority"].clone();
+        assert_eq!(
+            validate_condition_codes(&root(), &authority, &path)
+                .unwrap()
+                .len(),
+            121
+        );
+        let mut bad = authority.clone();
+        bad["conditions"][0]["code"] = json!(255);
+        assert!(validate_condition_codes(&root(), &bad, &path).is_err());
+        bad = authority.clone();
+        bad["conditions"].as_array_mut().unwrap().swap(0, 1);
+        assert!(validate_condition_codes(&root(), &bad, &path).is_err());
+        bad = authority.clone();
+        bad["conditions_sha256"] = json!("sha256:invalid");
+        assert!(validate_condition_codes(&root(), &bad, &path).is_err());
+        bad = authority;
+        bad["topic_sha256"] = json!("sha256:invalid");
+        assert!(validate_condition_codes(&root(), &bad, &path).is_err());
     }
 
     #[test]

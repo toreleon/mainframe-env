@@ -1,0 +1,10 @@
+{
+  "schema_version": "mainframe-env.conformance-dependency-additions@1",
+  "target_version": "0.10.0",
+  "edges": [
+    [
+      "xtask",
+      "mainframe-env-ir"
+    ]
+  ]
+}

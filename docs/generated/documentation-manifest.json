@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 226,
+    "markdown_documents": 227,
     "navigation_groups": 6,
-    "normative_documents": 60,
+    "normative_documents": 61,
     "xtask_commands": 212
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 116,
-      "sha256": "sha256:ae61b973c20cd3dc39dc9ab8edf5b15261f0f7771d7dd66e7c1e2a94844c7ebb",
+      "relative_links": 117,
+      "sha256": "sha256:6c75b80f28ca3e6f0d5861af2693451314877aeb36b6bd2419f9638bd8ca2753",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -987,10 +987,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.10.0 development",
+      "normative": true,
+      "owner": "CICS contract and verification maintainers",
+      "path": "docs/decisions/0030-cics-source-condition-authority.md",
+      "relative_links": 0,
+      "scope": "private source-validator dependency and condition identity",
+      "sha256": "sha256:a751d85138e935c8f5683258e02e3ace270691564ee007d39d8553b11caad3ed",
+      "status": "Proposed; private source-contract validation",
+      "title": "ADR-0030: Common CICS response authority in source validation",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 29,
-      "sha256": "sha256:4a9e4734f5d06fd1e9071a511dcfe02f15f2c391536013d3c3eb374d5537787e",
+      "relative_links": 30,
+      "sha256": "sha256:c6a3712c416134d644094a030b97d041c1aaf3f469d5168bdadcb5a227bd04b0",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1290,7 +1302,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:7d305e63753915faf090b8b7ae15897cdfdc21e25bfc6177eacad16515095477",
+      "sha256": "sha256:1a4e4107ffdc76cb05d5b9a47ac89beacbf0aad53f1c28f23547526ac01eb9c8",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },
@@ -2284,6 +2296,10 @@
           "path": "docs/decisions/0029-cobol-storage-entry-identity.md"
         },
         {
+          "label": "ADR-0030: Common CICS source condition authority",
+          "path": "docs/decisions/0030-cics-source-condition-authority.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2532,7 +2548,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:746b60282b689133e9760d917d914d17b0d8f0ccc70b857c2e2fe9c9b36f3123",
+  "registry_sha256": "sha256:6715ffd6171d1a3933c82f753671b118919ac7ff475b47eda563d9282857018d",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

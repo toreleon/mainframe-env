@@ -8402,6 +8402,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/0.6/inventory/dependency-additions.json"),
         root.join("conformance/0.7/inventory/dependency-additions.json"),
         root.join("conformance/0.8/inventory/dependency-additions.json"),
+        root.join("conformance/0.10/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;

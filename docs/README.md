@@ -95,6 +95,7 @@ explicitly names that authority as superseded.
 - [ADR-0027: CICS task ownership across logical program frames](decisions/0027-cics-logical-program-frames.md)
 - [ADR-0028: Explicit BTS SET loan lifetime](decisions/0028-explicit-bts-set-loan-lifetime.md)
 - [ADR-0029: COBOL storage-entry identity](decisions/0029-cobol-storage-entry-identity.md)
+- [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
