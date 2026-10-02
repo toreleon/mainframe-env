@@ -120,5 +120,88 @@ class Spi1001CatalogTests(unittest.TestCase):
             catalog_tool.render_rust_from_catalog(catalog)
 
 
+class AdministrativeGrammarTests(unittest.TestCase):
+    def setUp(self) -> None:
+        root = catalog_tool.ROOT
+        self.family = json.loads((root / catalog_tool.FAMILY_PATH / "spi-program.json").read_text())
+        self.mapping = json.loads((root / "conformance/0.10/cics/spi-command-source-map.json").read_text())
+        self.manifest = json.loads((root / "conformance/0.10/manifests/cics-spi-command-topics.json").read_text())
+
+    def project(self, family=None):
+        return catalog_tool.project_family_grammar(
+            self.family if family is None else family, self.mapping, self.manifest
+        )
+
+    def test_exact_program_cohort_uses_shared_operand_types_and_pending_status(self) -> None:
+        facts = self.project()
+        self.assertEqual([fact["official_row"].rsplit(":", 1)[1] for fact in facts],
+                         ["0026", "0084", "0155", "0241"])
+        self.assertEqual(sum(len(fact["grammar"]["options"]) for fact in facts), 97)
+        rendered = catalog_tool.render_grammar_facts(facts).decode()
+        self.assertEqual(rendered.count("CicsApplicationConstraintStatus::Pending"), 4)
+        self.assertIn("CicsApplicationOptionDescriptor", rendered)
+        self.assertNotIn("runtime_operation", rendered)
+        self.assertNotIn("handler_id", rendered)
+        self.assertNotIn("CicsResponse", rendered)
+
+    def test_cases_verdicts_and_lifecycle_prose_cannot_generate_product_behavior(self) -> None:
+        original = catalog_tool.render_grammar_facts(self.project())
+        changed = copy.deepcopy(self.family)
+        command = changed["commands"][0]
+        command["obligations"][0]["cases"][0]["expected"] = "invented pass"
+        command["obligations"][0]["gates"] = []
+        command["lifecycle"]["mutations"] = ["invented mutation"]
+        command["responses"][0]["resp2"] = 999
+        self.assertEqual(original, catalog_tool.render_grammar_facts(self.project(changed)))
+
+    def test_stale_source_pin_label_topic_and_baseline_are_rejected(self) -> None:
+        for field, value in (("sha256", "sha256:" + "0" * 64),
+                             ("topic_path", "wrong.html"), ("baseline", "wrong-baseline")):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(self.family)
+                changed["commands"][0]["source"][field] = value
+                with self.assertRaises((catalog_tool.CatalogError, KeyError)):
+                    self.project(changed)
+        changed = copy.deepcopy(self.family)
+        changed["commands"][0]["label"] = "SET PROGRAM"
+        with self.assertRaisesRegex(catalog_tool.CatalogError, "source identity"):
+            self.project(changed)
+
+    def test_missing_duplicate_and_reordered_rows_are_rejected(self) -> None:
+        for mode in ("missing", "duplicate", "reordered"):
+            with self.subTest(mode=mode):
+                changed = copy.deepcopy(self.family)
+                if mode == "missing":
+                    changed["commands"].pop()
+                elif mode == "duplicate":
+                    changed["commands"][-1] = copy.deepcopy(changed["commands"][0])
+                else:
+                    changed["commands"].reverse()
+                with self.assertRaisesRegex(catalog_tool.CatalogError, "row identity"):
+                    self.project(changed)
+
+    def test_public_binding_and_foreign_family_or_version_are_rejected(self) -> None:
+        for field, value in (("runtime_binding", "public-registered"),
+                             ("target_version", "0.9.0"), ("family", "spi-everything")):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(self.family)
+                changed[field] = value
+                with self.assertRaises(catalog_tool.CatalogError):
+                    self.project(changed)
+
+    def test_product_fact_digest_is_sensitive_to_shape_direction_and_byte_bound(self) -> None:
+        original = catalog_tool.render_grammar_facts(self.project())
+        for field, value in (("value_shape", "optional-value"),
+                             ("direction", "input-output"), ("source_max_value_bytes", 42)):
+            changed = copy.deepcopy(self.family)
+            changed["commands"][0]["grammar"]["options"][0][field] = value
+            self.assertNotEqual(original, catalog_tool.render_grammar_facts(self.project(changed)))
+
+    def test_emitted_grammar_is_current_and_deterministic(self) -> None:
+        expected = catalog_tool.render_grammar()
+        self.assertEqual(expected, catalog_tool.render_grammar())
+        self.assertEqual(expected, (catalog_tool.ROOT / catalog_tool.GRAMMAR_OUTPUT_PATH).read_bytes())
+
+
 if __name__ == "__main__":
     unittest.main()

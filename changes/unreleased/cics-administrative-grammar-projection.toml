@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Project reviewed administrative option facts into the shared CICS IR with pending grammar completeness and no runtime admission."

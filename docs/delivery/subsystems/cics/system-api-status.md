@@ -1364,3 +1364,37 @@ typing, SAF configuration, lock order and unspecified recovery remain explicit
 gaps. This seal covers the bounded private contract input only; it does not
 accept complete grammar, handlers, routes, recovery, licensed evidence or parent
 SPI-1001. Denominators remain 269 SPI and 39 FEPI, with zero behavioral credit.
+
+## Shared administrative grammar projection and binding reviews
+
+Manager declares `SPI-1001.family-grammar-projection` before implementation.
+The current IR exposes only administrative identities; it cannot carry the
+reviewed PROGRAM option/direction/byte/constraint facts. The manager exclusively
+owns the existing generate_spi1001_catalog.py owner and its focused tests,
+cics_administrative.rs and IR facade, a derived Rust grammar projection, this
+status, unique fragment and derived docs. It reuses existing CICS option and
+constraint types. Source cases, verdicts and lifecycle prose never generate
+handlers or routes; complete grammar status stays Pending until browse, CVDA
+and conditional source closure are structured and reviewed. Acceptance proves
+exact source/row binding, deterministic output, rejection of changed pins and
+public promotion, preserved 269/39 denominators and application separation.
+
+Manager also declares two independent read-only CLI review slices before
+resuming the retained worker sessions:
+
+| Slice | Rows and frozen input | Ownership and acceptance |
+|---|---|---|
+| `SPI-1001.fepi-pool-contract-review` | FEPI 0001/0007/0009/0018/0021/0034; frozen worker input bb414037950c2a0f6bcd37cc3757b6ffac72e7428ba0c66820d286fe08046f2c | External SPI worker fepi-pool-review handoff only; independent full six-row source/grammar/lifecycle/case review, exact defects and bounded repair recommendations. No tracked edits or runtime credit. |
+| `SPI-1001.family-runtime-binding-review` | Four PROGRAM and six POOL rows, existing CICS state/resource/UOW/SAF/store owners | External FEPI worker runtime-binding-review handoff only; precise shared runtime/state/persistence/ABI/compiler ownership, first dependency-ready implementation slice, source gaps, and independent selected-route tests. No alternate dispatcher/database/mapper or tracked edits. |
+
+Both use existing isolated worktrees and retained CLI sessions, gpt-6.1-sol high
+with fast mode off and no nested workers. Offline pinned search/read applies;
+no refresh, licensed execution, source inference, builds or semantic passes are
+authorized for these reviews. Manager retains one serialized shared owner.
+
+Shared IR grammar projection checks pass: seven focused Rust tests and
+17 generator tests, with no ignored cases. Four PROGRAM source contracts
+project 97 typed operand facts through existing CICS operand types. Every
+contract retains Pending completeness; source candidates/response/lifecycle
+prose and verdicts do not generate product behavior. Identity catalog bytes and
+269/39 denominators are unchanged. Mandatory gates precede this bounded seal.
