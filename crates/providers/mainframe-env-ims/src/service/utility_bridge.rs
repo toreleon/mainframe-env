@@ -938,6 +938,8 @@ mod tests {
             )
             .unwrap();
         let image = loaded_image(&service, run);
+        // Fresh navigation advances the image CAS; stage against that version.
+        assert_eq!(read_key(&service, run, b"A1").status, "GE");
         UtilityEngine::stage_initial_load(
             &service,
             &invocation,
@@ -954,7 +956,6 @@ mod tests {
             RecoveryLimits::default(),
         )
         .unwrap();
-        assert_eq!(read_key(&service, run, b"A1").status, "GE");
         let key = intent(&*store, run, "load-effect", [1; 32]);
         let receipt = UtilityEngine::publish(
             &service,

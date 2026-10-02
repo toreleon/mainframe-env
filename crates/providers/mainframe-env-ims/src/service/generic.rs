@@ -6,6 +6,7 @@ use crate::database::{
 };
 use crate::{ImsDatabaseMetadata, ImsDatabasePcbMetadata, ImsPcbMetadata};
 
+pub(super) mod integrity;
 pub(super) mod isolation;
 mod load_image;
 mod logical;
@@ -520,6 +521,14 @@ pub(in crate::service) fn allowed(
     segment: &str,
     operation: ImsOperation,
 ) -> bool {
+    if pcb.processing_options.contains('O')
+        && matches!(
+            operation,
+            ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
+        )
+    {
+        return false;
+    }
     let Some(sensitive) = pcb
         .sensitive_segments
         .iter()

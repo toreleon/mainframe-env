@@ -325,7 +325,7 @@ impl ImsService {
                 let plan = recovery
                     .xrst_staged(effect_id, selection(selector), |saved| {
                         let (number, position, observed) =
-                            restore_position(&next, &request.psb, saved, self.limits)
+                            restore_position(&next, run, &request.psb, saved, self.limits)
                                 .map_err(host_to_recovery)?;
                         generic::pcb::set_position(
                             Arc::make_mut(
@@ -578,6 +578,7 @@ fn save_positions(
 
 fn restore_position(
     state: &State,
+    run: &str,
     psb: &str,
     saved: &SavedPcbPosition,
     limits: ImsLimits,
@@ -596,6 +597,12 @@ fn restore_position(
     if pcb.secondary_index.is_some() {
         return Err(HostProblem::Unsupported);
     }
+    // XRST's provider-owned GU is still a database read. The common bridge
+    // already CAS-fences every selected database at publication.
+    let mut observation = checkpoint_observation();
+    observation.operation = ImsOperation::GetUnique;
+    observation.pcb = number;
+    generic::integrity::prepare(state, run, &observation)?;
     let engine = generic::restored(state, &saved.database, limits)?;
     let path: KeyPath =
         serde_json::from_slice(&saved.segment_key).map_err(|_| HostProblem::ProviderFailure)?;

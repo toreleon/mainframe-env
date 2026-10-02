@@ -150,7 +150,29 @@ fn local_uow_load_replace_delete_batch_and_denial_cannot_bypass_owner() {
             &["ROOT"],
             b"",
         );
+        // Establish B's hold from committed data before A stages a no-op write.
+        execute(
+            &service,
+            "isolation-a",
+            &request("isolation-a", ImsOperation::Commit, 3, &[], b""),
+        );
         execute(&service, "isolation-b", &hold);
+        execute(
+            &service,
+            "isolation-a",
+            &request(
+                "isolation-a",
+                ImsOperation::GetHoldUnique,
+                4,
+                &["ROOT"],
+                b"",
+            ),
+        );
+        execute(
+            &service,
+            "isolation-a",
+            &request("isolation-a", ImsOperation::Replace, 5, &[], b"A1X"),
+        );
         let before = rows(&*store);
         for op in [ImsOperation::Replace, ImsOperation::Delete] {
             let req = request("isolation-b", op, 3, &[], b"A1Z");
@@ -198,7 +220,7 @@ fn local_uow_load_replace_delete_batch_and_denial_cannot_bypass_owner() {
         execute(
             &service,
             "isolation-a",
-            &request("isolation-a", ImsOperation::Commit, 3, &[], b""),
+            &request("isolation-a", ImsOperation::Commit, 6, &[], b""),
         );
         assert_eq!(execute(&service, "isolation-b", &insert).status, "  ");
         execute(
@@ -668,8 +690,13 @@ fn local_uow_logical_cascade_fences_every_affected_database() {
     for store in backends() {
         let service = ImsService::open(store.clone(), ImsLimits::default()).unwrap();
         closure_tests::setup(&service, true);
-        closure_tests::insert_child(&service, 3);
+        execute(
+            &service,
+            "child-run",
+            &request("child-run", ImsOperation::Commit, 100, &[], b""),
+        );
         closure_tests::hold_parent(&service, 4);
+        closure_tests::insert_child(&service, 3);
         let mut delete = request("parent-run", ImsOperation::Delete, 5, &[], b"");
         delete.pcb = 2;
         let before = rows(&*store);

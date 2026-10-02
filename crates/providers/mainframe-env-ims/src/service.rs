@@ -478,7 +478,10 @@ impl ImsService {
         let mut durable = self.lock()?;
         refresh_replay(&*self.store, self.limits, &mut durable)?;
         system::reservations::refresh(&*self.store, self.limits, &mut durable)?;
-        if durable.state.metadata.is_some() {
+        let integrity_read = generic::integrity::is_read(request.operation);
+        if integrity_read {
+            generic::integrity::refresh_sessions(&*self.store, self.limits, &mut durable)?;
+        } else if durable.state.metadata.is_some() {
             generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
         }
         let system_resources = if request.operation == ImsOperation::System {
@@ -496,17 +499,12 @@ impl ImsService {
             }
         }
         refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let prepared = navigation
-            .map(|navigation| {
-                generic::ssa::prepare(&durable.state, invocation, navigation, self.limits)
-            })
-            .transpose()?;
         let request_sha256 = if let Some(navigation) = navigation {
             mainframe_env_host_api::canonical_request_digest(&HostRequest::ImsNavigation(
                 navigation.clone(),
             ))?
         } else {
-            request_digest(request)?
+            canonical_ims_request_digest(request)?
         };
         let replay_key = request
             .mutation
@@ -539,8 +537,20 @@ impl ImsService {
                 }
             }
         }
-        let mut next = durable.state.scoped_snapshot();
         let run = invocation.run_unit_id.as_str();
+        if integrity_read {
+            if durable.state.metadata.is_some() {
+                generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
+            }
+            generic::integrity::refresh_legacy(&*self.store, self.limits, &mut durable)?;
+        }
+        let read_fence = generic::integrity::prepare(&durable.state, run, request)?;
+        let prepared = navigation
+            .map(|navigation| {
+                generic::ssa::prepare(&durable.state, invocation, navigation, self.limits)
+            })
+            .transpose()?;
+        let mut next = durable.state.scoped_snapshot();
         let result = if let Some(prepared) = prepared {
             generic::ssa::read(&mut next, run, request, &prepared, self.limits)?
         } else if request.operation == ImsOperation::System {
@@ -594,7 +604,7 @@ impl ImsService {
             )?;
             next.replay.insert(key.into(), Arc::new(recorded));
             validate_state(&next, self.limits)?;
-            self.persist(&mut durable, next)?;
+            generic::integrity::persist(self, &mut durable, next, &read_fence)?;
             self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
                 .map_err(|_| HostProblem::UnknownOutcome)?;
         }
@@ -648,7 +658,7 @@ impl ImsService {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
-        let canonical = request_digest(request)?;
+        let canonical = canonical_ims_request_digest(request)?;
         let mut durable = self.lock()?;
         refresh_replay(&*self.store, self.limits, &mut durable)?;
         let retained = durable
@@ -720,16 +730,7 @@ impl ImsService {
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
-        let changes = row_changes(
-            &durable.state,
-            &state,
-            &durable.versions,
-            self.limits,
-            false,
-        )?;
-        commit_row_changes(&*self.store, changes, &mut durable.versions)?;
-        durable.state = state;
-        Ok(())
+        generic::integrity::persist(self, durable, state, &Default::default())
     }
 }
 
@@ -1450,10 +1451,6 @@ fn segment(name: &str, parent_key: Option<Vec<u8>>, data: Vec<u8>) -> ImsResult 
         affected_segments: 0,
         system: None,
     }
-}
-
-fn request_digest(request: &ImsRequest) -> Result<[u8; 32], HostProblem> {
-    canonical_ims_request_digest(request)
 }
 
 fn normalize(value: &str) -> String {

@@ -78,6 +78,12 @@ fn public_route_selects_every_pinned_organization_from_metadata() {
             ImsOperation::GetUnique
         };
         let read_run = if organization == Gsam {
+            // A different normal PCB cannot read this writer's pending image.
+            execute(
+                &service,
+                run,
+                &request(run, ImsOperation::Commit, 3, &[], b""),
+            );
             let fresh = "org-read";
             assert_eq!(
                 execute(
@@ -335,14 +341,18 @@ fn logical_child_requires_resolved_parent_and_tracks_parent_replace() {
         .status,
         "  "
     );
+    let read = request("child-run", ImsOperation::GetUnique, 8, &["CHILD"], b"");
     assert_eq!(
-        execute(
-            &service,
-            "child-run",
-            &request("child-run", ImsOperation::GetUnique, 8, &["CHILD"], b"")
-        )
-        .segments[0]
-            .data,
+        service.execute(&invocation("child-run"), &read),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    execute(
+        &service,
+        "parent-run",
+        &request("parent-run", ImsOperation::Commit, 9, &[], b""),
+    );
+    assert_eq!(
+        execute(&service, "child-run", &read).segments[0].data,
         b"C1BP1Z"
     );
     assert!(ImsService::open(store, ImsLimits::default()).is_ok());
@@ -408,13 +418,11 @@ fn paired_delete_rolls_back_both_databases_and_reopens_from_sqlite() {
             2
         );
         assert_eq!(
-            execute(
-                &service,
-                "child-run",
+            service.execute(
+                &invocation("child-run"),
                 &request("child-run", ImsOperation::GetUnique, 7, &["CHILD"], b"")
-            )
-            .status,
-            "GE"
+            ),
+            Err(HostProblem::IdempotencyConflict)
         );
         execute(
             &service,

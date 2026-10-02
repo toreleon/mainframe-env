@@ -1871,3 +1871,195 @@ runtime and four host-contract cases. Strict three-package Clippy, the global
 module ratchet and assurance/docs checks pass. The first manager server filter
 matched zero tests and earns no credit; the corrected
 `ims_package_tests::application_recovery` run is retained in the seal receipt.
+## IMS-1406.integrity-read-visibility (implemented bounded leaf, 2026-10-02)
+
+Parent: IMS-1406. Clean entry and preserved Q seal:
+`ab085b2c720d3b4964ea31a0e6bddb5e27d30581`; branch
+`codex/v014-integrity-read-visibility-20261002`. Consumes the accepted
+0.4/0.5/0.6 identities above and the shared host/SAF/effect/provider-row/CAS,
+storage, UOW, retention and pending participant boundaries. IBM-observable
+visibility remains provider-owned; no private locks, store or coordinator.
+
+Catalog context: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`
+(GU/GN/GNP and hold forms); settlement compatibility uses existing
+`:0002/:0017` context without altering recovery algorithms. No official row,
+participant, shared IR, licensed or parent credit is claimed.
+
+Source baseline `ibm-ims-15.6-programming-contracts-2026-09-11`:
+`ims_processingoptions.htm` (`bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4`),
+`ims_gughucall.htm` (`0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9`),
+`ims_gnghncall.htm` (`063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4`),
+`ims_gnpghnpcall.htm` (`6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762`),
+and `ims_comparingcmdcodesandopts.htm`
+(`eec570be49de991fe17b672c5e81dc4a83733d66267d3e0b561502e8820854ec`).
+All five retained path files are absent; their raw SHA archive bodies and
+committed TOC hash were verified, then used by the offline shared search/read
+parser. No selected registered topic is missing from both roots. The scoped
+reader's other missing-topic count is not a whole-cache audit finding.
+
+Existing archive supplements, separately verified against archive metadata,
+remain unregistered: `ims_reservingsegments.htm`
+(`4d3967707752564dcc2193e8003341bfdd63a2a2d5358ba8d5f9db210830fbbe`),
+`ims_readwithoutntegrity.htm`
+(`2c47c2c4d31978fe88fba7011b47bfadd043052b0413691264256471e587ff5b`),
+`ims_psbgendlipcbstmt.htm`
+(`0dad54edd1a9940ca9a6988e06412836ff35a706cc2e1f7fbd36eb14fa02cfba`),
+`ims_psbgenfastpathproc.htm`
+(`cf00db795cf0d591ac6217ee2116d62a1b07e5f4eb8a14e10891553989b9324c`).
+Exact shared-reader requests for these unregistered topics are unavailable;
+they are supplements, not silently registered baseline replacements. No IBM
+bodies enter Git or execution evidence; no network refresh is authorized.
+
+Applicability: normal G/R/D/A reads must not expose foreign uncommitted
+images; I implies G for DEDB only (existing capability validation remains
+separately owned). PCB O is read without integrity, restricted to the trusted
+GO/GOP/GON/GONP/GOT/GOTP forms. It cannot authorize segment updates or be
+inferred from a SENSEG O or caller flag. Full-function and DEDB have source
+support for O; MSDB and GSAM do not receive that exemption. N/T pointer-error,
+physical CI buffering/retry and exclusive E scheduling are not implemented by
+this image fence. The current legacy request carries selected PCB but no
+validated IMS execution-context/syncpoint owner: Interactive/Batch are local
+test contexts, not proof of the source DB/DC, DBCTL, DB batch matrix. Context
+validation and new SSA/GSAM DTOs stay with the manager/other workers.
+
+Owned edits: new bounded `service/generic/integrity.rs` and
+`service/generic/tests/integrity_tests.rs`, minimal module declarations and
+common `service.rs` execute/persistence integration, a unique changelog
+fragment, this status section and routine generated documentation manifest.
+Affected compatibility fixtures in `tests/closure_tests.rs`,
+`tests/isolation_tests.rs` and the utility-bridge test module also need
+source-consistent expectations/ordering: obtain holds from committed data,
+reject foreign pending insert/replace/delete observations and stage utilities
+after the fresh read CAS. Their product algorithms remain unchanged.
+Fence exact replay before fresh navigation; use pending undo plus unchanged
+database/dependency CAS rows in the existing atomic publication. Owner reads
+remain valid; foreign normal reads fail with host contention and no status,
+position, hold, Q or replay publication. Preserve Q algorithms and all
+STAT/index/recovery/participant ownership. Manager resolves facade movement.
+
+Required proof: deterministic public typed-provider fail-first on Memory and
+file SQLite; all six read/hold operations, selected PCBs and trusted O forms,
+forbidden O metadata/update cases, owner reads, commit/backout release,
+fresh/stale services, dependency scope, replay before later UOWs, no-op/new
+writer CAS races, atomic failure/lost acknowledgement, corruption/legacy undo,
+SQLite processes/reopen and inherited lease/retention compatibility. Run
+focused regressions, strict scoped `--no-deps` Clippy with `-D warnings`,
+fmt/deny/catalog/assurance/spec/shared guards/docs/changelog and exact leaf
+allowlist seal/check; retain receipts outside targets and clean each sequence.
+
+Remaining limits: database/dependency contention is conservative and does not
+prove IBM record/block lock granularity, shared-Q scheduling, ordinary Get
+Hold read locks, waits/deadlocks or complete isolation. Shared lease/live
+controls/audit/retention/coordinator and mixed-resource acceptance stay pending.
+No push/PR, licensed execution, network or unrelated campaigns.
+
+Implementation: `generic/integrity.rs` derives the read fence from the existing
+`ImsRequest.operation` and selected PCB. Common `execute_at` refreshes session
+authority for authorization, resolves exact canonical read replay, then refreshes
+database/undo and performs the integrity check before fresh navigation. There is
+one algorithm for legacy requests and manager-composed SSA/GSAM routes; no absent
+DTOs or private SSA/GSAM implementation. The existing row-diff/CAS publication
+adds unchanged observed database/dependency rows alongside session, status/Q and
+replay changes. New writers and no-op ownership transitions cannot publish past
+the inspected version. Ordinary G/R/D/A reads reject foreign pending images with
+host `IdempotencyConflict`; owner reads remain valid with verified undo. Host
+contention does not manufacture an IBM PCB status or change position/hold/Q.
+
+Trusted O metadata permits foreign pending data only for the declared database
+classes. O on SENSEG alone grants no exemption; O PCBs with update SENSEGs and
+O on MSDB/GSAM fail closed with `Unsupported` before observation. Ordinary
+mutation permission checks prohibit updating through any O PCB even with a
+SENSEG override. Legacy definition option strings lack the validated generic
+PROCOPT/organization authority and receive a conservative integrity fence.
+Logical-parent RULES are absent from this bounded metadata contract, so O on a
+child cannot exempt a different related database's foreign pending undo.
+Malformed undo fails closed; retained plain-map/unmatched post-image witnesses
+stay `UnknownOutcome` where ownership safety cannot be proved. O does not grant
+permission to consume corrupt state. Original replay returns recorded bytes
+before consulting a later unrelated UOW, including after a lost publication
+acknowledgement, without redispatch or restoring an obsolete position/hold.
+
+The deterministic fail-first receipt contains both public Memory and file-SQLite
+G reads returning foreign pending `C1Z`. Final focused verification executes
+15 integrity tests through `ims_providers`, including all six read/hold forms,
+selected G/update/O PCBs, G/R/D/A and full-function/DEDB GO/N/T classes,
+forbidden O cases, owner reads, commit/rollback release, stale/fresh services,
+unrelated/logical dependency scope, canonical replay/conflict, no-op/new-writer
+CAS races, atomic failure, lost acknowledgement, authorization, retained undo,
+corruption, legacy route and three separate SQLite seed/observe/verify processes.
+Existing Q/PCB/checkpoint/recovery/retention/participant regressions passed in
+the affected package run: 139 unit and 17 integration tests, before the final
+test-only PROCOPT matrix addition; final focused 15 and strict Clippy include
+that addition. These are local executable checks, not official verdict events.
+
+Exact commands: `cargo test -p mainframe-env-ims integrity_fail_first --
+--nocapture` (expected failure), `cargo test -p mainframe-env-ims`,
+`cargo test -p mainframe-env-ims integrity_`,
+`cargo clippy -p mainframe-env-ims --all-targets --no-deps -- -D warnings`,
+`cargo fmt --all -- --check`, `cargo deny --offline check`,
+`cargo xtask ims-catalog --check`, `cargo xtask ims-assurance-matrix --check`,
+`cargo xtask spec --check` (134 policy tests), `cargo xtask changelog --check`.
+Shared Python guards pass: `tools/check_execution_route.py`,
+`check_effect_encoding.py`, `check_provider_rows.py`, `check_storage_profile.py`,
+`check_enterprise_authorization.py`, `check_retention_lifecycle.py`,
+`check_transaction_participant.py`, plus
+`python3 -B tools/generate_transaction_participant.py --check`. Every Python
+command uses `python3 -B`; Cargo uses `PATH=/Users/tore/.local/bin:$PATH` and
+`CARGO_NET_OFFLINE=true`. Tools resolve to Python 3.12.13 / Cargo/Rust 1.98.0.
+No unchanged global architecture/cache/module failure is rerun or relabeled.
+The scoped helper has 218 production lines, generic 943, facade 2,123; the
+inherited facade ceiling and shared module/lint repairs remain manager-owned.
+
+Compatibility: no durable/public schema, namespace, request/result canonical
+domain, undo witness or replay-age/retention lifetime changes. Fresh reads now
+advance the observed image CAS even for unchanged bytes; utility stages bound
+to an older version require restaging. No second committed image is retained.
+Historical successful replay, including a read previously admitted incorrectly,
+is not rewritten. Stop admission and drain/reconcile sessions, Q reservations
+and UOWs before upgrade or binary rollback; retain original checkpoint/replay
+references or restore a consistent compatible backup. Mixed old/new writers
+remain unsupported, and v2-undo downgrade limits still apply. This leaf adds no
+coordinator recovery-lease epoch, current-time/cancellation check, audit
+composition, new retention authority or accepted participant capabilities.
+
+Receipts: external
+`/Users/tore/Library/Caches/mainframe-env/worker-receipts/v014-completion-20261002/IMS-1406.integrity-read-visibility`.
+Routine final documentation generation/check uses `cargo xtask docs` and
+`cargo xtask docs --check`. The leaf seal uses the exact staged changed-path
+allowlist with `cargo xtask work-package-seal --id
+IMS-1406.integrity-read-visibility --target-version 0.14.0`, then the same
+allowlist with `--check` after local commit. Cargo targets are cleaned after
+each sequence; no publication bodies enter Git. Manager must retain the common
+pipeline fence and existing row-helper names during mechanical module movement,
+integrate other worker changes and re-seal changed blobs. The next substantive
+work is source-backed record/read-lock/shared-Q scheduling and pending shared
+participant/context/IR acceptance, not repeating this leaf's successful checks.
+Official/IR credit remains zero and licensed differentials remain 0/25 pending;
+parent IMS-1406 and the 0.14 exit gate remain incomplete.
+
+### Integrity-read manager integration
+
+All fresh legacy and rich SSA reads share the common fence after exact replay
+resolution. SSA preparation follows the refreshed authoritative image rather
+than examining an old image before replay. Preserve current Q, selected-PCB,
+secondary, recovery markers and the extracted row/validation helpers. Remove
+only the redundant canonical digest wrapper and lower the exact facade budget.
+An additional public regression covers rich SSA replay during later foreign
+pending work, fresh normal-read rejection, and trusted GO visibility on both
+Memory and file SQLite.
+
+XRST's internally qualified GU is also a read. A fail-first selected recovery
+case reproduced fresh XRST accepting another run's uncommitted image. Apply
+the same trusted-PCB visibility preparation before repositioning; the existing
+recovery bridge atomically CAS-fences every selected database with the recovery
+and session publication. Do not invent a second recovery/read-lock authority.
+`integrity-restart-red.log` retains the failure; combined verification and the
+exact re-seal remain separate from the worker's historical receipts.
+The first combined unit run passed 165 cases and found one new fixture supplying
+both raw SSAs and legacy segment operands; validation correctly rejected it.
+That failure stays in `integrity-integration-initial-failure.log`. After fixing
+only that fixture, the focused rich SSA case, all 24 application recovery cases
+and all 13 signed IMS package cases pass in `integrity-integration.log`, with
+strict IMS/server Clippy and the module/assurance guards. Do not relabel the
+earlier whole-unit run as a later whole-suite receipt. Licensed and official
+row counts are unchanged.
