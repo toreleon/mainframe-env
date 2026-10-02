@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a private bounded finite Db2 DECFLOAT(16/34) assignment adapter from opaque exact numeric literal proofs, with seven caller-selected rounding modes and explicit origins, owned coefficient/exponent and inexact observations; public integration, package/register selection, SQL execution and licensed differential remain pending."

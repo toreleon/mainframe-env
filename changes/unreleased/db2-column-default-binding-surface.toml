@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose bounded column-only Db2 CREATE TABLE default binding through the existing facade, with independent public intent, assignment, provenance and budget vectors; runtime producers, full catalog binding and licensed differential remain pending."

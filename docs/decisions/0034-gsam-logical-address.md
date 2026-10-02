@@ -1,4 +1,4 @@
-# ADR-0028: GSAM logical record addresses on the owned host route
+# ADR-0034: GSAM logical record addresses on the owned host route
 
 Status: **Proposed within the human-authorized bounded IMS implementation**
 Owner: **host-contract and IMS maintainers**

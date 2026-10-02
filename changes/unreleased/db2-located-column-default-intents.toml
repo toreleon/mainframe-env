@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Distinguish omitted, operand-less type-default and explicit literal/NULL CREATE TABLE column defaults through an optional value API; retain original clause, operand and separate numeric sign/token locations without resolving defaults or executing SQL."

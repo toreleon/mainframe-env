@@ -88,7 +88,7 @@ and 502-byte result at
 `ee1eea1457dcca61a8318540879282c91e93d54a9bf5022583754b0095801821`.
 These are owned logical addresses, not IBM RSA bytes. Existing IMS preimages
 remain fixed. Replay output and downgrade rules are in
-[ADR-0028](../decisions/0028-gsam-logical-address.md); retention hashes the
+[ADR-0034](../decisions/0034-gsam-logical-address.md); retention hashes the
 additive result variant without relabeling historical receipts.
 
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
@@ -112,7 +112,7 @@ in the [class review](../delivery/subsystems/ims/selected-pcb-feedback.md).
 The optional retained output participates in the existing result hash and
 receipt authority; replay never reconstructs feedback from later cursor state.
 Downgrade requires a compatible receipt reader or coherent pre-feature restore
-as described in [ADR-0029](../decisions/0029-selected-pcb-feedback.md).
+as described in [ADR-0035](../decisions/0035-selected-pcb-feedback.md).
 
 `CapabilityDescriptor.max_request_bytes` and `.max_result_bytes` now count the
 canonical preimage, including domain prefix, tags, field identifiers and lengths.

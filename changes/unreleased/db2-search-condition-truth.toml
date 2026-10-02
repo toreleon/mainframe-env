@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a pure owned Db2 TRUE/FALSE/UNKNOWN predicate domain with AND, OR, NOT, TRUE-only qualification and explicit-nullness NULL predicates. Independent fixed truth tables preserve UNKNOWN through negation. Public exports, expression evaluation, SQL BOOLEAN scalars, runtime cells, statement execution and licensed differential remain pending."

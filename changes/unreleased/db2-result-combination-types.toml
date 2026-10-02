@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add pure bounded ordered Db2 numeric, binary and datetime result-type combination with explicit CASE/COALESCE context, untyped NULL handling, original-source spans and runtime whole-part preservation obligations; context-dependent families remain pending without evaluation or statement-row credit."

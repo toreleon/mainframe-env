@@ -93,10 +93,12 @@ explicitly names that authority as superseded.
 - [ADR-0025: Licence and provenance policy for IBM oracle evidence](decisions/0025-licence-and-provenance-policy.md)
 - [ADR-0026: CardDemo run bundle](decisions/0026-run-bundle.md)
 - [ADR-0027: CICS task ownership across logical program frames](decisions/0027-cics-logical-program-frames.md)
-- [ADR-0028: Bounded GSAM logical record addresses](decisions/0028-gsam-logical-address.md)
+- [ADR-0034: Bounded GSAM logical record addresses](decisions/0034-gsam-logical-address.md)
 - [ADR-0031: IMS TM recovery publication and work settlement](decisions/0031-ims-tm-recovery-publication.md)
-- [ADR-0029: Versioned selected database PCB feedback](decisions/0029-selected-pcb-feedback.md)
+- [ADR-0035: Versioned selected database PCB feedback](decisions/0035-selected-pcb-feedback.md)
 - [ADR-0033: Raw COBOL DL/I CALL and PCB binding contract](decisions/0033-cobol-dli-call-boundary.md)
+- [ADR-0028: Db2 typed catalog evolution](decisions/0028-db2-typed-catalog-evolution.md)
+- [ADR-0029: Db2 core participant evolution](decisions/0029-db2-core-participant-evolution.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

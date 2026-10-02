@@ -153,7 +153,7 @@ No SQL migration, new retention target or automatic history rewrite. Downgrade
 requires stopping new GSAM calls, draining active UOWs and preserving compatible
 image/replay/checkpoint backups: old writers can lose identity fields and old
 strict replay readers reject new GSAM receipts. See
-[ADR-0028](../../../decisions/0028-gsam-logical-address.md).
+[ADR-0034](../../../decisions/0034-gsam-logical-address.md).
 
 Integration exceptions: exhaustive request/result enum and canonical arms,
 exports/module declarations, existing provider operand dispatch and replay
@@ -3357,7 +3357,7 @@ hash-addressed archive files matched and were read with the repository parser
 and pinned search/read commands. Exact topics, hashes, catalog rows, independently
 derived literals, shared integration seams and unproved classes are recorded in
 [the bounded class review](selected-pcb-feedback.md), with the additive boundary
-and downgrade procedure in [ADR-0029](../../../decisions/0029-selected-pcb-feedback.md).
+and downgrade procedure in [ADR-0035](../../../decisions/0035-selected-pcb-feedback.md).
 No failed-call last-satisfied witness, selected secondary key-layout recipe,
 primary REPL/DLET validity, missing sequence/logical recipe or physical ABI is
 invented. Successful secondary REPL alone has source-defined invalidity.
@@ -3545,3 +3545,21 @@ Compiler/guest CALL references, signed PCB-capacity/linkage binding and complete
 validity-tagged raw feedback still require the shared owners' boundary decision.
 No parent/raw/official/human/participant/release success or licensed credit is
 claimed. Human implementation authorization has been requested separately.
+
+### Current-main merge and Proposed decision identity repair (2026-10-02)
+
+Current main advances to `f0727cf8b138439c1bed9da572fa37a43c167580`
+through independently merged DB2 work. The manager preserves its code and two
+existing dependency links unchanged; the shared conformance facade combines
+the independent declared modules. Only documentation navigation/registry and
+generated-manifest conflicts require manual resolution. No DB2 semantic change
+is made by this merge. Because main already owns decision IDs0028/0029, the
+manager's still-Proposed GSAM address and PCB-feedback decisions move to0034
+and0035, respectively. Their actual links and titles follow those identities;
+accepted/main DB2 decisions are not renumbered. Old feature seals/receipts retain
+their original identities and are not rewritten. Reserved integration IDs0030
+for GSAM formats,0031 for TM publication,0032 for secondary restart and0033 for
+raw CALL keep independent ownership. Runtime/source rules and official/license
+credit are unaffected by this navigation repair. Candidate merge checks and
+cleanup have their own external receipts; later worker deltas are not credited
+as part of this merge's unchanged IMS code.

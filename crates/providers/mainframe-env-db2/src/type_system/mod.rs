@@ -7,6 +7,9 @@
 use crate::ast::{Db2BuiltInDataType, Db2BuiltInType, Db2DataType};
 use std::fmt;
 
+pub mod string_constants;
+pub mod truth;
+
 const MAX_DECIMAL_PRECISION: u32 = 31;
 const MAX_FLOAT_PRECISION: u32 = 53;
 const MAX_CHARACTER_LENGTH: u32 = 255;
@@ -298,7 +301,17 @@ fn resolve_float(syntax: &Db2BuiltInDataType) -> Result<Db2ScalarType, Db2TypeEr
             "FLOAT precision must be from 1 through 53",
         ));
     }
-    Ok(Db2ScalarType::Float { precision })
+    // Db2 13 baseline ibm-db2-for-zos-13-2026-08-13, SQL0050:
+    // SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtable.html, 874327 bytes,
+    // SHA-256 104cc7fd0f43e804819da99c18887de60983cad8fa78b7d550ffaf63dfd299d6,
+    // lines 220..227 define FLOAT(1..21) as single precision (REAL) and
+    // FLOAT(22..53) as double precision (DOUBLE), with omitted precision 53.
+    // Canonicalize semantic shape only; the AST retains FLOAT and its arguments.
+    Ok(if precision <= 21 {
+        Db2ScalarType::Real
+    } else {
+        Db2ScalarType::Double
+    })
 }
 
 fn resolve_decfloat(syntax: &Db2BuiltInDataType) -> Result<Db2ScalarType, Db2TypeError> {

@@ -164,12 +164,7 @@ fn resolves_common_scalar_shapes_and_preserves_parameters() {
                 scale: 31,
             },
         ),
-        (
-            Db2BuiltInType::Float,
-            vec![21],
-            false,
-            Db2ScalarType::Float { precision: 21 },
-        ),
+        (Db2BuiltInType::Float, vec![21], false, Db2ScalarType::Real),
         (Db2BuiltInType::Real, vec![], false, Db2ScalarType::Real),
         (Db2BuiltInType::Double, vec![], false, Db2ScalarType::Double),
         (
@@ -237,10 +232,7 @@ fn resolves_common_scalar_shapes_and_preserves_parameters() {
 #[test]
 fn applies_only_context_free_defaults() {
     let cases = [
-        (
-            Db2BuiltInType::Float,
-            Db2ScalarType::Float { precision: 53 },
-        ),
+        (Db2BuiltInType::Float, Db2ScalarType::Double),
         (
             Db2BuiltInType::DecFloat,
             Db2ScalarType::DecFloat { precision: 34 },

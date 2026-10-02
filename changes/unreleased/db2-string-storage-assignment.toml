@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded storage assignment from opaque Db2 string literal proofs to resolved CHAR/VARCHAR and BINARY/VARBINARY targets under explicit encoding context, preserving owned source/target metadata, exact padding and excess-blank observations; other conversions, default binding, retrieval, cells, execution and licensed differential remain pending."

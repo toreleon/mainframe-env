@@ -11,6 +11,12 @@ pub use cursor::{
     Db2SensitiveCursorKind, parse_db2_cursor_statement, parse_db2_declare_cursor_prepared,
 };
 
+pub use create_table::default_binding::{
+    Db2BoundColumnDefault, Db2BoundColumnDefaultResult, Db2BoundCreateTableColumnDefaults,
+    Db2ColumnDefaultBindingError, Db2ColumnDefaultBindingErrorCode, Db2ColumnDefaultBindingLimits,
+    Db2ColumnDefaultStringContexts, Db2SystemDefaultProducer,
+    bind_db2_create_table_column_defaults,
+};
 pub use create_table::{
     Db2ColumnDefault, Db2CreateTableColumn, Db2CreateTableConstraint, Db2CreateTableStatement,
     Db2DefaultSpelling, Db2ForeignKeyConstraint, Db2OnDeleteAction, Db2TableConstraintKind,

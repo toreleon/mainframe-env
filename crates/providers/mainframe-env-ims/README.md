@@ -36,7 +36,7 @@ provider and atomic receipt pipeline. Primary successful retrieval/ISRT return
 concatenated keys, segment name/level, metadata fields and transferred data
 length. Failed-call witnesses, secondary key layouts and physical masks remain
 explicitly unproved. See the [class review](../../../docs/delivery/subsystems/ims/selected-pcb-feedback.md)
-and [ADR-0029](../../../docs/decisions/0029-selected-pcb-feedback.md).
+and [ADR-0035](../../../docs/decisions/0035-selected-pcb-feedback.md).
 
 `ImsService` installs validated application definitions and exposes typed host
 providers through `ims_providers`. `ims_providers_with_recovery` adds logical
@@ -130,7 +130,7 @@ The additive `ImsGsamRequest` route supplies fixed-length GSAM GU/GN/ISRT in
 DB batch with selected-PCB positions, authorization, shared UOW authority,
 atomic provider rows, and canonical replay. Its issued `ImsGsamAddress` is a
 bounded host logical identity, not IBM's physical RSA layout. See
-[ADR-0028](../../../docs/decisions/0028-gsam-logical-address.md) for the source
+[ADR-0034](../../../docs/decisions/0034-gsam-logical-address.md) for the source
 comparison, symbolic checkpoint/restart behavior, and compatibility limits.
 
 TM admission records a provider-row intent before adding work. An exact retry

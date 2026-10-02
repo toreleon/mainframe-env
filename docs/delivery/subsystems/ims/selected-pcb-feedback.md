@@ -140,6 +140,6 @@ handoff separately. Test/source receipts retain their original input identity;
 the seal is a content check and does not turn them into committed CI evidence.
 
 Compatibility and downgrade procedures are in
-[ADR-0029](../../../decisions/0029-selected-pcb-feedback.md). Parent IMS-1401,
+[ADR-0035](../../../decisions/0035-selected-pcb-feedback.md). Parent IMS-1401,
 complete-v0.14, participant, full-minor integration, official/maintainer IR,
 licensed differentials and release acceptance remain open. No push or PR.

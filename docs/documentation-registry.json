@@ -61,10 +61,12 @@
     "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
-    "docs/decisions/0028-gsam-logical-address.md",
+    "docs/decisions/0034-gsam-logical-address.md",
     "docs/decisions/0031-ims-tm-recovery-publication.md",
-    "docs/decisions/0029-selected-pcb-feedback.md",
+    "docs/decisions/0035-selected-pcb-feedback.md",
     "docs/decisions/0033-cobol-dli-call-boundary.md",
+    "docs/decisions/0028-db2-typed-catalog-evolution.md",
+    "docs/decisions/0029-db2-core-participant-evolution.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -293,20 +295,28 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
-          "label": "ADR-0028: Bounded GSAM logical record addresses",
-          "path": "docs/decisions/0028-gsam-logical-address.md"
+          "label": "ADR-0034: Bounded GSAM logical record addresses",
+          "path": "docs/decisions/0034-gsam-logical-address.md"
         },
         {
           "label": "ADR-0031: IMS TM recovery publication and work settlement",
           "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
         },
         {
-          "label": "ADR-0029: Versioned selected database PCB feedback",
-          "path": "docs/decisions/0029-selected-pcb-feedback.md"
+          "label": "ADR-0035: Versioned selected database PCB feedback",
+          "path": "docs/decisions/0035-selected-pcb-feedback.md"
         },
         {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
+        },
+        {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
           "label": "Decision index and template",

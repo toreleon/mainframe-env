@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Canonicalize resolved Db2 FLOAT(1..21) declarations to REAL and FLOAT(22..53), including omitted precision, to DOUBLE using the pinned SQL0050 rule; preserve AST spelling, bounds, nullability and unresolved-shape guards, with independent public consumer regressions. Floating values, execution and licensed differential remain pending."

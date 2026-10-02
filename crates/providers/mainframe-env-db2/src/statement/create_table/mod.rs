@@ -7,6 +7,7 @@
 
 mod columns;
 mod constraints;
+pub mod default_binding;
 
 #[cfg(test)]
 mod tests;
@@ -94,7 +95,11 @@ pub enum Db2DefaultSpelling {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Db2ColumnDefault {
     spelling: Db2DefaultSpelling,
-    value: Db2Literal,
+    value: Option<Db2Literal>,
+    span: Db2SourceSpan,
+    value_span: Option<Db2SourceSpan>,
+    numeric_sign_span: Option<Db2SourceSpan>,
+    numeric_token_span: Option<Db2SourceSpan>,
 }
 
 impl Db2ColumnDefault {
@@ -103,9 +108,34 @@ impl Db2ColumnDefault {
         self.spelling
     }
 
+    /// `None` preserves a present operand-less type-default clause. An omitted
+    /// clause is represented by `Db2CreateTableColumn::default()` returning `None`.
     #[must_use]
-    pub const fn value(&self) -> &Db2Literal {
-        &self.value
+    pub const fn value(&self) -> Option<&Db2Literal> {
+        self.value.as_ref()
+    }
+
+    /// Complete original clause, including `WITH` when present and operand trivia.
+    #[must_use]
+    pub const fn span(&self) -> Db2SourceSpan {
+        self.span
+    }
+
+    /// Original operand span; signed numbers include all trivia between tokens.
+    #[must_use]
+    pub const fn value_span(&self) -> Option<Db2SourceSpan> {
+        self.value_span
+    }
+
+    #[must_use]
+    pub const fn numeric_sign_span(&self) -> Option<Db2SourceSpan> {
+        self.numeric_sign_span
+    }
+
+    /// Original number token, excluding a separate sign and intervening trivia.
+    #[must_use]
+    pub const fn numeric_token_span(&self) -> Option<Db2SourceSpan> {
+        self.numeric_token_span
     }
 }
 
@@ -363,8 +393,13 @@ impl<'a> CreateTableParser<'a> {
                 format!("Db2 {label} must be an identifier"),
             ));
         };
+        let decoded = if *delimited {
+            value.replace("\"\"", "\"")
+        } else {
+            value.clone()
+        };
         let identifier =
-            Db2Identifier::new(value.clone(), *delimited, self.limits).map_err(|problem| {
+            Db2Identifier::new(decoded, *delimited, self.limits).map_err(|problem| {
                 Db2SyntaxDiagnostic::new(
                     Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                     token.span.start,

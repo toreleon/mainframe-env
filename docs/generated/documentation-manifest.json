@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 229,
+    "markdown_documents": 232,
     "navigation_groups": 6,
-    "normative_documents": 62,
+    "normative_documents": 64,
     "xtask_commands": 233
   },
   "documents": [
@@ -258,7 +258,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
       "relative_links": 1,
-      "sha256": "sha256:165035f2e30394e5ba6245b7dc3051125e877ac99e74a08ccc857e5ecd30fa5c",
+      "sha256": "sha256:f8eef7e76d23ad4b8c74c102b4640c7e8a759019ded8c6b28d8bd3fc24f3f1a9",
       "title": "mainframe-env-db2",
       "xtask_commands": 2
     },
@@ -266,7 +266,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
       "relative_links": 5,
-      "sha256": "sha256:9f9ec918e2c64b974c0a683cae7dc13c4a9f96ea56a02c3fe33d753d76c1263d",
+      "sha256": "sha256:4321364ea7adff34161a0b9b5cf70c68826fd743d19fdf6b68f273ebef83558f",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 118,
-      "sha256": "sha256:39759c5b6af12e221461a5a383c63bacf42ac3223fe592712811505c7c086c34",
+      "relative_links": 120,
+      "sha256": "sha256:0878e8be79dff44ee4a36056237f31adf3334b71206fe27940c85a5cdfbd6d23",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -585,7 +585,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 4,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:177cfd81aa17801ba6506a56775998d662d25deaad301569e8963a3646bb975b",
+      "sha256": "sha256:fb3e296d9b6d983620a58f68e694919de4a1490bfeaa4d337bccc23c7bd66581",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -963,27 +963,27 @@
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.14.0 development",
+      "applies_from": "mainframe-env 0.12.0 development; integration remains pending",
       "normative": true,
-      "owner": "host-contract and IMS maintainers",
-      "path": "docs/decisions/0028-gsam-logical-address.md",
+      "owner": "Db2, application-package and store-contract maintainers",
+      "path": "docs/decisions/0028-db2-typed-catalog-evolution.md",
       "relative_links": 0,
-      "scope": "IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart",
-      "sha256": "sha256:0667c74decf7d1c29f55f6bb3cd89ebb3e83629bc0b7ebe3f99efba7371029a8",
-      "status": "Proposed within the human-authorized bounded IMS implementation",
-      "title": "ADR-0028: GSAM logical record addresses on the owned host route",
+      "scope": "0.12 catalog/binder preparation and versioned integration",
+      "sha256": "sha256:eb401fc5e817bc7350f1929d82933e59428aec0d8f00e2ad52bab8f059f5de7d",
+      "status": "Proposed — implementation boundary, not owner acceptance",
+      "title": "ADR-0028: Db2 typed catalog evolution through existing authorities",
       "xtask_commands": 0
     },
     {
-      "applies_from": "mainframe-env 0.14.0 development",
+      "applies_from": "mainframe-env 0.12.0 development; implementation remains pending",
       "normative": true,
-      "owner": "host-contract and IMS provider maintainers",
-      "path": "docs/decisions/0029-selected-pcb-feedback.md",
-      "relative_links": 1,
-      "scope": "IMS-1401.selected-pcb-feedback, owned host projection",
-      "sha256": "sha256:2d154e64e47f4264e60e52123ee3fa04e369a1d3eac702e6d7af15e5ff70490a",
-      "status": "Proposed",
-      "title": "ADR-0029: Versioned selected database PCB feedback",
+      "owner": "execution-contract, coordinator and Db2 maintainers",
+      "path": "docs/decisions/0029-db2-core-participant-evolution.md",
+      "relative_links": 0,
+      "scope": "0.12 local Db2 core and early INT-1601 participant integration",
+      "sha256": "sha256:690b3db46a8eaece1f5d770b86d9e190bea48987625e88cd060fc44de67ebb2b",
+      "status": "Proposed — prerequisite direction, not capability acceptance",
+      "title": "ADR-0029: Versioned Db2 core participant binding before mutating integration",
       "xtask_commands": 0
     },
     {
@@ -1011,10 +1011,34 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0034-gsam-logical-address.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart",
+      "sha256": "sha256:6b04a663374075e850c6ddd717a5a3f2c1dcbd714e5382093b8e6e3864a97040",
+      "status": "Proposed within the human-authorized bounded IMS implementation",
+      "title": "ADR-0034: GSAM logical record addresses on the owned host route",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0035-selected-pcb-feedback.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.selected-pcb-feedback, owned host projection",
+      "sha256": "sha256:ddf22e63e542d796857580176bcb3147fbd3592fd8c51a4fb4c268de01c5201a",
+      "status": "Proposed",
+      "title": "ADR-0035: Versioned selected database PCB feedback",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 31,
-      "sha256": "sha256:315f2d68bb3bf952007d6098c59d30b04c577dd5ca55e9719944f2b6dcee97fe",
+      "relative_links": 33,
+      "sha256": "sha256:bf0da881ff9977a41e3f67e2cb6d1c1883dc7ebc629db24b67389f719c94fb2c",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1062,7 +1086,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 21,
-      "sha256": "sha256:e970c51f90d7be2cea82d6d1f46c5fba8ffc7aab2667264af84466cb03b21fd9",
+      "sha256": "sha256:7f36ec6320efcb817b7dad29e076049e34daeda3a339d99064747e5ef673f4d0",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1417,9 +1441,17 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:d1144bb7293d89f5ac9232f3b7542841b244207c6bbde0b46c6cf9abd24a5cfc",
+      "relative_links": 3,
+      "sha256": "sha256:bbf66d9e902d06d7de4297dfaeff1908128080235b24a97deae54ce276a4b17d",
       "title": "Db2 — Engine and common SQL progress",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/db2/decfloat-primitive-decision.md",
+      "relative_links": 1,
+      "sha256": "sha256:db4aee97b473239b509d94bc69d243fb3c5286aad56e8f00c6a5b2aff1869d9e",
+      "title": "Finite DECFLOAT assignment primitive",
       "xtask_commands": 0
     },
     {
@@ -1450,7 +1482,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 13,
-      "sha256": "sha256:9825f29bb716c8b07ce77cec0cde80fd5ef6b4593de3a04a5f69d3d70e9ba73a",
+      "sha256": "sha256:14e6f28616bccde165ecc831625e0410cd85b0353a25a320af7acde22974cb0d",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -1458,7 +1490,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/selected-pcb-feedback.md",
       "relative_links": 1,
-      "sha256": "sha256:d917edf4f1bd72feb3b315e631ff025f2acc022d993e977682981e857a1a0572",
+      "sha256": "sha256:fc7bd7c2116f7a0cab3b544194ee871713e137934894a4351e48ef4e6898ea04",
       "title": "Selected database PCB feedback: bounded contract and class review",
       "xtask_commands": 0
     },
@@ -2308,20 +2340,28 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
-          "label": "ADR-0028: Bounded GSAM logical record addresses",
-          "path": "docs/decisions/0028-gsam-logical-address.md"
+          "label": "ADR-0034: Bounded GSAM logical record addresses",
+          "path": "docs/decisions/0034-gsam-logical-address.md"
         },
         {
           "label": "ADR-0031: IMS TM recovery publication and work settlement",
           "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
         },
         {
-          "label": "ADR-0029: Versioned selected database PCB feedback",
-          "path": "docs/decisions/0029-selected-pcb-feedback.md"
+          "label": "ADR-0035: Versioned selected database PCB feedback",
+          "path": "docs/decisions/0035-selected-pcb-feedback.md"
         },
         {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
+        },
+        {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
           "label": "Decision index and template",
@@ -2572,7 +2612,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:ab30884b96b1df1f9c1060a5565a73e3d8e85a2c9fe0d3c042c2f9078aad46fa",
+  "registry_sha256": "sha256:34575bd679be706d7d4328b43c2eedb00adb27550fe342016e9c0e06c7947409",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
