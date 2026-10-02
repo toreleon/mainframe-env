@@ -96,9 +96,18 @@ does not certify the archive's overall retrieval, browser reproduction,
 row-to-topic review, grammar, runtime or licensed conformance. Only the bounded
 selected bodies and TOC need an offline import; no refresh is required.
 
+The private `cics-fepi-context-candidates` scope adds exactly nine retained
+FEPI reference topics (135,647 bytes), including programming-reference,
+CVDA/RESP2, data-format, end-condition and overview locators. It uses the same
+shared manifest registry and pinned TOC. These context bodies are disjoint
+from the 36 command pages and add no command identity, semantic authority or
+licensed credit. Registration does not resolve absent fragment links, prove
+all referenced context is available or certify mandatory-context closure.
+
 ```bash
 python3 -B conformance/tools/ibm_docs.py status --scope cics-spi-command-bodies
 python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-command-bodies
+python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-context-candidates
 ```
 
 The shared CICS mapper checks the private 0.10 projections and row-map candidates

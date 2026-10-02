@@ -1,0 +1,75 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.10.0",
+  "baseline_id": "ibm-cics-ts-6x-fepi-context-candidates-2026-09-12",
+  "subsystem": "cics",
+  "product": "SSJL4D_6.x",
+  "book_label": "CICS TS 6.x bounded retained FEPI reference context candidates",
+  "book_href": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html",
+  "snapshot_date": "2026-09-12",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 9,
+  "total_bytes": 135647,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "0b8515c30d5e18747b00dab9853bed716b568fe3a079604611861a0a6af39594",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html",
+      "sha256": "0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4",
+      "bytes": 56007,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73i.html",
+      "sha256": "84bb27ff6cf3b282754001015db6c4d871c872e4687ceab8c456f31af1e5f3b1",
+      "bytes": 12089,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73u.html",
+      "sha256": "84ad3c0a95a78d78a8fbcf79be34579f2bf769681213dea364b5e4192a591ef1",
+      "bytes": 7300,
+      "last_modified": "2026-01-16"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp743.html",
+      "sha256": "51b12ae091dc0fa5c2a493d7f8cbb2af2c032fc85951305e134f611ca39383d4",
+      "bytes": 9610,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74k.html",
+      "sha256": "e6b2c076787514186984f4e70d46a1f894fb02afa74a13230862629c36d115d6",
+      "bytes": 9144,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74l.html",
+      "sha256": "9f5713726ca1c63f09daa7c54d95bd8ce1debda00ff64af1dc4f06b9f2047fb5",
+      "bytes": 7024,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html",
+      "sha256": "2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60",
+      "bytes": 15636,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html",
+      "sha256": "ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712",
+      "bytes": 11092,
+      "last_modified": "2026-08-26"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-fepi/dfhp7kq.html",
+      "sha256": "5b43cfcde6407924913690fb9fb351fe566150d207baf544e57ac99b11ffc000",
+      "bytes": 7745,
+      "last_modified": "2026-08-26"
+    }
+  ]
+}

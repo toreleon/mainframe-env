@@ -539,6 +539,19 @@ class CacheTests(unittest.TestCase):
         self.assertTrue(all("/commands-fepi/" in pin.topic for pin in fepi))
         self.assertEqual(len({pin.topic for pin in fepi}), 36)
 
+    def test_fepi_context_scope_preserves_the_command_denominator(self):
+        pins, tocs = ibm_docs.load_pins()
+        context, context_tocs = ibm_docs.select(pins, tocs, "cics-fepi-context-candidates", None)
+        commands, _ = ibm_docs.select(pins, tocs, "cics-fepi-command-bodies", None)
+        self.assertEqual({pin.topic.rsplit("/", 1)[1] for pin in context}, {
+            "dfhp708.html", "dfhp73i.html", "dfhp73u.html", "dfhp743.html",
+            "dfhp74k.html", "dfhp74l.html", "dfhp74m.html", "dfhp7k4.html", "dfhp7kq.html",
+        })
+        self.assertEqual(sum(pin.size for pin in context), 135647)
+        self.assertEqual(len(context_tocs), 1)
+        self.assertEqual(len(commands), 36)
+        self.assertFalse({pin.topic for pin in context} & {pin.topic for pin in commands})
+
     def test_later_scope_target_mismatch_is_rejected(self):
         root, index, registry = self.source_repository()
         document = json.loads(registry.read_text())

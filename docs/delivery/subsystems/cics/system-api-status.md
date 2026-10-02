@@ -5,7 +5,7 @@ Phase: **system-api**
 Target release: **0.10.0**
 
 Status: **SPI-1001 identity foundation retained; command-body pins sealed;
-source-map candidates prepared with three qualified-row gaps; semantic review,
+source-map candidates and nine FEPI context pins prepared with qualified-row gaps; semantic review,
 shared gates and application dependency pending; 0.10.0 remains Proposed**
 
 - Branch: `codex/v010-spi-fepi-completion-20261002`
@@ -353,7 +353,82 @@ SPI-1001 passes.
 Coverage, semantic, execution, condition, recovery, and differential credit
 remain **0/269 SPI and 0/39 FEPI**. The 0.9 public/runtime surface is unchanged.
 
-## Next executable step
+## Declared bounded FEPI context registration
+
+The serialized manager slice `SPI-1001.fepi-context-pins` depends only on
+sealed command-body pins and the independent nine-topic context inventory.
+The demonstrated gap is that the shared reader cannot select those retained
+reference bodies by a registered scope. Exact identities remain FEPI rows
+0001–0039; registering context topics adds no command or obligation.
+The manager owns only `conformance/0.10/manifests/cics-fepi-context-topics.json`,
+the existing registry index, shared reader regression tests, source-cache
+documentation, this status, a unique changelog fragment and derived docs.
+Acceptance requires the nine archive body/TOC identities, shared manifest
+and registry validation, offline scope search/read, preserved command scopes,
+schema/docs/changelog checks and the existing policy/format results. Known
+aggregate source/module failures remain open; no passing work-package seal
+or parent completion can be issued while required gates fail. This is private
+source registration with zero semantic, execution or licensed credit; all
+fragment and out-of-cohort gaps stay explicit.
+
+## Prepared bounded FEPI context pins
+
+The independent `SPI-1001.fepi-context-source-inventory` completed on the
+private checkpoint `d9a29b48c9e13218f1470efc4b32a3cfe5b62609`, tree
+`c88dbca6e5d3c892526ce217a6830f495ffb272b`, with all 39 FEPI identities
+preserved. Its external JSON reproduces with SHA-256
+`7b00649162bd924d80bb6b6bd60ec603cf817061fc3d59f59c43bdd32e46253a`.
+Nine retained context bodies match the pinned TOC, exact archive metadata,
+H1, hashes, bytes and last-modified dates. The host topic-path copies are
+absent; the matching archive bodies remain available without refresh.
+
+`SPI-1001.fepi-context-pins` registers them through the existing shared reader
+and `conformance/0.10/manifests/index.json`, scope
+`cics-fepi-context-candidates`, baseline
+`ibm-cics-ts-6x-fepi-context-candidates-2026-09-12`. The manifest is
+`conformance/0.10/manifests/cics-fepi-context-topics.json`: 9 topics,
+135,647 bytes, topic-set digest
+`0b8515c30d5e18747b00dab9853bed716b568fe3a079604611861a0a6af39594`.
+This private, unsealed checkpoint retains zero semantic/execution/licensed
+credit and changes no command denominator, route or product behavior.
+
+The bounded scan records 54 command-to-context links (47 distinct document
+pairs) from the 36 command pages and 69 outbound context links. Ten additional
+document locators remain unfollowed; 23 edges target six absent fragments:
+`dfhp73i.html#dfhp73i`, `dfhp73u.html#dfhp73u`, `dfhp743.html#dfhp743`,
+`dfhp74k.html#dfhp74k`, `dfhp74l.html#dfhp74l` and `dfhp74m.html#dfhp74m`,
+under the FEPI topic prefix below. Named anchors provide no alternative.
+Byte availability does not establish fragment identity, full reference closure
+or any mandatory semantic context. The archive run remains `in-progress`;
+this bounded inventory is not corpus/browser reproduction certification.
+
+Focused validation passes: all 26 offline-reader tests (including the new
+nine-topic/disjoint-command regression), the shared xtask topic-manifest test,
+Draft 2020-12 schemas, formatting and dependency policy. Documentation and
+changelog checks are recorded in the external candidate receipts. The unchanged
+aggregate module, required-source, application and licensed blockers remain open.
+
+## Declared FEPI source inventory (completed)
+
+The next independent source-only review is
+`SPI-1001.fepi-context-source-inventory`, based on sealed command-body pins.
+It accounts for FEPI rows 0001–0039 and reads only the nine previously located
+context candidates under `SSJL4D_6.x/reference-applications/commands-fepi/`:
+`dfhp708.html`, `dfhp73i.html`, `dfhp73u.html`, `dfhp743.html`, `dfhp74k.html`,
+`dfhp74l.html`, `dfhp74m.html`, `dfhp7k4.html` and `dfhp7kq.html`.
+The existing FEPI CLI worker owns external
+`v010-20261002/fepi-context/` only on an isolated branch at the private
+checkpoint. It must verify exact TOC locators, retained hashes/bytes/provenance,
+use offline search/read with pinned Python, and enumerate bounded references
+from the 36 command bodies to these nine candidates. Out-of-cohort references
+are reported as locators without retrieval or presumed closure.
+Acceptance is a reproducible source-only inventory with all 39 identities
+preserved and an explicit closure boundary. No grammar, conditions, execution
+contexts, operation semantics or mandatory-obligation waivers are derived.
+The manager retains exclusive manifest/index, reader, generator, schema,
+status and integration ownership; any later source registration remains private
+and grants zero semantic, execution or licensed credit. This inventory does
+not depend on accepting the unsealed row maps or the application integration.
 
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before

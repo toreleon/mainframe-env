@@ -25,6 +25,17 @@
       "topic_manifest_sha256": "sha256:86de6d98be911824c2cccc9933d87d296cb3f77973b6ee1a5762e22910e95bc2",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-fepi-context-candidates",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-fepi-context-candidates-2026-09-12",
+      "manifest": "conformance/0.10/manifests/cics-fepi-context-topics.json",
+      "manifest_sha256": "sha256:9e143cec106665f488d97c3da89382f2c3b85afad14f45f6158eb1a9f07eef06",
+      "topic_count": 9,
+      "topic_manifest_sha256": "sha256:0b8515c30d5e18747b00dab9853bed716b568fe3a079604611861a0a6af39594",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
