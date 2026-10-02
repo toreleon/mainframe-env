@@ -10,6 +10,35 @@ pub(super) fn replay_data_bound(data: &[u8], limits: RecoveryLimits) -> usize {
 }
 
 impl RecoverySession {
+    pub(crate) fn check_checkpoint_capacity(
+        &self,
+        id: &str,
+        bound: usize,
+    ) -> Result<(), RecoveryProblem> {
+        if self.state.checkpoints.len() >= bound && !self.state.checkpoints.contains_key(id) {
+            return Err(RecoveryProblem::LimitExceeded);
+        }
+        Ok(())
+    }
+    /// Read the selected verified recipe through the existing selector authority.
+    pub(crate) fn checkpoint_positions(
+        &self,
+        selection: RestartSelection,
+        context: RecoveryContext,
+    ) -> Result<Vec<SavedPcbPosition>, RecoveryProblem> {
+        let result = self.restart(selection, context)?;
+        match result.checkpoint_id {
+            Some(id) => Ok(self
+                .state
+                .checkpoints
+                .get(&id)
+                .ok_or(RecoveryProblem::CorruptImage)?
+                .request
+                .positions
+                .clone()),
+            None => Ok(vec![]),
+        }
+    }
     pub(crate) fn application_replay(
         &self,
         effect_id: &str,

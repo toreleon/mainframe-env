@@ -2,7 +2,7 @@
 
 Status: **Proposed within the human-authorized bounded IMS implementation**
 Owner: **host-contract and IMS maintainers**
-Scope: **IMS-1403.gsam-record-addressability**
+Scope: **IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart**
 Applies from: **mainframe-env 0.14.0 development**
 
 IBM IMS 15.6 defines an RSA as an access-method-dependent physical record
@@ -62,14 +62,38 @@ supported. Never rewrite historical receipts or silently retry unknown outcomes.
 Recovery stays with the existing `CheckpointRequest`/`SavedPcbPosition`,
 `RecoverySession::xrst` resolver/transition and selected per-PCB helpers.
 Basic CHKP cannot checkpoint GSAM according to the pinned source. The typed
-CHKP/XRST owner must extend the existing saved-position interface with a
-discriminated GSAM logical-address/EOF-or-beginning representation; never put
-it into the current full-function `segment_key`. Capture positions before
-symbolic CHKP, retain engine identities, and resolve each GSAM PCB through the
-same direct lookup/helper during XRST. Publish the session/status/recovery
-plan in one existing atomic transition, with stale-address conditions and
-Memory/SQLite restart tests. This slice adds no recovery call or GSAM checkpoint
-credit and preserves the manager's existing basic checkpoint/UOW boundary.
+CHKP/XRST adapter extends the existing saved-position interface with an optional
+discriminated GSAM logical address, beginning, EOF or integrity-checked output
+prefix; the full-function `segment_key` is empty for this case. Symbolic CHKP
+materializes any required live identities before saving the position and commits
+actual pending writes while releasing PCB position. XRST resolves input through
+the existing direct address lookup and retains the next GN position. A witnessed
+unsettled output suffix is removed after validating its live prefix. Surviving
+identities and monotonic occurrence allocation remain intact. Missing/replaced
+prefixes fail; later committed output without an ownership witness returns
+UnknownOutcome without erasure. Mere settlement or row-version advancement does
+not invalidate a retained live address. Session/status/database/UOW/recovery and
+selection fences publish in the same atomic transition. Replay after later work
+returns the original receipt without reapplying CHKP or XRST.
+
+The logical output-prefix operation models repositioning within this owned
+record image. It is not proof of physical BSAM file truncation or permission
+to restart unsupported VSAM loading, temporary datasets or raw format paths.
+The specific GSAM checkpoint pin requires symbolic CHKP/XRST and describes
+BSAM/output dataset qualifications; those physical applicability obligations
+remain open. DbBatch fixed-length G/GS and L/LS are the admitted host projection.
+Root timestamp/day/region authority remains absent; logical ticks cannot supply
+IBM's timestamp identity. The tests cover Memory/file SQLite, independent PCBs,
+multiple files, real CAS races, lost acknowledgments and process exit/reopen;
+they grant no official, maintainer or licensed checkpoint credit.
+
+Absent `gsam` saved-position fields preserve historical checkpoint digest bytes.
+New GSAM checkpoint rows require a compatible reader; older readers/writers are
+not admitted concurrently. No SQL migration is required. Drain admission and
+active UOWs, reconcile ambiguous effects and take a coherent backup of images,
+sessions/checkpoints/recovery, selected metadata, journal and audit before
+rollback or upgrade. A coherent backup restore/retention expiry exercise remains
+a parent obligation; successful reopen is not a backup certification.
 
 Sources: IMS 15.6 database baseline
 `ibm-ims-15.6-database-contracts-2026-09-11`, topics
@@ -78,7 +102,12 @@ Sources: IMS 15.6 database baseline
 `ibm-ims-15.6-programming-contracts-2026-09-11`, `ims_pcbmaskgsamdb.htm`;
 recovery baseline `ibm-ims-15.6-recovery-utilities-2026-09-11`,
 `ims_symbolicchkpcall.htm`, `ims_xrstcall.htm`, `ims_basicchkpcall.htm`.
+Separate zero-credit GSAM recovery baseline
+`ibm-ims-15.6-gsam-recovery-2026-09-11`,
+`SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_gsamsymbolicchkpandxrst.htm`,
+SHA-256 `ebc695770a487c4fd3b9b06fa0d6948353a1f6543c75e29ec45e94048066616c`.
 Exact committed hashes and topic-set identities are recorded in the IMS status.
-Catalog context is `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0008`.
+Catalog context is `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0008`
+and checkpoint/restart `:0002/:0023/:0016/:0025`.
 Source review and local tests grant no official row, licensed, participant,
 parent-work-package or release credit.

@@ -6,14 +6,14 @@ mod integrity_tests;
 #[path = "checkpoint_tests/secondary_tests.rs"]
 mod secondary_tests;
 
-fn call(sequence: u64, call: ImsRecoveryCall) -> ImsRecoveryRequest {
+pub(super) fn call(sequence: u64, call: ImsRecoveryCall) -> ImsRecoveryRequest {
     ImsRecoveryRequest {
         call,
         ..request(sequence)
     }
 }
 
-fn invoke_call(
+pub(super) fn invoke_call(
     service: &Arc<ImsService>,
     store: &Arc<dyn TestStore>,
     invocation: &Invocation,
@@ -42,7 +42,7 @@ fn seed(service: &ImsService, invocation: &Invocation) {
     }
 }
 
-fn snapshot(store: &dyn ProviderStateStore) -> Vec<Vec<ProviderStateRecord>> {
+pub(super) fn snapshot(store: &dyn ProviderStateStore) -> Vec<Vec<ProviderStateRecord>> {
     [
         "ims-v1-generic-database",
         "ims-v1-session-index",
@@ -55,7 +55,7 @@ fn snapshot(store: &dyn ProviderStateStore) -> Vec<Vec<ProviderStateRecord>> {
     .collect()
 }
 
-fn next_execution(invocation: &Invocation, name: &str) -> Invocation {
+pub(super) fn next_execution(invocation: &Invocation, name: &str) -> Invocation {
     let mut next = invocation.clone();
     next.execution_id = ExecutionId::new(name, InvocationLimits::default()).unwrap();
     next

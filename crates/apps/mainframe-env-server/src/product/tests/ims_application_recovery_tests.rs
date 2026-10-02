@@ -214,7 +214,7 @@ impl Machine for RecoveryMachine {
     }
 }
 
-fn recovery_db(operation: ImsOperation, sequence: u64, key_prefix: &str) -> ImsRequest {
+pub(super) fn recovery_db(operation: ImsOperation, sequence: u64, key_prefix: &str) -> ImsRequest {
     ImsRequest {
         operation,
         psb: (operation == ImsOperation::Schedule).then(|| "AUTHPSB".into()),
@@ -238,7 +238,7 @@ fn recovery_db(operation: ImsOperation, sequence: u64, key_prefix: &str) -> ImsR
     }
 }
 
-fn recovery_request(
+pub(super) fn recovery_request(
     identity: &str,
     sequence: u64,
     key_prefix: &str,
@@ -264,7 +264,7 @@ fn recovery_request(
     }
 }
 
-fn run_recovery_machine(
+pub(super) fn run_recovery_machine(
     server: &ProductServer,
     store: Arc<dyn PlatformStore>,
     invocation: &Invocation,
@@ -273,11 +273,7 @@ fn run_recovery_machine(
     let effects = requests
         .into_iter()
         .map(|request| {
-            let mutation = match &request {
-                HostRequest::ImsRecovery(r) => &r.mutation,
-                HostRequest::Ims(r) => r.mutation.as_ref().unwrap(),
-                _ => panic!(),
-            };
+            let mutation = request.mutation().unwrap();
             EffectRequest {
                 run_unit: invocation.run_unit_id.clone(),
                 sequence: mutation.sequence,

@@ -225,7 +225,7 @@ pub(in crate::service) fn ensure_backout(state: &State, run: &str) -> Result<(),
     Ok(())
 }
 
-pub(super) fn publish_image(
+pub(in crate::service) fn publish_image(
     state: &mut State,
     run: &str,
     name: &str,

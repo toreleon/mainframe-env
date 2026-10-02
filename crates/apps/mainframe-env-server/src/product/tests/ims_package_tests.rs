@@ -1,6 +1,8 @@
 use super::*;
 #[path = "ims_application_recovery_tests.rs"]
 mod application_recovery;
+#[path = "ims_package_tests/gsam_checkpoint_tests.rs"]
+mod gsam_checkpoint_tests;
 #[path = "ims_package_tests/gsam_tests.rs"]
 mod gsam_tests;
 

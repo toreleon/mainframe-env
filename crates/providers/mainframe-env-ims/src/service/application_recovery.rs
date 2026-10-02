@@ -9,6 +9,7 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore};
 
 mod checkpoint;
+pub(in crate::service) mod gsam_checkpoint;
 
 /// Defaulted fields preserve prior v1 Session readers. Never supplied by callers.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]

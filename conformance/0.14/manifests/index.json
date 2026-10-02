@@ -58,6 +58,17 @@
       "topic_manifest_sha256": "sha256:7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-gsam-recovery",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-gsam-recovery-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-gsam-recovery-topics.json",
+      "manifest_sha256": "sha256:3913556e64e472a7be00dc3454e8b541336f881b7006abbac0f00e06cf04398f",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:5957b8e2a868c0fc8db7d379630af868b048fe9a3dd86fd8466c4de664bd2353",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

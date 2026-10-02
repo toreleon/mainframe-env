@@ -353,6 +353,7 @@ pub struct DatabaseEngineImage {
 
 mod definition;
 mod gsam;
+mod gsam_checkpoint;
 mod logical;
 mod navigation;
 mod secondary;

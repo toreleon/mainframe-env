@@ -45,7 +45,14 @@ Read-only recovery observation lets a fenced coordinator resolver distinguish
 published results from ambiguous outcomes without redispatch. Recovery session keys bind
 the selected application, package, PSB/database, run and principal; they are
 addresses in the existing version-one recovery namespace, not a new authority.
-Timestamp context identity, BMP/LAST, GSAM RSA/file restoration, other recovery
+GSAM symbolic CHKP retains discriminated live logical addresses, beginning/EOF
+and output prefix positions through the same resolver and atomic bridge. Its
+checkpoint commits pending writes; XRST removes a witnessed later output suffix
+and restores independent selected input PCB positions. Removed addresses remain
+invalid, while a settled row-version change alone does not prevent valid resume.
+Basic CHKP rejects selected GSAM. Later committed output without a UOW witness
+requires reconciliation and returns UnknownOutcome without erasure.
+Timestamp context identity, BMP/LAST, physical GSAM RSA/file restoration, other recovery
 families and contexts, raw language framing, physical log sizing,
 participant admission and concurrent recovery-lease fencing remain pending.
 Public definition and limit types describe
@@ -116,7 +123,7 @@ DB batch with selected-PCB positions, authorization, shared UOW authority,
 atomic provider rows, and canonical replay. Its issued `ImsGsamAddress` is a
 bounded host logical identity, not IBM's physical RSA layout. See
 [ADR-0028](../../../docs/decisions/0028-gsam-logical-address.md) for the source
-comparison, compatibility limits, and symbolic checkpoint/restart followup.
+comparison, symbolic checkpoint/restart behavior, and compatibility limits.
 
 TM admission records a provider-row intent before adding work. An exact retry
 or `repair_schedules` repairs that bounded cross-interface gap without executing

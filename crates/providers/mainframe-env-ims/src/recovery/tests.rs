@@ -82,6 +82,7 @@ fn checkpoint_image_digest_detects_corruption_and_is_stable_across_roundtrip() {
             pcb: "DBPCB".into(),
             database: "ACCOUNTS".into(),
             segment_key: vec![7, 8],
+            gsam: None,
         }],
     };
     let image = CheckpointImage::seal(1, request, [9; 32], limits).unwrap();
@@ -105,6 +106,7 @@ fn checkpoint_rejects_duplicate_positions_and_forbidden_context_without_mutation
         pcb: "DBPCB".into(),
         database: "ACCOUNTS".into(),
         segment_key: vec![1],
+        gsam: None,
     };
     let mut request = CheckpointRequest {
         id: "CHK00002".into(),

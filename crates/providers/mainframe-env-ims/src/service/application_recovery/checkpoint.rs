@@ -212,6 +212,9 @@ impl ImsService {
         let (transition, result) = match &request.call {
             ImsRecoveryCall::BasicCheckpoint { id }
             | ImsRecoveryCall::SymbolicCheckpoint { id, .. } => {
+                recovery
+                    .check_checkpoint_capacity(id, self.limits.max_checkpoints)
+                    .map_err(recovery_error)?;
                 let (kind, areas) = match &request.call {
                     ImsRecoveryCall::BasicCheckpoint { .. } => (CheckpointKind::Basic, vec![]),
                     ImsRecoveryCall::SymbolicCheckpoint { user_areas, .. } => {
@@ -219,6 +222,9 @@ impl ImsService {
                     }
                     _ => unreachable!(),
                 };
+                if kind == CheckpointKind::Basic {
+                    gsam_checkpoint::reject_basic(&next, &request.psb)?;
+                }
                 if (kind == CheckpointKind::Symbolic && !prior_xrst)
                     || (kind == CheckpointKind::Basic && prior_xrst)
                     || prior_kind.is_some_and(|prior| prior != kind)
@@ -251,7 +257,7 @@ impl ImsService {
                         )?;
                 }
                 let positions = if kind == CheckpointKind::Symbolic {
-                    save_positions(&next, run, self.limits)?
+                    save_positions(&mut next, &durable.versions, run, digest, self.limits)?
                 } else {
                     vec![]
                 };
@@ -298,15 +304,18 @@ impl ImsService {
                 if prior_xrst || prior_kind.is_some() {
                     return Err(HostProblem::Malformed);
                 }
-                // XRST cannot commit or erase an unsettled pre-restart UOW.
-                if next.generic_pending_undo.contains_key(run)
-                    || next.pending_undo.contains_key(run)
-                {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
                 let selected_image = recovery
                     .restart(selection(selector), RecoveryContext::Batch)
                     .map_err(recovery_error)?;
+                // Only witnessed GSAM output may settle its abended suffix.
+                let saved_positions = recovery
+                    .checkpoint_positions(selection(selector), RecoveryContext::Batch)
+                    .map_err(recovery_error)?;
+                gsam_checkpoint::prepare_restart(&next, run, &saved_positions, self.limits)?;
+                // Validate reads against the original witnessed proposal. Earlier
+                // GSAM restores may truncate their own suffix before later PCBs
+                // are resolved; that planned change is not a foreign write.
+                let restart_read_source = next.scoped_snapshot();
                 if selected_image.checkpoint_id.is_some()
                     && (area_lengths.len() > selected_image.user_areas.len()
                         || area_lengths
@@ -324,9 +333,15 @@ impl ImsService {
                 let mut pcb_statuses = vec![];
                 let plan = recovery
                     .xrst_staged(effect_id, selection(selector), |saved| {
-                        let (number, position, observed) =
-                            restore_position(&next, run, &request.psb, saved, self.limits)
-                                .map_err(host_to_recovery)?;
+                        let (number, position, observed) = restore_position(
+                            &mut next,
+                            &restart_read_source,
+                            run,
+                            &request.psb,
+                            saved,
+                            self.limits,
+                        )
+                        .map_err(host_to_recovery)?;
                         generic::pcb::set_position(
                             Arc::make_mut(
                                 next.sessions
@@ -350,6 +365,9 @@ impl ImsService {
                         })
                     })
                     .map_err(recovery_error)?;
+                if selected_image.checkpoint_id.is_some() {
+                    next.generic_pending_undo.remove(run);
+                }
                 pcb_statuses.sort_by_key(|(pcb, _)| *pcb);
                 for (number, observed) in &pcb_statuses {
                     let mut observation = checkpoint_observation();
@@ -420,18 +438,24 @@ impl ImsService {
                         AccessIntent::Update,
                     )?,
                 )?;
-                if selected
+                let db = selected
                     .catalog
                     .databases
                     .iter()
                     .find(|db| db.name == pcb.database)
-                    .is_none_or(|db| {
-                        db.organization == mainframe_env_host_api::ImsDatabaseOrganization::Gsam
-                    })
-                {
-                    // GSAM restart needs the RSA/file authority owned by the
-                    // GSAM lane. Never substitute an empty DB position for it.
-                    return Err(HostProblem::Unsupported);
+                    .ok_or(HostProblem::NotFound)?;
+                if db.organization == mainframe_env_host_api::ImsDatabaseOrganization::Gsam {
+                    let engine = DatabaseEngine::new(
+                        generic::definition(db)?,
+                        generic::engine_limits(self.limits),
+                    )
+                    .map_err(|_| HostProblem::Unsupported)?;
+                    if engine.definition().segments[0].min_length
+                        != engine.definition().segments[0].max_length
+                        || !matches!(pcb.processing_options.as_str(), "G" | "GS" | "L" | "LS")
+                    {
+                        return Err(HostProblem::Unsupported);
+                    }
                 }
             }
         }
@@ -535,8 +559,10 @@ fn record_key(
 }
 
 fn save_positions(
-    state: &State,
+    state: &mut State,
+    versions: &RowVersions,
     run: &str,
+    digest: [u8; 32],
     limits: ImsLimits,
 ) -> Result<Vec<SavedPcbPosition>, HostProblem> {
     let session = state.sessions.get(run).ok_or(HostProblem::NotFound)?;
@@ -544,13 +570,24 @@ fn save_positions(
         .metadata
         .as_ref()
         .and_then(|catalog| catalog.psbs.iter().find(|psb| psb.name == session.psb))
-        .ok_or(HostProblem::NotFound)?;
+        .ok_or(HostProblem::NotFound)?
+        .clone();
     let mut saved = vec![];
-    for (index, pcb) in psb.pcbs.iter().enumerate() {
+    let mut pcbs = psb.pcbs.iter().enumerate().collect::<Vec<_>>();
+    // Materialize input identities before capturing each output prefix.
+    pcbs.sort_by_key(|(_, pcb)| matches!(pcb, ImsPcbMetadata::Database(pcb) if pcb.processing_options.starts_with('L')));
+    for (index, pcb) in pcbs {
         let ImsPcbMetadata::Database(pcb) = pcb else {
             continue;
         };
         let number = u16::try_from(index + 1).map_err(|_| HostProblem::ResourceExhausted)?;
+        if gsam_checkpoint::is_gsam(state, &pcb.database) {
+            saved.push(gsam_checkpoint::save(
+                state, versions, run, number, pcb, digest, limits,
+            )?);
+            continue;
+        }
+        let session = state.sessions.get(run).ok_or(HostProblem::NotFound)?;
         let Some(id) = generic::pcb::position(session, number).current() else {
             continue;
         };
@@ -571,13 +608,16 @@ fn save_positions(
             pcb: number.to_string(),
             database: pcb.database.clone(),
             segment_key,
+            gsam: None,
         });
     }
+    saved.sort_by_key(|saved| saved.pcb.parse::<u16>().unwrap_or(0));
     Ok(saved)
 }
 
 fn restore_position(
-    state: &State,
+    state: &mut State,
+    read_source: &State,
     run: &str,
     psb: &str,
     saved: &SavedPcbPosition,
@@ -591,6 +631,7 @@ fn restore_position(
         return Err(HostProblem::ProviderFailure);
     }
     let (_, pcb) = generic::scheduled_pcb(state, psb, number)?;
+    let pcb = pcb.clone();
     if pcb.database != saved.database {
         return Err(HostProblem::IdempotencyConflict);
     }
@@ -602,7 +643,13 @@ fn restore_position(
     let mut observation = checkpoint_observation();
     observation.operation = ImsOperation::GetUnique;
     observation.pcb = number;
-    generic::integrity::prepare(state, run, &observation)?;
+    generic::integrity::prepare(read_source, run, &observation)?;
+    if gsam_checkpoint::is_gsam(state, &saved.database) {
+        return gsam_checkpoint::restore(state, run, number, &pcb, saved, limits);
+    }
+    if saved.gsam.is_some() {
+        return Err(HostProblem::ProviderFailure);
+    }
     let engine = generic::restored(state, &saved.database, limits)?;
     let path: KeyPath =
         serde_json::from_slice(&saved.segment_key).map_err(|_| HostProblem::ProviderFailure)?;
@@ -642,8 +689,8 @@ fn restore_position(
             .sensitive_segments
             .iter()
             .any(|segment| &segment.name == name)
-            || (!generic::allowed(pcb, name, ImsOperation::GetUnique)
-                && !generic::pcb::key_only(pcb, name))
+            || (!generic::allowed(&pcb, name, ImsOperation::GetUnique)
+                && !generic::pcb::key_only(&pcb, name))
         {
             return Err(HostProblem::Unsupported);
         }
@@ -740,6 +787,7 @@ fn host_to_recovery(problem: HostProblem) -> RecoveryProblem {
         HostProblem::Unauthorized => RecoveryProblem::Unauthorized,
         HostProblem::ResourceExhausted => RecoveryProblem::LimitExceeded,
         HostProblem::IdempotencyConflict => RecoveryProblem::Conflict,
+        HostProblem::UnknownOutcome => RecoveryProblem::UnknownOutcome,
         _ => RecoveryProblem::CorruptImage,
     }
 }

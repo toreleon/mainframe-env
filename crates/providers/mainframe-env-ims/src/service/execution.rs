@@ -170,12 +170,12 @@ impl ImsService {
         if request.operation != ImsOperation::System {
             system::observe_database_call(&mut next, run, request, &result, self.limits)?;
         }
-        if invocation.service_class == ServiceClass::Batch
-            && matches!(
-                request.operation,
-                ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
-            )
-        {
+        if application_recovery::gsam_checkpoint::settles_batch_uow(
+            &next,
+            invocation,
+            gsam.is_some(),
+            request.operation,
+        ) {
             next.pending_undo.remove(run);
             next.generic_pending_undo.remove(run);
         }

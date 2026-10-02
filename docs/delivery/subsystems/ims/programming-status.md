@@ -2641,3 +2641,186 @@ one canonical vector case. All 23 offline source-reader tests, strict IMS/host
 Clippy, global module guard, IMS catalog/assurance, schemas and docs checks pass.
 The exact manager re-seal is separate. Enhanced/extended counters, complete raw
 layouts, official maintainer-accepted IR and licensed equivalence remain open.
+
+The isolated GSAM restart branch starts from sealed GSAM
+`90b87d38b99c55362e8f2b0d70489ab2143c8476` and integrates exactly sealed
+`a1a84c7926851e61d0249ba576ba688794b073f9` as a separate prerequisite commit.
+Its parent LOG adapter registration is absent from the GSAM base: restore only
+the required host enum/validation/canonical/module exports, provider export,
+server factory composition and test declaration. Keep GSAM requests, addresses,
+canonical encoding, replay, PCB and witnessed UOW owners unchanged. Both lane
+status sections are retained; regenerate the documentation manifest normally.
+Conflicts comprise host/provider READMEs and exports, IMS service imports/module,
+status append, generated manifest, and six modify/delete adapter/contract/test
+files. The latter retain prerequisite bytes. This integration does not reseal
+the prerequisite or claim its old receipts for the combined tree.
+
+## IMS-1405.gsam-checkpoint-restart (declared bounded leaf)
+
+Parent IMS-1405 remains in progress. Clean GSAM entry is
+`90b87d38b99c55362e8f2b0d70489ab2143c8476`; prerequisite integration is
+`cb7aa908ff48527dfa35ff634c7831cd6fde341b`, consuming exactly sealed
+`a1a84c7926851e61d0249ba576ba688794b073f9`. Catalog scope is
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002/:0023/:0016/:0025`,
+with :0005/:0008 as GSAM GN/GU/ISRT consumers. Execution projection is installed
+signed selected metadata, DB-batch CALL, fixed-length logical GSAM files and
+G/GS input or L/LS output PCBs. Physical BSAM/VSAM formats/loading restrictions,
+other contexts, raw RSA layouts and authentic DFS0540I timestamp authority remain
+explicit unsupported boundaries. Logical ticks cannot supply region/day/time.
+
+Obligation classes: real GN/ISRT address provenance; retained record/start/EOF
+and output append boundary; CHKP commit/position behavior and basic rejection;
+XRST real per-PCB resolve, input continuation, output suffix removal and empty
+output validation; multiple PCBs/databases; row CAS and stale issuance guard;
+bounded capacity; malformed/missing/unknown images; authorization before data;
+replay after later work without reapplying; lost acknowledgments/unknown outcomes;
+actual Memory/file SQLite atomic races and process exits; historical reader,
+drain and backup boundaries. Expected bytes/statuses derive independently from
+the pinned topics, not the product resolver. Supplemental tests grant no official
+accepted-IR/maintainer/licensed credit. Licensed differential remains 0/25.
+
+Owners: new service/application_recovery/gsam_checkpoint helper, bounded saved
+GSAM DTO and engine resolver helpers, focused provider/host/signed-package tests,
+minimal checkpoint hooks and the GSAM batch-UOW composition helper. SETS/SETU/
+ROLS/ROLL/ROLB, ordinary read visibility and STAT algorithms remain untouched.
+No new store, engine, coordinator, address registry or dependency. New GSAM
+positions never occupy full-function segment_key. Manager's facade extractions
+are absent here; feature edits use bounded modules and report shared seams for
+manager integration. The standalone source supplement requires two metadata
+files because the committed scopes omit the exact GSAM checkpoint topic.
+
+Offline source basis: existing recovery/programming/database baselines
+`ibm-ims-15.6-recovery-utilities-2026-09-11`,
+`ibm-ims-15.6-programming-contracts-2026-09-11` and
+`ibm-ims-15.6-database-contracts-2026-09-11`,
+plus separate zero-credit `ibm-ims-15.6-gsam-recovery-2026-09-11`, topic
+`SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_gsamsymbolicchkpandxrst.htm`,
+SHA-256 `ebc695770a487c4fd3b9b06fa0d6948353a1f6543c75e29ec45e94048066616c`.
+The bounded retained/archive scope was hash-verified, searched and read with
+ibm_docs.py before semantics. All twelve required topics and shared TOC verify;
+retained topic-path copies are absent, matching raw archive bodies are used.
+Unselected cache entries remain unavailable without whole-cache audit/refresh.
+No publication body is committed and no existing baseline is repinned.
+
+Required acceptance is focused fail-first/pass provider, host and signed-package
+route with child processes; strict scoped Clippy --all-targets --no-deps with
+warnings denied, fmt, execution/effect/provider-row/storage/participant/security/
+retention/dependency/IMS catalog/schema/assurance/spec/docs/changelog gates;
+exact allowlist leaf seal/check and one feature commit. Receipts stay outside
+Git and targets. No delegation, certification, push/PR or source refresh.
+
+### Implemented local GSAM recovery projection
+
+SavedPcbPosition now retains an optional discriminated GSAM beginning, EOF,
+live issued address or integrity-checked output prefix; the hierarchy key stays
+empty for GSAM. Absent fields preserve historical serialized checkpoint bytes
+and digests. The existing RecoverySession verifies the selected image and calls
+the actual selected-PCB resolver. Symbolic CHKP materializes required live
+identities before capture, commits actual writes, and releases position/UOW in
+the existing atomic transition. XRST restores input position and removes only
+a witnessed later output suffix after verifying the live prefix. Removed
+addresses are never reconstructed. Existing issuance uses database identity and
+current row CAS version; restart resolves a live retained address regardless of
+settlement alone. A later committed suffix without an ownership witness returns
+UnknownOutcome with no erasure. This is reconciliation, not a successful restart.
+
+Focused current-candidate results: provider dispatch 34 passed (including 12
+GSAM harness tests; the process-worker entry without environment earns no
+scenario credit and the parent executes three real SQLite child phases), saved
+position contract 2, recovery regression 18, prior GSAM regression 12, ordinary
+basic checkpoint regression 4, host recovery contract 4, host canonical 18,
+signed selected IMS GSAM package 2 Memory/SQLite roundtrips after the final
+settlement-helper move. The earlier 16-test signed selected-package regression
+passed before that move; its unchanged consumer evidence is retained separately,
+not relabeled as a final-tree whole-package run.
+The real canonical coordinator and public selected route prove ISRT/GN addresses,
+checkpoint commit, later work, process reopen, saved areas and GU/GN continuation.
+Negative checks include initial empty/output, EOF/restart-at-start, no-save GN,
+multiple files/PCBs, stale replacement, malformed/order/selectors, SAF, quota,
+actual threaded Memory/file SQLite CAS races, capacity and lost-ack observation,
+missing-receipt ambiguity, and replay after later work. Initial failures are
+retained separately and are not labeled passing receipts.
+
+Strict host and IMS Clippy with all-targets/no-deps and warnings denied pass.
+Strict server all-targets remains blocked by inherited COBOL/CICS/product and
+test-helper diagnostics, including unchanged ims_package_tests.rs:250; no new
+GSAM module or feature-modified line has a diagnostic. No lint allowance or
+other-lane algorithm change was made. Exact diagnostics and command exits are
+in the external worker receipt directory. Manager must retain this distinction
+when folding the delta onto its extracted facades and resealing its candidate.
+
+Shared feature seams are a settlement-helper call in service.rs, ordinary basic
+CHKP GSAM rejection, saved-position capture/resolve and quota hooks in the
+existing checkpoint bridge, and broader visibility for the existing image
+publication helper. Isolation, backout and STAT algorithms are unchanged.
+Manager integration maps these hooks into its service rows/providers, selected
+product IMS facade and host request/canonical modules; those extractions do not
+exist in this base. The separate prerequisite commit must not be folded as part
+of the feature delta if already present in the manager candidate.
+
+No SQL migration or new persistence/recovery authority. New saved-position rows
+require a compatible reader. Before upgrade/downgrade, stop admission, drain
+UOWs, reconcile unknown effects and preserve a coherent database/session/recovery/
+selected-metadata/journal/audit backup. Existing Rust saved-position literals
+must set gsam to None; historical JSON remains readable. Older writers cannot be admitted against
+new GSAM checkpoint rows. Reopen tests do not certify backup restore or retention
+expiry. Physical BSAM/VSAM loading/repositioning, temporary/SYSOUT datasets,
+variable/undefined formats, raw RSA layouts, BMP/LAST, authentic root timestamp
+day/region authority, raw framing, participant/lease admission, official IR and
+licensed differential remain parent obligations. Logical ticks are not timestamp
+authority; no source-required physical applicability is labeled fake success.
+Only this bounded logical leaf can complete; IMS-1405 and v0.14 remain open.
+
+Required execution/effect/provider-row/storage/participant/generated-participant/
+security/retention/typed-boundary/supply-chain and offline dependency-policy gates
+pass, as do IMS catalog, assurance, schemas, shared spec, changelog and docs
+generate/check. The new zero-credit topic manifest passes shared schema/spec
+integrity. Scoped production budgets pass; service.rs stays at its prerequisite
+2,216 production lines and isolation.rs does not grow. Formatting/diff checks
+pass. The aggregate inherited server Clippy debt is not waived or reported as
+passing. Cargo targets are cleaned after each verification sequence; command,
+source and cleanup receipts are outside Git at
+`/Users/tore/Library/Caches/mainframe-env/worker-receipts/v014-completion-20261002/ims-gsam-checkpoint-restart`.
+Manager acceptance/reseal, participant/lease closure, physical source-required
+applicability, coherent backup/retention exercise and licensed evidence remain
+open; no official row or parent completion is asserted by the leaf seal.
+The local bounded GSAM projection is complete under
+`IMS-1405.gsam-checkpoint-restart`; its exact allowlist seal/check and commit
+identity are retained in the external handoff and completion receipt.
+
+### Manager GSAM restart integration — 2026-10-02
+
+The manager consumed exactly `2b7a92a1e57848fa3fbe158b71c38c6de71009af`
+on its sealed GSAM and secondary-SSA candidate, without duplicating the worker's
+prerequisite registration commit. Settlement is called from the existing
+`service/execution.rs` owner. The image publisher retains the current limits
+contract, ordinary read-visibility check and secondary-index restart rejection.
+No second facade, engine, address registry or recovery authority was introduced.
+
+The first integrated run exposed a real composition failure: after one GSAM
+output PCB planned its witnessed suffix removal, a later PCB's integrity read
+mistook that unpublished change for a foreign write. XRST now checks every read
+against the pristine witnessed proposal, while the existing atomic bridge still
+CAS-fences all selected database rows when publishing the whole transition.
+The multiple-database/independent-PCB regression now passes. This does not waive
+the foreign full-function dirty-read rejection or secondary-index guard.
+
+Current integration checks passed 36 application-recovery dispatch tests and
+two retained GSAM contract tests, then eight recovery-runtime unit tests,
+12 GSAM unit tests and 20 signed IMS-package tests. Empty filtered binaries and
+standalone process harnesses earn no scenario credit; substantive parent tests
+assert real SQLite child execution. Strict IMS/server all-targets Clippy,
+IMS catalog/assurance/schema, formatting and module-boundary checks pass on
+this integrated candidate. The worker's inherited lint/module blockers above
+are historical base results, not current manager failures.
+
+External manager receipts are `gsam-restart-integration-fixed.log` and
+`gsam-restart-remaining-gates.log` under the existing completion receipt root.
+The former records a later incorrect test-target selection after its passing
+36+2 checks; the remaining sequence used the correct unit filter. Initial
+semantic/selection failures remain distinct from passing evidence. Existing
+source baseline/topic and catalog identities above are unchanged, with zero
+official or licensed credit. Exact resealing, dependency/docs/changelog gates
+and cleanup accompany the manager feature commit. Participant/lease admission,
+physical applicability, coherent backup/retention and human rule acceptance
+remain open. Licensed certification is excluded by the user, not certified.

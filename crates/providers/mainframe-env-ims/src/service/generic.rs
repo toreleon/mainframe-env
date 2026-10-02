@@ -813,6 +813,8 @@ fn checkpoint(
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
+    let psb = &state.sessions.get(run).ok_or(HostProblem::NotFound)?.psb;
+    super::application_recovery::gsam_checkpoint::reject_basic(state, psb)?;
     let id = request
         .checkpoint_id
         .clone()

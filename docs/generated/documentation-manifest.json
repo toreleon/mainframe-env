@@ -266,7 +266,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
       "relative_links": 3,
-      "sha256": "sha256:bd9b16c5b7c6bc77ed70cea8949128a8a3929f59e64c1adb4380ed468867da92",
+      "sha256": "sha256:935306c7db7f60629e4fb7fb8f97def07464a062a68919bdeb83e4205083e573",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -968,8 +968,8 @@
       "owner": "host-contract and IMS maintainers",
       "path": "docs/decisions/0028-gsam-logical-address.md",
       "relative_links": 0,
-      "scope": "IMS-1403.gsam-record-addressability",
-      "sha256": "sha256:8c6c50d2959c7a0acd1cea81677926831e4b643e96a8472d42b0f375a1ca205f",
+      "scope": "IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart",
+      "sha256": "sha256:0667c74decf7d1c29f55f6bb3cd89ebb3e83629bc0b7ebe3f99efba7371029a8",
       "status": "Proposed within the human-authorized bounded IMS implementation",
       "title": "ADR-0028: GSAM logical record addresses on the owned host route",
       "xtask_commands": 0
@@ -1414,7 +1414,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 8,
-      "sha256": "sha256:2c105ded8a3fab3699cf65eb1de2a008b702105f9780ef473857eb35edf21204",
+      "sha256": "sha256:bb1991f5f9850bc42d33c790bb0cb0cbfabf386279c5e5dd52671f4f273af65b",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },

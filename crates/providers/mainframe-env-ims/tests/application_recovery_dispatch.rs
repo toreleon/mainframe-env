@@ -22,6 +22,8 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 #[path = "application_recovery/checkpoint_tests.rs"]
 mod checkpoint_tests;
+#[path = "application_recovery/gsam_checkpoint_tests.rs"]
+mod gsam_checkpoint_tests;
 
 trait TestStore: IdempotencyStore + ProviderStateStore {}
 impl<T: IdempotencyStore + ProviderStateStore> TestStore for T {}
@@ -575,6 +577,22 @@ impl ProviderStateStore for FaultRows {
                 let old = row.version;
                 row.version += 1;
                 self.inner.put_provider_state(row, Some(old))?;
+            }
+            4 => {
+                // A real competing database CAS between capture and atomic
+                // checkpoint publication, using the actual selected backend.
+                let inner = self.inner.clone();
+                std::thread::spawn(move || {
+                    let mut row = inner
+                        .get_provider_state("ims-v1-generic-database", "LOGDB")
+                        .unwrap()
+                        .unwrap();
+                    let old = row.version;
+                    row.version += 1;
+                    inner.put_provider_state(row, Some(old)).unwrap();
+                })
+                .join()
+                .unwrap();
             }
             _ => {}
         }
