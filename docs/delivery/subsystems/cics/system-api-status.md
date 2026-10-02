@@ -706,6 +706,82 @@ file, random or task-memory ownership. No code/API/schema/registry/coverage edit
 normal-return equivalence, disposition verdict or execution credit is authorized.
 The manager serializes any resulting pins and runtime contract after review.
 
+The four retained program contexts are sealed as an identity-only prerequisite at
+`c77892ba26974159cb28ac0323a93e55328505dc`. The initial reader/schema checks and
+repaired final corpus/architecture/docs/changelog/dependency gates pass. All
+source data remain external, and target artifacts are removed.
+
+`CIC-904.bts-container.explicit-root-lifetime` resumes the task-storage session
+in its existing regression checkout at `3f46b954751832336645da7e550a8b6713cfa6fc`.
+The relevant interpreter/root fixture owners are unchanged by later manager
+prerequisites. Own only interpreter `machine.rs` (private CICS pending metadata
+and response hook), `machine/typed_cics.rs` (its local preparation call),
+`machine/typed_cics/container_set.rs`, `machine/typed_cics/response.rs`, the new
+server `product/tests/bts_set_lifetime.rs`, and its existing test-only registration
+in `product.rs`. Shared schemas, checkpoint codecs, execution ABI, facades,
+provider routing, task/frame memory and coverage remain manager-owned.
+Repair the two observed red cases for explicitly resolved BTS selectors. Keep
+BTS loans distinct from channel pair loans under the existing interpreter memory
+authority; no shadow allocator. A known observed BTS SET response expires the
+previous BTS loan even on the reviewed handled missing-container condition;
+INTO/NODATA and channel-pair loans remain distinct. No guessed pre-issue,
+SAF/infrastructure failure or cross-variant expiry rule. Admission/preflight
+failure must not publish a successful loan. Account metadata/address bounds and
+preserve unknown outcomes. Turn the two independent compiled diagnostics into
+ordinary tests only after they pass. Acceptance includes all six root route
+tests, focused channel/metadata/control/boundary regressions, checkpoint purity
+and restore observations, required policy/format/module gates and cleanup.
+Task-wide child RETURN/XCTL, active legacy untyped loans, cold ownership and
+recovery closure remain pending; this root prerequisite grants no parent or
+recovered credit. If a serialized/public contract change is required, return the
+smallest proposal for the manager rather than reserving one.
+
+`CIC-901.cicsmessage.source-applicability-design` assigns the now-idle frame
+worker a disjoint read-only shared-conformance proposal for official row 0027.
+Own external design/fixtures only. Verify the internal-only diagnostics footnote
+and immutable EIBFN identity through pinned sources; consult the existing shared
+Conformance IR/spec/coverage owners and current all-six-gates catalog bindings.
+Design the smallest explicit source-backed distinction between inadmissible public
+commands and executable commands, preserving all 263 identities and accounting
+for every mandatory obligation without calling rejection executed or recovered.
+No invented not-applicable verdict, lowered acceptance, catalog removal, alternate
+ledger or row-specific bypass. Provide exact shared schema/driver/validator
+changes for manager review, independent rejection/mutation fixtures and whether
+any required authority remains unresolved. No repository/schema/registry/status/
+coverage edit or readiness/sealer/completion claim. At most two pinned source
+bodies; no network or unrelated lifecycle investigation. This lane can progress
+independently of root BTS implementation and the calling-context source review.
+
+`CIC-902.program-task.frames.calling-context-pins` is a manager-owned bounded
+identity prerequisite for the two reviewed flow/rules bodies, 17,228 bytes.
+Own `conformance/0.9/manifests/cics-cobol-calling-context-topics.json`, the existing
+0.9 registry, a bounded metadata-only verification receipt, this status, unique
+fragment and derived documentation. Verify worker proposed hashes against retained
+metadata/TOC/H1 and read both through the shared pinned reader. Do not change
+existing pins, official rows, source-map routing, runtime, tuple eligibility or
+coverage. Source-only acceptance uses exact identity/reader/schema/corpus/docs/
+policy checks. The reviewed rules distinguish fresh LINK storage from subsequent
+same-level COBOL CALL storage; runtime instance ownership and XCTL disposition
+remain manager-reviewed prerequisites.
+
+After the calling-context pins are sealed,
+`CIC-902.program-task.frames.link-storage-regressions` assigns the same source
+session a fresh exact-candidate test checkout. Own only server
+`product/tests/program_identity.rs`, whose existing test module already reaches
+compiled product fixtures; no shared module registration or production change.
+Use rules lines 93–102 for row 0138 and distinguish repeated LINK fresh working
+storage from same-level native CALL retained working storage, fresh local storage,
+and INITIAL reentry. Include a native CALL/LINK/native CALL sequence for the same
+program name so a linked lower-level copy cannot overwrite retained higher-level
+CALL state. Start with actual compiled selected routes, use independent VALUE
+constants and assertions, and retain explicitly ignored red cases with actual
+failure receipts. Existing identity/replay/reopen fixtures stay intact; no
+runtime, schema, coverage, routing or status edit. Acceptance is disjoint reviewable
+test patch, control passes and exact diagnosed baseline failures, source citations,
+focused format/module checks and cleanup. These are diagnostics and grant no
+runtime, parent, recovered or licensed credit. The manager owns any resulting
+instance-scope and normal-return eligibility contract.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001

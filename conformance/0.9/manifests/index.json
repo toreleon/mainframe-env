@@ -46,6 +46,17 @@
       "topic_manifest_sha256": "sha256:a848e11cb75baf44edbff10234516207756ec2d17beab3619cddf8ec413003cc"
     },
     {
+      "baseline_id": "ibm-cics-ts-6x-cobol-calling-context-candidates-2026-09-12",
+      "coverage_credit": 0,
+      "manifest": "conformance/0.9/manifests/cics-cobol-calling-context-topics.json",
+      "manifest_sha256": "sha256:7044dd0aac68029e62497de5e0b4500025cbc6fb41fe3cf7ea56205a896c3e22",
+      "scope_id": "cics-cobol-calling-context",
+      "semantic_authority": false,
+      "subsystem": "cics",
+      "topic_count": 2,
+      "topic_manifest_sha256": "sha256:1c9b95bc6d18c767a70269828fa36b8f0557e0543c43519c41abf06468e3f008"
+    },
+    {
       "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",
       "coverage_credit": 0,
       "manifest": "conformance/0.9/manifests/cics-file-uow-topics.json",

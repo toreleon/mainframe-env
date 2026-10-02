@@ -1,0 +1,91 @@
+{
+  "coverage_credit": 0,
+  "execution_credit": 0,
+  "licensed_credit": 0,
+  "records": [
+    {
+      "body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/19/19c888aa15e7d8b01333dd099c20f8bcb80ac1b507668346939e140b2ceb8f8b.html",
+      "bytes": 4466,
+      "fetched_at": "2026-09-12T06:07:35Z",
+      "further_links_followed": false,
+      "h1": "Flow of control between programs and subprograms",
+      "incoming_literal_link": "/docs/en/SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_flow.html",
+      "incoming_parent": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html",
+      "last_modified": "2026-01-16",
+      "links": [
+        "#dfhp3v7__dfhp3d7",
+        "/docs/en/SSJL4D_6.x/applications/designing/dfhp3kn.html",
+        "/docs/en/SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html"
+      ],
+      "manager_independent_identity_check": true,
+      "markup_ids": [
+        "dfhp3v7__title__1",
+        "lastModifiedDate",
+        "dfhp3v7__dfhp3d7"
+      ],
+      "metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/9e/9eaa4c6d483a2c145bdc254912529dcd5b5802db6a70e3da913120e3a15b21dc.json",
+      "metadata_sha256": "3c7b0cdfc27f6e49e530eeae3a546efe11b5c7e1f3b205fbac6df1200144eb11",
+      "plain_text_line_count": 23,
+      "private_candidate": true,
+      "registered_in_worker": false,
+      "sha256": "19c888aa15e7d8b01333dd099c20f8bcb80ac1b507668346939e140b2ceb8f8b",
+      "source_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fapplications%2Fdeveloping%2Fcobol%2Fdfhp3_cobol_subprog_flow.html?parsebody=true&lang=en",
+      "toc_match": {
+        "href": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_flow.html",
+        "label": "Flow of control between programs and subprograms",
+        "pointer": "/toc/topics/14/topics/10/topics/3/topics/0",
+        "topic_id": "programs-flow-control-between-subprograms"
+      },
+      "toc_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json",
+      "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+      "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_flow.html"
+    },
+    {
+      "body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/ff/ff6330589c9ff88c9292aac548c37d3c50de369fdcef485125d6165fca414d9c.html",
+      "bytes": 12762,
+      "fetched_at": "2026-09-12T06:07:34Z",
+      "further_links_followed": false,
+      "h1": "Rules for calling subprograms",
+      "incoming_literal_link": "/docs/en/SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_rules.html",
+      "incoming_parent": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html",
+      "last_modified": "2026-01-16",
+      "links": [
+        "/docs/en/SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html"
+      ],
+      "manager_independent_identity_check": true,
+      "markup_ids": [
+        "dfhp3f4__title__1",
+        "lastModifiedDate",
+        "dfhp3f4__title__2",
+        "dfhp3f4__title__3",
+        "dfhp3f4__title__4",
+        "dfhp3f4__title__5",
+        "dfhp3f4__title__6",
+        "dfhp3f4__title__7",
+        "dfhp3f4__title__8",
+        "dfhp3f4__title__9",
+        "dfhp3f4__title__10",
+        "dfhp3f4__title__11"
+      ],
+      "metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/77/771ce83c2d12256761595eb1823f159accf8ebe351bd1c8f8fae244cf3678c35.json",
+      "metadata_sha256": "4b055cf34ff9238af6b26b17756f9565e8dd58117fa7334ff0fc29fcdb6285ba",
+      "plain_text_line_count": 119,
+      "private_candidate": true,
+      "registered_in_worker": false,
+      "sha256": "ff6330589c9ff88c9292aac548c37d3c50de369fdcef485125d6165fca414d9c",
+      "source_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fapplications%2Fdeveloping%2Fcobol%2Fdfhp3_cobol_subprog_rules.html?parsebody=true&lang=en",
+      "toc_match": {
+        "href": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_rules.html",
+        "label": "Rules for calling subprograms",
+        "pointer": "/toc/topics/14/topics/10/topics/3/topics/1",
+        "topic_id": "programs-rules-calling-subprograms"
+      },
+      "toc_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json",
+      "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+      "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_rules.html"
+    }
+  ],
+  "schema_version": "mainframe-env.retained-source-verification@1",
+  "semantic_authority": false,
+  "source_topics": 2
+}
