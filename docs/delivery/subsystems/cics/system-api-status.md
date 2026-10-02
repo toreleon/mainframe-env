@@ -2417,3 +2417,99 @@ and no acceptance criterion is relaxed. Current private source projection still
 has 143 command rows (104 SPI, 39 FEPI), 2636 operands and 4074 case candidates.
 Runtime acceptance and official credit stay zero. Application, selected-route,
 recovery/licensed and parent SPI-1001 remain pending.
+
+### Pre-dispatch transaction-resource source repair
+
+SPI-1001.spi-transaction-resources-review-repair depends on verified terminal
+full independent review TXR-R01–R15 and frozen family SHA-256
+`beba8a363fc8dbec514100d7906700f2987a195fa893216dfd9b4b5378921394`.
+Sole repository ownership is conformance/0.10/cics/families/spi-transaction-resources.json;
+the retained original author thread has completed its disjoint NETWORK repair
+and is the only writer in this terminal source worktree. All 22 predeclared exact
+rows, 311 option identities, 148 numeric response identities, 64 domain sets/178
+symbols, five forms and all 737 original case IDs/order remain intact.
+
+Repair all reported receiver directions, optional MAXIMUM and expiry AT grammar,
+class-choice exclusions, precise retained-lock/timestamp/default predicates,
+28 contradictory authorization seeds, 21 negative-state seeds, actual class
+sender and prior mutation values. Registered FORMATTIME supplies eight-byte
+ABSTIME extents for ten receivers and copied forms; pointer/encoding/storage
+binding remains pending. Preserve raw REQID grouping/body opposition and all
+other pinned conflicts or unknown contexts. No invented browse recipe, numeric
+precedence, ABI alias, new DSL or runtime authority. Any source-backed paired
+class or unchanged-health additional case is separately counted. Every repair
+requires pinned search/read, complete action ledger/whole-original reversal and
+a different thread's changed-fact review before actual manager-owned family
+instance/generator/mandatory gates and serial sealing. Shared schema/IR/state/
+security/UOW/status/generators remain manager-owned. All six and 269 SPI/39 FEPI
+parent/dependency/selected-route/recovery/licensed acceptance remain pending,
+credit0. This declaration precedes dispatch.
+
+Exact repair rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0010`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0024`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0031`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0032`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0082`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0088`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0089`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0115`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0153`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0156`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0167`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0176`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0178`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0188`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0192`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0217`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0240`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0247`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0256`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0258`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0264`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0268`.
+
+### Pre-dispatch WEB symbolic CVDA domains
+
+SPI-1001.spi-web-cvda-domains depends on the sealed WEB source repair and common
+finite-domain/numeric facet vocabulary at the 54-commit candidate. Demonstrated
+inventory gap: the 25-row WEB family has zero finite CVDA domain arrays despite
+source-described CVDA value-shaped operands. One retained terminal thread owns
+only conformance/0.10/cics/families/spi-web-resources.json in a new isolated
+checkout. Exact frozen source SHA-256
+`40bc41026bbf213a26957f785a979cea2af25bb9cdbdec12647e0758868d39e9`.
+
+Derive all source-settled symbolic membership for parent and existing named form
+scopes, sender/output separately, with four-byte values only where pinned common
+CVDA authority applies. Every existing 25 row identity, 336 option identity/role,
+134 response identity, six form identity and 550 complete case objects/IDs/order
+remain unchanged. Only additive cvda_domains, directly supporting option source
+citations and precise unresolved-domain gaps may change. No new form, option,
+case, alias normalizer, numeric encoding, runtime route or shared schema edit.
+Conflicting or unstated finite membership stays an exact pending source gap.
+All additions and any citation/gap edits need whole-original reverse proof and
+different-thread independent source review before manager-owned actual instance/
+generator/focused/mandatory integration gates and serial sealing. Shared schema,
+generators, registries, IR/state/security/UOW/status remain manager-owned. All
+runtime/parent/application/selected-route/recovery/license acceptance remains
+pending, credit0. This declaration precedes dispatch.
+
+Exact WEB rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0003`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0009`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0023`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0035`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0036`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0063`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0070`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0081`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0091`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0092`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0097`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0114`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0150`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0187`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0190`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0191`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0193`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0198`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0206`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0216`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0239`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0263`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0266`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0267`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0269`.
+
+### Serialized queue/storage source-contract integration
+
+SPI-1001.spi-queue-source-contracts integrates the already predeclared 30-row
+QUEUE/storage family after its 13 source repairs and separately reviewed QSRR-01
+source-conflict repair. All 59 original repair actions plus one gap replacement
+reconstruct the whole final bytes and reverse to the entire original. All 903
+original case IDs/order remain: 17 amended, 886 identical; the final gap changes
+no case. 337 option identities, 204 condition identities and 24 form identities
+remain intact. SYSOUTCLASS's one-character source establishes its one-byte
+ceiling in parent/form scopes. Independent review has no remaining actionable
+finding; all runtime/source closure gaps remain pending.
+
+Pinned SSJL4D_6.x SPI bodies (ibm-cics-ts-6x-spi-command-bodies-2026-09-12)
+include createtdqueue/createtsmodel/discardtsmodel/inquiretsmodel/inquiretsqueue,
+inquirejournalmodel/inquirejournalname/inquirestreamname/inquiretdqueue,
+inquirecfdtpool and inquireenq/inquireuowenq. Common API-format receiver authority
+keeps response writes separate from source-preserved data areas. Exact catalog
+rows, per-topic pins and all 13 repair clause matrices remain unchanged. Fresh
+manager offline search/read covers 13 relevant topics/40 commands, all exit0.
+No refresh or execution credit.
+
+ENQ retains the opposed no-empty-filter-bypass diagram against UOWENQ's empty
+bypass/unfiltered START prose under both exact pins. Filter omission applicability,
+complete browse syntax/storage and precedence stay pending; NEXT output slots
+do not become START filters. Surrogate denial requests an actual USERID, TSMODEL
+inputs remain separate from TSQUEUE historical outputs, pool/certificate/stream
+observations use independent state, and platform lock-order ownership cites
+TRANSACTION-PARTICIPANT-V1. Eight obsolete JOURNALNUM references remain explicit
+unresolved source candidates. No runtime resource owner, route or generic
+handler is introduced. Application/selected-route/recovery/licensed, all six
+command gates, 269 SPI/39 FEPI acceptance and parent SPI-1001 remain pending,
+credit0. Manager alone owns sole generation, actual instance/mandatory gates and
+serial child sealing.
+
+Queue source integration passes 31 generator and nine shared IR regressions and
+the actual Draft202012 family-instance gate. Current private projection has
+173 command rows (134 SPI, 39 FEPI), 2973 operands and 4977 case candidates.
+Six of the 18 enrolled family files remain outside integration; the full wave
+gate stays pending. No source case adds runtime/official acceptance credit.
