@@ -1324,3 +1324,24 @@ will bind through the existing shared IR owner; product generators consume
 semantic contract facts rather than test outcomes. No runtime or official
 coverage is claimed. The pinned Python lacks jsonschema; the repository's
 existing Rust Draft 2020-12 schema checker owns validation instead.
+
+## Shared family validation owner
+
+Manager declares `SPI-1001.family-contract-validation` before implementation.
+The demonstrated gap is that `xtask schemas` compiles the new family schema but
+no existing gate checks its artifact instances against source-map/manifest rows
+or verifies option-constraint and case-reference closure. This slice exclusively
+owns `xtask/src/cics_system_families.rs`, its parent module/CLI registration, this
+status, a unique fragment and derived docs. It extends the existing xtask schema
+validator, rather than adding a source reader, executable Conformance IR,
+dispatcher or result ledger. The two family workers retain exclusive normative
+JSON ownership; no active worker input is changed. Acceptance includes exact
+cohort identity/source linkage, malformed/foreign/missing/duplicate row and
+constraint rejection, independent validation cases and mandatory policy gates.
+The validator grants zero execution/recovery/differential or parent credit.
+
+Shared family validation passes eight focused tests with zero ignored cases.
+Synthetic fixtures test authority/constraint rejection only, without IBM
+behavioral credit. The existing Rust offline Draft 2020-12 schema owner checks
+every present family instance; the explicit family command requires its file.
+Mandatory gates precede this bounded validator seal.

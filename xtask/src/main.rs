@@ -6,6 +6,7 @@ mod carddemo_base_batch_provenance;
 mod carddemo_readacct;
 mod carddemo_v09_host;
 mod changelog;
+mod cics_system_families;
 mod cobol_differential;
 mod db2_statement_catalog;
 mod docs;
@@ -184,6 +185,14 @@ enum EvidenceCommand {
     Callback,
 }
 
+#[derive(Debug, Args)]
+struct CicsSystemFamilyArgs {
+    #[arg(long)]
+    family: Option<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
     ProfileIntake(ProfileIntakeArgs),
@@ -196,6 +205,7 @@ enum XtaskCommand {
     RuntimeArchitecture(CheckArgs),
     Profiles(CheckArgs),
     Schemas(CheckArgs),
+    CicsSystemFamilies(CicsSystemFamilyArgs),
     Inventory(CheckArgs),
     MqMqiRegistry(CheckArgs),
     MqLicensedContract(CheckArgs),
@@ -352,6 +362,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         ),
         XtaskCommand::Profiles(args) => checked!("profiles", args, check_profiles(root)),
         XtaskCommand::Schemas(args) => checked!("schemas", args, check_schemas(root)),
+        XtaskCommand::CicsSystemFamilies(args) => checked!(
+            "cics-system-families",
+            args,
+            cics_system_families::check(root, args.family.as_deref())
+        ),
         XtaskCommand::Inventory(args) => checked!("inventory", args, check_inventory(root)),
         XtaskCommand::MqMqiRegistry(args) => {
             checked!("mq-mqi-registry", args, check_mq_mqi_registry(root))
@@ -8757,6 +8772,7 @@ fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
 
 fn check_schemas(root: &Path) -> TaskResult {
     check_cics_source_map_schemas(root)?;
+    cics_system_families::check_present(root)?;
     let files = versioned_schema_files(root)?;
     require(!files.is_empty(), "no evidence schemas found")?;
     for file in &files {
