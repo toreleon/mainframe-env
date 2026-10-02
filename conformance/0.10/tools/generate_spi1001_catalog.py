@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any
@@ -312,7 +313,7 @@ def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
     options = grammar["options"]
     names = [option["name"] for option in options]
     require(bool(names) and names == sorted(set(names)), "family options drifted")
-    return {
+    compact = {
         "options": [{key: option[key] for key in (
             "name", "value_shape", "direction", "source_max_value_bytes"
         )} for option in options],
@@ -321,6 +322,32 @@ def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
         "dependencies": grammar["dependencies"],
         "alternative_groups": grammar.get("alternative_groups", []),
     }
+    domains = grammar.get("cvda_domains", [])
+    require(isinstance(domains, list) and len(domains) <= 256, "CVDA domain bound/type drifted")
+    require(all(isinstance(domain, dict) and set(domain) == {"option", "values", "source_lines"}
+                and isinstance(domain["option"], str)
+                and re.fullmatch(r"[A-Z][A-Z0-9]{0,63}", domain["option"])
+                for domain in domains), "CVDA domain fields drifted")
+    heads = [domain["option"] for domain in domains]
+    require(heads == sorted(set(heads)), "CVDA domain operands drifted")
+    projected = []
+    by_name = {option["name"]: option for option in options}
+    for domain in domains:
+        require(set(domain) == {"option", "values", "source_lines"}, "unknown CVDA domain field")
+        operand = by_name.get(domain["option"])
+        require(operand is not None and operand["value_shape"] == "value"
+                and operand["direction"] != "none" and operand["source_max_value_bytes"] == 4,
+                "CVDA domain requires a declared valued fullword operand")
+        values = domain["values"]
+        require(isinstance(values, list) and 0 < len(values) <= 256
+                and all(isinstance(value, str) and re.fullmatch(r"[A-Z][A-Z0-9]{0,63}", value) for value in values),
+                "CVDA domain symbols drifted")
+        require(values == sorted(set(values)), "CVDA domain symbols must be unique and sorted")
+        projected.append({"option": domain["option"], "values": values})
+    if projected:
+        compact["cvda_domains"] = projected
+    return compact
+
 
 
 def project_family_grammar(
@@ -424,6 +451,12 @@ def render_grammar_facts(facts: list[dict[str, Any]]) -> bytes:
                 f"source_max_value_bytes: {maximum} "
                 "},"
             )
+        lines.append("        ],")
+        lines.append("        cvda_domains: &[")
+        for domain in grammar.get("cvda_domains", []):
+            lines.append("            CicsApplicationCvdaDomain { "
+                         f"option: {rust_string(domain['option'])}, "
+                         f"values: {rust_string_slice(domain['values'])} " + "},")
         lines.append("        ],")
         lines.append(f"        required_options: {rust_string_slice(grammar['required'])},")
         lines.append("        alternative_groups: &[")

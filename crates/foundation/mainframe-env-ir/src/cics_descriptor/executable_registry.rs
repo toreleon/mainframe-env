@@ -133,6 +133,18 @@ pub struct CicsApplicationOptionDescriptor {
     pub source_max_value_bytes: Option<usize>,
 }
 
+/// Source-reviewed symbolic values for one scoped CVDA operand.
+///
+/// This does not supply numeric codes, implied flag aliases, context predicates,
+/// completeness, or compiler admission. Its enclosing contract owns readiness.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsApplicationCvdaDomain {
+    /// Declared valued operand whose CVDA symbols are reviewed.
+    pub option: &'static str,
+    /// Sorted unique source symbols; numeric encoding is a separate authority.
+    pub values: &'static [&'static str],
+}
+
 /// An alternative option group; mutual exclusion is carried separately.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CicsApplicationOptionAlternative {

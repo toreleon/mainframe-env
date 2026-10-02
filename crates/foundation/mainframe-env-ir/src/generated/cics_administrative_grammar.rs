@@ -29,6 +29,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "TARGETLIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2048) },
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["POOL"],
         alternative_groups: &[
         ],
@@ -61,6 +63,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "TARGETLIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2048) },
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["POOL"],
         alternative_groups: &[
         ],
@@ -90,6 +94,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["NODELIST", "NODENUM"],
         alternative_groups: &[
         ],
@@ -113,6 +119,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "POOL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
             CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["POOL"],
         alternative_groups: &[
@@ -138,6 +146,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["PROPERTYSET"],
         alternative_groups: &[
         ],
@@ -162,6 +172,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "TARGETLIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2048) },
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["TARGETLIST", "TARGETNUM"],
         alternative_groups: &[
@@ -195,6 +207,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "START", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(64) },
+        ],
+        cvda_domains: &[
         ],
         required_options: &[],
         alternative_groups: &[
@@ -244,6 +258,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(64) },
             CicsApplicationOptionDescriptor { name: "WAITCONVNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["POOL"],
         alternative_groups: &[
         ],
@@ -285,6 +301,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "UNSOLDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
             CicsApplicationOptionDescriptor { name: "UNSOLDATACK", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &[],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["END", "PROPERTYSET", "START"], required: true },
@@ -318,6 +336,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["NODELIST", "NODENUM"],
         alternative_groups: &[
@@ -354,6 +374,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "TARGETLIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2048) },
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["POOL", "PROPERTYSET"],
         alternative_groups: &[
@@ -421,6 +443,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "UNSOLDATACK", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "WIN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["PROPERTYSET"],
         alternative_groups: &[
         ],
@@ -452,6 +476,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "TARGET", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::InputOutput, source_max_value_bytes: Some(8) },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(64) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &[],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["END", "START", "TARGET"], required: true },
@@ -482,6 +508,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "TARGETLIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2048) },
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["APPLLIST", "TARGETLIST", "TARGETNUM"],
         alternative_groups: &[
@@ -515,6 +543,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["NODE"],
         alternative_groups: &[
@@ -552,6 +582,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["NODELIST", "NODENUM"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["NODE", "NODELIST"], required: true },
@@ -584,6 +616,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
+        ],
+        cvda_domains: &[
         ],
         required_options: &[],
         alternative_groups: &[
@@ -618,6 +652,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["POOLLIST", "POOLNUM"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["POOL", "POOLLIST"], required: true },
@@ -650,6 +686,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "TARGETLIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2048) },
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
+        ],
+        cvda_domains: &[
         ],
         required_options: &["TARGET"],
         alternative_groups: &[
@@ -684,6 +722,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["TARGETLIST", "TARGETNUM"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["TARGET", "TARGETLIST"], required: true },
@@ -716,6 +756,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["ATTRIBUTES", "PROGRAM"],
         alternative_groups: &[
         ],
@@ -738,6 +780,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
                     CicsApplicationOptionDescriptor { name: "PROGRAM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
                     CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                     CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+                ],
+                cvda_domains: &[
                 ],
                 required_options: &["ATTRIBUTES", "PROGRAM"],
                 alternative_groups: &[
@@ -765,6 +809,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["PROGRAM"],
         alternative_groups: &[
         ],
@@ -781,6 +827,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
                     CicsApplicationOptionDescriptor { name: "PROGRAM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
                     CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                     CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+                ],
+                cvda_domains: &[
                 ],
                 required_options: &["PROGRAM"],
                 alternative_groups: &[
@@ -858,6 +906,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "TRANSID", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
             CicsApplicationOptionDescriptor { name: "USECOUNT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &[],
         alternative_groups: &[
         ],
@@ -922,6 +972,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
                     CicsApplicationOptionDescriptor { name: "TRANSID", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                     CicsApplicationOptionDescriptor { name: "USECOUNT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
+                cvda_domains: &[
+                ],
                 required_options: &["PROGRAM"],
                 alternative_groups: &[
                 ],
@@ -972,6 +1024,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
             CicsApplicationOptionDescriptor { name: "VERSION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
+        cvda_domains: &[
+        ],
         required_options: &["PROGRAM"],
         alternative_groups: &[
         ],
@@ -1014,6 +1068,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
                     CicsApplicationOptionDescriptor { name: "SHARESTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
                     CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
                     CicsApplicationOptionDescriptor { name: "VERSION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+                ],
+                cvda_domains: &[
                 ],
                 required_options: &["PROGRAM"],
                 alternative_groups: &[

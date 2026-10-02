@@ -40,7 +40,7 @@ pub use cics_descriptor::{
     CICS_APPLICATION_REGISTRY, CICS_APPLICATION_REGISTRY_FROZEN, CICS_APPLICATION_REGISTRY_SHA256,
     CICS_EXECUTABLE_DESCRIPTORS, CICS_RUNTIME_IMPORT, CicsApplicationCobolApplicability,
     CicsApplicationConditionClauseDescriptor, CicsApplicationConditionLabelOperand,
-    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
+    CicsApplicationConstraintStatus, CicsApplicationCvdaDomain, CicsApplicationHandlerReadiness,
     CicsApplicationOptionAlternative, CicsApplicationOptionDependency,
     CicsApplicationOptionDescriptor, CicsApplicationOptionDirection,
     CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,

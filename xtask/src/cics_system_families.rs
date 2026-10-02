@@ -314,6 +314,35 @@ fn validate_grammar<'a>(grammar: &'a Value, path: &Path) -> TaskResult<BTreeSet<
         "CICS family options must be nonempty, unique and sorted",
     )?;
     let known = option_names.into_iter().collect::<BTreeSet<_>>();
+    if grammar.get("cvda_domains").is_some() {
+        let domains = array(grammar, "cvda_domains", path)?;
+        let heads = domains
+            .iter()
+            .map(|domain| text(domain, "option", path))
+            .collect::<TaskResult<Vec<_>>>()?;
+        require(
+            heads.windows(2).all(|pair| pair[0] < pair[1]),
+            "CICS CVDA domain operands must be unique and sorted",
+        )?;
+        for domain in domains {
+            let head = text(domain, "option", path)?;
+            let operand = options
+                .iter()
+                .find(|option| option["name"] == head)
+                .ok_or("CICS CVDA domain names an undeclared option")?;
+            require(
+                operand["value_shape"] == "value"
+                    && operand["direction"] != "none"
+                    && operand["source_max_value_bytes"] == 4,
+                "CICS CVDA domain requires a valued fullword operand",
+            )?;
+            let values = names(&domain["values"], path)?;
+            require(
+                !values.is_empty() && values.windows(2).all(|pair| pair[0] < pair[1]),
+                "CICS CVDA symbols must be nonempty, unique and sorted",
+            )?;
+        }
+    }
     let references = |list: &Value| -> TaskResult {
         require(
             names(list, path)?.iter().all(|name| known.contains(name)),
@@ -691,6 +720,55 @@ mod tests {
                     .push(json!({"members":["NAME","OTHER"],"required":false})),
             }
             assert!(valid("spi-program", &value).is_err(), "mode {mode}");
+        }
+    }
+    fn cvda_fixture() -> Value {
+        let mut value = fixture("spi-program");
+        let grammar = &mut value["commands"][0]["grammar"];
+        grammar["options"][0]["source_max_value_bytes"] = json!(4);
+        grammar["cvda_domains"] =
+            json!([{"option":"NAME", "values":["A","B"], "source_lines":[1]}]);
+        value
+    }
+
+    #[test]
+    fn optional_symbolic_domains_validate_in_parent_and_form_without_admission() {
+        let mut value = cvda_fixture();
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        let shape = value["commands"][0]["grammar"].clone();
+        value["commands"][0]["grammar"]["forms"] = json!([{
+            "id":"named", "selector_options":["NAME"], "grammar":shape, "source_lines":[1]
+        }]);
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        value["commands"][0]["grammar"]["cvda_domains"] = json!([]);
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+    }
+
+    #[test]
+    fn malformed_unbound_or_numeric_symbolic_domains_fail_closed() {
+        for mode in 0..11 {
+            let mut value = cvda_fixture();
+            let grammar = &mut value["commands"][0]["grammar"];
+            match mode {
+                0 => grammar["cvda_domains"][0]["option"] = json!("MISSING"),
+                1 => grammar["cvda_domains"][0]["values"] = json!([]),
+                2 => grammar["cvda_domains"][0]["values"] = json!(["A", "A"]),
+                3 => grammar["cvda_domains"][0]["values"] = json!(["B", "A"]),
+                4 => grammar["cvda_domains"][0]["values"] = json!([23]),
+                5 => grammar["cvda_domains"][0]["number"] = json!(23),
+                6 => grammar["cvda_domains"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"option":"NAME", "values":["C"], "source_lines":[1]})),
+                7 => grammar["options"][0]["source_max_value_bytes"] = json!(8),
+                8 => grammar["options"][0]["value_shape"] = json!("flag"),
+                9 => grammar["options"][0]["direction"] = json!("none"),
+                _ => grammar["cvda_domains"][0]["values"] = json!(["bad-symbol"]),
+            }
+            assert!(
+                valid("spi-program", &value).is_err(),
+                "domain mutation {mode}"
+            );
         }
     }
 }

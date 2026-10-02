@@ -5,7 +5,7 @@
 //! The existing application-command and CICS runtime authorities are unchanged.
 
 use crate::{
-    CicsApplicationConstraintStatus, CicsApplicationOptionAlternative,
+    CicsApplicationConstraintStatus, CicsApplicationCvdaDomain, CicsApplicationOptionAlternative,
     CicsApplicationOptionDependency, CicsApplicationOptionDescriptor,
     CicsApplicationOptionDirection, CicsApplicationOptionValueShape,
 };
@@ -63,6 +63,8 @@ pub struct CicsAdministrativeGrammarContract {
     pub source_sha256: &'static str,
     /// Reviewed top-level operand shapes and IBM storage ceilings.
     pub options: &'static [CicsApplicationOptionDescriptor],
+    /// Optional scoped symbolic CVDA facts, without numeric or alias inference.
+    pub cvda_domains: &'static [CicsApplicationCvdaDomain],
     /// Unconditional required operands only.
     pub required_options: &'static [&'static str],
     /// Required or optional alternatives, using the existing CICS constraint type.
@@ -89,6 +91,8 @@ pub struct CicsAdministrativeGrammarForm {
     pub selector_options: &'static [&'static str],
     /// Form-specific shapes/directions using the existing CICS operand type.
     pub options: &'static [CicsApplicationOptionDescriptor],
+    /// Optional scoped symbolic CVDA facts, without numeric or alias inference.
+    pub cvda_domains: &'static [CicsApplicationCvdaDomain],
     /// Unconditional required clauses within this form.
     pub required_options: &'static [&'static str],
     /// Required or optional choices using the existing CICS constraint type.

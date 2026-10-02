@@ -1835,3 +1835,31 @@ checks for both files. The integrated private source projection now has24 rows
 These remain partial source contracts with Pending constraints and no handlers,
 application/selected-route/recovery/license acceptance or execution credit.
 Mandatory current-candidate gates precede this bounded source slice seal.
+
+Manager serialized slice SPI-1001.family-cvda-domains addresses the demonstrated
+absence of structured symbolic CVDA domains in common family/form projection.
+Only manager owns shared schema, actual validator, sole generator/tests, common
+CICS operand type, administrative IR facade/projection, fragment/status/docs.
+Optional bounded domains tie reviewed symbolic values to a declared fullword
+valued operand, including form-local direction. No numeric CVDA table, implicit
+aliases, predicate DSL, compiler admission, handler or response mapper is added.
+Absence/empty metadata must preserve the old fact preimage/digest; existing
+family facts are unchanged and no reviewed source values are invented. Scope
+requires malformed-domain regressions, generator/digest/source-line exclusion,
+actual Draft202012/schema/module/API/format/architecture/docs/changelog/deny
+gates and cleanup before this infrastructure seal. Existing live source workers
+retain their frozen old-schema inputs; manager enriches values only after source
+review. Generic dfha80x source-b pin81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25
+lines3-15 distinguishes finite named values, fullword storage and direction;
+lines16-38 keeps aliases/DFHVALUE/numeric reference separate. All administrative
+readiness and execution/recovery/differential/parent/application gates pending.
+
+Symbolic CVDA domain infrastructure passes15 focused actual-validator tests
+(including11 malformed domain payloads),26 generator regressions and seven
+IR source/compatibility regressions without ignores. Parent and form domain
+projection preserves scoped symbols and excludes source-line metadata; absent
+and empty domains preserve the previous product-fact preimage/digest. Current
+24 source rows retain their exact prior grammar digest and no domain facts are
+invented. All constraints stay Pending; numeric codes/aliases/context predicates
+and compiler admission remain separate unfulfilled obligations. Mandatory
+current-candidate gates precede this bounded infrastructure seal.

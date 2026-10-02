@@ -202,6 +202,65 @@ class AdministrativeGrammarTests(unittest.TestCase):
             with self.assertRaises(catalog_tool.CatalogError):
                 self.project(family)
 
+    def cvda_fixture(self):
+        family = copy.deepcopy(self.family)
+        family["commands"][0]["grammar"]["cvda_domains"] = [
+            {"option": "LOGMESSAGE", "values": ["LOG", "NOLOG"], "source_lines": [74]}]
+        return family
+
+    def test_absent_empty_cvda_domains_preserve_product_fact_digest(self) -> None:
+        absent = copy.deepcopy(self.family)
+        empty = copy.deepcopy(absent)
+        for command in empty["commands"]:
+            command["grammar"]["cvda_domains"] = []
+            for form in command["grammar"].get("forms", []):
+                form["grammar"]["cvda_domains"] = []
+        self.assertEqual(self.project(absent), self.project(empty))
+        self.assertEqual(catalog_tool.render_grammar_facts(self.project(absent)),
+                         catalog_tool.render_grammar_facts(self.project(empty)))
+
+    def test_cvda_symbols_project_in_forms_without_numeric_or_source_line_inference(self) -> None:
+        family = self.cvda_fixture()
+        grammar = family["commands"][0]["grammar"]
+        grammar["forms"][0]["grammar"]["cvda_domains"] = copy.deepcopy(grammar["cvda_domains"])
+        before = catalog_tool.render_grammar_facts(self.project(family))
+        grammar["cvda_domains"][0]["source_lines"] = [75, 76]
+        grammar["forms"][0]["grammar"]["cvda_domains"][0]["source_lines"] = [77]
+        self.assertEqual(before, catalog_tool.render_grammar_facts(self.project(family)))
+        grammar["forms"][0]["grammar"]["cvda_domains"][0]["values"] = ["LOG"]
+        after = catalog_tool.render_grammar_facts(self.project(family))
+        self.assertNotEqual(before, after)
+        self.assertIn(b'CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"]', after)
+        self.assertNotIn(b"numeric_code", after)
+        self.assertNotIn(b"CicsResponse", after)
+        self.assertEqual(after.count(b"CicsApplicationConstraintStatus::Pending"), 8)
+
+    def test_cvda_projection_rejects_unbound_wrong_shape_duplicate_numeric_and_unsorted(self) -> None:
+        for mutation in range(9):
+            family = self.cvda_fixture()
+            grammar = family["commands"][0]["grammar"]
+            domains = grammar["cvda_domains"]
+            if mutation == 0:
+                domains[0]["option"] = "MISSING"
+            elif mutation == 1:
+                domains[0]["option"] = "LOG"
+            elif mutation == 2:
+                domains[0]["values"] = ["LOG", "LOG"]
+            elif mutation == 3:
+                domains[0]["values"] = ["NOLOG", "LOG"]
+            elif mutation == 4:
+                domains[0]["values"] = []
+            elif mutation == 5:
+                domains[0]["values"] = [23]
+            elif mutation == 6:
+                domains.append(copy.deepcopy(domains[0]))
+            elif mutation == 7:
+                domains[0]["number"] = 23
+            else:
+                domains[0]["values"] = ["bad-symbol"]
+            with self.assertRaises(catalog_tool.CatalogError):
+                self.project(family)
+
     def project(self, family=None):
         return catalog_tool.project_family_grammar(
             self.family if family is None else family, self.mapping, self.manifest
