@@ -227,6 +227,32 @@ aggregate-family calls remain explicitly deferred pending function binding.
 Full-row recognition, common/deferred freeze, execution and licensed gates
 remain pending. These partial APIs cannot close DB2-1201 or DB2-1202.
 
+## Fourth-wave catalog/binder prerequisites
+
+Before further implementation, the manager declares two independent pure type
+kernels and one read-only catalog evolution review. All use current owned AST
+and resolved type contracts; no executor, value conversion or parallel catalog
+is introduced. Public integration follows reviewed feature seals.
+
+| Lane | Ownership and mandatory boundary |
+|---|---|
+| `DB2-1202.arithmetic-result-types` | `src/arithmetic_types.rs` and a unique `db2-arithmetic-result-types.toml` fragment. Unary/binary numeric result metadata, explicit DEC15/DEC31 and minimum-divide-scale context, preserved constant-digit provenance, nullability, and explicit runtime truncation/overflow/warning obligations. No guessing installation/package options or evaluation. |
+| `DB2-1202.result-combination-types` | `src/result_combination_types.rs` and a unique `db2-result-combination-types.toml` fragment. Ordered numeric/binary/datetime result-type combination, bounded operands, nullability and untyped-NULL handling; character/graphic CCSID-dependent combinations fail explicitly until attributes exist. No CASE evaluation or function overload resolution. |
+| Catalog evolution review | Read-only current catalog/compiler/package/server/store/rollback compatibility inspection. Report exact existing authority paths, required versioned metadata, finite reader/writer policy, canonical identity and migration boundaries outside Git. Do not edit code or claim a catalog feature complete. Manager chooses the integrated contract before catalog mutation. |
+
+Pinned arithmetic topic `db2z_witharithmeticoperators.html` (37064 bytes,
+`83a3db8b0d913dcbaff86c47624fda48fd2d462988499f83e73a6965d0f7d459`),
+result rules `db2z_rules4resultdatatypes.html` (36969 bytes,
+`7c23258e9e9f63a5be873ca3ce6f87a2f9b893d4f0aab7d0799b7f02e6bcc206`)
+and CASE `db2z_caseexpression.html` (39911 bytes,
+`fac861b774379be825c697a83d9447f40c125fbda877f716714b0e8ea930cd4a`)
+were verified against the manifest and read from retained/raw local HTML under
+the Db2 13 baseline. Language elements have no standalone statement row.
+Ordinary search/read remains TOC-blocked. Package/MSRV, focused matrices,
+format/catalog/changelog/docs/dependency policy and exact-path seals are
+required for the two code slices. Global unchanged architecture blockers are
+not retried. These declarations grant no full-row or licensed execution credit.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod arithmetic_types;
 mod ast;
 mod catalog;
 mod create_index_syntax;
@@ -14,6 +15,7 @@ mod generated_statement_catalog;
 mod insert_syntax;
 mod name_resolution;
 mod numeric_constant_types;
+mod result_combination_types;
 mod retention;
 mod service;
 mod statement;
