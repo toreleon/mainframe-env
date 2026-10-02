@@ -987,3 +987,103 @@ global suite was performed. The shared official IMS conformance selector still
 rejects because its product driver registry is absent; rejection earns no pass.
 This slice does not close those manager-owned aggregate gates, the IMS-1403
 parent, the 0.14 exit gate, licensed certification or mixed-resource recovery.
+
+## IMS-1403.local-uow-isolation (verified bounded local slice)
+
+Parent: IMS-1403. Candidate: this isolated `v014-cache-audit-20261002`
+checkout; consumed baseline `213ed878ec138bdb2914330db6613559bffc5a86`
+is the independent acceptance audit candidate. Existing execution, host ABI,
+SAF, provider-row CAS, durable storage, retention and participant authorities
+remain authoritative; the shared IMS participant descriptor is owned elsewhere.
+This slice owns generic database local undo/publication, mutating load and
+logical-cascade fences, utility bridge fences and focused Memory/SQLite tests.
+It does not change checkpoint semantics, CardDemo adapters, host shapes or
+the shared participant contract. The manager's CHKP change commits undo and
+resets position; isolation must release its fence when that undo disappears.
+
+Applicable catalog identities are IMS 15.6
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004/:0006/:0008/:0009/:0015`,
+with CHKP :0002 as an integration dependency. Local obligations cover two-run
+and two-service same-database rollback safety, fail-closed contention,
+authorization/malformed no-mutation, atomic CAS/failure/replay, retained undo
+readers and fresh SQLite connections. Interactive local UOWs retain undo;
+batch mutation's existing immediate commit remains in scope for fencing.
+No official obligation verdict, licensed credit, mixed-resource closure or
+release claim is granted. The minimum repair will reuse atomic shared-store
+row CAS; it will not add a lock service, coordinator or store.
+
+Source review: offline `ibm_docs.py search/read` with the existing verified
+`ims-1405-topic-cache` read recovery baseline
+`ibm-ims-15.6-recovery-utilities-2026-09-11`, `ims_rolscall.htm`
+(`b7e15d0c110d3296eac11d895326b3ef48ac913fd682b94b312aa6c59ad14af5`)
+and `ims_basicchkpcall.htm`
+(`1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a`).
+Whole-image local backout must never erase another committed writer; host
+contention/uncertainty is distinct from IBM PCB status. Before semantic implementation, the retained/raw archive was also hash-verified
+and parsed with the repository reader for programming baseline
+`ibm-ims-15.6-programming-contracts-2026-09-11`: `ims_gughucall.htm`
+(`0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9`),
+`ims_gnghncall.htm`
+(`063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4`),
+and `ims_processingoptions.htm`
+(`bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4`).
+Recovery `ims_rollcall.htm`
+(`01a33e88387636985ef575bdd7bdb99e0d3ce6a794dcf227d2f1e75c843ec61f`)
+was read in the verified reader cache. Missing programming bodies in that
+reader were resolved from the matching external archive; no source was
+repinned or fetched.
+
+The implementation retains whole-image undo only while its run owns the
+database and declared logical dependencies. Shared database-row CAS advances
+on image publication and undo acquisition/release, including an unchanged
+image at commit or the manager's checkpoint boundary. A second scan rejects
+a mixed database/undo observation; sessions refresh before position mutation.
+Load, paired cascade and utility/recovery publication use the same ownership
+and CAS fences. Contention returns host `IdempotencyConflict`; a stale or
+unwitnessed backout and a lost publication acknowledgement remain
+`UnknownOutcome`. Neither becomes a success PCB status or automatic redispatch.
+This conservative database/dependency scope is broader than IBM record locks;
+it does not prove IBM read isolation, scheduling/wait behavior or lock granularity.
+
+New generic undo values use `mainframe-env.ims-local-undo@2` inside the existing
+v1 object envelope/namespace and carry exact post-image SHA-256 witnesses plus
+bounded digests of images observed under that UOW's ownership. A bridge
+savepoint backout updates the current witness while retaining original undo
+and ownership until common local settlement. A proposed image outside those
+witnesses fails unknown, including a prior UOW's savepoint after another
+writer committed. This is a local safety fence, not full recovery-call closure.
+The reader preserves historical plain image maps without rewriting or
+promoting their evidence. Existing active legacy undo can be read, but
+unproven mutation/commit/backout fails unknown and requires explicit
+reconciliation. Drain older writers before upgrade. Old binaries cannot read
+active v2 undo: downgrade requires settling/draining those UOWs with this
+reader or restoring a verified compatible backup, retaining checkpoint, replay
+and recovery references. There is no SQL migration or new retention target.
+The participant descriptor owner must declare the v2 writer and retained
+plain-map reader; no shared participant acceptance is claimed here.
+
+Four initial deterministic two-run/two-service tests failed on Memory and
+SQLite before the repair. Affected-package verification now passes 86 unit
+tests, 12 integration tests and zero doc tests, including 16 new isolation
+cases. They cover the retained pre-fix committed-B image, legacy/schema
+rejection, authorization, malformed load, batch and ordinary mutators, CAS
+winners and stale rollback, lost acknowledgement/replay, logical cascade,
+utility contention, intermediate savepoint/old-UOW rejection and fresh SQLite
+connections. The CHKP test exercises
+the manager's intended state publication (undo removal, position reset,
+checkpoint retention), not an independently changed checkpoint handler.
+Strict scoped Clippy with dependency linting excluded, workspace format,
+dependency policy, IMS catalog/assurance, shared spec, changelog and the
+execution/effect/provider-row/storage/SAF/retention/participant guards pass.
+Dependency-inclusive Clippy stopped at unchanged MQ host validation warnings.
+The aggregate architecture gate passed its earlier guards and stopped at the
+unchanged CICS `dfhp37p.html` reader-cache gap; no unrelated cache provisioning
+or audit was performed and that gate is not claimed as passed. The historical
+0.4/0.5/0.6 licensed-pending dispositions remain as recorded; the audit's
+missing exact acceptance-provenance mapping is not invented by this slice.
+
+Next integration step: merge this exact sealed slice with the manager-owned
+CHKP and participant changes, run the selected public CHKP regression there,
+and resolve aggregate baseline gates in their owners. No official IMS row
+credit, licensed differential, CardDemo certification, mixed-resource closure
+or v0.14 release completion is asserted.

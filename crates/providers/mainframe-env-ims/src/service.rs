@@ -276,7 +276,7 @@ struct State {
     #[serde(default)]
     pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseState>>>>,
     #[serde(default)]
-    generic_pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseEngineImage>>>>,
+    generic_pending_undo: BTreeMap<String, Arc<generic::isolation::PendingUndo>>,
     #[serde(default)]
     system: BTreeMap<String, Arc<system::SystemState>>,
 }
@@ -907,14 +907,7 @@ fn row_changes(
         limits,
         &mut changes,
     )?;
-    map_arc_row_changes(
-        GENERIC_DATABASE_NAMESPACE,
-        &current.generic_databases,
-        &next.generic_databases,
-        versions,
-        limits,
-        &mut changes,
-    )?;
+    generic::isolation::fence_row_changes(current, next, versions, limits, &mut changes)?;
     map_arc_row_changes(
         SESSION_NAMESPACE,
         &current.sessions,
@@ -1066,7 +1059,7 @@ fn commit_row_changes(
         .collect::<Vec<_>>();
     store
         .mutate_provider_states_atomic(changes.into_iter().map(|change| change.mutation).collect())
-        .map_err(store_error)?;
+        .map_err(generic::isolation::publication_error)?;
     for (key, version) in applied {
         match version {
             Some(version) => {

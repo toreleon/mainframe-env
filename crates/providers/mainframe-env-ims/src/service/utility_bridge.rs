@@ -105,7 +105,7 @@ impl ImsService {
             return Err(RecoveryProblem::Conflict);
         }
         let name = normalize(database);
-        let mut changed = false;
+        let mut restored_image = None;
         for mutation in transition.resource_mutations() {
             match mutation {
                 ProviderStateMutation::Put(write)
@@ -124,11 +124,12 @@ impl ImsService {
                     if engine.definition() != &definition {
                         return Err(RecoveryProblem::Conflict);
                     }
-                    changed = true;
+                    restored_image = Some(engine.image());
                 }
                 _ => return Err(RecoveryProblem::Unsupported),
             }
         }
+        let changed = restored_image.is_some();
         let mut durable = self.lock().map_err(host_error)?;
         if durable.state.metadata.as_ref().is_none_or(|catalog| {
             !catalog.databases.iter().any(|candidate| {
@@ -140,17 +141,55 @@ impl ImsService {
         }
         let mut next = durable.state.scoped_snapshot();
         if changed {
+            generic::isolation::refresh_undo(&*self.store, self.limits, &mut durable)
+                .map_err(host_error)?;
+            generic::isolation::ensure_writer(
+                &durable.state,
+                invocation.run_unit_id.as_str(),
+                &name,
+            )
+            .map_err(host_error)?;
+            next = durable.state.scoped_snapshot();
+            generic::isolation::publish_backout_image(
+                &mut next,
+                invocation.run_unit_id.as_str(),
+                &name,
+                restored_image.ok_or(RecoveryProblem::CorruptImage)?,
+            )
+            .map_err(host_error)?;
             generic::reset_positions(&mut next, &name, None);
-            let run = invocation.run_unit_id.as_str();
-            if let Some(pending) = next.generic_pending_undo.get_mut(run) {
-                Arc::make_mut(pending).remove(&name);
-                if pending.is_empty() {
-                    next.generic_pending_undo.remove(run);
+            validate_state(&next, self.limits).map_err(host_error)?;
+        }
+        let mut changes = row_changes(&durable.state, &next, &durable.versions, self.limits, false)
+            .map_err(host_error)?;
+        if changed {
+            // The recovery proposal supplies this row's exact CAS publication.
+            changes.retain(|change| {
+                change.namespace != GENERIC_DATABASE_NAMESPACE || change.key != name
+            });
+            for related in generic::isolation::dependencies(&next, &name).map_err(host_error)? {
+                if related != name
+                    && !changes.iter().any(|change| {
+                        change.namespace == GENERIC_DATABASE_NAMESPACE && change.key == related
+                    })
+                {
+                    let image = next
+                        .generic_databases
+                        .get(&related)
+                        .ok_or(RecoveryProblem::Conflict)?;
+                    changes.push(
+                        put_row_change(
+                            GENERIC_DATABASE_NAMESPACE,
+                            &related,
+                            encode_object_row(&related, image).map_err(host_error)?,
+                            &durable.versions,
+                            self.limits.max_state_bytes,
+                        )
+                        .map_err(host_error)?,
+                    );
                 }
             }
         }
-        let changes = row_changes(&durable.state, &next, &durable.versions, self.limits, false)
-            .map_err(host_error)?;
         let mut uow_mutations = changes
             .iter()
             .map(|change| change.mutation.clone())
@@ -382,14 +421,6 @@ impl ImsService {
             return Err(RecoveryProblem::Conflict);
         }
         let name = normalize(database);
-        if durable
-            .state
-            .generic_pending_undo
-            .values()
-            .any(|pending| pending.contains_key(&name))
-        {
-            return Err(RecoveryProblem::Conflict);
-        }
         let raw = self
             .store
             .get_provider_state(GENERIC_DATABASE_NAMESPACE, &name)
@@ -404,7 +435,15 @@ impl ImsService {
         if stage.plan.kind != UtilityKind::DatabaseRecovery {
             generic::refresh_databases(&*self.store, self.limits, &mut durable)
                 .map_err(host_error)?;
+        } else {
+            durable.versions.insert(
+                (GENERIC_DATABASE_NAMESPACE.into(), name.clone()),
+                raw.version,
+            );
+            generic::isolation::refresh_undo(&*self.store, self.limits, &mut durable)
+                .map_err(host_error)?;
         }
+        generic::isolation::ensure_no_pending(&durable.state, &name).map_err(host_error)?;
         let engine = stage.image.validate(limits)?;
         let image = engine.image();
         DatabaseEngine::restore(image.clone(), generic::engine_limits(self.limits))
@@ -538,6 +577,7 @@ fn write_store_error(problem: StoreError) -> RecoveryProblem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod isolation_tests;
     use crate::recovery::{
         BackoutPointKind, CheckpointKind, CheckpointRequest, LogRequest, RecoveryContext,
         RecoverySession, UtilityDelta, UtilityDeltaChange, UtilityEngine, UtilityPlan,

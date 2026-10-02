@@ -6,6 +6,7 @@ use crate::database::{
 };
 use crate::{ImsDatabaseMetadata, ImsDatabasePcbMetadata, ImsPcbMetadata};
 
+pub(super) mod isolation;
 mod load_image;
 mod logical;
 pub(super) mod pcb;
@@ -171,18 +172,8 @@ pub(super) fn refresh_databases(
         .versions
         .retain(|(namespace, _), _| namespace != GENERIC_DATABASE_NAMESPACE);
     durable.versions.extend(versions);
-    let mut versions = RowVersions::new();
-    durable.state.generic_pending_undo = load_row_map(
-        store,
-        GENERIC_PENDING_NAMESPACE,
-        limits.max_sessions,
-        limits,
-        &mut versions,
-    )?;
-    durable
-        .versions
-        .retain(|(namespace, _), _| namespace != GENERIC_PENDING_NAMESPACE);
-    durable.versions.extend(versions);
+    isolation::refresh_sessions(store, limits, durable)?;
+    isolation::refresh_undo(store, limits, durable)?;
     super::validate_state(&durable.state, limits)
 }
 
@@ -428,11 +419,13 @@ pub(super) fn apply_request(
         ImsOperation::Load => load(state, run, request, limits),
         ImsOperation::Unload => unload(state, run, request, limits),
         ImsOperation::Commit => {
+            isolation::ensure_backout(state, run)?;
             state.pending_undo.remove(run);
             state.generic_pending_undo.remove(run);
             Ok(status("  "))
         }
         ImsOperation::Rollback => {
+            isolation::ensure_backout(state, run)?;
             if let Some(pending) = state.pending_undo.remove(run) {
                 for (name, image) in pending.iter() {
                     state.databases.insert(name.clone(), image.clone());
@@ -616,18 +609,6 @@ fn engine_status(problem: EngineProblem) -> &'static str {
     }
 }
 
-fn begin_unit(state: &mut State, run: &str, name: &str) -> Result<(), HostProblem> {
-    let image = state
-        .generic_databases
-        .get(name)
-        .cloned()
-        .ok_or(HostProblem::NotFound)?;
-    Arc::make_mut(state.generic_pending_undo.entry(run.into()).or_default())
-        .entry(name.into())
-        .or_insert(image);
-    Ok(())
-}
-
 pub(super) fn reset_positions(state: &mut State, database: &str, except: Option<&str>) {
     pcb::reset_database_positions(state, database, except);
 }
@@ -666,6 +647,7 @@ fn mutate(
     if !allowed(&pcb, &target, request.operation) {
         return Ok(status("AM"));
     }
+    isolation::ensure_writer(state, run, &name)?;
     if request.operation == ImsOperation::Delete {
         let (count, images) = match logical::delete_cascade(state, limits, &name, &mut position) {
             Ok(changed) => changed,
@@ -673,10 +655,7 @@ fn mutate(
             Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
         };
         for (database, image) in images {
-            begin_unit(state, run, &database)?;
-            state
-                .generic_databases
-                .insert(database.clone(), Arc::new(image.image()));
+            isolation::publish_image(state, run, &database, image.image())?;
             reset_positions(state, &database, Some(run));
             pcb::reset_deleted_positions(state, run, request.pcb, &database, limits)?;
         }
@@ -764,10 +743,7 @@ fn mutate(
         Ok(count) => count,
         Err(problem) => return Ok(status(engine_status(problem))),
     };
-    begin_unit(state, run, &name)?;
-    state
-        .generic_databases
-        .insert(name, Arc::new(engine.image()));
+    isolation::publish_image(state, run, &name, engine.image())?;
     pcb::set_position(
         Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
         request.pcb,
@@ -832,10 +808,7 @@ fn load(
             .map_err(install_error)?;
         ids.push(view.id);
     }
-    begin_unit(state, run, &name)?;
-    state
-        .generic_databases
-        .insert(name, Arc::new(engine.image()));
+    isolation::publish_image(state, run, &name, engine.image())?;
     let name = normalize(&image.database);
     reset_positions(state, &name, None);
     Ok(affected(ids.len() as u64))
@@ -930,6 +903,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
     }
     logical::validate_links(state, limits)?;
     for pending in state.generic_pending_undo.values() {
+        pending.validate(limits)?;
         for (name, image) in pending.iter() {
             let engine = DatabaseEngine::restore((**image).clone(), engine_limits(limits))
                 .map_err(|_| HostProblem::InfrastructureFailure)?;

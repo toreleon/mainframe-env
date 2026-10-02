@@ -203,7 +203,7 @@ fn relationship_catalog(paired: bool) -> ImsMetadataCatalog {
     metadata
 }
 
-fn setup(service: &ImsService, paired: bool) {
+pub(super) fn setup(service: &ImsService, paired: bool) {
     service
         .install_metadata(relationship_catalog(paired))
         .unwrap();
@@ -230,6 +230,11 @@ fn setup(service: &ImsService, paired: bool) {
         .status,
         "  "
     );
+    execute(
+        service,
+        parent,
+        &request(parent, ImsOperation::Commit, 100, &[], b""),
+    );
     assert_eq!(
         execute(
             service,
@@ -241,7 +246,7 @@ fn setup(service: &ImsService, paired: bool) {
     );
 }
 
-fn insert_child(service: &ImsService, sequence: u64) -> ImsRequest {
+pub(super) fn insert_child(service: &ImsService, sequence: u64) -> ImsRequest {
     let run = "child-run";
     let mut insert = request(run, ImsOperation::Insert, sequence, &["CHILD"], b"C1B");
     insert.qualifiers.push(ImsQualifier {
@@ -253,7 +258,7 @@ fn insert_child(service: &ImsService, sequence: u64) -> ImsRequest {
     insert
 }
 
-fn hold_parent(service: &ImsService, sequence: u64) {
+pub(super) fn hold_parent(service: &ImsService, sequence: u64) {
     let run = "parent-run";
     let mut hold = parent_request(ImsOperation::GetHoldUnique, sequence, &["PROOT"], b"");
     hold.qualifiers.push(ImsQualifier {
@@ -313,6 +318,11 @@ fn logical_child_requires_resolved_parent_and_tracks_parent_replace() {
             .data,
         b"C1BP1A"
     );
+    execute(
+        &service,
+        "child-run",
+        &request("child-run", ImsOperation::Commit, 100, &[], b""),
+    );
     hold_parent(&service, 6);
     assert_eq!(
         execute(
@@ -342,6 +352,11 @@ fn unpaired_parent_delete_fails_without_partial_mutation() {
     let service = ImsService::open(store, ImsLimits::default()).unwrap();
     setup(&service, false);
     insert_child(&service, 3);
+    execute(
+        &service,
+        "child-run",
+        &request("child-run", ImsOperation::Commit, 100, &[], b""),
+    );
     hold_parent(&service, 4);
     let before = service.lock().unwrap().state.generic_databases.clone();
     assert_eq!(
