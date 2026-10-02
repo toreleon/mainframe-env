@@ -73,3 +73,43 @@ row set under the `ProviderStateStore` atomic-mutation contract.
 Migration does not redesign public Db2, IMS, or MQ request/result contracts and
 does not introduce cross-provider transactions. A deployment must retain enough
 provider-state row capacity for the configured object/replay limits.
+
+## Private MQ rich delivery import boundary
+
+MQ's private `MQ-1505.legacy-delivery-import` planner accepts only validated,
+normalized v1 row state with a retained catalog, no live handles and no pending
+UOWs, including empty pending units. Empty handle indexes can be CAS-retired.
+Non-quiescent conversion requires explicitly completing/retiring work through
+the existing legacy authority; the planner never backs it out or discards it.
+
+Legacy queues stored only body, message ID and correlation ID. Import preserves
+those bytes and queue order exactly. Its explicit compatibility representation
+is persistent, unlimited expiry, queue-default priority, absent format/group ID,
+empty properties and no group/segment metadata. This preserves the legacy
+persistent restart behavior; it makes no claim about historical MQMD defaults
+or IBM wire representation. Entry IDs come from the existing kernel allocator.
+The retained catalog, including aliases, processes and trigger identities, is
+unchanged. Importing already queued data does not issue a new PUT operation.
+
+The planner returns a composable batch: existing rich per-object rows and finite
+metadata, exact legacy queue/empty-handle deletion CAS, an exact-byte retained
+catalog dependency CAS, and manifest CAS to `mainframe-env.mq-row-store@2`.
+Every legacy logical publication now CAS-advances the small manifest fence,
+including insertion of a previously absent pending or replay row. This introduces
+conservative contention between disjoint legacy writers: a stale writer gets an
+explicit conflict and no partial publication, never automatic mutation replay.
+Migration and any old writer have one winner. The old reader rejects the rich
+marker; an already-open old writer cannot publish across its changed version.
+Replay rows, digest domains, payloads, versions and retention/core references
+are untouched by the import.
+
+No open path automatically invokes this plan. The manager owns v2 reading and
+single service selection, admission/lease fencing, catalog generations,
+audit/effect transaction composition and participant/public acceptance. Before
+publishing, that authority must exclude independent rich writers, atomically
+compose all mutations and audit/replay dependencies, and adopt the returned
+kernel/target generation only after commit. Missing versions, malformed source,
+preexisting rich rows, narrowed limits and stale dependency CAS fail closed.
+Rollback after publication requires stopping admission and restoring the
+pre-import backup with its retained replay/core references; an old reader is
+not a downgrade path.

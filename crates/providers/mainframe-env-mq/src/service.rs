@@ -42,6 +42,9 @@ mod rows;
 pub(crate) use rows::encode_object_row;
 use rows::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
 
+#[path = "service_legacy_delivery_import.rs"]
+pub(crate) mod legacy_delivery_import;
+
 #[path = "service_object_integration.rs"]
 mod object_integration;
 use object_integration::{encode_catalog_row, load_catalog_row};
@@ -544,7 +547,9 @@ impl MqService {
             &state,
             &durable.versions,
             self.limits,
-            false,
+            // Every publication, including a new pending row, must conflict
+            // with retirement of this legacy authority.
+            true,
         )?;
         commit_row_changes(&*self.store, changes, &mut durable.versions)?;
         durable.state = state;
@@ -2441,13 +2446,12 @@ mod tests {
                 .unwrap(),
             queue_b_before
         );
-        assert_eq!(
-            store
-                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
-                .unwrap()
-                .unwrap(),
-            manifest_before
-        );
+        let manifest_after = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        assert_eq!(manifest_after.payload, manifest_before.payload);
+        assert_eq!(manifest_after.version, manifest_before.version + 1);
         assert!(
             store
                 .get_provider_state(
@@ -2629,7 +2633,7 @@ mod tests {
     }
 
     #[test]
-    fn independent_queue_rows_commit_from_separate_service_instances_without_global_cas() {
+    fn independent_queue_rows_contend_on_the_legacy_manifest_dependency() {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let installer = MqService::open(store.clone(), Default::default()).unwrap();
         installer
@@ -2663,19 +2667,46 @@ mod tests {
             put.message = b"RIGHT".to_vec();
             right.execute(&invocation("right-row"), &put)
         });
-        left_worker.join().unwrap().unwrap();
-        right_worker.join().unwrap().unwrap();
+        let left_result = left_worker.join().unwrap();
+        let right_result = right_worker.join().unwrap();
+        assert_eq!(
+            usize::from(left_result.is_ok()) + usize::from(right_result.is_ok()),
+            1
+        );
+        for result in [&left_result, &right_result] {
+            assert!(result.is_ok() || *result == Err(HostProblem::IdempotencyConflict));
+        }
 
         let reopened = MqService::open(store.clone(), Default::default()).unwrap();
-        assert_eq!(reopened.queue_messages("LEFT.Q").unwrap(), [b"LEFT"]);
-        assert_eq!(reopened.queue_messages("RIGHT.Q").unwrap(), [b"RIGHT"]);
+        assert_eq!(
+            reopened.queue_messages("LEFT.Q").unwrap(),
+            if left_result.is_ok() {
+                vec![b"LEFT".to_vec()]
+            } else {
+                vec![]
+            }
+        );
+        assert_eq!(
+            reopened.queue_messages("RIGHT.Q").unwrap(),
+            if right_result.is_ok() {
+                vec![b"RIGHT".to_vec()]
+            } else {
+                vec![]
+            }
+        );
         assert_eq!(
             store
-                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .list_provider_state(REPLAY_NAMESPACE, 3)
                 .unwrap()
-                .unwrap(),
-            manifest
+                .len(),
+            1
         );
+        let manifest_after = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        assert_eq!(manifest_after.payload, manifest.payload);
+        assert_eq!(manifest_after.version, manifest.version + 1);
     }
 
     #[test]

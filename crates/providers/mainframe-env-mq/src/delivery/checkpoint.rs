@@ -11,6 +11,37 @@ pub(crate) mod rows;
 impl MqDeliveryKernel {
     pub const LIVE_CHECKPOINT_SCHEMA: &str = "mainframe-env.mq-delivery-live@1";
 
+    /// Private migration projection of already queued data without issuing PUT.
+    /// Reuses the sole entry allocator and checkpoint validation, including
+    /// narrowed target limits.
+    pub(crate) fn import_legacy_queues(
+        catalog: &MqObjectCatalog,
+        limits: MqDeliveryLimits,
+        message_limits: MqMessageLimits,
+        queues: BTreeMap<MqObjectName, Vec<MqMessage>>,
+    ) -> Result<Self, MqDeliveryError> {
+        let mut candidate = Self::new(catalog, limits, message_limits, MqPersistence::Persistent)?;
+        for (name, messages) in queues {
+            let mut entries = Vec::new();
+            for message in messages {
+                entries.push(Entry {
+                    id: candidate.allocate_id()?,
+                    message,
+                    expires_at: None,
+                });
+            }
+            candidate.queues.insert(name, entries);
+        }
+        let bytes = candidate.encode_live_checkpoint()?;
+        Self::decode_live_checkpoint(
+            &bytes,
+            catalog,
+            limits,
+            message_limits,
+            MqPersistence::Persistent,
+        )
+    }
+
     /// Retains queued and pending persistent AND nonpersistent messages, UOW
     /// decisions and browse cursors for a live, fenced service resume. Expired
     /// entries are purged at the stored tick on a private candidate; an empty

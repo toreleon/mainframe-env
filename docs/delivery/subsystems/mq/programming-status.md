@@ -448,6 +448,33 @@ preserves the parent task, IMS syncpoint retirement advances its owner epoch,
 and process termination retires shared handles. This is not host attestation,
 durable UOW identity, a SAF permit, public dispatch or a new lifecycle journal.
 
+After its sealed quiescent import, lane N next owns
+`MQ-1505.rich-service-state-reader`: a private strict v1/v2 stored-authority
+union and reader child, minimal service/row-codec hooks, affected Memory/SQLite
+tests, narrow provider-row documentation and one fragment. A single bounded
+physical MQ-prefix snapshot must select either legacy or rich authority, never
+merge competing queues or use missing/corrupt state as an empty fallback.
+Retained replay rows keep their existing bytes/versions and retention authority.
+Public selection, runtime/UOW owner maps and audit/effect composition stay with
+the manager. Normalized legacy reads must reuse the existing row authority;
+rich decoding reuses the frozen delivery validator, not another runtime codec.
+
+The manager-owned lifecycle directory is sealed as `de16ca03`: nine provider
+lifecycle regressions and eight affected host registry tests passed, with
+unchanged module ceilings, canonical guard, formatting/changelog and repaired
+ADR navigation/docs freshness. The mandatory docs check initially identified
+the absent navigation entry; that exact registration was repaired before seal.
+No public caller, durable UOW or licensed evidence is supplied by the directory.
+
+Lane N's quiescent import is sealed at `1c6a8fc6` before manager integration.
+Its 77 focused Memory/SQLite service/delivery/object-service tests and four row
+guard mutants passed. All legacy logical publications now advance the small
+manifest CAS dependency, preventing either migration/writer race ordering from
+publishing stale state. The import preserves exact legacy replay bytes/versions;
+non-quiescent migration, actual v2 service selection and audit/effect composition
+remain required. Disjoint stale legacy writers conservatively conflict; no
+whole-state blob or automatic mutation redispatch is introduced.
+
 The manager delegates the declared `MQ-1501.host-effect-contract` to retained
 lane M. Lanes N and O receive the following disjoint next slices, keeping three
 CLI workers plus manager, `gpt-6.1-sol`, high effort, goal mode/bypass and fast off.
