@@ -6,6 +6,103 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1404.tm-output-identity-local-order (finite runtime declaration, 2026-10-03)
+
+Target **0.14.0**, composed base `86bf917e5a20d581a3b5d56b89de86db94ccadf4`.
+The historical fail-first packet remains candidate `87f951c4`, preserved in stash
+`c015e2b8ea26730bccd5806494f484e971cb5297` and its external receipts. Manager
+authorizes only future private IMS outbound identity and same-started-input/work
+completion order, using retained input/work incarnation, PCB, observed session
+CAS version and bounded completion slot. Sequence is checked version + slot + 1;
+PURG uses slot zero, commit enumerates remaining buffers deterministically and
+terminates the session. Existing pending rows retain their bytes/sequence; express
+available rows stay outside pending IDs. One publication/store proposal remains
+the owner; identity does not authorize a lease or shared TM recovery.
+
+Maximum exact allowlist declared before runtime edits:
+
+- `crates/providers/mainframe-env-ims/src/tm/service.rs`
+- `crates/providers/mainframe-env-ims/src/tm/support.rs`
+- `crates/providers/mainframe-env-ims/tests/tm_runtime.rs`
+- `crates/apps/mainframe-env-server/src/product/tests/ims_tm_backout_gap_tests.rs`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `docs/decisions/0042-ims-tm-output-identity-local-order.md`
+- `changes/unreleased/ims-tm-output-identity-local-order-20261003.toml`
+- `docs/documentation-registry.json`
+- `docs/README.md` (normal generator)
+- `docs/generated/documentation-manifest.json` (normal generator)
+
+Actual offline search/full reads reverify the three unchanged `ims-tm-contracts`
+pins, baseline `ibm-ims-15.6-tm-contracts-2026-09-11`: ISRT-TM 63–90/151–159,
+PURG 66–79, conversation recovery 30–38, with 167/132/49 complete selected lines.
+Catalog context stays ISRT `dli-call-families:0008`, GU `:0005`; supplemental PURG
+adds no comparison row. Source identities/commands remain external under
+`tm-output-identity-runtime/`. Reference source credit is zero.
+
+Required proof maps to public TmService and installed/published signed-selected
+ProductServer on Memory/file SQLite: original four literal two-group tests and
+four controls; mixed buffers/PCBs, replay/conflicts, ordinary commit/cancel/
+rollback immutability, real reuse/reclaim histories, capacity/CAS/failure/retry.
+Base-produced legacy fixture and retained base reader precede production changes;
+actual independent SQLite writer/read/replay processes carry phase proof. Scoped
+TM controls, strict affected Clippy and mandatory policy/docs/contract gates are
+required before a generated complete seal. No tests have yet passed for this
+runtime candidate. Coverage inventory and mandatory denominator stay unchanged.
+
+No row/schema/canonical migration or receipt pruning; old writers must stop and
+drain, unknown outcomes reconciled with retained rows/receipts. Schema readability
+does not permit rolling writers. Fresh calls require distinct existing call keys;
+terminal PURG replay and old-key/new-input replay lifetime remain separate seams.
+No dense/global/cross-incarnation order or mixed-restore guarantee. Coherent
+restore needs catalog/input/session/outbound/replay/work epochs/packages/artifacts/
+clock together. Proposed ADR0042 covers private ownership only. ADR0031/0033,
+raw CALL, participant/shared lease/settlement and actual TM application recovery
+remain unanswered; PostgreSQL/full backup/official/HUMAN and full v0.14 remain
+unfinished (official/HUMAN 0/25; licensed certification excluded).
+
+Local runtime results: 18 public tests pass (the three fixture entries ignored in
+that invocation are not proof); six signed gap/express tests pass, including the
+two unchanged negative actual-TM backout witnesses; one arithmetic boundary test
+passes. A further exact signed TM dispatch/selection/rollback control passes.
+These are 26 distinct ordinary/local test entries, with the two mixed histories
+also checked separately against literal sequences 4/6/8/10/15/16/17 and IO 18.
+Independent child phases actually execute 11 exact one-test processes: base
+writer/read/replay (3), new writer/read/replay plus both cross-version readers and
+legacy replay (6), and publication-lost-ack writer/cold retry (2). The five explicit
+fixture entry names use --ignored --exact with required external paths; their
+selected process logs show one pass, zero ignored, and real phase markers. No
+unselected/ignored helper, reopen-only or PostgreSQL skip earns process credit.
+
+Old reader binary SHA-256
+`a1d0fe7fcc1fb72b004ad6c19bea726ca292e953c9a269cc3bc1b868661fb1b5`
+was compiled while both production owners matched base 86bf917e, before edits;
+genuine available express/pending ordinary fixtures and exact row/receipt bytes
+remain external. The new reader preserves the base rows/replay; the actual old
+read-only reader preserves new rows. Original test prefixes, root HISAM/source
+sections and six other TM production owners are independently byte-verified.
+
+All-target/all-feature/no-deps IMS/server strict Clippy passes. Mandatory offline
+deny, license notices/supply-chain, schemas/spec (134 Python cases), IMS catalog/
+assurance, coverage inventory, changelog and execution/effect/provider-row/storage/
+SAF/retention/participant/typed/module/public-API guards pass without ratchet or
+denominator edits. Normal docs generation/check, final formatting and the exact
+generated ten-path seal/check complete packaging; external command receipts bind
+each check to its actual inputs. No unchanged global architecture/CICS source
+prerequisite is rerun or declared solved.
+
+Retained diagnostics: first public compilation exits 101 for a test-only invalid
+WorkState enum name (repaired to real Queued); its dependent process step executes
+zero tests. A later fmt check exits 1 for wrapping the added literal assertion.
+Both sequences retain nonzero aggregate exits and cargo-clean logs; no semantic
+expectation or production rule is weakened. Subsequent changed-input checks,
+normal docs packaging and cleanup are recorded separately. Original four failing
+second-PURG logs remain historical 87f951c4 evidence, never relabeled green.
+
+The first normal docs generation rejects the newly registered ADR because its
+navigation entry was omitted. Repair only that authorized registry entry; preserve
+the exit-1 packaging receipt/cleanup and rerun changed docs generation/check.
+No runtime, lint or policy result is relabeled or repeated for this docs repair.
+
 ## Root HISAM integration declaration — 2026-10-03
 
 Root composes worker `55cf6d5baead04bcfe97caecdbf5a48b4ef9e145` onto source-only
@@ -28,6 +125,64 @@ credit, and this finite Batch insertion leaf is not explicit all-context IMS,
 HISAM/SHISAM, PostgreSQL/backup, official/HUMAN/participant or v0.14 completion.
 After this root seal, execution and mutation-consumer ownership can transfer to
 the same uncommitted U/V CLI lane. Shared raw CALL/TM approvals remain pending.
+
+## IMS-1404.express-purg-output-identity-failfirst (test-only findings, 2026-10-03)
+
+Entry `87f951c49f48b117e41f1bc7ec1d46b4ea9606b1` on
+`codex/v014-tm-output-identity-failfirst-20261003`. This bounded investigation
+changes only `crates/providers/mainframe-env-ims/tests/tm_runtime.rs`,
+`crates/apps/mainframe-env-server/src/product/tests/ims_tm_backout_gap_tests.rs`
+and this status. Production, schemas, pins, accepted rules, public APIs and
+Proposed ADR0031 remain unchanged. Existing negative TM backout expectations
+and other lanes are preserved. Intentionally failing tests remain uncommitted;
+no feature seal or subsequent implementation is authorized by these findings.
+
+Independently verified retained-topic-path-first/archive fallback and actual
+offline reader search/full reads: `ims-tm-contracts`, baseline
+`ibm-ims-15.6-tm-contracts-2026-09-11`, product `SSEPH2_15.6.0`.
+ISRT-TM `ims_isrtcalltm.htm`:63–90 groups ordinary message segments and transmits
+at express PURG; `ims_purgcall.htm`:66–79 completes a PCB group and permits a next
+message; `ims_conversationrecovery.htm`:30–38 completes express output before
+commit, independently of later termination. Full selected reads are 167/132/49
+lines (348 total), not just Spool API paragraphs. Exact hashes, bytes, cache and
+catalog locators remain in the external handoff. Catalog context is the existing
+ISRT `dli-call-families:0008` and GU `:0005`; PURG is supplemental, not a new row.
+IMS denominator remains 25; official/HUMAN/runtime/licensed credit is zero.
+
+Four separately named public TmService and installed/published signed-selected
+ProductServer failure entries actually execute on Memory and file SQLite.
+Each uses real enqueue, a live claimed lease, start and GU, then fixed express
+PCB EXP on TERM2: literal `first-one`/`first-two`, PURG, exact replay, then
+`second-one`/`second-two` and a distinct PURG before any commit/next input.
+Both fresh PURGs are independently expected to succeed with distinct IDs and
+two immutable ordered groups. The actual second result and stored outbound rows
+are captured before assertion: **Err(IdempotencyConflict)** on all four cases;
+only the original first group remains, byte/version unchanged. Public first ID
+is `out-e98df96a427a4d3fa2d3e0036c7be56a`; signed first ID is
+`out-48d11749e1323c2ba8e438a22e29507b`. All first/replay/setup controls pass,
+including four separate passing control entries. No private/provider row or
+work/lease fabrication, cloned data oracle or weakened error expectation.
+
+Actual focused results: 8 exact named tests execute, 4 controls pass and 4 genuine
+semantic failures remain (Cargo exits 101 for each, aggregate wrapper also 101),
+0 ignored. No compile/setup failure or fixture repair. Formatting and strict
+affected all-feature no-deps test Clippy pass. The sequence ends in this checkout's
+`cargo clean` (13,488 files / 6.6 GiB); no unchanged runtime suite repeats for prose.
+Dependency/license policy remains required; no broad packaging/certification
+campaign is implied. Actual candidate identities and all logs are external under
+`worker-receipts/v014-completion-20261002/tm-output-identity-failfirst/`.
+
+Confirmed code cause: TM `support.rs::output_row` hashes run unit/PCB/ordinal;
+`service.rs::purge` uses only pending nonexpress IDs as ordinal, so completed
+express groups reuse zero. Suggested next design stays with these two IMS-owned
+production files: bind new output keys to retained input/work identity and an
+existing CAS-versioned completion occurrence, preserving replay/readers and
+pending-output ownership. No new schema counter or shared authority. The external
+handoff identifies ordering, old receipt/rolling-writer and lifetime obligations
+before implementation. Manager review and an exact implementation declaration
+are required first. Shared stale-lease publication/settlement and actual TM
+application backout remain gated by unanswered Proposed ADR0031; this collision
+proof grants none of their acceptance. Parent IMS/full v0.14 remains incomplete.
 
 ## IMS-1401.sequential-isrt-position-sources (source-only leaf declared, 2026-10-03)
 

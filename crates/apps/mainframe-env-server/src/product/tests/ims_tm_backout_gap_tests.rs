@@ -366,3 +366,256 @@ fn signed_tm_backout_gap_sqlite() {
     drop(reopened);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+// A separate output-identity witness; the negative backout tests above stay exact.
+fn signed_express_purg_groups(
+    store: Arc<dyn PlatformStore>,
+    config: ServerConfig,
+    second_group: bool,
+) {
+    let trust = Arc::new(test_package_trust());
+    let server = ProductServer::open_with_package_trust(
+        config,
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+        trust.clone(),
+    )
+    .unwrap();
+    let mut package = signed_tm_package(&trust, 1, "BACK");
+    package.sections.ims_metadata.as_mut().unwrap().psbs[0]
+        .pcbs
+        .push(ImsPcbMetadata::AlternateTerminal(ImsTerminalPcbMetadata {
+            name: "EXP".into(),
+            destination: Some("TERM2".into()),
+            modifiable: false,
+            express: true,
+            same_terminal: false,
+            response_mode: false,
+        }));
+    package.sections.ims_tm.as_mut().unwrap().transactions[0]
+        .alternate_pcbs
+        .push(TmAlternatePcbDefinition {
+            name: "EXP".into(),
+            destination: TmDestination::Fixed("TERM2".into()),
+            express: true,
+        });
+    resign_package(&mut package, &trust);
+    let installed = server.install_application_package_v2(&package).unwrap();
+    server.publish_application_generation(&installed).unwrap();
+    permit_tm(&server, &["BACK"]);
+    let deadline = server.jes_clock.now_tick().unwrap() + 60_000;
+    let invoke = |key: &str| {
+        let mut invocation = tm_invocation("signed-express-group-run", key);
+        invocation.deadline_tick = deadline;
+        invocation
+    };
+    let admitted = server
+        .ims_tm_enqueue(
+            "SIGNED-IMS-APPLICATION",
+            &invoke("signed-express-enqueue"),
+            tm_message("signed-express-input", "BACK", None),
+        )
+        .unwrap();
+    let now = server.jes_clock.now_tick().unwrap();
+    let work = server
+        .ims_tm_claim(
+            "SIGNED-IMS-APPLICATION",
+            "BACK",
+            "signed-express-worker",
+            now,
+            10_000,
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(work.work_id, admitted.work_id);
+    assert_eq!(work.state, WorkState::Claimed);
+    assert!(work.lease_id.is_some());
+    assert!(work.lease_epoch > 0);
+    assert!(work.lease_expiry_tick.unwrap() > now);
+    server
+        .ims_tm_start(
+            "SIGNED-IMS-APPLICATION",
+            &invoke("signed-express-start"),
+            &work,
+        )
+        .unwrap();
+    let input = server
+        .ims_tm_call(
+            "SIGNED-IMS-APPLICATION",
+            &invoke("signed-express-gu"),
+            TmCall::GetUnique,
+        )
+        .unwrap();
+    assert_eq!(input.status, TmPcbStatus::SUCCESS);
+    assert_eq!(input.segment, Some(b"first".to_vec()));
+    for (key, segment) in [
+        ("signed-express-first-one", b"first-one".to_vec()),
+        ("signed-express-first-two", b"first-two".to_vec()),
+    ] {
+        assert_eq!(
+            server
+                .ims_tm_call(
+                    "SIGNED-IMS-APPLICATION",
+                    &invoke(key),
+                    TmCall::Insert {
+                        pcb: TmPcb::Alternate("EXP".into()),
+                        segment,
+                    },
+                )
+                .unwrap()
+                .status,
+            TmPcbStatus::SUCCESS
+        );
+    }
+    assert!(server.ims_tm.outbound("TERM2", 16).unwrap().is_empty());
+    let purge = TmCall::Purge {
+        pcb: TmPcb::Alternate("EXP".into()),
+    };
+    let first_invocation = invoke("signed-express-first-purg");
+    let first = server
+        .ims_tm_call("SIGNED-IMS-APPLICATION", &first_invocation, purge.clone())
+        .unwrap();
+    assert_eq!(first.status, TmPcbStatus::SUCCESS);
+    assert!(!first.replayed);
+    assert_eq!(first.output_message_ids.len(), 1);
+    let first_groups = server.ims_tm.outbound("TERM2", 16).unwrap();
+    assert_eq!(first_groups.len(), 1);
+    assert_eq!(first_groups[0].message_id, first.output_message_ids[0]);
+    assert_eq!(first_groups[0].destination, "TERM2");
+    assert!(first_groups[0].express);
+    assert_eq!(
+        first_groups[0].segments,
+        vec![b"first-one".to_vec(), b"first-two".to_vec()]
+    );
+    let first_rows = store.list_provider_state("ims-tm-v1-outbound", 16).unwrap();
+    assert_eq!(first_rows.len(), 1);
+    let replay = server
+        .ims_tm_call("SIGNED-IMS-APPLICATION", &first_invocation, purge.clone())
+        .unwrap();
+    assert_eq!(replay.status, TmPcbStatus::SUCCESS);
+    assert!(replay.replayed);
+    assert_eq!(replay.output_message_ids, first.output_message_ids);
+    assert_eq!(server.ims_tm.outbound("TERM2", 16).unwrap(), first_groups);
+    assert_eq!(
+        store.list_provider_state("ims-tm-v1-outbound", 16).unwrap(),
+        first_rows
+    );
+    assert_eq!(store.get_work(&work.work_id).unwrap(), Some(work));
+    eprintln!(
+        "SIGNED EXPRESS CONTROL: signed install/publication; live enqueue/claim/start/GU; first literal group and exact PURG replay passed"
+    );
+    if second_group {
+        for (key, segment) in [
+            ("signed-express-second-one", b"second-one".to_vec()),
+            ("signed-express-second-two", b"second-two".to_vec()),
+        ] {
+            assert_eq!(
+                server
+                    .ims_tm_call(
+                        "SIGNED-IMS-APPLICATION",
+                        &invoke(key),
+                        TmCall::Insert {
+                            pcb: TmPcb::Alternate("EXP".into()),
+                            segment,
+                        },
+                    )
+                    .unwrap()
+                    .status,
+                TmPcbStatus::SUCCESS
+            );
+        }
+        let second_invocation = invoke("signed-express-second-purg");
+        assert_ne!(
+            second_invocation.execution_id,
+            first_invocation.execution_id
+        );
+        assert_ne!(
+            second_invocation.idempotency_key,
+            first_invocation.idempotency_key
+        );
+        let second = server.ims_tm_call("SIGNED-IMS-APPLICATION", &second_invocation, purge);
+        let actual_groups = server.ims_tm.outbound("TERM2", 16).unwrap();
+        let actual_rows = store.list_provider_state("ims-tm-v1-outbound", 16).unwrap();
+        eprintln!(
+            "SIGNED EXPRESS FAIL-FIRST: second={second:?}; stored_groups={actual_groups:?}; outbound_rows={actual_rows:?}"
+        );
+        assert_eq!(
+            actual_rows.iter().find(|row| row.key == first_rows[0].key),
+            Some(&first_rows[0]),
+            "the completed first group must remain immutable"
+        );
+        assert_eq!(
+            second.as_ref().map(|result| result.status),
+            Ok(TmPcbStatus::SUCCESS)
+        );
+        let second = second.unwrap();
+        assert_eq!(second.output_message_ids.len(), 1);
+        assert_ne!(second.output_message_ids[0], first.output_message_ids[0]);
+        assert_eq!(actual_groups.len(), 2);
+        assert_eq!(
+            actual_groups[0].segments,
+            vec![b"first-one".to_vec(), b"first-two".to_vec()]
+        );
+        assert_eq!(
+            actual_groups[1].segments,
+            vec![b"second-one".to_vec(), b"second-two".to_vec()]
+        );
+        assert_eq!(actual_groups[1].message_id, second.output_message_ids[0]);
+        assert!(actual_groups[1].sequence > actual_groups[0].sequence);
+        assert_eq!(actual_rows.len(), 2);
+    }
+}
+
+struct SignedExpressPurgSqliteDirectory(std::path::PathBuf);
+
+impl Drop for SignedExpressPurgSqliteDirectory {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.0).unwrap();
+    }
+}
+
+fn signed_express_purg_sqlite(second_group: bool) {
+    let directory = SignedExpressPurgSqliteDirectory(std::env::temp_dir().join(format!(
+        "ims-signed-express-purg-{}-{second_group}",
+        std::process::id()
+    )));
+    std::fs::create_dir(&directory.0).unwrap();
+    let url = format!("sqlite:{}?mode=rwc", directory.0.join("state.db").display());
+    let mut config = config();
+    config.store_profile = crate::StoreProfile::Sqlite;
+    config.sqlite_url = url.clone();
+    signed_express_purg_groups(
+        Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap()),
+        config,
+        second_group,
+    );
+}
+
+#[test]
+fn signed_express_purg_output_identity_failfirst_memory() {
+    signed_express_purg_groups(
+        Arc::new(MemoryStore::new(Default::default())),
+        config(),
+        true,
+    );
+}
+
+#[test]
+fn signed_express_purg_output_identity_failfirst_sqlite() {
+    signed_express_purg_sqlite(true);
+}
+
+#[test]
+fn signed_express_purg_first_group_replay_control_memory() {
+    signed_express_purg_groups(
+        Arc::new(MemoryStore::new(Default::default())),
+        config(),
+        false,
+    );
+}
+
+#[test]
+fn signed_express_purg_first_group_replay_control_sqlite() {
+    signed_express_purg_sqlite(false);
+}

@@ -68,6 +68,7 @@
     "docs/decisions/0038-logical-child-physical-key-feedback.md",
     "docs/decisions/0039-last-direct-child-ssa-selection.md",
     "docs/decisions/0041-first-direct-child-ssa-selection.md",
+    "docs/decisions/0042-ims-tm-output-identity-local-order.md",
     "docs/decisions/0033-cobol-dli-call-boundary.md",
     "docs/decisions/0028-db2-typed-catalog-evolution.md",
     "docs/decisions/0029-db2-core-participant-evolution.md",
@@ -328,6 +329,10 @@
         {
           "label": "ADR-0041: First direct child SSA selection",
           "path": "docs/decisions/0041-first-direct-child-ssa-selection.md"
+        },
+        {
+          "label": "ADR-0042: Private IMS TM output identity and local completion order",
+          "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
         },
         {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",

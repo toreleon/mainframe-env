@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 240,
+    "markdown_documents": 241,
     "navigation_groups": 6,
-    "normative_documents": 71,
+    "normative_documents": 72,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 127,
-      "sha256": "sha256:5de502e988da26a6feccf26f994b519550c5afd797a65ed61cbaba21dc9a54f5",
+      "relative_links": 128,
+      "sha256": "sha256:03362db491669bc451d2832f53110f58684220fdc6099dfc2bf7ef63ccda3691",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1119,6 +1119,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md",
+      "relative_links": 0,
+      "scope": "IMS-1404.tm-output-identity-local-order, finite local runtime leaf",
+      "sha256": "sha256:2df3a15664e230cf421bc6ffd43c750b74820615f12754c7049c4e2783a0df97",
+      "status": "Proposed",
+      "title": "ADR-0042: Private IMS TM output identity and local completion order",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 35,
@@ -1574,7 +1586,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 18,
-      "sha256": "sha256:f84a7f8def5cbe904a3a63c30c85d4dba4c59d41c9cdda719c1539a5226259a3",
+      "sha256": "sha256:f318ffa7adee7e5050d622d5e420383b4bd9b078a9c00255c5b06ef8aa25ef71",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2460,6 +2472,10 @@
           "path": "docs/decisions/0041-first-direct-child-ssa-selection.md"
         },
         {
+          "label": "ADR-0042: Private IMS TM output identity and local completion order",
+          "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
@@ -2732,7 +2748,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:da5911f655dbcb1e65cfeb4f48ae9192ba159871cf6bd44bcc7f9182127cd53b",
+  "registry_sha256": "sha256:5cd6ff31111a3a17b06df58ee0910323e32fdd2fe4c582ab789ac5790eb4fbb7",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

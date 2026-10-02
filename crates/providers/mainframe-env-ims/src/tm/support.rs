@@ -450,17 +450,27 @@ pub(super) fn output_row(
     session: &SessionRow,
     pcb: &str,
     buffer: OutputBuffer,
-    ordinal: usize,
+    session_version: u64,
+    completion_slot: usize,
 ) -> Result<(String, OutboundRow), HostProblem> {
+    // The observed CAS occurrence orders completions within one started work
+    // incarnation. Commit alone uses multiple slots and deletes that session.
+    let sequence = completion_sequence(session_version, completion_slot)?;
     let digest = digest(
-        "mainframe-env.ims-tm-output@1",
-        &(session.run_unit.as_str(), pcb, ordinal),
+        "mainframe-env.ims-tm-output@2",
+        &(
+            session.message_id.as_str(),
+            session.message_sequence,
+            session.work_id.as_str(),
+            session.lease_id.as_str(),
+            session.lease_epoch,
+            session.run_unit.as_str(),
+            pcb,
+            session_version,
+            completion_slot,
+        ),
     )?;
     let key = format!("out-{}", &hex_digest(&digest)[..32]);
-    let sequence = u64::try_from(ordinal)
-        .ok()
-        .and_then(|value| value.checked_add(1))
-        .ok_or(HostProblem::ResourceExhausted)?;
     Ok((
         key.clone(),
         OutboundRow {
@@ -474,6 +484,30 @@ pub(super) fn output_row(
             available: buffer.express,
         },
     ))
+}
+
+fn completion_sequence(session_version: u64, completion_slot: usize) -> Result<u64, HostProblem> {
+    u64::try_from(completion_slot)
+        .ok()
+        .and_then(|slot| session_version.checked_add(slot))
+        .and_then(|value| value.checked_add(1))
+        .ok_or(HostProblem::ResourceExhausted)
+}
+
+#[cfg(test)]
+#[test]
+fn completion_sequence_rejects_overflow_before_output_construction() {
+    assert_eq!(completion_sequence(7, 0), Ok(8));
+    assert_eq!(completion_sequence(7, 2), Ok(10));
+    assert_eq!(
+        completion_sequence(u64::MAX, 0),
+        Err(HostProblem::ResourceExhausted)
+    );
+    assert_eq!(
+        completion_sequence(u64::MAX - 1, 1),
+        Err(HostProblem::ResourceExhausted)
+    );
+    assert_eq!(completion_sequence(u64::MAX - 1, 0), Ok(u64::MAX));
 }
 
 pub(super) fn replay_work(session: &SessionRow, disposition: WorkDisposition) -> ReplayWork {
