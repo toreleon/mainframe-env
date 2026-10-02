@@ -7,6 +7,7 @@
 
 mod columns;
 mod constraints;
+pub mod default_binding;
 
 #[cfg(test)]
 mod tests;

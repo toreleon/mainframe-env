@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded column-only CREATE TABLE default binding from original source, reusing exact numeric and string assignment proofs and preserving NULL, missing-default and system-producer intents. WITH DEFAULT disambiguation, unsupported ordinary conversions, runtime producers, catalog admission, execution and licensed differential remain pending."
