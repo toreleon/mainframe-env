@@ -25,11 +25,15 @@ cross-reference validator and domain-separated digest. Packages and providers
 consume this one authority rather than translating between private schemas.
 
 `ImsRecoveryRequest` and `ImsRecoveryResult` are additive owned host forms for
-logical LOG code/text in DB-batch CALL context. They use `host.ims.write`, carry
+logical LOG, basic/symbolic CHKP and XRST in DB-batch CALL context. They use `host.ims.write`, carry
 the selected application/package/PSB/database binding and canonical mutation,
-and return a separate I/O PCB status and durable sequence. Unsupported contexts,
-command syntax and external transaction operands reject explicitly. Raw LL/ZZ
-and AIB framing, other recovery calls and physical log sizing are not admitted.
+and return bounded status, durable sequence, restored application areas and
+attempted database-PCB GU statuses. Normal start and named checkpoint selectors
+are distinct. Timestamp selection requires an authentic DFS0540I context
+authority; LAST requires BMP. Both reject explicitly in this DB-batch route.
+Unsupported contexts, command syntax and external transaction operands reject
+explicitly. Raw LL/ZZ and AIB framing, other recovery calls and physical log
+sizing are not admitted.
 The explicit canonical encoder freezes the new named variants without changing
 prior IMS request/result bytes. No provider type enters this contract.
 

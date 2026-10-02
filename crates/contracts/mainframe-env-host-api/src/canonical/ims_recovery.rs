@@ -11,6 +11,47 @@ impl Canonical for ImsRecoveryCall {
                 out.text("data")?;
                 data.encode(out)
             }
+            Self::BasicCheckpoint { id } => {
+                out.variant("ImsRecoveryCall", "BasicCheckpoint", 1)?;
+                out.text("id")?;
+                id.encode(out)
+            }
+            Self::SymbolicCheckpoint { id, user_areas } => {
+                out.variant("ImsRecoveryCall", "SymbolicCheckpoint", 2)?;
+                out.text("id")?;
+                id.encode(out)?;
+                out.text("user_areas")?;
+                user_areas.encode(out)
+            }
+            Self::Restart {
+                selection,
+                area_lengths,
+            } => {
+                out.variant("ImsRecoveryCall", "Restart", 2)?;
+                out.text("area_lengths")?;
+                area_lengths.encode(out)?;
+                out.text("selection")?;
+                selection.encode(out)
+            }
+        }
+    }
+}
+
+impl Canonical for ImsRestartSelection {
+    fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
+        match self {
+            Self::Normal => out.variant("ImsRestartSelection", "Normal", 0),
+            Self::Last => out.variant("ImsRestartSelection", "Last", 0),
+            Self::Checkpoint(id) => {
+                out.variant("ImsRestartSelection", "Checkpoint", 1)?;
+                out.text("0")?;
+                id.encode(out)
+            }
+            Self::Timestamp(timestamp) => {
+                out.variant("ImsRestartSelection", "Timestamp", 1)?;
+                out.text("0")?;
+                timestamp.encode(out)
+            }
         }
     }
 }
@@ -56,6 +97,35 @@ impl Canonical for ImsRecoveryResult {
                 sequence.encode(out)?;
                 out.text("status")?;
                 status.encode(out)
+            }
+            Self::Checkpointed {
+                id,
+                sequence,
+                status,
+            } => {
+                out.variant("ImsRecoveryResult", "Checkpointed", 3)?;
+                out.text("id")?;
+                id.encode(out)?;
+                out.text("sequence")?;
+                sequence.encode(out)?;
+                out.text("status")?;
+                status.encode(out)
+            }
+            Self::Restarted {
+                checkpoint_id,
+                pcb_statuses,
+                status,
+                user_areas,
+            } => {
+                out.variant("ImsRecoveryResult", "Restarted", 4)?;
+                out.text("checkpoint_id")?;
+                checkpoint_id.encode(out)?;
+                out.text("pcb_statuses")?;
+                pcb_statuses.encode(out)?;
+                out.text("status")?;
+                status.encode(out)?;
+                out.text("user_areas")?;
+                user_areas.encode(out)
             }
         }
     }

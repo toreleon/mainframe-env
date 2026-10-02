@@ -184,7 +184,7 @@ pub(super) fn refresh_databases(
     super::validate_state(&durable.state, limits)
 }
 
-fn scheduled_pcb<'a>(
+pub(in crate::service) fn scheduled_pcb<'a>(
     state: &'a State,
     psb_name: &str,
     pcb_number: u16,
@@ -406,6 +406,7 @@ pub(super) fn apply_request(
                     position: PcbPosition::default(),
                     pcb_positions: BTreeMap::new(),
                     system: system::SystemSession::default(),
+                    recovery: application_recovery::ExecutionRecovery::default(),
                 }),
             );
             Ok(status("  "))
@@ -454,7 +455,7 @@ pub(super) fn apply_request(
     }
 }
 
-pub(super) fn restored(
+pub(in crate::service) fn restored(
     state: &State,
     name: &str,
     limits: ImsLimits,
@@ -514,7 +515,11 @@ fn read_request(request: &ImsRequest, engine: &DatabaseEngine) -> Result<ReadReq
     })
 }
 
-fn allowed(pcb: &ImsDatabasePcbMetadata, segment: &str, operation: ImsOperation) -> bool {
+pub(in crate::service) fn allowed(
+    pcb: &ImsDatabasePcbMetadata,
+    segment: &str,
+    operation: ImsOperation,
+) -> bool {
     let Some(sensitive) = pcb
         .sensitive_segments
         .iter()

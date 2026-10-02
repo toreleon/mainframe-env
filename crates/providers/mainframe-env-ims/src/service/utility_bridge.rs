@@ -50,6 +50,106 @@ impl Publication {
 }
 
 impl ImsService {
+    /// Owned application adapter publication over the same row/CAS bridge.
+    /// No public API accepts a caller-created State or row mutations.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn publish_application_recovery(
+        &self,
+        invocation: &Invocation,
+        request: &mainframe_env_host_api::ImsRecoveryRequest,
+        durable: &mut DurableState,
+        next: State,
+        transition: RecoveryTransition,
+        effects: &dyn IdempotencyStore,
+        digest: [u8; 32],
+    ) -> Result<(), HostProblem> {
+        let selected = self
+            .selected_metadata_generation(&request.application)?
+            .ok_or(HostProblem::NotFound)?;
+        if selected.package_identity != request.package_identity
+            || next.metadata.as_ref() != Some(&selected.catalog)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let selection = self.selected_metadata_selection_fence(&selected)?;
+        validate_state(&next, self.limits)?;
+        let mut changes =
+            row_changes(&durable.state, &next, &durable.versions, self.limits, false)?;
+        // Fence observed GU images as well as real undo release. A concurrent
+        // writer cannot invalidate position between observation and publication.
+        let psb = next
+            .metadata
+            .as_ref()
+            .and_then(|catalog| catalog.psbs.iter().find(|psb| psb.name == request.psb))
+            .ok_or(HostProblem::NotFound)?;
+        for pcb in &psb.pcbs {
+            if let mainframe_env_host_api::ImsPcbMetadata::Database(pcb) = pcb
+                && !changes.iter().any(|change| {
+                    change.namespace == GENERIC_DATABASE_NAMESPACE && change.key == pcb.database
+                })
+            {
+                let image = next
+                    .generic_databases
+                    .get(&pcb.database)
+                    .ok_or(HostProblem::NotFound)?;
+                changes.push(put_row_change(
+                    GENERIC_DATABASE_NAMESPACE,
+                    &pcb.database,
+                    encode_object_row(&pcb.database, image)?,
+                    &durable.versions,
+                    self.limits.max_state_bytes,
+                )?);
+            }
+        }
+        let mut mutations = changes
+            .iter()
+            .map(|change| change.mutation.clone())
+            .collect::<Vec<_>>();
+        mutations.push(ProviderStateMutation::Put(ProviderStateWrite {
+            record: ProviderStateRecord {
+                version: selection
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+                ..selection.clone()
+            },
+            expected_version: Some(selection.version),
+        }));
+        if invocation.cancellation_requested() {
+            return Err(HostProblem::Cancelled);
+        }
+        if let Some(clock) = &self.replay_clock
+            && clock.now_tick()? >= invocation.deadline_tick
+        {
+            return Err(HostProblem::TimedOut);
+        }
+        let effect = effects
+            .effect(&request.mutation.idempotency_key)
+            .map_err(store_error)?
+            .ok_or(HostProblem::MissingIdempotency)?;
+        if effect.intent.recovery_lease.is_some() || effect.state == EffectState::UnknownOutcome {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        transition
+            .publish_with_intent(
+                &*self.store,
+                effects,
+                &request.mutation.idempotency_key,
+                digest,
+                mutations,
+            )
+            .map_err(host_recovery_error)?;
+        for change in changes {
+            let identity = (change.namespace, change.key);
+            if let Some(version) = change.next_version {
+                durable.versions.insert(identity, version);
+            } else {
+                durable.versions.remove(&identity);
+            }
+        }
+        durable.state = next;
+        Ok(())
+    }
     /// The live generic database row to capture in a recovery UOW baseline.
     pub fn recovery_database_resource(
         &self,
@@ -531,6 +631,10 @@ impl ImsService {
             replayed: false,
         })
     }
+}
+
+fn host_recovery_error(problem: RecoveryProblem) -> HostProblem {
+    super::application_recovery::recovery_error(problem)
 }
 
 fn decode_publication(

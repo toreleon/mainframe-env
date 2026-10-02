@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Connected selected IMS DB-batch basic and symbolic CHKP/XRST to real database undo, PCB positions and bounded application areas through the existing recovery authority and atomic row bridge."

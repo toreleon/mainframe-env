@@ -145,3 +145,157 @@ fn additive_recovery_canonical_golden_is_independently_framed() {
         "faf1ab27e09ccdd795f735bcdbc98f1db83fd4bc42caab4907ba58abe79b0c49"
     );
 }
+
+#[test]
+fn checkpoint_restart_canonical_goldens_preserve_exact_selector_and_area_identity() {
+    // Independent Python struct framing from EFFECT-CANONICAL-V1, including
+    // little-endian integer widths, ASCII field order and request/result domains.
+    // The same recipe reproduces the pre-existing LOG golden above.
+    let cases = [
+        (
+            ImsRecoveryCall::BasicCheckpoint {
+                id: "CHK00001".into(),
+            },
+            702,
+            "6f989e38ad73d8fb7fc74f6a97a72dd97357b833c009bb51c8b4d0d2765b8337",
+        ),
+        (
+            ImsRecoveryCall::SymbolicCheckpoint {
+                id: "CHK00001".into(),
+                user_areas: vec![vec![0, 255, 10], b"XY".to_vec()],
+            },
+            756,
+            "addd1562a861cfc41b3c114b5e97ccf3d6205778c997a31d9614f876f43f568f",
+        ),
+        (
+            ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Normal,
+                area_lengths: vec![3],
+            },
+            775,
+            "b37adc8f38498168d446ee797dac79b0c4076a94ff8885e18118d798bbac16fe",
+        ),
+        (
+            ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Checkpoint("CHK00001".into()),
+                area_lengths: vec![3],
+            },
+            806,
+            "bfaf1015aa6b3db25040c589825f20a40915d33681de2e98f2de53462b1984ae",
+        ),
+        (
+            ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Timestamp("00012741234560".into()),
+                area_lengths: vec![3],
+            },
+            811,
+            "209088e84007703c73c6a5c62e315496572b9a545b0396322770f559ffb67562",
+        ),
+        (
+            ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Last,
+                area_lengths: vec![3],
+            },
+            773,
+            "b6c90d1d9b8ece2c56724423e4509913e235071085d9eae195c541321e5ef625",
+        ),
+    ];
+    let hex = |digest: [u8; 32]| {
+        digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    for (call, size, expected) in cases {
+        let request = HostRequest::ImsRecovery(ImsRecoveryRequest { call, ..request() });
+        assert_eq!(
+            canonical_request_size(&request, MAX_CANONICAL_EFFECT_BYTES).unwrap(),
+            size
+        );
+        assert_eq!(hex(canonical_request_digest(&request).unwrap()), expected);
+    }
+    for (result, size, expected) in [
+        (
+            ImsRecoveryResult::Checkpointed {
+                status: "  ".into(),
+                id: "CHK00001".into(),
+                sequence: 1,
+            },
+            225,
+            "4a3bdaf6f77f5d08bbc300be10c4c1847f2b045e37c163f506b3386f8555174e",
+        ),
+        (
+            ImsRecoveryResult::Restarted {
+                status: "  ".into(),
+                checkpoint_id: Some("CHK00001".into()),
+                user_areas: vec![vec![0, 255, 10]],
+                pcb_statuses: vec![(1, "  ".into())],
+            },
+            301,
+            "aa7e3aef9da1ecbbfb32eb8d9c7f86a9cacb7e67681fc32aa1abcc1098387e4d",
+        ),
+    ] {
+        let result = Ok(HostResult::ImsRecovery(result));
+        assert_eq!(
+            canonical_result_size(&result, MAX_CANONICAL_EFFECT_BYTES).unwrap(),
+            size
+        );
+        assert_eq!(hex(canonical_result_digest(&result).unwrap()), expected);
+    }
+}
+
+#[test]
+fn checkpoint_restart_contract_rejects_malformed_ids_areas_and_result_shapes() {
+    for id in ["", "123456789", "bad id", "é"] {
+        let r = ImsRecoveryRequest {
+            call: ImsRecoveryCall::BasicCheckpoint { id: id.into() },
+            ..request()
+        };
+        assert_eq!(
+            r.validate(HostLimits::default()),
+            Err(HostProblem::Malformed)
+        );
+    }
+    for timestamp in ["short", "abcdDDD1234560", "ééééééé"] {
+        let r = ImsRecoveryRequest {
+            call: ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Timestamp(timestamp.into()),
+                area_lengths: vec![],
+            },
+            ..request()
+        };
+        assert_eq!(
+            r.validate(HostLimits::default()),
+            Err(HostProblem::Malformed)
+        );
+    }
+    for lengths in [vec![1; 8], vec![0], vec![32 * 1024 + 1]] {
+        let r = ImsRecoveryRequest {
+            call: ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Normal,
+                area_lengths: lengths,
+            },
+            ..request()
+        };
+        assert_eq!(
+            r.validate(HostLimits::default()),
+            Err(HostProblem::ResourceExhausted)
+        );
+    }
+    for pcbs in [
+        vec![(0, "  ".into())],
+        vec![(1, "  ".into()), (1, "GE".into())],
+        vec![(1, "FA".into())],
+    ] {
+        assert_eq!(
+            ImsRecoveryResult::Restarted {
+                status: "  ".into(),
+                checkpoint_id: Some("SAVE".into()),
+                user_areas: vec![],
+                pcb_statuses: pcbs
+            }
+            .validate(),
+            Err(HostProblem::Malformed)
+        );
+    }
+}

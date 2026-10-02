@@ -17,7 +17,7 @@ pub(in crate::service) fn position(session: &Session, number: u16) -> PcbPositio
     }
 }
 
-pub(super) fn set_position(session: &mut Session, number: u16, position: PcbPosition) {
+pub(in crate::service) fn set_position(session: &mut Session, number: u16, position: PcbPosition) {
     if number == session.pcb {
         session.position = position;
     } else {
@@ -25,7 +25,7 @@ pub(super) fn set_position(session: &mut Session, number: u16, position: PcbPosi
     }
 }
 
-pub(super) fn clear_positions(session: &mut Session) {
+pub(in crate::service) fn clear_positions(session: &mut Session) {
     session.position = PcbPosition::default();
     session.pcb_positions.clear();
 }
@@ -47,7 +47,7 @@ pub(super) fn session_databases(state: &State, run: &str) -> Result<BTreeSet<Str
     Ok(databases)
 }
 
-pub(super) fn key_only(pcb: &ImsDatabasePcbMetadata, segment: &str) -> bool {
+pub(in crate::service) fn key_only(pcb: &ImsDatabasePcbMetadata, segment: &str) -> bool {
     pcb.sensitive_segments
         .iter()
         .find(|item| normalize(&item.name) == segment)

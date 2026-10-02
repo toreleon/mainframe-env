@@ -1729,3 +1729,145 @@ no publication bodies, SQL schema, participant descriptor, LOG adapter, SSA
 navigation or secondary-index contracts are changed. The next substantive
 obligations are integrity-read visibility and the pending lock-manager semantics
 listed above; the manager separately owns facade extraction and aggregate gates.
+
+## IMS-1405.application-checkpoint-restart (declared bounded leaf)
+
+Parent IMS-1405 remains in progress. Exact clean entry candidate:
+`66e8bce0a4fa97daa057da61664a4da1816faecf`. Preserve its LOG adapter,
+per-PCB positions, checkpoint commit/reset and witnessed local UOW fences.
+This leaf connects basic CHKP, symbolic CHKP and XRST to the existing typed
+selected host route, RecoverySession and atomic provider-row bridge. No new
+engine, coordinator, store, participant admission or TM backout is owned.
+Catalog scope: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002/:0016/:0025`,
+with symbolic CHKP `:0023` as required context. Supported execution projection:
+DB-batch CALL on installed selected signed metadata, all its real DB PCBs.
+Other source-applicable contexts/command/raw language adapters remain pending;
+their rejection is not execution credit. SSA/GSAM future DTOs, secondary
+metadata/indexes and ordinary-write Q fencing belong to other owners.
+
+Obligation classes: exact logical operands/selectors and context/order errors
+without mutation; mandatory SAF over every affected database; real undo commit
+and all-PCB position/hold/Q release; bounded seven-area save/restore; actual
+qualified GU and GN continuation on retained Session rows; canonical identity,
+atomic CAS/failure/replay, process-exit recovery and explicit ambiguous/lost-ack
+observation. Independent tests exercise Memory and SQLite public host and
+signed selected-package/coordinator routes. They are supplemental, with no
+official row credit until the shared accepted Conformance IR owner binds them.
+Licensed differential remains 0/25, excluded by the human for this continuation.
+
+Necessary small shared edits: additive host recovery enums/exports/validation
+and canonical encoders; defaulted retained Session recovery-order metadata;
+crate-private visibility for existing PCB/session helper calls; a private
+existing-bridge hook to publish session/undo/recovery rows in one batch; bounded
+RecoverySession adapter methods using its existing state/replay authority.
+Tests, this appended status, a unique fragment and routine docs manifest are
+owned. No other owner's private authority or generated inventory is edited.
+
+Source review uses verified offline `ims-1405-topic-cache` search/read:
+`ibm-ims-15.6-recovery-utilities-2026-09-11`, basic CHKP
+`1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a`,
+symbolic CHKP `87ede5820b177ea850473dda852c424a7b4a8f5a93dd06c68a0b95c11a4093b5`,
+XRST `aff46320869b8910ab9916011c8d722a5e044f9e33970d2996e0501204046cb6`,
+checkpoint introduction `c3aaf84e538be688d44af8fe9072e6cb00c47e4f9e46277f2ba22aa053be013d`,
+restart command context `ac6ec41de956052fe05cb68efd58b59793af4c0903458cf447852b93b0211670`.
+Topic paths are the corresponding APR/APG entries of the committed manifest.
+CALL XRST is once and before CHKP, but need not precede database calls;
+command XRST is first. A program uses only one checkpoint kind. Timestamp
+selection requires the authentic DFS0540I `IIIIDDDHHMMSST` identity; existing
+logical clocks lack region/day/time-of-day authority. That concrete context
+boundary remains unsupported/pending, never synthesized from ticks or supplied
+by the caller. LAST is BMP-only and remains outside this DB-batch route.
+
+Acceptance: fail-first/pass focused host/provider/server and child-process
+checks, warnings-denied scoped Clippy with --no-deps, fmt, affected shared
+effect/provider-row/durable/schema/catalog/participant/security/retention guards,
+spec integrity, mandatory dependency/docs/changelog gates, exact leaf seal/check
+and one local completion commit. Receipts remain outside Git/target; no source
+refresh, licensed run, orchestration, push or PR is authorized.
+
+The implemented DB-batch typed projection now uses RecoverySession's existing
+checkpoint and replay maps, not a parallel engine. Its private bridge atomically
+publishes real Session positions, witnessed undo removal, Q release, recovery
+receipt and selected-metadata/database CAS fences. Canonical replay observes the
+prior receipt before inspecting later work, so it cannot commit that later UOW.
+Named XRST issues qualified GU against current database images and retains the
+actual per-PCB cursor for GN; missing keyed segments report GE and continue
+after the deleted key. Normal start is a distinct non-restoring selector.
+The provider derives PCB numbers, database identities and bounded key recipes;
+callers cannot submit resource mutations or snapshot namespace identities.
+Read-only observation supports explicit fenced reconciliation of lost acknowledgments
+and leaves absent/ambiguous receipts unresolved without redispatch.
+
+Additional offline position/metadata basis:
+`ibm-ims-15.6-programming-contracts-2026-09-11`, APR
+`ims_gughucall.htm` and `ims_gnghncall.htm`; and
+`ibm-ims-15.6-metadata-contracts-2026-09-11`, SUR
+`ims_fieldstmt.htm`, `ims_psbgendlipcbstmt.htm`, `ims_psbgensensegstmt.htm`.
+Each manifest SHA-256 was verified before repository-parser review. The latter
+bodies were available in the content-addressed raw archive despite absent
+retained topic-path files; no source mismatch or refresh occurred. Exact full
+paths/hashes and selected execution results are in the external leaf handoff.
+
+Focused public host/provider, signed-package/coordinator and separate-process
+regressions pass. Independent canonical framing preserves the old LOG and IMS
+goldens. Strict host/IMS Clippy, formatting, dependency policy, affected shared
+architecture/participant/security/retention guards, schema/catalog/spec integrity
+and changelog checks pass. The required IMS assurance check exposed stale
+pre-existing generic test paths; only their binding locators were repaired,
+without changing expectations, applicability or zero credit. Server diagnostic
+review finds no warning/error in changed files. Whole-server strict Clippy and
+the aggregate module-budget guard remain blocked by unchanged owner code;
+no lint allowances, inventory ceiling increase or unrelated repair is claimed.
+Changed production modules stay below the ordinary limit, with the existing
+service facade held at its entry size. Docs generation and exact leaf seal/check
+are packaging steps recorded by the external handoff, not official IMS credit.
+
+No SQL or row-schema migration is introduced. Prior Session rows default missing
+recovery-order fields; prior RecoverySession rows retain their digest and replay
+encoding. Existing per-PCB readers and version-two witnessed undo remain intact.
+New application result bytes use a private bounded prefix in the existing replay
+map. Older binaries cannot dispatch the new canonical variants or reliably
+enforce the new order markers, and their former replay-data bound may reject large
+new area receipts. Before downgrade, stop admission, drain/reconcile new effects
+and UOWs and use a coherent pre-upgrade backup containing database images,
+sessions, recovery/checkpoints, selected metadata, journals and audits.
+There is no automatic pruning; configured row/recovery bounds still reject
+saturation. Coherent restore and retention expiry are separate pending obligations.
+
+Remaining source-applicable work is explicit: authentic timestamp/context
+authority; BMP/LAST and other execution contexts; command/raw language/JCL CKPTID
+precedence; GSAM RSA/file restoration; the currently unsupported deleted-key
+continuation for non-key-ordered roots; and raw PCB feedback. Nonunique/keyless
+paths receive no successful reposition claim. SETS/SETU/ROLS/ROLL/ROLB real
+database/TM backout, atomic concurrent recovery-lease fencing, participant
+admission, official accepted-IR bindings and licensed differential remain pending.
+The inherited accepted shared-contract identities and prior licensed-pending
+dispositions are unchanged. This seals only the verified bounded leaf; IMS-1405,
+the full recovery family and the human's v0.14 goal remain in progress.
+
+### Application checkpoint manager integration
+
+Fold this route into the current Q/SSA/secondary candidate without changing
+their UOW or provider authorities. Extract the existing state/definition
+validators into `service/validation.rs`, retaining their parent exports and
+lowering the exact facade budget. New defaulted execution markers and actual
+session/undo/recovery atomic changes remain in the existing row codec.
+
+The pinned XRST contract (`ims_xrstcall.htm`, `aff46320...`, lines 166–200)
+requires the saved PCB's actual access sequence, not a primary-order substitute.
+The initial public regression demonstrated symbolic CHKP accepting an indexed
+cursor into a physical key path. Until secondary checkpoint capture/resolution
+is implemented, an established selected-secondary position returns Unsupported
+before checkpoint publication; primary positions and basic commit behavior
+remain supported. The retained-position reader likewise fails closed rather
+than resolving that PCB through the primary engine. This is an explicit pending
+obligation, not secondary restart credit. `checkpoint-secondary-red.log` records
+the intended runtime failure separately from the earlier module-path compile
+failure. Combined checks are in `checkpoint-integration.log`; original worker
+receipts and manager re-seal identities remain distinct.
+The integrated provider run passes 23 application-recovery cases, including the
+new secondary boundary, alongside 23 PCB/secondary, 18 reservation, 18 recovery
+runtime and four host-contract cases. Strict three-package Clippy, the global
+module ratchet and assurance/docs checks pass. The first manager server filter
+matched zero tests and earns no credit; the corrected
+`ims_package_tests::application_recovery` run is retained in the seal receipt.

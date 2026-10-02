@@ -1,5 +1,5 @@
-//! Bounded selected application LOG adapter. RecoverySession remains the only
-//! log authority; the existing bridge owns atomic selected-generation publication.
+//! Bounded selected application recovery adapter. RecoverySession remains the
+//! recovery authority; the existing bridge owns atomic selected publication.
 
 use super::*;
 use crate::recovery::{LogRequest, RecoveryLimits, RecoveryProblem, RecoverySession};
@@ -7,6 +7,42 @@ use mainframe_env_host_api::{
     HostLimits, ImsPcbMetadata, ImsRecoveryCall, ImsRecoveryRequest, ImsRecoveryResult,
 };
 use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore};
+
+mod checkpoint;
+
+/// Defaulted fields preserve prior v1 Session readers. Never supplied by callers.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ExecutionRecovery {
+    execution: String,
+    #[serde(default)]
+    attempt: u32,
+    checkpoint_kind: Option<crate::recovery::CheckpointKind>,
+    xrst: bool,
+}
+
+pub(super) fn validate_sessions(state: &State) -> Result<(), HostProblem> {
+    for session in state.sessions.values().chain(state.checkpoints.values()) {
+        let marker = &session.recovery;
+        if (!marker.execution.is_empty()
+            && mainframe_env_execution_api::ExecutionId::new(
+                &marker.execution,
+                InvocationLimits::default(),
+            )
+            .is_err())
+            || (marker.execution.is_empty()
+                && (marker.attempt != 0 || marker.xrst || marker.checkpoint_kind.is_some()))
+            || (!marker.execution.is_empty() && marker.attempt == 0)
+            || (marker.checkpoint_kind == Some(crate::recovery::CheckpointKind::Symbolic)
+                && !marker.xrst)
+            || (marker.checkpoint_kind == Some(crate::recovery::CheckpointKind::Basic)
+                && marker.xrst)
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(())
+}
 
 /// Compose the existing read/write providers with the typed application LOG route.
 /// `effects` must be the canonical journal from the same product store authority.
@@ -144,31 +180,15 @@ impl ImsService {
         }
         // Address the existing recovery row by an unambiguous selected binding.
         // This avoids collisions with other PSBs/generations using the same run.
-        let mut run_material = Sha256::new();
-        run_material.update(b"mainframe-env.ims-application-recovery-run@1\0");
-        for value in [
-            &selected.application,
-            &request.package_identity,
-            &request.psb,
-            &request.database,
-            invocation.run_unit_id.as_str(),
-            invocation.principal.id().as_str(),
-        ] {
-            run_material.update((value.len() as u64).to_le_bytes());
-            run_material.update(value.as_bytes());
-        }
-        let run = format!("{:x}", run_material.finalize());
+        let run = recovery_address(invocation, request, &selected.application);
         let recovery = RecoverySession::load(&*self.store, &run, RecoveryLimits::default())
             .map_err(recovery_error)?;
-        let mut effect_material = Sha256::new();
-        effect_material.update(b"mainframe-env.ims-application-recovery-effect@1\0");
-        for value in [invocation.execution_id.as_str(), key.as_str()] {
-            effect_material.update((value.len() as u64).to_le_bytes());
-            effect_material.update(value.as_bytes());
-        }
-        effect_material.update(request.mutation.sequence.to_le_bytes());
-        let effect_id = format!("{:x}", effect_material.finalize());
-        let ImsRecoveryCall::Log { code, data } = &request.call;
+        let effect_id = recovery_effect_address(invocation, request);
+        let ImsRecoveryCall::Log { code, data } = &request.call else {
+            return self.application_checkpoint(
+                invocation, request, effects, digest, &selected, recovery, &effect_id,
+            );
+        };
         let transition = recovery
             .log(
                 &effect_id,
@@ -197,7 +217,42 @@ impl ImsService {
     }
 }
 
-fn recovery_error(problem: RecoveryProblem) -> HostProblem {
+fn recovery_address(
+    invocation: &Invocation,
+    request: &ImsRecoveryRequest,
+    application: &str,
+) -> String {
+    let mut material = Sha256::new();
+    material.update(b"mainframe-env.ims-application-recovery-run@1\0");
+    for value in [
+        application,
+        &request.package_identity,
+        &request.psb,
+        &request.database,
+        invocation.run_unit_id.as_str(),
+        invocation.principal.id().as_str(),
+    ] {
+        material.update((value.len() as u64).to_le_bytes());
+        material.update(value.as_bytes());
+    }
+    format!("{:x}", material.finalize())
+}
+
+fn recovery_effect_address(invocation: &Invocation, request: &ImsRecoveryRequest) -> String {
+    let mut material = Sha256::new();
+    material.update(b"mainframe-env.ims-application-recovery-effect@1\0");
+    for value in [
+        invocation.execution_id.as_str(),
+        request.mutation.idempotency_key.as_str(),
+    ] {
+        material.update((value.len() as u64).to_le_bytes());
+        material.update(value.as_bytes());
+    }
+    material.update(request.mutation.sequence.to_le_bytes());
+    format!("{:x}", material.finalize())
+}
+
+pub(super) fn recovery_error(problem: RecoveryProblem) -> HostProblem {
     match problem {
         RecoveryProblem::InvalidRequest => HostProblem::Malformed,
         RecoveryProblem::Unauthorized => HostProblem::Unauthorized,

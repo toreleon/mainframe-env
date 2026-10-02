@@ -20,6 +20,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
+#[path = "application_recovery/checkpoint_tests.rs"]
+mod checkpoint_tests;
+
 trait TestStore: IdempotencyStore + ProviderStateStore {}
 impl<T: IdempotencyStore + ProviderStateStore> TestStore for T {}
 
@@ -140,7 +143,7 @@ fn intent(store: &dyn IdempotencyStore, invocation: &Invocation, request: &ImsRe
                 .unwrap(),
             intent: EffectIntentMetadata {
                 owner: invocation.execution_id.clone(),
-                attempt: 1,
+                attempt: invocation.attempt,
                 capability: Some(
                     CapabilityId::new("host.ims.write", InvocationLimits::default()).unwrap(),
                 ),
