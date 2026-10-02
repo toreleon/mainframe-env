@@ -17,7 +17,12 @@
         "fepi-pool",
         "spi-file",
         "fepi-resources",
-        "fepi-pool-list"
+        "fepi-pool-list",
+        "spi-csd-definition",
+        "spi-csd-browse",
+        "spi-monitoring-control",
+        "spi-region-lifecycle",
+        "fepi-session-data"
       ]
     },
     "runtime_binding": {

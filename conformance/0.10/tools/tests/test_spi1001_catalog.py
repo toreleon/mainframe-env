@@ -127,6 +127,28 @@ class AdministrativeGrammarTests(unittest.TestCase):
         self.mapping = json.loads((root / "conformance/0.10/cics/spi-command-source-map.json").read_text())
         self.manifest = json.loads((root / "conformance/0.10/manifests/cics-spi-command-topics.json").read_text())
 
+    def test_enrolled_source_cohorts_are_disjoint_pinned_and_schema_declared(self) -> None:
+        root = catalog_tool.ROOT
+        schema = json.loads((root / "conformance/0.10/schemas/cics-system-family-contract.schema.json").read_text())
+        self.assertEqual(set(catalog_tool.FAMILY_ROWS), set(schema["properties"]["family"]["enum"]))
+        seen = set()
+        for _, (interface, suffixes) in catalog_tool.FAMILY_ROWS.items():
+            self.assertTrue(0 < len(suffixes) <= 32)
+            mapping = json.loads((root / f"conformance/0.10/cics/{interface}-command-source-map.json").read_text())
+            manifest = json.loads((root / f"conformance/0.10/manifests/cics-{interface}-command-topics.json").read_text())
+            mapped = {row["official_row"]: row for row in mapping["rows"]}
+            pinned = {topic["topic_path"]: topic for topic in manifest["topics"]}
+            unit = "spi-commands-unique" if interface == "spi" else "fepi-commands"
+            for suffix in suffixes:
+                identity = f"ibm-cics-ts-6x-2026-08-31:{unit}:{suffix}"
+                self.assertNotIn(identity, seen)
+                seen.add(identity)
+                row = mapped[identity]
+                self.assertEqual(row["state"], "mapped")
+                topic = row["topic"]
+                self.assertEqual(topic["sha256"], "sha256:" + pinned[topic["topic_path"]]["sha256"])
+        self.assertEqual(len(seen), 118)
+
     def project(self, family=None):
         return catalog_tool.project_family_grammar(
             self.family if family is None else family, self.mapping, self.manifest

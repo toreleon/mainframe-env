@@ -8,12 +8,17 @@ use std::path::Path;
 const SCHEMA: &str = "conformance/0.10/schemas/cics-system-family-contract.schema.json";
 const DIRECTORY: &str = "conformance/0.10/cics/families";
 const MAX_ARTIFACT_BYTES: u64 = 4 * 1024 * 1024;
-const FAMILIES: [&str; 5] = [
+const FAMILIES: [&str; 10] = [
     "spi-program",
     "fepi-pool",
     "spi-file",
     "fepi-resources",
     "fepi-pool-list",
+    "spi-csd-definition",
+    "spi-csd-browse",
+    "spi-monitoring-control",
+    "spi-region-lifecycle",
+    "fepi-session-data",
 ];
 
 fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
@@ -29,6 +34,43 @@ fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
             ],
         )),
         "fepi-pool-list" => Ok(("fepi", &["0035"])),
+        "spi-csd-definition" => Ok((
+            "spi",
+            &[
+                "0037", "0038", "0040", "0041", "0042", "0053", "0054", "0055", "0056", "0060",
+                "0061",
+            ],
+        )),
+        "spi-csd-browse" => Ok((
+            "spi",
+            &[
+                "0039", "0043", "0044", "0045", "0046", "0047", "0048", "0049", "0050", "0051",
+                "0052", "0057", "0058", "0059",
+            ],
+        )),
+        "spi-monitoring-control" => Ok((
+            "spi",
+            &[
+                "0002", "0095", "0116", "0139", "0148", "0159", "0164", "0173", "0174", "0175",
+                "0177", "0195", "0218", "0234", "0238", "0243", "0244", "0253", "0254", "0255",
+                "0257",
+            ],
+        )),
+        "spi-region-lifecycle" => Ok((
+            "spi",
+            &[
+                "0004", "0065", "0096", "0100", "0101", "0113", "0157", "0160", "0161", "0163",
+                "0165", "0166", "0183", "0184", "0185", "0186", "0199", "0202", "0205", "0208",
+                "0215", "0245", "0246", "0261", "0262",
+            ],
+        )),
+        "fepi-session-data" => Ok((
+            "fepi",
+            &[
+                "0002", "0003", "0004", "0005", "0006", "0012", "0013", "0014", "0015", "0016",
+                "0025", "0026", "0027", "0028", "0029", "0030", "0031", "0038", "0039",
+            ],
+        )),
         _ => Err(format!("unknown CICS system family {family}")),
     }
 }
@@ -310,6 +352,36 @@ mod tests {
     }
 
     #[test]
+    fn source_cohorts_preserve_distinct_rows_and_bounded_artifacts() {
+        let mut identities = BTreeSet::new();
+        for family in FAMILIES {
+            let (interface, ids) = rows(family).unwrap();
+            assert!(!ids.is_empty() && ids.len() <= 32);
+            for id in ids {
+                assert!(
+                    identities.insert((interface, *id)),
+                    "cohort duplicates {interface}:{id}"
+                );
+            }
+        }
+        assert_eq!(identities.len(), 118);
+        assert_eq!(
+            identities
+                .iter()
+                .filter(|(interface, _)| *interface == "spi")
+                .count(),
+            79
+        );
+        assert_eq!(
+            identities
+                .iter()
+                .filter(|(interface, _)| *interface == "fepi")
+                .count(),
+            39
+        );
+    }
+
+    #[test]
     fn declared_cohorts_validate_without_semantic_claims() {
         for (family, count) in [
             ("spi-program", 4),
@@ -317,6 +389,11 @@ mod tests {
             ("spi-file", 4),
             ("fepi-resources", 13),
             ("fepi-pool-list", 1),
+            ("spi-csd-definition", 11),
+            ("spi-csd-browse", 14),
+            ("spi-monitoring-control", 21),
+            ("spi-region-lifecycle", 25),
+            ("fepi-session-data", 19),
         ] {
             assert_eq!(valid(family, &fixture(family)).unwrap(), count);
         }

@@ -1547,3 +1547,52 @@ Integrated primitive gates pass nine new observation tests plus two exact LOAD
 compatibility regressions, no failures/ignores. Actual module inventory and offline
 dependency policy now pass in the manager checkout. All command and licensed
 gates remain Pending; these checks earn zero administrative execution credit.
+
+## Second source-ready parallel wave
+
+Manager declares `SPI-1001.source-wave-two-enrollment` before changing shared
+cohort tables. Existing five cohorts and active FILE/FEPI resource workers retain
+their exact ownership. The next five bounded private cohorts contain 90 additional
+mapped rows, raising declared distinct scope to 79 SPI and all 39 FEPI identities
+(118 total). This is declared scope, not completed facts or behavioral coverage.
+Three unresolved SPI equivalences and all remaining unmapped grammar facts remain
+pending. No identity/EIBFN/name can substitute for a verified command body.
+
+Cohorts and exact official row suffixes:
+
+- spi-csd-definition: 0037/0038/0040/0041/0042/0053/0054/0055/0056/0060/0061.
+- spi-csd-browse: 0039/0043/0044/0045/0046/0047/0048/0049/0050/0051/0052/0057/0058/0059.
+- spi-monitoring-control: 0002/0095/0116/0139/0148/0159/0164/0173/0174/0175/0177/0195/0218/0234/0238/0243/0244/0253/0254/0255/0257.
+- spi-region-lifecycle: 0004/0065/0096/0100/0101/0113/0157/0160/0161/0163/0165/0166/0183/0184/0185/0186/0199/0202/0205/0208/0215/0245/0246/0261/0262.
+- fepi-session-data: 0002/0003/0004/0005/0006/0012/0013/0014/0015/0016/0025/0026/0027/0028/0029/0030/0031/0038/0039.
+
+After the shared enrollment commit passes, four disjoint CLI slices may start
+from that exact candidate: `SPI-1001.spi-csd-contracts` owns only
+families/spi-csd-definition.json and families/spi-csd-browse.json;
+`SPI-1001.spi-monitoring-contract` owns only families/spi-monitoring-control.json;
+`SPI-1001.spi-region-contract` owns only families/spi-region-lifecycle.json;
+`SPI-1001.fepi-session-contract` owns only families/fepi-session-data.json. Paths
+are relative to conformance/0.10/cics. Workers also own their external handoffs
+and receipts. Together with the current two source workers this is six CLI
+workers, within the requested ceiling of eight. No nested workers are authorized.
+
+Shared schema/validator/generator, IR/compiler/host/provider facades, resource
+state, security, dispatch/registration, status/docs and fragments remain the
+manager's serialized lane. Enrollment must prove exact mapped/pinned rows,
+disjoint cohorts and the existing 32-command artifact bound, synthetic validation,
+unchanged identity/current grammar bytes and mandatory infrastructure gates.
+Workers must use pinned offline search/read for complete selected bodies and
+necessary contexts, preserving exact source versions and distinct variants.
+They derive bounded option/constraint/condition/resource/lifecycle/security/audit/
+UOW/quiesce/timeout/failure/recovery facts and concrete independent case candidates.
+Missing authority stays explicit. All six command acceptance gates remain pending;
+contract shape, source review and optional private primitives earn zero execution
+credit. Artifact limits, generated owners and the existing shared ConformanceIR
+authority remain unchanged. No source refresh, runtime routing, blanket syncpoint/
+rollback, public capability, licensed credit or parent completion is delegated.
+
+Cohort enrollment passes eleven focused validator tests (including all ten
+synthetic cohorts), 20 current generator tests and seven unchanged IR contract
+checks, with no ignores. Current two inputs pass exact linkage; absent future
+inputs remain pending. Identity/grammar output bytes do not change until a
+reviewed input is added. Mandatory gates precede this infrastructure seal.
