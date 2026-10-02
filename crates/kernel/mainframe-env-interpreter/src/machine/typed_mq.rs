@@ -1,10 +1,10 @@
 //! Explicit host-installed MQI adapter, not invocation-binding attestation.
-//! Source rows 0008/0012, ibm-mq-9.4-mqi-2026-08-31.
+//! Source rows 0001/0007/0008/0012, ibm-mq-9.4-mqi-2026-08-31.
 
 use super::*;
 use mainframe_env_host_api::mq_mqi::{
     MqMqiCall, MqMqiConnect, MqMqiContext, MqMqiLimits, MqMqiOptions, MqMqiOutcome, MqMqiOutput,
-    MqMqiRequest, MqMqiRequestEnvelope, MqMqiStatus,
+    MqMqiRequest, MqMqiRequestEnvelope, MqMqiStatus, MqMqiUnitOfWork,
 };
 use mainframe_env_host_api::mq_object_route::MqRouteName;
 use mainframe_env_host_api::{
@@ -20,6 +20,19 @@ use std::sync::Arc;
 /// responsible for supplying the same frame to its selected provider route.
 pub trait MqMqiProgramFrame: Send + Sync {
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem>;
+
+    /// Read-only current local-UOW assertion for an actual live connection.
+    /// The selected provider must still check original intent, logical owner,
+    /// registry/control incarnation and durable UOW CAS when it executes the
+    /// effect. This port neither authorizes a decision nor accepts a wire ID.
+    /// Old embeddings fail closed until they deliberately supply that lookup.
+    fn local_unit(
+        &self,
+        _invocation: &Invocation,
+        _connection: MqHconn,
+    ) -> Result<MqMqiUnitOfWork, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,11 +56,29 @@ pub(super) struct Targets {
     completion: String,
     reason: String,
     disconnected: Option<i32>,
+    unit: Option<u64>,
 }
 
 pub(super) fn is_call(program: &str) -> bool {
     let program = normalize(program.trim_matches(['\'', '"']));
     MqMqiCall::ALL.iter().any(|call| call.label() == program)
+}
+
+pub(super) fn validate_reply(
+    pending: &Pending,
+    result: &EffectResult,
+) -> Result<(), MachineProblem> {
+    result
+        .validate(pending.sequence, HostLimits::default())
+        .map_err(|problem| {
+            MachineProblem::Host(if matches!(&pending.kind, PendingKind::MqMqi(_)) {
+                // The typed call has already been dispatched. An unusable
+                // envelope cannot establish that its owned work did not occur.
+                HostProblem::UnknownOutcome
+            } else {
+                problem
+            })
+        })
 }
 
 impl ReferenceMachine {
@@ -140,6 +171,7 @@ impl ReferenceMachine {
                         completion: parameters[2].clone(),
                         reason: parameters[3].clone(),
                         disconnected: None,
+                        unit: None,
                     },
                 )
             }
@@ -167,6 +199,57 @@ impl ReferenceMachine {
                         completion: parameters[1].clone(),
                         reason: parameters[2].clone(),
                         disconnected: Some(wire),
+                        unit: None,
+                    },
+                )
+            }
+            "MQCMIT" | "MQBACK" => {
+                if parameters.len() != 3 {
+                    return Err(MachineProblem::InvalidOperation);
+                }
+                for parameter in &parameters {
+                    self.mq_long_target(parameter)?;
+                }
+                self.mq_output_aliases(&parameters)?;
+                let value = self.decimal(&parameters[0])?;
+                let wire =
+                    i32::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)?;
+                let connection = state
+                    .connections
+                    .get(&wire)
+                    .copied()
+                    .ok_or(MachineProblem::Host(HostProblem::Malformed))?;
+                let unit = state
+                    .frame
+                    .local_unit(&self.invocation, connection)
+                    .map_err(MachineProblem::Host)?;
+                let MqMqiUnitOfWork::Local { unit } = unit else {
+                    return Err(MachineProblem::Host(HostProblem::Unsupported));
+                };
+                if unit == 0 {
+                    return Err(MachineProblem::Host(HostProblem::Malformed));
+                }
+                // Lookup callbacks cannot change the frame behind the original
+                // pending effect. Recheck before allocating its sequence/key.
+                state.current(&self.invocation)?;
+                let request = if call == "MQCMIT" {
+                    MqMqiRequest::Commit { connection, unit }
+                } else {
+                    MqMqiRequest::Back { connection, unit }
+                };
+                (
+                    request,
+                    Targets {
+                        call: if call == "MQCMIT" {
+                            MqMqiCall::Commit
+                        } else {
+                            MqMqiCall::Back
+                        },
+                        connection: parameters[0].clone(),
+                        completion: parameters[1].clone(),
+                        reason: parameters[2].clone(),
+                        disconnected: None,
+                        unit: Some(unit),
                     },
                 )
             }
@@ -268,6 +351,11 @@ impl ReferenceMachine {
                         MqMqiOutput::Connected(connection @ MqHconn::Issued(_)),
                     ) if !connection.is_historical() => Some(connection),
                     (MqMqiCall::Disconnect, MqMqiOutput::NoOutput) => None,
+                    (MqMqiCall::Commit | MqMqiCall::Back, MqMqiOutput::UnitOfWork { unit })
+                        if targets.unit == Some(unit) =>
+                    {
+                        None
+                    }
                     _ => return Err(MachineProblem::UnexpectedHostResult),
                 };
                 let status = mainframe_env_host_api::mq_status::MqReviewedStatus::from_symbols(
@@ -281,11 +369,29 @@ impl ReferenceMachine {
             }
             MqMqiOutcome::ReviewedStatus { status } => {
                 let (completion, reason) = status.wire_pair();
-                // A status-only observation cannot stand in for a successful
-                // connect or disconnect and cannot retire ABI aliases.
-                if status.completion() != mainframe_env_host_api::mq_status::MqCompletion::Failed {
+                // Syncpoint calls have only CompCode/Reason wire outputs. An
+                // exact reviewed warning/failure is not a local UOW decision:
+                // the real provider/recovery authority retains that ownership.
+                // CONNECT/DISC still require usable successful output proof.
+                if !matches!(targets.call, MqMqiCall::Commit | MqMqiCall::Back)
+                    && status.completion()
+                        != mainframe_env_host_api::mq_status::MqCompletion::Failed
+                {
                     return Err(MachineProblem::UnexpectedHostResult);
                 }
+                (completion, reason, None, false)
+            }
+            MqMqiOutcome::Completed {
+                status: MqMqiStatus::FailedEnvironment,
+                output: MqMqiOutput::NoOutput,
+            } if matches!(targets.call, MqMqiCall::Commit | MqMqiCall::Back) => {
+                let status = mainframe_env_host_api::mq_status::MqReviewedStatus::from_symbols(
+                    targets.call,
+                    "MQCC_FAILED",
+                    "MQRC_ENVIRONMENT_ERROR",
+                )
+                .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+                let (completion, reason) = status.wire_pair();
                 (completion, reason, None, false)
             }
             MqMqiOutcome::UnknownOutcome | MqMqiOutcome::DuplicatePossible => {

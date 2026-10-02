@@ -6,6 +6,16 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The typed machine now emits MQCMIT/MQBACK for an independently admitted ordinary
+batch/local-MQ frame. Its live-token UOW lookup is a read-only assertion, not
+authority reconstructed from bindings or an application integer. Original
+sequence/key/actor and the selected provider's logical-owner/control/CAS checks
+remain unchanged. Reviewed status observations are copied exactly without local
+durable decisions; mismatched units, changed frames and unusable post-dispatch
+typed envelopes are protected Unknown before writeback. Legacy validation and
+checkpoint bytes remain unchanged. Actual host-session lookup containment and
+selected service wiring, shared participants and typed recovery remain required.
+
 Private same-task batch-child ownership now consumes an opaque admitted parent
 lease and explicit host-supplied SAME TASK relationship. It retains the frozen
 logical processing-unit origin across child references and validates existing

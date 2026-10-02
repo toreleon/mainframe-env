@@ -3,6 +3,8 @@ use mainframe_env_host_api::mq_mqi::MqMqiResult;
 use mainframe_env_host_api::{MqHandleOwner, MqHandleRegistry};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+mod syncpoint;
+
 struct Frame {
     invocation: Invocation,
     changed: AtomicBool,

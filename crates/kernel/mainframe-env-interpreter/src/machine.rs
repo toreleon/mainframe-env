@@ -1637,9 +1637,7 @@ impl ReferenceMachine {
             .pending
             .take()
             .ok_or(MachineProblem::UnexpectedResume)?;
-        result
-            .validate(pending.sequence, HostLimits::default())
-            .map_err(MachineProblem::Host)?;
+        typed_mq::validate_reply(&pending, &result)?;
         // An in-doubt effect is not a language-level exception. CALL/ACCEPT
         // handlers, declaratives and subsystem error translation must not
         // turn uncertainty about committed work into ordinary control flow.

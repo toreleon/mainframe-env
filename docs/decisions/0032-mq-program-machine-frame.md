@@ -44,6 +44,26 @@ Uncertain, malformed or unusable post-dispatch replies remain UnknownOutcome.
 Other known MQI calls fail closed under this initial frame rather than bypass
 it through legacy MQ; unrelated program names remain ordinary program calls.
 
+The typed adapter additionally maps MQCMIT/MQBACK for this ordinary batch/local
+queue-manager profile. The embedding frame's read-only `local_unit` lookup takes
+the actual live HCONN token, never an application integer, and supplies a current
+local-UOW assertion before effect construction. It is not a permit: original
+intent, logical owner, physical incarnation/control and UOW CAS remain the
+selected provider's responsibility. Older frames default to Unsupported. The
+adapter rechecks the same profile after lookup and keeps the existing immutable
+effect's sequence/key/actor. External/absent/zero units fail before dispatch.
+
+All three arguments are checked signed fullword reference storage; successful
+UOW output must match the original asserted unit. Actual CompCode/Reason
+observations use the one reviewed call-specific status authority, including
+warnings and failures. Neither status writeback nor normal CALL return decides
+or advances durable work or retires connection aliases. Unknown/duplicate,
+changed profile, wrong unit and unusable typed reply envelopes remain protected
+UnknownOutcome before application writes; legacy reply-validation errors and
+checkpoint bytes remain unchanged. These machine/frame fixtures are not a real
+installed MQ service producer, shared participant or task-end policy. The real
+session containment must forward the lookup through its live revocation guard.
+
 The unchanged legacy checkpoint schema has no typed lifecycle/alias references.
 Typed frames therefore do not emit that checkpoint or restore it. A serialized
 binding cannot install a frame after restored/driven execution. Proper durable
@@ -112,6 +132,15 @@ defines the name, nonshared scope and returned Hconn. Row `0012` MQDISC,
 defines the input/output Hconn and undefined z/OS value after success. Completion
 numbers come from the existing reviewed status authority, not another table.
 Offline source review grants zero execution/licensed credit.
+
+The syncpoint handoff also reviews baseline `ibm-mq-9.4-mqi-2026-08-31`,
+row `0007` MQCMIT, `SSFKSJ_9.4.0/refdev/q101750_.html`, SHA-256
+`590f32c213d129d6937c253f048ccdb9c5cbd963ca2d3310cf5672dcf68c42f4`,
+and row `0001` MQBACK, `SSFKSJ_9.4.0/refdev/q101690_.html`, SHA-256
+`9550bf98c66f47f1d61943e0dbb7ab89043d0db1a3918ea3a4314dccf7182c86`.
+Their signatures use Hconn input and CompCode/Reason output; the reviewed usage
+requires queue-manager coordination and the same connection's UOW. CICS, IMS
+transaction-manager and RRS/shared resource work are not admitted by this port.
 
 ProductServer still opens and registers the previous MQ profile. It does not
 automatically configure this factory. A real factory must bridge the admitted
