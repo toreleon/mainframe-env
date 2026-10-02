@@ -71,6 +71,40 @@ Their exact manifest byte counts and hashes were verified in the supplied raw
 archive and read with the shared plain-text parser. The ordinary cache reader
 still lacks a verified Db2 TOC; no network refresh or source credit is inferred.
 
+### Current source availability and manager integration declarations
+
+The resumed candidate uses the owner-approved #350 repins already committed on
+`main`, with topic-set digest
+`83f04d82753771425aab203c7913dd9fea1c768766cf315df421100015e72463`.
+On 2026-10-02, checking the 174 catalog-referenced topics against their exact
+manifest byte counts and SHA-256 values found 171 matching retained/archive
+bodies and no accepted mismatches. The three unavailable pins are SQL 0013
+ALTER SEQUENCE (`e02c3cdfe5c1bfac9f7043b6387acec421c8c069553bbeff2d1a9d13c247d163`),
+SQL 0049 CREATE STOGROUP (`b46b9b521a329df85aa35f24b6015f84fe60c51cb1e8ba25349bc272004be4c5`),
+and SQL 0127 SET CURRENT APPLICATION ENCODING SCHEME
+(`cf5be34926528b6653fde14d0ff6a42a8069b959168d1a7f7f2bf99211de030c`).
+Availability is not semantic review, full-catalog freeze or execution evidence.
+The historical 27-topic and numeric-constants blockers below describe the
+recovered candidate, not the current source set. The current numeric-constants
+introduction (`bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8`)
+was verified and read locally; lifting existing parser fences requires a later
+declared, tested slice. No network refresh was performed.
+
+After worker seals, the manager owns these separate public integration slices:
+
+| Slice | Exact boundary and acceptance |
+|---|---|
+| `DB2-1201.second-wave-syntax-surface` | Export the three owned INSERT VALUES / CREATE INDEX / CREATE VIEW APIs through `lib.rs`; add `tests/second_wave_syntax.rs`, one unique changelog fragment, provider README and progress/derived documentation. Preserve the worker rejection/bounds/span obligations above; test public callers and combined package behavior. No statement dispatch, catalog/backend mutation, SQLCA or whole-row credit. |
+| `DB2-1202.qualification-surface` | Export the owned qualification candidate/context/error APIs through `lib.rs`; add `tests/schema_qualification.rs`, one unique changelog fragment, provider README and progress/derived documentation. Test public static/dynamic contexts and unresolved synonym/catalog behavior. No catalog lookup, privilege decision, execution or statement-row credit. |
+
+Both consume the sealed worker kernels without changing their IBM semantics.
+They are pure public library surfaces, so backend/durability, authorization,
+recovery and licensed execution remain outside their acceptance claims rather
+than being marked passed. Focused public/package regressions, formatting, Rust
+1.95 compatibility, catalog/changelog/docs checks, dependency policy and exact
+feature seals apply. The user confirmed no licensed Db2 13 environment is
+available; implementation continues with differential explicitly pending.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
