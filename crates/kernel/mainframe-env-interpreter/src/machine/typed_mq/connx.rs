@@ -17,10 +17,10 @@ pub struct MqMqiConnxProfile {
 const MAX_CNO_CAPACITY: usize = 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Storage {
-    layout: LayoutMetadata,
-    view: StorageView,
-    bytes: Vec<u8>,
+pub(super) struct Storage {
+    pub(super) layout: LayoutMetadata,
+    pub(super) view: StorageView,
+    pub(super) bytes: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -85,7 +85,7 @@ impl State {
 }
 
 impl ReferenceMachine {
-    fn connx_storage(&self, name: &str) -> Result<Storage, MachineProblem> {
+    pub(super) fn connx_storage(&self, name: &str) -> Result<Storage, MachineProblem> {
         let layout = self
             .layout(name)
             .cloned()
@@ -285,6 +285,7 @@ impl ReferenceMachine {
                     arguments,
                     members,
                 }),
+                connect: None,
             },
         ))
     }

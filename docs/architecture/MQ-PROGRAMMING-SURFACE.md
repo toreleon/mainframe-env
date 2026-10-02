@@ -137,8 +137,21 @@ All input bytes, including CNO Options and suffix, are retained unchanged.
 Captured layouts, views and bytes are rechecked before a preencoded bounded
 atomic output batch. Only a usable provider-issued opaque token installs an
 existing ABI alias. Failed reviewed status preserves undefined HCONN bytes.
-Unrepresented warning/handle output, including ALREADY_CONNECTED, remains
-protected Unknown until its existing host-result owner adds the required shape.
+Both compiled CONN and CONNX also copy the existing source-reviewed
+WARNING/ALREADY_CONNECTED plus Connected shape as exact application CC/RC
+1/2002. Only a nonhistorical provider-issued token can install an ABI alias;
+an already-observed exact token reuses its alias. A child's first observation
+does not allocate a connection or decide a UOW: its trusted provider alone
+attests the prior live handle. Status-only warnings, special/historical handles
+and other warning/failure output forms remain protected Unknown. The original
+reviewed result and canonical identity are retained without OK normalization.
+CONN now captures all four compiled argument layouts, views and bytes, checks
+input/output overlaps, contains profile callbacks and rechecks the entire
+capture before one preencoded atomic write batch. CONNX retains all five ranges,
+the frozen independently selected ABI/profile and its final callback recheck.
+Neither route writes undefined failed HCONN or fabricates conditional Options.
+This warning rule is MQCONN row0008 q101760_ usage271/failed273 and MQCONNX
+row0009 q101770_ return76–78/failed41–42 under the original baseline above.
 No profile/options grant SAF, lifecycle or UOW authority; no conditional Options
 output is fabricated. Sources are original row0009 q101770_ (signature8–18,
 scope26–66), MQCONN row0008 q101760_ (manager14–46), and the supplemental

@@ -13,6 +13,7 @@ use mainframe_env_host_api::{
 };
 use std::sync::Arc;
 
+mod connection_writeback;
 mod connx;
 pub use connx::MqMqiConnxProfile;
 
@@ -69,6 +70,7 @@ pub(super) struct Targets {
     disconnected: Option<i32>,
     unit: Option<u64>,
     connx: Option<connx::Capture>,
+    connect: Option<connection_writeback::Capture>,
 }
 
 pub(super) fn is_call(program: &str) -> bool {
@@ -121,7 +123,7 @@ impl ReferenceMachine {
         let call = args.first().ok_or(MachineProblem::InvalidOperation)?;
         let call = normalize(call.trim_matches(['\'', '"']));
         let state = self.mqi.as_ref().ok_or(MachineProblem::UnsupportedForm)?;
-        let profile = if call == "MQCONNX" {
+        let profile = if matches!(call.as_str(), "MQCONN" | "MQCONNX") {
             connx::contained(|| state.current(&self.invocation))?
         } else {
             state.current(&self.invocation)?
@@ -155,7 +157,8 @@ impl ReferenceMachine {
                 self.mq_long_target(&parameters[1])?;
                 self.mq_long_target(&parameters[2])?;
                 self.mq_long_target(&parameters[3])?;
-                self.mq_output_aliases(&parameters[1..])?;
+                self.mq_output_aliases(&parameters)?;
+                let capture = self.capture_connect(&parameters)?;
                 if state.connections.len() >= MQ_MAX_HANDLE_SLOTS
                     || state.next_connection == i32::MAX
                 {
@@ -190,6 +193,7 @@ impl ReferenceMachine {
                         disconnected: None,
                         unit: None,
                         connx: None,
+                        connect: Some(capture),
                     },
                 )
             }
@@ -220,6 +224,7 @@ impl ReferenceMachine {
                         disconnected: Some(wire),
                         unit: None,
                         connx: None,
+                        connect: None,
                     },
                 )
             }
@@ -271,6 +276,7 @@ impl ReferenceMachine {
                         disconnected: None,
                         unit: Some(unit),
                         connx: None,
+                        connect: None,
                     },
                 )
             }
@@ -278,6 +284,9 @@ impl ReferenceMachine {
         };
         if let Some(capture) = &targets.connx {
             self.recheck_connx(capture)?;
+        }
+        if let Some(capture) = &targets.connect {
+            self.recheck_connect(capture)?;
         }
         let connx_profile = targets.connx.as_ref().map(|capture| capture.profile);
         let step = self.effect(
@@ -354,6 +363,9 @@ impl ReferenceMachine {
         let profile = if let Some(capture) = &targets.connx {
             self.recheck_connx(capture)?;
             connx::contained(|| state.current(&self.invocation))?
+        } else if let Some(capture) = &targets.connect {
+            self.recheck_connect(capture)?;
+            connx::contained(|| state.current(&self.invocation))?
         } else {
             state.current(&self.invocation)?
         };
@@ -378,6 +390,23 @@ impl ReferenceMachine {
             other => other,
         };
         let (completion, reason, connection, completed) = match outcome {
+            MqMqiOutcome::ReviewedOutput {
+                status,
+                output: MqMqiOutput::Connected(connection @ MqHconn::Issued(_)),
+            } if matches!(
+                targets.call,
+                MqMqiCall::Connect | MqMqiCall::ConnectExtended
+            ) && status.completion()
+                == mainframe_env_host_api::mq_status::MqCompletion::Warning
+                && status.reason_symbol() == "MQRC_ALREADY_CONNECTED"
+                && !connection.is_historical() =>
+            {
+                // The provider attests the prior live connection. This machine
+                // records only an ABI alias, even on a child's first observation.
+                // Preserve the original reviewed warning; never map it to OK.
+                let (completion, reason) = status.wire_pair();
+                (completion, reason, Some(connection), true)
+            }
             MqMqiOutcome::Completed {
                 status: MqMqiStatus::OkNone,
                 output,
@@ -458,10 +487,12 @@ impl ReferenceMachine {
         } else {
             None
         };
-        // CONNX uses captured compiled views and one preflighted bounded batch.
-        // The established routes retain their exact writeback behavior.
+        // Connection calls use captured compiled views and a bounded atomic
+        // batch. DISC/CMIT/BACK retain their established writeback behavior.
         if let Some(capture) = &targets.connx {
             self.write_connx(capture, &targets, wire, completion, reason)?;
+        } else if let Some(capture) = &targets.connect {
+            self.write_connect(capture, &targets, wire, completion, reason)?;
         } else {
             // Preflight *all* writebacks before changing any application storage.
             for target in [&targets.connection, &targets.completion, &targets.reason] {

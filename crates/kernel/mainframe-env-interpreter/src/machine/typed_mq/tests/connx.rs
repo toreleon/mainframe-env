@@ -5,6 +5,8 @@ use mainframe_env_host_api::mq_raw_layout::{
 use mainframe_env_host_api::mq_status::MqReviewedStatus;
 use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize};
 
+mod connection_warning;
+
 struct ConnxFrame {
     frame: Frame,
     mode: AtomicU8,
@@ -12,6 +14,8 @@ struct ConnxFrame {
     change_at: AtomicUsize,
     context_change: AtomicBool,
     panic_profile: AtomicBool,
+    profile_lookups: AtomicUsize,
+    profile_refuse_at: AtomicUsize,
     connection: MqHconn,
     unit: AtomicU64,
 }
@@ -26,6 +30,11 @@ fn ordinary() -> MqMqiConnxProfile {
 }
 impl MqMqiProgramFrame for ConnxFrame {
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
+        if self.profile_lookups.fetch_add(1, Ordering::SeqCst) + 1
+            >= self.profile_refuse_at.load(Ordering::SeqCst)
+        {
+            return Err(HostProblem::Unsupported);
+        }
         assert!(
             !self.panic_profile.load(Ordering::SeqCst),
             "fixture profile panic"
@@ -106,6 +115,8 @@ fn bind_fixture(
         change_at: AtomicUsize::new(usize::MAX),
         context_change: AtomicBool::new(false),
         panic_profile: AtomicBool::new(false),
+        profile_lookups: AtomicUsize::new(0),
+        profile_refuse_at: AtomicUsize::new(usize::MAX),
         connection: issued(),
         unit: AtomicU64::new(31),
     });
@@ -524,7 +535,7 @@ fn failed_connx_preserves_undefined_handle_and_exact_reviewed_status() {
 }
 
 #[test]
-fn exact_issued_token_reuses_alias_but_unrepresented_warning_output_is_unknown() {
+fn exact_issued_token_reuses_alias_and_preserves_reviewed_warning_output() {
     let (mut machine, frame) = fixture(true);
     let e = connx(&mut machine).unwrap();
     reply(&mut machine, &e, success(frame.connection)).unwrap();
@@ -533,7 +544,6 @@ fn exact_issued_token_reuses_alias_but_unrepresented_warning_output_is_unknown()
     assert_eq!(machine.mqi.as_ref().unwrap().connections.len(), 1);
     assert_eq!(machine.mqi.as_ref().unwrap().next_connection, 2);
     let e = connx(&mut machine).unwrap();
-    let before = outputs(&machine);
     assert_eq!(
         reply(
             &mut machine,
@@ -547,12 +557,11 @@ fn exact_issued_token_reuses_alias_but_unrepresented_warning_output_is_unknown()
                 output: MqMqiOutput::Connected(frame.connection),
             },
         ),
-        Err(MachineProblem::Host(HostProblem::UnknownOutcome))
+        Ok(())
     );
-    assert_eq!(outputs(&machine), before);
     assert_eq!(machine.decimal("HCONN").unwrap().coefficient, 1);
-    assert_eq!(machine.decimal("CC").unwrap().coefficient, 0);
-    assert_eq!(machine.decimal("REASON").unwrap().coefficient, 0);
+    assert_eq!(machine.decimal("CC").unwrap().coefficient, 1);
+    assert_eq!(machine.decimal("REASON").unwrap().coefficient, 2002);
     assert_eq!(machine.mqi.as_ref().unwrap().connections.len(), 1);
     assert_eq!(machine.mqi.as_ref().unwrap().next_connection, 2);
 }
