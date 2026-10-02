@@ -172,6 +172,35 @@ changelog gates plus exact-path seals. A new module must stay below 1200
 production lines. Unchanged global architecture/source blockers are reported,
 not retried without new evidence. Public integration follows separate seals.
 
+The FETCH source's target-variable description also requires that a target not
+appear more than once in INTO (verified topic line 454). The syntax kernel
+rejects exact repeated primary host-target spelling; host-language aliases and
+case-equivalent targets require later binding. Repeated OPEN input references
+remain legal. Neither check infers scalar/structure identity from a name.
+
+Before integration, the manager declares these independent public slices:
+
+| Slice | Manager-owned boundary and required checks |
+|---|---|
+| `DB2-1201.third-wave-syntax-surface` | Export DELETE, UPDATE and OPEN/FETCH owned syntax APIs in `lib.rs`; add `tests/third_wave_syntax.rs`, `changes/unreleased/db2-third-wave-syntax-surface.toml`, provider README and status/derived docs. Public checks cover owned names/expressions/host operands, original spans, valid predicate composition, duplicate assignments/targets, aggregate bounds and the declared rejections. No shared statement dispatcher or durable host-route change. |
+| `DB2-1202.numeric-constant-type-surface` | Export the bounded numeric constant classifier, existing-type wrapper, limits and fixed located errors in `lib.rs`; add `tests/numeric_constants.rs`, `changes/unreleased/db2-numeric-constant-type-surface.toml`, provider README and status/derived docs. Public checks cover signed INTEGER/BIGINT range boundaries, exact DECIMAL precision/scale, source/spelling/span limits and explicit deferred forms. No lexer-fence lifting, evaluation, conversion or expression binding. |
+
+Each consumes only reviewed sealed kernels, runs affected public/package
+regressions plus formatting, Rust 1.95, catalog/changelog/docs and exact-path
+seal checks, and commits before the other integration slice begins. Dependency
+policy is reused only when its exact inputs are unchanged. Backend, recovery,
+authorization and licensed claims remain absent for these pure library routes.
+
+Catalog inspection confirms that the accepted application catalog v1 owns
+`max_bytes`, Raw/Varchar result framing, defaults and nullability, but no exact
+SQL scalar type/precision/scale/CCSID/collation. Its legacy host-name matching
+also differs from owned SQL identifier identity. A later binder must not infer
+SQL types from byte layout or treat legacy normalized names as equivalent to
+all SQL identifiers. Typed catalog evolution must retain the existing package,
+generation selection and persistence authority with explicit versioned metadata
+and compatibility tests; no parallel catalog or private executor is introduced
+by this wave. That boundary is not yet implemented or accepted.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
