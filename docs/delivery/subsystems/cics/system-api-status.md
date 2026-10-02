@@ -2027,3 +2027,31 @@ Monitoring source integration passes28 generator regressions,eight IR regression
 and the actual Draft202012 monitoring/control instance gate. Private source
 projection now has49 command rows,1126 operands and1402 case candidates.
 All runtime/application/selected-route/recovery/licensed gates remain pending.
+
+### Serialized CSD source-contract integration
+
+SPI-1001.spi-csd-source-contracts integrates the two declared CSD families after
+complete producer repair and independent review. Baseline SSJL4D_6.x, official
+SPI catalog rows retained in each command, and hash-verified dfha8_csd_* bodies
+bound the definition and browse contracts; dfha80x and dfhp4_argumentvalues
+provide fullword CVDA and language argument context. All 25 rows, 443 union
+operands, 250 response clauses and 475 case identities remain source-only.
+
+The reviewed corrections isolate INSTALL list/resource selectors, LOCK/UNLOCK
+and INQUIREGROUP namespaces, per-command lock ownership and protected targets,
+COPY duplicates, exact syntax citations and fullword CVDA width. Undefined
+character validation and CVDA numeric domains remain explicit pending gaps.
+The nine appended CVDA gap notes and fourteen width changes are independently
+counted; the producer report's earlier eleven-note prose is corrected only in
+external provenance-preserving copies. Existing staged worker drafts were not
+used. All 352 property changes reverse to the complete frozen originals; 49
+cases change and 426 cases are identical. Source-reference credit is zero.
+
+Administrative compiler admission and all runtime, authorization, recovery,
+selected-route and licensed acceptance gates remain pending. No CSD handler,
+resource mutation, alternate grammar or route is enabled by this integration.
+
+CSD source integration passes 28 generator regressions, eight IR regressions
+and both actual Draft202012 family instance gates. Private source projection
+now has 74 command rows, 1569 operands and 1877 case candidates. All runtime,
+application, selected-route, recovery and licensed gates remain pending.

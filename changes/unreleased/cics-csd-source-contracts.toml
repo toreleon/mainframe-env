@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Retain private source-bounded CSD definition and browse contracts with isolated pending fixtures and unchanged administrative admission."
