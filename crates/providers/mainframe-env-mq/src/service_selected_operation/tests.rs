@@ -12,6 +12,8 @@ mod bounds;
 mod connection_warning;
 #[path = "tests/failures.rs"]
 mod failures;
+#[path = "tests/full_get.rs"]
+mod full_get;
 #[path = "tests/historical.rs"]
 mod historical;
 #[path = "tests/restart.rs"]

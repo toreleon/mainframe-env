@@ -250,6 +250,18 @@ Issued handle outputs decode only to historical observations, and symbolic
 Default/Unassociated reconstruction is still refused. Every older storage kind
 and byte representation stays unchanged; older readers reject this new kind.
 
+The private ordinary z/OS selected complete GET profile admits only empty
+structured properties and stored BackoutCount values from zero through 255.
+The input GET descriptor counter is ignored/output-only. Exact full storage and
+replay continue to preserve arbitrary signed observations and ordered properties;
+their representability does not authorize native GMO/RFH2/property behavior.
+An original selected local BACK uses the explicit live z/OS kernel candidate to
+increment removed syncpoint complete messages once, capped at 255, under current
+logical ownership, mandatory SAF and the existing atomic audited publication.
+CMIT, partial payloads and storage-only/cold backout policy remain unchanged.
+Only known physical success adopts; retained Unknown decisions never authorize
+redispatch or recount. This is not HardenGetBackout, task-end or crash accuracy.
+
 A delivery-owned facade shares the original strict message/property projection.
 It records persistence, expiry and priority explicitly and restores them exactly,
 including nonpersistent and abstract pending/default values. Its neutral inner

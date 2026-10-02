@@ -305,6 +305,8 @@ impl MqService {
                     owner,
                     &admitted.envelope.request,
                     &mut reply,
+                    invocation,
+                    &**authorizer,
                 )?;
                 let resolved = admitted.preflight_result(&reply, clock.now_tick()?)?;
                 if resolved.host_result_digest != stored.value.result_digest {
@@ -343,6 +345,29 @@ impl MqService {
                         .publish(decision_tick)
                         .map_err(intent_error)?;
                     return Err(HostProblem::Unauthorized);
+                }
+                Err(
+                    error @ (HostProblem::ProviderFailure | HostProblem::InfrastructureFailure),
+                ) if matches!(admitted.envelope.request, MqMqiRequest::FullGet(_)) => {
+                    // This finite prepare error occurred before any complete
+                    // delivery candidate could be published. Use the SAME bound
+                    // original intent, never a sequential audit fallback.
+                    let decision = if error == HostProblem::ProviderFailure {
+                        AuditDecision::ProviderFailure
+                    } else {
+                        AuditDecision::InfrastructureFailure
+                    };
+                    let decision_tick = clock.now_tick()?;
+                    binding
+                        .prepare(
+                            audit(admitted, decision_tick, decision),
+                            Vec::new(),
+                            decision_tick,
+                        )
+                        .map_err(intent_error)?
+                        .publish(decision_tick)
+                        .map_err(intent_error)?;
+                    return Err(error);
                 }
                 Err(error) => return Err(error),
             };

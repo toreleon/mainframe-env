@@ -10,6 +10,8 @@ use mainframe_env_host_api::{
 
 #[path = "transition/connection_warning.rs"]
 mod connection_warning;
+#[path = "transition/full_get.rs"]
+mod full_get;
 
 #[derive(Clone)]
 pub(super) struct ConnectionBinding {
@@ -93,6 +95,7 @@ pub(super) fn prepare(
         | MqMqiRequest::Back { connection, .. }
         | MqMqiRequest::Disconnect { connection } => Some(*connection),
         MqMqiRequest::Get(get) => Some(get.connection),
+        MqMqiRequest::FullGet(get) => Some(get.connection),
         MqMqiRequest::Close(close) => Some(close.connection()),
         _ => None,
     };
@@ -135,6 +138,14 @@ pub(super) fn prepare(
             // occurrence plus existing control/UOW/catalog/marker dependencies.
             return Ok(next);
         }
+    }
+    if let MqMqiRequest::FullGet(get) = request {
+        // Complete profile/payload preflight occurs before clock, pending or
+        // cursor changes can become a publication candidate.
+        full_get::prepare(
+            state, runtime, invocation, logical, owner, get, now, authorizer, &mut next,
+        )?;
+        return Ok(next);
     }
     // Actual clock expiry changes only the candidate, never the current queues.
     next.delivery.advance_tick(now).map_err(delivery_error)?;
@@ -326,6 +337,11 @@ pub(super) fn prepare(
             ) {
                 let outcome = if commit {
                     next.delivery.commit(*unit)
+                } else if owner.environment == MqHostEnvironment::ZosBatch {
+                    // Actual original ordinary batch admission and current
+                    // logical unit/SAF checks above precede this live policy.
+                    // No cold/task-end/HardenGetBackout inference is permitted.
+                    next.delivery.backout_complete_zos(*unit)
                 } else {
                     next.delivery.backout(*unit)
                 }
@@ -678,11 +694,16 @@ pub(super) fn resolve_reply(
     owner: MqHandleOwner,
     request: &MqMqiRequest,
     reply: &mut EffectResult,
+    invocation: &Invocation,
+    authorizer: &dyn EnterpriseAuthorizer,
 ) -> Result<(), HostProblem> {
     let Ok(HostResult::MqMqi(reply)) = &mut reply.outcome else {
         return Err(HostProblem::UnknownOutcome);
     };
     match (&mut reply.result.outcome, request) {
+        (_, MqMqiRequest::FullGet(get)) => {
+            full_get::require_replay(state, runtime, logical, owner, get, invocation, authorizer)
+        }
         (
             MqMqiOutcome::Completed {
                 output: MqMqiOutput::Connected(connection),

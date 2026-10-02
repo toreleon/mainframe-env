@@ -360,11 +360,19 @@ fn pending_form(
             })
     };
     match request {
-        // Complete-message execution requires rich delivery integration; never
-        // route a new descriptor through the legacy partial delivery authority.
-        R::FullGet(_) | R::FullPut { .. } | R::FullPutOne { .. } => {
-            Some(P::StructureAndWireMapping)
-        }
+        // Full GET has one finite private selected profile. ContractDefault is
+        // kernel intent, NEVER evidence for arbitrary native MQGMO option bits.
+        R::FullGet(value) => options(value.options)
+            .or_else(|| unit(value.unit))
+            .or_else(|| {
+                (environment != MqHostEnvironment::ZosBatch
+                    || coordinator != MqSyncpointOwner::QueueManager
+                    || value.message_handle.is_some()
+                    || value.wait != mainframe_env_host_api::MqWait::NoWait
+                    || value.mode != mainframe_env_host_api::MqGetMode::Remove)
+                    .then_some(P::StructureAndWireMapping)
+            }),
+        R::FullPut { .. } | R::FullPutOne { .. } => Some(P::StructureAndWireMapping),
         R::Connect(value) | R::ConnectExtended(value) => options(value.options),
         // MQBEGIN's source global-coordination semantics are not the private
         // delivery kernel's local begin. Its participant mapping stays pending.

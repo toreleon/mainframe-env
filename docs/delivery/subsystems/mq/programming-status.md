@@ -6,6 +6,35 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.selected-full-get` consumes source-repaired sealed worker `b52553af6`
+on top of the live backout prerequisite. The private ordinary ZosBatch selected
+service now composes complete MD1/2, copied prefix, DataLength and exact reviewed
+GET status with actual held input object, current local unit, original core,
+mandatory SAF and the single physical audited receipt publication. Removed
+local GETs followed by original BACK increment stored counts once up to255;
+cached identical BACK does not recount. Invalid stored counts or nonempty
+structured properties refuse before adoption; the input GET counter remains
+ignored/output-only. CMIT/partial payloads and old storage/cold policies stay
+exact. The finite profile is unformatted, ungrouped Remove/NoWait; broader
+GMO/RFH2/property/conversion/wait/browse semantics are not inferred.
+Manager source review also corrects seeded stored GET CCSIDs to explicit37/819:
+`q097395_946–951` forbids returning the queue-manager sentinel zero. These are
+opaque input fixtures, not a PUT/context/default/CCSID-conversion producer.
+Independent checks bind14 worker paths,120 final tested inputs,57 frozen
+receipts and seven unique source pins. Worker131 focused passes retain exact
+worker/input identities. After the manager fixture correction, fresh composed
+checks pass 86 selected-service and 34 admission tests (120 total, zero ignored),
+13 policy tests, actual guards/four mutants, module953, fmt/docs/changelog and
+whitespace. Unchanged contract and dependency inputs reuse their exact earlier
+passes; no new global API, dependency-policy or CI run is claimed.
+Original baseline MQBACK/MQGET rows0001/0015 and supplemental MD/GMO topics
+define the source boundary, with zero official/source execution credit.
+Only known physical success adopts; late CAS/controls/quota errors preserve
+pending authority and postpersist Unknown retains/fences without redispatch.
+SQLite committed-counter reopen proves persistence, not HardenGetBackout crash
+accuracy or handle resurrection. Full PUT/PUT1, native/installed complete
+delivery, root/task-end/recovery, participant, CardDemo and all26 remain required.
+
 `MQ-1501.recovery-source-pins` consumes sealed worker `95ad8e9d4` and registers
 exactly one independent zero-credit source: HardenGetBackout `q103230_`, baseline
 `ibm-mq-9.4-recovery-policy-sources-2026-09-12`. Exact archive metadata, pinned
