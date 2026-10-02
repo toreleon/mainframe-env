@@ -201,6 +201,19 @@ generation selection and persistence authority with explicit versioned metadata
 and compatibility tests; no parallel catalog or private executor is introduced
 by this wave. That boundary is not yet implemented or accepted.
 
+The four third-wave kernels have now passed isolated review and were integrated
+as separate sealed feature commits. Their package checks, source identities
+and receipts do not establish execution or full-row recognition. The public
+numeric slice adds four integration regressions for signed range boundaries,
+precision/scale, owned results, UTF-8/CRLF locations, bounded failures and
+deferred forms while leaving shared lexer fences unchanged. Its pinned sources
+are `db2z_constantsintro.html` (17915 bytes,
+`bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8`)
+and `db2z_datatypesintro.html` (22904 bytes,
+`a488006755eedd9ef58da3ba8ef9f304a3d79c3910cc39da637dda1f3c38f570`),
+under the same Db2 13 baseline. These language elements have no independent
+statement-catalog row. Licensed differential remains pending by user direction.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

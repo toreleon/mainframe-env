@@ -57,6 +57,10 @@ pub use name_resolution::{
     Db2QualificationOrigin, Db2QualificationRequest, Db2QualificationStatus, Db2QualificationUse,
     Db2SynonymCheck, qualify_db2_name,
 };
+pub use numeric_constant_types::{
+    Db2NumericConstantError, Db2NumericConstantErrorCode, Db2NumericConstantLimits,
+    Db2NumericConstantType, classify_db2_numeric_constant,
+};
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, Db2ReplayDependency,

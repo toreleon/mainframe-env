@@ -117,3 +117,10 @@ decodes quoted-name escapes; inherited literal escape text, SELECT's compiled
 raw-name ceiling and CAST's first-component limitation remain explicit. Catalog
 validity, CHECK applicability, binding, execution and whole-row credit remain
 pending; none of these APIs changes the durable SQL route.
+
+The pure numeric-constant classifier accepts one located signed or unsigned
+INTEGER/BIGINT/DECIMAL spelling from bounded original UTF-8 source. It returns
+the existing resolved type with NOT NULL, exact decimal precision/scale and
+verified byte/line/column endpoints. Fixed errors distinguish invalid input
+from deferred exponent/special/comma/long-integer forms. It performs no numeric
+evaluation, conversion or expression binding, and does not lift lexer fences.
