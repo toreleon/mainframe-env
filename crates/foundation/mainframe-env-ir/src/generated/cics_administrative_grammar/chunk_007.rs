@@ -673,6 +673,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "SWITCHSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "OPENSTATUS", values: &["CLOSED", "OPEN"] },
+            CicsApplicationCvdaDomain { option: "SWITCHSTATUS", values: &["NOSWITCH", "SWITCHALL", "SWITCHNEXT"] },
         ],
         cvda_numeric_domains: &[
         ],

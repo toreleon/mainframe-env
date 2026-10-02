@@ -1704,6 +1704,88 @@
             ],
             "required": true
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ASYNCSERVICE",
+              "ATOMSERVICE",
+              "BUNDLE",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DISPATCHER",
+              "DOCTEMPLATE",
+              "ENQUEUE",
+              "EPADAPTER",
+              "EVENTBINDING",
+              "EVENTPROCESS",
+              "FILE",
+              "IPCONN",
+              "JOURNALNAME",
+              "JVMPROGRAM",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MONITOR",
+              "MQCONN",
+              "MQMONITOR",
+              "MVSTCB",
+              "PIPELINE",
+              "POLICY",
+              "PROGAUTO",
+              "PROGRAM",
+              "PROGRAMDEF",
+              "RECOVERY",
+              "SECURITY",
+              "STATS",
+              "STORAGE",
+              "STREAMNAME",
+              "SUBPOOL",
+              "SYSDUMPCODE",
+              "TASKSUBPOOL",
+              "TCPIP",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TRANCLASS",
+              "TRANDUMPCODE",
+              "TRANSACTION",
+              "TSQUEUE",
+              "URIMAP",
+              "USER",
+              "WEBSERVICE",
+              "XMLTRANSFORM"
+            ],
+            "source_lines": [
+              469,
+              470,
+              471,
+              522,
+              525,
+              539,
+              543,
+              545,
+              551,
+              563,
+              571,
+              577,
+              600,
+              602
+            ]
+          },
+          {
+            "option": "SUBRESTYPE",
+            "values": [
+              "CAPTURESPEC",
+              "POLICYRULE"
+            ],
+            "source_lines": [
+              617,
+              620,
+              623,
+              625
+            ]
+          }
         ]
       },
       "responses": [
@@ -3544,7 +3626,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "Body Table1 includes NODEJSAPP but the detailed RESTYPE list omits its definition. NOTFND/2 gives FEPI POOL/NODE examples despite explicit EXTRACT exclusion of FEPI forms; retain this contradiction, not accepted POOL/NODE grammar. Numeric widths for RESIDLEN/SUBRESIDLEN and pointer output are unstated. RESID character declaration conflicts with type-specific binary/packed/address forms; structured variant shape remains pending. Unpinned statistics intro/storage-subpool/layout contexts are listed externally; no byte-level DSECT claim."
+        "Body Table1 includes NODEJSAPP but the detailed RESTYPE list omits its definition. NOTFND/2 gives FEPI POOL/NODE examples despite explicit EXTRACT exclusion of FEPI forms; retain this contradiction, not accepted POOL/NODE grammar. Numeric widths for RESIDLEN/SUBRESIDLEN and pointer output are unstated. RESID character declaration conflicts with type-specific binary/packed/address forms; structured variant shape remains pending. Unpinned statistics intro/storage-subpool/layout contexts are listed externally; no byte-level DSECT claim.",
+        "EXTRACT finite RESTYPE/SUBRESTYPE membership is metadata only. Exact resource-specific versus global selector combinations and private/public application resolution still require Table1 and option-qualified binding; this domain does not make every RESID/SUBRESID combination admissible. POLICY/POLICYRULE pairing and optional CAPTURESPEC have different source scopes; complete selector/receiver ABI and unregistered linked contexts remain Pending. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_extractstatistics.html; sha256:fdda41d6613406ad054b0ed581469ba26359b010ba6e6eb0902050a0ea52be4c; parser 74-414,469-625.]"
       ]
     },
     {
@@ -3639,7 +3722,37 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "OPENSTATUS",
+            "values": [
+              "CLOSED",
+              "OPEN"
+            ],
+            "source_lines": [
+              41,
+              44,
+              47,
+              49
+            ]
+          },
+          {
+            "option": "SWITCHSTATUS",
+            "values": [
+              "NOSWITCH",
+              "SWITCHALL",
+              "SWITCHNEXT"
+            ],
+            "source_lines": [
+              50,
+              54,
+              56,
+              61,
+              64
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -4085,7 +4198,152 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "APPLNAMEST",
+            "values": [
+              "APPLNAME",
+              "NOAPPLNAME"
+            ],
+            "source_lines": [
+              41,
+              45,
+              48,
+              50
+            ]
+          },
+          {
+            "option": "COMPRESSST",
+            "values": [
+              "COMPRESS",
+              "NOCOMPRESS"
+            ],
+            "source_lines": [
+              51,
+              56,
+              59,
+              60
+            ]
+          },
+          {
+            "option": "CONVERSEST",
+            "values": [
+              "CONVERSE",
+              "NOCONVERSE"
+            ],
+            "source_lines": [
+              61,
+              66,
+              73,
+              76
+            ]
+          },
+          {
+            "option": "EXCEPTCLASS",
+            "values": [
+              "EXCEPT",
+              "NOEXCEPT"
+            ],
+            "source_lines": [
+              81,
+              85,
+              87,
+              88
+            ]
+          },
+          {
+            "option": "IDNTYCLASS",
+            "values": [
+              "IDNTY",
+              "NOIDNTY"
+            ],
+            "source_lines": [
+              120,
+              124,
+              126,
+              127
+            ]
+          },
+          {
+            "option": "PERFCLASS",
+            "values": [
+              "NOPERF",
+              "PERF"
+            ],
+            "source_lines": [
+              128,
+              132,
+              134,
+              135
+            ]
+          },
+          {
+            "option": "RESRCECLASS",
+            "values": [
+              "NORESRCE",
+              "RESRCE"
+            ],
+            "source_lines": [
+              136,
+              141,
+              143,
+              144
+            ]
+          },
+          {
+            "option": "RMIST",
+            "values": [
+              "NORMI",
+              "RMI"
+            ],
+            "source_lines": [
+              145,
+              150,
+              153,
+              155
+            ]
+          },
+          {
+            "option": "STATUS",
+            "values": [
+              "OFF",
+              "ON"
+            ],
+            "source_lines": [
+              156,
+              160,
+              164,
+              167
+            ]
+          },
+          {
+            "option": "SYNCPOINTST",
+            "values": [
+              "NOSYNCPOINT",
+              "SYNCPOINT"
+            ],
+            "source_lines": [
+              168,
+              177,
+              179,
+              180
+            ]
+          },
+          {
+            "option": "TIME",
+            "values": [
+              "GMT",
+              "LOCAL"
+            ],
+            "source_lines": [
+              181,
+              187,
+              189,
+              190
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -4367,7 +4625,22 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "TRACE",
+            "values": [
+              "NOOTELTRACE",
+              "OTELTRACE"
+            ],
+            "source_lines": [
+              29,
+              34,
+              38,
+              41
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -4523,7 +4796,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "Receiving TRACE and the invalid-CVDA condition conflict as to caller trigger. Keep output direction from returns and the exact condition candidate, with trigger fixture unresolved. Do not adopt SET semantics into INQUIRE."
+        "Receiving TRACE and the invalid-CVDA condition conflict as to caller trigger. Keep output direction from returns and the exact condition candidate, with trigger fixture unresolved. Do not adopt SET semantics into INQUIRE.",
+        "Finite TRACE membership does not settle service applicability beyond the body qualification CICS TS6.3 and CICS TS beta, or the inquiry returns-versus-invalid-CVDA trigger opposition. Exact transaction OTELPROP/OTELEMIT behavior and selected runtime admission remain Pending; no SET direction or all-TS6.x default is inferred. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireoteltrace.html; sha256:1701306cde27b77b00f696ed4f8870bfc06dd157d1626d8244b7f4d47f697315; parser 3-4,29-48.]"
       ]
     },
     {
@@ -4893,7 +5167,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "RECORDING description uses mutating verbs in this inquiry body (113-125), while command purpose is retrieval; preserve direction unresolved and symbolic domain. No ON/OFF input aliases are admitted by the INQUIRE diagram. Unpinned dfht3_stats_intro.html cannot supply reset layouts/defaults."
+        "RECORDING description uses mutating verbs in this inquiry body (113-125), while command purpose is retrieval; preserve direction unresolved and symbolic domain. No ON/OFF input aliases are admitted by the INQUIRE diagram. Unpinned dfht3_stats_intro.html cannot supply reset layouts/defaults.",
+        "No structured RECORDING CVDA domain is added: the OFF/ON list is finite, but this INQUIRE option paragraph uses mutating verbs and its existing direction remains unresolved. Sender/receiver role and exact service binding are Pending; SET STATISTICS semantics cannot repair that opposition by inference. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirestatistics.html; sha256:735951fd121970ce7bb59316c974fd3fc6e6010d29419335bd4eaa8f1fbda8af; parser 113-125.]"
       ]
     },
     {
@@ -5147,7 +5422,103 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DYNAMIC",
+              "OVERRIDE",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              49,
+              52,
+              54,
+              56,
+              58,
+              60,
+              62,
+              63
+            ]
+          },
+          {
+            "option": "DAEOPTION",
+            "values": [
+              "DAE",
+              "NODAE"
+            ],
+            "source_lines": [
+              80,
+              85,
+              87,
+              94
+            ]
+          },
+          {
+            "option": "DUMPSCOPE",
+            "values": [
+              "LOCAL",
+              "RELATED"
+            ],
+            "source_lines": [
+              105,
+              117,
+              119,
+              124
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "AUTOINSTALL",
+              "CREATESPI",
+              "CSDAPI",
+              "DYNAMIC",
+              "GRPLIST",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              125,
+              128,
+              130,
+              132,
+              135,
+              137,
+              139,
+              140
+            ]
+          },
+          {
+            "option": "SHUTOPTION",
+            "values": [
+              "NOSHUTDOWN",
+              "SHUTDOWN"
+            ],
+            "source_lines": [
+              154,
+              159,
+              162,
+              164
+            ]
+          },
+          {
+            "option": "SYSDUMPING",
+            "values": [
+              "NOSYSDUMP",
+              "SYSDUMP"
+            ],
+            "source_lines": [
+              168,
+              173,
+              175,
+              179
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -5516,7 +5887,65 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "AUXSTATUS",
+            "values": [
+              "AUXPAUSE",
+              "AUXSTART",
+              "AUXSTOP"
+            ],
+            "source_lines": [
+              28,
+              31,
+              36,
+              38,
+              39
+            ]
+          },
+          {
+            "option": "GTFSTATUS",
+            "values": [
+              "GTFSTART",
+              "GTFSTOP"
+            ],
+            "source_lines": [
+              49,
+              54,
+              56,
+              60
+            ]
+          },
+          {
+            "option": "INTSTATUS",
+            "values": [
+              "INTSTART",
+              "INTSTOP"
+            ],
+            "source_lines": [
+              61,
+              64,
+              66,
+              69
+            ]
+          },
+          {
+            "option": "SWITCHSTATUS",
+            "values": [
+              "NOSWITCH",
+              "SWITCHALL",
+              "SWITCHNEXT"
+            ],
+            "source_lines": [
+              70,
+              78,
+              80,
+              83,
+              85
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -5804,7 +6233,65 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "SINGLESTATUS",
+            "values": [
+              "SINGLEOFF",
+              "SINGLEON"
+            ],
+            "source_lines": [
+              30,
+              39,
+              41,
+              42
+            ]
+          },
+          {
+            "option": "SYSTEMSTATUS",
+            "values": [
+              "SYSTEMOFF",
+              "SYSTEMON"
+            ],
+            "source_lines": [
+              43,
+              53,
+              55,
+              56
+            ]
+          },
+          {
+            "option": "TCEXITSTATUS",
+            "values": [
+              "NOTAPPLIC",
+              "TCEXITALL",
+              "TCEXITNONE",
+              "TCEXITSYSTEM"
+            ],
+            "source_lines": [
+              57,
+              68,
+              71,
+              73,
+              75,
+              77
+            ]
+          },
+          {
+            "option": "USERSTATUS",
+            "values": [
+              "USEROFF",
+              "USERON"
+            ],
+            "source_lines": [
+              78,
+              86,
+              88,
+              89
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -5976,7 +6463,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "Supplemental trace context: ibm-cics-ts-6x-application-api-sources-a-2026-09-10, SSJL4D_6.x/troubleshooting/cics/dfhs13p.html sha256:b2ecbde185231d8a035f901976cfaba2cc308a07414df28c090cfe88cb1d9e49, parser149-168/179-198: exception traces always internal; traces differ from storage snapshots; CONFDATA can prevent sensitive data in trace/dumps. Exact CONFData/transaction/backend policy needs unpinned linked closure; no raw confidential audit retention is implied."
+        "Supplemental trace context: ibm-cics-ts-6x-application-api-sources-a-2026-09-10, SSJL4D_6.x/troubleshooting/cics/dfhs13p.html sha256:b2ecbde185231d8a035f901976cfaba2cc308a07414df28c090cfe88cb1d9e49, parser149-168/179-198: exception traces always internal; traces differ from storage snapshots; CONFDATA can prevent sensitive data in trace/dumps. Exact CONFData/transaction/backend policy needs unpinned linked closure; no raw confidential audit retention is implied.",
+        "The finite TCEXITSTATUS query domain includes NOTAPPLIC only for its Communications-Server-specific observation. Exact selected service binding and receiver observation remain Pending; SET TRACEFLAG TCEXITALLOFF is not an interchangeable query member, and the domain does not assert installed-service applicability. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretraceflag.html; sha256:3c644ebc17273ed2ccc0580327c76fb49acf8d388dc85f4b29d169cca8f32656; parser 57-77.]"
       ]
     },
     {
@@ -7346,6 +7834,21 @@
               "STANDARD"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "FLAGSET",
+            "values": [
+              "SPECIAL",
+              "STANDARD"
+            ],
+            "source_lines": [
+              266,
+              270,
+              273,
+              275
+            ]
           }
         ]
       },
@@ -9061,7 +9564,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "Asterisk table marks are metasyntactic subcomponent markers, not option-name characters. Component ID/keyword equivalence and receiver extents need structured manager mapping; @1 cannot distinguish identifiers from generic valued operands. Pinned SVG has a required FLAGSET/SPECIAL/STANDARD choice; no omitted selection is admitted. Component repetition has an optional path, but a no-component invocation usefulness/result remains a gap; no successful mutation is fabricated. Restart persistence for SET TRACETYPE is not stated and cannot be imported from TRACEFLAG/TRACEDEST. Exact component access errors/multi-option validation precedence and concurrent bitset coherence remain pending."
+        "Asterisk table marks are metasyntactic subcomponent markers, not option-name characters. Component ID/keyword equivalence and receiver extents need structured manager mapping; @1 cannot distinguish identifiers from generic valued operands. Pinned SVG has a required FLAGSET/SPECIAL/STANDARD choice; no omitted selection is admitted. Component repetition has an optional path, but a no-component invocation usefulness/result remains a gap; no successful mutation is fabricated. Restart persistence for SET TRACETYPE is not stated and cannot be imported from TRACEFLAG/TRACEDEST. Exact component access errors/multi-option validation precedence and concurrent bitset coherence remain pending.",
+        "Only FLAGSET receives a finite symbolic domain. Component keyword/ID receivers are trace-level bit strings, not closed CVDA value lists. Exact output storage extents, component accessibility/partial observations, and live receiver ABI remain Pending; SET fullword input width is not imported into these unresolved inquiry extents. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretracetype.html; sha256:d2767ad2b6fe3322e2e7b015e5123ce9823198e11ea16806cc352770b9494289; parser 24-46,266-293.]"
       ]
     },
     {
@@ -9297,7 +9801,103 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DYNAMIC",
+              "OVERRIDE",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              64,
+              67,
+              69,
+              71,
+              73,
+              75,
+              77,
+              78
+            ]
+          },
+          {
+            "option": "DUMPSCOPE",
+            "values": [
+              "LOCAL",
+              "RELATED"
+            ],
+            "source_lines": [
+              102,
+              118,
+              120,
+              125
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "AUTOINSTALL",
+              "CREATESPI",
+              "CSDAPI",
+              "DYNAMIC",
+              "GRPLIST",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              126,
+              129,
+              131,
+              133,
+              136,
+              138,
+              140,
+              141
+            ]
+          },
+          {
+            "option": "SHUTOPTION",
+            "values": [
+              "NOSHUTDOWN",
+              "SHUTDOWN"
+            ],
+            "source_lines": [
+              153,
+              158,
+              161,
+              163
+            ]
+          },
+          {
+            "option": "SYSDUMPING",
+            "values": [
+              "NOSYSDUMP",
+              "SYSDUMP"
+            ],
+            "source_lines": [
+              164,
+              171,
+              173,
+              174
+            ]
+          },
+          {
+            "option": "TRANDUMPING",
+            "values": [
+              "NOTRANDUMP",
+              "TRANDUMP"
+            ],
+            "source_lines": [
+              179,
+              184,
+              186,
+              187
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -9554,7 +10154,8 @@
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
         "Named selector is input; NEXT returns a code; @1 single direction cannot express both, so direction unresolved rather than globally output/input. Unpinned SSJL4D_6.x/system-programming/intro/dfha80w.html, security/audit/auditing-resource-signature.html and resourcesigtable.html leave browse ownership/direction/exclusions and signature defaults pending. ABSTIME width is not inferred from unrelated options.",
-        "Body CURRENT lines91-92 refers to SET SYSDUMPCODE RESET and INSTALLAGENT lines136-137 to SET SYSDUMPCODE ADD in a transaction-code inquiry. Preserve these cross-command references as a source discrepancy; SET TRANDUMPCODE body independently defines its RESET/ADD. Do not silently rewrite the cited authority."
+        "Body CURRENT lines91-92 refers to SET SYSDUMPCODE RESET and INSTALLAGENT lines136-137 to SET SYSDUMPCODE ADD in a transaction-code inquiry. Preserve these cross-command references as a source discrepancy; SET TRANDUMPCODE body independently defines its RESET/ADD. Do not silently rewrite the cited authority.",
+        "INSTALLAGENT DYNAMIC is an exact finite source member, but this INQUIRE TRANDUMPCODE paragraph describes SET SYSDUMPCODE ADD. Exact operation applicability for that observation remains Pending with the command-name opposition retained; membership does not silently substitute SET TRANDUMPCODE or resolve lifecycle precedence. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretrandumpcode.html; sha256:62f2989d3abbe9c7eecc0bac7a7f99a313fcb33716e965958e6f57c08dae8cb0; parser 126-141.]"
       ]
     },
     {
@@ -10343,7 +10944,39 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "OPENSTATUS",
+            "values": [
+              "CLOSED",
+              "OPEN",
+              "SWITCH"
+            ],
+            "source_lines": [
+              49,
+              52,
+              54,
+              56,
+              63
+            ]
+          },
+          {
+            "option": "SWITCHSTATUS",
+            "values": [
+              "NOSWITCH",
+              "SWITCHALL",
+              "SWITCHNEXT"
+            ],
+            "source_lines": [
+              64,
+              70,
+              72,
+              75,
+              77
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -11173,7 +11806,113 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "COMPRESSST",
+            "values": [
+              "COMPRESS",
+              "NOCOMPRESS"
+            ],
+            "source_lines": [
+              87,
+              97,
+              101,
+              103
+            ]
+          },
+          {
+            "option": "CONVERSEST",
+            "values": [
+              "CONVERSE",
+              "NOCONVERSE"
+            ],
+            "source_lines": [
+              104,
+              109,
+              115,
+              118
+            ]
+          },
+          {
+            "option": "EXCEPTCLASS",
+            "values": [
+              "EXCEPT",
+              "NOEXCEPT"
+            ],
+            "source_lines": [
+              124,
+              128,
+              130,
+              131
+            ]
+          },
+          {
+            "option": "IDNTYCLASS",
+            "values": [
+              "IDNTY",
+              "NOIDNTY"
+            ],
+            "source_lines": [
+              177,
+              181,
+              183,
+              184
+            ]
+          },
+          {
+            "option": "PERFCLASS",
+            "values": [
+              "NOPERF",
+              "PERF"
+            ],
+            "source_lines": [
+              185,
+              189,
+              191,
+              192
+            ]
+          },
+          {
+            "option": "RESRCECLASS",
+            "values": [
+              "NORESRCE",
+              "RESRCE"
+            ],
+            "source_lines": [
+              193,
+              197,
+              201,
+              205
+            ]
+          },
+          {
+            "option": "STATUS",
+            "values": [
+              "OFF",
+              "ON"
+            ],
+            "source_lines": [
+              206,
+              210,
+              213,
+              215
+            ]
+          },
+          {
+            "option": "SYNCPOINTST",
+            "values": [
+              "NOSYNCPOINT",
+              "SYNCPOINT"
+            ],
+            "source_lines": [
+              216,
+              225,
+              227,
+              228
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -12282,7 +13021,22 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "TRACE",
+            "values": [
+              "NOOTELTRACE",
+              "OTELTRACE"
+            ],
+            "source_lines": [
+              31,
+              34,
+              37,
+              40
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -12512,7 +13266,8 @@
         "Exact configured SAF classes/profile names and permission policy are unresolved unless explicitly stated below. Intent describes the request, not an IBM access-level grant. Use existing principal, capability and SAF owners; missing profiles and unavailable policy fail closed.",
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
-        "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability."
+        "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
+        "Finite TRACE membership preserves the body qualification CICS TS6.3 and CICS TS beta. Exact service/version binding, actual observation of the source-stated completed-task span flush and inflight-task span loss on enabling, and selected runtime telemetry delivery remain Pending; membership does not grant broader TS6.x applicability or an accepted transition. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setoteltrace.html; sha256:0cbdb6d7fd13f973134d19d0d8685592adbc38394297ab2e011ecc79dcc66e19; parser 3-4,24-40.]"
       ]
     },
     {
@@ -12718,7 +13473,22 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "RECORDING",
+            "values": [
+              "OFF",
+              "ON"
+            ],
+            "source_lines": [
+              114,
+              127,
+              129,
+              130
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -13605,7 +14375,76 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "ACTION",
+            "values": [
+              "ADD",
+              "REMOVE",
+              "RESET"
+            ],
+            "source_lines": [
+              46,
+              49,
+              51,
+              54,
+              56
+            ]
+          },
+          {
+            "option": "DAEOPTION",
+            "values": [
+              "DAE",
+              "NODAE"
+            ],
+            "source_lines": [
+              57,
+              61,
+              63,
+              73
+            ]
+          },
+          {
+            "option": "DUMPSCOPE",
+            "values": [
+              "LOCAL",
+              "RELATED"
+            ],
+            "source_lines": [
+              85,
+              101,
+              103,
+              108
+            ]
+          },
+          {
+            "option": "SHUTOPTION",
+            "values": [
+              "NOSHUTDOWN",
+              "SHUTDOWN"
+            ],
+            "source_lines": [
+              126,
+              130,
+              133,
+              137
+            ]
+          },
+          {
+            "option": "SYSDUMPING",
+            "values": [
+              "NOSYSDUMP",
+              "SYSDUMP"
+            ],
+            "source_lines": [
+              143,
+              146,
+              148,
+              154
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -14664,7 +15503,76 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "AUXSTATUS",
+            "values": [
+              "AUXPAUSE",
+              "AUXSTART",
+              "AUXSTOP"
+            ],
+            "source_lines": [
+              39,
+              43,
+              48,
+              51,
+              55
+            ]
+          },
+          {
+            "option": "GTFSTATUS",
+            "values": [
+              "GTFSTART",
+              "GTFSTOP"
+            ],
+            "source_lines": [
+              56,
+              59,
+              61,
+              63
+            ]
+          },
+          {
+            "option": "INTSTATUS",
+            "values": [
+              "INTSTART",
+              "INTSTOP"
+            ],
+            "source_lines": [
+              64,
+              68,
+              70,
+              71
+            ]
+          },
+          {
+            "option": "SWITCHACTION",
+            "values": [
+              "SWITCH"
+            ],
+            "source_lines": [
+              72,
+              84,
+              86
+            ]
+          },
+          {
+            "option": "SWITCHSTATUS",
+            "values": [
+              "NOSWITCH",
+              "SWITCHALL",
+              "SWITCHNEXT"
+            ],
+            "source_lines": [
+              87,
+              92,
+              94,
+              97,
+              98
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -15643,7 +16551,65 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "SINGLESTATUS",
+            "values": [
+              "SINGLEOFF",
+              "SINGLEON"
+            ],
+            "source_lines": [
+              31,
+              40,
+              42,
+              43
+            ]
+          },
+          {
+            "option": "SYSTEMSTATUS",
+            "values": [
+              "SYSTEMOFF",
+              "SYSTEMON"
+            ],
+            "source_lines": [
+              44,
+              53,
+              55,
+              56
+            ]
+          },
+          {
+            "option": "TCEXITSTATUS",
+            "values": [
+              "TCEXITALL",
+              "TCEXITALLOFF",
+              "TCEXITNONE",
+              "TCEXITSYSTEM"
+            ],
+            "source_lines": [
+              57,
+              68,
+              70,
+              73,
+              75,
+              77
+            ]
+          },
+          {
+            "option": "USERSTATUS",
+            "values": [
+              "USEROFF",
+              "USERON"
+            ],
+            "source_lines": [
+              78,
+              86,
+              88,
+              89
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -16169,7 +17135,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "Supplemental trace context: ibm-cics-ts-6x-application-api-sources-a-2026-09-10, SSJL4D_6.x/troubleshooting/cics/dfhs13p.html sha256:b2ecbde185231d8a035f901976cfaba2cc308a07414df28c090cfe88cb1d9e49, parser149-168/179-198: exception traces always internal; traces differ from storage snapshots; CONFDATA can prevent sensitive data in trace/dumps. Exact CONFData/transaction/backend policy needs unpinned linked closure; no raw confidential audit retention is implied."
+        "Supplemental trace context: ibm-cics-ts-6x-application-api-sources-a-2026-09-10, SSJL4D_6.x/troubleshooting/cics/dfhs13p.html sha256:b2ecbde185231d8a035f901976cfaba2cc308a07414df28c090cfe88cb1d9e49, parser149-168/179-198: exception traces always internal; traces differ from storage snapshots; CONFDATA can prevent sensitive data in trace/dumps. Exact CONFData/transaction/backend policy needs unpinned linked closure; no raw confidential audit retention is implied.",
+        "The finite TCEXITSTATUS update domain includes TCEXITALLOFF with its terminal-specific suppression/nonterminal-state-retention meaning. Exact Communications-Server binding and runtime observation remain Pending; INQUIRE NOTAPPLIC is not an input member or a permission/default for this update. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settraceflag.html; sha256:fa7d686772f48b0b7f4be2f0eef888ea1934ba3bcc80cc1c5286a0dd23105c79; parser 57-77,101-103.]"
       ]
     },
     {
@@ -17539,6 +18506,21 @@
               "STANDARD"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "FLAGSET",
+            "values": [
+              "SPECIAL",
+              "STANDARD"
+            ],
+            "source_lines": [
+              274,
+              278,
+              281,
+              283
+            ]
           }
         ]
       },
@@ -19276,7 +20258,8 @@
         "IBM internal lock order, cancellation/deadline outcomes, audit record transport/saturation, journal failure, catalog migration, backup/restore, concurrency snapshot coherence and full restart guarantees are unstated here unless explicitly cited. Resolve through the existing CICS resource/state, canonical effect, participant/UOW and versioned store owners; do not assume caller-UOW rollback, physical restart credit or redispatch after unknown outcome.",
         "Manager extension request: retain structured CVDA domains/aliases, value-dependent constraints, per-variant types/directions, context/version applicability and independently pinned supplemental sources in existing shared contract/IR types. @1 prose/cases retain these facts without inventing a DSL or editing the frozen schema.",
         "Detailed allowed/forbidden DPL, BTS, exit and other execution contexts remain pending where the body is silent. Correct rejection in a forbidden context cannot prove execution in an allowed one. CICS TS 6.x source identity and release badges do not prove all-version or licensed-runtime applicability.",
-        "Asterisk table marks are metasyntactic subcomponent markers, not option-name characters. Component ID/keyword equivalence and receiver extents need structured manager mapping; @1 cannot distinguish identifiers from generic valued operands. Pinned SVG has a required FLAGSET/SPECIAL/STANDARD choice; no omitted selection is admitted. Component repetition has an optional path, but a no-component invocation usefulness/result remains a gap; no successful mutation is fabricated. Restart persistence for SET TRACETYPE is not stated and cannot be imported from TRACEFLAG/TRACEDEST. Exact component access errors/multi-option validation precedence and concurrent bitset coherence remain pending."
+        "Asterisk table marks are metasyntactic subcomponent markers, not option-name characters. Component ID/keyword equivalence and receiver extents need structured manager mapping; @1 cannot distinguish identifiers from generic valued operands. Pinned SVG has a required FLAGSET/SPECIAL/STANDARD choice; no omitted selection is admitted. Component repetition has an optional path, but a no-component invocation usefulness/result remains a gap; no successful mutation is fabricated. Restart persistence for SET TRACETYPE is not stated and cannot be imported from TRACEFLAG/TRACEDEST. Exact component access errors/multi-option validation precedence and concurrent bitset coherence remain pending.",
+        "Only FLAGSET receives a finite symbolic domain. Component keyword/ID arguments remain32-bit trace-level bit strings with ignored irrelevant bits, not closed symbolic CVDA domains. Exact component validation/access precedence, partial-change observation, empty component invocation and persistence remain Pending; no universal bitset enumeration is inferred. [Pending source qualifier: ibm-cics-ts-6x-spi-command-bodies-2026-09-12; SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settracetype.html; sha256:f8e662d3af6baac05bd66348c49314c45761d848451be8d61f7faab75ea0ad17; parser 24-62,274-303.]"
       ]
     },
     {
@@ -19578,7 +20561,76 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "ACTION",
+            "values": [
+              "ADD",
+              "REMOVE",
+              "RESET"
+            ],
+            "source_lines": [
+              53,
+              56,
+              58,
+              61,
+              63
+            ]
+          },
+          {
+            "option": "DUMPSCOPE",
+            "values": [
+              "LOCAL",
+              "RELATED"
+            ],
+            "source_lines": [
+              64,
+              79,
+              81,
+              86
+            ]
+          },
+          {
+            "option": "SHUTOPTION",
+            "values": [
+              "NOSHUTDOWN",
+              "SHUTDOWN"
+            ],
+            "source_lines": [
+              94,
+              99,
+              101,
+              104
+            ]
+          },
+          {
+            "option": "SYSDUMPING",
+            "values": [
+              "NOSYSDUMP",
+              "SYSDUMP"
+            ],
+            "source_lines": [
+              105,
+              109,
+              111,
+              117
+            ]
+          },
+          {
+            "option": "TRANDUMPING",
+            "values": [
+              "NOTRANDUMP",
+              "TRANDUMP"
+            ],
+            "source_lines": [
+              128,
+              131,
+              133,
+              138
+            ]
+          }
+        ]
       },
       "responses": [
         {

@@ -240,6 +240,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "XMLTRANSFORM", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "RESTYPE", values: &["ASYNCSERVICE", "ATOMSERVICE", "BUNDLE", "DB2CONN", "DB2ENTRY", "DISPATCHER", "DOCTEMPLATE", "ENQUEUE", "EPADAPTER", "EVENTBINDING", "EVENTPROCESS", "FILE", "IPCONN", "JOURNALNAME", "JVMPROGRAM", "JVMSERVER", "LIBRARY", "LSRPOOL", "MONITOR", "MQCONN", "MQMONITOR", "MVSTCB", "PIPELINE", "POLICY", "PROGAUTO", "PROGRAM", "PROGRAMDEF", "RECOVERY", "SECURITY", "STATS", "STORAGE", "STREAMNAME", "SUBPOOL", "SYSDUMPCODE", "TASKSUBPOOL", "TCPIP", "TCPIPSERVICE", "TDQUEUE", "TRANCLASS", "TRANDUMPCODE", "TRANSACTION", "TSQUEUE", "URIMAP", "USER", "WEBSERVICE", "XMLTRANSFORM"] },
+            CicsApplicationCvdaDomain { option: "SUBRESTYPE", values: &["CAPTURESPEC", "POLICYRULE"] },
         ],
         cvda_numeric_domains: &[
         ],

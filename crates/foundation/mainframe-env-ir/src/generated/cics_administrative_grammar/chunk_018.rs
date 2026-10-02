@@ -4,6 +4,235 @@
 /// Partial source-reviewed grammar contracts, with Pending completeness and no routes.
 pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
     CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0262",
+        family: "spi-region-lifecycle",
+        label: "SET UOWLINK",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setuowlink.html",
+        source_sha256: "sha256:74cebf53658af18d3903a3ba363704dcae999ed782e8794234b5a3b24182561f",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "ACTION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "DELETE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "UOWLINK", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+        ],
+        cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &["UOWLINK"],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["ACTION", "DELETE"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0263",
+        family: "spi-web-resources",
+        label: "SET URIMAP",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_seturimap.html",
+        source_sha256: "sha256:8e05e01bc4909868868907ab8370ab8b9bd9a757db2014429a5108fe5e73e16f",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "DISABLED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "ENABLED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "ENABLESTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "LOCATION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(255) },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NONE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PERMANENT", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "REDIRECTTYPE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "TEMPORARY", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "URIMAP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::BoundedAmbiguity, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
+            CicsApplicationCvdaDomain { option: "REDIRECTTYPE", values: &["NONE", "PERMANENT", "TEMPORARY"] },
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &["URIMAP"],
+        alternative_groups: &[
+            CicsApplicationOptionAlternative { members: &["DISABLED", "ENABLED", "ENABLESTATUS"], required: false },
+            CicsApplicationOptionAlternative { members: &["NONE", "PERMANENT", "REDIRECTTYPE", "TEMPORARY"], required: false },
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["DISABLED", "ENABLED", "ENABLESTATUS"], &["NONE", "PERMANENT", "REDIRECTTYPE", "TEMPORARY"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0264",
+        family: "spi-transaction-resources",
+        label: "SET VOLUME",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setvolume.html",
+        source_sha256: "sha256:8d23531195fea5a5ebef0dad34f154a6dbaf2d6d3b008906b106c25e0576aa35",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "VOLUME", value_shape: CicsApplicationOptionValueShape::BoundedAmbiguity, direction: CicsApplicationOptionDirection::BoundedAmbiguity, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &[],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+        ],
+        mutual_exclusion_groups: &[],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0265",
+        family: "spi-terminal-sessions",
+        label: "SET VTAM 1",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setvtam.html",
+        source_sha256: "sha256:e74032ca2487b4cecf788eddd21aaedf4090a517c782df31185b1d23c46afa69",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "CLOSED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DEREGISTERED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "FORCECLOSE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "IMMCLOSE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "OPEN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "OPENSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "PSDINTERVAL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "PSDINTHRS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "PSDINTMINS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "PSDINTSECS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "VTAM", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "OPENSTATUS", values: &["CLOSED", "FORCECLOSE", "IMMCLOSE", "OPEN"] },
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &["VTAM"],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["CLOSED", "FORCECLOSE", "IMMCLOSE", "OPEN", "OPENSTATUS"], &["PSDINTERVAL", "PSDINTHRS"], &["PSDINTERVAL", "PSDINTMINS"], &["PSDINTERVAL", "PSDINTSECS"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0266",
+        family: "spi-web-resources",
+        label: "SET WEB",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setweb.html",
+        source_sha256: "sha256:fa76470e98e95543b62c944eb77897461b5758ed91b0be195c7d2a2ba67358a7",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "GARBAGEINT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "TIMEOUTINT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+        ],
+        cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &[],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0267",
+        family: "spi-web-resources",
+        label: "SET WEBSERVICE",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setwebservice.html",
+        source_sha256: "sha256:43dc6885a97f0933107dcdc88babfa15d2d6958930cfafa1f4e858a4b87ff12a",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOVALIDATION", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "VALIDATION", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "VALIDATIONST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "VALIDATIONST", values: &["NOVALIDATION", "VALIDATION"] },
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &["WEBSERVICE"],
+        alternative_groups: &[
+            CicsApplicationOptionAlternative { members: &["NOVALIDATION", "VALIDATION", "VALIDATIONST"], required: false },
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["NOVALIDATION", "VALIDATION", "VALIDATIONST"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0268",
+        family: "spi-transaction-resources",
+        label: "SET WLMHEALTH",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8-setwlmhealth.html",
+        source_sha256: "sha256:18d0d9fc450dbd3f8189d8c25520313b15dc8eaffc455601f55479ac8f5fc88b",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "ADJUSTMENT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "CLOSED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "IMMCLOSE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "INTERVAL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "OPEN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "OPENSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+        ],
+        cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "OPENSTATUS", values: &["CLOSED", "IMMCLOSE", "OPEN"] },
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &[],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["CLOSED", "IMMCLOSE", "OPEN", "OPENSTATUS"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0269",
         family: "spi-web-resources",
         label: "SET XMLTRANSFORM",

@@ -3214,3 +3214,49 @@ the shared condition-name/RESP authority. Private 305-command projection
 (266 SPI and 39 FEPI), 5082 operands/8947 case candidates and all 62 numeric
 domains/217 numeric records remain unchanged. MONITOR and FEPI source children
 retain their own independent review/integration gates; runtime acceptance pending.
+
+MONITOR integration child SPI-1001.spi-monitoring-cvda-domains is manager-owned
+after different-thread independent review of exactly 27 additions: 18 parent
+arrays containing 69 symbolic domains/210 members and nine precise Pending gaps.
+All 21 rows, 635 operands, 142 response records, 101 obligations, 768 whole cases,
+210 original gaps and form absence remain exact, including both prior response
+repairs, IDs/types/key/array order. Manager independently proved whole-byte
+forward/reverse replay for both diffs and all 81 current handoff artifact references;
+read every complete added field/value/citation/gap and all 18 full qualifiers.
+Fresh offline consultation used 46 successful search/read calls on 20 exact
+pinned topics, with all 26 actual parser pages/3236 lines completely read. The
+unchanged common dfha80x fullword/direction source and exact manager receipt were
+reused after hash verification; the earlier read is not relabeled as current
+execution evidence. Primary baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12;
+exact catalog rows/topic/hash pins stay in spi-monitoring-control.json. Common
+CVDA context is sources-b and dump-default dfhs14a context is sources-a, both
+2026-09-10. Source consultation supplies no licensed credit.
+EXTRACT resource/global and private/public application selector combinations stay
+Table1-qualified, including absent explicitly selected private resources without
+fallback and CICS-owned reusable/freed statistics storage. Table1 NODEJSAPP versus
+RESTYPE list omission and FEPI POOL/NODE condition opposition remain explicit old
+gaps; no authoritative precedence is invented. INQUIRE STATISTICS RECORDING keeps
+its unresolved mutating-versus-return role and gains no domain. OTEL is qualified
+to 6.3/beta with transaction controls, inquiry invalid-CVDA opposition and enabling
+span flush/loss; broader TS6.x applicability and delivery remain Pending. DUMPDS
+inquiry OPEN/CLOSED and update SWITCH remain distinct. TRACEFLAG query NOTAPPLIC
+and update TCEXITALLOFF retain different service scopes. TRACETYPE component bits
+remain separate from FLAGSET symbolic values. Dump ADD defaults/count comparison,
+temporary versus explicit restart persistence, catalog-error current-run partial
+effects and shutdown loss retain exact source qualifications. Trace switching/
+exception recording/GTF prerequisites, TABLESIZE requested/effective effects,
+monitoring class accumulation/write/loss, QR/CO scope and syncpoint rollback limits
+remain separate. No default, alias, numeric encoding, field/form/case, receiver
+geometry, caller-UOW rollback, mutation or runtime route is added. Manager solely
+owns schema/types/generator/IR/status/shared authorities and serial integration.
+Only this bounded source child seals after actual family/projection/focused and
+mandatory gates. Parent/application/selected-route/recovery/restart/licensed and
+all six command gates remain Pending, credit0; three v0.9 identities remain
+catalogued and deferred by user scope.
+
+MONITOR integrated source candidate passes 31 generator and nine IR regressions,
+actual Draft202012 monitoring instance and all 18 actual family instances,
+including the common condition-name/RESP authority. Private 305-command projection
+(266 SPI and 39 FEPI), 5082 operands/8947 case candidates and all 62 numeric
+domains/217 numeric records remain unchanged. FEPI session and pool/resource
+source children retain independent manager integration gates; runtime pending.
