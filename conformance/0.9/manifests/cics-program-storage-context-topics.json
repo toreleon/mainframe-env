@@ -1,0 +1,39 @@
+{
+  "baseline_id": "ibm-cics-ts-6x-program-storage-context-2026-09-12",
+  "book_href": "SSJL4D_6.x/applications/designing/dfhp3_concepts_storeprog.html",
+  "book_label": "Program lifecycle retained context candidates",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSJL4D_6.x",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-12",
+  "subsystem": "cics",
+  "target_version": "0.9.0",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "topic_count": 3,
+  "topic_manifest_digest": "2c5520dec7a78d6d2c7f20c62193b99887ed3a5abe477ba5aec4d83f24b05ff3",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 4285,
+      "last_modified": "2026-05-20",
+      "sha256": "a7203cb90ab73acc9d4956edcaa9caf14cf8408bc0a038d16dfa7470b52c0dc3",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_concepts_storeprog.html"
+    },
+    {
+      "bytes": 14216,
+      "last_modified": "2026-01-16",
+      "sha256": "f5cb3f296eb03963e86545d92358f387b4f01e34fec66e367a4f1ee1db5799b9",
+      "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_prog.html"
+    },
+    {
+      "bytes": 5823,
+      "last_modified": "2026-01-16",
+      "sha256": "61266930d4f21f430b016ca7b2e46d6d14b35a52b2a804be96761e49e5ade324",
+      "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html"
+    }
+  ],
+  "total_bytes": 24324
+}

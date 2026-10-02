@@ -667,6 +667,45 @@ all new pins and semantic decisions stay manager-owned and private. Source revie
 grants zero execution/licensed credit. These lanes are independent of the manager's
 server transfer-attestation validation and source-state authority review.
 
+The attestation prerequisite is sealed at
+`38f08bb22f9ea5b000a09a586756453edb1ae54c`: 25 focused tests pass and four
+ignored backend/staging selectors earn no credit. Required architecture,
+format/docs/changelog/dependency gates pass; default target is removed.
+
+`CIC-902.program-task.frames.transfer-context-pins` is the next manager-only
+source prerequisite for rows 0138/0263. The twelve-body worker review identifies
+four unregistered retained contexts: CICS `dfhp3_concepts_storeprog.html`,
+`dfhp3_cobol_prog.html`, `dfhp3_cobol_subprog_calling.html`, and COBOL 6.5
+`pg/tasks/tppgm07.html`. Matching archived metadata/body bytes are present.
+Verify each against its existing product TOC, exact content locator and H1;
+register two bounded zero-credit candidate manifests under the existing 0.9
+registry, then read all four through the shared pinned reader. Exact ownership is
+those two new manifests, the registry, a bounded metadata-only verification
+receipt, this status, a unique fragment and derived documentation. No browser,
+network, publication text in Git, last-used tuple reuse, grammar, runtime,
+coverage or codec disposition is introduced. Acceptance is identity/hash/reader
+validation and focused source-reader/schema/docs/policy gates. All four bodies have now been fully read through the pinned reader. CICS program
+variable storage lasts for program execution, and the subprogram rules depend on
+LINK versus static/dynamic COBOL CALL; INITIAL documents reentry initialization.
+These contexts do not justify treating XCTL as normal GOBACK. Last-used tuple
+reuse and exact source disposition remain fenced pending the applicable calling
+rules and manager lifecycle review.
+
+`CIC-902.program-task.frames.calling-context-review` is an independent read-only
+continuation of the command-authority worker. It owns external provenance/design
+only for the two literal links from the newly retained subprogram context:
+`SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_flow.html` and
+`dfhp3_cobol_subprog_rules.html`. It may consult the four exact retained context
+identities from the manager pin candidate, explicitly keeping candidate identity
+separate from accepted semantics. Resolve existing pins first, then exact retained
+archive/TOC/H1 provenance for an unregistered candidate; no network refresh or
+further outbound bodies. At most six bodies. Acceptance is baseline/hash/row
+0138/0263 linkage and a precise lifecycle distinction between CICS LINK/XCTL and
+static/dynamic COBOL CALL, including working storage and INITIAL without guessed
+file, random or task-memory ownership. No code/API/schema/registry/coverage edit,
+normal-return equivalence, disposition verdict or execution credit is authorized.
+The manager serializes any resulting pins and runtime contract after review.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001

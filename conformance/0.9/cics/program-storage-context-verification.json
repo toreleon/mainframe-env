@@ -1,0 +1,198 @@
+{
+  "coverage_credit": 0,
+  "execution_credit": 0,
+  "licensed_credit": 0,
+  "records": [
+    {
+      "actual_bytes": 4285,
+      "actual_sha256": "a7203cb90ab73acc9d4956edcaa9caf14cf8408bc0a038d16dfa7470b52c0dc3",
+      "archive_run": {
+        "path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/run.json",
+        "product": "SSJL4D_6.x",
+        "run_id": "20260912T054102Z-0a2bbb55",
+        "sha256": "356217b899c27472688bc71522343b320b88c64ac6b56a032b2483f260892081",
+        "status": "in-progress",
+        "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+      },
+      "body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/a7/a7203cb90ab73acc9d4956edcaa9caf14cf8408bc0a038d16dfa7470b52c0dc3.html",
+      "body_present": true,
+      "h1": "Program storage",
+      "host_matches_metadata": null,
+      "host_present": false,
+      "last_modified": "2026-05-20",
+      "matching_metadata": true,
+      "metadata": {
+        "attempts": 1,
+        "bytes": 4285,
+        "content_type": "text/html; charset=utf-8",
+        "fetched_at": "2026-09-12T05:59:50Z",
+        "http_status": 200,
+        "labels": [
+          "Program storage"
+        ],
+        "schema_version": "mainframe-env.ibm-docs-archive@1",
+        "sha256": "a7203cb90ab73acc9d4956edcaa9caf14cf8408bc0a038d16dfa7470b52c0dc3",
+        "source_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fapplications%2Fdesigning%2Fdfhp3_concepts_storeprog.html?parsebody=true&lang=en",
+        "status": "ok",
+        "storage_path": "raw/html/sha256/a7/a7203cb90ab73acc9d4956edcaa9caf14cf8408bc0a038d16dfa7470b52c0dc3.html",
+        "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_concepts_storeprog.html"
+      },
+      "metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/26/263d2b213aedb7927629f2dc042a40c445544da6f24f7a67d6c2366769597e57.json",
+      "metadata_present": true,
+      "metadata_sha256": "0748d24a175f5c93f4c34cc9b775382a96446a671709b0e055b76c878c2202c5",
+      "plain_text_lines": 18,
+      "toc_match": {
+        "label": "Program storage",
+        "pointer": "/toc/topics/13/topics/9/topics/5",
+        "topic_id": "applications-program-storage"
+      },
+      "toc_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json",
+      "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_concepts_storeprog.html"
+    },
+    {
+      "actual_bytes": 14216,
+      "actual_sha256": "f5cb3f296eb03963e86545d92358f387b4f01e34fec66e367a4f1ee1db5799b9",
+      "archive_run": {
+        "path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/run.json",
+        "product": "SSJL4D_6.x",
+        "run_id": "20260912T054102Z-0a2bbb55",
+        "sha256": "356217b899c27472688bc71522343b320b88c64ac6b56a032b2483f260892081",
+        "status": "in-progress",
+        "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+      },
+      "body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/f5/f5cb3f296eb03963e86545d92358f387b4f01e34fec66e367a4f1ee1db5799b9.html",
+      "body_present": true,
+      "h1": "COBOL programming restrictions and requirements",
+      "host_matches_metadata": null,
+      "host_present": false,
+      "last_modified": "2026-01-16",
+      "matching_metadata": true,
+      "metadata": {
+        "attempts": 1,
+        "bytes": 14216,
+        "content_type": "text/html; charset=utf-8",
+        "fetched_at": "2026-09-12T06:07:22Z",
+        "http_status": 200,
+        "labels": [
+          "COBOL programming restrictions and requirements"
+        ],
+        "schema_version": "mainframe-env.ibm-docs-archive@1",
+        "sha256": "f5cb3f296eb03963e86545d92358f387b4f01e34fec66e367a4f1ee1db5799b9",
+        "source_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fapplications%2Fdeveloping%2Fcobol%2Fdfhp3_cobol_prog.html?parsebody=true&lang=en",
+        "status": "ok",
+        "storage_path": "raw/html/sha256/f5/f5cb3f296eb03963e86545d92358f387b4f01e34fec66e367a4f1ee1db5799b9.html",
+        "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_prog.html"
+      },
+      "metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/c9/c9e347358b915aa71ee10ab0bd83286af7c2213a985d08639778bd1f3c1796d9.json",
+      "metadata_present": true,
+      "metadata_sha256": "befb19931ebf6b5f2f4ab20efa89652bc57c73a374652ed3427a7a61a494dbb8",
+      "plain_text_lines": 104,
+      "toc_match": {
+        "label": "COBOL programming restrictions and requirements",
+        "pointer": "/toc/topics/14/topics/10/topics/0",
+        "topic_id": "applications-cobol-programming-restrictions-requirements"
+      },
+      "toc_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json",
+      "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+      "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_prog.html"
+    },
+    {
+      "actual_bytes": 5823,
+      "actual_sha256": "61266930d4f21f430b016ca7b2e46d6d14b35a52b2a804be96761e49e5ade324",
+      "archive_run": {
+        "path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/run.json",
+        "product": "SSJL4D_6.x",
+        "run_id": "20260912T054102Z-0a2bbb55",
+        "sha256": "356217b899c27472688bc71522343b320b88c64ac6b56a032b2483f260892081",
+        "status": "in-progress",
+        "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+      },
+      "body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/61/61266930d4f21f430b016ca7b2e46d6d14b35a52b2a804be96761e49e5ade324.html",
+      "body_present": true,
+      "h1": "Calling subprograms from COBOL programs",
+      "host_matches_metadata": null,
+      "host_present": false,
+      "last_modified": "2026-01-16",
+      "matching_metadata": true,
+      "metadata": {
+        "attempts": 1,
+        "bytes": 5823,
+        "content_type": "text/html; charset=utf-8",
+        "fetched_at": "2026-09-12T06:07:23Z",
+        "http_status": 200,
+        "labels": [
+          "Calling subprograms from COBOL programs"
+        ],
+        "schema_version": "mainframe-env.ibm-docs-archive@1",
+        "sha256": "61266930d4f21f430b016ca7b2e46d6d14b35a52b2a804be96761e49e5ade324",
+        "source_url": "https://www.ibm.com/docs/api/v1/content/SSJL4D_6.x%2Fapplications%2Fdeveloping%2Fcobol%2Fdfhp3_cobol_subprog_calling.html?parsebody=true&lang=en",
+        "status": "ok",
+        "storage_path": "raw/html/sha256/61/61266930d4f21f430b016ca7b2e46d6d14b35a52b2a804be96761e49e5ade324.html",
+        "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html"
+      },
+      "metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SSJL4D_6.x-d44905bca77947f4/20260912T054102Z-0a2bbb55/topics/ff/ff7179092ad38d834bd09620b9d522b67f6453837456ecf6320b45210ed07c68.json",
+      "metadata_present": true,
+      "metadata_sha256": "5fed42bb3fca4f18cb348360c91212ba845ba733de0d23106f4131a0c7ac63e2",
+      "plain_text_lines": 40,
+      "toc_match": {
+        "label": "Calling subprograms from COBOL programs",
+        "pointer": "/toc/topics/14/topics/10/topics/3",
+        "topic_id": "applications-calling-subprograms-from-cobol-programs"
+      },
+      "toc_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json",
+      "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+      "topic_path": "SSJL4D_6.x/applications/developing/cobol/dfhp3_cobol_subprog_calling.html"
+    },
+    {
+      "actual_bytes": 3699,
+      "actual_sha256": "0c0de3b5aee04c212b7828895af6d0fb6d18890153c86327d2cdbc02a7ee937f",
+      "archive_run": {
+        "path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SS6SG3_6.5-6caa76f00a444bbb/20260911T072939Z-05590c38/run.json",
+        "product": "SS6SG3_6.5",
+        "run_id": "20260911T072939Z-05590c38",
+        "sha256": "76631c7d28cbf314006aeee7e8d960567a9ff305a86c380d6c7a1f0afefaf485",
+        "status": "in-progress",
+        "toc_sha256": "c3527d5e084e9749bef54ddf7bfdb1ecbbed94dd686c724417a4a3b669f671ce"
+      },
+      "body_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/0c/0c0de3b5aee04c212b7828895af6d0fb6d18890153c86327d2cdbc02a7ee937f.html",
+      "body_present": true,
+      "h1": "Setting a program to an initial state",
+      "host_matches_metadata": null,
+      "host_present": false,
+      "last_modified": "2026-01-30",
+      "matching_metadata": true,
+      "metadata": {
+        "attempts": 1,
+        "bytes": 3699,
+        "content_type": "text/html; charset=utf-8",
+        "fetched_at": "2026-09-11T10:12:22Z",
+        "http_status": 200,
+        "labels": [
+          "Setting a program to an initial state"
+        ],
+        "schema_version": "mainframe-env.ibm-docs-archive@1",
+        "sha256": "0c0de3b5aee04c212b7828895af6d0fb6d18890153c86327d2cdbc02a7ee937f",
+        "source_url": "https://www.ibm.com/docs/api/v1/content/SS6SG3_6.5%2Fpg%2Ftasks%2Ftppgm07.html?parsebody=true&lang=en",
+        "status": "ok",
+        "storage_path": "raw/html/sha256/0c/0c0de3b5aee04c212b7828895af6d0fb6d18890153c86327d2cdbc02a7ee937f.html",
+        "topic_path": "SS6SG3_6.5/pg/tasks/tppgm07.html"
+      },
+      "metadata_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/work/SS6SG3_6.5-6caa76f00a444bbb/20260911T072939Z-05590c38/topics/d2/d239bc472a22ce73beef3e096fc3311bb818f87891d77def7ffa3f704c45a50c.json",
+      "metadata_present": true,
+      "metadata_sha256": "a9b419f087b81da075eb113f23f9a50faab808a75174816992e5c94cd0818aa3",
+      "plain_text_lines": 20,
+      "toc_match": {
+        "label": "Setting a program to an initial state",
+        "pointer": "/toc/topics/2/topics/1/topics/0/topics/0/topics/2",
+        "topic_id": "program-setting-initial-state"
+      },
+      "toc_path": "/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/c3/c3527d5e084e9749bef54ddf7bfdb1ecbbed94dd686c724417a4a3b669f671ce.json",
+      "toc_sha256": "c3527d5e084e9749bef54ddf7bfdb1ecbbed94dd686c724417a4a3b669f671ce",
+      "topic_path": "SS6SG3_6.5/pg/tasks/tppgm07.html"
+    }
+  ],
+  "schema_version": "mainframe-env.retained-source-verification@1",
+  "semantic_authority": false,
+  "source_disposition": "bounded retained context identities only; lifecycle disposition requires separate reviewed contract"
+}
