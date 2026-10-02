@@ -1,4 +1,6 @@
 use super::*;
+#[path = "ims_secondary_ssa_tests/mixed_boolean_tests.rs"]
+mod mixed_boolean_tests;
 static NEXT_SECONDARY_FILE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 use mainframe_env_host_api::{
     ImsExecutionContext, ImsNavigationRequest, ImsSecondaryIndexMetadata,

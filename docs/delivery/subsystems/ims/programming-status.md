@@ -3947,3 +3947,140 @@ remain external under `v014-completion-20261002/secondary-root-*`; prior worker
 receipts retain their actual base. Final signed-route/mixed-SSA and aggregate
 policy composition is a separate candidate sequence, not retroactive credit.
 This completes only the bounded secondary restart leaf, not IMS-1405 or v0.14.
+## Historical prerequisite packet imported from bdbca36 (2026-10-02)
+
+The following packet retains its original source and verification disposition.
+It is not current integration evidence. The four supplement bodies have now
+been reviewed offline before integration; the evaluation delta is a separate
+feature and seal. Manager selected-index field resolution and the existing
+child-name collision regression are preserved. Integration receipts are kept
+in the external ims-mixed-manager receipt directory.
+
+## IMS-1401.mixed-boolean-ssa (scope declaration, 2026-10-02)
+
+Parent IMS-1401 remains open. Clean sealed base is
+`b7068757a3af472579c2e493f2ff9eb1a4909a66`, isolated branch
+`codex/v014-mixed-boolean-ssa-20261002`. This leaf owns bounded SSA helper
+changes in the existing public parser/AST and database matcher, minimal rich
+SSA integration, focused new tests, a unique fragment and routine generated
+docs. No separate expression engine or cursor, frozen facade growth, recovery,
+GSAM, checkpoint, STAT, lock, integrity, row-guard, coordinator or participant
+algorithm change is authorized. Manager execution/host-result extractions and
+shared SessionCasStore integration remain external seams; do not duplicate them.
+
+Catalog scope: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`,
+with inherited :0004/:0008/:0015 maintenance interactions. Expected classes:
+source-defined mixed dependent AND / OR / independent AND grouping and encoding,
+exact binary relations and metadata byte lengths, multiple clauses/groups,
+primary hierarchy and admitted full-function selected-root secondary order,
+distinct source/target composite XDFLD, C/D/P/O preservation, per-PCB position,
+parentage, hold and sensitivity, malformed/unsupported no mutation, SAF,
+canonical replay/conflict, actual atomic CAS/lost acknowledgement and Memory /
+file SQLite reopen/child process where applicable. No unsupported context is
+loosened. Missing precedence/grouping source claims require an independently
+authored acceptance gap packet and zero implementation credit for that class.
+
+Before semantics, inspect exact IMS 15.6 programming/database pins using bounded
+offline search/read, retained topic-path root first, then SHA archive verification
+and the repository plain_text parser. No refresh or publication bodies in Git.
+Acceptance uses fail-first public provider and signed selected-package cases,
+focused affected regressions and mandatory policy/catalog/assurance/schema/docs/
+fmt/deny/changelog gates, then exact allowlist feature seal, commit and committed
+check. Receipts remain outside Git and disposable targets. Official, maintainer,
+licensed and parent/release completion credit stays zero. Consumed dependencies
+and compatibility boundaries in earlier handoffs remain applicable.
+
+### Source-gap disposition and bounded runtime guard
+
+Mixed evaluation remains pending. The independently authored
+[acceptance gap packet](mixed-boolean-ssa-gap.md) records exact missing claims,
+discriminating fixtures and pending outcomes, without an expression evaluator
+or official bindings. Verified programming pins establish binary comparison,
+exact field/value lengths and all five connector encodings; they do not establish
+mixed precedence or dependent versus independent AND evaluation. The SSA overview
+links `SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_multiqualificationstmts.htm`.
+That body and the TOC-located `ims_examplmultiqualificationstmts.htm`,
+`ims_multqualificationstmtshdam_phdam_dedb.htm` and
+`ims_multqualificationstatementssecondaryindex.htm` have no registered body pin.
+Their expected SHA/byte counts are unavailable; retained topic-path files are
+absent. No unpinned archive body is promoted to authority and no refresh occurs.
+
+Sixteen bounded existing topics were checked first at the retained root, then
+read from matching SHA-archive bytes through ibm_docs.py search/read/plain_text.
+TOC pin `aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618`
+verified. Programming baseline
+`ibm-ims-15.6-programming-contracts-2026-09-11`: APG ims_ssas.htm
+`7a0fb0faa50c4308924576ebbe6bfcca0dd78e217f33c59e78480b9c6dd8ae20`,
+ims_ssacodingrules.htm
+`cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5`,
+ims_ssacodingformats.htm
+`dd8afe24c819750ec361d8359529ad328c4ef280235553da7bdd918be28504d9`.
+Database baseline `ibm-ims-15.6-database-contracts-2026-09-11`: APG
+ims_ssassecondaryindex.htm
+`4b3a1ee3cc0eabbbb4984d23a0eb60fe93be50887e1853643e0f382710139900`.
+Full source identities, explicit bounded-cache omissions and unavailable claims
+remain in external sources.json, source-review.log and source-gaps.json. There
+was no mismatch or contradiction in the selected verified body set.
+
+The sole production change tightens database/ssa.rs admission to uniform
+connector identities. Previously `&` plus `#` silently executed as uniform AND.
+It now returns local Unsupported before matcher/publication, just as existing
+OR/AND mixtures do. Encoding aliases `*`/`&` and `+`/`|` still map to the same
+identity and remain admitted. This is a conservative local guard, not an
+IBM-documented rejection or implemented mixed-expression claim. Parser/AST,
+field resolver, C/D/P/O, cursor/position, canonical/retained schemas, index
+maintenance and atomic publication algorithms remain unchanged.
+
+Fail-first public-provider and signed-route receipts reproduce unintended
+mixed-AND success. Initial secondary fixture expectation and server nested-module
+locator failures are separately retained, not credited as semantic proof.
+New focused checks pass two public-parser tests, four provider cases and two
+signed selected-package cases. Memory/file SQLite fresh reopen preserves rows,
+position/hold, replay/conflict and denied-observation behavior. Fixtures preserve
+unequal primary/index order and distinct child source/root target composite
+bytes; no mixed evaluation outcome is guessed. Existing mixed-OR rejection is
+also exercised, along with malformed grouping and length boundaries.
+
+Upgrade admission rejects old completed mixed-AND requests before replay. Retain
+their canonical receipts and reconcile/drain them; rejection does not prove
+nonpublication and must not trigger redispatch under a new key. No SQL, AST,
+host/canonical or row migration occurs. Older binary rollback restores the
+flattening defect. Inherited extended-index/undo/recovery downgrade and coherent
+backup restrictions remain unchanged. Manager-owned integrity integration,
+service/execution.rs, request/host_result.rs and shared SessionCasStore retain
+their authority; this patch does not edit or resurrect those owners. The older
+nested session_cas helper is untouched, so manager re-export integration has
+no competing implementation in this leaf.
+
+### Local verification and seal boundary
+
+Current runtime inputs are frozen in external runtime-inputs.json. Focused new
+tests above pass, plus 11 existing primary SSA cases, 13 existing rich-secondary
+cases and four inherited signed secondary cases. These cover exact binary
+relations, C/D/P/O, failed positions/status, sensitivity, real update/index
+maintenance, rollback, Memory/file SQLite reopen, actual atomic session CAS,
+lost acknowledgement/UnknownOutcome and three independent SQLite child processes.
+The ordinary unconfigured worker helper was excluded; only the parent that
+actually launches its processes earns local process evidence. Zero-test filtered
+binaries earn no evidence. Signed primary selection and old canonical goldens
+are the final compatibility checks recorded separately in external handoff.md.
+
+Strict host/IMS/server all-target Clippy --no-deps -D warnings, fmt, offline
+deny, supply-chain and license policy, schemas, IMS catalog/assurance, shared
+spec integrity, changelog and diff checks pass. Execution/effect/provider-row/
+storage/enterprise SAF/retention/participant guards and the participant generator
+check pass. The module ratchet passes without any ceiling change; the sole
+production helper is smaller than its base. No unrelated aggregate cache audit,
+CardDemo-full, PostgreSQL, fuzz/coverage campaign, licensed certification, push
+or PR occurs. Required official/parent gates remain pending, not waived.
+
+Receipts remain outside Git/targets in the external
+worker-receipts/v014-completion-20261002/ims-mixed-boolean-ssa directory. Each
+Cargo sequence ends with cargo clean for this exact checkout. The merge driver
+is installed. Final routine docs generation/check, exact ten-path leaf seal,
+feature commit and committed seal check are packaging commands retained there.
+The seal's pass disposition applies only to this bounded guard and acceptance
+gap packet, not the pending mixed evaluation, any official gate, maintainer
+approval, licensed differential, parent IMS-1401 or v0.14 completion. Next step:
+authorize and review exact pins for the four missing topics, then implement and
+prove independently derived mixed outcomes through the same existing authority.

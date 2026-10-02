@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 234,
+    "markdown_documents": 235,
     "navigation_groups": 6,
     "normative_documents": 66,
     "xtask_commands": 233
@@ -1496,6 +1496,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/subsystems/ims/mixed-boolean-ssa-gap.md",
+      "relative_links": 0,
+      "sha256": "sha256:284db17f9eb765b15dc6520e51e05a674775f53c5e576cb890f3ff3b67353e5e",
+      "title": "IMS mixed Boolean SSA acceptance gap",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-plan.md",
       "relative_links": 2,
       "sha256": "sha256:7658762291bf3f444b66c2a70a9ae6c19c3f4b209e09cb138ddcae9fb27f67ac",
@@ -1505,8 +1513,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 16,
-      "sha256": "sha256:94b07e39b904182d46a76fa8c91c2dd67d459106330a4d2d88cb284c35d04be0",
+      "relative_links": 17,
+      "sha256": "sha256:197b01c6d8c9aa7cca3491cd5ac64b0e8f83f38d999518325ae905d9eadff13c",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },

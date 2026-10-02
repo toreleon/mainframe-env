@@ -5,6 +5,7 @@ use mainframe_env_host_api::ImsNavigationRequest;
 
 mod integration_tests;
 mod lifecycle_tests;
+mod mixed_boolean_tests;
 mod process_tests;
 mod rejection_tests;
 

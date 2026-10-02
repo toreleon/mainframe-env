@@ -172,14 +172,13 @@ impl DatabaseEngine {
                     return Err(EngineProblem::InvalidRequest);
                 }
             }
-            // The pinned scope names the connectors but does not freeze mixed-group
-            // precedence. Admit uniform conjunction/disjunction, reject that class.
-            let has_or = ssa.connectors.contains(&ImsSsaBoolean::LogicalOr);
-            if has_or
-                && ssa
-                    .connectors
-                    .iter()
-                    .any(|c| *c != ImsSsaBoolean::LogicalOr)
+            // Pins establish the encodings, but the linked multiple-qualification
+            // bodies are unpinned. Do not flatten distinct AND identities or infer
+            // mixed precedence. This is a local admission fence, not an IBM status.
+            if ssa
+                .connectors
+                .first()
+                .is_some_and(|first| ssa.connectors.iter().any(|c| c != first))
             {
                 return Err(EngineProblem::Unsupported);
             }
