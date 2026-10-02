@@ -61,14 +61,71 @@ made by SQLite reopen. Normal docs generation/check, offline dependency and
 license-notice policy, catalog/assurance/schema/spec/coverage/changelog gates,
 formatting and exact existing public API ratchets pass. The initial docs failure
 for missing ADR applicability metadata was repaired and its receipt retained;
-no runtime suite was repeated for that metadata repair. The feature seal is the
-remaining local packaging step.
+no runtime suite was repeated for that metadata repair. The exact-path feature
+seal/check passed in commit `92977fcdf06c62bcd3ce5b9e2e5136072953ba5f`;
+that local packaging result is not parent acceptance.
 
 Receipts are external under worker-receipts/v014-completion-20261002/null-ssa-*;
 each sequence cleans this checkout's Cargo target. The new grammar byte is
 generated privately; the active seventeen-letter inventory, twenty-five-row
 denominator, accepted IR rules, public DTOs and historical canonical fixtures
 are unchanged. Raw/TM owner approvals and full-minor acceptance remain open.
+
+## IMS-1401.ssa-last-position-sources (declared source-only leaf)
+
+Parent IMS-1401 and the full v0.14 manager goal remain incomplete. This leaf
+starts from `a8deb3d8a97be2660cfa0d38327ff246a194a910`, target 0.14.0. Its
+scope is registration of exactly three existing IMS 15.6 archived topics:
+L command code, position after a successful call, and position after an
+unsuccessful call. The separate `ims-ssa-last-position` scope uses the existing
+later-manifest mechanism with semantic_authority=false and coverage_credit=0.
+All previous publication pins, accepted IR and catalog denominators are preserved.
+
+Dependencies are the manager-authorized immutable archive identities, matching
+shared IMS TOC, existing registry/source reader and cache runbook. Acceptance is
+retained-topic-path-first SHA/byte and archive metadata binding verification,
+actual offline search/read of all three registered topics, an external finite
+two-level GNP-L exhaustion-position interpretation for manager review, normal
+docs generation/check, dependency policy, changelog, IMS catalog, schemas/spec,
+affected source registry checks, and exact-path generated leaf seal/check with
+one local commit. No runtime tests are needed for this source-only delta.
+
+Exact product/docs allowlist: `conformance/0.14/manifests/ims-ssa-last-position-topics.json`,
+`conformance/0.14/manifests/index.json`, this status file,
+`changes/unreleased/ims-ssa-last-position-sources-20261002.toml`, and the normal
+`docs/generated/documentation-manifest.json`. External reports and command
+receipts stay under worker-receipts/v014-completion-20261002/ssa-last-source.
+There is no fetch, refresh, source-body Git copy, product semantic change,
+shared contract/schema extension, ADR0039, HUMAN/official/licensed acceptance,
+push or PR operation. F/L/U/V/W runtime admission remains Unsupported; the
+future bounded L leaf and its failure-position expectations need separate
+manager review. Cargo cleanup ends each verification/generator/seal sequence.
+
+The bounded source registration is verified: baseline
+`ibm-ims-15.6-ssa-last-position-2026-09-11` binds L command code
+`ims_lcmdcode.htm`, successful position `ims_currentpossuccess.htm`, and failed
+position `ims_currentpostafterfail.htm`, topic-set SHA-256
+`804ec48438f467df2e8afc4bac243264ec0a0f9ebee4454e749d6c8e67b79cb6`.
+The retained topic-path files were absent; exact archived bodies/metadata and
+the unchanged IMS TOC matched. The repository reader searched and read all
+three complete topics through the new registered scope using an external cache.
+The external disposition proposes finite empty/exhausted GNP-L transitions
+from those sources and existing GNP/hold rules, while preserving the unresolved
+same-PCB hold and parent-level qualification distinctions for manager review.
+This source leaf provides zero behavioral/conformance credit and no runtime
+admission; the manager's full v0.14 and future L semantic leaf remain open.
+
+Root integration preserves worker seal
+`6bca4715d3ebac54aec1d89bc70a8095c6e187b9` and its original five-file evidence.
+The manager independently searched/read the three registered sources and the
+actual pinned hold-call discussion, then approved a separate bounded runtime
+leaf for only one unqualified direct-child L SSA in GNP/GHNP. Its attempted
+same-PCB exhausted search cancels the old hold through the existing owner;
+the forward remaining interval stays parent-bounded. This is a source-derived
+composition, not an IBM dedicated failure example or an accepted HUMAN rule.
+The optional root-qualification prefix, including a matching prefix, is excluded
+until its position/hold disposition is settled. Runtime work remains isolated
+and unintegrated; no L execution credit is granted by this source seal.
 
 ## IMS-1401.cobol-dli-call-boundary (declared contract-gap leaf)
 

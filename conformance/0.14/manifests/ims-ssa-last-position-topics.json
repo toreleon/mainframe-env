@@ -1,0 +1,39 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-ssa-last-position-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 L command and successful/unsuccessful position archive supplement for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_lcmdcode.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 3,
+  "total_bytes": 31103,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "804ec48438f467df2e8afc4bac243264ec0a0f9ebee4454e749d6c8e67b79cb6",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_lcmdcode.htm",
+      "sha256": "fe03a71d0cfddca1a822c6560aa92be8b3522e54a20ac4026a33b22382949610",
+      "bytes": 4452,
+      "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_currentpossuccess.htm",
+      "sha256": "6efede425fe9eedf95238368fce603298dd2287f24e9b61313df91cae570d64f",
+      "bytes": 10561,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_currentpostafterfail.htm",
+      "sha256": "992855fdf264472dfc4e40d28dd81cfce9429feb1b9712e0f4a23bc0b8898726",
+      "bytes": 16090,
+      "last_modified": "2026-03-24"
+    }
+  ]
+}

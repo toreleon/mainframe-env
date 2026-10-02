@@ -1526,7 +1526,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 18,
-      "sha256": "sha256:bfd8f9a38c839b40612e036785170c0f6cda54786ce4fd9f021b59addbcead45",
+      "sha256": "sha256:88323a8c5112c3757046c8bff6061a79b6d1fdaa09851714feb2e695a05cd197",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },

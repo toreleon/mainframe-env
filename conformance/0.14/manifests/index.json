@@ -113,6 +113,17 @@
       "topic_manifest_sha256": "sha256:b47a9522b8447bc969730baafc18aa973041112667a710b1bfe337112112bf72",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-ssa-last-position",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-ssa-last-position-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-ssa-last-position-topics.json",
+      "manifest_sha256": "sha256:0f255bfcaf184df62a80a5e18c0925322b338e331e3362fab4eb7d3af230f910",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:804ec48438f467df2e8afc4bac243264ec0a0f9ebee4454e749d6c8e67b79cb6",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
