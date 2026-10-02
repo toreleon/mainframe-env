@@ -762,3 +762,33 @@ pass. The previously diagnosed unrelated batch-service module ratchet violation
 (7,404 versus 7,402) is not waived or represented as a passing global module gate.
 Dependency policy reuses the d8a026ab receipt only after verifying its receipt
 hash and all 32 unchanged manifest/toolchain/policy input identities.
+
+## Strict typed-result storage integration
+
+`MQ-1505.typed-result-replay-codec` is integrated from sealed worker `0c6426e1`.
+It preserves complete non-handle typed results, descriptors, buffers, exact
+required/copied lengths, properties and outcome distinctions using the existing
+message projection. Storage binds the full shared HostResult digest and original
+MQI limits; duplicate, missing, unknown, malformed and over-budget input fails
+closed before typed allocation. Callback notification storage cannot admit a
+public callback effect. Opaque handle outputs remain explicitly unsupported in
+this slice; no registry token is deserialized or reconstructed. Old delivery
+restart/checkpoint bytes and default policies remain unchanged.
+
+On this composed manager candidate, 15 codec, 34 delivery and five installed-batch
+handoff regressions pass, with no failures or ignored tests. The worker's other
+host-contract receipts remain separately bound to its original candidate.
+Dependency policy is reused only under the same verified 32-input identity
+proof described above. No provider receipt row, service mutation, journal,
+public route or full-v0.15 acceptance is implied by this pure storage feature.
+
+The next declared isolated CLI slices are `MQ-1505.historical-handle-result-replay`
+(N: strict historical identity plus all-entry registry rejection and checked
+lookup of existing live entries, existing codec and ADR0033) and
+`MQ-1501.point-to-point-wire-options` (O: source-pinned numeric option/version
+projection inside the existing normative catalog and checked constructors to
+existing typed requests). Neither owns M's selected service/UOW publication or
+the manager's machine/server route. Historical reconstruction cannot mint live
+authority; caller option bits cannot mint UOW/SAF or erase unsupported modes.
+Only sealed commits will be consumed, with generated/facade overlaps reconciled
+and final composed checks retained under their actual candidate identity.

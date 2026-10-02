@@ -9,6 +9,7 @@ mod message;
 mod message_handle;
 mod mqi_admission;
 mod mqi_lifecycle;
+mod mqi_replay;
 mod object;
 pub mod object_inquiry;
 mod object_service;

@@ -215,3 +215,53 @@ The persisted fence is not a coordinator permit, UOW decision or owner lease.
 Fresh plans under one still-live intent are not intent-wide deduplication:
 actual original-effect/replay/UOW binding, lifecycle retirement, SAF, service
 selection, core completion and participant/licensed acceptance remain required.
+
+## Private MQI typed result storage
+
+`MQ-1505.typed-result-replay-codec` supplies only pure private storage conversion
+under `mainframe-env.mq-mqi-result-storage@1`. It does not select a namespace,
+write a receipt, prune history, authorize dispatch or calculate a status pair.
+The codec takes explicit finite HostLimits, MqMqiLimits and storage-byte bounds;
+profiles may narrow existing ceilings, never widen them. MQI limits remain part
+of the original full host result identity and must match the service's original
+result profile. The stored digest is recomputed over
+`Ok(HostResult::MqMqi(MqMqiHostResult { result, limits }))` in the existing shared
+canonical result domain, including the wrapper and limits. A standalone MQI
+digest cannot replace it.
+
+Completed and StatusPending keep their exact distinct outcomes and representable
+Put, Got, Distribution, Property, Buffer, Attributes, UnitOfWork,
+PublicationsRequested and NoOutput values. ReviewedStatus reconstructs only an
+already admitted symbolic pair through the existing call-specific table; pending
+or mismatched identities fail closed. Pending, UnknownOutcome and
+DuplicatePossible never become completed success. CallbackReturned remains a
+private notification value validated by the frozen standalone result validator;
+the unchanged public host validator still rejects callback notifications as
+application MQI effects. Canonical framing alone grants no public admissibility.
+
+A delivery-owned facade shares the original strict message/property projection.
+It records persistence, expiry and priority explicitly and restores them exactly,
+including nonpersistent and abstract pending/default values. Its neutral inner
+projection cannot override those fields. Descriptor-only values require empty
+body/properties rather than discarding hidden payload. Message identifiers,
+format, group/segment/order metadata, typed property bytes/order, truncated copied
+and required lengths, buffers and attribute arrays are preserved. Cold/live
+checkpoint schemas, bytes, historical defaults and recovery policies are unchanged.
+
+Readers deny unknown, missing and duplicate fields, including explicitly nullable
+fields, unsupported schemas/tags, trailing data, malformed call/output/status
+combinations, non-SQL local UOW/cursor identities and digest disagreement.
+Before typed allocation a bounded streaming structural pass checks collection,
+string, nesting, field and aggregate input limits without a Value tree. Encoding
+uses a bounded writer. The original frozen validators still own public shape
+and resource legality; this storage schema is not IBM wire or a second public
+request encoding.
+
+Connected, Opened, MessageHandle and Subscribed are explicitly unsupported pending
+historical handle authority, even when their supplied live tokens are valid.
+No numeric token representation or reconstruction exists. The manager must later
+observe/adopt historical handles through the sole registry and compose typed
+receipt rows, exact original effect/UOW/core references, CAS and existing retention
+proofs. The strict stored-authority reader accepts no new namespace here. Public
+service/host dispatch, SAF, durable UOWs, replay publication/retention, participant,
+CardDemo and licensed acceptance remain required.

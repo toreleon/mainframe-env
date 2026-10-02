@@ -320,14 +320,14 @@ impl SnapshotMessage {
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct SnapshotProperty {
+pub(super) struct SnapshotProperty {
     name: String,
     kind: String,
     value: Vec<u8>,
 }
 
 impl SnapshotProperty {
-    fn from_property(property: &MqMessageProperty) -> Self {
+    pub(super) fn from_property(property: &MqMessageProperty) -> Self {
         let kind = match property.kind {
             MqPropertyType::Boolean => "boolean",
             MqPropertyType::ByteString => "byte-string",
@@ -347,7 +347,7 @@ impl SnapshotProperty {
         }
     }
 
-    fn into_property(self) -> Result<MqMessageProperty, MqDeliveryError> {
+    pub(super) fn into_property(self) -> Result<MqMessageProperty, MqDeliveryError> {
         let kind = match self.kind.as_str() {
             "boolean" => MqPropertyType::Boolean,
             "byte-string" => MqPropertyType::ByteString,

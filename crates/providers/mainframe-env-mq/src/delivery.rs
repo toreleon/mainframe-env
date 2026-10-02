@@ -1,6 +1,7 @@
 //! Pure, bounded point-to-point MQ queue-manager transitions.
 
 pub(crate) mod checkpoint;
+pub(crate) mod replay;
 mod restart;
 
 use crate::{
