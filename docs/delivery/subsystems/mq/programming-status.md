@@ -969,3 +969,19 @@ bridge must compose before public registration. Pending owners survive cold
 restart without reassignment; no retention deletion or participant protocol is
 invented. Full security/recovery/participant/CardDemo/all-26 acceptance remains
 required, with only the licensed oracle human-skipped at zero credit.
+
+## Inherited module-ratchet repair
+
+The manager extracted three unchanged batch terminal-problem projection helpers
+into a bounded child module. Their production bodies are byte-identical apart
+from child visibility; no IBM semantic behavior changes. Batch service production
+size falls from 7,404 to 7,360, and its exact reviewed inventory ratchets downward
+from 7,402 to 7,360 rather than raising the ceiling. The child has 51 production
+lines. Earlier overage findings retain their actual pre-repair candidates.
+
+A bounded inventory comparison also exposed other existing mismatches: product
+assembly, package-v2, IMS service and CardDemo conformance exceed their recorded
+counts; several previously extracted modules need lower-count inventory refresh.
+Those untouched inputs are not waived, and this batch repair is not a passing
+global module gate or full-release acceptance. They require distinct scoped
+repairs with verification before the final v0.15 candidate can pass that gate.

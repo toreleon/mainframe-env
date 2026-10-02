@@ -1,4 +1,7 @@
 mod dd_allocation;
+mod problem;
+
+use problem::{abend_code, ams_condition_code, problem_category};
 
 use crate::ams::{
     AmsCommand, AmsRegister, AmsStatement, compare, numeric_operand, operand, pair_operand,
@@ -6029,53 +6032,6 @@ fn parse_sdsf_file_controls(control: &str) -> Result<Vec<SdsfFileControl>, HostP
         Err(HostProblem::Malformed)
     } else {
         Ok(controls)
-    }
-}
-
-fn ams_condition_code(problem: &HostProblem) -> u8 {
-    match problem {
-        HostProblem::NotFound => 8,
-        HostProblem::Condition { response, .. } if *response <= 4 => 4,
-        HostProblem::Condition { response, .. } if *response <= 8 => 8,
-        HostProblem::Condition { response, .. } if *response <= 12 => 12,
-        HostProblem::Unsupported
-        | HostProblem::UnsupportedCapability { .. }
-        | HostProblem::Malformed
-        | HostProblem::Unauthorized
-        | HostProblem::IdempotencyConflict => 12,
-        _ => 16,
-    }
-}
-
-fn abend_code(problem: &HostProblem) -> Option<String> {
-    match problem {
-        HostProblem::Condition { name, .. } => name.strip_prefix("ABEND:").and_then(|code| {
-            (!code.is_empty()
-                && code.len() <= 16
-                && code
-                    .bytes()
-                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit()))
-            .then(|| code.to_string())
-        }),
-        _ => None,
-    }
-}
-
-fn problem_category(problem: &HostProblem) -> &'static str {
-    match problem {
-        HostProblem::Malformed => "malformed",
-        HostProblem::Unsupported | HostProblem::UnsupportedCapability { .. } => "unsupported",
-        HostProblem::NotFound => "not-found",
-        HostProblem::Condition { .. } => "condition",
-        HostProblem::Unauthorized => "unauthorized",
-        HostProblem::Cancelled => "cancelled",
-        HostProblem::TimedOut => "timed-out",
-        HostProblem::ResourceExhausted => "resource-exhausted",
-        HostProblem::ProviderFailure => "provider-failure",
-        HostProblem::InfrastructureFailure => "infrastructure-failure",
-        HostProblem::MissingIdempotency => "missing-idempotency",
-        HostProblem::IdempotencyConflict => "idempotency-conflict",
-        HostProblem::UnknownOutcome => "unknown-outcome",
     }
 }
 
