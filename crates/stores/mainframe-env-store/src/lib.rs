@@ -8,6 +8,7 @@ mod local_artifact;
 mod memory;
 mod postgres;
 mod postgres_artifact;
+mod publication;
 mod retention;
 mod runtime;
 mod sqlite;

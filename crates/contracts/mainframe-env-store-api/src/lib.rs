@@ -43,8 +43,11 @@
 
 #![forbid(unsafe_code)]
 
+mod audited_publication;
 mod model;
 mod traits;
+
+pub use audited_publication::{AuditedProviderPublication, MAX_AUDITED_PROVIDER_MUTATIONS};
 
 pub use model::{
     ArchivedRetentionRow, ArtifactRecord, ArtifactStoreHealth, CheckpointRecord,

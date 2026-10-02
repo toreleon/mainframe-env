@@ -62,6 +62,7 @@
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
     "docs/decisions/0028-mq-shared-handle-kernel.md",
+    "docs/decisions/0029-audited-provider-publication.md",
     "docs/decisions/0030-mq-host-lifecycle-directory.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
@@ -293,6 +294,10 @@
         {
           "label": "ADR-0028: Shared MQ handle-family kernel",
           "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
+        },
+        {
+          "label": "ADR-0029: Audited provider publication under a retained intent",
+          "path": "docs/decisions/0029-audited-provider-publication.md"
         },
         {
           "label": "ADR-0030: Private MQ host lifecycle directory",

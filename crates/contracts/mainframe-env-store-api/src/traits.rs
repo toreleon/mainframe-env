@@ -381,6 +381,18 @@ pub trait IdempotencyStore: Send + Sync {
 
 /// Versioned per-object provider state and atomic mutation batches.
 pub trait ProviderStateStore: AuditSink + Send + Sync {
+    /// Atomically assert an exact live canonical coordinator intent and publish
+    /// bounded provider rows plus their typed audit. Core completion remains
+    /// coordinator-owned. No transaction may span provider/SAF dispatch.
+    ///
+    /// Empty mutations permit an audit-only decision; denial cannot mutate rows.
+    /// Unsupported adapters fail without a sequential rows/audit fallback.
+    fn publish_provider_states_audited(
+        &self,
+        _request: crate::AuditedProviderPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Return a positive durable tick no lower than `observed_floor` or any
     /// previously observed floor.
     ///

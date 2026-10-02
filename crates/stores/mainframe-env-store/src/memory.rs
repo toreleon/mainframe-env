@@ -32,6 +32,7 @@ use std::sync::{Mutex, MutexGuard};
 
 mod container_retention;
 mod journal;
+mod publication;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StoreLimits {
@@ -1220,97 +1221,14 @@ impl ProviderStateStore for MemoryStore {
         &self,
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
-        if mutations.is_empty() {
-            return Err(StoreError::InvalidTransition);
-        }
-        let mut state = self.lock()?;
-        let limits = self.limits;
-        let staging_limits = StoreLimits {
-            max_provider_state: usize::MAX,
-            max_total_blob_bytes: usize::MAX,
-            ..limits
-        };
-        journal::journaled(&mut state, |state, journal| {
-            for mutation in mutations {
-                match mutation {
-                    ProviderStateMutation::Put(write) => {
-                        let key = (write.record.namespace.clone(), write.record.key.clone());
-                        journal.touch_provider_state(state, &key);
-                        journal.touch_blob_bytes(state);
-                        journal.touch_provider_epoch(state);
-                        Self::put_provider_state_locked(
-                            state,
-                            write.record,
-                            write.expected_version,
-                            staging_limits,
-                        )?;
-                    }
-                    ProviderStateMutation::Delete {
-                        namespace,
-                        key,
-                        expected_version,
-                    } => {
-                        if namespace.is_empty() || key.is_empty() || expected_version == 0 {
-                            return Err(StoreError::Conflict);
-                        }
-                        let map_key = (namespace, key);
-                        let current = state
-                            .provider_state
-                            .get(&map_key)
-                            .ok_or(StoreError::NotFound)?;
-                        if current.version != expected_version {
-                            return Err(StoreError::Conflict);
-                        }
-                        let bytes = current.payload.len();
-                        journal.touch_provider_state(state, &map_key);
-                        journal.touch_blob_bytes(state);
-                        journal.touch_provider_epoch(state);
-                        state.provider_state.remove(&map_key);
-                        state.blob_bytes = state.blob_bytes.saturating_sub(bytes);
-                        state.provider_epoch = state
-                            .provider_epoch
-                            .checked_add(1)
-                            .ok_or(StoreError::CapacityExceeded)?;
-                    }
-                    ProviderStateMutation::Move {
-                        record,
-                        old_key,
-                        expected_version,
-                    } => {
-                        record.validate_move(&old_key, expected_version, limits.max_blob_bytes)?;
-                        let old_map_key = (record.namespace.clone(), old_key);
-                        let new_map_key = (record.namespace.clone(), record.key.clone());
-                        let old = state
-                            .provider_state
-                            .get(&old_map_key)
-                            .ok_or(StoreError::Conflict)?;
-                        if old.version != expected_version
-                            || state.provider_state.contains_key(&new_map_key)
-                        {
-                            return Err(StoreError::Conflict);
-                        }
-                        let old_bytes = old.payload.len();
-                        journal.touch_provider_state(state, &old_map_key);
-                        journal.touch_provider_state(state, &new_map_key);
-                        journal.touch_blob_bytes(state);
-                        Self::reserve_blob(state, old_bytes, record.payload.len(), staging_limits)?;
-                        journal.touch_provider_epoch(state);
-                        state.provider_state.remove(&old_map_key);
-                        state.provider_state.insert(new_map_key, record);
-                        state.provider_epoch = state
-                            .provider_epoch
-                            .checked_add(1)
-                            .ok_or(StoreError::CapacityExceeded)?;
-                    }
-                }
-            }
-            if state.provider_state.len() > limits.max_provider_state
-                || state.blob_bytes > limits.max_total_blob_bytes
-            {
-                return Err(StoreError::CapacityExceeded);
-            }
-            Ok(())
-        })
+        self.mutate_provider_rows(mutations)
+    }
+
+    fn publish_provider_states_audited(
+        &self,
+        request: mainframe_env_store_api::AuditedProviderPublication,
+    ) -> Result<(), StoreError> {
+        self.publish_audited(request)
     }
 
     fn archive_provider_state_replacement(

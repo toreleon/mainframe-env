@@ -14,6 +14,7 @@ use tokio::runtime::Builder;
 
 mod container_retention;
 mod provider_retention;
+mod publication;
 use provider_retention::validate_sqlite_provider_dependency;
 
 fn derived_archive_bytes(max_payload_bytes: usize, max_rows: usize) -> u64 {
@@ -1276,123 +1277,14 @@ impl ProviderStateStore for SqliteStateStore {
         &self,
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
-        if mutations.is_empty() {
-            return Err(StoreError::InvalidTransition);
-        }
-        for mutation in &mutations {
-            if let ProviderStateMutation::Put(write) = mutation {
-                write.record.validate_write(self.max_payload_bytes)?;
-            }
-        }
-        block_on(&self.runtime, async {
-            let mut transaction = self
-                .pool
-                .begin()
-                .await
-                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-            for mutation in mutations {
-                let affected = match mutation {
-                    ProviderStateMutation::Put(write) => {
-                        let record = write.record;
-                        if let Some(expected) = write.expected_version {
-                            if record.version
-                                != expected.checked_add(1).ok_or(StoreError::Conflict)?
-                            {
-                                return Err(StoreError::Conflict);
-                            }
-                            sqlx::query(
-                                "UPDATE provider_state SET version=?,payload=? WHERE namespace=? AND key=? AND version=?",
-                            )
-                            .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
-                            .bind(record.payload)
-                            .bind(record.namespace)
-                            .bind(record.key)
-                            .bind(i64::try_from(expected).map_err(|_| StoreError::Conflict)?)
-                            .execute(&mut *transaction)
-                            .await
-                            .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                            .rows_affected()
-                        } else {
-                            if record.version != 1 {
-                                return Err(StoreError::Conflict);
-                            }
-                            sqlx::query(
-                                "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) VALUES(?,?,1,?)",
-                            )
-                            .bind(record.namespace)
-                            .bind(record.key)
-                            .bind(record.payload)
-                            .execute(&mut *transaction)
-                            .await
-                            .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                            .rows_affected()
-                        }
-                    }
-                    ProviderStateMutation::Delete {
-                        namespace,
-                        key,
-                        expected_version,
-                    } => {
-                        if namespace.is_empty() || key.is_empty() || expected_version == 0 {
-                            return Err(StoreError::Conflict);
-                        }
-                        sqlx::query(
-                            "DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?",
-                        )
-                        .bind(namespace)
-                        .bind(key)
-                        .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
-                        .execute(&mut *transaction)
-                        .await
-                        .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                        .rows_affected()
-                    }
-                    ProviderStateMutation::Move {
-                        record,
-                        old_key,
-                        expected_version,
-                    } => {
-                        record.validate_move(&old_key, expected_version, self.max_payload_bytes)?;
-                        let inserted = sqlx::query(
-                            "INSERT OR IGNORE INTO provider_state(namespace,key,version,payload) VALUES(?,?,?,?)",
-                        )
-                        .bind(&record.namespace)
-                        .bind(&record.key)
-                        .bind(i64::try_from(record.version).map_err(|_| StoreError::Conflict)?)
-                        .bind(&record.payload)
-                        .execute(&mut *transaction)
-                        .await
-                        .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                        .rows_affected();
-                        let deleted = sqlx::query(
-                            "DELETE FROM provider_state WHERE namespace=? AND key=? AND version=?",
-                        )
-                        .bind(&record.namespace)
-                        .bind(old_key)
-                        .bind(i64::try_from(expected_version).map_err(|_| StoreError::Conflict)?)
-                        .execute(&mut *transaction)
-                        .await
-                        .map_err(|error| StoreError::Infrastructure(error.to_string()))?
-                        .rows_affected();
-                        u64::from(inserted == 1 && deleted == 1)
-                    }
-                };
-                if affected != 1 {
-                    return Err(StoreError::Conflict);
-                }
-            }
-            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM provider_state")
-                .fetch_one(&mut *transaction)
-                .await
-                .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-            if usize::try_from(count).map_err(|_| StoreError::CapacityExceeded)? > self.max_rows {
-                return Err(StoreError::CapacityExceeded);
-            }
-            transaction
-                .commit()
-                .await
-                .map_err(|error| StoreError::Infrastructure(error.to_string()))
-        })?
+        self.mutate_provider_rows(mutations)
+    }
+
+    fn publish_provider_states_audited(
+        &self,
+        request: mainframe_env_store_api::AuditedProviderPublication,
+    ) -> Result<(), StoreError> {
+        self.publish_audited(request)
     }
 
     fn archive_provider_state_replacement(

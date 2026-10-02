@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 226,
+    "markdown_documents": 227,
     "navigation_groups": 6,
-    "normative_documents": 60,
+    "normative_documents": 61,
     "xtask_commands": 213
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 116,
-      "sha256": "sha256:afd24994461caeac692e6d651b8f222d8cf4c23940e55edb77da97fd70a2f7eb",
+      "relative_links": 117,
+      "sha256": "sha256:813d67b4bea0298e475447498467bec8a39d06bb5619a566293f3e3bcc0c1049",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -571,9 +571,9 @@
       "normative": true,
       "owner": "store adapters and core-server composition",
       "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "PostgreSQL quotas, shared immutable artifacts, and local publication durability",
-      "sha256": "sha256:0604bb711feefd94c4440780f88fe8cf8fa03d95bbbd02285ca9fd6ac1f683f0",
+      "sha256": "sha256:79584cb43df7850e120d602d510d44c32dee0eac000840b16f9f77088b74560c",
       "status": "Implemented",
       "title": "Durable storage profile",
       "xtask_commands": 0
@@ -972,6 +972,18 @@
       "sha256": "sha256:7f84e5e85307fde1a45f1a1b7ce32b6a618fd2499ae4a66df101ab6a295f8173",
       "status": "Proposed",
       "title": "Shared MQ handle-family kernel",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "store-contract and adapter maintainers",
+      "path": "docs/decisions/0029-audited-provider-publication.md",
+      "relative_links": 0,
+      "scope": "additive Memory/SQLite publication primitive for v0.15 integration",
+      "sha256": "sha256:cda624eea2e595d5c899e57f8051704afc5e592cd2262aaa4fd7fb24ee81d7ba",
+      "status": "Proposed",
+      "title": "Audited provider publication under a retained intent",
       "xtask_commands": 0
     },
     {
@@ -2280,6 +2292,10 @@
           "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
         },
         {
+          "label": "ADR-0029: Audited provider publication under a retained intent",
+          "path": "docs/decisions/0029-audited-provider-publication.md"
+        },
+        {
           "label": "ADR-0030: Private MQ host lifecycle directory",
           "path": "docs/decisions/0030-mq-host-lifecycle-directory.md"
         },
@@ -2532,7 +2548,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:f04b53c68975b056c643b6182fa375ac4e58412316c71f6c7d05fb863c8cac82",
+  "registry_sha256": "sha256:63efde3e66bdbce085fa82508debd2d55bf9825b0df328e75c8ff1a40735da9d",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

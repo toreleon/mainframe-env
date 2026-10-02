@@ -31,6 +31,7 @@ enum Entry {
     BlobBytes(usize),
     ProviderEpoch(u64),
     NextAuditOrdinal(u64),
+    LogicalTick(u64),
 }
 
 /// Records the prior value of every `State` entry a hot-path method is
@@ -53,6 +54,9 @@ fn set_or_remove<K: Ord, V>(map: &mut std::collections::BTreeMap<K, V>, key: K, 
 }
 
 impl Journal {
+    pub(super) fn touch_logical_tick(&mut self, state: &State) {
+        self.entries.push(Entry::LogicalTick(state.logical_tick));
+    }
     pub(super) fn touch_execution(&mut self, state: &State, id: &ExecutionId) {
         self.entries.push(Entry::Execution(
             id.clone(),
@@ -147,6 +151,7 @@ impl Journal {
                 Entry::BlobBytes(prior) => state.blob_bytes = prior,
                 Entry::ProviderEpoch(prior) => state.provider_epoch = prior,
                 Entry::NextAuditOrdinal(prior) => state.next_audit_ordinal = prior,
+                Entry::LogicalTick(prior) => state.logical_tick = prior,
             }
         }
     }
