@@ -30,6 +30,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TRIGGERLEVEL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ATIFACILITY", values: &["NOTERMINAL", "TERMINAL"] },
+            CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
+            CicsApplicationCvdaDomain { option: "OPENSTATUS", values: &["CLOSED", "OPEN"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -67,6 +70,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TRIGGERLEVEL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ATIFACILITY", values: &["NOTERMINAL", "TERMINAL"] },
+                    CicsApplicationCvdaDomain { option: "ENABLESTATUS", values: &["DISABLED", "ENABLED"] },
+                    CicsApplicationCvdaDomain { option: "OPENSTATUS", values: &["CLOSED", "OPEN"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -620,6 +626,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TSQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ACTION", values: &["DELETE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -647,6 +654,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TSQNAME", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(16) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ACTION", values: &["DELETE"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -682,6 +690,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TSQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ACTION", values: &["DELETE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -709,6 +718,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TSQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ACTION", values: &["DELETE"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

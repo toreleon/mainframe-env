@@ -386,6 +386,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "STATUS", values: &["DISABLED", "ENABLED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -411,6 +412,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "STATUS", values: &["DISABLED", "ENABLED"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -805,6 +807,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ACTION", values: &["FLUSH", "RESET"] },
+            CicsApplicationCvdaDomain { option: "STATUS", values: &["DISABLED", "ENABLED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -834,6 +838,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ACTION", values: &["FLUSH", "RESET"] },
+                    CicsApplicationCvdaDomain { option: "STATUS", values: &["DISABLED", "ENABLED"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

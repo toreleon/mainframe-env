@@ -242,6 +242,11 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TSMODEL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["CREATESPI", "CSDAPI", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "LOCATION", values: &["AUXILIARY", "MAIN"] },
+            CicsApplicationCvdaDomain { option: "RECOVSTATUS", values: &["NOTRECOVABLE", "RECOVERABLE"] },
+            CicsApplicationCvdaDomain { option: "SECURITYST", values: &["NOSECURITY", "SECURITY"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -281,6 +286,11 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TSMODEL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["CREATESPI", "CSDAPI", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "LOCATION", values: &["AUXILIARY", "MAIN"] },
+                    CicsApplicationCvdaDomain { option: "RECOVSTATUS", values: &["NOTRECOVABLE", "RECOVERABLE"] },
+                    CicsApplicationCvdaDomain { option: "SECURITYST", values: &["NOSECURITY", "SECURITY"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -314,6 +324,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TSPOOL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::BoundedAmbiguity, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CONNSTATUS", values: &["CONNECTED", "UNCONNECTED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -360,6 +371,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TSQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::InputOutput, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "LOCATION", values: &["AUXILIARY", "MAIN"] },
+            CicsApplicationCvdaDomain { option: "RECOVSTATUS", values: &["NOTRECOVERABLE", "RECOVERABLE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -395,6 +408,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TSQNAME", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(16) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "LOCATION", values: &["AUXILIARY", "MAIN"] },
+                    CicsApplicationCvdaDomain { option: "RECOVSTATUS", values: &["NOTRECOVERABLE", "RECOVERABLE"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -442,6 +457,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TSQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::InputOutput, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "LOCATION", values: &["AUXILIARY", "MAIN"] },
+            CicsApplicationCvdaDomain { option: "RECOVSTATUS", values: &["NOTRECOVERABLE", "RECOVERABLE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -477,6 +494,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "TSQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "LOCATION", values: &["AUXILIARY", "MAIN"] },
+                    CicsApplicationCvdaDomain { option: "RECOVSTATUS", values: &["NOTRECOVERABLE", "RECOVERABLE"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

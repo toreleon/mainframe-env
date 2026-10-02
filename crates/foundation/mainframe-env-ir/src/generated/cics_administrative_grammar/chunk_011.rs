@@ -560,6 +560,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "USECOUNT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "STATUS", values: &["FAILED", "OK"] },
+            CicsApplicationCvdaDomain { option: "SYSTEMLOG", values: &["NOSYSLOG", "SYSLOG"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -584,6 +586,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "USECOUNT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "STATUS", values: &["FAILED", "OK"] },
+                    CicsApplicationCvdaDomain { option: "SYSTEMLOG", values: &["NOSYSLOG", "SYSLOG"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

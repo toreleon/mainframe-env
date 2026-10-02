@@ -243,11 +243,41 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "LOGMESSAGE",
+                  "values": [
+                    "LOG",
+                    "NOLOG"
+                  ],
+                  "source_lines": [
+                    68,
+                    69,
+                    70,
+                    72
+                  ]
+                }
               ]
             },
             "source_lines": [
               65,
               67
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              68,
+              69,
+              70,
+              72
             ]
           }
         ]
@@ -923,7 +953,9 @@
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha8lr.html (The ATTRIBUTES option): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOGMESSAGE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createenqmodel.html sha256:ba7687a25315c351ebdb488acf2f6701c212fe11a2c5c56f10131a43da5169b9 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "LOGMESSAGE(LOG/NOLOG) is closed by this command's own option paragraph; CSDL resource-attribute logging is separate from durable product audit. No default is derived from flattened syntax, and embedded ATTRIBUTES symbolic lists are not top-level option domains. CREATE implicit-syncpoint early-exception qualification does not establish rollback of installed resource definitions."
       ]
     },
     {
@@ -1164,11 +1196,41 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "LOGMESSAGE",
+                  "values": [
+                    "LOG",
+                    "NOLOG"
+                  ],
+                  "source_lines": [
+                    62,
+                    63,
+                    64,
+                    66
+                  ]
+                }
               ]
             },
             "source_lines": [
               58,
               61
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              62,
+              63,
+              64,
+              66
             ]
           }
         ]
@@ -1815,7 +1877,9 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/reference-system-management/resources/journalmodel/dfha4_summary.html (JOURNALMODEL resources): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOGMESSAGE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createjournalmodel.html sha256:22a1e8515a6c5a9ca4185a99655dc952fbd9d2880f589deba123fd69fae8c5b8 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "LOGMESSAGE(LOG/NOLOG) is closed by this command's own option paragraph; CSDL resource-attribute logging is separate from durable product audit. No default is derived from flattened syntax, and embedded ATTRIBUTES symbolic lists are not top-level option domains. CREATE implicit-syncpoint early-exception qualification does not establish rollback of installed resource definitions."
       ]
     },
     {
@@ -2056,11 +2120,41 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "LOGMESSAGE",
+                  "values": [
+                    "LOG",
+                    "NOLOG"
+                  ],
+                  "source_lines": [
+                    69,
+                    70,
+                    71,
+                    73
+                  ]
+                }
               ]
             },
             "source_lines": [
               75,
               77
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              69,
+              70,
+              71,
+              73
             ]
           }
         ]
@@ -2750,7 +2844,9 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/reference-system-management/resources/lsrpool/dfha4_summary.html (LSRPOOL resources): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOGMESSAGE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createlsrpool.html sha256:cc6873f0d33bf931d778fc5df60d37c93176c8c714188fa6f25ebb3b60fb9c2b (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "LOGMESSAGE(LOG/NOLOG) is closed by this command's own option paragraph; CSDL resource-attribute logging is separate from durable product audit. No default is derived from flattened syntax, and embedded ATTRIBUTES symbolic lists are not top-level option domains. CREATE implicit-syncpoint early-exception qualification does not establish rollback of installed resource definitions."
       ]
     },
     {
@@ -2991,11 +3087,41 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "LOGMESSAGE",
+                  "values": [
+                    "LOG",
+                    "NOLOG"
+                  ],
+                  "source_lines": [
+                    70,
+                    71,
+                    72,
+                    74
+                  ]
+                }
               ]
             },
             "source_lines": [
               76,
               78
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              70,
+              71,
+              72,
+              74
             ]
           }
         ]
@@ -3824,7 +3950,9 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/reference-system-management/resources/tdqueue/dfha4_summary.html (TDQUEUE resources): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOGMESSAGE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createtdqueue.html sha256:1f43175ddc013b70e1c435b136fdb31b64cb0ca750de2952ee626f3281ecb16b (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "LOGMESSAGE(LOG/NOLOG) is closed by this command's own option paragraph; CSDL resource-attribute logging is separate from durable product audit. No default is derived from flattened syntax, and embedded ATTRIBUTES symbolic lists are not top-level option domains. CREATE implicit-syncpoint early-exception qualification does not establish rollback of installed resource definitions."
       ]
     },
     {
@@ -4065,11 +4193,41 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "LOGMESSAGE",
+                  "values": [
+                    "LOG",
+                    "NOLOG"
+                  ],
+                  "source_lines": [
+                    63,
+                    64,
+                    65,
+                    67
+                  ]
+                }
               ]
             },
             "source_lines": [
               69,
               71
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              63,
+              64,
+              65,
+              67
             ]
           }
         ]
@@ -4785,7 +4943,9 @@
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha8lr.html (The ATTRIBUTES option): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOGMESSAGE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createtsmodel.html sha256:949195b4d7aba56441668ae55592f1b27590532e828095faf6aa3c76231543ae (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "LOGMESSAGE(LOG/NOLOG) is closed by this command's own option paragraph; CSDL resource-attribute logging is separate from durable product audit. No default is derived from flattened syntax, and embedded ATTRIBUTES symbolic lists are not top-level option domains. CREATE implicit-syncpoint early-exception qualification does not establish rollback of installed resource definitions."
       ]
     },
     {
@@ -7322,11 +7482,47 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "CONNSTATUS",
+                  "values": [
+                    "CONNECTED",
+                    "UNAVAILABLE",
+                    "UNCONNECTED"
+                  ],
+                  "source_lines": [
+                    38,
+                    40,
+                    42,
+                    43,
+                    47,
+                    51
+                  ]
+                }
               ]
             },
             "source_lines": [
               34,
               37
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CONNSTATUS",
+            "values": [
+              "CONNECTED",
+              "UNAVAILABLE",
+              "UNCONNECTED"
+            ],
+            "source_lines": [
+              38,
+              40,
+              42,
+              43,
+              47,
+              51
             ]
           }
         ]
@@ -7780,7 +7976,8 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha80w.html (Browsing resource definitions): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for CONNSTATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirecfdtpool.html sha256:c5cd217ddcda7ad18d66d8e3415e1ce40d3131d90b1ff4d645cdbcf3ae3f8f4e (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations."
       ]
     },
     {
@@ -8010,6 +8207,45 @@
             "option": "RESP2",
             "requires": [
               "RESP"
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "RELATION",
+            "values": [
+              "OWNER",
+              "WAITER"
+            ],
+            "source_lines": [
+              4,
+              15
+            ]
+          },
+          {
+            "option": "STATE",
+            "values": [
+              "ACTIVE",
+              "RETAINED"
+            ],
+            "source_lines": [
+              4,
+              15
+            ]
+          },
+          {
+            "option": "TYPE",
+            "values": [
+              "DATASET",
+              "EXECENQ",
+              "EXECENQADDR",
+              "FILE",
+              "TDQUEUE",
+              "TSQUEUE"
+            ],
+            "source_lines": [
+              4,
+              15
             ]
           }
         ]
@@ -8567,7 +8803,9 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
         "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
-        "ENQ authority SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireenq.html sha256:9a0448c39618e0db9d41b3bf56e57cafd0fa4a396f20f6ec8f6f0b40f399cbee parser4 establishes the UOWENQ synonym; its raw syntax SVG is flattened at parser15. Supplemental UOWENQ authority SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireuowenq.html sha256:3a7368c2114aff7f355bdfd74fc092dffa898019e4759e270254a1cb40c106d1 has raw syntax SVG at parser16 and START-filter prose at parser31-39,122-133,160-173,262-270. Both pinned diagrams settle alternative input-filter branches UOW, RESOURCE with RESLEN, or ENQSCOPE; UOWENQ164-165 requires RESLEN when RESOURCE is START input, and blank ENQSCOPE selects local. Retained source conflict: the ENQ filter choice has no empty bypass, while the UOWENQ filter choice has an empty bypass and UOWENQ39 explicitly describes a CICS-wide unfiltered START. Filter-omission applicability to ENQ remains Pending under these opposed authorities despite the synonym; no universal omission rule, default or licensed precedence is chosen. The input-filter alternatives do not restrict simultaneous independent NEXT output slots or require RESLEN solely because RESOURCE is a NEXT output. Complete browse request/receiver ABI, recognition, rejection/precedence and byte binding still require unregistered SSJL4D_6.x/system-programming/intro/dfha80w.html (expected SHA unknown) and remain Pending; no union-level filter exclusion/dependency, complete browse form or runtime/licensed truth is admitted."
+        "ENQ authority SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireenq.html sha256:9a0448c39618e0db9d41b3bf56e57cafd0fa4a396f20f6ec8f6f0b40f399cbee parser4 establishes the UOWENQ synonym; its raw syntax SVG is flattened at parser15. Supplemental UOWENQ authority SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireuowenq.html sha256:3a7368c2114aff7f355bdfd74fc092dffa898019e4759e270254a1cb40c106d1 has raw syntax SVG at parser16 and START-filter prose at parser31-39,122-133,160-173,262-270. Both pinned diagrams settle alternative input-filter branches UOW, RESOURCE with RESLEN, or ENQSCOPE; UOWENQ164-165 requires RESLEN when RESOURCE is START input, and blank ENQSCOPE selects local. Retained source conflict: the ENQ filter choice has no empty bypass, while the UOWENQ filter choice has an empty bypass and UOWENQ39 explicitly describes a CICS-wide unfiltered START. Filter-omission applicability to ENQ remains Pending under these opposed authorities despite the synonym; no universal omission rule, default or licensed precedence is chosen. The input-filter alternatives do not restrict simultaneous independent NEXT output slots or require RESLEN solely because RESOURCE is a NEXT output. Complete browse request/receiver ABI, recognition, rejection/precedence and byte binding still require unregistered SSJL4D_6.x/system-programming/intro/dfha80w.html (expected SHA unknown) and remain Pending; no union-level filter exclusion/dependency, complete browse form or runtime/licensed truth is admitted.",
+        "Finite symbolic CVDA memberships for RELATION, STATE, TYPE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireenq.html sha256:9a0448c39618e0db9d41b3bf56e57cafd0fa4a396f20f6ec8f6f0b40f399cbee (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "ENQ RELATION, STATE and TYPE domains use only the explicit primary synonym at parser4/15 and pinned UOWENQ 3a7368c2114aff7f355bdfd74fc092dffa898019e4759e270254a1cb40c106d1, baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12, option paragraphs149-159,174-183,194-234. Structured source_lines point to the primary join, not supplementary line numbers. General browse grammar and opposed ENQ/UOWENQ filter-omission semantics remain Pending; ENQSCOPE is an open character name, DURATION is elapsed seconds, neither is a finite CVDA. UOWENQ QUALLEN147 spells EXECQENQ, while its own TYPE202 member is EXECENQ; only the exact TYPE member is included. That spelling opposition remains Pending, without an invented alias or numeric equality."
       ]
     },
     {
@@ -8966,11 +9204,121 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "OVERRIDE",
+                    "SYSTEM"
+                  ],
+                  "source_lines": [
+                    44,
+                    45,
+                    46,
+                    47,
+                    49,
+                    51,
+                    53,
+                    55,
+                    57
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    91,
+                    92,
+                    93,
+                    94,
+                    96,
+                    99
+                  ]
+                },
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED",
+                    "WAITING"
+                  ],
+                  "source_lines": [
+                    106,
+                    108,
+                    110,
+                    112,
+                    116
+                  ]
+                }
               ]
             },
             "source_lines": [
               75,
               77
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              44,
+              45,
+              46,
+              47,
+              49,
+              51,
+              53,
+              55,
+              57
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              91,
+              92,
+              93,
+              94,
+              96,
+              99
+            ]
+          },
+          {
+            "option": "STATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED",
+              "WAITING"
+            ],
+            "source_lines": [
+              106,
+              108,
+              110,
+              112,
+              116
             ]
           }
         ]
@@ -9716,7 +10064,8 @@
         "Unpinned linked context SSJL4D_6.x/security/audit/auditing-resource-signature.html (Identifying changes to resources (resource signatures)): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/security/audit/resourcesigtable.html (Summary of the resource signature field values): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for CHANGEAGENT, INSTALLAGENT, STATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireenqmodel.html sha256:030acb6cd823b13942921e7f09cf756dc559d44d47bb0fdbdcaf4efa098fe9d5 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations."
       ]
     },
     {
@@ -10114,11 +10463,117 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "OVERRIDE"
+                  ],
+                  "source_lines": [
+                    50,
+                    51,
+                    52,
+                    53,
+                    55,
+                    57,
+                    59,
+                    61
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    79,
+                    80,
+                    81,
+                    82,
+                    84,
+                    87
+                  ]
+                },
+                {
+                  "option": "TYPE",
+                  "values": [
+                    "DUMMY",
+                    "MVS",
+                    "SMF"
+                  ],
+                  "source_lines": [
+                    108,
+                    109,
+                    110,
+                    112,
+                    115
+                  ]
+                }
               ]
             },
             "source_lines": [
               94,
               95
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE"
+            ],
+            "source_lines": [
+              50,
+              51,
+              52,
+              53,
+              55,
+              57,
+              59,
+              61
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              79,
+              80,
+              81,
+              82,
+              84,
+              87
+            ]
+          },
+          {
+            "option": "TYPE",
+            "values": [
+              "DUMMY",
+              "MVS",
+              "SMF"
+            ],
+            "source_lines": [
+              108,
+              109,
+              110,
+              112,
+              115
             ]
           }
         ]
@@ -10877,7 +11332,8 @@
         "Unpinned linked context SSJL4D_6.x/security/audit/auditing-resource-signature.html (Identifying changes to resources (resource signatures)): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/security/audit/resourcesigtable.html (Summary of the resource signature field values): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for CHANGEAGENT, INSTALLAGENT, TYPE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirejournalmodel.html sha256:39fbbf6535fecc667d3f6580a45ca4919a2a1c3d0501b0f69bfe7bc30a9ef4bc (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations."
       ]
     },
     {
@@ -11095,11 +11551,75 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED",
+                    "FAILED"
+                  ],
+                  "source_lines": [
+                    41,
+                    42,
+                    43,
+                    47,
+                    49
+                  ]
+                },
+                {
+                  "option": "TYPE",
+                  "values": [
+                    "DUMMY",
+                    "MVS",
+                    "SMF"
+                  ],
+                  "source_lines": [
+                    60,
+                    61,
+                    62,
+                    64,
+                    66
+                  ]
+                }
               ]
             },
             "source_lines": [
               36,
               40
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "STATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED",
+              "FAILED"
+            ],
+            "source_lines": [
+              41,
+              42,
+              43,
+              47,
+              49
+            ]
+          },
+          {
+            "option": "TYPE",
+            "values": [
+              "DUMMY",
+              "MVS",
+              "SMF"
+            ],
+            "source_lines": [
+              60,
+              61,
+              62,
+              64,
+              66
             ]
           }
         ]
@@ -11641,7 +12161,8 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha80w.html (Browsing resource definitions): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for STATUS, TYPE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirejournalname.html sha256:10d329dcc4d40f7a2ae6430a1ad330364a45757fd0ba34fd3f9134c4ad193958 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations."
       ]
     },
     {
@@ -12040,11 +12561,71 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "FAILED",
+                    "OK"
+                  ],
+                  "source_lines": [
+                    32,
+                    33,
+                    34,
+                    35,
+                    38
+                  ]
+                },
+                {
+                  "option": "SYSTEMLOG",
+                  "values": [
+                    "NOSYSLOG",
+                    "SYSLOG"
+                  ],
+                  "source_lines": [
+                    46,
+                    47,
+                    48,
+                    49,
+                    51
+                  ]
+                }
               ]
             },
             "source_lines": [
               40,
               45
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "STATUS",
+            "values": [
+              "FAILED",
+              "OK"
+            ],
+            "source_lines": [
+              32,
+              33,
+              34,
+              35,
+              38
+            ]
+          },
+          {
+            "option": "SYSTEMLOG",
+            "values": [
+              "NOSYSLOG",
+              "SYSLOG"
+            ],
+            "source_lines": [
+              46,
+              47,
+              48,
+              49,
+              51
             ]
           }
         ]
@@ -12557,7 +13138,8 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha80w.html (Browsing resource definitions): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for STATUS, SYSTEMLOG use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirestreamname.html sha256:4d5a95ceba64af354681e3f9a2c60effae0a7429ceba9cf39495bb994dbf69a1 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations."
       ]
     },
     {
@@ -13497,11 +14079,593 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "ATIFACILITY",
+                  "values": [
+                    "NOTAPPLIC",
+                    "NOTERMINAL",
+                    "TERMINAL"
+                  ],
+                  "source_lines": [
+                    72,
+                    75,
+                    79,
+                    80,
+                    82,
+                    84
+                  ]
+                },
+                {
+                  "option": "BLOCKFORMAT",
+                  "values": [
+                    "BLOCKED",
+                    "NOTAPPLIC",
+                    "UNBLOCKED"
+                  ],
+                  "source_lines": [
+                    110,
+                    113,
+                    115,
+                    116,
+                    118,
+                    121
+                  ]
+                },
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "OVERRIDE",
+                    "SYSTEM"
+                  ],
+                  "source_lines": [
+                    126,
+                    127,
+                    128,
+                    129,
+                    131,
+                    133,
+                    135,
+                    137,
+                    139
+                  ]
+                },
+                {
+                  "option": "DISPOSITION",
+                  "values": [
+                    "MOD",
+                    "NOTAPPLIC",
+                    "OLD",
+                    "SHARE"
+                  ],
+                  "source_lines": [
+                    167,
+                    170,
+                    172,
+                    182,
+                    185,
+                    187
+                  ]
+                },
+                {
+                  "option": "EMPTYSTATUS",
+                  "values": [
+                    "EMPTY",
+                    "FULL",
+                    "NOTAPPLIC",
+                    "NOTEMPTY"
+                  ],
+                  "source_lines": [
+                    197,
+                    200,
+                    205,
+                    206,
+                    208,
+                    210,
+                    213
+                  ]
+                },
+                {
+                  "option": "ENABLESTATUS",
+                  "values": [
+                    "DISABLED",
+                    "DISABLING",
+                    "ENABLED",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    216,
+                    219,
+                    223,
+                    224,
+                    228,
+                    230,
+                    232
+                  ]
+                },
+                {
+                  "option": "ERROROPTION",
+                  "values": [
+                    "IGNORERR",
+                    "SKIP"
+                  ],
+                  "source_lines": [
+                    234,
+                    237,
+                    238,
+                    239,
+                    241
+                  ]
+                },
+                {
+                  "option": "INDOUBT",
+                  "values": [
+                    "QUEUE",
+                    "REJECT"
+                  ],
+                  "source_lines": [
+                    249,
+                    252,
+                    254,
+                    255,
+                    266
+                  ]
+                },
+                {
+                  "option": "INDOUBTWAIT",
+                  "values": [
+                    "NOWAIT",
+                    "WAIT"
+                  ],
+                  "source_lines": [
+                    274,
+                    277,
+                    280,
+                    281,
+                    285
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "GRPLIST",
+                    "SYSTEM"
+                  ],
+                  "source_lines": [
+                    292,
+                    293,
+                    294,
+                    295,
+                    297,
+                    300,
+                    302
+                  ]
+                },
+                {
+                  "option": "IOTYPE",
+                  "values": [
+                    "INPUT",
+                    "NOTAPPLIC",
+                    "OUTPUT",
+                    "RDBACK"
+                  ],
+                  "source_lines": [
+                    309,
+                    312,
+                    313,
+                    314,
+                    316,
+                    318,
+                    320
+                  ]
+                },
+                {
+                  "option": "OPENSTATUS",
+                  "values": [
+                    "CLOSED",
+                    "CLOSING",
+                    "NOTAPPLIC",
+                    "OPEN",
+                    "OPENING"
+                  ],
+                  "source_lines": [
+                    332,
+                    335,
+                    336,
+                    337,
+                    339,
+                    341,
+                    343,
+                    345
+                  ]
+                },
+                {
+                  "option": "PRINTCONTROL",
+                  "values": [
+                    "ASACTL",
+                    "MCHCTL",
+                    "NOCTL",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    347,
+                    350,
+                    356,
+                    357,
+                    359,
+                    361,
+                    363
+                  ]
+                },
+                {
+                  "option": "RECORDFORMAT",
+                  "values": [
+                    "FIXED",
+                    "NOTAPPLIC",
+                    "UNDEFINED",
+                    "VARIABLE"
+                  ],
+                  "source_lines": [
+                    365,
+                    368,
+                    369,
+                    370,
+                    372,
+                    374,
+                    376
+                  ]
+                },
+                {
+                  "option": "RECOVSTATUS",
+                  "values": [
+                    "LOGICAL",
+                    "NOTAPPLIC",
+                    "NOTRECOVABLE",
+                    "PHYSICAL"
+                  ],
+                  "source_lines": [
+                    385,
+                    388,
+                    389,
+                    391,
+                    393,
+                    395,
+                    397
+                  ]
+                },
+                {
+                  "option": "REWIND",
+                  "values": [
+                    "LEAVE",
+                    "REREAD"
+                  ],
+                  "source_lines": [
+                    413,
+                    416,
+                    418,
+                    421
+                  ]
+                },
+                {
+                  "option": "TYPE",
+                  "values": [
+                    "EXTRA",
+                    "INDIRECT",
+                    "INTRA",
+                    "REMOTE"
+                  ],
+                  "source_lines": [
+                    440,
+                    442,
+                    443,
+                    445,
+                    447,
+                    449
+                  ]
+                }
               ]
             },
             "source_lines": [
               427,
               430
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ATIFACILITY",
+            "values": [
+              "NOTAPPLIC",
+              "NOTERMINAL",
+              "TERMINAL"
+            ],
+            "source_lines": [
+              72,
+              75,
+              79,
+              80,
+              82,
+              84
+            ]
+          },
+          {
+            "option": "BLOCKFORMAT",
+            "values": [
+              "BLOCKED",
+              "NOTAPPLIC",
+              "UNBLOCKED"
+            ],
+            "source_lines": [
+              110,
+              113,
+              115,
+              116,
+              118,
+              121
+            ]
+          },
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              126,
+              127,
+              128,
+              129,
+              131,
+              133,
+              135,
+              137,
+              139
+            ]
+          },
+          {
+            "option": "DISPOSITION",
+            "values": [
+              "MOD",
+              "NOTAPPLIC",
+              "OLD",
+              "SHARE"
+            ],
+            "source_lines": [
+              167,
+              170,
+              172,
+              182,
+              185,
+              187
+            ]
+          },
+          {
+            "option": "EMPTYSTATUS",
+            "values": [
+              "EMPTY",
+              "FULL",
+              "NOTAPPLIC",
+              "NOTEMPTY"
+            ],
+            "source_lines": [
+              197,
+              200,
+              205,
+              206,
+              208,
+              210,
+              213
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "DISABLING",
+              "ENABLED",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              216,
+              219,
+              223,
+              224,
+              228,
+              230,
+              232
+            ]
+          },
+          {
+            "option": "ERROROPTION",
+            "values": [
+              "IGNORERR",
+              "SKIP"
+            ],
+            "source_lines": [
+              234,
+              237,
+              238,
+              239,
+              241
+            ]
+          },
+          {
+            "option": "INDOUBT",
+            "values": [
+              "QUEUE",
+              "REJECT"
+            ],
+            "source_lines": [
+              249,
+              252,
+              254,
+              255,
+              266
+            ]
+          },
+          {
+            "option": "INDOUBTWAIT",
+            "values": [
+              "NOWAIT",
+              "WAIT"
+            ],
+            "source_lines": [
+              274,
+              277,
+              280,
+              281,
+              285
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              292,
+              293,
+              294,
+              295,
+              297,
+              300,
+              302
+            ]
+          },
+          {
+            "option": "IOTYPE",
+            "values": [
+              "INPUT",
+              "NOTAPPLIC",
+              "OUTPUT",
+              "RDBACK"
+            ],
+            "source_lines": [
+              309,
+              312,
+              313,
+              314,
+              316,
+              318,
+              320
+            ]
+          },
+          {
+            "option": "OPENSTATUS",
+            "values": [
+              "CLOSED",
+              "CLOSING",
+              "NOTAPPLIC",
+              "OPEN",
+              "OPENING"
+            ],
+            "source_lines": [
+              332,
+              335,
+              336,
+              337,
+              339,
+              341,
+              343,
+              345
+            ]
+          },
+          {
+            "option": "PRINTCONTROL",
+            "values": [
+              "ASACTL",
+              "MCHCTL",
+              "NOCTL",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              347,
+              350,
+              356,
+              357,
+              359,
+              361,
+              363
+            ]
+          },
+          {
+            "option": "RECORDFORMAT",
+            "values": [
+              "FIXED",
+              "NOTAPPLIC",
+              "UNDEFINED",
+              "VARIABLE"
+            ],
+            "source_lines": [
+              365,
+              368,
+              369,
+              370,
+              372,
+              374,
+              376
+            ]
+          },
+          {
+            "option": "RECOVSTATUS",
+            "values": [
+              "LOGICAL",
+              "NOTAPPLIC",
+              "NOTRECOVABLE",
+              "PHYSICAL"
+            ],
+            "source_lines": [
+              385,
+              388,
+              389,
+              391,
+              393,
+              395,
+              397
+            ]
+          },
+          {
+            "option": "REWIND",
+            "values": [
+              "LEAVE",
+              "REREAD"
+            ],
+            "source_lines": [
+              413,
+              416,
+              418,
+              421
+            ]
+          },
+          {
+            "option": "TYPE",
+            "values": [
+              "EXTRA",
+              "INDIRECT",
+              "INTRA",
+              "REMOTE"
+            ],
+            "source_lines": [
+              440,
+              442,
+              443,
+              445,
+              447,
+              449
             ]
           }
         ]
@@ -15571,7 +16735,9 @@
         "Unpinned linked context SSJL4D_6.x/security/audit/resourcesigtable.html (Summary of the resource signature field values): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha80y.html (Null values): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for ATIFACILITY, BLOCKFORMAT, CHANGEAGENT, DISPOSITION, EMPTYSTATUS, ENABLESTATUS, ERROROPTION, INDOUBT, INDOUBTWAIT, INSTALLAGENT, IOTYPE, OPENSTATUS, PRINTCONTROL, RECORDFORMAT, RECOVSTATUS, REWIND, TYPE use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretdqueue.html sha256:283d7ea7e426ba67cffdb6f19c1ca0e991312e75bd6f3004d92bd242ead10196 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "INQUIRE TDQUEUE finite memberships describe only the queue kinds and states stated in each option paragraph. Primary24-60 allows nulls/inapplicable outputs and limits INDIRECT/REMOTE local information; missing registered Null values dfha80y.html pin remains Pending. No new null symbol is invented for ERROROPTION, INDOUBT, INDOUBTWAIT or REWIND, and no full receiver result is asserted in an inapplicable context. DISPOSITION SHARE is the returned symbol; SHR is only the stated CEDA abbreviation. SYSOUTCLASS syntax(cvda) conflicts with option423-426(data-area)/single-character prose, so no SYSOUTCLASS CVDA domain is added and the existing one-character extent remains exact."
       ]
     },
     {
@@ -16384,11 +17550,171 @@
                     "RESP"
                   ]
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "OVERRIDE"
+                  ],
+                  "source_lines": [
+                    38,
+                    39,
+                    40,
+                    41,
+                    43,
+                    45,
+                    47,
+                    49
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "CREATESPI",
+                    "CSDAPI",
+                    "GRPLIST"
+                  ],
+                  "source_lines": [
+                    84,
+                    85,
+                    86,
+                    87,
+                    89,
+                    92
+                  ]
+                },
+                {
+                  "option": "LOCATION",
+                  "values": [
+                    "AUXILIARY",
+                    "MAIN"
+                  ],
+                  "source_lines": [
+                    99,
+                    100,
+                    101,
+                    102,
+                    104
+                  ]
+                },
+                {
+                  "option": "RECOVSTATUS",
+                  "values": [
+                    "NOTRECOVABLE",
+                    "RECOVERABLE"
+                  ],
+                  "source_lines": [
+                    111,
+                    112,
+                    113,
+                    114,
+                    116
+                  ]
+                },
+                {
+                  "option": "SECURITYST",
+                  "values": [
+                    "NOSECURITY",
+                    "SECURITY"
+                  ],
+                  "source_lines": [
+                    124,
+                    125,
+                    126,
+                    127,
+                    129
+                  ]
+                }
               ]
             },
             "source_lines": [
               132,
               134
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE"
+            ],
+            "source_lines": [
+              38,
+              39,
+              40,
+              41,
+              43,
+              45,
+              47,
+              49
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST"
+            ],
+            "source_lines": [
+              84,
+              85,
+              86,
+              87,
+              89,
+              92
+            ]
+          },
+          {
+            "option": "LOCATION",
+            "values": [
+              "AUXILIARY",
+              "MAIN"
+            ],
+            "source_lines": [
+              99,
+              100,
+              101,
+              102,
+              104
+            ]
+          },
+          {
+            "option": "RECOVSTATUS",
+            "values": [
+              "NOTRECOVABLE",
+              "RECOVERABLE"
+            ],
+            "source_lines": [
+              111,
+              112,
+              113,
+              114,
+              116
+            ]
+          },
+          {
+            "option": "SECURITYST",
+            "values": [
+              "NOSECURITY",
+              "SECURITY"
+            ],
+            "source_lines": [
+              124,
+              125,
+              126,
+              127,
+              129
             ]
           }
         ]
@@ -17239,7 +18565,9 @@
         "Unpinned linked context SSJL4D_6.x/security/audit/auditing-resource-signature.html (Identifying changes to resources (resource signatures)): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/security/audit/resourcesigtable.html (Summary of the resource signature field values): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for CHANGEAGENT, INSTALLAGENT, LOCATION, RECOVSTATUS, SECURITYST use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretsmodel.html sha256:ad43145e9ccdae311834377e4fb56fc6bc2fca122ce90f04518f162a327ec485 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "Exact symbolic spelling is local to the pinned body: model RECOVSTATUS uses NOTRECOVABLE; queue RECOVSTATUS uses NOTRECOVERABLE. This slice supplies no numeric alias/equivalence, queue-to-model output equality, physical recovery proof or expiry/default normalization. Shared/remote/CICS-created/recoverable expiry exceptions and browse receiver lifetimes remain unchanged."
       ]
     },
     {
@@ -17346,6 +18674,21 @@
             "option": "RESP2",
             "requires": [
               "RESP"
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CONNSTATUS",
+            "values": [
+              "CONNECTED",
+              "UNCONNECTED"
+            ],
+            "source_lines": [
+              39,
+              41,
+              43,
+              45
             ]
           }
         ]
@@ -17766,7 +19109,9 @@
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/system-programming/intro/dfha80w.html (Browsing resource definitions): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for CONNSTATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretspool.html sha256:a3065a7654c412ef66f88f2eecdf05dbeadbeae2f72f3bd808c2e833f9264555 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "TSPOOL CONNSTATUS membership CONNECTED/UNCONNECTED is independently closed by primary39-46, but it does not settle TSPOOL named-selector direction (data-value heading versus returns36-38) or missing general browse grammar. No CFDTPOOL UNAVAILABLE or named form is borrowed."
       ]
     },
     {
@@ -18230,11 +19575,69 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "LOCATION",
+                  "values": [
+                    "AUXILIARY",
+                    "MAIN"
+                  ],
+                  "source_lines": [
+                    110,
+                    112,
+                    113,
+                    114,
+                    117
+                  ]
+                },
+                {
+                  "option": "RECOVSTATUS",
+                  "values": [
+                    "NOTRECOVERABLE",
+                    "RECOVERABLE"
+                  ],
+                  "source_lines": [
+                    169,
+                    171,
+                    173,
+                    175
+                  ]
+                }
+              ]
             },
             "source_lines": [
               199,
               202
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOCATION",
+            "values": [
+              "AUXILIARY",
+              "MAIN"
+            ],
+            "source_lines": [
+              110,
+              112,
+              113,
+              114,
+              117
+            ]
+          },
+          {
+            "option": "RECOVSTATUS",
+            "values": [
+              "NOTRECOVERABLE",
+              "RECOVERABLE"
+            ],
+            "source_lines": [
+              169,
+              171,
+              173,
+              175
             ]
           }
         ]
@@ -19241,7 +20644,9 @@
         "Unpinned linked context SSJL4D_6.x/configuring/cics/dfha2_def_ts_serverregions.html (Defining TS server regions): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/configuring/cics/dfha2_control_interval.html (Control interval size for auxiliary temporary storage): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOCATION, RECOVSTATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretsqueue.html sha256:437141dad1b69708acd148c084690a6d2cf471c38873d8b662d4a6b5243f5d68 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "Exact symbolic spelling is local to the pinned body: model RECOVSTATUS uses NOTRECOVABLE; queue RECOVSTATUS uses NOTRECOVERABLE. This slice supplies no numeric alias/equivalence, queue-to-model output equality, physical recovery proof or expiry/default normalization. Shared/remote/CICS-created/recoverable expiry exceptions and browse receiver lifetimes remain unchanged."
       ]
     },
     {
@@ -19705,11 +21110,69 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "LOCATION",
+                  "values": [
+                    "AUXILIARY",
+                    "MAIN"
+                  ],
+                  "source_lines": [
+                    110,
+                    112,
+                    113,
+                    114,
+                    117
+                  ]
+                },
+                {
+                  "option": "RECOVSTATUS",
+                  "values": [
+                    "NOTRECOVERABLE",
+                    "RECOVERABLE"
+                  ],
+                  "source_lines": [
+                    169,
+                    171,
+                    173,
+                    175
+                  ]
+                }
+              ]
             },
             "source_lines": [
               195,
               198
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOCATION",
+            "values": [
+              "AUXILIARY",
+              "MAIN"
+            ],
+            "source_lines": [
+              110,
+              112,
+              113,
+              114,
+              117
+            ]
+          },
+          {
+            "option": "RECOVSTATUS",
+            "values": [
+              "NOTRECOVERABLE",
+              "RECOVERABLE"
+            ],
+            "source_lines": [
+              169,
+              171,
+              173,
+              175
             ]
           }
         ]
@@ -20700,7 +22163,9 @@
         "Unpinned linked context SSJL4D_6.x/configuring/cics/dfha2_def_ts_serverregions.html (Defining TS server regions): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Unpinned linked context SSJL4D_6.x/configuring/cics/dfha2_control_interval.html (Control interval size for auxiliary temporary storage): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for LOCATION, RECOVSTATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquiretsqueue.html sha256:437141dad1b69708acd148c084690a6d2cf471c38873d8b662d4a6b5243f5d68 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "Exact symbolic spelling is local to the pinned body: model RECOVSTATUS uses NOTRECOVABLE; queue RECOVSTATUS uses NOTRECOVERABLE. This slice supplies no numeric alias/equivalence, queue-to-model output equality, physical recovery proof or expiry/default normalization. Shared/remote/CICS-created/recoverable expiry exceptions and browse receiver lifetimes remain unchanged."
       ]
     },
     {
@@ -20915,11 +22380,41 @@
                   ],
                   "required": true
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    45,
+                    46,
+                    48,
+                    51
+                  ]
+                }
               ]
             },
             "source_lines": [
               43,
               44
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "STATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              45,
+              46,
+              48,
+              51
             ]
           }
         ]
@@ -21373,7 +22868,9 @@
         "Case fixture strings are bounded normative preconditions, not a fixture interpreter/DSL. Common case typing cannot represent exact byte buffers, nested attribute fields, queue-list selectors, asynchronous child ownership or observed snapshots. Manager owns the minimal typed fixture/value extension and actual selected-route binding; no cases are generated into production logic.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for STATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setenqmodel.html sha256:984b93ccbc401770c6a12a30fb5293d554687460e6341b9d58c633a3a87fb71e (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "SET ENQMODEL STATUS admits only DISABLED/ENABLED from primary45-55; observed WAITING is not a requested STATUS member. INVREQ3 primary63 calls the invalid option STATE; that opposed spelling remains Pending, without adding STATE or equating aliases."
       ]
     },
     {
@@ -21687,11 +23184,67 @@
                   ],
                   "required": false
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "ACTION",
+                  "values": [
+                    "FLUSH",
+                    "RESET"
+                  ],
+                  "source_lines": [
+                    41,
+                    43,
+                    44,
+                    51
+                  ]
+                },
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    62,
+                    63,
+                    64,
+                    67
+                  ]
+                }
               ]
             },
             "source_lines": [
               55,
               61
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACTION",
+            "values": [
+              "FLUSH",
+              "RESET"
+            ],
+            "source_lines": [
+              41,
+              43,
+              44,
+              51
+            ]
+          },
+          {
+            "option": "STATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              62,
+              63,
+              64,
+              67
             ]
           }
         ]
@@ -22483,7 +24036,9 @@
         "Case fixture strings are bounded normative preconditions, not a fixture interpreter/DSL. Common case typing cannot represent exact byte buffers, nested attribute fields, queue-list selectors, asynchronous child ownership or observed snapshots. Manager owns the minimal typed fixture/value extension and actual selected-route binding; no cases are generated into production logic.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for ACTION, STATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setjournalname.html sha256:6eef1cffbef169d60ccfb34965ba8e492ddf2e2eb984f9d7c230f6848e0a5613 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "ACTION(FLUSH/RESET) and STATUS(DISABLED/ENABLED) membership does not replace the existing exclusion, deferred file-journal effects or source failure clauses. The original unresolved ACTION-domain gap remains exact provenance; numeric/shorthand ABI and complete grammar/default admission remain Pending."
       ]
     },
     {
@@ -23124,11 +24679,93 @@
                   ],
                   "required": false
                 }
+              ],
+              "cvda_domains": [
+                {
+                  "option": "ATIFACILITY",
+                  "values": [
+                    "NOTERMINAL",
+                    "TERMINAL"
+                  ],
+                  "source_lines": [
+                    93,
+                    98,
+                    99,
+                    101
+                  ]
+                },
+                {
+                  "option": "ENABLESTATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    139,
+                    141,
+                    142,
+                    145
+                  ]
+                },
+                {
+                  "option": "OPENSTATUS",
+                  "values": [
+                    "CLOSED",
+                    "OPEN"
+                  ],
+                  "source_lines": [
+                    150,
+                    154,
+                    155,
+                    157
+                  ]
+                }
               ]
             },
             "source_lines": [
               159,
               162
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ATIFACILITY",
+            "values": [
+              "NOTERMINAL",
+              "TERMINAL"
+            ],
+            "source_lines": [
+              93,
+              98,
+              99,
+              101
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              139,
+              141,
+              142,
+              145
+            ]
+          },
+          {
+            "option": "OPENSTATUS",
+            "values": [
+              "CLOSED",
+              "OPEN"
+            ],
+            "source_lines": [
+              150,
+              154,
+              155,
+              157
             ]
           }
         ]
@@ -24622,7 +26259,9 @@
         "Case fixture strings are bounded normative preconditions, not a fixture interpreter/DSL. Common case typing cannot represent exact byte buffers, nested attribute fields, queue-list selectors, asynchronous child ownership or observed snapshots. Manager owns the minimal typed fixture/value extension and actual selected-route binding; no cases are generated into production logic.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for ATIFACILITY, ENABLESTATUS, OPENSTATUS use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settdqueue.html sha256:38cf5055a93075e56ac538a846e48a661da1960c7d180125a1c83c8de558bdda (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "SET TDQUEUE symbolic lists do not resolve primary43-44/INVREQ12-13 versus62-63 REMOTE/INDIRECT disablement, or fully-disabled46-51 versus anytime111-114/129-132 wording. Retained/unused ATI fields, delayed ATI error checks, disable-pending task/UOW/indoubt behavior and availability-versus-dataset-open distinctions remain Pending under the original pinned clauses."
       ]
     },
     {
@@ -25300,11 +26939,37 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ACTION",
+                  "values": [
+                    "DELETE"
+                  ],
+                  "source_lines": [
+                    40,
+                    41,
+                    43
+                  ]
+                }
+              ]
             },
             "source_lines": [
               53,
               54
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACTION",
+            "values": [
+              "DELETE"
+            ],
+            "source_lines": [
+              40,
+              41,
+              43
             ]
           }
         ]
@@ -26060,7 +27725,9 @@
         "Case fixture strings are bounded normative preconditions, not a fixture interpreter/DSL. Common case typing cannot represent exact byte buffers, nested attribute fields, queue-list selectors, asynchronous child ownership or observed snapshots. Manager owns the minimal typed fixture/value extension and actual selected-route binding; no cases are generated into production logic.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for ACTION use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settsqueue.html sha256:9952f0c76e754978ae4475e745e65ca5bb806dd0b1aa0edb83da1fb4721fa7b6 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "ACTION DELETE is the sole explicit member at primary40-44; it does not prove mandatory ACTION/default normalization, synchronous deletion or caller-UOW transactionality. Original unresolved ACTION-domain gap is retained as provenance, with numeric/alias/binding and missing LASTUSEDINT receiver/value representation still Pending. Distinct TSQNAME/TSQUEUE row/form identities and all cases are exact."
       ]
     },
     {
@@ -26311,11 +27978,37 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ACTION",
+                  "values": [
+                    "DELETE"
+                  ],
+                  "source_lines": [
+                    40,
+                    41,
+                    43
+                  ]
+                }
+              ]
             },
             "source_lines": [
               55,
               56
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACTION",
+            "values": [
+              "DELETE"
+            ],
+            "source_lines": [
+              40,
+              41,
+              43
             ]
           }
         ]
@@ -27071,7 +28764,9 @@
         "Case fixture strings are bounded normative preconditions, not a fixture interpreter/DSL. Common case typing cannot represent exact byte buffers, nested attribute fields, queue-list selectors, asynchronous child ownership or observed snapshots. Manager owns the minimal typed fixture/value extension and actual selected-route binding; no cases are generated into production logic.",
         "Unpinned linked context SSJL4D_6.x/reference-system-programming/commands-spi/dfha81j.html (System commands): expected SHA unknown in registered manifests. Source gap; no fetch/refresh or inferred replacement authority.",
         "Storage ceilings are IBM operand-byte facts only; numeric limits, response representation, selector domains and namespace counts are separate. Artifact option/case counts impose no IBM total resource cap.",
-        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority."
+        "Actual current owner inventory: CicsService::State owns enqueue_models, transient and journals; application TD definitions cover only INTRA/EXTRA and enabled/open/record bounds, not the full administrative model. TS has existing cics-tsq state and placement/recovery/indoubt metadata; journal has existing cics-journal-v1 task-owned outputs. LSRPOOL/JOURNALMODEL/TSMODEL/shared-pool/administrative-drain and complete SPI fields are not admitted by these private facts. Reuse and extend existing sole owners through manager scope; never clone the application DELETEQ path or its local SAF profiles as IBM SPI authority.",
+        "Finite symbolic CVDA memberships for ACTION use SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_settsqueue.html sha256:9952f0c76e754978ae4475e745e65ca5bb806dd0b1aa0edb83da1fb4721fa7b6 (ibm-cics-ts-6x-spi-command-bodies-2026-09-12); they are command-specific source metadata only. Numeric representations, wire/receiver ABI, shorthand-to-parent runtime binding, omitted-option defaults, value-dependent precedence and exact selected product/service applicability remain Pending. Existing fullword extents and directions are preserved; no generic success, runtime admission, caller-UOW rollback or licensed equivalence follows. Original gap entries remain exact provenance and pending integration obligations.",
+        "ACTION DELETE is the sole explicit member at primary40-44; it does not prove mandatory ACTION/default normalization, synchronous deletion or caller-UOW transactionality. Original unresolved ACTION-domain gap is retained as provenance, with numeric/alias/binding and missing LASTUSEDINT receiver/value representation still Pending. Distinct TSQNAME/TSQUEUE row/form identities and all cases are exact."
       ]
     }
   ]

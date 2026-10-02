@@ -950,6 +950,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "START", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CONNSTATUS", values: &["CONNECTED", "UNAVAILABLE", "UNCONNECTED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -972,6 +973,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CONNSTATUS", values: &["CONNECTED", "UNAVAILABLE", "UNCONNECTED"] },
                 ],
                 cvda_numeric_domains: &[
                 ],

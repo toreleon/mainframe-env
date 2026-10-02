@@ -717,6 +717,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "UOW", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::InputOutput, source_max_value_bytes: Some(16) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "RELATION", values: &["OWNER", "WAITER"] },
+            CicsApplicationCvdaDomain { option: "STATE", values: &["ACTIVE", "RETAINED"] },
+            CicsApplicationCvdaDomain { option: "TYPE", values: &["DATASET", "EXECENQ", "EXECENQADDR", "FILE", "TDQUEUE", "TSQUEUE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -760,6 +763,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE", "SYSTEM"] },
+            CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["CREATESPI", "CSDAPI", "GRPLIST"] },
+            CicsApplicationCvdaDomain { option: "STATUS", values: &["DISABLED", "ENABLED", "WAITING"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -793,6 +799,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "STATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CHANGEAGENT", values: &["CREATESPI", "CSDAPI", "CSDBATCH", "DREPAPI", "OVERRIDE", "SYSTEM"] },
+                    CicsApplicationCvdaDomain { option: "INSTALLAGENT", values: &["CREATESPI", "CSDAPI", "GRPLIST"] },
+                    CicsApplicationCvdaDomain { option: "STATUS", values: &["DISABLED", "ENABLED", "WAITING"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
