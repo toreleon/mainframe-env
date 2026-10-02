@@ -6,6 +6,31 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.complete-get-md-writeback` supplies the complete returned descriptor
+writer for later compiled forwarding. It maps every actual MQMD1/2 output field
+through the existing generated raw policy and one atomic prefix copy, with exact
+version/structure-character checks. Input-only StrucId/Version and caller suffix
+remain unchanged; numeric order is the original capture, never body Encoding/
+CCSID. Late scalar, stale prefix, capacity, foreign profile/version/identifier
+or non-GET errors change no destination bytes. No partial projection, new codec,
+status inference, field defaulting, conversion or execution authority is added.
+Original MQGETrow0015 and supplemental baseline2026-09-12 MQMD declaration/
+field topics are hash-verified retained-first and searched/read offline.
+Six new writer tests and28 existing raw regressions pass (34 Rust, zero ignored;
+filtered208 and empty integration0 earn no credit), plus13 mandatory policy tests,
+actual guards/four mutants/module968/34/4/1. Changed public contract requires the
+genuine combined API gate; it passes compiler70/coverage386/execution0/host931/
+store72 without raising ceilings. First docs generation rejected an incorrect
+change-fragment format; the failed receipt remains preserved. Corrected fragment
+passes normaldocs/check/changelog/whitespace without repeating unchanged Rust,
+policy or API checks. Final ledger-only docs generation/check is separate.
+All sequences and exact feature seal/HEADcheck clean the intended target.
+Diagnostic signed/opaque-byte fixtures prove complete value fidelity, not native
+MQMD legality. Compiled OPEN/GET, trusted catalog/profile facts and all-argument
+final reply writeback still must compose actual selected execution. All other
+nonlicensed parent gates remain required; licensed oracle ONLY skipped0/26.
+Originald8 dependency receipt/all32unchangedinputs reused, not fresh deny/CI.
+
 `MQ-1501.producer-attribute-source-pins` consumes sealed worker4243880b3 after
 independent seven-path/blob, seven frozen binding, 87 finalized receipt,
 nine source-pin, 22 pre-run snapshot and 32 dependency-input verification.

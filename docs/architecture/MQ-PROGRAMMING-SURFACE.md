@@ -69,6 +69,21 @@ clock scaling. Captured numeric Context is an alias observation, never HOBJ
 authority. The eventual registry bridge must supply live handles, including the
 actual retained HCONN for PUT1, independently of names or options.
 
+`MqRawCapture::writeback_full_get_md` maps an actual complete returned MQMD1/2
+value to the same generated output policy and one atomic prefix copy. It requires
+GET applicability, the captured version and exact structure character profile;
+StrucId/Version remain input-only. Every other common/extension output field is
+retained without partial-descriptor narrowing. Numeric byte order comes from
+the original capture, not the returned body Encoding/CCSID. Range, stale-prefix,
+capacity and late-field failures leave every destination byte unchanged; suffix
+bytes remain caller-owned. This helper performs no conversion, defaulting, status
+inference, queue mutation or authority check. Diagnostic signed/opaque-byte
+fixtures prove value preservation, not native semantic validity. Compiled
+OPEN/GET forwarding, trusted catalog/profile binding and multi-argument final
+reply writeback must still compose it with actual selected execution.
+Sources: original MQGETrow0015 and supplemental baseline2026-09-12
+`q097390_204–304`, `q097395_6–30/1498–1508`; source review earns zero credit.
+
 Complete MQMD projection into the current typed message descriptor rejects with
 `DescriptorRepresentationPending`: Report, MsgType, Feedback, body encoding/CCSID,
 backout/reply/context/origin and OriginalLength lack lossless typed fields. The
