@@ -34,6 +34,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0028](0028-gsam-logical-address.md) | bounded public GSAM logical addresses using existing engine, PCB and row authorities | Proposed |
 | [0031](0031-ims-tm-recovery-publication.md) | shared work/effect-fenced IMS TM recovery publication and settlement | Proposed |
 | [0029](0029-selected-pcb-feedback.md) | versioned owned selected PCB feedback retained in the existing proposal and receipt | Proposed |
+| [0033](0033-cobol-dli-call-boundary.md) | owned raw COBOL DL/I CALL frame, PCB entry binding and feedback contract proposal | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

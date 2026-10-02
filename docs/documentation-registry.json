@@ -64,6 +64,7 @@
     "docs/decisions/0028-gsam-logical-address.md",
     "docs/decisions/0031-ims-tm-recovery-publication.md",
     "docs/decisions/0029-selected-pcb-feedback.md",
+    "docs/decisions/0033-cobol-dli-call-boundary.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -302,6 +303,10 @@
         {
           "label": "ADR-0029: Versioned selected database PCB feedback",
           "path": "docs/decisions/0029-selected-pcb-feedback.md"
+        },
+        {
+          "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
+          "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
         {
           "label": "Decision index and template",

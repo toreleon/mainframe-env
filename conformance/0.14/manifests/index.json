@@ -80,6 +80,17 @@
       "topic_manifest_sha256": "sha256:7d4d6f9d5431bae8a438e9fa40c32f371325cd0956c282df7a4920514ee9c509",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-cobol-dli-boundary",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-cobol-dli-boundary-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-cobol-dli-boundary-topics.json",
+      "manifest_sha256": "sha256:32733c89af0aa729acf51c0e6a72114248b8f1587657a3820a0d05c0b4e2c347",
+      "topic_count": 5,
+      "topic_manifest_sha256": "sha256:27da1f1a5c46e08776285cc005d8022ad03888349fe8916cdf167d146fda8d7a",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

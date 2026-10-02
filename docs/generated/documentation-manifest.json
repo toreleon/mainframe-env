@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 228,
+    "markdown_documents": 229,
     "navigation_groups": 6,
-    "normative_documents": 61,
+    "normative_documents": 62,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 117,
-      "sha256": "sha256:7c814cbf4cf2578007ed5de982c5fcfa3c51d8b7cd7282a695802b4b13cf57c8",
+      "relative_links": 118,
+      "sha256": "sha256:39759c5b6af12e221461a5a383c63bacf42ac3223fe592712811505c7c086c34",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -999,10 +999,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "compiler, interpreter, host-contract and IMS maintainers",
+      "path": "docs/decisions/0033-cobol-dli-call-boundary.md",
+      "relative_links": 0,
+      "scope": "IMS-1401.cobol-dli-call-boundary",
+      "sha256": "sha256:5fa0493c1e99df285789340f15d7b1112c0ca780a99cbe35a6777d4b980037d2",
+      "status": "Proposed; raw execution blocked pending contract-owner decisions",
+      "title": "ADR-0033: Raw COBOL DL/I needs an owned CALL and PCB binding contract",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 30,
-      "sha256": "sha256:3e1779d1b14d5ebfedc6e1a5fb53b55626b997876defe9a8c67ccf27bc49d9e3",
+      "relative_links": 31,
+      "sha256": "sha256:315f2d68bb3bf952007d6098c59d30b04c577dd5ca55e9719944f2b6dcee97fe",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1437,8 +1449,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 11,
-      "sha256": "sha256:c969b06dbc14f98c46813e8eef8d4dd3e85ff48612b90bff988575a02ffd6e10",
+      "relative_links": 13,
+      "sha256": "sha256:9825f29bb716c8b07ce77cec0cde80fd5ef6b4593de3a04a5f69d3d70e9ba73a",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2308,6 +2320,10 @@
           "path": "docs/decisions/0029-selected-pcb-feedback.md"
         },
         {
+          "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
+          "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2556,7 +2572,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:75e8b6655beb2a7c0b64d01ac2556e2c3531b4c0be5d077a20dc2cd48f955c10",
+  "registry_sha256": "sha256:ab30884b96b1df1f9c1060a5565a73e3d8e85a2c9fe0d3c042c2f9078aad46fa",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

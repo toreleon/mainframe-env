@@ -96,6 +96,7 @@ explicitly names that authority as superseded.
 - [ADR-0028: Bounded GSAM logical record addresses](decisions/0028-gsam-logical-address.md)
 - [ADR-0031: IMS TM recovery publication and work settlement](decisions/0031-ims-tm-recovery-publication.md)
 - [ADR-0029: Versioned selected database PCB feedback](decisions/0029-selected-pcb-feedback.md)
+- [ADR-0033: Raw COBOL DL/I CALL and PCB binding contract](decisions/0033-cobol-dli-call-boundary.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

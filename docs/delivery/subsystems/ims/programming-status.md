@@ -6,6 +6,85 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1401.cobol-dli-call-boundary (declared contract-gap leaf)
+
+Parent IMS-1401 remains open. Clean entry `9e97502604d61440047e4c1643190bb178fef5df`
+is preserved on `codex/v014-gsam-record-formats-20261002`. This branch,
+`codex/v014-cobol-dli-call-20261002`, starts from exact manager
+`56871bf83f38ed86a615b0a29fda298a467289b4`; no format-worker delta is consumed.
+Target is 0.14.0. The accepted dependency identities and pending participant
+dispositions below remain in force.
+
+Before edits, inspection identifies a genuine shared contract gap. The generic
+CALL producer erases passing modes and guest address/alias identity into copied
+`mainframe-env.cobol.call@1` values. Signed database PCB metadata lacks KEYLEN,
+raw-mask capacity and linkage/PSB-order binding; existing typed results lack
+complete validity-tagged raw feedback. A raw adapter cannot infer these from
+names, copied bytes or current position. No unintegrated feedback DTO is consumed.
+
+Bounded scope: actual compiled COBOL CALL CBLTDLI GU/GHU/GN/REPL witnesses,
+signed selected CardDemo package and real coordinator/product routes, independent
+literal function/SSA/PCB/I/O bytes, rejection/no guest or provider mutation,
+Memory and SQLite reopen, source registration/contract-gap ADR, unique fragment
+and normal docs. Catalog context is
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006/:0015`; COBOL CALL is
+`ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005`, both verified
+against the committed catalogs. Required raw execution, status/level/key
+writeback, selected-PCB holds/undo, alias/capacity/encoding/replay acceptance
+remain pending unless their owning contracts prove them. Correct rejection
+does not earn required-execution credit.
+
+Owners: shared compiler/IR/interpreter guest storage and CALL frame, host
+contracts/dispatcher, IMS metadata/context/provider and selected signed product
+route. No new interpreter, memory engine, PCB registry, coordinator, persistence
+or private API is admitted. Existing service/execution, rows/providers, product/ims,
+request and canonical owners remain unchanged. Mixed SSA, selected-secondary
+checkpoint, feedback algorithms and API-doc ratchets are outside this leaf.
+BMP/JCL/CMPAT/other language/distributed classes remain unproved and fail closed.
+
+Acceptance for this gap deliverable: substantive fail-first compiled signed-route
+witnesses, passing explicit rejection regressions, focused affected tests and
+strict all-target no-deps Clippy, fmt/deny, execution/effect/provider-row/storage/
+participant/security/retention/typed/module/supply-chain/catalog/assurance/schema/
+spec/docs/changelog checks, exact-path leaf seal/check and one local commit.
+Receipts remain external under worker-receipts/v014-completion-20261002/
+ims-cobol-dli-call; Cargo clean ends each sequence. No refresh, delegation,
+licensed/official/human/participant/parent/release acceptance, push or PR.
+
+The bounded deliverable is a contract-gap packet, not an implemented raw adapter.
+[ADR-0033](../../../decisions/0033-cobol-dli-call-boundary.md) proposes the shared
+owned reference/mode/atomic-copyout frame, signed PCB entry/KEYLEN binding and
+complete validity-tagged feedback decisions. A separate five-topic invocation
+supplement, `ibm-ims-15.6-cobol-dli-boundary-2026-09-11`, is registered with zero
+credit; historical baselines are unchanged. Selected IMS 15.6 and COBOL 6.5 pins
+matched exact archived SHA-256/byte counts after retained topic-path checks;
+repository plain-text parsing and offline search/read were used. No selected
+source was unavailable and no refresh or publication body was committed.
+
+Current-candidate evidence has three focused tests, including twenty actual
+compiled signed-route cases across Memory and file SQLite with reopen. GU/GHU/
+GN/REPL, optional count, two unbound PCB canaries, short/malformed/aliased areas
+and absent Program capability are exercised through the real coordinator and
+product Program provider. Independent literal output and initialized guest
+storage remain unchanged; IMS row payloads and versions remain unchanged.
+The granted route returns `PROGRAM-NOTFOUND:CBLTDLI`; the denied route returns
+Unauthorized. The fail-first receipt separately observes erased REFERENCE/
+CONTENT identity and missing CBLTDLI ABI registration on both signed backends.
+These are substantive raw producer/route gap witnesses. Typed Schedule/Load/
+Checkpoint/GHU only establish a selected database and held control occurrence;
+they earn no raw CALL credit. Malformed cases prove absent-adapter rejection,
+not raw validation or IMS status/PCB writeback.
+
+Focused tests, strict affected Clippy and all declared mandatory guards/gates
+pass. The new ADR was added to the normal documentation registry after its
+initial missing-registry failure. Receipts preserve earlier unsuccessful test
+setup attempts separately; only the final candidate tests are passing evidence.
+No runtime/schema/migration or frozen facade change is introduced. Compatibility,
+drain/reconcile and coherent backup obligations remain those of the manager base;
+no backup/restore or subprocess restart acceptance is claimed. Shared CALL-frame,
+IMS entry/metadata and feedback owners must admit a coherent class before raw
+status/cursor/hold/update/undo/replay/copyout acceptance or parent closure.
+
 ## IMS-1403.gsam-record-addressability (bounded slice implemented)
 
 Parent: IMS-1403. Consumed clean base: `65d2904d47155a9c0cffc6c21948eb5c76feb68c`,
@@ -3431,3 +3510,38 @@ relabeled as this manager candidate. Unchanged dependency/architecture policy
 results retain their original evidence identities. Source/ABI/participant,
 human/official, full-v0.14 and release acceptance remain pending; licensed
 certification stays excluded.
+
+### Manager compiled-CBLTDLI gap composition (2026-10-02)
+
+The manager consumes `24c9255909f93d02176758433edc5657f9e8aeb8` after
+`eb5890acd6546214ebe18831d7a864a74553764c`. Its Proposed ABI decision is
+renumbered [ADR-0033](../../../decisions/0033-cobol-dli-call-boundary.md)
+to keep independent IMS decisions distinct. The now-integrated versioned PCB
+feedback route does not supply the missing raw guest binding, capacity or
+unsuccessful-call witness. No runtime adapter or schema is added by this leaf.
+
+Before handoff interpretation, the manager searches/reads all361 lines of pinned
+Enterprise COBOL6.5 CALL `lr/ref/rlpscall.html`, SHA-256
+`fdf73c18a03049cd540efcfa652bfc7f842a16a1000c68a09a18938e2689cc4a`,
+baseline `ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005`.
+It also reads complete IMS invocation and batch-entry topics in
+`ibm-ims-15.6-cobol-dli-boundary-2026-09-11`, hashes `49543439b7d78448832f226646b1393de857cc5290567b3d7a5f3984a0be8994`
+and `b128e9b82ea93b39b92e75feafaaa620cdff6552713fe6cebe7a55ecfca35f6c`.
+The previously reviewed programming PCB-mask pin remains unchanged. Default
+reference shares storage, argument correspondence is positional, content/value
+do not modify the caller, and IMS supplies PSB-ordered entry PCBs. A source
+lookup's wrong initial scope spelling is corrected without source refresh.
+The partial COBOL cache's unselected missing entries are not a whole-cache
+finding; every selected pin is available and hash verified.
+
+Three focused compiled tests pass through the existing signed Program provider
+and coordinator on Memory and file SQLite, including20 real rejection cases,
+literal copied-frame collision, output/canaries and unchanged IMS rows. Those
+are gap/rejection witnesses, not raw operand validation or successful DL/I calls.
+Strict affected Clippy, module guard, coverage policy, formatting and normal
+docs/changelog checks pass. Empty filtered test binaries earn no credit.
+Receipts retain the actual code candidate, separate from this final prose seal.
+Compiler/guest CALL references, signed PCB-capacity/linkage binding and complete
+validity-tagged raw feedback still require the shared owners' boundary decision.
+No parent/raw/official/human/participant/release success or licensed credit is
+claimed. Human implementation authorization has been requested separately.

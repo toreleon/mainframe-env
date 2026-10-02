@@ -1028,3 +1028,7 @@ async fn exercise_ims_routes_at(
 #[cfg(test)]
 #[path = "ims_process_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ims_raw_call_tests.rs"]
+mod raw_call_tests;
