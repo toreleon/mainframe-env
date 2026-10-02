@@ -47,6 +47,17 @@
       "topic_manifest_sha256": "sha256:414608491fdbefa8ec0b8b2b1adf8742a4dbc5553cd488344db649ef945bba11",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-producer-attribute-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-producer-attribute-sources-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-producer-attribute-sources-topics.json",
+      "manifest_sha256": "sha256:8e6ee63586f57c7ee8fb872cb8f8dec0b1c81d66a8f1d2bc4991df32d5a924b0",
+      "topic_count": 9,
+      "topic_manifest_sha256": "sha256:bc78af054eb037a938d7224d8e7caa6ea37d834ccb043f30157079087d703f81",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

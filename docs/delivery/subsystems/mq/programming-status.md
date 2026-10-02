@@ -6,6 +6,35 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1501.producer-attribute-source-pins` consumes sealed worker4243880b3 after
+independent seven-path/blob, seven frozen binding, 87 finalized receipt,
+nine source-pin, 22 pre-run snapshot and 32 dependency-input verification.
+The shared independent registry now includes nine exact retained topics under
+`mq-producer-attribute-sources`, baseline
+`ibm-mq-9.4-producer-attribute-sources-2026-09-12`; manifest SHA
+`8e6ee63586f57c7ee8fb872cb8f8dec0b1c81d66a8f1d2bc4991df32d5a924b0`.
+Original MQPUT/MQPUT1 rows0020/0021, original27/supplement80/layout12/property12/
+recovery1 bindings and the26/27 denominator remain exact. Actual retained-first
+SHA/bytes/metadata/TOC and offline repository search/read checks pass, with no
+network/browser refresh or publication body in Git. MQAT_MVS and MQAT_ZOS both
+have value2 (`q090310_19–21/25–27`), a declaration rather than admission.
+Queue-manager CCSID is explicit configuration; the pinned z/OS startup default
+is500 (`q102230_`), not an inferred CP037 default. The archive remains
+in-progress without independent browser reproduction or freshness claims.
+Fresh composed checks pass31 reader plus13 mandatory policy Python tests and
+14 actual Rust topic-registry tests, zero ignored. Actual guards/four mutants,
+module966/34/4/1, fmt/normaldocs+check/changelog/whitespace pass; zero-test binary
+fixtures earn no credit. Ledger-only docs regeneration does not repeat these
+passing checks. Each sequence and feature seal cleans the intended target.
+Unchanged API inputs retain the exact028c combined global-documentation pass;
+dependency evidence reuses only originald8 and its32 unchanged inputs, not a
+fresh deny/CI run. Early worker snapshots retain their original candidate
+identities; fresh composed checks cover the final registered files.
+This is zero source/execution/official/licensed credit, not native producer
+semantics. Complete PUT/PUT1, trusted physical GMT/JES context, generated IDs,
+defaults/priority/expiry and every other nonlicensed parent gate remain required.
+Only the licensed oracle is human-skipped0/26; the parent remains ACTIVE.
+
 `MQ-1503.selected-property-family` consumes sealed worker927e8c4ac after full
 production/tests/schema/generator/source review and independent46path/blob/
 77frozenreceipt/21pin/106locator/32dependency checks. The existing selected

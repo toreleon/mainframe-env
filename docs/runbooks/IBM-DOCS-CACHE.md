@@ -114,6 +114,25 @@ establish freshness, snapshot equivalence or semantic acceptance. Registration
 enables subsequent explicit review; all ten pending reason declarations remain
 pending and no numeric/layout, execution, licensed or coverage credit is granted.
 
+The independent 0.15 `mq-producer-attribute-sources` scope registers nine
+retained MQ 9.4 topics under
+`ibm-mq-9.4-producer-attribute-sources-2026-09-12`: QM CCSID, QM and queue
+maximum message lengths, maximum priority, default put response/persistence/
+priority, message delivery sequence and the MQAT application-type declaration.
+Use the same offline reader with this exact scope and SHA selection. Original
+27 call positions, 26 unique calls, supplements80, layout12, property12 and
+recovery1 pins and baselines remain unchanged. The new scope grants zero
+semantic authority, execution, licensed or coverage credit; it changes no
+runtime numeric projection, producer context, generated ID or queue policy.
+
+Its bounded archive metadata and pinned TOC identify retained HTML only. The
+archive run remains in-progress, has no independent browser-reproduction
+receipt and predates the MQINQ issue337 re-pin. Publication `last_modified`
+comes from each hash-verified HTML `lastModifiedDate`, not fetch time. This
+registration establishes neither freshness nor snapshot equivalence. Read
+and review sources before a separate admitted producer implementation; source
+presence and a numeric declaration are not execution permission.
+
 For a new CICS source corpus:
 
 1. derive the exact topic set from its accepted mapping and explicit context

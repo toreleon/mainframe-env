@@ -484,12 +484,13 @@ mod tests {
         check_later_registry(&root, config_015()).expect("shipped independent scopes");
         let registry = json(&root.join(config_015().registry_path)).unwrap();
         let entries = registry["manifests"].as_array().unwrap();
-        assert_eq!(entries.len(), 4);
+        assert_eq!(entries.len(), 5);
         for (scope, count) in [
             ("mq-programming-supplements", 80),
             ("mq-point-layout-sources", 12),
             ("mq-property-sources", 12),
             ("mq-recovery-policy-sources", 1),
+            ("mq-producer-attribute-sources", 9),
         ] {
             let entry = entries
                 .iter()
@@ -523,6 +524,40 @@ mod tests {
                 "bytes": 3691,
                 "last_modified": "2026-05-18"
             }])
+        );
+    }
+
+    #[test]
+    fn later_015_producer_scope_binds_exact_attributes_and_application_declaration() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered producer sources");
+        let manifest = json(
+            &root.join("conformance/0.15/manifests/mq-producer-attribute-sources-topics.json"),
+        )
+        .unwrap();
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 9);
+        assert_eq!(manifest["total_bytes"], 36295);
+        assert_eq!(manifest["coverage_credit"], 0);
+        assert_eq!(manifest["retained_in_repository"], false);
+        assert_eq!(
+            manifest["baseline_id"],
+            "ibm-mq-9.4-producer-attribute-sources-2026-09-12"
+        );
+        let topics = manifest["topics"].as_array().unwrap();
+        for (row, name) in topics.iter().zip([
+            "q090310_", "q102230_", "q102510_", "q102520_", "q103140_", "q103180_", "q103190_",
+            "q103280_", "q103300_",
+        ]) {
+            assert_eq!(
+                row["topic_path"],
+                format!("SSFKSJ_9.4.0/refdev/{name}.html")
+            );
+            assert_eq!(row["last_modified"], "2026-05-18");
+        }
+        assert_eq!(
+            topics[0]["sha256"],
+            "99c5eb46d8046b6ab2ce7aad0c8284e79bb4f0ae24c0d1942664bec451fa3c2d"
         );
     }
 

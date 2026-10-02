@@ -539,6 +539,7 @@ class CacheTests(unittest.TestCase):
         self.assertIn("mq-point-layout-sources", scopes)
         self.assertIn("mq-property-sources", scopes)
         self.assertIn("mq-recovery-policy-sources", scopes)
+        self.assertIn("mq-producer-attribute-sources", scopes)
         supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
         self.assertEqual(len(supplemental), 80)
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
@@ -599,9 +600,10 @@ class CacheTests(unittest.TestCase):
                          "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
         registry = json.loads((docs_api.REPOSITORY /
                                "conformance/0.15/manifests/index.json").read_text())
-        self.assertEqual(len(registry["manifests"]), 4)
+        self.assertEqual(len(registry["manifests"]), 5)
         old_rows = [row for row in registry["manifests"]
-                    if row["scope_id"] != "mq-recovery-policy-sources"]
+                    if row["scope_id"] not in {
+                        "mq-recovery-policy-sources", "mq-producer-attribute-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old_rows, sort_keys=True, separators=(",", ":")).encode()),
             "d21d08a6548a9088640374f8ebfa6fcd5344104c3748678b8002406bd9985033")
@@ -632,6 +634,99 @@ class CacheTests(unittest.TestCase):
             with self.subTest(path=relative):
                 self.assertEqual(docs_api.digest(
                     (docs_api.REPOSITORY / relative).read_bytes()), digest)
+
+    def test_producer_attribute_scope_binds_nine_independent_zero_credit_pins(self):
+        pins, tocs = ibm_docs.load_pins()
+        selected, selected_tocs = ibm_docs.select(
+            pins, tocs, "mq-producer-attribute-sources", None
+        )
+        expected = {
+            "q090310_": ("99c5eb46d8046b6ab2ce7aad0c8284e79bb4f0ae24c0d1942664bec451fa3c2d", 12159),
+            "q102230_": ("3a983b400b7497dde61623f58c5656d6d5da7920147b638ea25dc8ee3bae6291", 1650),
+            "q102510_": ("c55745f2e5ab347547fb95b1deeff9e9ce980435643fc300dc831c2202a76baa", 1617),
+            "q102520_": ("4a4821f9faac0b5605ef05c260fcb9f5858f3770014b2157ae7653514cfae57a", 668),
+            "q103140_": ("b62d0e01bb209571b35c9cff1bd0292cac6e5a6b517a4e90123a855c785e71a0", 2165),
+            "q103180_": ("20aa3eba7a13ebcc714d405228fb192cb86411429bb8729142943782138074a0", 3963),
+            "q103190_": ("523f962203da33fdce4cf7fa638b1c5ee03bfeab664f491d5ae714510f031bc1", 4278),
+            "q103280_": ("3749a7eea034280f0762a2d80ff564cacbdc67dc4fbd7efe24231845afef289b", 3682),
+            "q103300_": ("0df88519d9ea7e46448590980fe1619e494048676ac095a66097a5c9ec7762b7", 6113),
+        }
+        self.assertEqual({Path(pin.topic).stem: (pin.sha256, pin.size)
+                          for pin in selected}, expected)
+        self.assertTrue(all(pin.baseline == "ibm-mq-9.4-producer-attribute-sources-2026-09-12"
+                            for pin in selected))
+        self.assertEqual(len(selected_tocs), 1)
+        self.assertEqual(selected_tocs[0].sha256,
+                         "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
+        registry = json.loads((docs_api.REPOSITORY /
+                               "conformance/0.15/manifests/index.json").read_text())
+        row = next(row for row in registry["manifests"]
+                   if row["scope_id"] == "mq-producer-attribute-sources")
+        self.assertFalse(row["semantic_authority"])
+        self.assertEqual(row["coverage_credit"], 0)
+        old = [row for row in registry["manifests"]
+               if row["scope_id"] != "mq-producer-attribute-sources"]
+        self.assertEqual([row["topic_count"] for row in old], [80, 12, 12, 1])
+        for prior in old:
+            self.assertEqual(prior["manifest_sha256"], "sha256:" + docs_api.digest(
+                (docs_api.REPOSITORY / prior["manifest"]).read_bytes()))
+        self.assertFalse({pin.topic for pin in selected} & {
+            pin.topic for pin in pins if pin not in selected})
+
+    def test_producer_nine_topic_fixture_uses_shared_import_search_and_read(self):
+        # Authored synthetic bodies, never copied publication text or source credit.
+        root, index, registry, first_path, document, _ = self.registry_015()
+        first_bytes = first_path.read_bytes()
+        bodies = [f'<h1>Producer fixture {n}</h1><p>Authored example {n}.</p>'.encode()
+                  for n in range(9)]
+        manifest = self.manifest(bodies[0], "0.15.0", "producer-fixture", "mq",
+                                 "PRODUCT/ref/producer-0.html")
+        manifest["topics"] = [{
+            "topic_path": f"PRODUCT/ref/producer-{n}.html",
+            "sha256": docs_api.digest(body), "bytes": len(body),
+            "last_modified": "2026-09-10",
+        } for n, body in enumerate(bodies)]
+        manifest.update(topic_count=9, total_bytes=sum(map(len, bodies)),
+                        topic_manifest_digest=docs_api.manifest_digest(manifest["topics"]))
+        relative = "conformance/0.15/manifests/producer-topics.json"
+        path = root / relative
+        path.write_text(json.dumps(manifest))
+        entry = deepcopy(document["manifests"][0])
+        entry.update(scope_id="producer-fixture", baseline_id="producer-fixture",
+                     manifest=relative, topic_count=9,
+                     manifest_sha256="sha256:" + docs_api.digest(path.read_bytes()),
+                     topic_manifest_sha256="sha256:" + manifest["topic_manifest_digest"])
+        document["manifests"].append(entry)
+        registry.write_text(json.dumps(document))
+        with patch.object(docs_api, "REPOSITORY", root):
+            pins, tocs = ibm_docs.load_pins(index, registry)
+            selected, selected_tocs = ibm_docs.select(pins, tocs, "producer-fixture", None)
+            entries = [(pin.legacy_key, body, None) for pin, body in zip(selected, bodies)]
+            entries.append((selected_tocs[0].legacy_key, self.toc_body, None))
+            counts = ibm_docs.import_cache(self.archive(entries), self.cache,
+                                          selected, selected_tocs)
+            self.assertEqual(counts["imported"], 10)
+            self.assertEqual(counts["missing_expected"], 0)
+            with patch.object(ibm_docs, "load_pins", return_value=(pins, tocs)):
+                for n, pin in enumerate(selected):
+                    output = io.StringIO()
+                    with redirect_stdout(output):
+                        self.assertEqual(ibm_docs.main([
+                            "--cache", str(self.cache), "read", pin.topic,
+                            "--scope", "producer-fixture", "--sha256", pin.sha256,
+                            "--lines", "2"]), 0)
+                    self.assertIn(f"Producer fixture {n}", output.getvalue())
+                with redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(ibm_docs.main([
+                        "--cache", str(self.cache), "search", "Producer fixture 8",
+                        "--scope", "producer-fixture"]), 0)
+                    self.assertIn(selected[8].sha256, output.getvalue())
+            (self.cache / selected[0].key).write_bytes(b"x" * selected[0].size)
+            with self.assertRaises(ValueError):
+                ibm_docs.cached_body(self.cache, selected[0])
+            with self.assertRaises(FileNotFoundError):
+                ibm_docs.cached_body(self.cache, next(pin for pin in pins if pin not in selected))
+        self.assertEqual(first_path.read_bytes(), first_bytes)
 
     def registry_015(self):
         root, index, old_registry = self.source_repository()
