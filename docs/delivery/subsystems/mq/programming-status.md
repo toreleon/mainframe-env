@@ -338,3 +338,16 @@ on their temporary directory. `MQ-1502.sqlite-fixture-isolation` owns only the
 object-service integration fixture/helper and a unique fragment; atomic bounded
 directory allocation must preserve existing paths rather than deleting them.
 This repair changes no product semantics or licensed/official coverage.
+
+Lane M may make the existing retention `origin_for` function and its minimal
+returned origin view crate-private, without changing that parser or its rules.
+This scoped read-only hook reuses exact nested/outer CICS attestation checks;
+application MQI admission must not gain coordinator authority merely because
+bindings are present. No participant capability is advertised by this helper.
+
+The affected MQ service's size audit found 1,477 baseline production lines
+against its registered 1,331 non-growing ceiling (1,480 after the visibility
+hook). `MQ-1505.service-row-codec-module` therefore owns a mechanical extraction
+of existing row persistence/projection helpers into one child module, preserving
+their bytes, CAS behavior and service facade. It must bring the affected service
+below its existing ceiling, without raising exemptions or changing schemas.
