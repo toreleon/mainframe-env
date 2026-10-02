@@ -14,7 +14,7 @@ mod tests;
 
 mod link_entry;
 mod replacement;
-pub use link_entry::CicsLocalLinkEntryAttestation;
+pub use link_entry::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation};
 
 const MAX_PROGRAM_LEVELS: usize = 16;
 
@@ -353,6 +353,7 @@ impl<'a> ProgramLease<'a> {
         Self::acquire_selected(service, caller, program, artifact, None)
     }
 
+    #[cfg(test)]
     fn acquire_selected(
         service: &'a CicsService,
         caller: &'a mut Run,
@@ -360,6 +361,35 @@ impl<'a> ProgramLease<'a> {
         artifact: Option<mainframe_env_execution_api::ArtifactRef>,
         selection: Option<ProgramLinkSelection>,
     ) -> Result<Self, HostProblem> {
+        Self::acquire_selected_effect(service, caller, program, artifact, selection, None)
+    }
+
+    fn acquire_selected_effect(
+        service: &'a CicsService,
+        caller: &'a mut Run,
+        program: &str,
+        artifact: Option<mainframe_env_execution_api::ArtifactRef>,
+        selection: Option<ProgramLinkSelection>,
+        effect: Option<&EffectRequest>,
+    ) -> Result<Self, HostProblem> {
+        // Capture the actual nested request and caller's outer key before the loan
+        // changes the live task. Fixture loans deliberately have no provenance.
+        let call = effect
+            .filter(|_| selection.is_some())
+            .map(|effect| -> Result<_, HostProblem> {
+                let outer = caller
+                    .outer_effect_key
+                    .as_deref()
+                    .ok_or(HostProblem::MissingIdempotency)?;
+                let outer_effect_key = IdempotencyKey::new(outer, InvocationLimits::default())
+                    .map_err(|_| HostProblem::Malformed)?;
+                Ok(link_entry::SelectedCall {
+                    effect: effect.clone(),
+                    outer_effect_key,
+                    occurrence: caller.current_program.program_occurrence,
+                })
+            })
+            .transpose()?;
         let mut state = service.lock()?;
         let run_unit = &caller.invocation.run_unit_id;
         if state.runs.contains_key(run_unit) {
@@ -394,6 +424,7 @@ impl<'a> ProgramLease<'a> {
                     .clone(),
                 source_level: caller.current_program.logical_level,
                 selection,
+                call,
             }),
         });
         let mut task = caller.clone();
@@ -562,12 +593,13 @@ impl CicsService {
         let loan = match &effect.request {
             HostRequest::Program(ProgramRequest::Link {
                 program, selection, ..
-            }) => Some(ProgramLease::acquire_selected(
+            }) => Some(ProgramLease::acquire_selected_effect(
                 self,
                 run,
                 program.as_str(),
                 selection.as_ref().map(|selected| selected.artifact.clone()),
                 selection.clone(),
+                Some(&effect),
             )?),
             _ => None,
         };

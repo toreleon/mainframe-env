@@ -1259,3 +1259,32 @@ Inherited-control current-input checks pass for all three compiled factories,
 including cancellation requested during child observation, plus existing selected
 installed-call compatibility regressions. No scoped writer is enabled; mandatory
 gates precede this bounded seal and all application acceptance remains pending.
+
+## Atomic core guard review and LINK call provenance integration
+
+Manager declares `CIC-902.program-task.frames.atomic-core-guard-review` before
+CLI dispatch. This read-only dependency slice reviews exact existing execution,
+event, effect and checkpoint guards within Memory/SQLite/PostgreSQL provider-row
+transactions. It owns only external `atomic-core-guard-review/handoff.md` and
+`handoff.json`; no tracked edits, tests, schema, facade, ceilings or store writes
+are assigned. Manager exclusively owns the shared contract and serialized runtime
+admission/close implementation. Acceptance is precise lock-order, race, existing
+DTO/API, SQL boundary and backend test recommendations, with zero execution credit.
+Base is the sealed inherited-control candidate `337da5038474167ac3743b675e891ed30674c018`.
+
+Manager serially integrates `CIC-902.program-task.frames.link-call-origin-proof`:
+the three reviewed provider host-boundary files, manager facade exports, exact
+one-path handler inventory registration, ADR-0029, unique fragment, this status
+and derived documentation manifest. Worker tests passed 45 (eight new and 37
+existing), without ignored tests. Its shared-Git index write was unavailable; the
+reviewable bytes are retained without a sandbox bypass and are not a sealed worker
+candidate. Current integrated focused and mandatory gates must pass before seal.
+The observation retains the full actual nested LINK request and original outer
+CICS effect key; matching current canonical core Intent and a current source lease
+remains the manager's responsibility. No scoped writer, cold loan reconstruction,
+parent acceptance or licensed credit is enabled.
+
+Integrated LINK call provenance checks pass: 45 focused tests, zero failures
+and zero ignored. Manual loans, changed requests/sources, cold or exited loans,
+cancellation, expiry and nested top-loan ownership are covered. Mandatory gates
+precede the bounded seal; no runtime writer or parent acceptance is enabled.

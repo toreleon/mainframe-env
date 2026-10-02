@@ -26,7 +26,7 @@ mod file_tokens;
 mod file_unlock;
 mod handle_state;
 mod host_boundary;
-pub use host_boundary::CicsLocalLinkEntryAttestation;
+pub use host_boundary::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation};
 pub(in crate::service) use host_boundary::{SessionCleanupLease, TaskDispatch};
 mod interval;
 mod interval_control;

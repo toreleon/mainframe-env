@@ -31,7 +31,7 @@ pub use service::{
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
-pub use service::{CicsLocalLinkEntryAttestation, IssuePassTransfer};
+pub use service::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation, IssuePassTransfer};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

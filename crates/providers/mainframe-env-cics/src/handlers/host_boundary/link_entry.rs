@@ -7,6 +7,42 @@ pub(super) struct SelectedEntry {
     pub(super) source_execution_id: ExecutionId,
     pub(super) source_level: u32,
     pub(super) selection: ProgramLinkSelection,
+    pub(super) call: Option<SelectedCall>,
+}
+
+#[derive(Debug)]
+pub(super) struct SelectedCall {
+    pub(super) effect: EffectRequest,
+    pub(super) outer_effect_key: IdempotencyKey,
+    pub(super) occurrence: u64,
+}
+
+/// Immutable observation of the exact effect dispatched at a live local LINK loan.
+///
+/// This nonserializable value retains request provenance, not the live loan. It
+/// grants no admission, store write, dispatch, completion, cleanup or recovery
+/// authority. The embedding must independently match the original outer key to
+/// its current canonical core Intent and validate its current source lease.
+#[derive(Debug)]
+pub struct CicsLocalLinkCallAttestation {
+    entry: CicsLocalLinkEntryAttestation,
+    effect: EffectRequest,
+    outer_effect_key: IdempotencyKey,
+}
+
+impl CicsLocalLinkCallAttestation {
+    /// Return the observed selected entry boundary and its original source.
+    pub fn entry(&self) -> &CicsLocalLinkEntryAttestation {
+        &self.entry
+    }
+    /// Return the full actual nested effect observed immediately before host dispatch.
+    pub fn effect(&self) -> &EffectRequest {
+        &self.effect
+    }
+    /// Return the caller's original outer CICS effect key, before loan mutation.
+    pub fn outer_effect_key(&self) -> &IdempotencyKey {
+        &self.outer_effect_key
+    }
 }
 
 /// Immutable observation of a live, selected local CICS LINK entry boundary.
@@ -80,6 +116,75 @@ fn preserves_controls(source: &Invocation, target: &Invocation) -> bool {
 }
 
 impl CicsService {
+    /// Observe the exact selected LINK effect on the current same-thread top loan.
+    ///
+    /// The source must equal the original caller before entry enrichment; the
+    /// entire effect, including its payload, selection, key, sequence and deadline,
+    /// must equal the actual request retained by `nested` before host dispatch.
+    /// Manual fixture loans without that provenance fail even when their existing
+    /// entry proof succeeds. Expired, exited, foreign-thread and cold loans fail.
+    /// This read-only proof grants no admission, publication or cleanup authority;
+    /// the embedding still owns current core Intent and source lease validation.
+    pub fn attest_local_link_call(
+        &self,
+        source: &Invocation,
+        target: &Invocation,
+        effect: &EffectRequest,
+    ) -> Result<super::CicsLocalLinkCallAttestation, HostProblem> {
+        let HostRequest::Program(ProgramRequest::Link {
+            selection: Some(selection),
+            ..
+        }) = &effect.request
+        else {
+            return Err(HostProblem::Unauthorized);
+        };
+        let attestation = self.attest_local_link_entry(source, target, selection)?;
+        let state = self.lock()?;
+        let task = state
+            .runs
+            .get(&source.run_unit_id)
+            .ok_or(HostProblem::Unauthorized)?;
+        state
+            .task_dispatch
+            .require_available_session(&task.session)?;
+        let claim = state
+            .task_dispatch
+            .claims
+            .get(&source.run_unit_id)
+            .ok_or(HostProblem::Unauthorized)?;
+        let loan = claim.loans.last().ok_or(HostProblem::Unauthorized)?;
+        let entry = loan.entry.as_ref().ok_or(HostProblem::Unauthorized)?;
+        let call = entry.call.as_ref().ok_or(HostProblem::Unauthorized)?;
+        if claim.thread != std::thread::current().id()
+            || claim.commands != claim.loans.len()
+            || claim.command_origin != Some(CicsOperation::Link)
+            || claim.session != task.session
+            || task.program_abend.is_some()
+            || loan.parent != *source
+            || entry.source_execution_id != source.execution_id
+            || entry.origin != Some(CicsOperation::Link)
+            || entry.selection != *selection
+            || task.current_program.logical_level != attestation.logical_level
+            || task.invocation != attestation.root_invocation
+            || loan.actor.as_ref().is_some_and(|actor| actor != target)
+            || task.current_program.effect_invocation != *loan.actor.as_ref().unwrap_or(source)
+            || call.occurrence == 0
+            || call.occurrence > u64::from(source.limits.max_effects)
+            || call.effect.sequence != call.occurrence
+            || call.effect.run_unit != source.run_unit_id
+            || call.effect.deadline_tick != source.deadline_tick
+            || call.effect.idempotency_key.is_none()
+            || call.effect != *effect
+        {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(CicsLocalLinkCallAttestation {
+            entry: attestation,
+            effect: call.effect.clone(),
+            outer_effect_key: call.outer_effect_key.clone(),
+        })
+    }
+
     /// Observe the live selected local LINK loan without changing task, claim or rows.
     ///
     /// The source must be the original loan parent; entry COMMAREA enrichment is
@@ -184,3 +289,6 @@ impl CicsService {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod call_tests;

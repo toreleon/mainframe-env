@@ -256,3 +256,23 @@ Runtime acceptance still requires the independently asserted repeated LINK
 37/37/37 and mixed CALL/LINK/CALL 37/37/47 routes, higher-state byte/CAS
 preservation, atomic rollback and physical SQLite/PostgreSQL reopen. Pending
 gate counts and the user's retained CICSMESSAGE internal requirement stay intact.
+
+### Exact live LINK call provenance
+
+The existing CICS selected host loan records the full actual nested EffectRequest,
+positive bounded occurrence and caller's original outer CICS effect key before
+loan mutation. A nonserializable read-only attestation exposes this provenance
+only for the same-thread current selected LINK loan, exact original source and
+validated target. Manual loans retain the prior entry observation but cannot
+produce actual call provenance. Replay, cold providers and exited loans cannot
+recreate this observation. No rows or logical frames are changed by attestation.
+
+The embedding must match the original outer key to the current canonical source
+core Intent and revalidate its current source lease. The nested selected Program
+request is distinct from the outer CICS Intent and must not be substituted for
+its canonical fingerprint. Retaining the value grants no admission, completion,
+cleanup or recovery authority. Existing entry validation remains unchanged.
+Source: CICS TS 6.x application sources-b, catalog row 0138 LINK,
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_link.html`, SHA-256
+`d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e`;
+calling-context flow/rules pins remain the scope boundary sources.
