@@ -1362,3 +1362,7 @@ fn hardening_47_counter_era_and_replay_only_runs_require_drain_before_upgrade() 
             .is_empty()
     );
 }
+#[cfg(test)]
+mod inherited_control {
+    include!("hardening/inherited_control.rs");
+}

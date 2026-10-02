@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve parent audit correlation in native and batch COBOL child factories and retain the shared live cancellation signal in both batch factories."

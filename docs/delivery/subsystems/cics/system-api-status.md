@@ -1178,3 +1178,84 @@ licensed run, commit, push or parent completion is authorized.
 Reservation current-input checks: twenty focused tests pass with zero ignores.
 The helper writes no store state; mandatory gates precede its bounded seal.
 Actual admission/close and all application acceptance gates remain pending.
+
+### Scoped runtime dependency wave (2026-10-02)
+
+The manager owns original CALL5/protocol4 codecs, shared registrations, the
+actual selected root context, source/control factories and serial integration.
+Reservation preparation is now sealed at `05b482c6` with twenty current-input
+checks and all mandatory gates; no runtime or parent credit follows.
+
+`CIC-902.program-task.frames.link-call-origin-proof` owns only CICS provider
+handlers/host_boundary.rs, host_boundary/link_entry.rs and a new dedicated test
+module. It must retain the actual selected EffectRequest and original outer
+CICS effect key in the existing live LINK loan and expose an immutable read-only
+attestation for that exact request. Keep the prior entry attestation compatible;
+manual fixture loans lacking actual effect provenance cannot pass the new proof.
+Validate current same-thread/top live loan, original unmodified source, actual
+selection/target controls, full effect identity/payload/deadline and outer key;
+no durable bytes, dispatch, store writer, fabricated loan or shadow journal.
+The manager remains responsible for matching the outer key to the current core
+Intent and source authority. Tests require actual selected LINK success and
+changed/rehashed key, request/payload/sequence/deadline/selection/source failures,
+manual loan rejection and expiry/exit/cold rejection. Pinned LINK row0138 plus
+flow/rules apply; isolated CLI worker, no nested workers/refresh/license/push.
+
+`CIC-902.program-task.frames.scoped-return-preparation` owns only new instance/
+scoped/closing.rs and closing/tests.rs, using a manager-frozen registration.
+From a current managed lease and exact terminal observation it prepares native
+idle state or deletion of just a quiescent LINK scope, with exact root/member
+CAS proposals and complete member postimage validation. The actual fresh machine
+must match the observation; INITIAL drops retained bytes, other native entries
+retain their actual working state. LINK siblings must be idle and child scopes
+absent. Preserve every higher scope/member byte, index version and root CALL/
+receipt charge. Return exact observed rows for the manager-owned bounded close
+proof. No publication, lease creation, original CALL DTO, cleanup permission,
+CANCEL/ABEND/task-end/recovery or runtime enablement is delegated. Require actual
+GOBACK/EXIT fixtures and stale/current-lease/quiescence/capacity/CAS negatives,
+zero mutation on failure, independent counters and exact sibling preservation.
+All shared schemas/factories/status/docs remain manager-owned. Focused tests and
+mandatory worker module/format/dependency checks precede unsealed handoff; manager
+integrated gates and sealer follow. No nested workers or unrelated work.
+
+### Manager inherited CALL controls (2026-10-02)
+
+`CIC-902.program-task.frames.inherited-call-control` repairs the actual native,
+installed batch and compiled batch child factories' audit correlation and live
+cancellation probe inheritance. The manager owns cobol.rs and one new private
+hardening regression module/registration, with a unique fragment and status/docs.
+Current factories construct distinct traces but must retain the caller's audit
+identity; both batch factories also need the same live cancellation signal.
+Start with compiled regressions for the three routes and a request made during
+child control observation; prove controls/pins/grants/limits remain inherited
+and requested cancellation wins. No schema, scope writer, source refresh or
+application gate closure is included. Focused regressions and mandatory gates
+precede the bounded seal; all actual scope factory obligations remain pending.
+
+The initial control regression sequence compiled but rejected all calls before
+child observation: its generation-17 fixture conflicted with the actual host
+registry generation 1. That failure gives no child execution/bug credit. The
+fixture now carries the exact selected host generation 1. The manager repairs
+the demonstrated factory inventory gaps by explicitly retaining caller audit
+correlation in all three constructors and the live probe in both batch paths.
+Current-input compiled regressions and mandatory checks remain required.
+
+The repaired cancellation regression passes for all three compiled routes. The
+success harness also records the later parent retention-time observation; that
+parent record is now excluded from child-only inheritance assertions. The prior
+mixed receipt remains failed and is not relabeled. Current-input checks use two
+new regression selectors and the three existing installed-call tests, rather
+than treating route-loop cases or filtered tests as extra passing selectors.
+
+Both new regressions and the three installed-call compatibility selectors now
+pass with zero ignores. The hardening parent is already at its frozen 1,364-line
+ceiling: its new registration is placed in an explicit terminal cfg(test) module
+using the same module path and included owned test file, keeping the production
+ceiling unchanged. Current gates must verify this test-only registration; no
+inventory ceiling or module guard is relaxed. Earlier failed gate receipts remain
+separate from the repaired candidate.
+
+Inherited-control current-input checks pass for all three compiled factories,
+including cancellation requested during child observation, plus existing selected
+installed-call compatibility regressions. No scoped writer is enabled; mandatory
+gates precede this bounded seal and all application acceptance remains pending.
