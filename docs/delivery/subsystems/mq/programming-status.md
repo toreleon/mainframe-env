@@ -512,3 +512,50 @@ public upgrade before the manager supplies the v2 reader and single service
 selection. Non-quiescent conversion remains explicit pending work. The manager
 retains status/ADR coordination, trusted owner/UOW minting, service selection,
 SAF/audit composition, participant acceptance and public route proof.
+
+### Integrated host and storage composition boundaries
+
+| Slice | Integrated feature | Exact bounded proof |
+|---|---|---|
+| `MQ-1501.host-effect-contract` | `7ed1ed79` | 142 host unit plus nine integration tests; full typed host framing, immutable occurrence extraction and original sequence/key. Reviewed-status result arm reconciled and re-sealed. |
+| `MQ-1501.trusted-lifecycle-directory` | `de16ca03` | Nine private lifecycle plus eight host registry tests; non-reused leases/owners, explicit CICS inheritance, IMS epoch and exact process retirement. No host attestation or durable UOW owner is supplied. |
+| `MQ-1505.legacy-delivery-import` | `cb7d9eb5` | 36 service plus seven object-service tests and four row-guard mutants on integration; worker's separate 34 delivery regressions retain their original candidate. Small manifest CAS fences every legacy publication. |
+| `MQ-1505.audited-provider-publication` | `8e8d02da` | 17 publication, five affected Memory/SQLite mutation and eight store-API checks on integration; exact retained live canonical intent and running execution fence rows plus typed audit in one physical transaction. |
+| `MQ-1501.mqi-original-effect-binding` | `de24f3cc` | 30 admission/result regressions on integration; one original host occurrence, full shared canonical request/result identity and original call/limits/copied-capacity checks. |
+
+All feature HEAD seals and required affected formatting, changelog and docs
+freshness checks passed. Canonical/provider-row guards passed where applicable.
+The manager reconciled the ADR 0029/0030 registry/navigation overlap and
+regenerated derived documentation; no worker prose or source pin was discarded.
+Every sequence cleaned its own checkout target, preserving external receipts.
+No dependency input changed; prior policy passes are explicitly reused.
+
+Audited publication deliberately does not finalize core results/outbox or
+deduplicate disjoint batches under one unchanged intent. The actual service
+must supply its CAS-protected UOW/replay dependency and remove sequential old
+writers before atomic claims. PostgreSQL publication remains default-unsupported
+and has no execution credit. Result preflight alone cannot validate returned
+handles/UOW state or erase uncertainty after dispatch; the actual service must
+map uncertainty through the existing shared effect authority. Missing additional
+property/conversion required-length output forms remain pending, not invented.
+
+The current three retained CLI lanes still use `gpt-6.1-sol`, high effort, fast
+off, goal mode/bypass and no nested workers or orchestration skill:
+
+- N implements the declared single-snapshot `rich-service-state-reader`.
+- O performs bounded offline `retained-supplemental-source-inventory`: exact
+  linked structure/constant/attribute topics needed for remaining mappings,
+  narrowly resolved from archive metadata; unpinned candidates are not normative
+  source or execution evidence. No repository writes, refresh or whole-cache audit.
+- M independently reviews the other authors' lifecycle/import/publication
+  composition boundaries and reports concrete findings and the next end-to-end
+  service proof contract. It may run only a narrowly justified isolated diagnostic;
+  it must not edit the manager or another lane's source or bless its own feature.
+
+The manager owns actual selected service/ABI/host admission, separately durable
+UOW ownership, SAF/security context and audit/replay composition, participant
+minimum acceptance and public capability proof. All 26-call gates, CardDemo and
+licensed differentials remain required. The clean `eb9483bc` licensed gate
+reported missing external receipt/pins and pending 0/26; that older candidate
+receipt is not relabeled as evidence for these newer commits. No release or
+parent work package is complete.
