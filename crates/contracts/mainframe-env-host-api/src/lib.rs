@@ -25,6 +25,7 @@ mod mq_catalog;
 mod mq_context;
 mod mq_contract;
 mod mq_handles;
+pub mod mq_md_value;
 mod mq_message_contract;
 pub mod mq_mqi;
 pub mod mq_object_route;

@@ -6,6 +6,19 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The complete MQMD VALUE primitive now retains every version-one/two signed
+MQLONG and fixed character/byte field, with a separate explicit structure
+character profile and no invented v2 fields. Projection uses the one generated
+raw catalog; the new bounded strict value codec reuses existing canonical
+primitives. Original effect/result/replay/storage/checkpoint bytes and the old
+partial descriptor remain unchanged; partial projection still refuses pending.
+Worker `71d66481`, ADR0033 and original rows `0015/0020/0021`, supplemental MQMD
+`q097390_/q097395_/q091870_` and the point-layout scalar/encoding pins define this
+slice. Full-message request/result, actual PUT/GET, context/SAF, delivery and
+durable evolution remain pending. The worker's global API-doc ratchet failure
+(execution 303/176, host 2546/1128, store 98/95) stays unwaived; zero diagnostics
+on this slice's new API items is not a global pass or release acceptance.
+
 The compiled typed adapter now recognizes original MQCONNX VERSION1 calls through
 an additive, default-Unsupported trusted profile/encoding port. It checks real
 compiled direct/COPY-wrapper CNO group layouts, all five reference ranges and

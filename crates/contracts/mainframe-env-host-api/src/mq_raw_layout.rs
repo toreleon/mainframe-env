@@ -8,7 +8,9 @@
 use crate::mq_mqi::MqMqiCall;
 
 mod connx;
+mod md_value;
 pub use connx::{MqConnxProblem, MqConnxProfile, mq_connx_numeric_identities};
+pub(crate) use md_value::validate_md_identity;
 
 mod generated {
     use super::*;

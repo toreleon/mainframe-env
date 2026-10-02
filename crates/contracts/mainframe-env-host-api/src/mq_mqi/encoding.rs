@@ -37,8 +37,13 @@ macro_rules! variants {
     };
 }
 
+mod md_value;
 mod payload;
 mod values;
+pub use md_value::{
+    MQ_MD_VALUE_DOMAIN, MQ_MD_VALUE_MAX_BYTES, MQ_MD_VALUE_SCHEMA, mq_md_value_bytes,
+    mq_md_value_decode, mq_md_value_digest, mq_md_value_size,
+};
 
 fn emit<T: Canonical>(
     value: &T,

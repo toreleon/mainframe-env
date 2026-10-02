@@ -18,8 +18,10 @@ mod tests;
 mod validation;
 
 pub use encoding::{
-    mq_mqi_request_bytes, mq_mqi_request_digest, mq_mqi_request_size, mq_mqi_result_bytes,
-    mq_mqi_result_digest, mq_mqi_result_size,
+    MQ_MD_VALUE_DOMAIN, MQ_MD_VALUE_MAX_BYTES, MQ_MD_VALUE_SCHEMA, mq_md_value_bytes,
+    mq_md_value_decode, mq_md_value_digest, mq_md_value_size, mq_mqi_request_bytes,
+    mq_mqi_request_digest, mq_mqi_request_size, mq_mqi_result_bytes, mq_mqi_result_digest,
+    mq_mqi_result_size,
 };
 
 use crate::mq_object_route::*;

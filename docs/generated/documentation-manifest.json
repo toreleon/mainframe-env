@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 233,
+    "markdown_documents": 234,
     "navigation_groups": 6,
-    "normative_documents": 66,
+    "normative_documents": 67,
     "xtask_commands": 213
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 122,
-      "sha256": "sha256:571e6b4c16b46bbd6a7cfdd579013fc089b85a1296baf5c754cba725f2583661",
+      "relative_links": 123,
+      "sha256": "sha256:851bb0a03f8e54e342f460d856824114a5a7895983a777df108842e06c592473",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1049,6 +1049,18 @@
     {
       "applies_from": "mainframe-env 0.15.0",
       "normative": true,
+      "owner": "MQ host contract maintainers",
+      "path": "docs/decisions/0033-mq-full-md-value.md",
+      "relative_links": 0,
+      "scope": "complete descriptor value and codec, not per-call admission or message execution",
+      "sha256": "sha256:c7a214c1da32ac1010c8f25a103c538f3dd820dc34d20932d6abb5b8f477746d",
+      "status": "Proposed",
+      "title": "Complete MQMD value primitive",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
       "owner": "MQ contract and provider maintainers",
       "path": "docs/decisions/0033-mq-historical-handle-observation.md",
       "relative_links": 2,
@@ -1061,8 +1073,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 35,
-      "sha256": "sha256:6f9ad3188c8ed1d83905d3fab844f033dae6102222368ad67e1e173ae97b366d",
+      "relative_links": 36,
+      "sha256": "sha256:d6c1aef2bf8212207a8196c3fd2cd0ff517a1b16703abe40e1f689341d078135",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1578,7 +1590,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:75a2df7f8b3f6565f82441fc408b61327f4cf457bb77e63c62d4a7afa889df54",
+      "sha256": "sha256:3fa210ee2bde0af46b4bcc6ac63699295834c06dbce4f0c1a3d8b67e5067f1dd",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2384,6 +2396,10 @@
           "path": "docs/decisions/0032-mq-program-machine-frame.md"
         },
         {
+          "label": "ADR-0033: Complete MQMD value primitive",
+          "path": "docs/decisions/0033-mq-full-md-value.md"
+        },
+        {
           "label": "ADR-0033: MQ historical handle observation",
           "path": "docs/decisions/0033-mq-historical-handle-observation.md"
         },
@@ -2636,7 +2652,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:c0eade1c746869d0fd7e3fdb5170fdd1d6b85faa27f216a12b26289cb740713d",
+  "registry_sha256": "sha256:da961e9365fa1e702fc4b3d419dfce21552eff7e72a424d748621d0c12f6009e",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

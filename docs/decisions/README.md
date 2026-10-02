@@ -38,6 +38,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0030](0030-mq-host-lifecycle-directory.md) | private volatile MQ lifecycle directory with explicit persisted restart fencing prerequisite | Proposed |
 | [0031](0031-mq-selected-service-authority.md) | one selected legacy/rich MQ service authority and strict same-store opener | Proposed |
 | [0032](0032-mq-program-machine-frame.md) | explicit installed-batch MQI frame and original machine connection effects | Proposed |
+| [0033](0033-mq-full-md-value.md) | complete lossless MQMD1/2 value and bounded separate canonical value codec | Proposed |
 | [0033](0033-mq-historical-handle-observation.md) | historical MQ canonical handle identity without live registry authority | Proposed |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
