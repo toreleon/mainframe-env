@@ -4,6 +4,21 @@ pub(super) fn validate_definition(
     definition: &DatabaseDefinition,
     limits: EngineLimits,
 ) -> Result<(), EngineProblem> {
+    if let Some(format) = &definition.gsam_format {
+        let record = definition
+            .segments
+            .first()
+            .ok_or(EngineProblem::InvalidDefinition)?;
+        if definition.organization != DatabaseOrganization::Gsam
+            || definition.segments.len() != 1
+            || !record.fields.is_empty()
+            || format
+                .validate(record.min_length, record.max_length)
+                .is_err()
+        {
+            return Err(EngineProblem::InvalidDefinition);
+        }
+    }
     if !valid_name(&definition.name, limits.max_name_bytes)
         || definition.segments.is_empty()
         || definition.segments.len() > limits.max_segments

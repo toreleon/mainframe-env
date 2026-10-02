@@ -1,0 +1,39 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-gsam-formats-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 GSAM record format source supplement",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_gsamioareas.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 3,
+  "total_bytes": 199886,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "3dd6d4c3d4a361dd23a3c5b65a2d873f085363c09715a9aa9539454d202957d8",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_gsamioareas.htm",
+      "sha256": "eb104bbf0d57784d7f70d39dfa6ece1436d8cff70d947f48cd16990b1abacbe2",
+      "bytes": 3471,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_origingsamdataset.htm",
+      "sha256": "90c324c979936c308b959f0e5ccd49a24eb17e0647aceda4b7568b649ad3459b",
+      "bytes": 9651,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_datastmt.htm",
+      "sha256": "847d7dd38e43c170861b9b5fba2d615a4813cb491e94330b2bca2265181d72b6",
+      "bytes": 186764,
+      "last_modified": "not-recorded-in-retained-archive"
+    }
+  ]
+}

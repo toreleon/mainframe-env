@@ -9,11 +9,15 @@ use mainframe_env_host_api::{
 pub(in crate::service) struct ExecutionOutput {
     pub result: ImsResult,
     pub address: Option<mainframe_env_host_api::ImsGsamAddress>,
+    pub undefined_length: Option<u32>,
     pub feedback: Option<ImsPcbFeedbackV1>,
 }
 
 impl ExecutionOutput {
     pub(in crate::service) fn feedback_result(self) -> Result<ImsPcbFeedbackResultV1, HostProblem> {
+        if self.address.is_some() || self.undefined_length.is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
         Ok(ImsPcbFeedbackResultV1 {
             result: self.result,
             feedback: self.feedback.ok_or(HostProblem::InfrastructureFailure)?,
@@ -21,6 +25,7 @@ impl ExecutionOutput {
     }
     pub(in crate::service) fn gsam_result(self) -> mainframe_env_host_api::ImsGsamResult {
         mainframe_env_host_api::ImsGsamResult {
+            undefined_length: self.undefined_length,
             result: self.result,
             address: self.address,
         }

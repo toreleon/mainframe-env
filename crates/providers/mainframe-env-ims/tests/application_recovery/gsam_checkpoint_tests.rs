@@ -1,5 +1,7 @@
 //! Independent logical file expectations from IMS 15.6 GSAM/CHKP/XRST pins.
 use super::*;
+#[path = "gsam_checkpoint_tests/formats_tests.rs"]
+mod formats_tests;
 use checkpoint_tests::{call, invoke_call, next_execution, snapshot};
 use mainframe_env_host_api::{
     ImsGsamAddress, ImsGsamRequest, ImsGsamResult, ImsGsamSearchArgument, ImsOperation,
@@ -36,6 +38,7 @@ fn db(sequence: u64, operation: ImsOperation, pcb: u16, data: &[u8]) -> ImsGsamR
     request.segments.clear();
     request.pcb = pcb;
     ImsGsamRequest {
+        undefined_length: None,
         request,
         context: ImsExecutionContext::DbBatch,
         save_address: operation != ImsOperation::GetUnique,

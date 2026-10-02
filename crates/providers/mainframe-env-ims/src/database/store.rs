@@ -272,7 +272,14 @@ impl DatabaseEngine {
         {
             Err(EngineProblem::InvalidData)
         } else {
-            Ok(())
+            self.definition
+                .gsam_format
+                .as_ref()
+                .map_or(Ok(()), |format| {
+                    format
+                        .validate_area(data, definition.min_length, definition.max_length)
+                        .map_err(|_| EngineProblem::InvalidData)
+                })
         }
     }
 

@@ -80,6 +80,7 @@ fn metadata(version: u32) -> ImsMetadataCatalog {
     ImsMetadataCatalog {
         schema_version: IMS_METADATA_SCHEMA_V1.into(),
         databases: vec![ImsDatabaseMetadata {
+            gsam_format: None,
             name: "AUTHDB".into(),
             version,
             organization: ImsDatabaseOrganization::Hidam,

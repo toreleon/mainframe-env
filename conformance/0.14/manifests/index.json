@@ -71,6 +71,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "ims-gsam-formats",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-gsam-formats-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-gsam-formats-topics.json",
+      "manifest_sha256": "sha256:0370ccc32d300749817e401cf530d8e6ae9a4f657f8bf814b05a839333cd8c42",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:3dd6d4c3d4a361dd23a3c5b65a2d873f085363c09715a9aa9539454d202957d8",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "ims-status-explanations",
       "subsystem": "ims",
       "baseline_id": "ibm-ims-15.6-status-explanations-2026-09-11",

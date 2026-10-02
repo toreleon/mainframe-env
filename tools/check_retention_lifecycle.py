@@ -390,6 +390,19 @@ def check_provider_codecs(root: Path) -> None:
         for reserved in ("cics.nested-effect-origin", "cics.outer-effect-origin"):
             if reserved not in retention:
                 raise ValueError(f"{provider} full codec omits trusted {reserved} provenance")
+        if provider == "ims":
+            execution = require(
+                root / "crates/providers/mainframe-env-ims/src/service/execution.rs",
+                ("fn execute_operands_at(", "Result<feedback::ExecutionOutput, HostProblem>",
+                 "application_backout::prepare_database_call(",
+                 "application_backout::settle_database_call(", "feedback::project(",
+                 "generic::integrity::persist(", "undefined_length: output.undefined_length"),
+                production=True,
+            )
+            if execution.count("fn execute_operands_at(") != 1 or "settles_batch_uow" in execution:
+                raise ValueError("IMS execution owner is ambiguous or restores Batch autocommit")
+            if execution.index("feedback::project(") > execution.index("generic::integrity::persist("):
+                raise ValueError("IMS feedback projection follows atomic publication")
         require(
             root / f"crates/providers/mainframe-env-{provider}/src/service.rs",
             (

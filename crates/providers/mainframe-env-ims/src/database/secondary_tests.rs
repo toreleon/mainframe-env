@@ -151,6 +151,7 @@ fn descriptor() -> DatabaseDefinition {
         ],
     };
     DatabaseDefinition {
+        gsam_format: None,
         name: "INDEXDB".into(),
         organization: DatabaseOrganization::Hidam,
         segments: vec![

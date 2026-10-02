@@ -79,6 +79,7 @@ fn checkpoint_image_digest_detects_corruption_and_is_stable_across_roundtrip() {
         prior_xrst: true,
         user_areas: vec![vec![1, 2, 3]],
         positions: vec![SavedPcbPosition {
+            gsam_format: None,
             pcb: "DBPCB".into(),
             database: "ACCOUNTS".into(),
             segment_key: vec![7, 8],
@@ -103,6 +104,7 @@ fn checkpoint_image_digest_detects_corruption_and_is_stable_across_roundtrip() {
 fn checkpoint_rejects_duplicate_positions_and_forbidden_context_without_mutation() {
     let limits = RecoveryLimits::default();
     let position = SavedPcbPosition {
+        gsam_format: None,
         pcb: "DBPCB".into(),
         database: "ACCOUNTS".into(),
         segment_key: vec![1],

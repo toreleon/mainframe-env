@@ -135,6 +135,7 @@ pub(super) fn metadata(corpus: &Path) -> Result<ImsMetadataCatalog, CorpusProble
             }
         }
         databases.push(ImsDatabaseMetadata {
+            gsam_format: None,
             name: operand(&dbd.2, "NAME")?.into(),
             version: 1,
             organization,

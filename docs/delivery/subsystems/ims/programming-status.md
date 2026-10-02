@@ -3563,3 +3563,166 @@ raw CALL keep independent ownership. Runtime/source rules and official/license
 credit are unaffected by this navigation repair. Candidate merge checks and
 cleanup have their own external receipts; later worker deltas are not credited
 as part of this merge's unchanged IMS code.
+## IMS-1403.gsam-record-formats (declared bounded leaf)
+
+Parent IMS-1403 remains open. Exact clean entry is
+`2b7a92a1e57848fa3fbe158b71c38c6de71009af`, branch
+`codex/v014-gsam-record-formats-20261002`. Preserve prerequisite integration
+`cb7aa908ff48527dfa35ff634c7831cd6fde341b` and both sealed GSAM features.
+Catalog context: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0008`,
+with :0002/:0023/:0016/:0025 as checkpoint/restart consumers. Scope is the owned
+DbBatch CALL GSAM route on selected signed generic metadata, G/GS retrieval and
+L/LS append, explicit logical V/U format and owned application record lengths.
+Physical DASD/BSAM/VSAM/tape layout, raw RSA/PCB/AIB framing, JCL/label precedence,
+OPEN/CLOSE, physical dataset BASIC/LARGE, participant/lease and licensed parity
+remain unsupported. Synthetic segment bounds never infer RECFM.
+
+Mandatory local obligations: fail-first public Unsupported; independent literal
+V length/data and U separate length boundaries; malformed zero/small/large/
+truncated/mismatched controls without mutation; GN/GU/ISRT identity/order/status/
+EOF/independent PCB positions; SAF before read/write; exact canonical replay and
+conflicts; quotas, atomic CAS and unknown acknowledgments; Memory/file SQLite
+fresh reopen and child processes; capture/restart format identity and rejection
+of wrong/stale format without mutation; historical absent metadata/image/replay/
+checkpoint/canonical bytes. Tests supplement shared IR and grant no official
+row or licensed credit. Missing safely representable ABI classes stay Unsupported
+with explicit followup acceptance rather than invented equivalence.
+
+Owners: bounded format adapter/helpers and explicit additive host/metadata/
+canonical seam where needed, existing engine image and checkpoint resolver hooks,
+focused public provider/signed-package tests, boundary ADR, unique fragment and
+normally generated docs. Keep one dispatcher, address, integrity/UOW/recovery and
+store authority; no secondary/SSA/STAT/backout/TM/lease/participant algorithm edits,
+new dependency, frozen facade growth or budget ceiling increase. Manager mapping
+targets service/providers.rs, service/execution.rs, canonical/dispatch.rs,
+request/host_request.rs, request/host_result.rs and product/ims.rs; this base may
+retain pre-extraction files. No other checkout or worker is touched.
+
+Offline source review first checked retained topic-path files, then verified
+exact repository hashes/bytes in the SHA archive with ibm_docs.py plain_text and
+bounded search/read. Database/programming/metadata/recovery baselines and exact
+GSAM recovery supplement remain unchanged. DATASET/I/O-area/origin details absent
+from those manifests require a separately pinned zero-credit retained supplement;
+no refresh or publication bodies enter Git. Acceptance is focused nonempty route
+regressions and strict scoped Clippy, catalog/assurance/schema/spec/shared guards,
+fmt/deny/docs/changelog, exact allowlist seal and committed --check. Receipts
+remain outside Git/targets; cargo clean follows each sequence. Known unchanged
+infrastructure is diagnosed once and reported. No delegation, certification,
+push/PR, official/maintainer/parent/release completion is authorized.
+
+### Owned record-format implementation and remaining ABI obligations
+
+The additive GSAM route now admits explicit version-1 `ImsGsamFormat` metadata
+for F/V/U, BSAM/VSAM applicability, block bound and None/ASA/machine control.
+V retains the literal complete application area, checks big-endian LL against
+its exact byte length and adds no physical ZZ/RDW bytes. U is BSAM-only and
+requires a separate owned u32 length on ISRT; successful GN/GU return that
+length from the retained record. U areas are greater than 11 and bounded by
+BLKSIZE. The BSAM V projection accounts for the source's physical +2 ZZ bytes
+in admission bounds without emulating their physical storage. See
+[ADR-0030](../../../decisions/0030-gsam-application-record-formats.md) for exact
+bounds, source derivation and upgrade/rollback obligations.
+
+Absent format metadata remains fixed-only on the additive route. Historical
+`ImsRequest`/navigation envelopes lack U's separate length ABI and keep U data
+calls Unsupported. The owned bulk image contract validates the same record
+areas through the existing engine. No raw PCB support is claimed. Optional
+format, U replay length and saved format identity serialize by omission when
+absent; prior fixed canonical goldens and ordinary checkpoint preimages remain
+frozen. The signed generic metadata and engine definition own characteristics;
+min/max never infer RECFM. There is no format, length or address side registry.
+
+Capture validates current format/image and binds explicit format plus area
+bounds to each saved GSAM PCB. Restart checks that identity before the existing
+resolver changes position or removes witnessed output suffixes. Wrong/absent
+saved identities, corrupt LL/U areas and stale image characteristics fail with
+no row publication. Identity, integrity, UOW fences, checkpoint resolution and
+atomic CAS remain with their prior owners. The common execution method is
+extracted once to `service/execution.rs`; its authorization, dispatch, replay
+and publication algorithm is retained, with only the optional owned output and
+unrepresentable historical-U envelope check added. Shared guards follow that
+owner. Frozen product/request/canonical outer dispatch facades do not grow.
+
+Exact new source pins (product `SSEPH2_15.6.0`, IMS 15.6), baseline
+`ibm-ims-15.6-gsam-formats-2026-09-11`, zero-credit topic-set digest
+`3dd6d4c3d4a361dd23a3c5b65a2d873f085363c09715a9aa9539454d202957d8`:
+
+| Topic below product root | SHA-256 |
+|---|---|
+| `com.ibm.ims156.doc.apg/ims_gsamioareas.htm` | `eb104bbf0d57784d7f70d39dfa6ece1436d8cff70d947f48cd16990b1abacbe2` |
+| `com.ibm.ims156.doc.apg/ims_origingsamdataset.htm` | `90c324c979936c308b959f0e5ccd49a24eb17e0647aceda4b7568b649ad3459b` |
+| `com.ibm.ims156.doc.sur/ims_datastmt.htm` | `847d7dd38e43c170861b9b5fba2d615a4813cb491e94330b2bca2265181d72b6` |
+
+The retained topic-path cache was absent for the selected topics. Each required
+topic was resolved from the bounded archive by expected repository SHA/bytes
+and read with `ibm_docs.py`'s plain-text parser. No selected topic mismatch or
+unavailability was found. Initial subsystem searches intentionally reported
+unselected missing entries; those are not whole-cache verification. The new
+three-topic scope search verifies only its explicit selected set and shared
+TOC. Existing formats/PCB/retrieval/DBD and CHKP/XRST pins remain unchanged.
+
+Followup/acceptance packet: raw PCB/AIB input/output length and memory ownership,
+physical RDW/BDW/FB/VB, physical RSA, DASD/tape/VSAM device adapters, JCL/label
+precedence, concatenations and BASIC/LARGE need explicit ABI classes and their
+own public adapter. Preserve Unsupported until source-derived literal framing,
+bad/truncated controls, memory bounds, device errors, independent PCBs,
+checkpoint/restart and durable replay tests pass through that adapter. This
+leaf supplies an owned application-area projection, not physical equivalence.
+The source-derived followup is detailed in ADR-0030; licensed execution and
+official/maintainer/parent IMS-1403/v0.14/release completion remain pending.
+
+Candidate receipts, fail-first Unsupported and exact command/source identities
+are outside Git and disposable targets at
+`/Users/tore/Library/Caches/mainframe-env/worker-receipts/v014-completion-20261002/IMS-1403.gsam-record-formats`.
+Memory/file SQLite tests use independent literal records, public provider and
+signed selected-package routes, real CAS/failure/unknown acknowledgments and
+actual process exit/reopen. No empty filtered suite or unconfigured process
+worker grants scenario credit. New production modules stay below 1,200 lines.
+The inherited server strict-Clippy diagnostics and unchanged server facade
+budget failure are reported once and left to their owners; ceilings are not
+raised. They are not relabeled passes by the bounded feature seal.
+
+### Manager GSAM format integration — 2026-10-02
+
+The bounded integration consumes only record-format delta
+`9e97502604d61440047e4c1643190bb178fef5df` on manager base
+`0634ffc221aa977c66a063ba792ab22b379a248d`, preserving the sealed raw COBOL and
+original format branches. [ADR-0030](../../../decisions/0030-gsam-application-record-formats.md)
+owns the new format decision; legacy GSAM ADR-0028 and selected-PCB ADR-0029
+remain unchanged for the root manager's separate numbering composition.
+
+The manager's complete execution owner retains authorization before read/replay,
+integrity refresh and read fences, reservations, image/Q publication fencing,
+application-backout prepare/settle and feedback projection before atomic publish.
+The additive U length is carried in `feedback::ExecutionOutput`, live GSAM
+results, canonical recorded host results and exact replay. Historical omitted
+length bytes stay unchanged. The historical envelope guard follows retained
+replay and authority. No old extraction or generic Batch autocommit helper is
+restored. Saved format identity composes with the existing epoch/incarnation,
+pristine XRST read source and output suffix witness.
+
+Focused GSAM verification passes 53 parent harness cases: six host, 23 IMS unit,
+17 recovery, two checkpoint-contract and five signed-package cases. The V/U
+process parent also captures six configured seed/restart/replay child executions.
+Two unconfigured recovery workers and empty filtered binaries earn no scenario
+credit. Added Memory/SQLite composition regressions protect generic Batch undo
+and epoch after V/U plus PCB-feedback mutations, rollback and later exact replay,
+legacy replay before U-envelope rejection and mutually exclusive result outputs.
+The CAS fixture now explicitly commits its winning foreign UOW before reading it;
+this preserves the manager's unsettled-image fence. Separate focused feedback
+(15 harness cases) and backout (19 harness cases) suites pass, with unconfigured
+child entry points again excluded from scenario credit. Affected strict host/IMS
+Clippy, formatting, module and typed boundaries, all eight architecture guards
+and seven guard tooling regressions pass. Historical worker receipts remain bound
+to their original candidates; current logs, hashes and remaining gate results
+are external under the `ims-gsam-format-manager` receipt directory.
+
+Source review verifies all 12 selected IMS 15.6 pins with the repository reader,
+including full GSAM record-format, I/O-area, origin/DATASET, PCB and CHKP/XRST
+topics. Topic-path cache entries were absent; exact retained archive hashes and
+shared TOC were read locally without a refresh. Catalog context remains
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0008`, with
+`:0002/:0023/:0016/:0025` checkpoint consumers. Source text stays external and
+grants zero execution credit. Parent IMS-1403/1405, selected-secondary integration,
+root current-main composition, participant/official/human acceptance, licensed
+evidence, full-v0.14 and release promotion remain open.

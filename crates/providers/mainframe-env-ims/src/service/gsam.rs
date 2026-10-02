@@ -6,6 +6,8 @@ use mainframe_env_host_api::{ImsGsamAddress, ImsGsamRequest, ImsGsamResult};
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReplayOutput {
     pub(crate) address: Option<ImsGsamAddress>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) undefined_length: Option<u32>,
 }
 
 impl ImsService {
@@ -35,6 +37,7 @@ impl RecordedResult {
             })
         } else if let Some(gsam) = &self.gsam {
             HostResult::ImsGsam(ImsGsamResult {
+                undefined_length: gsam.undefined_length,
                 result: self.result(),
                 address: gsam.address.clone(),
             })

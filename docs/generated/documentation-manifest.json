@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 232,
+    "markdown_documents": 233,
     "navigation_groups": 6,
-    "normative_documents": 64,
+    "normative_documents": 65,
     "xtask_commands": 233
   },
   "documents": [
@@ -161,8 +161,8 @@
     {
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:707d6cb1ffb4aed4bb7bd07be6fe097fde9f3f40b5cdca55b8dc22d15f4847a8",
+      "relative_links": 1,
+      "sha256": "sha256:6b729d11f25a430c09ce5761397751e3045b1a222998122701f313ce3a3bf836",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -265,8 +265,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 5,
-      "sha256": "sha256:4321364ea7adff34161a0b9b5cf70c68826fd743d19fdf6b68f273ebef83558f",
+      "relative_links": 6,
+      "sha256": "sha256:2830373fa6763ab6c5ff1877ab0f0b30a66de7a86d573a9068740f89b0c160dc",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 120,
-      "sha256": "sha256:0878e8be79dff44ee4a36056237f31adf3334b71206fe27940c85a5cdfbd6d23",
+      "relative_links": 121,
+      "sha256": "sha256:052253a7d58385109614a83b3a38867ee574d102d2708a65be670a2c042b9e65",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -583,9 +583,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 4,
+      "relative_links": 5,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:fb3e296d9b6d983620a58f68e694919de4a1490bfeaa4d337bccc23c7bd66581",
+      "sha256": "sha256:67982fb914099cd0511c295dc915ef3aade9c69ecf57f006528d1cb1afed0670",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -987,6 +987,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0030-gsam-application-record-formats.md",
+      "relative_links": 1,
+      "scope": "IMS-1403.gsam-record-formats",
+      "sha256": "sha256:af1bd4755f2d53f02eb3527a59a204a678c1bcab1b498e50d1ff6bc3ac3109f7",
+      "status": "Proposed within the authorized bounded IMS leaf",
+      "title": "ADR-0030: GSAM application record formats and owned undefined length",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 investigation; implementation pending owner decision",
       "normative": true,
       "owner": "store/execution contracts and coordinator maintainers, with host and IMS owners",
@@ -1037,8 +1049,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 33,
-      "sha256": "sha256:bf0da881ff9977a41e3f67e2cb6d1c1883dc7ebc629db24b67389f719c94fb2c",
+      "relative_links": 34,
+      "sha256": "sha256:a27ac62d2bd2b95269b78b1db860a765f08e3a5b01e32bf9f91d1e9aee876f73",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1481,8 +1493,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 13,
-      "sha256": "sha256:14e6f28616bccde165ecc831625e0410cd85b0353a25a320af7acde22974cb0d",
+      "relative_links": 15,
+      "sha256": "sha256:5201777b977bf6992a0476a8dce9037411276508fc9cbf02ae0b5293e0fb5d2d",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2364,6 +2376,10 @@
           "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
+          "label": "ADR-0030: GSAM application record formats and owned length",
+          "path": "docs/decisions/0030-gsam-application-record-formats.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2612,7 +2628,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:34575bd679be706d7d4328b43c2eedb00adb27550fe342016e9c0e06c7947409",
+  "registry_sha256": "sha256:447ce80643b53708a030e3304375eb300cfd1cead9ac9661f0c891daf58166f5",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

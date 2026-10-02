@@ -52,6 +52,9 @@ impl ImsService {
         gsam: Option<&mainframe_env_host_api::ImsGsamRequest>,
         feedback: Option<&mainframe_env_host_api::ImsPcbFeedbackRequestV1>,
     ) -> Result<feedback::ExecutionOutput, HostProblem> {
+        if gsam.is_some() && (feedback.is_some() || navigation.is_some()) {
+            return Err(HostProblem::Malformed);
+        }
         if let Some(feedback) = feedback {
             feedback.validate(mainframe_env_host_api::HostLimits::default())?;
         }
@@ -118,6 +121,7 @@ impl ImsService {
                         return Err(HostProblem::UnknownOutcome);
                     }
                     let result = recorded.result();
+                    let undefined_length = recorded.gsam.as_ref().and_then(|o| o.undefined_length);
                     let feedback = recorded.pcb_feedback_v1.clone();
                     let address = recorded
                         .gsam
@@ -134,6 +138,7 @@ impl ImsService {
                             .map_err(|_| HostProblem::UnknownOutcome)?;
                     }
                     return Ok(feedback::ExecutionOutput {
+                        undefined_length,
                         result,
                         address,
                         feedback,
@@ -162,6 +167,8 @@ impl ImsService {
             .transpose()?;
         if let Some(gsam) = gsam {
             generic::gsam::prepare(&durable.state, invocation, gsam, self.limits)?;
+        } else {
+            generic::gsam::reject_unowned_length(&durable.state, invocation, request)?;
         }
         let mut next = durable.state.scoped_snapshot();
         application_backout::prepare_database_call(&next, run, request)?;
@@ -218,6 +225,7 @@ impl ImsService {
             && !durable.state.generic_pending_undo.contains_key(run)
         {
             return Ok(feedback::ExecutionOutput {
+                undefined_length: None,
                 result,
                 address: None,
                 feedback: None,
@@ -232,6 +240,7 @@ impl ImsService {
             recorded.pcb_feedback_v1 = pcb_feedback.clone();
             if let Some(output) = &output {
                 recorded.gsam = Some(gsam::ReplayOutput {
+                    undefined_length: output.undefined_length,
                     address: output.address.clone(),
                 });
             }
@@ -249,6 +258,7 @@ impl ImsService {
                 .map_err(|_| HostProblem::UnknownOutcome)?;
         }
         Ok(feedback::ExecutionOutput {
+            undefined_length: output.as_ref().and_then(|o| o.undefined_length),
             result,
             address: output.and_then(|o| o.address),
             feedback: pcb_feedback,

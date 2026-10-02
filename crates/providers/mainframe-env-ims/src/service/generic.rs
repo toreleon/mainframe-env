@@ -104,6 +104,7 @@ pub(super) fn definition(
         });
     }
     Ok(DatabaseDefinition {
+        gsam_format: database.gsam_format.clone(),
         name: normalize(&database.name),
         organization,
         segments,

@@ -54,6 +54,7 @@ pub(crate) fn catalog() -> ImsMetadataCatalog {
     ImsMetadataCatalog {
         schema_version: IMS_METADATA_SCHEMA_V1.into(),
         databases: vec![ImsDatabaseMetadata {
+            gsam_format: None,
             name: "GENDB".into(),
             version: 1,
             organization: ImsDatabaseOrganization::Hidam,

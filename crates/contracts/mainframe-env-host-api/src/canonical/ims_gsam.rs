@@ -23,7 +23,14 @@ impl Canonical for ImsGsamSearchArgument {
 }
 impl Canonical for ImsGsamRequest {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
-        out.object("ImsGsamRequest", 4)?;
+        out.object(
+            "ImsGsamRequest",
+            if self.undefined_length.is_some() {
+                5
+            } else {
+                4
+            },
+        )?;
         out.text("context")?;
         self.context.encode(out)?;
         out.text("request")?;
@@ -31,16 +38,33 @@ impl Canonical for ImsGsamRequest {
         out.text("save_address")?;
         self.save_address.encode(out)?;
         out.text("search")?;
-        self.search.encode(out)
+        self.search.encode(out)?;
+        if let Some(length) = self.undefined_length {
+            out.text("undefined_length")?;
+            length.encode(out)?;
+        }
+        Ok(())
     }
 }
 impl Canonical for ImsGsamResult {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
-        out.object("ImsGsamResult", 2)?;
+        out.object(
+            "ImsGsamResult",
+            if self.undefined_length.is_some() {
+                3
+            } else {
+                2
+            },
+        )?;
         out.text("address")?;
         self.address.encode(out)?;
         out.text("result")?;
-        self.result.encode(out)
+        self.result.encode(out)?;
+        if let Some(length) = self.undefined_length {
+            out.text("undefined_length")?;
+            length.encode(out)?;
+        }
+        Ok(())
     }
 }
 
@@ -52,6 +76,7 @@ mod tests {
 
     fn sample() -> ImsGsamRequest {
         ImsGsamRequest {
+            undefined_length: None,
             request: ImsRequest {
                 operation: ImsOperation::GetUnique,
                 psb: None,
@@ -102,6 +127,7 @@ mod tests {
             _ => unreachable!(),
         };
         let result = Ok(HostResult::ImsGsam(ImsGsamResult {
+            undefined_length: None,
             result: ImsResult {
                 status: "  ".into(),
                 segments: vec![ImsSegment {
@@ -178,5 +204,73 @@ mod tests {
             token: [0; 32],
         }));
         assert_eq!(req.validate(limits), Err(HostProblem::Malformed));
+    }
+
+    #[test]
+    fn gsam_undefined_length_has_independent_literal_canonical_field_and_validates_shape() {
+        fn bytes(value: &impl Canonical) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            let mut sink = |part: &[u8]| bytes.extend_from_slice(part);
+            value
+                .encode(&mut Encoder {
+                    sink: &mut sink,
+                    size: 0,
+                    limit: MAX_CANONICAL_EFFECT_BYTES,
+                })
+                .unwrap();
+            bytes
+        }
+        let mut request = sample();
+        request.request.operation = ImsOperation::Insert;
+        request.request.data = b"0123456789AB".to_vec();
+        request.search = None;
+        let historical = bytes(&request);
+        request.undefined_length = Some(12);
+        assert_eq!(request.validate(HostLimits::default()), Ok(()));
+        let mut expected = historical;
+        // Object tag + text tag + u64 name length + 14-byte ImsGsamRequest.
+        expected[24..32].copy_from_slice(&5_u64.to_le_bytes());
+        expected.extend_from_slice(
+            b"\x01\x10\x00\x00\x00\x00\x00\x00\x00undefined_length\x12\x0c\x00\x00\x00",
+        );
+        assert_eq!(bytes(&request), expected);
+        let result = ImsGsamResult {
+            undefined_length: Some(12),
+            address: None,
+            result: ImsResult {
+                status: "  ".into(),
+                affected_segments: 0,
+                checkpoint_id: None,
+                system: None,
+                segments: vec![ImsSegment {
+                    name: "RECORD".into(),
+                    parent_key: None,
+                    data: b"0123456789AB".to_vec(),
+                }],
+            },
+        };
+        assert_eq!(result.validate(HostLimits::default()), Ok(()));
+        let mut absent = result.clone();
+        absent.undefined_length = None;
+        let mut expected = bytes(&absent);
+        // ImsGsamResult has a 13-byte object name.
+        expected[23..31].copy_from_slice(&3_u64.to_le_bytes());
+        expected.extend_from_slice(
+            b"\x01\x10\x00\x00\x00\x00\x00\x00\x00undefined_length\x12\x0c\x00\x00\x00",
+        );
+        assert_eq!(bytes(&result), expected);
+        for length in [0, 11, 13, u32::MAX] {
+            request.undefined_length = Some(length);
+            assert_eq!(
+                request.validate(HostLimits::default()),
+                Err(HostProblem::Malformed)
+            );
+            let mut bad = result.clone();
+            bad.undefined_length = Some(length);
+            assert_eq!(
+                bad.validate(HostLimits::default()),
+                Err(HostProblem::Malformed)
+            );
+        }
     }
 }

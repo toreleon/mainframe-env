@@ -11,6 +11,20 @@ SPEC.loader.exec_module(retention)
 
 
 class RetentionProviderDeletionGuardTests(unittest.TestCase):
+    def test_ims_selected_output_and_backout_remain_before_publication(self):
+        original = Path.read_text
+        execution_path = retention.ROOT / "crates/providers/mainframe-env-ims/src/service/execution.rs"
+        for marker in ("Result<feedback::ExecutionOutput, HostProblem>",
+                       "application_backout::settle_database_call(",
+                       "undefined_length: output.undefined_length"):
+            with self.subTest(marker=marker):
+                def altered(path, *args, **kwargs):
+                    source = original(path, *args, **kwargs)
+                    return source.replace(marker, "removed_contract") if path == execution_path else source
+                with patch.object(Path, "read_text", altered):
+                    with self.assertRaises(ValueError):
+                        retention.check_provider_codecs(retention.ROOT)
+
     def test_split_ims_pipeline_retains_replay_refresh_guard(self):
         original = Path.read_text
         execution_path = retention.ROOT / "crates/providers/mainframe-env-ims/src/service/execution.rs"

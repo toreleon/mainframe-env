@@ -85,7 +85,11 @@ pub use ims_feedback::{
     ImsPcbKeyFeedbackV1,
 };
 mod ims_gsam;
+mod ims_gsam_format;
 pub use ims_gsam::{ImsGsamAddress, ImsGsamRequest, ImsGsamResult, ImsGsamSearchArgument};
+pub use ims_gsam_format::{
+    ImsGsamAccessMethod, ImsGsamControl, ImsGsamFormat, ImsGsamRecordFormat,
+};
 pub use ims_pcb::{
     IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
     IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,

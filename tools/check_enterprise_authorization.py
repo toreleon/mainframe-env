@@ -38,12 +38,22 @@ def check(root: Path = ROOT) -> None:
         execution = source
         if family == "ims":
             execution = (root / "crates/providers/mainframe-env-ims/src/service/execution.rs").read_text()
+            require("mod execution;" in source, "IMS execution owner is disconnected")
+            require(execution.count("fn execute_operands_at(") == 1, "IMS execution owner is ambiguous")
+            require("self.execute_operands_at(" in execution, "IMS public route bypasses execution owner")
+            require("Result<feedback::ExecutionOutput, HostProblem>" in execution,
+                    "IMS execution loses the selected result-output contract")
         body = execute_body(execution)
         require("authorizer.authorize(" in body, f"{family} execute omits enterprise authorization")
         require(
             body.index("authorizer.authorize(") < body.index("apply_request("),
             f"{family} authorization occurs after provider dispatch",
         )
+        if family == "ims":
+            require(body.index("authorizer.authorize(") < body.index("recorded.request_sha256 == request_sha256"),
+                    "IMS authorization occurs after exact replay")
+            require(body.index("recorded.request_sha256 == request_sha256") < body.index("generic::gsam::reject_unowned_length("),
+                    "IMS unowned U guard hides retained replay")
         require(
             f"fn {family}_" in source and "_denial_precedes_mutation()" in source,
             f"{family} deny-before-mutation regression is missing",

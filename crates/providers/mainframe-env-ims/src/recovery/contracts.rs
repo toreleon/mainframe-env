@@ -77,6 +77,9 @@ pub enum CheckpointKind {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SavedPcbPosition {
+    /// Exact owned format/bounds identity. Absent preserves old checkpoint bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gsam_format: Option<[u8; 32]>,
     pub pcb: String,
     pub database: String,
     pub segment_key: Vec<u8>,
@@ -104,6 +107,8 @@ impl SavedPcbPosition {
         if !valid_name(&self.pcb, limits.max_database_name_bytes)
             || !valid_name(&self.database, limits.max_database_name_bytes)
             || (self.segment_key.is_empty() != self.gsam.is_some())
+            || self.gsam_format.is_some() && self.gsam.is_none()
+            || self.gsam_format == Some([0; 32])
         {
             return Err(RecoveryProblem::InvalidRequest);
         }

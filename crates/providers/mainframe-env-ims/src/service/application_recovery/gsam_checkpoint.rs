@@ -12,11 +12,11 @@ pub(super) fn validate_pcb(
 ) -> Result<(), HostProblem> {
     let engine = generic::restored(state, &pcb.database, limits)?;
     if engine.definition().segments.len() != 1
-        || engine.definition().segments[0].min_length != engine.definition().segments[0].max_length
         || !matches!(pcb.processing_options.as_str(), "G" | "GS" | "L" | "LS")
     {
         return Err(HostProblem::Unsupported);
     }
+    crate::database::gsam_format::validate_definition_route(engine.definition())?;
     Ok(())
 }
 
@@ -78,6 +78,7 @@ pub(super) fn save(
         generic::isolation::publish_image(state, run, &pcb.database, engine.image(), limits)?;
     }
     Ok(SavedPcbPosition {
+        gsam_format: crate::database::gsam_format::identity(engine.definition())?,
         pcb: number.to_string(),
         database: pcb.database.clone(),
         segment_key: vec![],
@@ -134,6 +135,9 @@ pub(super) fn restore(
         return Err(HostProblem::ProviderFailure);
     }
     let mut engine: DatabaseEngine = generic::restored(state, &saved.database, limits)?;
+    if saved.gsam_format != crate::database::gsam_format::identity(engine.definition())? {
+        return Err(HostProblem::ProviderFailure);
+    }
     if let SavedGsamPosition::Output { records, .. } = saved_position
         && engine.record_count() > *records
         && !state

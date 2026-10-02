@@ -42,6 +42,8 @@ pub enum ImsGsamSearchArgument {
 /// Bounded GU/GN/ISRT operands with explicit context and saved-address selection.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImsGsamRequest {
+    /// Owned input counterpart of U's four-byte PCB length, ISRT only.
+    pub undefined_length: Option<u32>,
     /// Existing effect identity/PCB/data envelope; SSA and hierarchy operands are forbidden.
     pub request: ImsRequest,
     /// Standalone DL/I batch; BMP/JBP need an explicit region identity.
@@ -69,6 +71,14 @@ impl ImsGsamRequest {
         {
             return Err(HostProblem::Malformed);
         }
+        if self.undefined_length.is_some_and(|length| {
+            self.request.operation != ImsOperation::Insert
+                || length < 12
+                || length as usize != self.request.data.len()
+                || length > 32760
+        }) {
+            return Err(HostProblem::Malformed);
+        }
         if let Some(ImsGsamSearchArgument::Record(address)) = &self.search {
             address.validate(limits)?;
         }
@@ -78,6 +88,8 @@ impl ImsGsamRequest {
 /// Additive result shape; historical `ImsResult` canonical bytes stay frozen.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImsGsamResult {
+    /// Owned output counterpart of U's PCB length on successful GN/GU.
+    pub undefined_length: Option<u32>,
     /// Existing bounded status/data result; synthetic metadata record names are host-only.
     pub result: ImsResult,
     /// Saved fourth-operand output for successful GN/ISRT, when requested.
@@ -107,6 +119,14 @@ impl ImsGsamResult {
         }
         if let Some(address) = &self.address {
             address.validate(limits)?;
+        }
+        if self.undefined_length.is_some_and(|length| {
+            self.result.status != "  "
+                || self.result.segments.len() != 1
+                || !(12..=32760).contains(&length)
+                || self.result.segments[0].data.len() != length as usize
+        }) {
+            return Err(HostProblem::Malformed);
         }
         Ok(())
     }

@@ -91,6 +91,15 @@ remain fixed. Replay output and downgrade rules are in
 [ADR-0034](../decisions/0034-gsam-logical-address.md); retention hashes the
 additive result variant without relabeling historical receipts.
 
+For owned U records, present `undefined_length` adds one sorted final field to
+either GSAM object (five request fields, three result fields). Its value is the
+canonical u32 primitive, tag `0x12` followed by four little-endian bytes. Absence
+omits both name and value and preserves the historical four/two-field preimages
+above. The explicit length is covered by request conflict and result integrity
+digests. Format metadata is bound by signed package/metadata identity and saved
+checkpoint format identity rather than embedded in each call. See
+[ADR-0029](../decisions/0030-gsam-application-record-formats.md).
+
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
 schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
 `suppressed`. The entry therefore participates in the ordinary canonical result

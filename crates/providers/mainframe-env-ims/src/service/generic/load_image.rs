@@ -20,6 +20,7 @@ mod tests {
             metadata: Some(ImsMetadataCatalog {
                 schema_version: IMS_METADATA_SCHEMA_V1.into(),
                 databases: vec![ImsDatabaseMetadata {
+                    gsam_format: None,
                     name: "RENAMED".into(),
                     version: 1,
                     organization: ImsDatabaseOrganization::Hidam,

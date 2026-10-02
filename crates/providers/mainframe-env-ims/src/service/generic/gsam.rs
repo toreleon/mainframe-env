@@ -6,6 +6,47 @@ use mainframe_env_host_api::{
     validate_ims_call_site,
 };
 
+/// Historical IMS envelopes have no owned U input/output length operand.
+pub(in crate::service) fn reject_unowned_length(
+    state: &State,
+    invocation: &Invocation,
+    request: &ImsRequest,
+) -> Result<(), HostProblem> {
+    if !matches!(
+        request.operation,
+        ImsOperation::GetUnique
+            | ImsOperation::GetNext
+            | ImsOperation::GetNextParent
+            | ImsOperation::GetHoldUnique
+            | ImsOperation::GetHoldNext
+            | ImsOperation::GetHoldNextParent
+            | ImsOperation::Insert
+            | ImsOperation::Replace
+            | ImsOperation::Delete
+    ) || !is_generic(state, invocation.run_unit_id.as_str(), request)
+    {
+        return Ok(());
+    }
+    let pcb = session_pcb(state, invocation.run_unit_id.as_str(), request.pcb)?;
+    if state
+        .metadata
+        .as_ref()
+        .and_then(|catalog| {
+            catalog
+                .databases
+                .iter()
+                .find(|db| normalize(&db.name) == normalize(&pcb.database))
+        })
+        .and_then(|db| db.gsam_format.as_ref())
+        .is_some_and(|format| {
+            format.record_format == mainframe_env_host_api::ImsGsamRecordFormat::U
+        })
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    Ok(())
+}
+
 pub(in crate::service) fn prepare(
     state: &State,
     invocation: &Invocation,
@@ -22,11 +63,7 @@ pub(in crate::service) fn prepare(
     if engine.definition().organization != crate::ImsDatabaseOrganization::Gsam {
         return Err(HostProblem::Unsupported);
     }
-    let record = &engine.definition().segments[0];
-    if record.min_length != record.max_length {
-        // RECFM=V LL/RDW and RECFM=U PCB length need owned format metadata.
-        return Err(HostProblem::Unsupported);
-    }
+    crate::database::gsam_format::validate_route(engine.definition(), call)?;
     let option = match pcb.processing_options.as_str() {
         "G" | "GS" => ImsProcessingOptionClass::Read,
         "L" | "LS" => ImsProcessingOptionClass::Insert,
@@ -79,6 +116,7 @@ pub(in crate::service) fn apply(
         request.pcb,
     );
     let wrap = |result| ImsGsamResult {
+        undefined_length: None,
         result,
         address: None,
     };
@@ -136,6 +174,7 @@ pub(in crate::service) fn apply(
                 position,
             );
             return Ok(ImsGsamResult {
+                undefined_length: None,
                 result: affected(1),
                 address: call.save_address.then_some(address),
             });
@@ -160,6 +199,7 @@ pub(in crate::service) fn apply(
         position,
     );
     Ok(ImsGsamResult {
+        undefined_length: crate::database::gsam_format::output_length(engine.definition(), &view),
         result: ImsResult {
             status: "  ".into(),
             segments: vec![segment_result(&engine, view)?],

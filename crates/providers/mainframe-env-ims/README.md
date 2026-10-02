@@ -126,12 +126,17 @@ a coherent backup of metadata/package generations, database images, sessions,
 checkpoints, UOW/undo and replay rows. Binary rollback requires stopping admission
 and restoring that pre-feature backup with its referenced artifacts. Removing
 fields from live rows is not a rollback or an identity-preserving migration.
-The additive `ImsGsamRequest` route supplies fixed-length GSAM GU/GN/ISRT in
+The additive `ImsGsamRequest` route supplies GSAM GU/GN/ISRT in
 DB batch with selected-PCB positions, authorization, shared UOW authority,
 atomic provider rows, and canonical replay. Its issued `ImsGsamAddress` is a
 bounded host logical identity, not IBM's physical RSA layout. See
 [ADR-0034](../../../docs/decisions/0034-gsam-logical-address.md) for the source
 comparison, symbolic checkpoint/restart behavior, and compatibility limits.
+Optional version-1 format metadata admits complete variable LL application
+areas and BSAM undefined records with an explicit owned input/output length.
+Historical absent metadata remains fixed-only. Format/bounds are checked during
+image restoration and bound to saved PCB identities before CHKP/XRST publication.
+See [ADR-0030](../../../docs/decisions/0030-gsam-application-record-formats.md).
 
 TM admission records a provider-row intent before adding work. An exact retry
 or `repair_schedules` repairs that bounded cross-interface gap without executing

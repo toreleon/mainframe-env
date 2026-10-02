@@ -32,6 +32,22 @@ class EnterpriseAuthorizationGuardTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ims execute omits enterprise authorization"):
                 guard.check()
 
+    def test_unowned_u_guard_cannot_precede_exact_replay(self):
+        original = Path.read_text
+        execution_path = guard.ROOT / "crates/providers/mainframe-env-ims/src/service/execution.rs"
+
+        def altered(path, *args, **kwargs):
+            source = original(path, *args, **kwargs)
+            if path == execution_path:
+                marker = "generic::gsam::reject_unowned_length("
+                source = source.replace(marker, "removed_unowned_guard(")
+                source = source.replace("        let replay_key =", marker + "\n        let replay_key =")
+            return source
+
+        with patch.object(Path, "read_text", altered):
+            with self.assertRaisesRegex(ValueError, "unowned U guard hides retained replay"):
+                guard.check()
+
 
 if __name__ == "__main__":
     unittest.main()

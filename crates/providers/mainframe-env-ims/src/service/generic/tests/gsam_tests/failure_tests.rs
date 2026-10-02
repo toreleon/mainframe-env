@@ -12,7 +12,7 @@ pub(super) fn backends() -> Vec<Arc<dyn ProviderStateStore>> {
         Arc::new(SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap()),
     ]
 }
-fn rows(store: &dyn ProviderStateStore) -> Vec<ProviderStateRecord> {
+pub(super) fn rows(store: &dyn ProviderStateStore) -> Vec<ProviderStateRecord> {
     [
         GENERIC_DATABASE_NAMESPACE,
         GENERIC_PENDING_NAMESPACE,
@@ -23,14 +23,14 @@ fn rows(store: &dyn ProviderStateStore) -> Vec<ProviderStateRecord> {
     .flat_map(|ns| store.list_provider_state(ns, 4096).unwrap())
     .collect()
 }
-struct Intercept {
+pub(super) struct Intercept {
     inner: Arc<dyn ProviderStateStore>,
-    mode: AtomicU8,
-    entered: Barrier,
-    release: Barrier,
+    pub(super) mode: AtomicU8,
+    pub(super) entered: Barrier,
+    pub(super) release: Barrier,
 }
 impl Intercept {
-    fn new(inner: Arc<dyn ProviderStateStore>) -> Arc<Self> {
+    pub(super) fn new(inner: Arc<dyn ProviderStateStore>) -> Arc<Self> {
         Arc::new(Self {
             inner,
             mode: AtomicU8::new(0),

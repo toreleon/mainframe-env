@@ -467,10 +467,8 @@ impl ImsService {
                         generic::engine_limits(self.limits),
                     )
                     .map_err(|_| HostProblem::Unsupported)?;
-                    if engine.definition().segments[0].min_length
-                        != engine.definition().segments[0].max_length
-                        || !matches!(pcb.processing_options.as_str(), "G" | "GS" | "L" | "LS")
-                    {
+                    crate::database::gsam_format::validate_definition_route(engine.definition())?;
+                    if !matches!(pcb.processing_options.as_str(), "G" | "GS" | "L" | "LS") {
                         return Err(HostProblem::Unsupported);
                     }
                 }
@@ -622,6 +620,7 @@ fn save_positions(
         let segment_key =
             serde_json::to_vec(&path).map_err(|_| HostProblem::InfrastructureFailure)?;
         saved.push(SavedPcbPosition {
+            gsam_format: None,
             pcb: number.to_string(),
             database: pcb.database.clone(),
             segment_key,

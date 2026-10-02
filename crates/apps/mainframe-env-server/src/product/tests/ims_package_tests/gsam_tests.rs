@@ -11,6 +11,7 @@ fn selected_signed_package_gsam_roundtrip_preserves_selection_and_authority() {
         request.segments.clear();
         request.pcb = pcb;
         ImsGsamRequest {
+            undefined_length: None,
             request,
             context: ImsExecutionContext::DbBatch,
             search: None,

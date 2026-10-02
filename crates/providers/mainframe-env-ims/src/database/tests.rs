@@ -54,6 +54,7 @@ fn segment(name: &str, parent: Option<&str>, key: &str) -> SegmentDefinition {
 
 fn definition(organization: DatabaseOrganization) -> DatabaseDefinition {
     DatabaseDefinition {
+        gsam_format: None,
         name: "TESTDB".into(),
         organization,
         segments: vec![
@@ -449,6 +450,7 @@ fn record_version_fences_a_stale_hold_without_mutation() {
 #[test]
 fn gsam_is_bounded_ordered_and_append_only() {
     let definition = DatabaseDefinition {
+        gsam_format: None,
         name: "GSAMDB".into(),
         organization: DatabaseOrganization::Gsam,
         segments: vec![SegmentDefinition {

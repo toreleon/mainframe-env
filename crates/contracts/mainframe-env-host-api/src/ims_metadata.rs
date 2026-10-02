@@ -206,6 +206,9 @@ pub struct ImsLogicalRelationshipMetadata {
 #[serde(deny_unknown_fields)]
 /// Versioned database definition consumed by packages and providers after shared validation.
 pub struct ImsDatabaseMetadata {
+    /// Explicit GSAM application format; absence retains historical fixed-only admission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gsam_format: Option<crate::ImsGsamFormat>,
     /// Database resource identity unique after normalization.
     pub name: String,
     /// Definition version bounded by signed 32-bit range.
@@ -458,6 +461,21 @@ fn validate_database(
     database: &ImsDatabaseMetadata,
     limits: ImsMetadataLimits,
 ) -> Result<(), ImsMetadataProblem> {
+    if let Some(format) = &database.gsam_format {
+        let record = database
+            .segments
+            .first()
+            .ok_or(ImsMetadataProblem::MissingReference)?;
+        if database.organization != ImsDatabaseOrganization::Gsam
+            || database.segments.len() != 1
+            || !record.fields.is_empty()
+            || format
+                .validate(record.min_length, record.max_length)
+                .is_err()
+        {
+            return Err(ImsMetadataProblem::IncompatibleReference);
+        }
+    }
     if database.segments.is_empty()
         || database.segments.len() > database.organization.segment_limit(limits)
         || database.secondary_indexes.len() > limits.max_named_fields_and_indexes
@@ -866,6 +884,41 @@ fn normalize(value: &str) -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn gsam_absent_format_keeps_historical_metadata_bytes_and_explicit_format_binds_identity() {
+        let literal = br#"{"name":"GENDB","version":1,"organization":"GSAM","segments":[{"name":"RECORD","parent":null,"min_length":16,"max_length":16,"fields":[]}],"secondary_indexes":[],"logical_relationships":[]}"#;
+        let mut db: ImsDatabaseMetadata = serde_json::from_slice(literal).unwrap();
+        assert_eq!(db.gsam_format, None);
+        assert_eq!(serde_json::to_vec(&db).unwrap(), literal);
+        let catalog = |db| ImsMetadataCatalog {
+            schema_version: IMS_METADATA_SCHEMA_V1.into(),
+            databases: vec![db],
+            psbs: vec![],
+        };
+        let old =
+            validate_ims_metadata(&catalog(db.clone()), ImsMetadataLimits::default()).unwrap();
+        db.segments[0].min_length = 12;
+        db.gsam_format = Some(crate::ImsGsamFormat {
+            version: 1,
+            record_format: crate::ImsGsamRecordFormat::U,
+            access_method: crate::ImsGsamAccessMethod::Bsam,
+            block_size: 16,
+            control: crate::ImsGsamControl::None,
+        });
+        let identity =
+            validate_ims_metadata(&catalog(db.clone()), ImsMetadataLimits::default()).unwrap();
+        assert_ne!(old.digest, identity.digest);
+        db.gsam_format.as_mut().unwrap().control = crate::ImsGsamControl::Asa;
+        assert_ne!(
+            identity.digest,
+            validate_ims_metadata(&catalog(db.clone()), ImsMetadataLimits::default())
+                .unwrap()
+                .digest
+        );
+        db.organization = ImsDatabaseOrganization::Hsam;
+        assert!(validate_ims_metadata(&catalog(db), ImsMetadataLimits::default()).is_err());
+    }
+
     fn field(name: &str, offset: usize, length: usize, sequence: bool) -> ImsFieldMetadata {
         ImsFieldMetadata {
             name: Some(name.into()),
@@ -890,6 +943,7 @@ mod tests {
         ImsMetadataCatalog {
             schema_version: IMS_METADATA_SCHEMA_V1.into(),
             databases: vec![ImsDatabaseMetadata {
+                gsam_format: None,
                 name: "AUTHDB".into(),
                 version: 7,
                 organization: ImsDatabaseOrganization::Hidam,

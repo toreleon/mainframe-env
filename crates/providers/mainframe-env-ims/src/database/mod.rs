@@ -135,6 +135,9 @@ impl SecondaryIndexDefinition {
 /// Immutable metadata consumed by the algorithm foundation.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DatabaseDefinition {
+    /// Optional complete GSAM application format; absence preserves fixed-only compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gsam_format: Option<mainframe_env_host_api::ImsGsamFormat>,
     pub name: String,
     pub organization: DatabaseOrganization,
     pub segments: Vec<SegmentDefinition>,
@@ -354,6 +357,7 @@ pub struct DatabaseEngineImage {
 mod definition;
 mod gsam;
 mod gsam_checkpoint;
+pub(crate) mod gsam_format;
 mod logical;
 mod navigation;
 mod secondary;

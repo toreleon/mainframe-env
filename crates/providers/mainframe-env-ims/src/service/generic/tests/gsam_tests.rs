@@ -3,6 +3,7 @@ use mainframe_env_host_api::{
     HostLimits, ImsGsamAddress, ImsGsamRequest, ImsGsamResult, ImsGsamSearchArgument,
 };
 mod failure_tests;
+mod formats_tests;
 
 fn snapshot(service: &ImsService) -> (Vec<u8>, RowVersions) {
     let durable = service.lock().unwrap();
@@ -62,6 +63,7 @@ fn gsam(run: &str, sequence: u64, op: ImsOperation, pcb: u16, data: &[u8]) -> Im
     let mut request = request(run, op, sequence, &[], data);
     request.pcb = pcb;
     ImsGsamRequest {
+        undefined_length: None,
         request,
         context: ImsExecutionContext::DbBatch,
         search: None,
@@ -259,6 +261,7 @@ fn exercise(
         first,
         next,
         ImsGsamResult {
+            undefined_length: None,
             result: found.result,
             address: Some(inserted.address.unwrap()),
         },

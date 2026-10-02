@@ -166,6 +166,7 @@ fn relationship_catalog(paired: bool) -> ImsMetadataCatalog {
             paired,
         });
     metadata.databases.push(ImsDatabaseMetadata {
+        gsam_format: None,
         name: "PARENTDB".into(),
         version: 1,
         organization: ImsDatabaseOrganization::Phidam,

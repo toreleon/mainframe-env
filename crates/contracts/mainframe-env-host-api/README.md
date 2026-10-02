@@ -11,6 +11,13 @@ display-code parser. Encoding adapters translate source bytes before parsing;
 generic DBD metadata supplies exact field lengths so comparative values remain
 binary and cannot be split by connector-shaped data.
 
+The optional version-1 `ImsGsamFormat` declares application-area F/V/U format,
+access method, block bound and control selection in signed database metadata.
+`ImsGsamRequest`/`ImsGsamResult` carry U's separate owned length; V retains its
+two-byte LL and exact application bytes. This is an owned logical adapter.
+Raw PCB and physical RDW interfaces require separate authorities. See
+[ADR-0029](../../../docs/decisions/0030-gsam-application-record-formats.md).
+
 The IMS PCB/status contract freezes DB, GSAM, I/O, and alternate mask layouts,
 execution contexts, and field applicability. Its generated registry contains
 the exact database, system-service, and message status memberships, including

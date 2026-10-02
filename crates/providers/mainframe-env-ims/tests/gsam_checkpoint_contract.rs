@@ -25,6 +25,7 @@ fn gsam_retained_position_preserves_historical_bytes_and_rejects_ambiguous_shape
             prior_xrst: true,
             user_areas: vec![],
             positions: vec![SavedPcbPosition {
+                gsam_format: None,
                 pcb: "1".into(),
                 database: "DB".into(),
                 segment_key: vec![],
@@ -73,6 +74,7 @@ fn gsam_retained_position_bounds_and_database_identity_are_checked_before_sealin
         prior_xrst: true,
         user_areas: vec![],
         positions: vec![SavedPcbPosition {
+            gsam_format: None,
             pcb: "1".into(),
             database: "DB".into(),
             segment_key: vec![],
