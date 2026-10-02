@@ -429,8 +429,9 @@ CLI workers plus manager, `gpt-6.1-sol`, high effort, goal mode/bypass and fast 
 
 `MQ-1505.audited-provider-publication` (lane O) owns a minimal additive shared
 store boundary, Memory/SQLite implementations and focused tests, linked child
-modules/extraction hooks, ADR 0029, relevant provider-row/storage contract
-documentation and one fragment. It must assert the exact existing live canonical
+modules/extraction hooks, ADR 0029, `DURABLE-STORAGE-PROFILE.md` and one fragment.
+Lane N exclusively owns the narrow `PROVIDER-ROW-PERSISTENCE-V1.md` edits.
+The publication boundary must assert the exact existing live canonical
 coordinator intent inside the same physical transaction as provider object,
 UOW/replay-result rows and their typed audit. It must use existing audit/effect
 codecs and touched-row rollback, never a private MQ audit/journal or whole-store
