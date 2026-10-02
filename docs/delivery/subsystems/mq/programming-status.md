@@ -325,3 +325,9 @@ not replace the required 26-call final outcome with private-kernel completion.
 Existing replay, audit, canonical effect and transaction authorities must be
 reused. Parent work packages and all official execution/differential gates
 remain in progress.
+
+The manager additionally owns `MQ-1505.row-envelope-reuse`, a mechanical
+crate-private visibility hook for the existing MQ `ObjectRow<T>` envelope and
+encoder in `service.rs`, plus a unique fragment. No payload, schema, namespace,
+decoder, state transition or public API changes. Lane N consumes that single
+codec instead of copying it; the hook is integrated before its worker resumes.
