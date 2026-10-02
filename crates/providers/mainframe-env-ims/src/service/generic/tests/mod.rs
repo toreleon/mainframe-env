@@ -24,6 +24,7 @@ mod basic_checkpoint_tests;
 mod closure_tests;
 mod isolation_tests;
 mod pcb_tests;
+mod reservation_tests;
 mod ssa_tests;
 
 pub(crate) fn catalog() -> ImsMetadataCatalog {

@@ -1530,3 +1530,202 @@ race after refresh and before the real atomic store batch on both backends.
 The metadata/schema and local feature seal remain zero-credit preparation for
 official IR and licensed equivalence. Rich SSA with a selected secondary index
 remains explicitly unsupported, not a successful primary-order substitute.
+## IMS-1406.q-reservation-write-fence (declared bounded slice, 2026-10-02)
+
+Parent: IMS-1406. Entry HEAD: `2f70b82f` (integrated UOW isolation, PCB
+sensitivity, checkpoint and CardDemo repairs). Consumes the recorded released
+0.4/0.5/0.6 dependency identities above and the existing host ABI, SAF,
+canonical effect, durable storage, provider-row/CAS and replay authorities.
+Owns a bounded reservation helper and minimal system/generic/isolation/utility
+call-site integration; SSA navigation, secondary-index projection and application
+LOG/recovery DTOs remain other workers' scope. No private lock/store/coordinator.
+
+Catalog: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0003` (DEQ),
+`:0005/:0006` (Q Get/Get Hold), `:0004/:0015` (DLET/REPL), `:0008/:0009`
+(insertion/load publication) and `:0002` (checkpoint release integration).
+Public routes are typed `ImsService::execute` / `ims_providers` and the existing
+utility image publisher, full-function metadata and retained legacy reservations.
+Mandatory local obligations: deterministic two-run/two-service fail-first on
+Memory and file SQLite; ordinary updates, record granularity and cascades;
+bulk/utility invalidation; acquisition/write CAS races and stale-row refresh;
+owner update and per-PCB current/modified tracking; DEQ rules; checkpoint,
+commit/rollback/termination release; authorization/no mutation, replay, retained
+readers and SQLite restart. Host contention must not become an invented IBM
+PCB result. Inspect pending-undo integrity reads separately from PROCOPT O and
+record remaining obligations. No official row credit, parent seal, licensed
+campaign, network refresh, push, PR or mixed-resource closure is authorized.
+
+Acceptance: focused failing/passing regressions, strict scoped Clippy
+`--no-deps -- -D warnings`, fmt, deny, affected IMS/spec/shared architecture
+guards, docs/changelog; exact allowlist slice seal and check. Preserve external
+receipts and clean Cargo targets after each command sequence. Next step:
+offline pinned Q/DEQ/update/syncpoint review and deterministic reproduction.
+
+Implementation: `service/system/reservations.rs` is a bounded helper on the
+existing SystemState. Database refresh includes the authoritative system row
+before undo verification; Q acquisition/release/current/modified changes
+advance the existing database-row CAS, including unchanged image bytes. The
+same atomic publication contains session, reservation, undo and replay changes.
+Two concurrent acquisitions/writes cannot both publish observations from the
+same database version. Acquisition also rejects another run's pending undo.
+Image publication compares existing segment identities, versions, hierarchy and
+bytes: a root Q fences its database record, a dependent Q fences that segment,
+and deletion/cascades cannot remove a reserved dependent. Other roots and
+unreserved sibling segments remain writable subject to the pre-existing
+database/dependency UOW fence. Bulk image load and utility replacement reject
+active reservations, including the owner's, because they can reassign occurrence
+identities. A utility staged before a reservation/release must be restaged at
+the new CAS version. No new private lock service or store is introduced.
+
+Owner mutation marks the affected reservation modified even through another
+PCB or a cascade; reacquisition cannot clear that mark. Successful navigation
+within the same database record retains the position-required flag. Requested
+PCB identity and historical missing-PCB scheduled-PCB fallback are preserved.
+The existing observer releases reservations on CHKP, commit, rollback and
+termination. Exact replay neither reacquires a released Q nor releases a new
+reservation on replay of an older settlement. Commit/rollback authorization
+now includes reserved databases even when there is no pending undo. The legacy
+location reader and legacy write/load route receive minimal matching fences;
+their other historical semantics are unchanged. Contentious updates return
+host `IdempotencyConflict`; lost publication acknowledgement stays
+`UnknownOutcome`, with retained authoritative replay and no automatic redispatch.
+MSDB Q is explicitly unsupported without publishing data or position changes.
+
+Source review is offline. The existing verified `ims-1403-topic-cache` supports
+`ibm_docs.py search/read` for programming scope; the retained path root lacks
+these exact bodies, so the raw SHA archive was checked against manifest hashes
+and byte counts and read with the repository `plain_text` parser. Exact sources:
+
+| Baseline / topic | SHA-256 |
+|---|---|
+| `ibm-ims-15.6-programming-contracts-2026-09-11`, `ims_comparingcmdcodesandopts.htm` | `eec570be49de991fe17b672c5e81dc4a83733d66267d3e0b561502e8820854ec` |
+| Same programming baseline, `ims_gughucall.htm` | `0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9` |
+| Same programming baseline, `ims_processingoptions.htm` | `bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4` |
+| `ibm-ims-15.6-database-contracts-2026-09-11`, `ims_replacecall.htm` | `55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a` |
+| Same database baseline, `ims_issuedeletecall.htm` | `f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23` |
+| `ibm-ims-15.6-recovery-utilities-2026-09-11`, `ims_basicchkpcall.htm` | `1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a` |
+
+The archive's IMS 15.6 topic metadata also supplies bounded supplemental
+identities: `ims_qcmdcode.htm` (9,960 bytes,
+`e5af5bd0b7a2a631e0db6600fc0464428bda15cb1d5364b74cfe5fc7b8559eae`),
+`ims_reservingsegments.htm` (3,791 bytes,
+`4d3967707752564dcc2193e8003341bfdd63a2a2d5358ba8d5f9db210830fbbe`),
+`ims_lockqcommand.htm` (1,863 bytes,
+`e9127601febd8f76a8e5a36d3f761ac62be74dcbd67deefb2ed3c45aabe92f2d`),
+and the previously recorded `ims_deqcall.htm` (17,885 bytes,
+`ece3fcc632ba0b1cfa68836d8ab30cadf8081afbdb7d626ef26cc4d337728990`).
+All four exact archive bodies hash-verified and parsed locally. Direct Q and
+DEQ topics are absent from the registered manifests, so exact reader requests
+remain unavailable there; these supplements are not silently promoted to
+registered pins or execution evidence. The registered comparison topic binds
+Q/LOCKED to update protection; supplemental Q topics distinguish root-record
+versus dependent-segment scope and DEQ's class, modified and position exceptions.
+No body is copied into Git, refreshed, or treated as licensed evidence.
+
+Integrity-read inspection remains a separate obligation. Programming
+`ims_processingoptions.htm` and supplemental `ims_reservingsegments.htm` say
+that integrity readers must not observe another program's uncommitted altered
+data; GO is the explicit read-without-integrity exception. The current generic
+read route restores the live database image and selects by SENSEG/PROCOPT but
+does not consult pending undo for ordinary Get/Get Hold. G and GO therefore do
+not yet have distinct pending-undo visibility fences. This write repair does
+not supply full transaction isolation, ordinary read/update lock coexistence,
+root-Q entry restrictions, shared Q holders, waiting/deadlock scheduling, MAXQ
+call accounting, physical block/CI data-sharing granularity, or complete Fast
+Path DEQ buffer/FW semantics. Those source-backed obligations stay pending;
+the existing conservative database-wide undo fence is also broader than IBM
+record locks. Mixed-resource ownership, recovery-lease epochs, audit composition
+and licensed equivalence retain their shared participant blockers.
+
+Manager integration preserves the rich SSA/selected-secondary boundary and
+the existing witnessed UOW publisher. Q checks therefore use the same common
+fresh-call observer and atomic row changes, not an independent reservation map.
+Move the unchanged legacy load/unload helpers into `service/legacy_load.rs` so
+the new common fencing hooks lower, rather than enlarge, the frozen facade
+budget. Original worker checks remain historical; combined verification and
+exact re-seal are recorded separately in `q-integration.log` and its seal log.
+The combined runtime passes 18 reservation tests (including child processes),
+23 selected-PCB/secondary tests, 11 rich SSA tests and 10 application LOG tests;
+strict IMS Clippy, the global module ratchet and IMS assurance/docs checks pass.
+Legacy reservation/load checks exercise the extracted load helper through the
+public route. These are current integrated checks, not official row coverage.
+
+Compatibility: the v1 system/object rows, reservation key shape, optional PCB
+field, canonical request/replay domains and namespace names are unchanged.
+No SQL migration, new durable schema, or eager reader rewrite is introduced.
+Earlier reservations without PCB identity remain readable and fenced. This
+cannot undo updates already admitted by an older binary or relabel historical
+successful replay receipts. Stop admission and drain/reconcile sessions,
+reservations and UOWs before upgrade or binary downgrade; alternatively restore
+a consistent compatible backup with all database/checkpoint/replay references.
+An older writer does not enforce this CAS/reservation protocol, so mixed writer
+versions and live downgrade with active reservations are unsupported. The
+inherited v2-undo downgrade limits still apply.
+
+Verification receipts are external at
+`v014-completion-20261002/ims-q-reservation-write-fence`. The corrected
+fail-first receipt shows REPL bypass on all four Memory/file-SQLite two-run and
+two-service cases (the initial two-service attempt instead exposed a stale
+Get-Hold CAS failure). Passing scoped regressions exercise the public
+`ims_providers` write route, root/dependent and logical-cascade scope,
+authorization and malformed no-mutation, modified/PCB and class rules,
+settlement replay, forced acquisition/write CAS ordering, atomic failure,
+unknown acknowledgement, retained missing-PCB readers, and three separate
+SQLite seed/resume/verify processes. An earlier candidate's full IMS package
+suite passed (121 unit, 17 integration and zero doc tests). The final runtime
+candidate passes all 18 focused reservation regressions and strict scoped
+Clippy; the added legacy/context checks also cover identical-byte REPL,
+root/dependent acquisition overlap and same-record DEQ position retention.
+A three-level case permits foreign insertion/deletion below a Q-reserved
+dependent while root Q still fences that descendant publication; engine-owned
+child-list changes alone do not modify the reserved dependent segment.
+Final affected policy/generated gates are recorded below when complete. No licensed,
+PostgreSQL, CardDemo-full, global cache audit, or release campaign is run.
+
+Small shared integration needs: retain the original provider-row helper names
+when the manager extracts `service/rows.rs`; this slice calls them unchanged.
+The service facade grows only by reservation refresh/check/authorization/load
+integration. Its entry count was already 2,109 versus the 1,959-line recorded
+ceiling; the manager owns that split, and this slice does not raise the ceiling
+or perform the extraction. New production modules remain below 1,200 lines.
+The routine docs manifest must reflect this appended section. No official row
+passes, IMS-1406 parent completion or full-minor seal is claimed.
+
+The IMS assurance matrix initially failed because the integrated generic-test
+split left 14 local-gate locators at `service/generic.rs`. This slice corrects
+only those paths to the executable tests in `service/generic/tests/mod.rs`;
+test names, source/catalog bindings, schema, pending dispositions and credit
+remain unchanged. The final production counts are helper 381, system 1,036,
+generic 934, isolation 376, utility bridge 581 and facade 2,122. The repository
+module ratchet stops first at unchanged server `product.rs` (6,291 versus
+6,008); the facade's pre-existing IMS ceiling issue remains for the manager's
+separate extraction. No budget is raised and that global gate is not passed.
+
+Final scoped acceptance: 18 reservation tests pass on the final runtime
+candidate; 14 existing PCB tests and two existing system-family tests passed
+before the final helper-only child-list refinement. Commands:
+`cargo test -p mainframe-env-ims reservation_ -- --nocapture`,
+`cargo test -p mainframe-env-ims service::generic::tests::pcb_tests`,
+`cargo test -p mainframe-env-ims system_families_replay_and_restart`,
+`cargo clippy -p mainframe-env-ims --all-targets --no-deps -- -D warnings`,
+`cargo fmt --all -- --check`, `cargo deny --offline check`,
+`cargo xtask ims-catalog --check`, `cargo xtask ims-assurance-matrix --check`,
+`cargo xtask spec --check` (134 policy tests) and
+`cargo xtask changelog --check`. The execution-route, effect-encoding,
+provider-row, storage-profile, enterprise-authorization, retention-lifecycle
+and transaction-participant Python guards pass, as does
+`python3 -B tools/generate_transaction_participant.py --check`.
+Cargo runs use the pinned toolchain, the authorized PATH prefix and
+`CARGO_NET_OFFLINE=true`; deny uses retained advisory data without refresh.
+
+Final documentation/sealing command receipt: `final-docs-seal.log` under the
+external slice receipts directory. The routine generator/check is
+`cargo xtask docs` / `cargo xtask docs --check`. The seal uses the exact staged
+file allowlist with `cargo xtask work-package-seal --id
+IMS-1406.q-reservation-write-fence --target-version 0.14.0` and the same paths
+with `--check` after local commit. It is a bounded slice seal, not an official
+row or parent seal. `git diff --check` and Cargo cleanup complete each sequence;
+no publication bodies, SQL schema, participant descriptor, LOG adapter, SSA
+navigation or secondary-index contracts are changed. The next substantive
+obligations are integrity-read visibility and the pending lock-manager semantics
+listed above; the manager separately owns facade extraction and aggregate gates.

@@ -344,15 +344,15 @@ fn local_uow_witness_mismatch_and_malformed_schema_fail_closed() {
     }
 }
 
-struct InterceptStore {
+pub(super) struct InterceptStore {
     inner: Arc<dyn ProviderStateStore>,
-    mode: AtomicU8,
-    entered: Barrier,
-    release: Barrier,
+    pub(super) mode: AtomicU8,
+    pub(super) entered: Barrier,
+    pub(super) release: Barrier,
 }
 
 impl InterceptStore {
-    fn new(inner: Arc<dyn ProviderStateStore>) -> Arc<Self> {
+    pub(super) fn new(inner: Arc<dyn ProviderStateStore>) -> Arc<Self> {
         Arc::new(Self {
             inner,
             mode: AtomicU8::new(0),

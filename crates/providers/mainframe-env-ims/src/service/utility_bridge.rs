@@ -141,6 +141,8 @@ impl ImsService {
         }
         let mut next = durable.state.scoped_snapshot();
         if changed {
+            system::reservations::refresh(&*self.store, self.limits, &mut durable)
+                .map_err(host_error)?;
             generic::isolation::refresh_undo(&*self.store, self.limits, &mut durable)
                 .map_err(host_error)?;
             generic::isolation::ensure_writer(
@@ -155,6 +157,7 @@ impl ImsService {
                 invocation.run_unit_id.as_str(),
                 &name,
                 restored_image.ok_or(RecoveryProblem::CorruptImage)?,
+                self.limits,
             )
             .map_err(host_error)?;
             generic::reset_positions(&mut next, &name, None);
@@ -436,6 +439,8 @@ impl ImsService {
             generic::refresh_databases(&*self.store, self.limits, &mut durable)
                 .map_err(host_error)?;
         } else {
+            system::reservations::refresh(&*self.store, self.limits, &mut durable)
+                .map_err(host_error)?;
             durable.versions.insert(
                 (GENERIC_DATABASE_NAMESPACE.into(), name.clone()),
                 raw.version,
@@ -578,6 +583,7 @@ fn write_store_error(problem: StoreError) -> RecoveryProblem {
 mod tests {
     use super::*;
     mod isolation_tests;
+    mod reservation_tests;
     use crate::recovery::{
         BackoutPointKind, CheckpointKind, CheckpointRequest, LogRequest, RecoveryContext,
         RecoverySession, UtilityDelta, UtilityDeltaChange, UtilityEngine, UtilityPlan,

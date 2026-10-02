@@ -11,6 +11,7 @@ use mainframe_env_host_api::{
 };
 
 const ROW_KEY: &str = "runtime";
+pub(super) mod reservations;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub(super) struct SystemSession {
@@ -731,11 +732,52 @@ pub(super) fn observe_database_call(
             .transpose()?
     };
     if is_get && result.status == "  " {
+        if let (Some(_), Some(location)) = (class, &location) {
+            reservations::ensure_acquisition(state, run, &database, location, limits)?;
+        }
+        let mut required = BTreeMap::new();
+        if session.generic
+            && let Some(id) = generic::pcb::position(&session, selected_pcb).current()
+            && let Some(row) = state.system.get(ROW_KEY)
+        {
+            for (key, reservation) in &row.reservations {
+                if reservation.owner == run
+                    && reservation.pcb.unwrap_or(session.pcb) == selected_pcb
+                {
+                    let (name, text) = key
+                        .split_once(':')
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    required.insert(
+                        key.clone(),
+                        name == database
+                            && reservations::same_record(state, name, text, id, limits)?,
+                    );
+                }
+            }
+        }
+        if !session.generic
+            && let Some(location) = &location
+            && let Some(row) = state.system.get(ROW_KEY)
+        {
+            for (key, reservation) in &row.reservations {
+                if reservation.owner == run
+                    && reservation.pcb.unwrap_or(session.pcb) == selected_pcb
+                {
+                    let (name, text) = key
+                        .split_once(':')
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    required.insert(
+                        key.clone(),
+                        name == database && reservations::same_legacy_record(text, location)?,
+                    );
+                }
+            }
+        }
         let row = system_state(state);
-        for reservation in row.reservations.values_mut().filter(|reservation| {
-            reservation.owner == run && reservation.pcb.unwrap_or(session.pcb) == selected_pcb
-        }) {
-            reservation.current = false;
+        for (key, reservation) in &mut row.reservations {
+            if reservation.owner == run && reservation.pcb.unwrap_or(session.pcb) == selected_pcb {
+                reservation.current = required.get(key).copied().unwrap_or(false);
+            }
         }
         if let (Some(class), Some(location)) = (class, location) {
             let key = format!("{database}:{location}");
@@ -749,6 +791,10 @@ pub(super) fn observe_database_call(
             if row.reservations.len() >= limits.max_roots && !row.reservations.contains_key(&key) {
                 return Err(HostProblem::ResourceExhausted);
             }
+            let modified = row
+                .reservations
+                .get(&key)
+                .is_some_and(|reservation| reservation.modified);
             row.reservations.insert(
                 key,
                 Reservation {
@@ -756,7 +802,7 @@ pub(super) fn observe_database_call(
                     pcb: Some(selected_pcb),
                     class: class.byte(),
                     current: true,
-                    modified: false,
+                    modified,
                 },
             );
         }

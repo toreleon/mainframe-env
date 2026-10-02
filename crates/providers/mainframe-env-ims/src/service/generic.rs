@@ -179,6 +179,7 @@ pub(super) fn refresh_databases(
         .retain(|(namespace, _), _| namespace != GENERIC_DATABASE_NAMESPACE);
     durable.versions.extend(versions);
     isolation::refresh_sessions(store, limits, durable)?;
+    system::reservations::refresh(store, limits, durable)?;
     isolation::refresh_undo(store, limits, durable)?;
     super::validate_state(&durable.state, limits)
 }
@@ -314,6 +315,7 @@ pub(super) fn resources(
             );
         }
         ImsOperation::Commit | ImsOperation::Rollback => {
+            databases.extend(system::reservations::owned_databases(state, run)?);
             if let Some(pending) = state.generic_pending_undo.get(run) {
                 databases.extend(pending.keys().cloned());
             }
@@ -452,7 +454,11 @@ pub(super) fn apply_request(
     }
 }
 
-fn restored(state: &State, name: &str, limits: ImsLimits) -> Result<DatabaseEngine, HostProblem> {
+pub(super) fn restored(
+    state: &State,
+    name: &str,
+    limits: ImsLimits,
+) -> Result<DatabaseEngine, HostProblem> {
     let image = state
         .generic_databases
         .get(name)
@@ -669,7 +675,7 @@ fn mutate(
             Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
         };
         for (database, image) in images {
-            isolation::publish_image(state, run, &database, image.image())?;
+            isolation::publish_image(state, run, &database, image.image(), limits)?;
             reset_positions(state, &database, Some(run));
             pcb::reset_deleted_positions(state, run, request.pcb, &database, limits)?;
         }
@@ -777,7 +783,7 @@ fn mutate(
         Ok(count) => count,
         Err(problem) => return Ok(status(engine_status(problem))),
     };
-    isolation::publish_image(state, run, &name, engine.image())?;
+    isolation::publish_image(state, run, &name, engine.image(), limits)?;
     pcb::set_position(
         Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
         request.pcb,
@@ -825,6 +831,7 @@ fn load(
     let image = load_image::decode(state, &request.data)?;
     let name = normalize(&image.database);
     let prior = restored(state, &name, limits)?;
+    system::reservations::ensure_no_reservations(state, &name)?;
     let mut engine = DatabaseEngine::new(prior.definition().clone(), engine_limits(limits))
         .map_err(install_error)?;
     let mut ids = Vec::new();
@@ -842,7 +849,7 @@ fn load(
             .map_err(install_error)?;
         ids.push(view.id);
     }
-    isolation::publish_image(state, run, &name, engine.image())?;
+    isolation::publish_image(state, run, &name, engine.image(), limits)?;
     let name = normalize(&image.database);
     reset_positions(state, &name, None);
     Ok(affected(ids.len() as u64))

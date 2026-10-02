@@ -151,6 +151,7 @@ pub(in crate::service) fn ensure_no_pending(state: &State, name: &str) -> Result
     {
         return Err(HostProblem::IdempotencyConflict);
     }
+    system::reservations::ensure_no_reservations(state, name)?;
     Ok(())
 }
 
@@ -229,8 +230,10 @@ pub(super) fn publish_image(
     run: &str,
     name: &str,
     image: DatabaseEngineImage,
+    limits: ImsLimits,
 ) -> Result<(), HostProblem> {
     ensure_writer(state, run, name)?;
+    system::reservations::ensure_image(state, run, name, &image, limits)?;
     let prior = state
         .generic_databases
         .get(name)
@@ -254,8 +257,10 @@ pub(in crate::service) fn publish_backout_image(
     run: &str,
     name: &str,
     image: DatabaseEngineImage,
+    limits: ImsLimits,
 ) -> Result<(), HostProblem> {
     ensure_writer(state, run, name)?;
+    system::reservations::ensure_image(state, run, name, &image, limits)?;
     let digest = image_digest(&image)?;
     let undo = state
         .generic_pending_undo
@@ -333,6 +338,12 @@ pub(in crate::service) fn fence_row_changes(
         }
     }
     let mut fenced = names.clone();
+    names.extend(
+        system::reservations::changed_databases(current, next)?
+            .into_iter()
+            .filter(|name| next.generic_databases.contains_key(name)),
+    );
+    system::reservations::fence_legacy_rows(current, next, versions, limits, changes)?;
     for name in names {
         fenced.extend(dependencies(next, &name)?);
     }

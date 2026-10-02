@@ -25,6 +25,8 @@ use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 
 mod application_recovery;
 mod generic;
+mod legacy_load;
+use legacy_load::{load, unload};
 mod providers;
 pub use providers::ims_providers;
 mod rows;
@@ -475,6 +477,7 @@ impl ImsService {
         }
         let mut durable = self.lock()?;
         refresh_replay(&*self.store, self.limits, &mut durable)?;
+        system::reservations::refresh(&*self.store, self.limits, &mut durable)?;
         if durable.state.metadata.is_some() {
             generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
         }
@@ -547,6 +550,13 @@ impl ImsService {
         } else {
             apply_request(&mut next, run, request, self.limits)?
         };
+        system::reservations::ensure_legacy_changes(
+            &durable.state,
+            &mut next,
+            run,
+            request,
+            &result,
+        )?;
         if request.operation != ImsOperation::System {
             system::observe_database_call(&mut next, run, request, &result, self.limits)?;
         }
@@ -812,10 +822,14 @@ fn ims_resources(
                 databases.insert(context(state, run)?.0);
             }
         }
-        ImsOperation::Commit | ImsOperation::Rollback => match state.pending_undo.get(run) {
-            Some(pending) => databases.extend(pending.keys().cloned()),
-            None => return Ok(resources),
-        },
+        ImsOperation::Commit | ImsOperation::Rollback => {
+            databases.extend(system::reservations::owned_databases(state, run)?);
+            if let Some(pending) = state.pending_undo.get(run) {
+                databases.extend(pending.keys().cloned());
+            } else if databases.is_empty() {
+                return Ok(resources);
+            }
+        }
         ImsOperation::Schedule => {
             let psb = normalize(request.psb.as_deref().ok_or(HostProblem::Malformed)?);
             let definition = state
@@ -1275,90 +1289,6 @@ fn checkpoint(
         status: "  ".into(),
         segments: Vec::new(),
         checkpoint_id: Some(id),
-        affected_segments: 0,
-        system: None,
-    })
-}
-
-fn load(
-    state: &mut State,
-    request: &ImsRequest,
-    limits: ImsLimits,
-) -> Result<ImsResult, HostProblem> {
-    let image: ImsLoadImage =
-        serde_json::from_slice(&request.data).map_err(|_| HostProblem::Malformed)?;
-    let database_name = normalize(&image.database);
-    let (_, root_definition, child_definition) = database_definition(state, &database_name)?;
-    let child_definition = child_definition.ok_or(HostProblem::NotFound)?;
-    if image.roots.len() > limits.max_roots {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut database = DatabaseState::default();
-    let mut affected_count = 0u64;
-    for root in image.roots {
-        validate_segment_data(&root.data, &root_definition, limits)?;
-        if root.children.len() > limits.max_children_per_root {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let root_key = data_key(&root.data, &root_definition)?;
-        let mut record = RootRecord {
-            data: root.data,
-            children: BTreeMap::new(),
-        };
-        for child in root.children {
-            validate_segment_data(&child, &child_definition, limits)?;
-            let child_key = data_key(&child, &child_definition)?;
-            if record.children.insert(child_key, child).is_some() {
-                return Err(HostProblem::Malformed);
-            }
-            affected_count += 1;
-        }
-        if database.roots.insert(root_key.clone(), record).is_some() {
-            return Err(HostProblem::Malformed);
-        }
-        database.secondary_index.insert(root_key.clone(), root_key);
-        affected_count += 1;
-    }
-    state.databases.insert(database_name, Arc::new(database));
-    Ok(affected(affected_count))
-}
-
-fn unload(state: &State, run: &str, request: &ImsRequest) -> Result<ImsResult, HostProblem> {
-    let database_name = request
-        .psb
-        .as_ref()
-        .map(|name| normalize(name))
-        .or_else(|| context(state, run).ok().map(|context| context.0))
-        .ok_or(HostProblem::Malformed)?;
-    let (_, root_definition, child_definition) = database_definition(state, &database_name)?;
-    let database = state
-        .databases
-        .get(&database_name)
-        .ok_or(HostProblem::NotFound)?;
-    let mut segments = Vec::new();
-    for (root_key, root) in &database.roots {
-        segments.push(ImsSegment {
-            name: root_definition.name.clone(),
-            parent_key: None,
-            data: root.data.clone(),
-        });
-        if let Some(child_definition) = &child_definition {
-            for child in root.children.values() {
-                segments.push(ImsSegment {
-                    name: child_definition.name.clone(),
-                    parent_key: Some(decode_key(root_key)?),
-                    data: child.clone(),
-                });
-            }
-        }
-        if segments.len() >= request.max_segments as usize {
-            break;
-        }
-    }
-    Ok(ImsResult {
-        status: "  ".into(),
-        segments,
-        checkpoint_id: None,
         affected_segments: 0,
         system: None,
     })
