@@ -1345,3 +1345,22 @@ Synthetic fixtures test authority/constraint rejection only, without IBM
 behavioral credit. The existing Rust offline Draft 2020-12 schema owner checks
 every present family instance; the explicit family command requires its file.
 Mandatory gates precede this bounded validator seal.
+
+## PROGRAM source contract integration
+
+Manager integrates `SPI-1001.spi-program-contract` from the terminal CLI worker's
+exact single-file handoff. Four PROGRAM rows carry 97 options, 47 response
+triggers and 89 independent source-review case candidates. The manager checked
+all four contracts against their pinned bodies and corrected SET PROGRAM's
+INVREQ/17 trigger to include SHARESTATUS, with a remote-SHARED negative case
+from dfha8_setprogram.html lines 190 and 237-239. Primary authority is
+ibm-cics-ts-6x-spi-command-bodies-2026-09-12, catalog rows 0026/0084/0155/0241;
+common command-format and CVDA sources are cited in each contract.
+
+Exact command-body pins and constraints are checked through the existing Rust
+Draft 2020-12 owner; Python jsonschema availability is not an acceptance bypass.
+General CREATE/ATTRIBUTES/DISCARD/browse source closure, conditional operand
+typing, SAF configuration, lock order and unspecified recovery remain explicit
+gaps. This seal covers the bounded private contract input only; it does not
+accept complete grammar, handlers, routes, recovery, licensed evidence or parent
+SPI-1001. Denominators remain 269 SPI and 39 FEPI, with zero behavioral credit.
