@@ -43,6 +43,8 @@ use xml_helpers::*;
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
 mod amode64_access;
 mod completion;
+mod normal_return;
+pub use normal_return::{InstalledProgramReturn, InstalledProgramReturnKind};
 mod condition_literals;
 mod corresponding;
 mod decimal_capacity;
@@ -496,6 +498,8 @@ pub struct ReferenceMachine {
     pending: Option<Pending>,
     perform_stack: Vec<usize>,
     deferred_drive: Option<MachineDrive<EffectRequest>>,
+    // Volatile live-drive observation; deliberately absent from every snapshot.
+    normal_return: Option<normal_return::NormalReturnMarker>,
 }
 impl ReferenceMachine {
     pub fn from_binary(
@@ -843,6 +847,7 @@ impl ReferenceMachine {
             pending: None,
             perform_stack: Vec::new(),
             deferred_drive: None,
+            normal_return: None,
         };
         typed_decimal::validate_machine(&machine)?;
         typed_cics::validate_machine(&machine)?;
@@ -988,6 +993,7 @@ impl ReferenceMachine {
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
+        self.validate_return_restore(&snapshot)?;
         if !matches!(snapshot.schema_version, 1..=12)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
@@ -1209,6 +1215,7 @@ impl ReferenceMachine {
         self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
         self.deferred_drive = None;
+        self.normal_return = None;
         Ok(())
     }
 
@@ -8632,23 +8639,16 @@ impl Machine for ReferenceMachine {
         resume: MachineResume<Self::EffectResult>,
         quantum: Quantum,
     ) -> MachineDrive<Self::Effect> {
+        self.normal_return = None;
         let result = (|| -> Result<MachineDrive<Self::Effect>, MachineProblem> {
             match resume {
                 MachineResume::Start if self.pending.is_none() => {}
                 MachineResume::HostResult(result) => self.resume_host(result)?,
                 MachineResume::Cancelled => {
-                    self.release_storage64_task();
-                    return Ok(failure_drive(
-                        FailureCategory::Cancelled,
-                        "execution cancelled",
-                    ));
+                    return Ok(self.interrupted_drive(FailureCategory::Cancelled));
                 }
                 MachineResume::TimedOut => {
-                    self.release_storage64_task();
-                    return Ok(failure_drive(
-                        FailureCategory::TimedOut,
-                        "execution timed out",
-                    ));
+                    return Ok(self.interrupted_drive(FailureCategory::TimedOut));
                 }
                 _ => return Err(MachineProblem::UnexpectedResume),
             }
@@ -8705,7 +8705,7 @@ impl Machine for ReferenceMachine {
                         };
                         return Ok(MachineDrive::HostCall(*effect));
                     }
-                    Step::Complete => return Ok(MachineDrive::Completed(self.complete()?)),
+                    Step::Complete => return self.complete_installed_step(&operation),
                 }
                 steps += 1;
             }

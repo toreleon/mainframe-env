@@ -1,6 +1,31 @@
 use super::*;
 
 impl ReferenceMachine {
+    pub(super) fn complete_installed_step(
+        &mut self,
+        operation: &Operation,
+    ) -> Result<MachineDrive<EffectRequest>, MachineProblem> {
+        let completion = self.complete()?;
+        self.normal_return =
+            normal_return::NormalReturnMarker::completed(operation, self.pc, self.executed_steps);
+        Ok(MachineDrive::Completed(completion))
+    }
+
+    pub(super) fn interrupted_drive(
+        &mut self,
+        category: FailureCategory,
+    ) -> MachineDrive<EffectRequest> {
+        self.release_storage64_task();
+        failure_drive(
+            category,
+            match category {
+                FailureCategory::Cancelled => "execution cancelled",
+                FailureCategory::TimedOut => "execution timed out",
+                _ => "execution interrupted",
+            },
+        )
+    }
+
     pub(super) fn complete(&mut self) -> Result<Completion, MachineProblem> {
         let limits = InvocationLimits {
             max_payload_bytes: self.invocation.limits.max_output_bytes as usize,

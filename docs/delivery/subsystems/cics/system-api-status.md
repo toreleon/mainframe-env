@@ -946,3 +946,13 @@ applied it serially plus its two exact module-inventory registrations with no
 ceiling changes. Manager integrated checks pass: 37 focused tests (10 new and 27 existing), no ignores, plus mandatory module/API/schema/format/docs/changelog/dependency gates. Its exploratory Rust 1.98
 Clippy findings are unchanged host MQ/CICS code outside this bounded API;
 aggregate lint stays pending, without new suppression or policy change.
+
+The executed-return worker returned exact five-path patch `3859c652…2ff6660`.
+Its 17 focused tests and three existing compiled installed-call tests pass in
+the worker checkout. The manager reviewed the full patch and restore prechecks,
+retained its exact artifacts and applied it serially. Manager integrated checks pass: 17 new witness tests, three checkpoint/storage64
+regressions and three existing compiled installed-call tests, with zero ignores,
+plus mandatory module/API/schema/format/architecture/docs/changelog/dependency
+gates. Core completion currently persists its terminal events without a final
+machine checkpoint; the future atomic scope writer must independently bind
+the live terminal state and core authority. No writer or acceptance is enabled.

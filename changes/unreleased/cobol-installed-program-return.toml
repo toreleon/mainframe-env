@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Observe a successfully executed live GOBACK or EXIT PROGRAM without granting durable terminal or storage cleanup authority; scoped runtime and recovery acceptance remain pending."

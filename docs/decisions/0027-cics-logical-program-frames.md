@@ -525,6 +525,25 @@ backend reopen and full family acceptance remain pending. Earlier exploratory
 Rust 1.98 Clippy checks failed on unchanged host MQ/CICS code outside this slice;
 aggregate lint acceptance remains pending, with no suppression or policy change.
 
+### Executed native-return observation
+
+`InstalledProgramReturn` has private fields and no constructor or serde. The
+live machine sets its volatile marker only after GOBACK or EXIT PROGRAM
+successfully completes. Constructors, checkpoint restore and every subsequent
+drive clear it. Exact opcode, PC, step count, supported retained resources and
+closed cursors must still agree. STOP RUN, CICS RETURN and other exits do not
+attest. Invalid restore validates formerly late-failing checks before mutation,
+preserving machine bytes; accepted snapshot versions and shapes are unchanged.
+
+The marker records execution, not durable terminal state or storage authority.
+The coordinator currently records Completing/Completed without a terminal
+machine checkpoint. A future scope writer must bind the live terminal snapshot
+and exact core Completed event/attempt/version in its existing atomic CALL close;
+it cannot treat a restored prior checkpoint as the terminal snapshot. Installing
+retained bytes is separately validated, and no observation authorizes their
+identity, backend closure, redispatch or cleanup. Old retained tuple1 and BTS
+completion cleanup remain unchanged. Scope writers and recovery remain pending.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline

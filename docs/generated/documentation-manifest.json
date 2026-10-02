@@ -957,7 +957,7 @@
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:6bb4c03d64335e82a85129e7c108822a915670857729848cab11f75a22f83e64",
+      "sha256": "sha256:d6f2313e75c0d8caaa43fe8496195b9128afd4919b86c53285829e55e4257f3d",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0
@@ -1290,7 +1290,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:5f3b034de0ab65efc930a12a586f7d58d371289282ec41fd754325f6d72c7da8",
+      "sha256": "sha256:1b35573b28fcb704d6d83b8e1e130954a66e81c963b44adbb12df2f313004017",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },
