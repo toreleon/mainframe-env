@@ -48,21 +48,15 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 3046,
+      "max_production_lines": 2976,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2300,
+      "max_production_lines": 2283,
       "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
       "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
-    },
-    {
-      "path": "crates/kernel/mainframe-env-application/src/package_v2.rs",
-      "max_production_lines": 1314,
-      "responsibility": "Application package v2 validation, identity, signatures, generations, and installation transitions are co-located.",
-      "split_boundary": "Separate manifest validation and identity/signature verification from generation-selection and install-state transitions."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",
@@ -102,7 +96,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11940,
+      "max_production_lines": 11909,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
