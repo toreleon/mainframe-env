@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Record reviewed FEPI pool grammar and event-specific lifecycle contracts with explicit partial-success and pending runtime obligations."

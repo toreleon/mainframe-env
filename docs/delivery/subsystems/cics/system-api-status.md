@@ -1423,3 +1423,28 @@ Old family inputs remain valid and no command-specific alternatives are
 invented. Dangling/duplicate/nonboolean groups fail validation; required
 flags survive the common IR projection. Pending completeness, private
 binding and zero behavioral credit remain. Mandatory gates precede seal.
+
+## POOL source contract integration after independent review
+
+Manager integrates `SPI-1001.fepi-pool-contract` after a complete independent
+CLI review of all six command bodies, 77 options, 96 responses and 132 original
+case candidates. The unchanged worker input is retained with its original hash.
+R1 corrects five universal TD-routing statements using dfhp73i.html lines 91-147:
+common CSZX versus pool EXCEPTIONQ follows the event type. R2 supplies concrete
+ADD/DELETE node selections and SET OUTSERVICE for nine deny/later-function/
+unknown-outcome cases; exact late error injection stays pending. R3 replaces an
+unisolated duplicate-connection fixture with a supported mixed duplicate/new
+node list case; the 175 mapping remains, but its isolated fixture is pending.
+An independent SETFAIL/115-to-CSZX case raises the candidate count to 133.
+
+SET POOL now represents required POOL-or-POOLLIST selection through the shared
+alternative type, retaining POOLLIST/POOLNUM pairing and exclusions. The existing
+IR generator projects these six rows alongside PROGRAM, with 174 operand facts
+across ten partial contracts. Primary baseline is
+ibm-cics-ts-6x-fepi-command-bodies-2026-09-12, rows
+0001/0007/0009/0018/0021/0034; overview/TD authorities are
+ibm-cics-ts-6x-fepi-context-candidates-2026-09-12 (dfhp7k4/dfhp73i).
+Browse/value forms, exact SAF policy, syncpoint/rollback, detailed asynchronous
+work, concurrency and restart remain explicit. No runtime or official verdict
+is installed; all ten grammar completeness statuses remain Pending. Mandatory
+source/instance/generator/IR/policy gates precede this bounded input seal.
