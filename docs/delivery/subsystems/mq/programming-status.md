@@ -259,6 +259,17 @@ The shared reader and registry keep separate scope closure and zero credit.
 This supplies sources for subsequent reviewed layout projections, not numeric
 admission, wire execution, a new browser capture or licensed certification.
 
+The independent `mq-property-sources` scope now registers twelve retained topics
+for property names/restrictions, descriptor mapping, variable strings and property
+option/structure/copy constants, baseline
+`ibm-mq-9.4-property-sources-2026-09-12`, manifest SHA-256
+`f1537d0ab7feba5c7260e5dced3e9878b5bf999b274e0254f888fc1d78d96ba7`.
+Frozen original27/supplemental80/layout12 bindings remain unchanged. Hash-verified
+archive metadata and retained bytes are not refreshed browser capture, semantic
+admission or execution evidence; the in-progress archive's reproduction/freshness
+caveats remain. Source and licensed execution credit stay zero. Actual selected
+property transitions, associated-descriptor mapping and full26 gates remain.
+
 The continuation's module-budget composition repair passes the global module
 guard after unchanged validation, input-projection and conversation helpers are
 split from the inherited server/application/IMS/CardDemo modules. IMS generic

@@ -537,6 +537,7 @@ class CacheTests(unittest.TestCase):
         self.assertIn("ims-tm-contracts", scopes)
         self.assertIn("mq-programming-supplements", scopes)
         self.assertIn("mq-point-layout-sources", scopes)
+        self.assertIn("mq-property-sources", scopes)
         supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
         self.assertEqual(len(supplemental), 80)
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
@@ -546,6 +547,29 @@ class CacheTests(unittest.TestCase):
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-point-layout-sources-2026-09-12"
                             for pin in layouts))
         self.assertFalse({pin.topic for pin in supplemental} & {pin.topic for pin in layouts})
+        properties, property_tocs = ibm_docs.select(pins, tocs, "mq-property-sources", None)
+        self.assertEqual({pin.topic for pin in properties}, {
+            "SSFKSJ_9.4.0/develop/q022940_.html",
+            "SSFKSJ_9.4.0/develop/q022950_.html",
+            "SSFKSJ_9.4.0/develop/q022960_.html",
+            "SSFKSJ_9.4.0/refdev/q091110_.html",
+            "SSFKSJ_9.4.0/refdev/q091050_.html",
+            "SSFKSJ_9.4.0/refdev/q091320_.html",
+            "SSFKSJ_9.4.0/refdev/q091330_.html",
+            "SSFKSJ_9.4.0/refdev/q091730_.html",
+            "SSFKSJ_9.4.0/refdev/q092160_.html",
+            "SSFKSJ_9.4.0/refdev/q092800_.html",
+            "SSFKSJ_9.4.0/refdev/q094690_.html",
+            "SSFKSJ_9.4.0/refdev/q094695_.html",
+        })
+        self.assertTrue(all(pin.baseline == "ibm-mq-9.4-property-sources-2026-09-12"
+                            for pin in properties))
+        self.assertEqual(len(property_tocs), 1)
+        self.assertFalse({pin.topic for pin in properties}
+                         & {pin.topic for pin in [*supplemental, *layouts]})
+        self.assertEqual(docs_api.digest((docs_api.REPOSITORY /
+                         "conformance/0.15/manifests/mq-point-layout-sources-topics.json").read_bytes()),
+                         "128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa")
         self.assertEqual(docs_api.digest((docs_api.REPOSITORY /
                          "conformance/0.15/manifests/mq-programming-supplements-topics.json").read_bytes()),
                          "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a")

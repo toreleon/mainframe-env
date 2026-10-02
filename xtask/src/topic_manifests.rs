@@ -479,6 +479,28 @@ mod tests {
     }
 
     #[test]
+    fn later_015_shipped_property_scope_preserves_independent_zero_credit_bindings() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("shipped independent scopes");
+        let registry = json(&root.join(config_015().registry_path)).unwrap();
+        let entries = registry["manifests"].as_array().unwrap();
+        assert_eq!(entries.len(), 3);
+        for (scope, count) in [
+            ("mq-programming-supplements", 80),
+            ("mq-point-layout-sources", 12),
+            ("mq-property-sources", 12),
+        ] {
+            let entry = entries
+                .iter()
+                .find(|entry| entry["scope_id"] == scope)
+                .unwrap();
+            assert_eq!(entry["topic_count"], count);
+            assert_eq!(entry["semantic_authority"], false);
+            assert_eq!(entry["coverage_credit"], 0);
+        }
+    }
+
+    #[test]
     fn later_015_independent_second_scope_preserves_the_first_file_binding() {
         let (fixture, mut second, mut registry, first_path, registry_path) = registry_015();
         let first_bytes = fs::read(&first_path).unwrap();

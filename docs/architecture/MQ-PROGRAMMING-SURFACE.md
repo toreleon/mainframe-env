@@ -392,6 +392,23 @@ remains in-progress without independent browser reproduction and predates MQINQ
 issue337 re-pin; identity metadata supplies no freshness or same-snapshot claim.
 Source and execution credit remain zero, with all ten reason declarations pending.
 
+### Additive property source scope
+
+The independent `mq-property-sources` scope registers exactly twelve retained
+topics under `ibm-mq-9.4-property-sources-2026-09-12`: property names
+`SSFKSJ_9.4.0/develop/q022940_.html`, restrictions `q022950_.html`, descriptor
+mapping `q022960_.html`, and
+`SSFKSJ_9.4.0/refdev/q091110_.html` copy constants; it also pins MQCHARV and field
+details, MQCMHO/MQDMHO/MQDMPO/MQIMPO/MQPD/MQSMPO option/structure constants needed
+by the five-call property profile. The existing shared reader
+and registry bind exact manifest bytes, topic-set digest and product/version.
+Frozen call, supplemental and point-layout manifests are unchanged. This is
+source registration only: property-name mapping, numeric admission and actual
+selected execution need subsequent source review and tests. Source/coverage
+credit is zero; the archive remains in-progress without independent browser
+reproduction, predates the MQINQ re-pin and establishes no freshness or snapshot
+equivalence. No publication bodies or refreshed sources are retained in Git.
+
 ### Historical handle observation
 
 The strict private typed-result storage codec can preserve issued handle outputs

@@ -25,6 +25,17 @@
       "topic_manifest_sha256": "sha256:5f29e97b1930418d018bbdd7834c6cb164ee567dab1a447c4116bff6a993673e",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-property-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-property-sources-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-property-sources-topics.json",
+      "manifest_sha256": "sha256:f1537d0ab7feba5c7260e5dced3e9878b5bf999b274e0254f888fc1d78d96ba7",
+      "topic_count": 12,
+      "topic_manifest_sha256": "sha256:cbef5b608afc3f12945f69656c666cae80b19049bcf78b67ff598f855038369e",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
