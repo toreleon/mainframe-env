@@ -331,3 +331,10 @@ crate-private visibility hook for the existing MQ `ObjectRow<T>` envelope and
 encoder in `service.rs`, plus a unique fragment. No payload, schema, namespace,
 decoder, state transition or public API changes. Lane N consumes that single
 codec instead of copying it; the hook is integrated before its worker resumes.
+
+The hook's verification exposed a fixture allocation race: two parallel SQLite
+tests can observe the same nanosecond clock value within one process and collide
+on their temporary directory. `MQ-1502.sqlite-fixture-isolation` owns only the
+object-service integration fixture/helper and a unique fragment; atomic bounded
+directory allocation must preserve existing paths rather than deleting them.
+This repair changes no product semantics or licensed/official coverage.
