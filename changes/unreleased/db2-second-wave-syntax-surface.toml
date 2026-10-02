@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose bounded Db2 INSERT VALUES, CREATE INDEX and CREATE VIEW owned syntax, with public bounds/span/rejection regressions and no execution or whole-row credit."

@@ -103,3 +103,17 @@ dependency unless an external caller confirms absence; every candidate still
 needs catalog lookup. SQL-path objects, EXPLAIN output and catalog/authorization
 resolution fail explicitly. This surface never establishes object existence,
 privileges or execution and grants no statement-row or licensed credit.
+
+The common INSERT VALUES surface preserves qualified targets, unique optional
+columns, expression/DEFAULT/NULL values and uniform-width rows. Nested column
+references in VALUES and undeclared forms fail explicitly. The CREATE INDEX
+surface preserves three uniqueness modes and omitted/ASC/DESC/RANDOM ordering
+on at most 64 distinct unqualified column keys; physical and expression-index
+forms remain unsupported. CREATE VIEW reuses SELECT core and transfers it into
+owned located syntax with result-name/width validation and CHECK OPTION spelling.
+It rejects wildcard widths, host/parameter references and forbidden functions.
+All three retain original-source spans and aggregate bounds. Identifier transfer
+decodes quoted-name escapes; inherited literal escape text, SELECT's compiled
+raw-name ceiling and CAST's first-component limitation remain explicit. Catalog
+validity, CHECK applicability, binding, execution and whole-row credit remain
+pending; none of these APIs changes the durable SQL route.

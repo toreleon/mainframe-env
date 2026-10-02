@@ -30,10 +30,22 @@ pub use catalog::{
     Db2ExtractLayout, Db2ForeignKeyDefinition, Db2ResultEncoding, Db2SeedRow, Db2TableDefinition,
     decode_table_definitions_bounded,
 };
+pub use create_index_syntax::{
+    Db2CreateIndexKey, Db2CreateIndexStatement, Db2IndexKeyOrder, Db2IndexUniqueness,
+    parse_db2_create_index_statement,
+};
+pub use create_view_syntax::{
+    Db2CreateViewStatement, Db2ViewCheckMode, Db2ViewExpression, Db2ViewLocated, Db2ViewOrderKey,
+    Db2ViewSelectCore, parse_db2_create_view_statement,
+};
 pub use expression_parser::{Db2ParsedExpression, parse_db2_expression};
 pub use generated_statement_catalog::{
     DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
     Db2StatementId, Db2StatementUnit, db2_statement_descriptor, db2_statement_descriptor_by_row,
+};
+pub use insert_syntax::{
+    Db2InsertExpression, Db2InsertValue, Db2InsertValuesRow, Db2InsertValuesStatement,
+    parse_db2_insert_values,
 };
 pub use name_resolution::{
     Db2DynamicQualificationContext, Db2QualificationCandidate, Db2QualificationContext,

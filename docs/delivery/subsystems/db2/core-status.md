@@ -112,10 +112,19 @@ acceptance boundary. The qualification surface exports the owned context,
 candidate and located error types plus `qualify_db2_name`; public integration
 tests preserve explicit and derived names and verify that caller-confirmed
 synonym absence never becomes object-existence or authorization evidence.
-INSERT and CREATE VIEW are still under manager review. No whole-row recognition
-or execution count changes. Repository-wide architecture validation remains
+INSERT and CREATE VIEW were amended after manager identifier-escape review and
+integrated as their own sealed commits. The
+`DB2-1201.second-wave-syntax-surface` exposes these APIs and the CREATE INDEX
+kernel without a shared statement dispatcher or execution route. Public tests
+exercise owned output, decoded names, relocated spans, duplicate/width checks,
+forbidden references/functions and aggregate budgets. Literal escape text,
+SELECT's compiled raw-name ceiling and CAST's delimited first-type-component
+restriction remain inherited limitations, not licensed behavior. No whole-row
+recognition or execution count changes. Repository-wide architecture validation remains
 blocked by the unrelated unavailable CICS topic
-`SSJL4D_6.x/applications/designing/dfhp37p.html`; it is not retried as a Db2 test.
+`SSJL4D_6.x/applications/designing/dfhp37p.html` and the batch service's
+7,404-production-line count exceeding its 7,402-line legacy ceiling; these are
+not retried as Db2 tests.
 
 ## Dependency gate
 
@@ -399,12 +408,14 @@ common/deferred freeze remain pending until matching bodies are available.
 
 ## Blockers and pending external evidence
 
-- Exact pinned HTML is still missing for 27 catalog rows. This blocks semantic
+- Exact pinned HTML is currently missing for the three catalog rows listed in
+  the resumed source-availability record, rather than the historical 27. This blocks semantic
   changes for those rows and the final common/deferred freeze, not unrelated
   parser/catalog infrastructure.
-- The pinned numeric-constants introduction is unavailable (#350); float and
-  decfloat forms are rejected, and integer/decimal tokens carry no numeric
-  semantics in this slice.
+- The repinned numeric-constants introduction is available and reviewed, but
+  the recovered lexer/expression fences have not been lifted by a declared
+  numeric slice. Float/decfloat forms remain rejected and integer/decimal tokens
+  carry no numeric semantics here.
 - No pinned licensed Db2 13 oracle receipt is present. Differential remains
   pending and 0.12 cannot pass its exit gate without the required environment.
 - The early shared participant contract must be audited before DB2-1204 mutating
