@@ -359,6 +359,8 @@ mod browse;
 mod cics;
 mod generated;
 mod ims_system;
+mod mq;
+pub(crate) mod mq_mqi;
 mod security_request;
 use security_request::encode_principal_validation;
 

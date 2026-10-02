@@ -150,8 +150,9 @@ pub use request::{
     DatasetOrganization, DatasetReadControl, DatasetReadLockMode, DatasetReelUnit, DatasetRequest,
     DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
     EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
-    ImsRequest, ImsResult, ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation,
-    ProgramLinkSelection, ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
+    ImsRequest, ImsResult, ImsSegment, KeyRelation, MqMqiEffectOccurrence, MqMqiHostRequest,
+    MqMqiHostResult, MqOperation, MqRequest, MqResult, Mutation, ProgramLinkSelection,
+    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
     SPOOL_REQUEST_CONTRACT, SPOOL_RESULT_CONTRACT, SecretRef, SecurityDecision, SecurityRequest,
     SpoolFileSummary, SpoolRequest, SpoolResult, StateRequest, TerminalField, TerminalRequest,
 };

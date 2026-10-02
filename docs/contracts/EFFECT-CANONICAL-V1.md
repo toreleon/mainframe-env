@@ -19,6 +19,46 @@ and a zero byte. SHA-256 hashes that domain prefix and the canonical value.
 names appearing there are wire identifiers and must remain fixed within version
 1, even if Rust types are renamed later.
 
+The additive `HostRequest::MqMqi(MqMqiHostRequest)` and
+`HostResult::MqMqi(MqMqiHostResult)` names are distinct from the retained legacy
+`Mq` variants. `canonical/mq.rs` retains the legacy MQ implementations
+mechanically; `canonical/mq_mqi.rs` frames the new host records through the same
+streaming encoder. Existing `Mq` names, bytes, validators and grants are unchanged.
+The new request object encodes `envelope` then `mutation`; the result object
+encodes `limits` then `result`. Their values use the existing exhaustive MQI,
+Mutation and limits implementations directly, without standalone MQI preimages
+or digests replacing host payloads.
+
+Every typed MQI occurrence conservatively uses `host.mq.write` and the existing
+mutation journal/replay admission path, including inquiries and cursor-bearing
+observations. This classification does not claim that every MQI call changes
+queue state. The original `EffectRequest` sequence and required idempotency key
+must match its embedded `Mutation`. `mq_mqi_occurrence` validates and borrows
+that one immutable effect; envelope and mutation extraction cannot accept a
+separately substituted payload. Run-unit identity remains in the outer effect,
+while execution/principal, trusted context, provider constraints, live deadline
+and cancellation, grants and SAF remain their existing dispatch authorities.
+
+Before structural validation can clone bounded MQ fields, the shared encoder
+counts the actual host request or Ok/result preimage under the original explicit
+MQI canonical limit and the 64 MiB host ceiling. Host name, record, field,
+record-count and property aggregate ceilings also apply, including requested
+output capacities and reported truncation lengths. Result call/status, payload
+and validation limits remain explicit. The future provider must compare the
+result with its original request, capacities, UOW and handle lifetimes before
+publication; standalone result validation does not attest that relationship.
+
+This freezes a typed boundary, not a handler, executable route or accepted MQ
+transaction participant. Pending structures, selectors, contexts and status
+mapping retain their typed pending identities; validation does not turn pending
+public dispatch into success. The MQ 9.4 baseline
+`ibm-mq-9.4-mqi-2026-08-31`, catalog rows `0001`–`0026`, preserves 26 call
+identities and 27 source positions, including both MQMHBUF positions.
+`MQCB_FUNCTION` (row `0005`, `SSFKSJ_9.4.0/refdev/q101730_.html`) describes
+callback parameters without an application entry point, so this command/reply
+boundary rejects it. Source review and unit tests grant zero licensed or
+conformance execution credit.
+
 All lengths/counts are unsigned 64-bit little-endian numbers. Integers are fixed
 width little-endian with distinct signed/unsigned type tags; `usize` uses u64,
 not native pointer width. Text is UTF-8 with a byte length, without Unicode
@@ -207,3 +247,10 @@ Provider replay golden digests are:
 - RACROUTE: `f12a7fce354c0f3c1a42b54376597d9230b956d729186932208c9f519824f503`.
 - Credential-redacted RACF command:
   `5b150c202f1af2c3d1f63a24875153e7055dcc894d28daa90de9f3eb5356035e`.
+
+The typed MQI host golden request (MQCONN, owner IDs 1/2/3/4/epoch 5,
+queue manager QMGR, sequence 7, key `mqi-host-golden`, default MQI limits) is
+`433a011034843ece80caaef730dd18d990c3fba577df9d1dd84663004cf68b8f`.
+The typed MQI host golden result (MQDISC, source-pinned OkNone/NoOutput,
+default explicit limits) is
+`feb3c22c6f1150b7a39bf17cee6612d0b722f524edc582e43b8a401b72826c27`.
