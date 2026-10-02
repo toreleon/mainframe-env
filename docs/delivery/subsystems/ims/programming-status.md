@@ -61,6 +61,32 @@ failure is not repeatedly rerun. Focused architecture/security/effect/storage/
 retention guards and dependency policy passed on the audited base; their old
 receipts are not relabeled as new-candidate acceptance.
 
+### Consumed dependency acceptance identities
+
+The continuation consumes the released implementation baselines below, not
+the starting-branch SHAs in their historical status paragraphs. The annotated
+tags resolve to these exact commits and Git trees; the published Apple ARM64
+evidence archive SHA-256 values match the GitHub release asset digests. Each
+archive retains `manifest.json` and `provenance.intoto.json`; its source-tree
+digest also matches the annotated tag. This is provenance review of existing
+acceptance, not a rerun or attestation of the current IMS candidate.
+
+| Dependency | Accepted commit / Git tree | Published receipt SHA-256 | Approval / disposition |
+|---|---|---|---|
+| COBOL 0.4 | `4a50a4e66f08b9cb5d293fb276cfbd52424b07fc` / `92ba4ce0855c02b6157d08fedac2cae51977a972` | `df6b835b57ce586927dafc4e1866e030b04f08929a18eca10de13f52738983b8` | [Explicit 2026-09-02 approval](../cobol/execution-status.md), licensed-pending implementation; [published release](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.4.0) |
+| RACF/SAF 0.5 | `bd5e8ecd211b7da4f3e18dfcfc807352d0ebd2e8` / `7e89e90c372a8bb1ca63a7b06c3c744e1a85e8d9` | `c0089130b19d524c7f47a7e3dc301392369ffb0e97d045d5c4b9817c214bfec7` | [User-approved 2026-09-01 policy](../racf/security-status.md), licensed-pending implementation; [published release](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.5.0) |
+| Dataset/VSAM/AMS 0.6 | `ca3c061adaa63af71eefe8ee494b7c523c3e5540` / `a0dbae4c52a0e3aea28a3ea4bf2e1e8297d2d360` | `3665fa112264b470a2c8a09fe3e767d6ca68f7a9f9972df5850855743e9e5cba` | [Approved 2026-09-01 policy](../dataset/data-status.md), [local certification record](../../../../conformance/0.6/evidence/dataset-certification.json); [published release](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.6.0) |
+
+The receipts are the assets named
+`mainframe-env-0.{4,5,6}.0-aarch64-apple-darwin-release-evidence.tar.gz`
+on those releases. Licensed obligations remain respectively **0/153**,
+**0/48** and **0/36**, owned by CER-1702 / 0.17 certification; their scoped
+historical approvals are not a blanket approval of later subsystem claims.
+Affected consumption regressions are the actual COBOL/JCL CardDemo load/unload
+route, SAF denial-before-observation/mutation, and shared provider-row / durable
+Memory and SQLite contracts. The current feature sections identify their exact
+candidate-specific checks; the final integrated exit run is still pending.
+
 ## IMS-1405.basic-checkpoint-boundary (implemented repair slice)
 
 Parent: IMS-1405. Candidate base: `213ed878ec138bdb2914330db6613559bffc5a86`
