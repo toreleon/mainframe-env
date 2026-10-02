@@ -6,6 +6,39 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root primary-level position integration — 2026-10-03
+
+Root composes worker `9dc8a36d7df11f83659b7f973c47950382180b28` onto
+`7925b2c9ad29e45df19fee88df2d21e4e77cd995` with the same exact 31-path
+primary-level-position allowlist below. Manager reviewed every production and
+public/signed/recovery/retained test path, the full final handoff and immutable
+source bindings. Independent audit verifies all 31 committed hashes, 25 final
+Rust inputs, 24 mandatory gates, 129 preserved original receipts, eight public
+and six signed cold-process phases, two actual coherent SQLite backup phases
+and two separately configured PostgreSQL selected tests. Historical failures
+remain bound to their original candidates; no old receipt is relabeled.
+
+Only four documentation owners overlap the intervening TM/SHISAM commits.
+Both complete declarations and ADR registry additions survive composition;
+normal docs generation recomputes the manifest. All 25 worker Rust inputs and
+six integrated SHISAM Rust inputs remain byte-exact. Root checks strict combined
+host/IMS/server Clippy, formatting, dependency/license/supply-chain policy,
+normal docs/check, changelog/check, coverage/check and module/typed boundaries,
+then the exact 31-path generated seal and committed check, with Cargo cleanup.
+Passing unchanged runtime/PostgreSQL exploration is not repeated merely for
+integration or commit. Any observed composition failure must be diagnosed.
+
+The signed PostgreSQL test injects the real PostgreSQL PlatformStore while
+retaining the existing test configuration profile: selected typed-route/store
+parity is established, not full configured-deployment/artifact/backup parity.
+The SQLite coherent proof covers the recorded package/session/database/undo/
+recovery/replay/journal/audit graph, not arbitrary mixed restores or certification.
+Older strict position readers and GE/Valid validators require stop/drain and
+compatible readers or a coherent pre-feature restore. No rolling downgrade is
+claimed. ADR0040 remains Proposed; pending shared ADR0031/0033, HUMAN/official
+0/25, all 25 mandatory rows and broader IMS/v0.14 acceptance remain open.
+Licensed IBM certification stays excluded; mandatory OSS license policy stays.
+
 ## Root SHISAM fixed-layout integration — 2026-10-03
 
 Root composes worker `5a7118d94d889de5d670fca953080d712a0a057c` onto
@@ -290,6 +323,146 @@ The external handoff proposes only SHISAM equality checks in existing shared
 metadata and engine definition owners, and identifies fail-closed consequences
 for retained invalid images/generations. That runtime phase awaits manager review.
 
+## IMS-1403.primary-level-position-closure — completion declaration, 2026-10-03
+
+Entry `86bf917e5a20d581a3b5d56b89de86db94ccadf4`, branch
+`codex/v014-primary-position-completion-20261003`, target **0.14.0**. Continue the
+same reviewed private three-level unique/fixed primary HIDAM producer design and
+original fail-first inputs; ADR0040 remains Proposed. Full completion now owns
+the fresh call-local feedback transport, finite ordinary ISRT/DLET/REPL and
+legacy Batch producers/consumers, actual recovery/reset composition and required
+public/signed Memory, file SQLite, scoped PostgreSQL and coherent durability
+proof. Explicit navigation retains its existing DbBatch context; legacy ImsRequest
+uses trusted Batch Invocation without inventing a global execution-context field.
+
+Exact maximum completion allowlist, declared before completion semantic edits:
+
+```text
+crates/contracts/mainframe-env-host-api/src/ims_feedback.rs
+crates/contracts/mainframe-env-host-api/src/canonical/ims_feedback.rs
+crates/providers/mainframe-env-ims/src/database/mod.rs
+crates/providers/mainframe-env-ims/src/database/navigation.rs
+crates/providers/mainframe-env-ims/src/database/primary_position.rs
+crates/providers/mainframe-env-ims/src/database/ssa.rs
+crates/providers/mainframe-env-ims/src/database/store.rs
+crates/providers/mainframe-env-ims/src/database/logical.rs
+crates/providers/mainframe-env-ims/src/service/generic.rs
+crates/providers/mainframe-env-ims/src/service/generic/ssa.rs
+crates/providers/mainframe-env-ims/src/service/generic/pcb.rs
+crates/providers/mainframe-env-ims/src/service/feedback.rs
+crates/providers/mainframe-env-ims/src/service/execution.rs
+crates/providers/mainframe-env-ims/src/service/application_recovery/checkpoint.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests/trace_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests/fences.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests/publication.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests/retained.rs
+crates/providers/mainframe-env-ims/tests/application_recovery/checkpoint_tests.rs
+crates/providers/mainframe-env-ims/tests/application_recovery/checkpoint_tests/primary_position_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/primary_position_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/primary_position_tests/retained.rs
+docs/delivery/subsystems/ims/programming-status.md
+docs/decisions/0040-primary-level-position-search-boundary.md
+changes/unreleased/ims-primary-level-position-20261003.toml
+docs/documentation-registry.json
+docs/README.md
+docs/generated/documentation-manifest.json
+```
+
+Manager-reviewed host invariant amendment extends this maximum from 29 to 31
+paths before host edits. Valid remains available on blank success; GE additionally
+permits Valid only with empty result segments and zero transferred bytes. Retain
+the GE-with-segments rejection, all other failed-status negatives, bounds and
+checkpoint/system exclusions, canonical tags and historical Unsupported bytes.
+The provider's fresh witness and atomic capacity/CAS remain the provenance owners.
+Old host validators reject this new shape: no rolling mixed-writer/downgrade
+equivalence; stop/drain/reconcile and compatible readers or coherent pre-feature
+restore remain required. This review supplies no HUMAN/official/raw CALL/TM
+approval. Original Malformed receipts remain failures on their original inputs.
+
+database/logical.rs permits default-field compatibility only. database/tests.rs
+and generic/tests/closure_tests.rs remain reserved and unchanged. Preserve HISAM's
+trusted Invocation, insertion policy, utility hooks and all integrated proofs;
+no second traversal/feedback/store/settlement owner, shared API, source/catalog,
+accepted rule, Cargo dependency or ratchet edits. Both producer stashes remain:
+`cb17367f063177e3ca497fb604aaf8dd94e740cc` and
+`54288497d1b5618688d4f1ad31e83e562e313c8d`. Producer inputs/receipts are preserved
+outside Git; composed status and generated identities are recorded separately.
+
+Catalog rows remain `0005/0006/0004/0008/0015/0002/0023/0025` under the immutable
+IMS DL/I baseline; `0016` remains separate. All 25 mandatory rows remain unfinished
+at parent level. Four strict fresh failed-feedback expectations remain required,
+not acceptance from the earlier producer receipt. Completion requires actual
+consumer/recovery/replay/security/publication/cold-process/backend proof and
+strict affected IMS/server Clippy plus mandatory fmt, deny/license/supply-chain,
+catalog/assurance/schema/spec/coverage/boundary/API/docs/changelog checks. All
+new receipts go to external `primary-position-completion/`; each Cargo sequence
+cleans only this checkout. Seal only the exact changed subset after all covered
+requirements pass. No push/PR; shared ADR0031/0033, HUMAN/official/licensed and
+participant credit remain zero; IMS-1403, IMS-1401 and v0.14 remain incomplete.
+
+Historical transport diagnostic before the manager's two-path amendment: the public primary suite
+executes 25 tests, with 23 passing and the two unchanged literal failed-feedback
+expectations now rejected as HostProblem::Malformed before publication. The fresh
+loop supplies A1B11, but shared host-api ims_feedback.rs:186–193 requires blank
+status for every Valid key; canonical/ims_feedback.rs:229–231 explicitly requires
+GE/Valid rejection. At that diagnostic's identity, no host-contract path was in
+the allowlist. The worker stopped for manager review of that exact validity boundary rather than
+remove validation, downgrade to Unsupported or weaken the source expectation.
+Consumer/backend/full gates remain unrun at this blocker, not passed by old
+producer receipts. The first failed command and its target cleanup are retained
+under primary-position-completion/transport-01. Signed-selected coordinator proof
+executes 14 tests: 12 pass and the same two feedback expectations receive
+Malformed with journal Failed and both canonical digests checked by the existing
+helper. The other independently literal histories still pass. All four original
+GE/Valid expectations remain intact; neither suite is green acceptance. Both
+sequences clean the intended target. No ISRT/DLET/REPL/store or HISAM production
+changes had started past that shared-contract blocker. Those original receipts
+remain failures; the later repair has distinct input identities and receipts.
+
+Local completion observations on the declared 31-path subset: all four unchanged
+literal failed-feedback expectations pass after the bounded host shape repair.
+Actual B11 satisfaction/B13 examination yields A1B11/5 bytes/zero transfer on GE,
+independent ordinary E11f and U/U or V C111a, exact-parent miss then D111e. The
+same loop supplies finite Batch legacy producers, inserted occurrence/ancestor
+certificates, real DLET gaps/removed-level reconciliation and REPL versions.
+Failed parent ISRT captures an actual traced GU prefix; AC/AM never recaptures an
+older prefix. Equal-key reinsertion cancels old gap certificates. Actual CHKP
+captures B11, clears every PCB/hold, and XRST uses real GU; deleted C112 restores
+GE and a missing-key gap, then ordinary GN returns D111e. Backout/load cancels
+certification, and canonical replay never re-evaluates position or recreates hold.
+
+The affected public provider selection executes 268 generic tests, including 37
+primary tests, plus 10 engine controls and 49 checkpoint composition tests. Signed
+selection executes 16 primary tests, F/L 6/6, feedback/logical 4, null 1,
+secondary 9 and HISAM 3. Separate SQLite child processes execute eight public
+writer/reader phases (ordinary/constrained/hold/deleted), six signed retained
+phases and two coherent backup writer/reader phases with nonzero exact tests and
+success markers. The coherent backup uses existing SqliteStateStore.backup_to,
+then restores actual package/session/database/undo/recovery/replay/journal/audit
+and held versions before backout/XRST. It is bounded graph proof, not broader
+mixed-image or licensed backup certification.
+
+Two actual configured PostgreSQL 18.6 tests execute on independent disposable
+loopback databases with fsync on: public five-pattern/feedback/hold/DLET/backout/
+CHKP/XRST and signed five-pattern/feedback/REPL/DLET/ISRT/backout. They are not
+unconfigured early returns or inherited retention credit. The task cluster stops
+and only its validated generated directory is removed after log preservation.
+Normal runs' two ignored PostgreSQL selectors receive no skip credit; the actual
+configured commands are separate passing receipts. All 24 mandatory local gates
+pass, including strict host-api/IMS/server all-target/all-feature no-deps Clippy
+with -D warnings, fmt, offline deny, license notices, catalog/assurance/schema/
+spec/coverage, execution/effect/rows/storage/SAF/retention/participant/typed/module/
+API/supply-chain and normal docs/changelog checks. New modules stay within 1200
+production lines with no ratchet increase. The final changed subset is exactly
+the 31 paths declared above; no unused allowance is padded. Generate the entire
+`Complete IMS-1403.primary-level-position-closure` message and committed check
+only for this bounded local leaf. ADR0040 remains Proposed; broader IMS-1403,
+IMS-1401, mandatory official/HUMAN 0/25, all 25 mandatory rows, pending ADR0031/
+0033, licensed/participant and v0.14 obligations remain open. No push or PR.
+
 ## Root HISAM integration declaration — 2026-10-03
 
 Root composes worker `55cf6d5baead04bcfe97caecdbf5a48b4ef9e145` onto source-only
@@ -542,6 +715,89 @@ and unrerun, not passed by these selected guards.
 No production owner beyond the declared ten paths changed. PostgreSQL, backup
 composition, official/HUMAN/participant acceptance and broader mandatory classes
 remain pending; a provider reopen is not process-restart or backup certification.
+## IMS-1403.ssa-primary-level-position — producer phase declaration, 2026-10-03
+
+Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51`, branch
+`codex/v014-primary-position-failfirst-20261003`. This uncommitted phase owns
+only the private three-level HIDAM DbBatch search trace, satisfied-level witness,
+finite GN/GHN U/V admission, same-call feedback and selected retained/recovery
+producers. ADR0040 is Proposed. The twenty original literal fail-first failures
+and four controls retain their original receipt identities. Source review and
+local proof grant zero accepted-IR/HUMAN/official/licensed/participant credit.
+IMS-1403, IMS-1401 and v0.14 remain incomplete; no feature seal is authorized.
+
+Exact phase allowlist (no ratchet or shared contract changes):
+
+```text
+crates/providers/mainframe-env-ims/src/database/mod.rs
+crates/providers/mainframe-env-ims/src/database/navigation.rs
+crates/providers/mainframe-env-ims/src/database/primary_position.rs
+crates/providers/mainframe-env-ims/src/database/ssa.rs
+crates/providers/mainframe-env-ims/src/database/logical.rs
+crates/providers/mainframe-env-ims/src/service/generic/ssa.rs
+crates/providers/mainframe-env-ims/src/service/generic/pcb.rs
+crates/providers/mainframe-env-ims/src/service/feedback.rs
+crates/providers/mainframe-env-ims/src/service/application_recovery/checkpoint.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests/trace_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests/retained.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/primary_position_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/primary_position_tests/retained.rs
+docs/delivery/subsystems/ims/programming-status.md
+docs/decisions/0040-primary-level-position-search-boundary.md
+changes/unreleased/ims-primary-level-position-20261003.toml
+docs/documentation-registry.json
+docs/README.md
+docs/generated/documentation-manifest.json
+```
+
+The server parent permits module declarations only. database/logical.rs permits
+only initializer/default compatibility. HISAM exclusively owns database/store.rs,
+service/generic.rs, database/tests.rs, generic/tests/closure_tests.rs and
+tests/application_recovery/checkpoint_tests.rs, plus service/execution.rs under
+the manager's ownership correction: none may change here. The exact maximum
+producer allowance excludes execution.rs until explicit transfer after HISAM
+integration. Same-call failed-feedback transport and its unchanged literal tests
+remain pending at that gate; no alternative transport or context owner is
+authorized. Full
+ISRT/DLET/REPL consumption, legacy generic producer integration and load/backout
+reconciliation that require those owners remain gated until manager transfer.
+No alternative consumer hooks may bypass this restriction. Pending ADR0031/0033,
+source pins/catalog denominators and retention prefix fences remain unchanged.
+
+Owned producer observations at this uncommitted base: thirteen public named
+producer tests and two signed producer tests execute Memory/file SQLite, including
+twelve nonzero independent writer/reader child phases. Actual BDATA-qualified GN
+captures B11/A1B11 satisfied feedback separately from examined B13; independent
+ordinary GN returns E11f, U/U or intermediate V returns C111a, and exact-parent
+failure continues to D111e. All five U/V patterns, real GU/GHU and GHN holds,
+root-only C121 and intermediate-only root-transition C211, repeated GE, ordinary
+GNP frames, GB restart, absent-byte/strict reader fixtures, wide runtime keys,
+per-PCB isolation, raw null/context/PCB conflicts, capacity/session CAS/lost ack,
+local/remote logical and metadata exclusions, AC/AM/SAF and actual symbolic
+CHKP/XRST prefix GU are observed. Current versioned REPL/replay composition is a
+selected existing-owner witness, not full mutation-consumer closure. Stale hold
+status still belongs to current_hold/DJ; live occurrence validation accepts
+nonkey version growth and never supplies a new hold.
+
+Sixteen of the original twenty literal failures now pass on public/signed Memory
+and SQLite; four original setup controls pass. Four unchanged public/signed
+failed-feedback expectations still fail: actual Unsupported(FailedCallWitness),
+required Valid B/level2/A1B11/5 bytes/zero transfer. execution.rs is unchanged;
+these are pending transport obligations, not passing acceptance or an accepted
+Unsupported disposition. Original fail-first receipts are never relabeled.
+Current receipts are external under primary-position-producer. Strict affected
+IMS/server all-target/all-feature no-deps Clippy, fmt, deny, normal docs generation/
+check, changelog/catalog/assurance/schema/spec/coverage and execution/effect/rows/
+storage/SAF/retention/participant/generator/typed/module/API/supply-chain checks
+pass in gates-01 (23 commands); every sequence cleans this checkout target.
+Proportional source/reader/producer proofs retain their exact input identities;
+prior unaffected F/L/null/secondary/logical feedback controls retain their own
+candidate receipts. No feature commit/seal, full
+producer/consumer acceptance, PostgreSQL parity, backup certification, broader
+IMS-1403/IMS-1401 or v0.14 completion is claimed.
 
 ## Root F integration declaration — 2026-10-03
 
@@ -5567,3 +5823,70 @@ and selects the source reader, coverage registry and docs/changelog/policy/seal
 checks for this metadata-only composition. No Rust runtime repeat or CICS cache
 retry is justified by these unchanged semantic inputs. F/U/V/W behavior and the
 proposed private positioning authority remain unfinished; full v0.14 stays open.
+
+## IMS-1403.ssa-primary-level-position — fail-first phase only
+
+Declared before test edits on clean manager base
+`dd097038e761730f394098b58f01ffca3906eda7`, target 0.14.0.
+This bounded phase captures independent expected failures through the real
+public provider and signed-selected coordinator on Memory and file SQLite.
+It authorizes no production implementation, retained wire, matcher, feedback,
+recovery/mutation consumer, shared contract, source registration, ADR or seal.
+The manager owns later F integration and separate runtime authorization.
+
+Exact five-path phase allowlist:
+
+- `crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests.rs`
+- `crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/primary_position_tests.rs` (new)
+- `crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs`
+- `crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/primary_position_tests.rs` (new)
+- `docs/delivery/subsystems/ims/programming-status.md`
+
+Independent fixed/unique three-level HIDAM data establishes A1/B11 by real
+prefix GU. Actual source GN qualifies A=A1, B>=B11 AND BDATA=14, C=C113.
+Require GE/no data, failed Valid feedback B/level2/raw A1B11/length5/transfer0.
+Separately rebuilt histories require ordinary GN E11f, U/U GN C111a and
+intermediate V GN C111a; an exact-parent miss followed by GN D111e discriminates
+the C112 boundary. Separate named assertions prevent one failure hiding others.
+Setup controls must pass; compile/setup errors are distinct from semantic
+failures. Signed completed executions use distinct identities for fresh calls.
+
+Read actual committed U/V scope `ims-ssa-position-commands`, baseline
+`ibm-ims-15.6-ssa-position-commands-2026-09-11`, plus failed-position and relevant
+get/PCB pins before authoring expectations. Source/catalog credit remains zero.
+Receipts and handoff stay external in worker-receipts/v014-completion-20261002/
+primary-position-failfirst/. Selected Cargo sequences always end with cargo
+clean, failures included. No policy/full regression/PostgreSQL/process/backup
+campaign or docs generation is required for this pre-implementation phase.
+Keep the proof inputs uncommitted; no feature completion, official/HUMAN/licensed
+acceptance, shared ADR0031/0033 approval or parent v0.14 completion is inferred.
+
+Fail-first outcome: twelve named public tests execute: two setup controls pass
+and ten literal semantic expectations fail. After a signed test-only package-
+trust compile repair, twelve named signed tests execute: two setup controls pass,
+six semantic expectations fail and four U/V cases stop at an overstrict journal
+setup assertion. Repair that harness to validate Completed for successful
+effects and Failed for rejected effects, preserving canonical digest assertions;
+rerun only those four U/V cases and capture their real literal failures.
+All twenty final semantic failures are real
+Memory/file SQLite witnesses: GE feedback is Unsupported(FailedCallWitness)
+instead of Valid B/2/A1B11/length5; ordinary/exact-parent continuation returns
+A1r instead of E11f/D111e; U/U and V return Unsupported instead of C111a.
+GE/no data and transfer0 setup observations pass. Independent histories prevent
+the feedback assertion or ordinary navigation from hiding constrained witnesses.
+Signed fresh calls use distinct completed execution identities and assert the
+actual retained canonical coordinator request/result digests.
+
+Original public receipt remains attempt-01-public.log; signed compile error is
+attempt-01-signed.log and earns no execution count; signed feedback/ordinary/
+exact-parent and setup observations remain attempt-02-signed.log under their
+original inputs. Its four harness failures are not semantic evidence. Repaired
+U/V literals execute in attempt-03-signed-uu.log and attempt-03-signed-v.log.
+Twenty-four unique named tests execute (28 executions including harness retries):
+four passing setup controls, twenty genuine semantic failures and four earlier
+harness errors. All three Cargo sequences finish successful cargo clean;
+target is absent. Only the declared five paths remain dirty/uncommitted. No
+production file, source pin, docs generator, ADR, policy/full campaign, PostgreSQL
+startup, feature seal or parent completion was performed. External
+primary-position-failfirst-handoff.md binds exact inputs and results. Stop here
+until the manager supplies the F-integrated runtime base and authorization.

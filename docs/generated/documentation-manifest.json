@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 241,
+    "markdown_documents": 242,
     "navigation_groups": 6,
-    "normative_documents": 72,
+    "normative_documents": 73,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 128,
-      "sha256": "sha256:03362db491669bc451d2832f53110f58684220fdc6099dfc2bf7ef63ccda3691",
+      "relative_links": 129,
+      "sha256": "sha256:619a60375d174015089a01930a66cdb9283ebb483456c85523fd78f1eb12920f",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1110,6 +1110,18 @@
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0040-primary-level-position-search-boundary.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.primary-level-position-closure, reviewed private design",
+      "sha256": "sha256:f659f096668a1c867e20bb5db617611f8d926fe8b9987c771ee5904a0974a79d",
+      "status": "Proposed",
+      "title": "ADR-0040: Private primary level witnesses and search boundary",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
       "path": "docs/decisions/0041-first-direct-child-ssa-selection.md",
       "relative_links": 0,
       "scope": "IMS-1403.ssa-first-direct-child, bounded local runtime leaf",
@@ -1586,7 +1598,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 18,
-      "sha256": "sha256:be71b11fa34da73d0ec1be925652dcdaada919155bd7bd94644f314cc6013ff9",
+      "sha256": "sha256:25acec8f5a858242cafabb91254a101364548251b98f7b0b1c9806a5b3bdd764",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2468,6 +2480,10 @@
           "path": "docs/decisions/0039-last-direct-child-ssa-selection.md"
         },
         {
+          "label": "ADR-0040: Private primary level witnesses and search boundary",
+          "path": "docs/decisions/0040-primary-level-position-search-boundary.md"
+        },
+        {
           "label": "ADR-0041: First direct child SSA selection",
           "path": "docs/decisions/0041-first-direct-child-ssa-selection.md"
         },
@@ -2748,7 +2764,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:5cd6ff31111a3a17b06df58ee0910323e32fdd2fe4c582ab789ac5790eb4fbb7",
+  "registry_sha256": "sha256:47e4edf60ef55f0ae0e67e9a6e77ff2081ed20a1a515642ce94291b97c149ac5",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

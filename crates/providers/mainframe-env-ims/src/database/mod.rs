@@ -228,6 +228,8 @@ pub struct PcbPosition {
     /// Original missing-occurrence boundary, not the ordinary-order predecessor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     secondary_restart: Option<Box<crate::recovery::SavedSecondaryPosition>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    primary_search: Option<Box<primary_position::PrimarySearch>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -239,6 +241,7 @@ struct SecondaryPosition {
 
 impl PcbPosition {
     pub fn set_current(&mut self, id: RecordId) {
+        self.primary_search = None;
         self.secondary = None;
         self.secondary_restart = None;
         self.current = Some(id);
@@ -375,6 +378,7 @@ mod gsam_checkpoint;
 pub(crate) mod gsam_format;
 mod logical;
 mod navigation;
+pub(crate) mod primary_position;
 mod secondary;
 mod secondary_checkpoint;
 mod ssa;
@@ -611,6 +615,7 @@ impl DatabaseEngine {
     }
 
     pub fn validate_position(&self, position: &PcbPosition) -> Result<(), EngineProblem> {
+        self.validate_primary_position(position, true)?;
         self.validate_secondary_position(position)?;
         if position
             .current

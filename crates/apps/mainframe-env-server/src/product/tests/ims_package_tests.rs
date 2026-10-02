@@ -11,6 +11,8 @@ mod gsam_tests;
 mod logical_feedback_tests;
 #[path = "ims_package_tests/null_ssa_tests.rs"]
 mod null_ssa_tests;
+#[path = "ims_package_tests/primary_position_tests.rs"]
+mod primary_position_tests;
 #[path = "ims_package_tests/secondary_checkpoint_tests.rs"]
 mod secondary_checkpoint_tests;
 #[path = "ims_package_tests/ssa_first_tests.rs"]

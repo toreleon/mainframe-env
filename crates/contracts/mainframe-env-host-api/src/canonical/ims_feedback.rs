@@ -196,6 +196,63 @@ mod tests {
         );
     }
     #[test]
+    fn feedback_v1_ge_empty_valid_prefix_has_bounded_shape_only() {
+        let limits = HostLimits::default();
+        let mut result = response();
+        result.result.status = "GE".into();
+        result.result.segments.clear();
+        result.feedback.transferred_data_length = 0;
+        result.feedback.key = ImsPcbKeyFeedbackV1::Valid {
+            segment_name: "B".into(),
+            segment_level: 2,
+            bytes: b"A1B11".to_vec(),
+        };
+        assert_eq!(result.validate(limits), Ok(()));
+        for status in ["AC", "AM", "GB", "II", "DJ"] {
+            let mut bad = result.clone();
+            bad.result.status = status.into();
+            assert_eq!(
+                bad.validate(limits),
+                Err(HostProblem::Malformed),
+                "{status}"
+            );
+        }
+        let mut bad = result.clone();
+        bad.feedback.transferred_data_length = 1;
+        assert_eq!(bad.validate(limits), Err(HostProblem::Malformed));
+        let mut bad = result.clone();
+        bad.result.segments.push(ImsSegment {
+            name: "C".into(),
+            parent_key: None,
+            data: vec![],
+        });
+        assert_eq!(bad.validate(limits), Err(HostProblem::Malformed));
+        for level in [0, 16] {
+            let mut bad = result.clone();
+            let ImsPcbKeyFeedbackV1::Valid { segment_level, .. } = &mut bad.feedback.key else {
+                unreachable!()
+            };
+            *segment_level = level;
+            assert_eq!(bad.validate(limits), Err(HostProblem::Malformed));
+        }
+        let mut bounded = limits;
+        bounded.max_record_bytes = 4;
+        assert_eq!(result.validate(bounded), Err(HostProblem::Malformed));
+        let mut bad = result.clone();
+        bad.result.checkpoint_id = Some("CHKP".into());
+        assert_eq!(bad.validate(limits), Err(HostProblem::Malformed));
+        let mut historical = result;
+        historical.feedback.key =
+            ImsPcbKeyFeedbackV1::Unsupported(ImsPcbFeedbackUnsupportedV1::FailedCallWitness);
+        let encoded = serde_json::to_vec(&historical.feedback).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<ImsPcbFeedbackV1>(&encoded).unwrap(),
+            historical.feedback
+        );
+        assert_eq!(historical.validate(limits), Ok(()));
+    }
+
+    #[test]
     fn feedback_v1_validates_bounds_status_length_and_unknown_fields() {
         let limits = HostLimits::default();
         let host = HostRequest::ImsPcbFeedbackV1(sample());

@@ -208,6 +208,7 @@ impl DatabaseEngine {
             id: record.id,
             version,
         });
+        self.primary_replaced(position, record.id);
         if position.secondary.as_ref().is_some_and(|selected| {
             old_values
                 .iter()
@@ -230,6 +231,13 @@ impl DatabaseEngine {
     /// Physically delete the current held occurrence and all physical
     /// dependents, updating every secondary index atomically.
     pub fn delete(&mut self, position: &mut PcbPosition) -> Result<usize, EngineProblem> {
+        self.delete_with_primary(position).map(|(count, _)| count)
+    }
+
+    pub(crate) fn delete_with_primary(
+        &mut self,
+        position: &mut PcbPosition,
+    ) -> Result<(usize, Option<primary_position::PrimaryDeletion>), EngineProblem> {
         if self.definition.organization == DatabaseOrganization::Gsam {
             return Err(EngineProblem::Unsupported);
         }
@@ -254,6 +262,7 @@ impl DatabaseEngine {
             .revision
             .checked_add(1)
             .ok_or(EngineProblem::LimitExceeded)?;
+        let deletion = self.primary_deletion(record.id, removed.clone(), revision)?;
         let mut records = self.records.clone();
         let mut roots = self.roots.clone();
         let mut indexes = self.indexes.clone();
@@ -290,7 +299,10 @@ impl DatabaseEngine {
         {
             *position = PcbPosition::default();
         }
-        Ok(removed.len())
+        if let Some(deletion) = &deletion {
+            position.consume_primary_deletion(deletion, true);
+        }
+        Ok((removed.len(), deletion))
     }
 
     /// Resolve an exact secondary-index value in current hierarchical order.

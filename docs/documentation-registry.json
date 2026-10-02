@@ -67,6 +67,7 @@
     "docs/decisions/0037-private-ims-recovery-retention-fence.md",
     "docs/decisions/0038-logical-child-physical-key-feedback.md",
     "docs/decisions/0039-last-direct-child-ssa-selection.md",
+    "docs/decisions/0040-primary-level-position-search-boundary.md",
     "docs/decisions/0041-first-direct-child-ssa-selection.md",
     "docs/decisions/0042-ims-tm-output-identity-local-order.md",
     "docs/decisions/0033-cobol-dli-call-boundary.md",
@@ -325,6 +326,10 @@
         {
           "label": "ADR-0039: Last remaining direct child SSA selection",
           "path": "docs/decisions/0039-last-direct-child-ssa-selection.md"
+        },
+        {
+          "label": "ADR-0040: Private primary level witnesses and search boundary",
+          "path": "docs/decisions/0040-primary-level-position-search-boundary.md"
         },
         {
           "label": "ADR-0041: First direct child SSA selection",

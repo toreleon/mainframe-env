@@ -5,6 +5,7 @@ mod first_tests;
 mod last_tests;
 mod null_slot_tests;
 mod pcb_tests;
+mod primary_position_tests;
 
 fn navigation(run: &str, sequence: u64, op: ImsOperation, ssas: &[&[u8]]) -> ImsNavigationRequest {
     ImsNavigationRequest {

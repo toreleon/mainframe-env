@@ -382,6 +382,7 @@ pub(super) fn apply_request(
     invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
+    witness: &mut Option<super::feedback::PrimaryCallWitness>,
 ) -> Result<ImsResult, HostProblem> {
     let run = invocation.run_unit_id.as_str();
     match request.operation {
@@ -424,9 +425,9 @@ pub(super) fn apply_request(
         | ImsOperation::GetNextParent
         | ImsOperation::GetHoldUnique
         | ImsOperation::GetHoldNext
-        | ImsOperation::GetHoldNextParent => read(state, run, request, limits),
+        | ImsOperation::GetHoldNextParent => read(state, invocation, request, limits, witness),
         ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete => {
-            mutate(state, invocation, request, limits)
+            mutate(state, invocation, request, limits, witness)
         }
         ImsOperation::Checkpoint => checkpoint(state, run, request, limits),
         ImsOperation::Load => load(state, invocation, request, limits),
@@ -585,18 +586,31 @@ fn segment_result(engine: &DatabaseEngine, view: RecordView) -> Result<ImsSegmen
 
 fn read(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
+    witness: &mut Option<super::feedback::PrimaryCallWitness>,
 ) -> Result<ImsResult, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
     let pcb = session_pcb(state, run, request.pcb)?.clone();
     let engine = restored(state, &normalize(&pcb.database), limits)?;
     let read = read_request(request, &engine)?;
     if let Some(code) = pcb::read_status(&pcb, request, &read) {
         return Ok(status(code));
     }
-    let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
-    let mut position = pcb::position(session, request.pcb);
+    let mut position = pcb::position(
+        state.sessions.get(run).ok_or(HostProblem::NotFound)?,
+        request.pcb,
+    );
+    let plan = ssa::ordinary_plan(
+        state,
+        invocation,
+        request,
+        &pcb,
+        (&engine, &read),
+        &position,
+        limits,
+    )?;
     let parent_qualification = pcb::gnp_target_below_parent(&engine, &position, &read);
     let visible = |segment: &str| {
         read.target.is_some()
@@ -604,10 +618,17 @@ fn read(
     };
     let outcome = if let Some(index) = &pcb.secondary_index {
         engine.read_secondary_visible(&normalize(index), &mut position, &read, visible)
+    } else if let Some(plan) = &plan {
+        engine.read_ssas_planned(&mut position, &read, &plan.ssas, None, visible, Some(plan))
     } else {
         engine.read_visible(&mut position, &read, visible)
     };
-    pcb::set_position(session, request.pcb, position);
+    *witness = ssa::fresh_witness(&position, plan.is_some(), &outcome);
+    pcb::set_position(
+        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+        request.pcb,
+        position,
+    );
     match outcome {
         Ok(_)
             if read
@@ -726,6 +747,7 @@ fn mutate(
     invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
+    witness: &mut Option<super::feedback::PrimaryCallWitness>,
 ) -> Result<ImsResult, HostProblem> {
     let run = invocation.run_unit_id.as_str();
     let pcb = session_pcb(state, run, request.pcb)?.clone();
@@ -760,7 +782,39 @@ fn mutate(
         return Ok(status("AM"));
     }
     isolation::ensure_writer(state, run, &name)?;
+    let primary = if invocation.service_class == ServiceClass::Batch {
+        ssa::primary_identity(
+            state,
+            &state.sessions[run].psb,
+            request.pcb,
+            &pcb,
+            &engine,
+            limits,
+        )?
+    } else {
+        None
+    };
+    if primary.is_none() {
+        position.clear_primary();
+    }
     if request.operation == ImsOperation::Delete {
+        if primary.is_some() {
+            let (count, deletion) = match engine.delete_with_primary(&mut position) {
+                Ok(changed) => changed,
+                Err(problem) => return Ok(status(engine_status(problem))),
+            };
+            isolation::publish_image(state, run, &name, engine.image(), limits)?;
+            reset_positions(state, &name, Some(run));
+            if let Some(deletion) = &deletion {
+                pcb::consume_primary_deletion(state, run, request.pcb, &name, deletion)?;
+            }
+            pcb::set_position(
+                Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+                request.pcb,
+                position,
+            );
+            return Ok(affected(count as u64));
+        }
         let (count, images) = match logical::delete_cascade(state, limits, &name, &mut position) {
             Ok(changed) => changed,
             Err(logical::LogicalMutationError::Status(code)) => return Ok(status(code)),
@@ -780,6 +834,9 @@ fn mutate(
     }
     let changed = match request.operation {
         ImsOperation::Insert => {
+            let old_parentage = position.parentage();
+            let certify = primary.is_some()
+                && (position.primary_feedback_path().is_some() || !request.qualifiers.is_empty());
             let segment = engine
                 .definition()
                 .segments
@@ -790,6 +847,12 @@ fn mutate(
             };
             let parent = match &segment.parent {
                 None => None,
+                Some(parent_name)
+                    if request.qualifiers.is_empty()
+                        && position.primary_feedback_path().is_some() =>
+                {
+                    position.primary_parent(parent_name)
+                }
                 Some(parent_name) if request.qualifiers.is_empty() => {
                     position.current().or(position.parentage()).and_then(|id| {
                         engine.path_to(id).ok().and_then(|path| {
@@ -799,6 +862,31 @@ fn mutate(
                                 .map(|view| view.id)
                         })
                     })
+                }
+                Some(parent_name) if primary.is_some() => {
+                    let (found, observed) = ssa::lookup_insert_parent(
+                        state,
+                        invocation,
+                        request,
+                        &pcb,
+                        (&engine, parent_name),
+                        &mut position,
+                        limits,
+                    )?;
+                    match found {
+                        Ok(view) => Some(view.id),
+                        Err(problem) => {
+                            *witness = observed;
+                            pcb::set_position(
+                                Arc::make_mut(
+                                    state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?,
+                                ),
+                                request.pcb,
+                                position,
+                            );
+                            return Ok(status(engine_status(problem)));
+                        }
+                    }
                 }
                 Some(parent_name) => {
                     let mut ancestry = BTreeSet::new();
@@ -865,6 +953,16 @@ fn mutate(
                         }
                         Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
                     }
+                    if engine.primary_shape() {
+                        pcb::invalidate_primary_reinsertion(
+                            state,
+                            run,
+                            request.pcb,
+                            &name,
+                            &engine,
+                            view.id,
+                        )?;
+                    }
                     if let Some(index) = &pcb.secondary_index {
                         engine
                             .position_after_secondary_insert(
@@ -877,6 +975,12 @@ fn mutate(
                         engine
                             .position_after_nonunique_dependent_insert(&mut position, view.id)
                             .map(|()| 1usize)
+                    } else if let Some(digest) = primary.filter(|_| certify || parent.is_none()) {
+                        engine
+                            .primary_inserted(&mut position, digest, view.id, old_parentage)
+                            .map_err(|_| HostProblem::InfrastructureFailure)?;
+                        *witness = ssa::fresh_witness(&position, true, &Ok(view.clone()));
+                        Ok(1usize)
                     } else {
                         position.set_current(view.id);
                         Ok(1usize)

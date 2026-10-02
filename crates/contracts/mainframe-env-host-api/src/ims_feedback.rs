@@ -96,7 +96,7 @@ pub enum ImsPcbFeedbackUnsupportedV1 {
 pub enum ImsPcbKeyFeedbackV1 {
     /// Only valid bytes, from root to selected occurrence; never stale area tails.
     Valid {
-        /// Lowest selected segment of the successful call.
+        /// Lowest satisfied segment of a successful or bounded GE retrieval.
         segment_name: String,
         /// One-based level in the selected primary path.
         segment_level: u16,
@@ -183,7 +183,11 @@ impl ImsPcbFeedbackResultV1 {
                 segment_level,
                 bytes,
             } => {
-                if self.result.status != "  "
+                let valid_status = self.result.status == "  "
+                    || (self.result.status == "GE"
+                        && self.result.segments.is_empty()
+                        && f.transferred_data_length == 0);
+                if !valid_status
                     || segment_name.is_empty()
                     || segment_name.len() > limits.max_name_bytes
                     || *segment_level == 0

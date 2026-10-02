@@ -125,6 +125,83 @@ pub(super) fn reset_deleted_positions(
     Ok(())
 }
 
+pub(super) fn consume_primary_deletion(
+    state: &mut State,
+    run: &str,
+    selected: u16,
+    database: &str,
+    deletion: &crate::database::primary_position::PrimaryDeletion,
+) -> Result<(), HostProblem> {
+    let session = state.sessions.get(run).ok_or(HostProblem::NotFound)?;
+    let numbers = std::iter::once(session.pcb)
+        .chain(session.pcb_positions.keys().copied())
+        .filter(|n| *n != selected)
+        .filter(|n| {
+            scheduled_pcb(state, &session.psb, *n)
+                .is_ok_and(|(_, p)| normalize(&p.database) == database)
+        })
+        .collect::<Vec<_>>();
+    let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
+    for number in numbers {
+        let mut p = position(session, number);
+        if p.primary_feedback_path().is_some() {
+            p.consume_primary_deletion(deletion, false);
+        } else if p.current().is_some_and(|id| deletion.removed.contains(&id))
+            || p.parentage()
+                .is_some_and(|id| deletion.removed.contains(&id))
+        {
+            p = PcbPosition::default();
+        }
+        set_position(session, number, p);
+    }
+    Ok(())
+}
+
+pub(super) fn invalidate_primary_reinsertion(
+    state: &mut State,
+    run: &str,
+    selected: u16,
+    database: &str,
+    engine: &DatabaseEngine,
+    inserted: crate::database::RecordId,
+) -> Result<(), HostProblem> {
+    let targets = state
+        .sessions
+        .iter()
+        .filter(|(_, s)| s.generic)
+        .map(|(owner, session)| {
+            let numbers = std::iter::once(session.pcb)
+                .chain(session.pcb_positions.keys().copied())
+                .filter(|n| owner.as_str() != run || *n != selected)
+                .filter(|n| {
+                    scheduled_pcb(state, &session.psb, *n)
+                        .is_ok_and(|(_, p)| normalize(&p.database) == database)
+                })
+                .collect::<Vec<_>>();
+            (owner.clone(), numbers)
+        })
+        .collect::<Vec<_>>();
+    for (owner, numbers) in targets {
+        let session = Arc::make_mut(
+            state
+                .sessions
+                .get_mut(&owner)
+                .ok_or(HostProblem::NotFound)?,
+        );
+        for number in numbers {
+            let original = position(session, number);
+            let mut p = original.clone();
+            engine
+                .invalidate_primary_reinsertion(&mut p, inserted)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if original != p {
+                set_position(session, number, p);
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn read_status(
     pcb: &ImsDatabasePcbMetadata,
     request: &ImsRequest,
@@ -231,8 +308,21 @@ pub(super) fn validate_sessions(state: &State, limits: ImsLimits) -> Result<(), 
             {
                 return Err(HostProblem::InfrastructureFailure);
             }
+            let engine = restored(state, &normalize(&pcb.database), limits)?;
+            let selected_position = position(session, number);
+            if selected_position.primary_feedback_path().is_some() {
+                let digest =
+                    ssa::primary_identity(state, &session.psb, number, pcb, &engine, limits)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                if !selected_position.validate_primary_identity(digest) {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                engine
+                    .validate_primary_position(&selected_position, live)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            }
             if live {
-                restored(state, &normalize(&pcb.database), limits)?
+                engine
                     .validate_position(&position(session, number))
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
             }

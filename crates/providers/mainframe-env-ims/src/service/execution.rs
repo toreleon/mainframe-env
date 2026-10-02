@@ -142,6 +142,7 @@ impl ImsService {
                         result,
                         address,
                         feedback,
+                        primary_witness: None,
                     });
                 }
                 ReplayDigestFormat::CanonicalHostV1 => {
@@ -184,14 +185,24 @@ impl ImsService {
         } else {
             None
         };
+        let mut primary_witness = None;
         let result = if let Some(output) = &output {
             output.result.clone()
         } else if let Some(prepared) = prepared {
-            generic::ssa::read(&mut next, run, request, &prepared, self.limits)?
+            let (result, witness) =
+                generic::ssa::read(&mut next, run, request, &prepared, self.limits)?;
+            primary_witness = witness;
+            result
         } else if request.operation == ImsOperation::System {
             system::apply_request(&mut next, run, request, self.limits)?
         } else if generic::is_generic(&next, run, request) {
-            generic::apply_request(&mut next, invocation, request, self.limits)?
+            generic::apply_request(
+                &mut next,
+                invocation,
+                request,
+                self.limits,
+                &mut primary_witness,
+            )?
         } else {
             apply_request(&mut next, run, request, self.limits)?
         };
@@ -206,8 +217,25 @@ impl ImsService {
             system::observe_database_call(&mut next, run, request, &result, self.limits)?;
         }
         application_backout::settle_database_call(&mut next, invocation, request, &result)?;
+        let mut fresh = feedback::ExecutionOutput {
+            undefined_length: output.as_ref().and_then(|o| o.undefined_length),
+            address: output.as_ref().and_then(|o| o.address.clone()),
+            result,
+            feedback: None,
+            primary_witness,
+        };
+        let result = &fresh.result;
         let pcb_feedback = feedback
-            .map(|feedback| feedback::project(&next, run, feedback, &result, self.limits))
+            .map(|feedback| {
+                feedback::project(
+                    &next,
+                    run,
+                    feedback,
+                    result,
+                    self.limits,
+                    fresh.primary_witness.take(),
+                )
+            })
             .transpose()?;
         if let Some(feedback) = &pcb_feedback {
             mainframe_env_host_api::ImsPcbFeedbackResultV1 {
@@ -226,9 +254,10 @@ impl ImsService {
         {
             return Ok(feedback::ExecutionOutput {
                 undefined_length: None,
-                result,
+                result: result.clone(),
                 address: None,
                 feedback: None,
+                primary_witness: None,
             });
         }
         if request.operation.is_mutating() {
@@ -236,7 +265,7 @@ impl ImsService {
             if next.replay.len() >= self.limits.max_replays {
                 return Err(HostProblem::ResourceExhausted);
             }
-            let mut recorded = RecordedResult::from_result(request_sha256, &result);
+            let mut recorded = RecordedResult::from_result(request_sha256, result);
             recorded.pcb_feedback_v1 = pcb_feedback.clone();
             if let Some(output) = &output {
                 recorded.gsam = Some(gsam::ReplayOutput {
@@ -257,12 +286,8 @@ impl ImsService {
             self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
                 .map_err(|_| HostProblem::UnknownOutcome)?;
         }
-        Ok(feedback::ExecutionOutput {
-            undefined_length: output.as_ref().and_then(|o| o.undefined_length),
-            result,
-            address: output.and_then(|o| o.address),
-            feedback: pcb_feedback,
-        })
+        fresh.feedback = pcb_feedback;
+        Ok(fresh)
     }
 
     pub(in crate::service) fn finalize_replay_metadata(

@@ -67,6 +67,76 @@ impl ImsSsaFieldResolver for SsaFields<'_> {
 }
 
 impl DatabaseEngine {
+    /// Evaluate active frames in the sole navigation loop. Rejected data
+    /// advances examination without replacing a previously satisfied prefix.
+    pub(super) fn primary_step(
+        &self,
+        position: &PcbPosition,
+        plan: &primary_position::PrimaryPlan,
+        progress: &mut primary_position::Progress,
+        id: RecordId,
+    ) -> Result<bool, EngineProblem> {
+        let path = self.record_path(id)?;
+        if plan.ssas.is_empty() {
+            self.primary_accept_prefix(progress, &path, path.len())?;
+            self.primary_examined(progress, id)?;
+            return Ok(true);
+        }
+        let mut accepted = 0;
+        let mut fenced = true;
+        for (level, candidate) in path.iter().enumerate() {
+            let Some(ssa) = plan.ssas.get(level) else {
+                return Ok(false);
+            };
+            let record = &self.records[candidate];
+            if record.segment != ssa.segment {
+                // A different dependent type is an end probe only when every
+                // ancestor is fixed. Otherwise skip it and try later parents.
+                if fenced {
+                    progress.stopped = true;
+                }
+                return Ok(false);
+            }
+            let constraint = self.primary_constraint(position, plan, level, &path);
+            let key_equal = self
+                .segment(&ssa.segment)?
+                .key_field
+                .as_deref()
+                .and_then(|key| {
+                    ssa.predicates.iter().find(|p| {
+                        matches!(&p.field, ImsSsaField::Named(name) if name == key)
+                            && p.relation == ImsSsaRelation::Equal
+                    })
+                });
+            if constraint.is_some_and(|expected| expected != *candidate) {
+                if fenced {
+                    progress.stopped = true;
+                }
+                return Ok(false);
+            }
+            if !self.matches_ssa(*candidate, ssa, None) {
+                if fenced
+                    && key_equal
+                        .is_some_and(|p| self.key_part(*candidate).is_ok_and(|k| k.key > p.value))
+                {
+                    progress.stopped = true;
+                    return Ok(false);
+                }
+                // A rejected parent was actually examined; its dependents were
+                // not eligible. Do not replace B11 by a B13 data rejection.
+                if level + 1 == path.len() {
+                    self.primary_examined(progress, *candidate)?;
+                }
+                return Ok(false);
+            }
+            accepted += 1;
+            self.primary_accept_prefix(progress, &path, accepted)?;
+            fenced &= constraint.is_some() || key_equal.is_some();
+        }
+        self.primary_examined(progress, id)?;
+        Ok(path.len() == plan.ssas.len())
+    }
+
     /// Shared live-path fence for the finite F/L direct-child selections.
     /// Uniqueness/logical metadata and call context remain with the PCB adapter.
     /// The historical method name remains for existing L regression callers.
@@ -147,6 +217,18 @@ impl DatabaseEngine {
         secondary: Option<&str>,
         visible: impl Fn(&str) -> bool,
     ) -> Result<RecordView, EngineProblem> {
+        self.read_ssas_planned(position, request, ssas, secondary, visible, None)
+    }
+
+    pub(crate) fn read_ssas_planned(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        ssas: &[ImsSsa],
+        secondary: Option<&str>,
+        visible: impl Fn(&str) -> bool,
+        plan: Option<&primary_position::PrimaryPlan>,
+    ) -> Result<RecordView, EngineProblem> {
         self.validate_ssas(request, ssas, secondary)?;
         let direct_child_selection = ssas
             .iter()
@@ -205,7 +287,7 @@ impl DatabaseEngine {
                 |id, key| matches(id, Some((name, key))),
             )
         } else {
-            self.read_matching_selected(
+            self.read_matching_progress(
                 position,
                 request,
                 match ssas
@@ -218,6 +300,7 @@ impl DatabaseEngine {
                     _ => Selection::First,
                 },
                 |id| matches(id, None),
+                plan,
             )
         }?;
         if let Some(parent) = ssas

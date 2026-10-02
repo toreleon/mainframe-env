@@ -608,20 +608,32 @@ fn save_positions(
             // A missing-occurrence fallback is not a newly proven checkpoint GU.
             return Err(HostProblem::Unsupported);
         }
-        let Some(id) = position.current() else {
-            continue;
-        };
         if pcb.secondary_index.is_some() {
+            if position.current().is_none() {
+                continue;
+            }
             saved.push(secondary_checkpoint::save(
                 state, versions, run, number, pcb, digest, limits,
             )?);
             continue;
         }
         let engine = generic::restored(state, &pcb.database, limits)?;
-        let path = match record_key(&engine, id) {
-            Ok(path) => path,
-            Err(HostProblem::Unsupported) => vec![],
-            Err(problem) => return Err(problem),
+        let path = if let Some(path) = position.primary_feedback_path() {
+            if path.is_empty() {
+                continue;
+            }
+            path.iter()
+                .map(|part| (part.segment.clone(), part.key.clone()))
+                .collect()
+        } else {
+            let Some(id) = position.current() else {
+                continue;
+            };
+            match record_key(&engine, id) {
+                Ok(path) => path,
+                Err(HostProblem::Unsupported) => vec![],
+                Err(problem) => return Err(problem),
+            }
         };
         let segment_key =
             serde_json::to_vec(&path).map_err(|_| HostProblem::InfrastructureFailure)?;
@@ -750,6 +762,48 @@ fn restore_position(
         path: selectors,
         hold: false,
     };
+    if let Some(digest) = generic::ssa::primary_identity(state, psb, number, &pcb, &engine, limits)?
+    {
+        // A new real GU in the same traced loop, never revival of the old IDs,
+        // old failure boundary or hold. Missing-key progress is captured there.
+        let ssas = request
+            .path
+            .iter()
+            .map(|selector| {
+                let predicate = &selector.predicates[0];
+                mainframe_env_host_api::ImsSsa {
+                    segment: selector.segment.clone(),
+                    command_format: false,
+                    commands: vec![],
+                    predicates: vec![mainframe_env_host_api::ImsSsaPredicate {
+                        field: mainframe_env_host_api::ImsSsaField::Named(predicate.field.clone()),
+                        relation: mainframe_env_host_api::ImsSsaRelation::Equal,
+                        value: predicate.value.clone(),
+                    }],
+                    connectors: vec![],
+                    concatenated_key: None,
+                }
+            })
+            .collect::<Vec<_>>();
+        let plan = crate::database::primary_position::PrimaryPlan {
+            digest,
+            ssas: ssas.clone(),
+            mask: [false; 2],
+        };
+        let observed = match engine.read_ssas_planned(
+            &mut position,
+            &request,
+            &ssas,
+            None,
+            |_| true,
+            Some(&plan),
+        ) {
+            Ok(_) => "  ",
+            Err(EngineProblem::NotFound) => "GE",
+            Err(_) => return Err(HostProblem::ProviderFailure),
+        };
+        return Ok((number, position, Some(observed.into())));
+    }
     let observed = match engine.read(&mut position, &request) {
         Ok(_) => "  ",
         Err(EngineProblem::NotFound) => {

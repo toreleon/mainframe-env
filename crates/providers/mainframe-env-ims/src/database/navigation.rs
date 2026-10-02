@@ -37,6 +37,10 @@ impl PcbPosition {
                         .as_ref()
                         .is_none_or(|p| p.index == saved.index)
             })
+            && (self.primary_search.is_none()
+                || (!self.after_end
+                    && self.secondary.is_none()
+                    && self.secondary_restart.is_none()))
     }
 }
 
@@ -86,11 +90,23 @@ impl DatabaseEngine {
         selection: Selection,
         matches: impl Fn(RecordId) -> bool,
     ) -> Result<RecordView, EngineProblem> {
+        self.read_matching_progress(position, request, selection, matches, None)
+    }
+
+    pub(super) fn read_matching_progress(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        selection: Selection,
+        matches: impl Fn(RecordId) -> bool,
+        plan: Option<&primary_position::PrimaryPlan>,
+    ) -> Result<RecordView, EngineProblem> {
         let mut next = position.clone();
         next.held = None;
+        next.primary_search = None;
         let order = self.hierarchy_order();
-        let selected = match request.kind {
-            ReadKind::Unique => order.iter().copied().find(|id| matches(*id)),
+        let (start, stop) = match request.kind {
+            ReadKind::Unique => (0, order.len()),
             ReadKind::Next => {
                 let start = if next.after_end {
                     0
@@ -99,7 +115,12 @@ impl DatabaseEngine {
                         .and_then(|current| order.iter().position(|id| *id == current))
                         .map_or(0, |index| index + 1)
                 };
-                order[start..].iter().copied().find(|id| matches(*id))
+                let start = plan
+                    .map(|plan| self.primary_start(position, plan, &order))
+                    .transpose()?
+                    .flatten()
+                    .unwrap_or(start);
+                (start, order.len())
             }
             ReadKind::NextInParent => {
                 let parent = next.parentage.ok_or(EngineProblem::ParentageRequired)?;
@@ -124,22 +145,40 @@ impl DatabaseEngine {
                     Selection::FirstInParent => parent_index + 1,
                     Selection::First | Selection::Last => forward_start,
                 };
-                let mut candidates = order[start..stop].iter().copied();
-                match selection {
-                    Selection::First | Selection::FirstInParent => {
-                        candidates.find(|id| matches(*id))
-                    }
-                    Selection::Last => {
-                        candidates.fold(
-                            None,
-                            |selected, id| {
-                                if matches(id) { Some(id) } else { selected }
-                            },
-                        )
-                    }
-                }
+                let start = plan
+                    .map(|plan| self.primary_start(position, plan, &order))
+                    .transpose()?
+                    .flatten()
+                    .unwrap_or(start)
+                    .clamp(parent_index + 1, stop);
+                (start, stop)
             }
         };
+        let mut progress = plan
+            .map(|plan| self.primary_progress(position, plan, request))
+            .transpose()?;
+        let mut selected = None;
+        for id in order[start..stop].iter().copied() {
+            if let Some(plan) = plan
+                && !self.primary_past_gap(position, plan, request, id)?
+            {
+                continue;
+            }
+            let matched = if let (Some(plan), Some(progress)) = (plan, &mut progress) {
+                self.primary_step(position, plan, progress, id)? && matches(id)
+            } else {
+                matches(id)
+            };
+            if progress.as_ref().is_some_and(|p| p.stopped) {
+                break;
+            }
+            if matched {
+                selected = Some(id);
+                if !matches!(selection, Selection::Last) {
+                    break;
+                }
+            }
+        }
         let Some(id) = selected else {
             match request.kind {
                 ReadKind::Unique => next.parentage = None,
@@ -149,6 +188,15 @@ impl DatabaseEngine {
                     next.after_end = true;
                 }
                 ReadKind::NextInParent => {}
+            }
+            if let Some(progress) = progress {
+                self.primary_finish(
+                    &mut next,
+                    progress,
+                    request,
+                    None,
+                    plan.expect("progress has a plan"),
+                );
             }
             *position = next;
             return Err(
@@ -172,6 +220,15 @@ impl DatabaseEngine {
                 id,
                 version: self.records[&id].version,
             });
+        }
+        if let Some(progress) = progress {
+            self.primary_finish(
+                &mut next,
+                progress,
+                request,
+                Some(id),
+                plan.expect("progress has a plan"),
+            );
         }
         *position = next;
         Ok(self.view(id))

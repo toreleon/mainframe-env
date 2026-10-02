@@ -3,6 +3,8 @@ use mainframe_env_host_api::{ImsOperation, ImsRestartSelection};
 
 #[path = "checkpoint_tests/integrity_tests.rs"]
 mod integrity_tests;
+#[path = "checkpoint_tests/primary_position_tests.rs"]
+mod primary_position_tests;
 #[path = "checkpoint_tests/secondary_tests.rs"]
 mod secondary_tests;
 

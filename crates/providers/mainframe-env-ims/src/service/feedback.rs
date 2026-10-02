@@ -11,6 +11,13 @@ pub(in crate::service) struct ExecutionOutput {
     pub address: Option<mainframe_env_host_api::ImsGsamAddress>,
     pub undefined_length: Option<u32>,
     pub feedback: Option<ImsPcbFeedbackV1>,
+    pub primary_witness: Option<PrimaryCallWitness>,
+}
+
+/// Produced only by this fresh primary search; retained checkpoint feedback is
+/// never used to reconstruct this value after a condition or replay.
+pub(in crate::service) struct PrimaryCallWitness {
+    pub path: Vec<crate::database::primary_position::KeyPart>,
 }
 
 impl ExecutionOutput {
@@ -94,9 +101,28 @@ pub(in crate::service) fn project(
     request: &ImsPcbFeedbackRequestV1,
     result: &ImsResult,
     limits: ImsLimits,
+    witness: Option<PrimaryCallWitness>,
 ) -> Result<ImsPcbFeedbackV1, HostProblem> {
     let pcb = generic::session_pcb(state, run, request.request.pcb)?;
-    let key = if result.status != "  " {
+    let key = if let Some(witness) = witness {
+        let Some(last) = witness.path.last() else {
+            return Err(HostProblem::InfrastructureFailure);
+        };
+        let bytes = witness
+            .path
+            .iter()
+            .flat_map(|p| p.key.iter().copied())
+            .collect::<Vec<_>>();
+        if bytes.len() > request.key_capacity as usize {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        ImsPcbKeyFeedbackV1::Valid {
+            segment_name: last.segment.clone(),
+            segment_level: u16::try_from(witness.path.len())
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            bytes,
+        }
+    } else if result.status != "  " {
         ImsPcbKeyFeedbackV1::Unsupported(Unproved::FailedCallWitness)
     } else if pcb.secondary_index.is_some() && request.request.operation == ImsOperation::Replace {
         ImsPcbKeyFeedbackV1::InvalidatedSecondaryReplace
