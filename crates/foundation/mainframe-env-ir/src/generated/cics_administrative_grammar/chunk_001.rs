@@ -156,6 +156,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "VALUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CONTROL", values: &["ATTENTION", "CANCEL", "EXCEPTRESP", "LUSTAT", "NORMALRESP", "RTR", "STSN"] },
+            CicsApplicationCvdaDomain { option: "VALUE", values: &["DEFRESP1", "DEFRESP1OR2", "DEFRESP2", "DEFRESP3", "INVALID", "NEGATIVE", "POSITIVE", "RESET"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -197,6 +199,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "UNTILCDEB", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ENDSTATUS", values: &["CD", "EB", "LIC", "MORE", "RU"] },
+            CicsApplicationCvdaDomain { option: "FMHSTATUS", values: &["FMH", "NOFMH"] },
+            CicsApplicationCvdaDomain { option: "RESPSTATUS", values: &["DEFRESP1", "DEFRESP2", "DEFRESP3", "NONE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -238,6 +243,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TIMEOUT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ALARMSTATUS", values: &["ALARM", "NOALARM"] },
+            CicsApplicationCvdaDomain { option: "ENDSTATUS", values: &["CD", "EB", "LIC"] },
+            CicsApplicationCvdaDomain { option: "RESPSTATUS", values: &["DEFRESP1", "DEFRESP2", "DEFRESP3", "NONE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -382,6 +390,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ACQSTATUS", values: &["ACQUIRED", "RELEASED"] },
+            CicsApplicationCvdaDomain { option: "SERVSTATUS", values: &["INSERVICE", "OUTSERVICE"] },
         ],
         cvda_numeric_domains: &[
         ],

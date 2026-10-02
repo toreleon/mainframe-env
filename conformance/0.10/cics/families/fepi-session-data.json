@@ -814,7 +814,22 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "SESSNSTATUS",
+            "values": [
+              "NEWSESSION",
+              "OLDSESSION"
+            ],
+            "source_lines": [
+              26,
+              28,
+              29,
+              30
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -1995,7 +2010,8 @@
         "Schema extension request (manager-owned): typed conditional variants, sender CVDA domain/alias ownership, pool-relative length bounds, value-dependent constraints, output ownership, browse mode and independent case preconditions/fixtures. Preserve current facts in bounded prose/candidates; do not interpret them as a workflow/predicate DSL.",
         "Linked unpinned SNA/3270, DFHAID/DFHBMSCA/copybook, ESM reason-code, secure-signon and detailed browse/security/argument contexts remain unresolved. Missing literal fragments dfhp743/dfhp73u/dfhp74k/dfhp74l/dfhp74m/dfhp73i are not repaired by matching page headings. No refresh or source closure claim.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
-        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit."
+        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
+        "Pending domain qualification: SESSNSTATUS is an optional receiver reporting whether the selected conversation session was newly bound; its two symbols do not select a pool mode, promise session capacity or imply a requested receiver. TARGET omission still requires a single target or an all-suitable pool. Absent/zero source TIMEOUT remains subject to existing host bounds. Numeric encodings, receiver storage identity and runtime/version admission remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp747.html; sha256:093bedea8af6965ee46c24ebecb3ff56d778612db437333f4888a8e1c5b59e57; complete parser body 1-62]."
       ]
     },
     {
@@ -2809,6 +2825,57 @@
               "POOL"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ENDSTATUS",
+            "values": [
+              "CD",
+              "EB",
+              "LIC",
+              "MORE",
+              "RU"
+            ],
+            "source_lines": [
+              34,
+              36,
+              39,
+              41,
+              43,
+              45,
+              47
+            ]
+          },
+          {
+            "option": "FMHSTATUS",
+            "values": [
+              "FMH",
+              "NOFMH"
+            ],
+            "source_lines": [
+              55,
+              57,
+              58,
+              59
+            ]
+          },
+          {
+            "option": "RESPSTATUS",
+            "values": [
+              "DEFRESP1",
+              "DEFRESP2",
+              "DEFRESP3",
+              "NONE"
+            ],
+            "source_lines": [
+              87,
+              89,
+              92,
+              94,
+              96,
+              98
+            ]
           }
         ]
       },
@@ -5511,7 +5578,8 @@
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
         "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
         "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer.",
-        "RESP2/40 prose spells FROMLENGTH whereas the declared operand is FROMFLENGTH. Preserve primary command option/condition locators; no additional invented FROMLENGTH operand or silent licensed-source correction."
+        "RESP2/40 prose spells FROMLENGTH whereas the declared operand is FROMFLENGTH. Preserve primary command option/condition locators; no additional invented FROMLENGTH operand or silent licensed-source correction.",
+        "Pending domain qualification: ENDSTATUS is the command paragraph union, not a promise that every member can occur in every ending option or temporary POOL variant. The temporary-pool paragraph ends at CD/EB and discards excess inbound data; pinned ending context also describes an area-full end and excludes LIC/RU from that temporary variant. RU is RU-option-local; FMHSTATUS and RESPSTATUS report distinct received facts, not automatic reply or completion. Exact variant/ending-condition precedence, optional receiver storage identity and numeric encodings remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp748.html; sha256:29dc747063cb0d24bfab5a4cc6823aa2c613abc79a01f1bbd719f66f2bb16459; complete parser body 1-187]. Ending context [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html; sha256:2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60; parser 6-159] retains variant-specific table/prose; no automatic reply, recovery or remote completion is inferred."
       ]
     },
     {
@@ -5819,6 +5887,53 @@
               "KEYSTROKES"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ALARMSTATUS",
+            "values": [
+              "ALARM",
+              "NOALARM"
+            ],
+            "source_lines": [
+              40,
+              42,
+              43,
+              44
+            ]
+          },
+          {
+            "option": "ENDSTATUS",
+            "values": [
+              "CD",
+              "EB",
+              "LIC"
+            ],
+            "source_lines": [
+              50,
+              52,
+              55,
+              57,
+              59
+            ]
+          },
+          {
+            "option": "RESPSTATUS",
+            "values": [
+              "DEFRESP1",
+              "DEFRESP2",
+              "DEFRESP3",
+              "NONE"
+            ],
+            "source_lines": [
+              107,
+              109,
+              112,
+              114,
+              116,
+              118
+            ]
           }
         ]
       },
@@ -9424,7 +9539,8 @@
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
         "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
         "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer.",
-        "RESP2/40 prose spells FROMLENGTH whereas the declared operand is FROMFLENGTH. Preserve primary command option/condition locators; no additional invented FROMLENGTH operand or silent licensed-source correction."
+        "RESP2/40 prose spells FROMLENGTH whereas the declared operand is FROMFLENGTH. Preserve primary command option/condition locators; no additional invented FROMLENGTH operand or silent licensed-source correction.",
+        "Pending domain qualification: ALARMSTATUS, ENDSTATUS and RESPSTATUS are distinct optional outputs for this formatted SLU2 command. POOL requires KEYSTROKES, does not permit AID, and ends at CD/EB; allocated-conversation outcomes are not temporary-pool outcomes. ENDSTATUS LIC remains in the own command paragraph but the pinned ending table excludes LIC for temporary POOL. Exact endpoint/response precedence, null-AID versus final-attention conflict, changed-ESCAPE byte validation, numeric encodings and optional receiver storage identity remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp749.html; sha256:76799890aa7515442ae0df87761eec0cc521dbc098da4cb936ab86d1a4f93d9d; complete parser body 1-229]. Ending context [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html; sha256:2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60; parser 6-159] retains variant-specific table/prose; no automatic reply, recovery or remote completion is inferred."
       ]
     },
     {
@@ -9548,7 +9664,56 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "DEVICE",
+            "values": [
+              "LUP",
+              "T3278M2",
+              "T3278M3",
+              "T3278M4",
+              "T3278M5",
+              "T3279M2",
+              "T3279M3",
+              "T3279M4",
+              "T3279M5",
+              "TPS55M2",
+              "TPS55M3",
+              "TPS55M4"
+            ],
+            "source_lines": [
+              12,
+              14,
+              17,
+              19,
+              21,
+              23,
+              25,
+              27,
+              29,
+              31,
+              33,
+              35,
+              37,
+              39
+            ]
+          },
+          {
+            "option": "FORMAT",
+            "values": [
+              "DATASTREAM",
+              "FORMATTED"
+            ],
+            "source_lines": [
+              41,
+              42,
+              43,
+              44,
+              45
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -10549,7 +10714,8 @@
         "Schema extension request (manager-owned): typed conditional variants, sender CVDA domain/alias ownership, pool-relative length bounds, value-dependent constraints, output ownership, browse mode and independent case preconditions/fixtures. Preserve current facts in bounded prose/candidates; do not interpret them as a workflow/predicate DSL.",
         "Linked unpinned SNA/3270, DFHAID/DFHBMSCA/copybook, ESM reason-code, secure-signon and detailed browse/security/argument contexts remain unresolved. Missing literal fragments dfhp743/dfhp73u/dfhp74k/dfhp74l/dfhp74m/dfhp73i are not repaired by matching page headings. No refresh or source closure claim.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
-        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit."
+        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
+        "Pending domain qualification: DEVICE is exactly this EXTRACT CONV paragraph list, including T3279M4/T3279M5 and LUP; it is not an installable pool-property list or a device capability inference. FORMAT is returned in SLU2 mode only; no FORMAT value or inapplicability verdict is invented for SLU P. Numeric encodings, optional receiver storage identity and exact device/service-level admission remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74a.html; sha256:f3da0cc9dae3f6f264c7be462b58badbbf5b55f61d77ec4614f542c3d45c866e; complete parser body 1-67]."
       ]
     },
     {
@@ -10805,6 +10971,34 @@
               "FIELDNUM"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "MDT",
+            "values": [
+              "MDT",
+              "NOMDT"
+            ],
+            "source_lines": [
+              46,
+              48,
+              49,
+              50
+            ]
+          },
+          {
+            "option": "PROTECT",
+            "values": [
+              "PROTECTED",
+              "UNPROTECTED"
+            ],
+            "source_lines": [
+              57,
+              59,
+              60,
+              61
+            ]
           }
         ]
       },
@@ -12516,7 +12710,8 @@
         "Field attribute value domains need pinned 3270/DFHBMSCA authority; field-count/location constraints depend on the actual screen. The broad any-point description (primary 4) coexists with /224 restriction (86-87), not an unconditional right to bypass flow state. Zero MAXFLENGTH conflict with [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; cics-fepi-context-candidates; SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html; sha256:0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4; parser lines 5-398,409-705] lines 495-497 remains pending.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
         "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
-        "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer."
+        "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer.",
+        "Pending domain qualification: MDT and PROTECT report attributes of the selected field in the current simulated terminal buffer for formatted SLU2. FIELDLOC/FIELDNUM and actual optional output receivers remain distinct; these domains do not populate omitted receivers or change field numbering/buffer limits. One-byte BMS/color/highlight attributes have no four-byte domain added. Their linked copybook pins, numeric encodings and receiver storage identity remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74b.html; sha256:d3dfa883dbef0c89e35bb95edccb797488e17982885bfe8c267ca9a9258446cf; complete parser body 1-91]."
       ]
     },
     {
@@ -12613,7 +12808,24 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "STSNSTATUS",
+            "values": [
+              "NOSTSN",
+              "STSNSET",
+              "STSNTEST"
+            ],
+            "source_lines": [
+              16,
+              18,
+              21,
+              23,
+              25
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -13385,7 +13597,8 @@
         "Schema extension request (manager-owned): typed conditional variants, sender CVDA domain/alias ownership, pool-relative length bounds, value-dependent constraints, output ownership, browse mode and independent case preconditions/fixtures. Preserve current facts in bounded prose/candidates; do not interpret them as a workflow/predicate DSL.",
         "Linked unpinned SNA/3270, DFHAID/DFHBMSCA/copybook, ESM reason-code, secure-signon and detailed browse/security/argument contexts remain unresolved. Missing literal fragments dfhp743/dfhp73u/dfhp74k/dfhp74l/dfhp74m/dfhp73i are not repaired by matching page headings. No refresh or source closure claim.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
-        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit."
+        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
+        "Pending domain qualification: STSNSTATUS reports the current sequence-number set/test status of this caller-owned SLU P conversation; STSNSET versus STSNTEST preserves set versus test-and-set meaning. It is not a command selector or a session recovery guarantee. Numeric encodings and optional receiver storage identity remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74c.html; sha256:b89d16aeca58f6fb2ef2cd32ef6c7b09a5745835ff56842dab9fb927fed96cf1; complete parser body 1-38]."
       ]
     },
     {
@@ -14852,7 +15065,92 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ACQSTATUS",
+                  "values": [
+                    "ACQUIRED",
+                    "ACQUIRING",
+                    "RELEASED",
+                    "RELEASING"
+                  ],
+                  "source_lines": [
+                    38,
+                    40,
+                    41,
+                    43,
+                    46,
+                    48
+                  ]
+                },
+                {
+                  "option": "INSTLSTATUS",
+                  "values": [
+                    "INSTALLED",
+                    "NOTINSTALLED"
+                  ],
+                  "source_lines": [
+                    56,
+                    58,
+                    59,
+                    62
+                  ]
+                },
+                {
+                  "option": "SERVSTATUS",
+                  "values": [
+                    "GOINGOUT",
+                    "INSERVICE",
+                    "OUTSERVICE"
+                  ],
+                  "source_lines": [
+                    73,
+                    75,
+                    76,
+                    78,
+                    83
+                  ]
+                },
+                {
+                  "option": "STATE",
+                  "values": [
+                    "APPLICATION",
+                    "BEGINSESSION",
+                    "FREE",
+                    "NOCONV",
+                    "PENDBEGIN",
+                    "PENDDATA",
+                    "PENDFREE",
+                    "PENDPASS",
+                    "PENDRELEASE",
+                    "PENDSTART",
+                    "PENDSTSN",
+                    "PENDUNSOL",
+                    "RELEASE",
+                    "STSN",
+                    "UNSOLDATA"
+                  ],
+                  "source_lines": [
+                    86,
+                    89,
+                    91,
+                    93,
+                    95,
+                    97,
+                    99,
+                    101,
+                    103,
+                    106,
+                    109,
+                    112,
+                    115,
+                    118,
+                    120,
+                    122
+                  ]
+                }
+              ]
             },
             "source_lines": [
               5,
@@ -15036,7 +15334,92 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ACQSTATUS",
+                  "values": [
+                    "ACQUIRED",
+                    "ACQUIRING",
+                    "RELEASED",
+                    "RELEASING"
+                  ],
+                  "source_lines": [
+                    38,
+                    40,
+                    41,
+                    43,
+                    46,
+                    48
+                  ]
+                },
+                {
+                  "option": "INSTLSTATUS",
+                  "values": [
+                    "INSTALLED",
+                    "NOTINSTALLED"
+                  ],
+                  "source_lines": [
+                    56,
+                    58,
+                    59,
+                    62
+                  ]
+                },
+                {
+                  "option": "SERVSTATUS",
+                  "values": [
+                    "GOINGOUT",
+                    "INSERVICE",
+                    "OUTSERVICE"
+                  ],
+                  "source_lines": [
+                    73,
+                    75,
+                    76,
+                    78,
+                    83
+                  ]
+                },
+                {
+                  "option": "STATE",
+                  "values": [
+                    "APPLICATION",
+                    "BEGINSESSION",
+                    "FREE",
+                    "NOCONV",
+                    "PENDBEGIN",
+                    "PENDDATA",
+                    "PENDFREE",
+                    "PENDPASS",
+                    "PENDRELEASE",
+                    "PENDSTART",
+                    "PENDSTSN",
+                    "PENDUNSOL",
+                    "RELEASE",
+                    "STSN",
+                    "UNSOLDATA"
+                  ],
+                  "source_lines": [
+                    86,
+                    89,
+                    91,
+                    93,
+                    95,
+                    97,
+                    99,
+                    101,
+                    103,
+                    106,
+                    109,
+                    112,
+                    115,
+                    118,
+                    120,
+                    122
+                  ]
+                }
+              ]
             },
             "source_lines": [
               16,
@@ -15222,7 +15605,92 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "ACQSTATUS",
+                  "values": [
+                    "ACQUIRED",
+                    "ACQUIRING",
+                    "RELEASED",
+                    "RELEASING"
+                  ],
+                  "source_lines": [
+                    38,
+                    40,
+                    41,
+                    43,
+                    46,
+                    48
+                  ]
+                },
+                {
+                  "option": "INSTLSTATUS",
+                  "values": [
+                    "INSTALLED",
+                    "NOTINSTALLED"
+                  ],
+                  "source_lines": [
+                    56,
+                    58,
+                    59,
+                    62
+                  ]
+                },
+                {
+                  "option": "SERVSTATUS",
+                  "values": [
+                    "GOINGOUT",
+                    "INSERVICE",
+                    "OUTSERVICE"
+                  ],
+                  "source_lines": [
+                    73,
+                    75,
+                    76,
+                    78,
+                    83
+                  ]
+                },
+                {
+                  "option": "STATE",
+                  "values": [
+                    "APPLICATION",
+                    "BEGINSESSION",
+                    "FREE",
+                    "NOCONV",
+                    "PENDBEGIN",
+                    "PENDDATA",
+                    "PENDFREE",
+                    "PENDPASS",
+                    "PENDRELEASE",
+                    "PENDSTART",
+                    "PENDSTSN",
+                    "PENDUNSOL",
+                    "RELEASE",
+                    "STSN",
+                    "UNSOLDATA"
+                  ],
+                  "source_lines": [
+                    86,
+                    89,
+                    91,
+                    93,
+                    95,
+                    97,
+                    99,
+                    101,
+                    103,
+                    106,
+                    109,
+                    112,
+                    115,
+                    118,
+                    120,
+                    122
+                  ]
+                }
+              ]
             },
             "source_lines": [
               16,
@@ -15301,6 +15769,91 @@
             },
             "source_lines": [
               15
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACQSTATUS",
+            "values": [
+              "ACQUIRED",
+              "ACQUIRING",
+              "RELEASED",
+              "RELEASING"
+            ],
+            "source_lines": [
+              38,
+              40,
+              41,
+              43,
+              46,
+              48
+            ]
+          },
+          {
+            "option": "INSTLSTATUS",
+            "values": [
+              "INSTALLED",
+              "NOTINSTALLED"
+            ],
+            "source_lines": [
+              56,
+              58,
+              59,
+              62
+            ]
+          },
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "GOINGOUT",
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              73,
+              75,
+              76,
+              78,
+              83
+            ]
+          },
+          {
+            "option": "STATE",
+            "values": [
+              "APPLICATION",
+              "BEGINSESSION",
+              "FREE",
+              "NOCONV",
+              "PENDBEGIN",
+              "PENDDATA",
+              "PENDFREE",
+              "PENDPASS",
+              "PENDRELEASE",
+              "PENDSTART",
+              "PENDSTSN",
+              "PENDUNSOL",
+              "RELEASE",
+              "STSN",
+              "UNSOLDATA"
+            ],
+            "source_lines": [
+              86,
+              89,
+              91,
+              93,
+              95,
+              97,
+              99,
+              101,
+              103,
+              106,
+              109,
+              112,
+              115,
+              118,
+              120,
+              122
             ]
           }
         ]
@@ -16848,7 +17401,8 @@
         "NODE/TARGET direction remains unresolved in the preserved union inventory; the current frozen @1 vocabulary now expresses five source-bounded forms. Named form requires both eight-byte input names; START/END use their browse selector; NEXTNODE/NEXTTARGET require both eight-byte writable receivers and return the source-specific next connection. Value-dependent domains, browse owner/concurrency and mutation visibility, exact unpinned common browse contexts, and the retained ILLOGIC/1 body-versus-overview contradiction remain pending. Structural forms confer no execution or licensed credit; manager owns generated projection and the actual schema instance gate. [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; cics-fepi-command-bodies; SSJL4D_6.x/reference-applications/commands-fepi/dfhp734.html; sha256:b1eb0b837466f42cd80e3dcfff995106c6d276134f20c19b4f68046e9e0551c1; parser lines 10-33]",
         "Primary ILLOGIC/1 says NEXT or INQUIRE when END was not issued (143-144); [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; cics-fepi-context-candidates; SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html; sha256:0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4; parser lines 5-398,409-705] lines 416-424 says NEXT or END when START was not issued. Retain both exact pins and predicates pending; no numeric precedence or silent correction. Named/NEXT/START/END ownership/output/default-handling and browse under concurrent topology change need shared browse/source closure.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
-        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit."
+        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
+        "Pending domain qualification: ACQSTATUS, INSTLSTATUS, SERVSTATUS and STATE are optional outputs for named and NEXTNODE/NEXTTARGET, whose output option set is the same in this own body; START/END have no such output domain. Installation/pool or node/target discard, requested-versus-achieved acquire/service state, and pending scheduled-versus-owning tasks stay distinct. Persisting pending states require source-described operator/application consideration, not automatic redispatch. Domains do not request omitted receivers. Numeric encodings, actual receiver storage and licensed/version admission remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp734.html; sha256:b1eb0b837466f42cd80e3dcfff995106c6d276134f20c19b4f68046e9e0551c1; complete parser body 1-161]."
       ]
     },
     {
@@ -16946,7 +17500,64 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "CONTROL",
+            "values": [
+              "ATTENTION",
+              "CANCEL",
+              "EXCEPTRESP",
+              "LUSTAT",
+              "NORMALRESP",
+              "RTR",
+              "STSN"
+            ],
+            "source_lines": [
+              13,
+              17,
+              20,
+              22,
+              25,
+              27,
+              30,
+              33,
+              35,
+              38,
+              40
+            ]
+          },
+          {
+            "option": "VALUE",
+            "values": [
+              "DEFRESP1",
+              "DEFRESP1OR2",
+              "DEFRESP2",
+              "DEFRESP3",
+              "INVALID",
+              "NEGATIVE",
+              "POSITIVE",
+              "RESET"
+            ],
+            "source_lines": [
+              48,
+              52,
+              55,
+              57,
+              59,
+              61,
+              63,
+              66,
+              68,
+              70,
+              72,
+              74,
+              76,
+              78,
+              80
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -18371,7 +18982,8 @@
         "Linked unpinned SNA/3270, DFHAID/DFHBMSCA/copybook, ESM reason-code, secure-signon and detailed browse/security/argument contexts remain unresolved. Missing literal fragments dfhp743/dfhp73u/dfhp74k/dfhp74l/dfhp74m/dfhp73i are not repaired by matching page headings. No refresh or source closure claim.",
         "CONTROL/VALUE/SENSEDATA requiredness is value/state-dependent and cannot be represented with unconditional dependencies. Sender CVDA bare aliases are documented by [ibm-cics-ts-6x-application-api-sources-b-2026-09-10; cics-application-api-sources-b; SSJL4D_6.x/system-programming/intro/dfha80x.html; sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; parser lines 7-27] but omitted in this diagram; alias/domain ownership requires the manager shared typed grammar extension, not invented flag dispatch.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
-        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit."
+        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
+        "Pending domain qualification: CONTROL is a mode-qualified union: NORMALRESP/EXCEPTRESP/ATTENTION/LUSTAT for all modes; CANCEL for data stream only; STSN/RTR for SLU P only. VALUE is a CONTROL-qualified union: NORMALRESP/EXCEPTRESP permit DEFRESP1OR2/DEFRESP1/DEFRESP2/DEFRESP3; STSN permits POSITIVE/NEGATIVE/INVALID/RESET/DEFRESP2/DEFRESP3; other controls do not use VALUE (None is omission, not a symbol). SENSEDATA belongs to LUSTAT/EXCEPTRESP. INVALID/RESET unbind the session. Domains are not a Cartesian product or phase admission rule; existing /80-/95 predicates remain. Typed mode/control/phase constraints, numeric aliases and future execution remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74e.html; sha256:bb98f54aec211f7bea2dee72ebf642faf7968390756ef38740b98335e8c389d1; complete parser body 1-128]."
       ]
     },
     {
@@ -18576,7 +19188,58 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "ENDSTATUS",
+            "values": [
+              "CD",
+              "EB",
+              "LIC",
+              "MORE",
+              "RU"
+            ],
+            "source_lines": [
+              23,
+              25,
+              28,
+              30,
+              32,
+              34,
+              36
+            ]
+          },
+          {
+            "option": "FMHSTATUS",
+            "values": [
+              "FMH",
+              "NOFMH"
+            ],
+            "source_lines": [
+              44,
+              46,
+              47,
+              48
+            ]
+          },
+          {
+            "option": "RESPSTATUS",
+            "values": [
+              "DEFRESP1",
+              "DEFRESP2",
+              "DEFRESP3",
+              "NONE"
+            ],
+            "source_lines": [
+              61,
+              63,
+              66,
+              68,
+              70,
+              72
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -20368,7 +21031,8 @@
         "TIMEOUT is documented and generic [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; cics-fepi-context-candidates; SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html; sha256:0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4; parser lines 5-398,409-705] lines 661-662 defines RESP2 213, but this command condition table omits 213. SEQNUMIN/OUT headings say data-value while descriptions return values (primary lines 77-84); semantic output direction is retained with this label contradiction. No automatic numeric /213 completion claim.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
         "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
-        "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer."
+        "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer.",
+        "Pending domain qualification: ENDSTATUS, FMHSTATUS and RESPSTATUS are optional received outputs, not sender selections or temporary-POOL promises. ENDSTATUS varies with RU/CHAIN/UNTILCDEB (default CHAIN) and receive-area exhaustion; RU is RU-option-local. INTO/FLENGTH and inbound-only optional receivers remain as declared, without sender TOFLENGTH or missing output inference. TIMEOUT waits for data to begin arriving. Existing /213 and SEQNUM heading opposition is preserved. Exact ending/response precedence, numeric encodings and receiver storage identity remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74f.html; sha256:ec5a4ec1a0023c097344e690e559de1624b29364087d11b3a0e25e43ddd7ad9c; complete parser body 1-130]. Ending context [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html; sha256:2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60; parser 6-159] retains variant-specific table/prose; no automatic reply, recovery or remote completion is inferred."
       ]
     },
     {
@@ -20549,7 +21213,54 @@
             ]
           }
         ],
-        "alternative_groups": []
+        "alternative_groups": [],
+        "cvda_domains": [
+          {
+            "option": "ALARMSTATUS",
+            "values": [
+              "ALARM",
+              "NOALARM"
+            ],
+            "source_lines": [
+              18,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "option": "ENDSTATUS",
+            "values": [
+              "CD",
+              "EB",
+              "LIC"
+            ],
+            "source_lines": [
+              33,
+              35,
+              38,
+              40,
+              42
+            ]
+          },
+          {
+            "option": "RESPSTATUS",
+            "values": [
+              "DEFRESP1",
+              "DEFRESP2",
+              "DEFRESP3",
+              "NONE"
+            ],
+            "source_lines": [
+              62,
+              64,
+              67,
+              69,
+              71,
+              73
+            ]
+          }
+        ]
       },
       "responses": [
         {
@@ -22425,7 +23136,8 @@
         "FIELDS heading says data-value but description returns field count (primary 46-47); output direction follows the return verb. Body completes on LIC/EB/CD, whereas [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; cics-fepi-context-candidates; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html; sha256:2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60; parser lines 6-159] lines 43-44 says end of chain; preserve both without licensed equivalence. Screen-prefix/min-length behavior for RECEIVE is not inferred from CONVERSE TOFLENGTH note.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
         "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
-        "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer."
+        "Length operands are optional in this command syntax where shown on a bypass/optional branch. The primary body describes explicit lengths but does not establish language-specific omission/default inference here; resolve translator/language, actual supplied buffer extent and output receiver handling through pinned argument authority. Do not declare the optional length globally required or infer an unlimited buffer.",
+        "Pending domain qualification: ALARMSTATUS, ENDSTATUS and RESPSTATUS are optional received formatted-SLU2 outputs, without sender cursor/length or implicit omitted outputs. The primary says completion on LIC/EB/CD while pinned ending context says end of chain; both remain Pending without licensed equivalence or chosen precedence. TIMEOUT concerns data beginning to arrive. Numeric encodings, exact receiver storage and ending/response precedence remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74g.html; sha256:4eca4919f59609f34efc048fd2b3a10fb4dfa22487fd7b4442fbf990332b7186; complete parser body 1-125]. Ending context [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp74m.html; sha256:2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60; parser 6-159] retains variant-specific table/prose; no automatic reply, recovery or remote completion is inferred."
       ]
     },
     {
@@ -27345,6 +28057,34 @@
             ],
             "required": true
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACQSTATUS",
+            "values": [
+              "ACQUIRED",
+              "RELEASED"
+            ],
+            "source_lines": [
+              15,
+              18,
+              19,
+              22
+            ]
+          },
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              36,
+              38,
+              39,
+              41
+            ]
+          }
         ]
       },
       "responses": [
@@ -28990,7 +29730,8 @@
         "Linked unpinned SNA/3270, DFHAID/DFHBMSCA/copybook, ESM reason-code, secure-signon and detailed browse/security/argument contexts remain unresolved. Missing literal fragments dfhp743/dfhp73u/dfhp74k/dfhp74l/dfhp74m/dfhp73i are not repaired by matching page headings. No refresh or source closure claim.",
         "Selecting both NODELIST and TARGETLIST needs a source-backed connection-set expansion/order/duplicate/partial-failure fixture; do not infer a Cartesian product or total resource cap. Exact cross-list visit order and per-item failure precedence are unresolved. Common no-change error statement coexists with list partial success in [ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; cics-fepi-context-candidates; SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html; sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; parser lines 12-32,46-121] lines 102-121.",
         "Independent scalar case inputs describe bounded fixture bytes/output receiver names and preconditions; typed shared IR fixtures must resolve them before execution. A response-trigger fixture is not a production dispatch key or proof of reachable response precedence. Every case/gate is pending; generic infrastructure mappings cannot substitute for specific IBM conditions.",
-        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit."
+        "Derived CVDA numeric prose joins this primary command domain to pinned dfhp708 alphabetical values; it is a source expectation, not alias dispatch or a new enum/DSL. Shared typed domain and fixture extension is pending. Placeholder or overlapping-error byte fixtures, including DFHAID/3270/DBCS and final-attention precedence, remain explicitly unresolved before runtime credit.",
+        "Pending domain qualification: ACQSTATUS/SERVSTATUS are requested input domains only, not INQUIRE pending-state outputs; no ACQUIRING/RELEASING/GOINGOUT input is added. The bare ACQUIRED/RELEASED/INSERVICE/OUTSERVICE flags retain their original declaration and receive no domain. Omitted acquire/service options leave that state unchanged. Request completion precedes actual bind/unbind/drain, with owned versus unowned conversation release distinct; existing conversations survive OUTSERVICE. NODELIST/TARGETLIST item bounds are not total resource caps; partial failure remains possible. USERDATA is not used by FEPI and replaces prior data. Source not-audited does not discharge durable product audit. Numeric alias equivalence, list order/failure precedence, actual drain/recovery and licensed execution remain Pending. Own authority [ibm-cics-ts-6x-fepi-command-bodies-2026-09-12; SSJL4D_6.x/reference-applications/commands-fepi/dfhp73d.html; sha256:338d1b625a39ba544b879c3a8035e3687797ff268b8fe2eff277cfc39aebf060; complete parser body 1-80]."
       ]
     },
     {

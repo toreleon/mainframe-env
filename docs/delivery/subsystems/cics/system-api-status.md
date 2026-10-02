@@ -3260,3 +3260,62 @@ including the common condition-name/RESP authority. Private 305-command projecti
 (266 SPI and 39 FEPI), 5082 operands/8947 case candidates and all 62 numeric
 domains/217 numeric records remain unchanged. FEPI session and pool/resource
 source children retain independent manager integration gates; runtime pending.
+
+### Pre-dispatch application dependency evidence audit
+
+SPI-1001.application-dependency-evidence-audit is a bounded read-only dependency audit, not implementation or semantic acceptance. Exact scope: cics.application-api prerequisite on sealed68 v010 integration candidate fa0709419d9848d5b4911e11e43f54d82222f317, fetched main213ed878ec138bdb2914330db6613559bffc5a86, existing263 catalog identities and260 typed baseline; user explicitly defers only CICSMESSAGE0027,GETNEXT TIMER0093,ISSUE COPY0114 and requests accelerated v010. Do not implement, delete, reclassify or quietly accept those three. Distinguish actual application integration/start gate from formal full application completion, licensed acceptance and merely typed advertised counts. Read current full application status/plan/prompt,system start/integration dependency contracts, DEPENDENCIES and applicable existing shared CICS/security/UOW/effect/recovery/condition/product-route acceptance requirements. Inspect actual current code and exact retained evidence by candidate/input hash, tests/receipts/selected-route/recovery/backend matrix; historical green or source receipts don't prove currentcandidate. Determine every concrete remaining prerequisite with path/line, criterion, actual proof, hash/candidate binding and honest missing status. Verify actual per-row mappings/readiness rather than counts. Audit which receipt is required to start private SPI/FEPI runtime work and what non-conflicting shared-contract work is independently dependency-ready. Identify smallest concrete implementation/test slice that moves whole v010 objective forward under existing owners, not a narrower terminal goal or invented generic-success/private shadow subsystem. Preserve required licensed differential Pending0 under user's instruction to omit unavailable licensed CICS; no license bypass/fabrication/newnotapplicable. Parent/all269SPI39FEPI remainPending. No newly accepted applicationclaim without evidence. Existing v010305privategrammar/runtime0 is source preparation, not execution. Review core actual runtime/shared owners and existing private named PROGRAM STATUS route if relevant, retain its limits rather than restart sealedwork. Report exact current versus historical input compatibility and concrete next work, not a status restatement or speculative large plan. This scope may read relevant pinned sources offline via search/read for any semantic recommendation; matching retained bodies only, norefresh/repin/browser/network/license. No whole-cache audit or new exploratory suite. Ownership repository/index/cache/history/current manager files READONLY; external /Users/tore/.codex/worker-runs/v010-20261002/application-dependency-evidence-audit only. Manager soleowner shared schemas/generator/IR/facades/status/security/UOW/runtime/integration. Dependencies sealed68 sourceprojection/commonconditiongate and three explicitly deferred identities; never equate source-child seals with accepted parent. No build/test/lint/repositorygenerator/stage/commit/seal/install or workerdelegation. Read full objective and newest frozen declaration/status; no overlapping manager MONITOR/FEPI source-domain proof investigation. Handoff requirements: dependency-requirements.json criterion-by-criterion evidence disposition, current-input-identities.json, actual-read/receipt identities, findings.json exact actionable blockers versus sourcequalifications, and concise handoff.md with concrete dependency-ready nextaction. Stop bounded audit.
+Exact application selector: conformance/0.9/cics/command-descriptors.json SHA-256 af06985dba30c6fd7f8dab88886340b3b4fa88ad5b770ef287201b7e172ea948, application_catalog.commands[*].official_row (263 unique rows, unit api-commands, baseline ibm-cics-ts-6x-2026-08-31); the complete immutable row list and labels are frozen in /Users/tore/.codex/worker-runs/v010-20261002/application-dependency-evidence-audit/exact-row-scope.json. Deferred exact rows: ibm-cics-ts-6x-2026-08-31:api-commands:0027 CICSMESSAGE, ibm-cics-ts-6x-2026-08-31:api-commands:0093 GETNEXT TIMER, ibm-cics-ts-6x-2026-08-31:api-commands:0114 ISSUE COPY. All other 260 identity mappings remain within read-only audit scope.
+
+FEPI session integration child SPI-1001.fepi-session-cvda-domains is manager-owned
+after different-thread independent review of exactly 25 additions: 14 arrays
+with 26 parent domains/106 members and 12 existing-form domains/72 members, plus
+11 precise Pending gaps. All 19 rows, 222 parent operands, 380 response records,
+five forms, 779 whole cases/obligation objects and 272 original gaps retain exact
+values/types/key/array/ID order. Eight whole commands are unchanged. Whole-byte
+forward/reverse delta replay and standalone full-snapshot reconstruction and
+reversal are exact; all 493 current artifact references were hash-verified,
+including repository blobs at declared author/reviewer bases. Manager consumed
+all 25 complete additions and 30 full qualifier records, the 11 independent gap
+reasons and eight retained FSR dispositions. Fresh manager offline consultation
+used 25 successful search/read calls on 12 exact pinned topics, with all 13
+actual pages/1460 parser lines read completely. The unchanged common dfha80x
+fullword/direction source and exact prior read receipt were reused after hash
+verification, without relabeling historical consultation as current execution.
+Primary baseline ibm-cics-ts-6x-fepi-command-bodies-2026-09-12, ending context
+ibm-cics-ts-6x-fepi-context-candidates-2026-09-12 dfhp74m hash
+2f5c45518008e0f9b5e090fde7030a916ff4374d472d65225790ece0c64a3c60;
+common CVDA uses sources-b 2026-09-10. Exact own catalog row/topic/hash identities
+stay in fepi-session-data.json. Publication references provide no execution credit.
+ISSUE CONTROL/VALUE lists remain mode/control-qualified unions, with omission
+distinct from NONE and no Cartesian product or phase-precedence inference.
+Allocated and temporary CONVERSE endings differ; the complete raw dfhp74m table
+excludes LIC/RU for temporary POOL and MORE for formatted commands. Own RECEIVE
+FORMATTED LIC/EB/CD completion versus context end-chain wording stays both-authority
+Pending. EXTRACT DEVICE has its own twelve names without implying installable
+property/device capabilities; FORMAT stays SLU2-qualified. Optional receiver
+requests, current-buffer field geometry, caller-owned CONVID, sequence-number
+set/test, scheduled versus owning tasks and pending acquire/service states remain
+distinct. SET has only requested ACQUIRED/RELEASED and INSERVICE/OUTSERVICE;
+omission retains the respective state. Immediate request return does not mean
+achieved bind/unbind/drain. Existing conversations survive OUTSERVICE; unowned
+and owned conversations release differently. Item-list bounds are not total
+resource caps, partial list failure stays possible and source not-audited does
+not discharge durable product audit. Prior response/case repairs remain exact;
+unknown contexts/pins, numeric encoding/ABI, receiver storage, version/service
+admission, precedence, cancellation, caller rollback and physical recovery stay
+Pending. No operand/form/case, numeric binding, request handler or runtime route
+is added. Manager solely owns schemas/types/generator/IR/status/shared authorities
+and serialized integration. Only this bounded source child seals after actual
+family/projection/focused/mandatory gates. Parent/application/selected route/
+recovery/restart/licensed and all six command gates remain Pending, credit0.
+The three user-deferred v0.9 rows0027/0093/0114 remain catalogued and Pending.
+The application evidence audit declaration present before this integration is
+preserved; its separate reviewer has no shared-path ownership.
+
+FEPI session integrated source candidate passes 31 generator and nine IR
+regressions, the actual Draft202012 FEPI-session instance and all 18 actual
+family instances, including the common condition-name/RESP authority. Private
+305-command projection (266 SPI and 39 FEPI), 5082 operands/8947 case candidates
+and all 62 numeric domains/217 numeric records remain unchanged. FEPI pool/resource
+extent/domain review and application dependency audit retain separate gates;
+runtime and parent acceptance remain Pending.

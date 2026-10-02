@@ -93,6 +93,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TIMEOUT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "SESSNSTATUS", values: &["NEWSESSION", "OLDSESSION"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -166,6 +167,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "UNTILCDEB", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ENDSTATUS", values: &["CD", "EB", "LIC", "MORE", "RU"] },
+            CicsApplicationCvdaDomain { option: "FMHSTATUS", values: &["FMH", "NOFMH"] },
+            CicsApplicationCvdaDomain { option: "RESPSTATUS", values: &["DEFRESP1", "DEFRESP2", "DEFRESP3", "NONE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -217,6 +221,9 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TOFLENGTH", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ALARMSTATUS", values: &["ALARM", "NOALARM"] },
+            CicsApplicationCvdaDomain { option: "ENDSTATUS", values: &["CD", "EB", "LIC"] },
+            CicsApplicationCvdaDomain { option: "RESPSTATUS", values: &["DEFRESP1", "DEFRESP2", "DEFRESP3", "NONE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -409,6 +416,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TARGET", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(8) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "DEVICE", values: &["LUP", "T3278M2", "T3278M3", "T3278M4", "T3278M5", "T3279M2", "T3279M3", "T3279M4", "T3279M5", "TPS55M2", "TPS55M3", "TPS55M4"] },
+            CicsApplicationCvdaDomain { option: "FORMAT", values: &["DATASTREAM", "FORMATTED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -455,6 +464,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "VALIDATION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(1) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "MDT", values: &["MDT", "NOMDT"] },
+            CicsApplicationCvdaDomain { option: "PROTECT", values: &["PROTECTED", "UNPROTECTED"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -489,6 +500,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "STSNSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "STSNSTATUS", values: &["NOSTSN", "STSNSET", "STSNTEST"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -564,6 +576,10 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WAITCONVNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "ACQSTATUS", values: &["ACQUIRED", "ACQUIRING", "RELEASED", "RELEASING"] },
+            CicsApplicationCvdaDomain { option: "INSTLSTATUS", values: &["INSTALLED", "NOTINSTALLED"] },
+            CicsApplicationCvdaDomain { option: "SERVSTATUS", values: &["GOINGOUT", "INSERVICE", "OUTSERVICE"] },
+            CicsApplicationCvdaDomain { option: "STATE", values: &["APPLICATION", "BEGINSESSION", "FREE", "NOCONV", "PENDBEGIN", "PENDDATA", "PENDFREE", "PENDPASS", "PENDRELEASE", "PENDSTART", "PENDSTSN", "PENDUNSOL", "RELEASE", "STSN", "UNSOLDATA"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -618,6 +634,10 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "WAITCONVNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ACQSTATUS", values: &["ACQUIRED", "ACQUIRING", "RELEASED", "RELEASING"] },
+                    CicsApplicationCvdaDomain { option: "INSTLSTATUS", values: &["INSTALLED", "NOTINSTALLED"] },
+                    CicsApplicationCvdaDomain { option: "SERVSTATUS", values: &["GOINGOUT", "INSERVICE", "OUTSERVICE"] },
+                    CicsApplicationCvdaDomain { option: "STATE", values: &["APPLICATION", "BEGINSESSION", "FREE", "NOCONV", "PENDBEGIN", "PENDDATA", "PENDFREE", "PENDPASS", "PENDRELEASE", "PENDSTART", "PENDSTSN", "PENDUNSOL", "RELEASE", "STSN", "UNSOLDATA"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -652,6 +672,10 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "WAITCONVNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ACQSTATUS", values: &["ACQUIRED", "ACQUIRING", "RELEASED", "RELEASING"] },
+                    CicsApplicationCvdaDomain { option: "INSTLSTATUS", values: &["INSTALLED", "NOTINSTALLED"] },
+                    CicsApplicationCvdaDomain { option: "SERVSTATUS", values: &["GOINGOUT", "INSERVICE", "OUTSERVICE"] },
+                    CicsApplicationCvdaDomain { option: "STATE", values: &["APPLICATION", "BEGINSESSION", "FREE", "NOCONV", "PENDBEGIN", "PENDDATA", "PENDFREE", "PENDPASS", "PENDRELEASE", "PENDSTART", "PENDSTSN", "PENDUNSOL", "RELEASE", "STSN", "UNSOLDATA"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
@@ -686,6 +710,10 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "WAITCONVNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "ACQSTATUS", values: &["ACQUIRED", "ACQUIRING", "RELEASED", "RELEASING"] },
+                    CicsApplicationCvdaDomain { option: "INSTLSTATUS", values: &["INSTALLED", "NOTINSTALLED"] },
+                    CicsApplicationCvdaDomain { option: "SERVSTATUS", values: &["GOINGOUT", "INSERVICE", "OUTSERVICE"] },
+                    CicsApplicationCvdaDomain { option: "STATE", values: &["APPLICATION", "BEGINSESSION", "FREE", "NOCONV", "PENDBEGIN", "PENDDATA", "PENDFREE", "PENDPASS", "PENDRELEASE", "PENDSTART", "PENDSTSN", "PENDUNSOL", "RELEASE", "STSN", "UNSOLDATA"] },
                 ],
                 cvda_numeric_domains: &[
                 ],
