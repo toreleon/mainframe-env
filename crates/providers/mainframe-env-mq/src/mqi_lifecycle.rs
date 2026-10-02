@@ -8,6 +8,9 @@
 //! for retirement (via the existing pub/sub guard for reclamation). Durable UOW
 //! owners, recovery fences, authorization and coordinator decisions remain with
 //! their existing authorities. These volatile owners cannot identify durable work.
+//! Directory counters are unique only within this host OS process. Restart must
+//! advance the service's durably retained handle-registry epoch before exposure;
+//! resetting these counters is not a recovery or cross-process ABA fence.
 //!
 //! MQ 9.4 baseline ibm-mq-9.4-mqi-2026-08-31, rows 0008/0009/0012;
 //! q101760_, q101770_, q101800_: task/thread scope, process sharing and retirement.

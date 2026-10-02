@@ -51,6 +51,10 @@ The directory is volatile and not yet called by public dispatch. It attests no
 arbitrary Invocation or origin binding, gives no coordinator privileges, and
 cannot supply a durable UOW owner or recovery fence. The selected service must
 bind its real host authority, original effect, actual registry, SAF/security
-context and separately persisted UOW identity before advertising MQI. Restart
-creates fresh directory/registry identities; leases are not serialized. Kernel
-tests grant no official call coverage or licensed differential credit.
+context and separately persisted UOW identity before advertising MQI. Directory
+counters are unique only within one host OS process; resetting them on restart
+does not establish durable identity freshness or prevent cross-process ABA.
+Before exposing restarted dispatch, the service must advance its durably
+retained handle-registry epoch under its recovery authority. That service
+transition remains unimplemented here. Leases are not serialized. Kernel tests
+grant no official call coverage or licensed differential credit.

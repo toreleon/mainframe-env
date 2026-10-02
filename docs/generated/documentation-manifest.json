@@ -993,7 +993,7 @@
       "path": "docs/decisions/0030-mq-host-lifecycle-directory.md",
       "relative_links": 0,
       "scope": "volatile trusted-service composition, not public route acceptance",
-      "sha256": "sha256:687b04d5799f9c49a07b0d038c054efb7cfa98c96cce24bf58b0d596d0a21b4d",
+      "sha256": "sha256:0ca2fd1212ac74001aeefb02102870192a3e8c9d4273a94a94f61d518ae9cfb8",
       "status": "Proposed",
       "title": "Private MQ host lifecycle directory",
       "xtask_commands": 0
