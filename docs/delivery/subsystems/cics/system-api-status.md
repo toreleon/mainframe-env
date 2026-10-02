@@ -185,6 +185,11 @@ source-set baseline. Their H1 and syntax diagrams include REBUILD/RECORD;
 the shorter EIBFN row provides no joining link. An explicit pinned
 cross-reference or identity statement must establish equivalence before these
 rows can supply grammar authority. Prefix/filename similarity grants no credit.
+The bounded cross-reference follow-up is complete: five pinned reference topics
+and 22 markup fragments yielded no shorter-label bridge. Two statistics links
+target the RECORD page but their `#dfha81l` fragment is absent from the retained
+body. All three candidate dispositions remain unresolved; no extra unpinned
+source dependency or network refresh was introduced.
 
 Nine focused source-map tests pass, including rehashed mutation rejection and
 forbidden promotion of a qualified candidate. The existing application mapper
@@ -210,7 +215,8 @@ application source-review gate. Aggregate acceptance remains open:
   25,657 bytes; application catalog row 0011 ASSIGN). The repaired sources-a
   checker still reports the first missing topic. Restore those exact pinned
   HTML bytes externally, or explicitly authorize a refresh under the cache
-  runbook; no refresh or review-receipt regeneration occurred.
+  runbook; no refresh or review-receipt regeneration occurred. Both missing
+  topics belong to baseline `ibm-cics-ts-6x-application-api-sources-a-2026-09-10`.
 
 `SPI-1001.command-source-maps` is prepared but **unsealed** while these gates
 remain open. No generated `Work-Package=pass` trailer is claimed for this
@@ -349,10 +355,11 @@ remain **0/269 SPI and 0/39 FEPI**. The 0.9 public/runtime surface is unchanged.
 
 ## Next executable step
 
-Finish the bounded qualified cross-reference review. Keep the source-map
-checkpoint private and unsealed until the three SPI row equivalences, required
+Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001
 contracts. Application acceptance and licensed gates remain prerequisites to
 dependent runtime integration waves. Do not refresh sources or widen into
 unrelated application/batch implementation merely to clear these prerequisites.
+Independent source-context inventories may still be prepared from the sealed
+command-body pins, without consuming these candidates as semantic authority.
