@@ -169,6 +169,17 @@ allocation. Other encodings, delimiters, graphic and ordinary value families
 remain explicitly pending. This surface neither converts target values nor
 establishes defaults, collation, catalog/cell identities, execution or row credit.
 
+The string storage-assignment surface consumes those opaque literal proofs and
+validated CHAR/VARCHAR or BINARY/VARBINARY targets under explicit Unicode UTF-8
+MIXED or binary context. Fixed targets pad right with blanks or binary zeros;
+varying targets retain their actual length. Only excess character ASCII blanks
+may be removed; every oversized binary value fails. Natural empty strings stay
+nonnull and cannot serve as positive-length declared targets. Output budgets are
+checked before allocation, and returned proofs own source/target metadata, exact
+bytes, context and original locations. Other conversions fail explicitly as
+pending or incompatible, not through CCSID inference. This is storage preparation,
+not default binding, retrieval/host warning handling, durable cells or execution.
+
 The searched DELETE/UPDATE surfaces own qualified targets and optional common
 search conditions; UPDATE also owns unique single-column expression/DEFAULT/
 NULL assignments. Scalar/predicate structure is validated at every expression

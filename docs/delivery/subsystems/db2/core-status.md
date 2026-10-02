@@ -710,6 +710,24 @@ provides alias authority; main verified and read it locally. HFP values, IEEE ho
 conversion, floating literals/evaluation, exact SQL diagnostics, typed catalog and
 licensed differential remain required pending implementation and evidence.
 
+The manager declares `DB2-1202.string-storage-surface` to expose the separately
+sealed storage-assignment kernel without changing its production semantics.
+Exact ownership is provider `lib.rs`, new `tests/string_storage_assignment.rs`,
+README, this status, `changes/unreleased/db2-string-storage-surface.toml` and
+the derived documentation manifest. Independent public tests cover fixed/varying
+character and binary targets, empty nonnull values, byte-exact UTF-8 boundaries,
+NUL, X/BX family separation, excess-blank versus binary-overflow rules, explicit
+target encoding, nullable metadata, positive declared lengths, configured output
+budgets and immutable-owned provenance after source/target scope ends. Root
+exports make the existing proof authority reachable; no second converter is added.
+
+The pinned string-assignment topic cited above supplies storage rules, not
+retrieval-warning or SQLCA authority. Focused/package/MSRV, strict scoped Clippy,
+formatting, dependency policy/catalog/changelog/docs and exact-path sealing must
+pass before this public feature commit. Defaults, other encodings/ordinary
+families, typed durable cells/catalog, executor and licensed differentials remain
+pending; source review and local proofs grant no official row/gate credit.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

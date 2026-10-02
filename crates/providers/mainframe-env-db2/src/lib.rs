@@ -125,6 +125,10 @@ pub use syntax::{
     Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenCursor,
     Db2TokenKind, lex_db2, parse_db2_host_reference,
 };
+pub use type_system::string_constants::storage_assignment::{
+    Db2StoredStringConstant, Db2StringStorageContext, Db2StringStorageError,
+    Db2StringStorageErrorCode, Db2StringStorageLimits, store_db2_string_constant,
+};
 pub use type_system::string_constants::{
     Db2MixedData, Db2StringConstant, Db2StringConstantContext, Db2StringConstantEncoding,
     Db2StringConstantError, Db2StringConstantErrorCode, Db2StringConstantLimits,
