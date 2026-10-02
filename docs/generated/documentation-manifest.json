@@ -3,7 +3,7 @@
     "markdown_documents": 224,
     "navigation_groups": 6,
     "normative_documents": 58,
-    "xtask_commands": 225
+    "xtask_commands": 231
   },
   "documents": [
     {
@@ -1402,9 +1402,9 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 7,
-      "sha256": "sha256:59149ee78261fd7357ac0d6f69199f3190945a5af72bf176160024b0517cb5d5",
+      "sha256": "sha256:5fd4ef51902179225b508c20bc417862eadd6f818f3013a96977e9ea165a68fc",
       "title": "IMS — DB / TM programming surface progress",
-      "xtask_commands": 18
+      "xtask_commands": 24
     },
     {
       "normative": false,

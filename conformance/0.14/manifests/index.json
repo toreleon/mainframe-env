@@ -9,9 +9,9 @@
       "subsystem": "ims",
       "baseline_id": "ibm-ims-15.6-programming-contracts-2026-09-11",
       "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
-      "manifest_sha256": "sha256:5f84803886475a9c94736d73504fb5487d77381756b7fabe65451c952f90db48",
-      "topic_count": 26,
-      "topic_manifest_sha256": "sha256:a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594",
+      "manifest_sha256": "sha256:c5dc9991e9138a83cffdaee7760ed9ed788a3921ee318150c23c064f5e94fd32",
+      "topic_count": 27,
+      "topic_manifest_sha256": "sha256:119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182",
       "semantic_authority": false,
       "coverage_credit": 0
     },

@@ -3,15 +3,17 @@
 use super::*;
 use mainframe_env_execution_api::ServiceClass;
 use mainframe_env_host_api::{
-    ImsAcceptRow, ImsBufferPoolKind, ImsBufferStatistics, ImsCallSite, ImsCallSyntax,
-    ImsDatabaseOrganization, ImsDedbAreaDefinition, ImsExecutionContext, ImsPcbAvailability,
-    ImsPcbKind, ImsPositionArea, ImsPositionKeyword, ImsProcessingOptionClass, ImsQClass,
-    ImsSsaForm, ImsStatisticsFamily, ImsStatusContext, ImsSystemCall, ImsSystemRequest,
-    ImsSystemResult, ImsSystemRuntimeDefinition, resolve_ims_status, validate_ims_call_site,
+    ImsAcceptRow, ImsBufferStatistics, ImsCallSite, ImsCallSyntax, ImsDatabaseOrganization,
+    ImsDedbAreaDefinition, ImsExecutionContext, ImsPcbAvailability, ImsPcbKind, ImsPositionArea,
+    ImsPositionKeyword, ImsProcessingOptionClass, ImsQClass, ImsSsaForm, ImsStatisticsFamily,
+    ImsStatusContext, ImsSystemCall, ImsSystemRequest, ImsSystemResult, ImsSystemRuntimeDefinition,
+    resolve_ims_status, validate_ims_call_site,
 };
 
 const ROW_KEY: &str = "runtime";
 pub(super) mod reservations;
+
+mod stat;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub(super) struct SystemSession {
@@ -22,6 +24,8 @@ pub(super) struct SystemSession {
     last_database_call: bool,
     refresh_used: bool,
     stat_cursor: BTreeMap<String, usize>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    stat_cursors_v2: BTreeMap<u16, stat::CursorV2>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -39,6 +43,8 @@ pub(super) struct SystemState {
     runtime: Option<ImsSystemRuntimeDefinition>,
     areas: BTreeMap<String, ImsPositionArea>,
     pools: BTreeMap<String, ImsBufferStatistics>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    published_pools_v2: Option<BTreeSet<String>>,
     reservations: BTreeMap<String, Reservation>,
 }
 
@@ -243,7 +249,7 @@ fn call_identity(call: &ImsSystemCall, syntax: ImsCallSyntax) -> (u8, &'static s
         ImsSystemCall::Dequeue { .. } => (3, "DEQ"),
         ImsSystemCall::Gscd => (7, "GSCD"),
         ImsSystemCall::Position { .. } => (11, "POS"),
-        ImsSystemCall::Statistics { .. } => (22, "STAT"),
+        ImsSystemCall::Statistics { .. } | ImsSystemCall::StatisticsV2 { .. } => (22, "STAT"),
     }
 }
 
@@ -306,6 +312,7 @@ fn validate_call_site(
     if let Some(session) = state.sessions.get(run)
         && request.pcb != 0
         && request.pcb != session.pcb
+        && !stat::is_stat(&system.call)
     {
         return Err(HostProblem::Malformed);
     }
@@ -333,7 +340,9 @@ fn validate_shape(request: &ImsRequest) -> Result<&ImsSystemRequest, HostProblem
     }
     if matches!(
         &system.call,
-        ImsSystemCall::Position { .. } | ImsSystemCall::Statistics { .. }
+        ImsSystemCall::Position { .. }
+            | ImsSystemCall::Statistics { .. }
+            | ImsSystemCall::StatisticsV2 { .. }
     ) && request.pcb == 0
     {
         return Err(HostProblem::Malformed);
@@ -610,38 +619,18 @@ pub(super) fn apply_request(
             )
         }
         ImsSystemCall::Statistics { function } => {
-            let database = database.ok_or(HostProblem::Malformed)?;
-            let kind = match function.family {
-                ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Dbes => ImsBufferPoolKind::Osam,
-                ImsStatisticsFamily::Vbas | ImsStatisticsFamily::Vbes => ImsBufferPoolKind::Vsam,
-            };
-            let candidates = state
-                .system
-                .get(ROW_KEY)
-                .map(|row| {
-                    row.pools
-                        .values()
-                        .filter(|pool| pool.kind == kind)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            let session =
-                &mut Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?)
-                    .system;
-            let cursor_key = format!("{database}:{:?}", function.family);
-            let cursor = session.stat_cursor.entry(cursor_key).or_default();
-            let pool = candidates.get(*cursor).cloned();
-            if pool.is_some() {
-                *cursor += 1;
-            }
-            output(
-                if pool.is_some() { "  " } else { "GE" },
-                ImsSystemResult::Statistics { pool },
-                pcb_kind,
-            )
+            stat::apply(state, run, request.pcb, *function, false)
+        }
+        ImsSystemCall::StatisticsV2 { function, .. } => {
+            stat::apply(state, run, request.pcb, *function, true)
         }
     }?;
+    if !stat::is_stat(&system.call)
+        && request.pcb != 0
+        && let Some(session) = state.sessions.get_mut(run)
+    {
+        stat::reset(&mut Arc::make_mut(session).system, request.pcb);
+    }
     if request.pcb != 0
         && !matches!(&system.call, ImsSystemCall::Gscd)
         && let Some(session) = state.sessions.get_mut(run)
@@ -661,6 +650,7 @@ pub(super) fn observe_database_call(
     result: &ImsResult,
     limits: ImsLimits,
 ) -> Result<(), HostProblem> {
+    stat::observe_database_call(state, run, request);
     if matches!(
         request.operation,
         ImsOperation::Commit
@@ -828,6 +818,7 @@ pub(super) fn observe_database_call(
 }
 
 pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
+    stat::validate_state(state, limits)?;
     if state.system.len() > 1 || state.system.keys().any(|key| key != ROW_KEY) {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -893,6 +884,7 @@ fn validate_runtime(
     runtime: &ImsSystemRuntimeDefinition,
     limits: ImsLimits,
 ) -> Result<(), HostProblem> {
+    stat::validate_runtime(runtime)?;
     if runtime.dedb_areas.len() > limits.max_databases.saturating_mul(limits.max_segments)
         || runtime.buffer_pools.len() > limits.max_segments
         || runtime
@@ -956,6 +948,7 @@ impl ImsService {
         }
         let mut next = durable.state.scoped_snapshot();
         let row = system_state(&mut next);
+        row.published_pools_v2 = Some(BTreeSet::new());
         for area in &runtime.dedb_areas {
             row.areas.insert(
                 normalize(&area.name),
@@ -1029,7 +1022,11 @@ impl ImsService {
             return Err(HostProblem::Malformed);
         }
         let mut next = durable.state.scoped_snapshot();
-        system_state(&mut next).pools.insert(name, statistics);
+        let row = system_state(&mut next);
+        row.published_pools_v2
+            .get_or_insert_with(BTreeSet::new)
+            .insert(name.clone());
+        row.pools.insert(name, statistics);
         validate_state(&next, self.limits)?;
         self.persist(&mut durable, next)
     }

@@ -97,9 +97,10 @@ pub use ims_status::{
 pub use ims_system::{
     ImsAcceptRow, ImsBufferPoolDefinition, ImsBufferPoolKind, ImsBufferStatistics,
     ImsDedbAreaDefinition, ImsPcbAvailability, ImsPositionArea, ImsPositionKeyword, ImsPositionSsa,
-    ImsQClass, ImsStatisticsFamily, ImsStatisticsFormat, ImsStatisticsFunction, ImsStatusGroup,
-    ImsSystemCall, ImsSystemDirectory, ImsSystemRequest, ImsSystemResult,
-    ImsSystemRuntimeDefinition,
+    ImsQClass, ImsStatisticsFamily, ImsStatisticsFormat, ImsStatisticsFunction,
+    ImsStatisticsObservationV2, ImsStatusGroup, ImsSystemCall, ImsSystemDirectory,
+    ImsSystemRequest, ImsSystemResult, ImsSystemRuntimeDefinition, ImsVsamSubpoolMetadata,
+    ImsVsamSubpoolType,
 };
 pub use ims_tm::{
     TmAlternatePcbDefinition, TmDefinitionSet, TmDestination, TmExecutionContext, TmLimits,

@@ -62,7 +62,7 @@ pub enum ImsBufferPoolKind {
     Vsam,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ImsStatisticsFamily {
     Dbas,
     Dbes,
@@ -70,7 +70,7 @@ pub enum ImsStatisticsFamily {
     Vbes,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ImsStatisticsFormat {
     Full,
     Osam,
@@ -78,7 +78,7 @@ pub enum ImsStatisticsFormat {
     Unformatted,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImsStatisticsFunction {
     pub family: ImsStatisticsFamily,
     pub format: ImsStatisticsFormat,
@@ -105,6 +105,11 @@ pub enum ImsSystemCall {
     },
     Statistics {
         function: ImsStatisticsFunction,
+    },
+    /// Bounded host projection, not IBM print records or binary fullword layout.
+    StatisticsV2 {
+        function: ImsStatisticsFunction,
+        io_area_bytes: u32,
     },
 }
 
@@ -143,15 +148,65 @@ pub struct ImsBufferStatistics {
     pub writes: u64,
 }
 
+/// Only explicitly published read/write counters are projected. No other IBM
+/// buffer-handler, error, hiperspace or coupling-facility statistic is implied.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ImsStatisticsObservationV2 {
+    Subpool {
+        statistics: ImsBufferStatistics,
+    },
+    Totals {
+        buffers: u64,
+        storage_bytes: u64,
+        reads: u64,
+        writes: u64,
+    },
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ImsSystemResult {
-    Accepted { group: ImsStatusGroup },
-    Query { pcb: ImsPcbAvailability },
-    Refreshed { pcbs: Vec<ImsPcbAvailability> },
-    Dequeued { released: u32 },
-    Gscd { scd_address: u32, pst_address: u32 },
-    Positioned { areas: Vec<ImsPositionArea> },
-    Statistics { pool: Option<ImsBufferStatistics> },
+    Accepted {
+        group: ImsStatusGroup,
+    },
+    Query {
+        pcb: ImsPcbAvailability,
+    },
+    Refreshed {
+        pcbs: Vec<ImsPcbAvailability>,
+    },
+    Dequeued {
+        released: u32,
+    },
+    Gscd {
+        scd_address: u32,
+        pst_address: u32,
+    },
+    Positioned {
+        areas: Vec<ImsPositionArea>,
+    },
+    Statistics {
+        pool: Option<ImsBufferStatistics>,
+    },
+    StatisticsV2 {
+        function: ImsStatisticsFunction,
+        observation: Option<ImsStatisticsObservationV2>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum ImsVsamSubpoolType {
+    Data,
+    Index,
+}
+
+/// Explicit LSR definition order; names are resource identities, never sort keys.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImsVsamSubpoolMetadata {
+    pub subpool: String,
+    pub lsr_pool: u16,
+    pub definition_order: u16,
+    pub subpool_type: ImsVsamSubpoolType,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -182,6 +237,58 @@ pub struct ImsSystemRuntimeDefinition {
     pub directory: Option<ImsSystemDirectory>,
     pub dedb_areas: Vec<ImsDedbAreaDefinition>,
     pub buffer_pools: Vec<ImsBufferPoolDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vsam_subpools_v2: Vec<ImsVsamSubpoolMetadata>,
+}
+
+impl ImsStatisticsFunction {
+    pub fn validate(self) -> Result<(), HostProblem> {
+        if self.extended
+            && !(self.family == ImsStatisticsFamily::Dbes
+                && matches!(
+                    self.format,
+                    ImsStatisticsFormat::Full
+                        | ImsStatisticsFormat::Osam
+                        | ImsStatisticsFormat::Unformatted
+                ))
+            || self.format == ImsStatisticsFormat::Osam
+                && matches!(
+                    self.family,
+                    ImsStatisticsFamily::Vbas | ImsStatisticsFamily::Vbes
+                )
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Conservative capacity from the specific format topics. E1 capacities
+    /// and DBASO lack a consistent proven form in this bounded contract.
+    pub fn minimum_io_area_bytes(self) -> Result<u32, HostProblem> {
+        self.validate()?;
+        if self.extended
+            || self.family == ImsStatisticsFamily::Dbas && self.format == ImsStatisticsFormat::Osam
+        {
+            return Err(HostProblem::Unsupported);
+        }
+        Ok(match (self.family, self.format) {
+            (ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Vbas, ImsStatisticsFormat::Full) => {
+                360
+            }
+            (ImsStatisticsFamily::Dbes | ImsStatisticsFamily::Vbes, ImsStatisticsFormat::Full) => {
+                600
+            }
+            (
+                ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Vbas,
+                ImsStatisticsFormat::Summary,
+            ) => 180,
+            (_, ImsStatisticsFormat::Summary | ImsStatisticsFormat::Osam) => 360,
+            (ImsStatisticsFamily::Dbes, ImsStatisticsFormat::Unformatted) => 84,
+            (ImsStatisticsFamily::Vbes, ImsStatisticsFormat::Unformatted) => 104,
+            (_, ImsStatisticsFormat::Unformatted) => 72,
+        })
+    }
 }
 
 impl ImsSystemRequest {
@@ -221,25 +328,16 @@ impl ImsSystemRequest {
                 }
                 Ok(())
             }
-            ImsSystemCall::Statistics { function } => {
-                if function.extended
-                    && !(function.family == ImsStatisticsFamily::Dbes
-                        && matches!(
-                            function.format,
-                            ImsStatisticsFormat::Full
-                                | ImsStatisticsFormat::Osam
-                                | ImsStatisticsFormat::Unformatted
-                        ))
-                    || function.format == ImsStatisticsFormat::Osam
-                        && !matches!(
-                            function.family,
-                            ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Dbes
-                        )
-                {
-                    Err(HostProblem::Malformed)
-                } else {
-                    Ok(())
+            ImsSystemCall::Statistics { function } => function.validate(),
+            ImsSystemCall::StatisticsV2 {
+                function,
+                io_area_bytes,
+            } => {
+                let minimum = function.minimum_io_area_bytes()?;
+                if *io_area_bytes < minimum || *io_area_bytes as usize > limits.max_record_bytes {
+                    return Err(HostProblem::Malformed);
                 }
+                Ok(())
             }
             _ => Ok(()),
         }
@@ -276,6 +374,37 @@ impl ImsSystemResult {
                 if !valid_name(&pool.pool) || pool.buffer_bytes == 0 || pool.buffers == 0 =>
             {
                 Err(HostProblem::Malformed)
+            }
+            Self::StatisticsV2 {
+                function,
+                observation,
+            } => {
+                function.minimum_io_area_bytes()?;
+                if matches!(
+                    function.family,
+                    ImsStatisticsFamily::Dbes | ImsStatisticsFamily::Vbes
+                ) {
+                    return Err(HostProblem::Unsupported);
+                }
+                match observation {
+                    Some(ImsStatisticsObservationV2::Subpool { statistics }) => {
+                        if function.family != ImsStatisticsFamily::Vbas
+                            || statistics.kind != ImsBufferPoolKind::Vsam
+                        {
+                            return Err(HostProblem::Malformed);
+                        }
+                        Self::Statistics {
+                            pool: Some(statistics.clone()),
+                        }
+                        .validate(limits)
+                    }
+                    Some(ImsStatisticsObservationV2::Totals {
+                        buffers,
+                        storage_bytes,
+                        ..
+                    }) if *buffers == 0 || *storage_bytes == 0 => Err(HostProblem::Malformed),
+                    _ => Ok(()),
+                }
             }
             _ => Ok(()),
         }

@@ -26,7 +26,9 @@ mod integrity_tests;
 mod isolation_tests;
 mod pcb_tests;
 mod reservation_tests;
+mod session_cas;
 mod ssa_tests;
+mod stat_tests;
 
 pub(crate) fn catalog() -> ImsMetadataCatalog {
     fn field(name: &str, offset: usize, sequence: bool) -> ImsFieldMetadata {
@@ -728,6 +730,7 @@ fn exercise_system(store: Arc<dyn ProviderStateStore>) {
                 buffer_bytes: 4096,
                 buffers: 8,
             }],
+            vsam_subpools_v2: Vec::new(),
         })
         .unwrap();
     let run = "system-run";
@@ -1005,7 +1008,7 @@ fn exercise_system(store: Arc<dyn ProviderStateStore>) {
         ImsCallSyntax::Call,
         ImsSystemCall::Statistics { function },
     );
-    assert_eq!(execute(&service, run, &exhausted).status, "GE");
+    assert_eq!(execute(&service, run, &exhausted), observed);
     let no_vsam_pool = system_request(
         run,
         23,
@@ -1194,9 +1197,20 @@ fn system_authorization_precedes_stat_observation_and_replay() {
                 buffer_bytes: 4096,
                 buffers: 8,
             }],
+            vsam_subpools_v2: Vec::new(),
         })
         .unwrap();
     let run = "system-auth";
+    service
+        .publish_buffer_statistics(ImsBufferStatistics {
+            pool: "OSAM1".into(),
+            kind: ImsBufferPoolKind::Osam,
+            buffer_bytes: 4096,
+            buffers: 8,
+            reads: 0,
+            writes: 0,
+        })
+        .unwrap();
     execute(
         &service,
         run,

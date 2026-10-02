@@ -116,6 +116,160 @@ These wider failures are retained for manager integration, not hidden by a
 baseline refresh. They do not establish full-parent gate or promotion success.
 All receipts are outside Git and disposable Cargo targets under the worker's
 `v014-completion-20261002/IMS-1401.public-ssa-navigation` receipt directory.
+## IMS-1401.stat-observable-contract (bounded slice, 2026-10-02)
+
+Parent: IMS-1401. Entry HEAD: `f2cb3009b2d3929e642b9bab83d59ffab5329b55`;
+branch: `codex/v014-stat-observable-contract-20261002`. Preserve the sealed
+secondary feature and the accepted host/effect/provider-row/storage/SAF/retention
+and pending participant boundaries above. This is provider-owned observable
+behavior, with no new dependency, store, coordinator, execution credit or
+maintainer source acceptance. Catalog: IMS 15.6 baseline
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0022`.
+
+Inspection found name-ordered pools, ignored formats/extensions, synthetic zero
+counters, a database/family cursor rather than selected-PCB iteration, no GA
+totals or intervening-PCB reset, and scheduled-PCB-only system validation.
+The bounded supported class is a versioned **typed host projection** of basic
+DBAS/VBAS F/S/U statistics using explicitly published existing read/write
+counters. It does not provide IBM print records, raw fullwords, AIB operands or
+all IBM counters. Enhanced DBES/VBES, E1, and unproven DBASO must reject explicitly;
+their missing buffer-handler/hiperspace/CF counters cannot be manufactured.
+Historical request/result canonical bytes and retained rows stay readable;
+an additive call/result distinguishes new output and I/O-capacity operands.
+
+Offline `ibm_docs.py search/read` was run before edits: STAT is unregistered,
+while call-functions is readable in the existing verified 1401 cache. The
+recorded direct `com.ibm.ims156.doc.apr/ims_statcall.htm` pin is exactly
+`cc777a81e45ccaedc704c8319a9f9b6a6eb7b30521b00b110cd371491eb5fb51`,
+16,635 bytes, verified against the retained SHA archive and its topic metadata.
+The repository `plain_text` parser was used, with no refresh. A minimal locator
+repair may add only that existing exact pin to the programming-contract reader
+manifest/registry; it grants zero credit. Related retained archive identities:
+`ims_statcalldbstatistics.htm` / `04a50c5a16d20ff421a787d3acf995f7dac6c3e8fe930a421966aa77fcc31109`
+(5,599 bytes), `ims_osambufferpoolstats.htm` /
+`d52ef6a0d812e17234b4299b89eafa78585aa4a6f1870d16a0cd4e411fc4b2d5`
+(6,521), `ims_vsambuffersubpoolstats.htm` /
+`b8222f22ccaaf9f4ed630bdcd6bf2bf8ed03ba9bb3441f2bfb66c916114a5706`
+(9,029), and `ims_osambuffersubpoolformat.htm` /
+`9a663f2a9d4d714314c764786c44001d206e6b07d032df38704af756e600a2fd`
+(19,814). These supplemental bodies are hash/length verified reference review,
+not registered execution evidence. The specific summary pages require 180 bytes
+for basic S where the call page says 120; enhanced U pages exceed the call
+page's generic 72. Use the stricter proven basic capacity; leave enhanced/raw
+layout discrepancies pending rather than assert parity.
+
+Mandatory local obligations: DBAS aggregate repeatability; VBAS LSR definition
+order, data-before-index and ascending buffer size, GA aggregate and GE absent
+pools; independent PCB cursor, reset on intervening PCB use, exact replay without
+advancement; F/S/U capacity boundaries; every invalid combination, unsupported
+form/context/PCB and unavailable runtime/counter rejection without mutation;
+SAF before observation, canonical conflicts, atomic row/CAS/failure and explicit
+post-publication unknown outcomes. Backends: Memory and fresh file-backed SQLite
+reopen. LSR grouping/type metadata is additive and required for VSAM ordering;
+historical runtime definitions without it remain readable but cannot prove that
+order. No unverified DSR ordering rule is inferred from the LSR-only direct page.
+
+Owned files: bounded `service/system/stat.rs` and STAT test modules; minimal
+`ims_system.rs` DTO/canonical changes, runtime publication/validation and STAT
+call sites in `service/system.rs`; focused existing STAT fixture corrections;
+the two source locator files, this status, one fragment and generated docs
+manifest. Do not change Q/integrity algorithms, GSAM, CHKP/XRST or manager facade
+and row-helper infrastructure; use original helpers. Shared integration is
+limited to STAT-selected PCB admission and reset hooks.
+
+Exact checks: fail-first `cargo test --locked -p mainframe-env-ims stat_`;
+passing focused STAT public-provider tests and existing `generic::tests::`;
+host `ims_stat`/canonical compatibility tests; strict affected package
+`cargo clippy --locked -p mainframe-env-ims --all-targets --no-deps -- -D warnings`;
+`cargo fmt --all -- --check`, `cargo deny check`, `cargo xtask ims-catalog --check`,
+`cargo xtask ims-assurance-matrix --check`, `cargo xtask schemas --check`,
+`cargo xtask spec --check`, focused execution/effect/provider-row/durable/SAF/
+retention/participant/module guards, `cargo xtask docs --check` and
+`cargo xtask changelog --check`. Diagnose unchanged aggregate blockers once;
+no whole-cache/global certification run. Clean this checkout's Cargo target
+after each sequence; external receipts live under
+`v014-completion-20261002/IMS-1401.stat-observable-contract`. Seal only this ID
+with exact changed-path allowlist and target `0.14.0`, then `--check`.
+Official and licensed credit remains **0/25**, with no parent/release claim.
+
+Bounded implementation outcome: `StatisticsV2` supplies a distinct canonical
+request with capacity and a format-tagged partial host observation. DBAS returns
+repeatable OSAM totals. VBAS returns explicitly described LSR subpools in pool
+definition order, then data before index, ascending buffer size; the subsequent
+GA returns totals. A selected full-function DB PCB owns its cursor independently
+of the scheduled PCB. Intervening database use resets that PCB; exact retained
+replay does not advance it. GA remains the aggregate until an intervening use;
+automatic post-GA restart is not claimed. Empty configured pools return GE;
+missing runtime, ordering proof or published counters fail explicitly. Defined
+zero counters become observable only after authoritative publication. Totals
+overflow, authorization denial, conflict and failed atomic publication preserve
+the prior durable cursor and receipt. Post-publication clock failure returns
+UnknownOutcome and retries replay the committed receipt.
+
+The direct pin is now registered without replacing its identity. Related
+registered comparison, call-function, PCB and status topics were read through
+the pinned reader. Additional exact retained reference pins read with its
+`plain_text` parser are `ims_vsambuffersubpoolformat.htm` /
+`ef46730a81ac5e063d703a9293a7b4b474d6da66aaed710145be7ad5d841db74`
+(12,292 bytes) and `ims_statcmd.htm` /
+`2dd3f64795b6b9ad6f78d1b3113d6ab87d3a2d38bde53420eb870ca40a9646cd`
+(20,833 bytes). These supplemental pins remain unregistered, zero-credit
+reference review. The command page permits USING PCB / INTO / LENGTH and the
+basic VSAM/NONVSAM formatted/unformatted/summary selection; it does not justify
+rejecting all typed Command syntax. Both typed syntax classes retain existing
+applicability/context authority. The programming manifest has 27 topics,
+591,162 bytes, set digest
+`119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182`.
+Only generated SSA/PCB manifest digest constants change with this locator
+repair; no applicability, status or catalog row is granted new credit.
+
+Compatibility: independently frozen old Statistics call/result canonical
+vectors and historical runtime JSON remain exact. Old replay receipts retain
+their original values, including previously overbroad results; reading them is
+not recertification of those semantics. Fresh legacy calls support only the
+representable basic Full single-OSAM result (or GE for empty configured pools);
+formats, aggregates and enhanced classes requiring a new result reject
+Unsupported. New requests/results use additive V2 variants. Old retained runtime
+and sessions deserialize with absent V2 metadata/proof/cursor defaults and are
+not rewritten on open; historical counters without publication proof remain
+unavailable to fresh calls. Rust runtime struct literals require the new default
+field. Older binaries cannot interpret V2 replies and may discard additive
+state fields on write. Drain older writers before admission and preserve a
+coherent pre-feature provider/replay/session/checkpoint/UOW/metadata backup;
+rollback restores that backup rather than stripping fields or replay variants.
+
+Local verification receipts are external under the declared directory.
+Fail-first public-route cases exposed three actual entry-HEAD gaps: repeated
+DBAS incorrectly exhausted, unmeasured pools returned invented zero counters,
+and E1 returned an unsupported basic result. Passing checks: focused public
+Memory and fresh SQLite reopen STAT cases; the existing `generic::tests::`
+suite (56 tests); host `ims_stat` capacity/extension/JSON and canonical vectors;
+final STAT tests after the reset-hook extraction; strict IMS `--all-targets
+--no-deps` Clippy with `-D warnings`; fmt; offline locked deny; IMS catalog
+generation/check; IMS assurance matrix; schemas; spec; changelog; license
+notices; supply-chain check; assurance inventory; source-reader unit tests;
+execution/effect/provider-row/storage/SAF/retention/participant guards. Filtered
+zero-test binaries receive no credit. Cargo targets were cleaned after each
+sequence. Docs are regenerated and checked for this final status.
+
+Unchanged manager-owned blockers diagnosed once: strict host-api Clippy fails
+at `mq_validation.rs:438/443` (`collapsible_if`, `manual_contains`); the global
+module guard fails at server `product.rs` (6,291 versus its 6,008 ceiling).
+No lint suppression, algorithm rewrite or budget refresh is included. Owned
+production modules remain bounded: STAT helper 295 lines, host ims_system 412,
+provider system 987. Minimal shared edits are V2 DTO/exports/canonical dispatch,
+runtime proof/validation, selected-PCB STAT admission and reset hooks; Q,
+integrity, GSAM, CHKP/XRST and manager row-helper algorithms are unchanged.
+
+Remaining STAT work: enhanced DBES/VBES and E1 require authoritative missing
+buffer-handler/error/fix/hiperspace/CF counters and complete format sources;
+DBASO and the basic S 120-versus-180-byte discrepancy remain unproven classes.
+No raw IBM binary/EBCDIC layout, AIB/raw operand/status parity, complete printed
+output, DSR ordering, licensed comparison or official IR case credit is claimed.
+Fresh SQLite connection reopen is not process restart or PostgreSQL acceptance;
+coherent rollback, shared participant acceptance and full IMS/release gates remain
+separate. Seal only `IMS-1401.stat-observable-contract` for `0.14.0` with the exact
+changed-path allowlist and verify with `--check`; parent IMS-1401 remains open.
 
 ## 2026-10-02 nonlicensed continuation
 
@@ -2063,3 +2217,30 @@ and all 13 signed IMS package cases pass in `integrity-integration.log`, with
 strict IMS/server Clippy and the module/assurance guards. Do not relabel the
 earlier whole-unit run as a later whole-suite receipt. Licensed and official
 row counts are unchanged.
+
+### STAT manager integration
+
+Keep the current Q observer, actual per-PCB refresh, integrity-read publication
+and checkpoint markers when folding the basic typed STAT projection. The direct
+STAT call pin `cc777a81...` now resolves through the shared offline reader; the
+additional exact topic locator expands the zero-credit programming source set
+without repinning any existing topic body or granting official approval. Format
+detail pages remain verified archive supplements. Their minimum-summary-area
+discrepancy with the call page is retained; raw layout parity remains pending.
+
+The first combined STAT run passed 13 cases and found the inherited expectation
+that a stale adapter must fail instead of refreshing. Preserve the correct fresh
+subpool result, then use the shared test-only session shim to force a real CAS
+race after refresh and before atomic publication. Assert the exact unchanged
+cursor/system/replay payloads, with only the shim's independently advanced
+session version permitted. Capacity rejection/retry remains asserted. Reuse
+that same shim for the existing selected-secondary backend regressions rather
+than duplicate a race algorithm. The old test-only module path re-exports it.
+Initial and passing combined receipts are `stat-integration-initial-failure.log`
+and `stat-integration.log`; original worker receipts are not relabeled.
+The repaired candidate passes 14 STAT, two existing system-family, 23 selected
+PCB/secondary and 24 application-recovery cases, two host STAT contracts and
+one canonical vector case. All 23 offline source-reader tests, strict IMS/host
+Clippy, global module guard, IMS catalog/assurance, schemas and docs checks pass.
+The exact manager re-seal is separate. Enhanced/extended counters, complete raw
+layouts, official maintainer-accepted IR and licensed equivalence remain open.
