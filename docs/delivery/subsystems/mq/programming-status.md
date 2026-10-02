@@ -198,7 +198,7 @@ at 0/26 because the required external IBM MQ 9.4 receipt and exact external pins
 are absent. The next implementation step is one manager-owned additive public
 request/result boundary before service integration.
 
-## Active continuation wave
+## Integrated continuation wave
 
 The manager uses Codex CLI directly, with at most three isolated workers plus
 the manager. This wave uses `gpt-6.1-sol`, high reasoning, goal mode, approval
@@ -252,3 +252,53 @@ control/dispatch matching, focused task-isolation regressions and a unique
 fragment. Special default connections must retain registry-defined CICS task
 identity, rather than sharing control state because their symbolic Hconn values
 are equal. This is private-kernel isolation, not acceptance of CICS MQOP_START.
+
+### Integrated commits and review outcome
+
+| Slice | Integrated feature commit | Outcome |
+|---|---|---|
+| `MQ-1501.shared-handle-kernel` | `acc3ad11` | One connection/slot authority for message properties and subscriptions. |
+| J: `MQ-1501.mqi-request-boundary` | `8a6f4f9e` | All 26 typed call identities, distinct canonical request/result domains and exact issued-token identities; dispatch remains pending. |
+| K: `MQ-1502.object-inquiry-kernel` | `6076f9bc` | Catalog-backed bounded inquiry; unreviewed selectors and MQSET remain pending. |
+| L: `MQ-1505.delivery-checkpoint-kernel` | `298e1040` | Live resume retains pending work/cursors/final decisions; cold restart retains its separate policy. |
+| `MQ-1501.handle-access-guard` | `50dd6a92` | Direct registry/kernel retirement cannot leave a dispatchable stale callback; live unassociated/in-use properties are preserved. |
+| `MQ-1504.cics-callback-scope` | `532159c4` | Default-connection controls isolate host/process/task units; issued shared connections retain one control. |
+
+The independent read-only CLI review found no actionable inquiry/checkpoint
+defects and identified the inherited CICS default-Hconn scope leak. Three
+baseline regressions reproduced that leak before repair. Manager review also
+closed direct-accessor retirement cleanup. Callback-state observation now takes
+an owner, validates the connection and reports stale/cross-owner errors instead
+of silently presenting stopped state; scoped accessors return dereference
+guards rather than naked mutable references. See ADR 0028 for compatibility.
+
+Verification selected from this diff passed: 124 host-API unit and nine
+integration tests after canonical/handle integration; the final MQ suite's 83
+unit, ten CICS scope, four object-lifecycle, six object-service and eleven shared
+handle tests (114 total); and 13 licensed-verifier mutant tests. Formatting,
+changelog, docs freshness, MQI registry, licensed-contract structure,
+effect-encoding and exact-path feature-seal checks passed. Dependency policy
+passed with unchanged dependencies. Each sequence cleaned its checkout target;
+receipts remain outside disposable targets and Git.
+
+The broader architecture-fast attempt stopped at the missing pinned CICS
+`SSJL4D_6.x/applications/designing/dfhp37p.html` in its configured cache; the
+expected retained topic-path file is also absent. No architecture-fast pass is
+claimed. Optional global module-budget verification found an unchanged batch
+baseline of 7,404 production lines against its 7,402 ceiling; new production
+modules meet the 1,200-line limit. Supplemental strict Clippy found unchanged
+MQ warnings; a strict-Clippy pass is not claimed. Unavailable unrelated evidence
+was not refreshed or repeatedly retried.
+
+### Remaining parent acceptance
+
+These feature commits are bounded prerequisites, not completed parent work
+packages or release acceptance. Public MQI dispatch/ABI registration, trusted
+context and SAF/audit, Memory/SQLite durable service wiring, shared participant
+acceptance, full structure/options/status/selector mappings and CardDemo exact
+execution remain required. Unsupported forms stay explicit rather than generic
+success. Licensed MQ 9.4 verification remains
+`pending-external-licensed-receipt` at **0/26** without the external receipt and
+exact external pins. Harness structure and mutant tests are not licensed runs.
+The next manager-owned step is trusted public dispatch and service composition
+through existing provider-row/effect/UOW authorities, without a private journal.
