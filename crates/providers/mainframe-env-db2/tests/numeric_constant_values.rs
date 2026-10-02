@@ -94,7 +94,7 @@ fn public_decimal_values_have_independent_exact_coefficients_precision_and_scale
 
 #[test]
 fn public_results_and_errors_own_original_utf8_crlf_locations() {
-    let (result, error, expected_span) = {
+    let (clone, error, expected_span) = {
         let prefix = "/*é😀*/\r\n  ";
         let text = "-000.00100";
         let source = format!("{prefix}{text}; -- trailing\r\n");
@@ -112,10 +112,8 @@ fn public_results_and_errors_own_original_utf8_crlf_locations() {
         let source = String::from("1E0");
         let error = materialize_db2_numeric_constant(&source, span(&source), Default::default())
             .unwrap_err();
-        (result, error, expected_span)
+        (result.clone(), error, expected_span)
     };
-    let clone = result.clone();
-    drop(result);
     assert_eq!(clone.span(), expected_span);
     let Db2NumericConstantValue::Decimal(value) = clone.value() else {
         panic!("DECIMAL");

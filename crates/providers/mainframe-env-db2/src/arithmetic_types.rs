@@ -7,6 +7,7 @@
 //!   bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8;
 //! - db2z_datatypesintro.html, 22904 bytes,
 //!   a488006755eedd9ef58da3ba8ef9f304a3d79c3910cc39da637dda1f3c38f570.
+//!
 //! Language elements have no standalone statement-catalog row. Existing
 //! resolved types own validity; context is explicitly resolved, never guessed.
 //! Constants use the existing located classifier, without lifting lexer fences.

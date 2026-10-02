@@ -656,8 +656,10 @@ mod tests {
 
     #[test]
     fn configured_source_literal_and_type_argument_bounds() {
-        let mut limits = Db2NumericConstantLimits::default();
-        limits.max_source_bytes = 4;
+        let mut limits = Db2NumericConstantLimits {
+            max_source_bytes: 4,
+            ..Db2NumericConstantLimits::default()
+        };
         assert!(classify_db2_numeric_constant("+1.0", full_span("+1.0"), limits).is_ok());
         assert_eq!(
             classify_db2_numeric_constant("+1.00", full_span("+1.00"), limits)

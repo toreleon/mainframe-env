@@ -283,8 +283,8 @@ pub fn parse_db2_create_view_statement(
     }
     let mut depth = 0_usize;
     let mut select_end = end;
-    for index in select_start..end {
-        match tokens[index].kind {
+    for (index, token) in tokens.iter().enumerate().take(end).skip(select_start) {
+        match token.kind {
             Db2TokenKind::Symbol(Db2Symbol::LeftParenthesis) => depth += 1,
             Db2TokenKind::Symbol(Db2Symbol::RightParenthesis) => depth -= 1,
             _ if depth == 0 && parser.word_at(index) == Some("WITH") => {

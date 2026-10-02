@@ -359,18 +359,17 @@ impl UpdateParser<'_> {
                     *name = decoded_name(name, self.ast_limits, node_span.start)?;
                 }
                 // Intermediate name budget expansion must never expand hosts.
-                Db2ExpressionKind::HostVariable(host) => {
+                Db2ExpressionKind::HostVariable(host)
                     if host.variable().value().len() > self.ast_limits.max_identifier_bytes
                         || host.indicator().is_some_and(|name| {
                             name.value().len() > self.ast_limits.max_identifier_bytes
-                        })
-                    {
-                        return Err(problem(
-                            Db2SyntaxDiagnosticCode::InvalidStatementOperand,
-                            node_span.start,
-                            "UPDATE host identifier exceeds its configured byte limit",
-                        ));
-                    }
+                        }) =>
+                {
+                    return Err(problem(
+                        Db2SyntaxDiagnosticCode::InvalidStatementOperand,
+                        node_span.start,
+                        "UPDATE host identifier exceeds its configured byte limit",
+                    ));
                 }
                 _ => {}
             }

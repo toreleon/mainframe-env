@@ -944,8 +944,10 @@ mod tests {
     #[test]
     fn exact_and_one_beyond_source_spelling_and_type_argument_limits() {
         use Db2NumericConstantErrorCode as Code;
-        let mut limits = Db2NumericConstantLimits::default();
-        limits.max_source_bytes = 4;
+        let mut limits = Db2NumericConstantLimits {
+            max_source_bytes: 4,
+            ..Db2NumericConstantLimits::default()
+        };
         assert!(materialize_db2_numeric_constant("+1.0", full_span("+1.0"), limits).is_ok());
         let source_start = Db2SourceSpan {
             start_byte: 0,
