@@ -6,6 +6,34 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root DEDB subset-pointer source integration — 2026-10-03
+
+Root composes source-only worker `6a603bf39613eca32d4336f92d9c98a394770dfe`
+onto `1c3619d2ac5e9f15072596d60249b551033fe3b9` with the same exact five
+declared paths below. Manager reviews the full handoff, W prerequisite addendum,
+manifest, fragment and source-only declaration. Independent audit verifies ten
+source identities, original archive metadata and exact TOC leaves, thirteen
+worker-base manifests, 2,255 unchanged tracked files, 959 preserved receipts,
+84 packet identities, 23 source-reader tests and fourteen source-only gates.
+Main executes the registered subset search and all ten full reads: 352 plain
+lines. Matching retained material is never refreshed; no IBM body enters Git.
+
+The additive registry composition preserves all fifteen root rows and adds only
+the reviewed worker row. Every complete root/worker status declaration survives;
+only normal docs generation recomputes the manifest. New source manifest and
+fragment remain worker-byte-exact. Root checks normal docs/check, changelog,
+coverage, formatting, exact five-path generated seal and committed check, then
+cleans this checkout target. Unchanged runtime, PostgreSQL and policy exploration
+keep original candidate identities and are not repeated merely for integration.
+
+This resolves only ten retained-source registration prerequisites. W/R runtime,
+shared metadata/context/framing/status/lifecycle/recovery choices and remaining
+DEDB classes are not approved or admitted. Root-level pointer ignored semantics
+are not an Unsupported success; prospective histories remain unexecuted. Source
+review earns zero runtime/IR/official/HUMAN/licensed/participant credit. All 25
+mandatory rows, official/HUMAN0/25, shared ADR0031/0033 and parent v0.14 remain
+incomplete. Licensed certification is excluded; mandatory OSS policy remains.
+
 ## Root Q/DEQ source integration — 2026-10-03
 
 Root composes source-only worker `f0e72434235675dccf63904a8cce15d9d4ae9a7c`
@@ -493,6 +521,69 @@ unselected STAT cache entry is absent. The finite source requirement is availabl
 The external handoff proposes only SHISAM equality checks in existing shared
 metadata and engine definition owners, and identifies fail-closed consequences
 for retained invalid images/generations. That runtime phase awaits manager review.
+
+## IMS-1401.dedb-subset-pointer-sources — source-only declaration, 2026-10-03
+
+Entry `9dc8a36d7df11f83659b7f973c47950382180b28`, branch
+`codex/v014-dedb-subset-sources-20261003`, target **0.14.0**. Register exactly ten
+existing IMS 15.6 archive topics as the separate zero-credit scope
+`ims-dedb-subset-pointer-contracts`, baseline
+`ibm-ims-15.6-dedb-subset-pointers-2026-09-11`. Verify retained-topic paths first,
+original archive metadata, SHA/bytes and shared TOC membership; import through
+the existing reader and search/read every selected body through EOF. Preserve
+all prior pins, registry rows, accepted IR, completed primary/W packets and
+historical command exits. The original archive run remains in progress.
+
+Exact maximum five-path allowlist, declared before registration edits:
+
+```text
+conformance/0.14/manifests/ims-dedb-subset-pointer-contract-topics.json
+conformance/0.14/manifests/index.json
+docs/delivery/subsystems/ims/programming-status.md
+changes/unreleased/ims-dedb-subset-sources-20261003.toml
+docs/generated/documentation-manifest.json
+```
+
+The manifest contains only bounded source identities, 43,367 bytes across ten
+topics, with `coverage_credit=0`; the additive registry row retains
+`semantic_authority=false`. Authored publication bodies remain external. No W
+runtime/test admission, metadata/schema/ADR/applicability change or new shared
+authority is included. Reconcile W prerequisites in a new external addendum,
+without altering the completed read-only packet. Source review gives zero
+execution/HUMAN/official/licensed credit; all 25 mandatory rows and parent v0.14
+remain unfinished. Pending ADR0031/0033 and participant approvals stay unanswered.
+
+Required source-only gates: reader unit tests, registered status/search/full
+reads, schema/spec/IMS catalog/assurance and coverage inventory, offline
+dependency/license/supply-chain policy, fmt, normal docs generation/check,
+changelog and exact five-path generated seal/committed check. No IMS runtime,
+PostgreSQL, unrelated global CICS/cache campaign or licensed certification runs.
+Receipts remain outside targets under
+`worker-receipts/v014-completion-20261002/dedb-subset-source-registration/`.
+
+### DEDB subset-pointer source review disposition
+
+The ten bodies and original successful archive metadata bindings matched the
+expected SHA/byte identities and shared IMS 15.6 TOC. The derived topic-set digest
+is `d49cecc6da4e3d322adf513508950af03330f1d352352a5d5bfeca25b0b3d144`.
+Normal import/status and complete registered reads cover all ten topics. A new
+programming search uses the existing complete `ims-1401-stat-cache` (27 topics);
+the older ten partial searches against `ims-1403-topic-cache` retain their original
+failed exits. STAT is not globally unavailable, and no refresh occurred.
+
+The source review resolves database-chain pointer lifetime after program exit,
+DBD plus PSB/SENSEG pointer declarations and sensitivity, fully satisfied-call
+setting, root-level ignored semantics, deletion advancement/clear and R's
+read-only observation with GE at an unset subset. Existing committed SENSEG/FIELD
+pins additionally establish pointer R/U sensitivity and its PROCOPT restriction.
+The proposed first W class must include a reviewed R observer and real pointer
+declarations; it cannot equate PROCOPT alone with pointer-update permission.
+Call-level AJ/AM conditions and command-level subset options remain distinct.
+An external addendum records exact locators, corrected hypothetical histories
+and unresolved context, DEDB framing, CHKP/backout and metadata/public-owner
+decisions. This is source interpretation, not accepted conformance evidence or
+W runtime admission. The exact changed subset remains the five declared paths;
+all prior status sections, sources, catalogs, rules and runtime owners are intact.
 
 ## IMS-1403.primary-level-position-closure — completion declaration, 2026-10-03
 
