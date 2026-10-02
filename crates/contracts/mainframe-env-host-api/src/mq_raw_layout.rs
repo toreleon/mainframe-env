@@ -10,6 +10,7 @@ use crate::mq_mqi::MqMqiCall;
 mod connx;
 mod full_get;
 mod md_value;
+mod put_context;
 pub use connx::{MqConnxProblem, MqConnxProfile, mq_connx_numeric_identities};
 pub(crate) use md_value::validate_md_identity;
 
@@ -251,6 +252,19 @@ impl MqRawCapture {
         observations: &[MqRawObservedField<'_>],
         destination: &mut [u8],
     ) -> Result<(), MqRawProblem> {
+        self.writeback_inner(context, observations, destination, false)
+    }
+
+    // The private extension is reachable only after the complete PUT context
+    // writer proves that every other descriptor field remains exact input.
+    // Generic observations retain the historical generated writeback policy.
+    fn writeback_inner(
+        &self,
+        context: MqRawWritebackContext,
+        observations: &[MqRawObservedField<'_>],
+        destination: &mut [u8],
+        defined_put_context: bool,
+    ) -> Result<(), MqRawProblem> {
         if observations.len() > self.layout.fields.len() {
             return Err(MqRawProblem::ObservationCount);
         }
@@ -299,7 +313,12 @@ impl MqRawCapture {
                         && matches!(context.call, MqMqiCall::Put | MqMqiCall::PutOne)
                 }
             };
-            if !permitted {
+            let context_output = defined_put_context
+                && context.platform == MqRawPlatform::Zos
+                && context.single_queue
+                && matches!(context.call, MqMqiCall::Put | MqMqiCall::PutOne)
+                && put_context::is_context_field(field.name);
+            if !permitted && !context_output {
                 return Err(MqRawProblem::OutputPending);
             }
             if matches!(context.call, MqMqiCall::Put | MqMqiCall::PutOne) && !context.single_queue {

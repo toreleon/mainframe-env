@@ -6,6 +6,33 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.put-context-md-writeback` adds the atomic descriptor context writer
+needed by later compiled PUT/PUT1 forwarding. Eight actual default/no-context
+output fields use the same generated widths/kinds/offsets and prefix copier;
+the generic historical writeback policy stays unchanged. The complete returned
+MD must preserve every other captured field, including ignored signed input
+BackoutCount, supplied IDs and MD2 extension. No source/default/status generation,
+new codec/numeric projection, semantic permission or installed execution credit
+follows. Original PUTrows0020/0021 and supplements baseline2026-09-12
+`q098655_194–227`, `q097395_1498–1508/1571–1605/1634–1715/1739–1955` are
+retained-first hash-verified and read through actual offline scoped search/read.
+Seven new writer tests plus34 raw regressions pass (41 Rust, zero ignored;
+208 filtered and the empty binary fixture earn no credit). All19 Python tests
+pass:13 mandatory policy regressions and6 raw-layout/source projection tests.
+Actual guards/four mutants/module970/34/4/1, generated-registry reproduction,
+fmt/normaldocs+check/changelog/whitespace pass. The fresh combined public API
+gate passes compiler70/coverage386/execution0/host931/store72, without raising
+ceilings. Diagnostic fixtures cover both MD versions, both numeric orders,
+ASCII/CP037, both PUT calls, null/padding and explicit no-context output, including
+an unchanged ignored signed counter outside PIC output range. All failed
+preflight cases preserve every destination byte; generic PUT context observations
+still reject. Ledger-only docs checks are separate. Every sequence and exact
+feature seal/HEADcheck cleans the intended target. Originald8 dependency policy
+and all32 unchanged Cargo/lock/policy/toolchain inputs are reused, not fresh deny.
+Compiled OPEN/PUT, actual physical point bindings, all-argument writeback and
+M's genuine pending-PUT root-terminal proof remain required. Parent remains
+ACTIVE; licensed oracle alone is human-skipped0/26, with zero credit.
+
 `MQ-1501.rfh2-source-pins` consumes sealed workerd317512d3 after independent
 eight-path/blob,124historical binding,61command receipt,17external artifact,
 15source pin,five pre-run snapshot and32dependency checks. The independent scope

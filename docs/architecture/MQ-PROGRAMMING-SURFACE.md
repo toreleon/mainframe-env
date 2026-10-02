@@ -63,7 +63,9 @@ Actual observations and platform/model/single-queue applicability must come from
 the trusted adapter/service. No status determines output synthesis or mutation
 permission. PMO destination counts cannot be written on z/OS; GMO Signal1 remains
 an opaque slot and SET_SIGNAL pointer behavior is unsupported. Conditional PUT
-correlation/context/group output updates remain pending in this bounded substrate.
+correlation/group output updates remain pending in this bounded substrate;
+generic context observations remain GET-only. The bounded context writer below
+is an explicit source-reviewed extension, not a generic policy expansion.
 The API does not generate names, counts, message IDs, descriptor fields or expiry
 clock scaling. Captured numeric Context is an alias observation, never HOBJ
 authority. The eventual registry bridge must supply live handles, including the
@@ -83,6 +85,23 @@ OPEN/GET forwarding, trusted catalog/profile binding and multi-argument final
 reply writeback must still compose it with actual selected execution.
 Sources: original MQGETrow0015 and supplemental baseline2026-09-12
 `q097390_204–304`, `q097395_6–30/1498–1508`; source review earns zero credit.
+
+`MqRawCapture::writeback_put_context_md` copies only eight actual returned
+default/no-context MQMD1/2 fields for a z/OS single-queue PUT/PUT1. It proves
+every other field equals captured input before admitting that private writeback
+extension through the same generated widths/kinds/offsets and atomic copier.
+Ignored BackoutCount, supplied IDs, input-only identity/version and MD2 extension
+remain exact, even for diagnostic signed observations. Any other field change,
+foreign character/version/identifier, out-of-range output scalar, stale prefix
+or changed capacity refuses without a write. Suffix bytes remain unowned.
+This helper copies observations; it does not generate blanks, identity, GMT,
+accounting, status, default queue values or execution permission. No pass/set
+context, generated-ID or distribution-list admission follows. Generic raw
+policy and its historical generated digests remain unchanged. Actual selected
+producer and compiled multi-argument forwarding remain separate obligations.
+Sources: supplements baseline2026-09-12 `q098655_194–227` and
+`q097395_1498–1508/1571–1605/1634–1715/1739–1955`, with retained-first SHA/bytes
+and actual offline search/read; source review earns zero execution credit.
 
 Complete MQMD projection into the current typed message descriptor rejects with
 `DescriptorRepresentationPending`: Report, MsgType, Feedback, body encoding/CCSID,
