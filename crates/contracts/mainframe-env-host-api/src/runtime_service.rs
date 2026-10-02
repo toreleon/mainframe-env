@@ -1,24 +1,35 @@
 use crate::{HostProblem, RuntimeServiceKind, RuntimeServiceName};
 use std::collections::BTreeMap;
 
+/// Versioned identity of the shared runtime-service registry contract.
 pub const RUNTIME_SERVICE_REGISTRY_CONTRACT: &str = "mainframe-env.runtime-service-registry@1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned service identity and schema labels for one positive ABI version.
 pub struct RuntimeServiceDescriptor {
+    /// Service family used as part of the exact registry key.
     pub kind: RuntimeServiceKind,
+    /// Validated service name used as part of the exact registry key.
     pub name: RuntimeServiceName,
+    /// Positive ABI version; registry construction rejects zero.
     pub abi_version: u16,
+    /// Nonempty owned request-schema label, bounded by UTF-8 byte length at construction.
     pub request_schema: String,
+    /// Nonempty owned response-schema label, bounded by UTF-8 byte length at construction.
     pub response_schema: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Immutable descriptors keyed by service family, name and exact ABI version.
 pub struct RuntimeServiceRegistry {
     entries: BTreeMap<(RuntimeServiceKind, RuntimeServiceName, u16), RuntimeServiceDescriptor>,
     max_entries: usize,
 }
 
 impl RuntimeServiceRegistry {
+    /// Build a registry within positive entry-count and per-schema byte ceilings.
+    /// Zero ceilings or duplicate keys are malformed; invalid descriptors or capacity
+    /// overflow return resource exhaustion without publishing a partial registry.
     pub fn new(
         descriptors: impl IntoIterator<Item = RuntimeServiceDescriptor>,
         max_entries: usize,
@@ -54,6 +65,7 @@ impl RuntimeServiceRegistry {
     }
 
     #[must_use]
+    /// Borrow an exact descriptor, or return absence without version or family fallback.
     pub fn resolve(
         &self,
         kind: RuntimeServiceKind,
@@ -64,6 +76,7 @@ impl RuntimeServiceRegistry {
     }
 
     #[must_use]
+    /// Configured descriptor-count ceiling, independent of the current entry count.
     pub fn max_entries(&self) -> usize {
         self.max_entries
     }

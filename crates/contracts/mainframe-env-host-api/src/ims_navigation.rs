@@ -2,14 +2,18 @@
 use crate::{HostLimits, HostProblem, HostRequest, ImsExecutionContext, ImsOperation, ImsRequest};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned display-code SSA navigation operands; validation does not imply every parsed form executes.
 pub struct ImsNavigationRequest {
+    /// Existing Get/Get Hold request with legacy segment, qualifier and data operands empty.
     pub request: ImsRequest,
+    /// Explicit applicability context for the SSA route.
     pub context: ImsExecutionContext,
     /// Invariant syntax is display-code; comparative values are exact binary bytes.
     pub ssas: Vec<Vec<u8>>,
 }
 
 impl ImsNavigationRequest {
+    /// Reject mixed legacy operands and bound at most 15 SSAs, each 32 KiB, before host validation.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         Self::validate_operands(&self.request, &self.ssas, limits)
     }

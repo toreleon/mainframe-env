@@ -3337,3 +3337,97 @@ command-selection failures are retained rather than counted as gate passes.
 The separate API-documentation repair is not folded into this feature seal.
 Unsupported secondary/failure/raw ABI classes, official/human/participant/parent
 and release acceptance remain open; licensed certification is excluded.
+## IMS-1406.api-documentation-ratchet-repair (implemented documentation leaf)
+
+Parent IMS-1406; target 0.14.0. Clean base:
+`86a8774f6e3eae07d2f222d7fd174a000da1b266`; branch
+`codex/v014-api-doc-ratchet-20261002`. Preserve the prior branch and the
+`6f1bd076` official-IR candidate. This nonsemantic infrastructure leaf owns
+Rustdoc additions only in execution `participant.rs` and host `ims.rs`,
+`ims_applicability.rs`, `ims_metadata.rs`, `ims_navigation.rs`, `ims_pcb.rs`,
+`ims_status.rs`, `ims_system.rs`, `ims_tm.rs`, `request/ims.rs`, `dataset.rs`,
+`mq_message_contract.rs`, `mq_validation.rs`, `canonical.rs` and
+`runtime_service.rs`. It also owns
+this status section, a unique change fragment and normal generated docs manifest.
+These are complete missing-item owner groups, including the bounded shared
+message/validation contracts needed to return to the unchanged host baseline.
+Inline enum fields retain their original tokens; variant docs explain their
+units and validity collectively. The immutable runtime-service registry is a
+complete additional shared host owner, with exact resolution and bounded inputs.
+No generated Rust, provider/server code, algorithms or policy thresholds change.
+
+The current base diagnostic is execution 305 versus 176 and host 2100 versus
+1128; compiler 70, coverage 386 and store 95 equal their baselines. The older
+selected-feedback diagnostic's host 2126 is historical, not this base's count.
+Required obligations: accurate owned inputs/results, byte/count/tick units,
+absence/default meaning, identity/fencing/uncertainty and fail-closed boundaries;
+unchanged Rust code tokens, enum order, serde and canonical/type golden inputs;
+unchanged ratchet equality, focused ratchet tooling tests, fmt, strict execution/
+host all-target no-deps Clippy, affected no-deps Rustdoc, module/typed/supply-chain/
+deny/participant-generator/schema/spec/docs/changelog guards and exact leaf
+seal with committed check. No examples or runtime changes are planned.
+
+The module checker actually counts physical production comments (ADR-0010);
+no assumption that Rustdoc is excluded will waive its exact frozen inventory.
+The selected modules fit ordinary budgets; frozen modules stay untouched.
+Execution-context and backend applicability are unchanged; no official catalog
+row or mandatory behavioral obligation is added or passed. Rustdoc describes
+existing local contracts and explicit unsupported/pending boundaries, without
+new IBM semantic assertions, source refresh or fabricated physical equivalence.
+No unrelated IBM lookup, architecture-fast cache gate, runtime campaign,
+licensed certification, participant admission, parent or release acceptance.
+Receipts remain outside Git/targets in the external worker directory
+`v014-completion-20261002/ims-api-doc-ratchet`. Manager composition of feedback,
+GSAM formats, mixed SSA and selected-secondary restart remains separate.
+
+### Documentation repair verification and handoff
+
+The actual sealed-base failure is retained as `base-ratchet.log`; the historical
+selected-feedback log is separately retained without candidate credit. The
+unchanged all-package checker now passes exactly: compiler 70, coverage 386,
+execution 176, host 1128 and store 95. This removes 129 execution and 972 host
+missing-doc diagnostics through complete owner groups. Inline enum fields retain
+eleven missing-doc diagnostics to preserve their original code tokens; their
+units, bounds and identity meaning are described in the variant documentation.
+Remaining documentation debt is the unchanged baseline, with no exemption,
+suppression, threshold increase or detection change.
+
+`contracts-final-receipt.json` records passing focused public-doc tooling tests
+(3), formatting, strict execution/host all-target no-deps Clippy `-Dwarnings`
+and no-deps Rustdoc for both affected packages. No examples were added, so no
+new example requires doctest execution. `comment-only-identity.json` independently
+verifies identical Rust tokens in all 15 owners and byte identity of 346 retained
+golden/schema/generated/test/policy inputs, including historical canonical/type
+inputs. It also verifies the base seal and preserved prior branch/candidate.
+The largest changed owner is dataset at 1,076 physical production lines; every
+changed owner remains under 1,200 and the frozen inventory is byte-identical.
+
+Final module and typed-boundary checks pass in `policy-final-scoped-receipt.json`.
+`policy-receipt.json` retains passing supply-chain, deny, participant contract and
+participant-generator, schema and spec checks on their unchanged inputs; it is
+not relabeled as a later candidate run. Documentation generation/check and
+changelog checking use `packaging-receipt.json`; the final manifest regeneration,
+docs check and seal use `completion-receipt.json`. Final staging must match the
+exact 15-source/status/fragment/generated-manifest allowlist; the feature seal
+and committed `--check` receipts are retained externally. Every Cargo sequence
+cleans this checkout's default target, preserving receipts outside disposable
+output. No runtime suite, cache-source gate or licensed campaign was repeated
+for comments. These checks establish this documentation leaf only; all parent,
+official, release, participant and licensed acceptance obligations remain open.
+
+### Manager API-documentation composition (2026-10-02)
+
+The manager consumes `0ced07859b1b314e5794a90a9ac48d3fbdcc6977` after
+its selected-feedback seal `8379fd3f9eacd1301327ccafe92ece378fb7eea8`.
+Independent comparison of all15 changed Rust owners against that actual manager
+base proves exact byte identity after excluding Rustdoc lines; no runtime,
+canonical, serde, schema, fixture, accepted-rule or ratchet-policy input changes.
+The root gate passes at compiler70, coverage386, execution176, host1128 and
+store95, including the newer backout and IR-candidate API surface. Module/typed
+guards, strict affected all-target Clippy, formatting and normal docs/changelog
+checks pass. Receipts remain external with actual code-candidate identity.
+No runtime suite is repeated for these comments and no old worker receipt is
+relabeled as this manager candidate. Unchanged dependency/architecture policy
+results retain their original evidence identities. Source/ABI/participant,
+human/official, full-v0.14 and release acceptance remain pending; licensed
+certification stays excluded.

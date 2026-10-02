@@ -3,24 +3,39 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Owned catalog schema identity required by the metadata validator.
 pub const IMS_METADATA_SCHEMA_V1: &str = "mainframe-env.ims-metadata@1";
 const DIGEST_DOMAIN: &[u8] = b"mainframe-env.ims-metadata@1\0";
 const MAX_DATABASE_VERSION: u32 = i32::MAX as u32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Local ceilings enforced on metadata collections, hierarchy and segment bytes.
 pub struct ImsMetadataLimits {
+    /// Maximum database definitions in a catalog; default 64.
     pub max_databases: usize,
+    /// Maximum PSB definitions in a catalog; default 256.
     pub max_psbs: usize,
+    /// Maximum segments for general organizations; default 255.
     pub max_segments_per_database: usize,
+    /// Maximum DEDB segment definitions; default 127.
     pub max_dedb_segments: usize,
+    /// Maximum parent-chain depth; default 15.
     pub max_hierarchy_depth: usize,
+    /// Maximum fields, including target index names where checked; default 255.
     pub max_fields_per_segment: usize,
+    /// Maximum combined database field/index count; default 20,000.
     pub max_fields_per_database: usize,
+    /// Maximum combined named fields and index identities; default 1,000.
     pub max_named_fields_and_indexes: usize,
+    /// Maximum secondary indexes per target segment; default 32.
     pub max_secondary_indexes_per_segment: usize,
+    /// Maximum logical relationship definitions; default 255.
     pub max_relationships_per_database: usize,
+    /// Maximum ordered PCB definitions per PSB; default 2,500.
     pub max_pcbs_per_psb: usize,
+    /// Maximum aggregate SENSEG entries across a PSB; default 30,000.
     pub max_sensitive_segments_per_psb: usize,
+    /// Maximum segment length in bytes; default 32 KiB.
     pub max_segment_bytes: usize,
 }
 
@@ -45,32 +60,46 @@ impl Default for ImsMetadataLimits {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Metadata organization identity; recognition alone does not establish executable or physical parity.
 pub enum ImsDatabaseOrganization {
     #[serde(rename = "DEDB")]
+    /// DEDB metadata identity, subject to organization-specific validation and route admission.
     Dedb,
     #[serde(rename = "GSAM")]
+    /// GSAM metadata identity, subject to organization-specific validation and route admission.
     Gsam,
     #[serde(rename = "HDAM")]
+    /// HDAM metadata identity, subject to organization-specific validation and route admission.
     Hdam,
     #[serde(rename = "HIDAM")]
+    /// HIDAM metadata identity, subject to organization-specific validation and route admission.
     Hidam,
     #[serde(rename = "HISAM")]
+    /// HISAM metadata identity, subject to organization-specific validation and route admission.
     Hisam,
     #[serde(rename = "HSAM")]
+    /// HSAM metadata identity, subject to organization-specific validation and route admission.
     Hsam,
     #[serde(rename = "INDEX")]
+    /// INDEX metadata identity, subject to organization-specific validation and route admission.
     Index,
     #[serde(rename = "MSDB")]
+    /// MSDB metadata identity, subject to organization-specific validation and route admission.
     Msdb,
     #[serde(rename = "PHDAM")]
+    /// PHDAM metadata identity, subject to organization-specific validation and route admission.
     Phdam,
     #[serde(rename = "PHIDAM")]
+    /// PHIDAM metadata identity, subject to organization-specific validation and route admission.
     Phidam,
     #[serde(rename = "PSINDEX")]
+    /// PSINDEX metadata identity, subject to organization-specific validation and route admission.
     Psindex,
     #[serde(rename = "SHISAM")]
+    /// SHISAM metadata identity, subject to organization-specific validation and route admission.
     Shisam,
     #[serde(rename = "SHSAM")]
+    /// SHSAM metadata identity, subject to organization-specific validation and route admission.
     Shsam,
 }
 
@@ -113,91 +142,141 @@ impl ImsDatabaseOrganization {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Named or anonymous byte range within a segment, with optional sequence-key role.
 pub struct ImsFieldMetadata {
+    /// Optional field identity; sequence fields require a name.
     pub name: Option<String>,
+    /// Zero-based byte offset within segment data.
     pub offset: usize,
+    /// Positive field length in bytes, bounded by the segment's maximum length.
     pub length: usize,
+    /// Whether this is the segment's single sequence field, present at minimum length.
     pub sequence: bool,
+    /// Whether the declared sequence value is unique.
     pub unique: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Segment identity, parent link and bounded byte-layout definitions.
 pub struct ImsSegmentMetadata {
+    /// Segment name unique within the database after normalization.
     pub name: String,
+    /// Parent segment identity; None denotes the single root.
     pub parent: Option<String>,
+    /// Positive minimum segment length in bytes.
     pub min_length: usize,
+    /// Maximum segment length in bytes, no smaller than min_length.
     pub max_length: usize,
+    /// Field byte ranges and sequence metadata for this segment.
     pub fields: Vec<ImsFieldMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Declared source-field concatenation and self/ancestor target reference; route support is checked separately.
 pub struct ImsSecondaryIndexMetadata {
+    /// Index identity, unique in the database and distinct from target field names.
     pub name: String,
+    /// Target segment that is the source itself or a declared ancestor.
     pub target_segment: String,
+    /// Segment whose field bytes form the search value.
     pub source_segment: String,
+    /// Ordered distinct named fields; one to five fields totaling at most 240 bytes.
     pub source_fields: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Cross-database parent/child reference validated against the catalog.
 pub struct ImsLogicalRelationshipMetadata {
+    /// Database containing the referenced logical parent.
     pub parent_database: String,
+    /// Logical parent segment identity in that database.
     pub parent_segment: String,
+    /// Database containing the referenced logical child.
     pub child_database: String,
+    /// Logical child segment identity in that database.
     pub child_segment: String,
+    /// Declared paired relationship flag consumed by the admitted relationship route.
     pub paired: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Versioned database definition consumed by packages and providers after shared validation.
 pub struct ImsDatabaseMetadata {
+    /// Database resource identity unique after normalization.
     pub name: String,
+    /// Definition version bounded by signed 32-bit range.
     pub version: u32,
+    /// Declared organization used for validation and route applicability.
     pub organization: ImsDatabaseOrganization,
+    /// Nonempty hierarchy with exactly one root.
     pub segments: Vec<ImsSegmentMetadata>,
+    /// Declared indexes whose references and search lengths must validate.
     pub secondary_indexes: Vec<ImsSecondaryIndexMetadata>,
+    /// Declared logical parent/child links to catalog resources.
     pub logical_relationships: Vec<ImsLogicalRelationshipMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// One ordered SENSEG entry defining visibility and optional processing-option override.
 pub struct ImsSensitiveSegmentMetadata {
+    /// Segment identity visible through this PCB.
     pub name: String,
+    /// Declared parent matching metadata and preceding this entry; None for a root.
     pub parent: Option<String>,
+    /// Optional validated SENSEG override; absent leaves PCB options in authority.
     pub processing_options: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Named database PCB binding with ordered sensitivity and optional version selection.
 pub struct ImsDatabasePcbMetadata {
+    /// PCB identity unique within the PSB.
     pub name: String,
+    /// Referenced database resource identity.
     pub database: String,
+    /// Optional exact version; present values must match the referenced definition.
     pub database_version: Option<u32>,
     /// XDFLD identity selecting the secondary processing sequence. Historical
     /// descriptors omit this field and retain the primary processing sequence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secondary_index: Option<String>,
+    /// Validated uppercase PCB PROCOPT text, not an unchecked permission flag.
     pub processing_options: String,
+    /// Nonempty ordered sensitivity path; parents must precede children.
     pub sensitive_segments: Vec<ImsSensitiveSegmentMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Alternate-terminal PCB routing flags; metadata presence does not admit every TM context.
 pub struct ImsTerminalPcbMetadata {
+    /// Alternate PCB identity unique within the PSB.
     pub name: String,
+    /// Initial destination; may be absent only for a modifiable PCB.
     pub destination: Option<String>,
+    /// Whether the destination can be changed by an admitted route.
     pub modifiable: bool,
+    /// Declared express-message flag.
     pub express: bool,
+    /// Declared same-terminal routing flag.
     pub same_terminal: bool,
+    /// Declared response-mode flag.
     pub response_mode: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
+/// Owned tagged PCB definition; host-kind conversion does not inspect database organization.
 pub enum ImsPcbMetadata {
+    /// Database binding, including references later classified as GSAM by the consuming route.
     Database(ImsDatabasePcbMetadata),
+    /// Alternate-terminal routing definition.
     AlternateTerminal(ImsTerminalPcbMetadata),
 }
 
@@ -213,53 +292,85 @@ impl ImsPcbMetadata {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
+/// PSB database-level selector retained in the metadata contract.
 pub enum ImsDbLevel {
+    /// Select the current database-level identity.
     Current,
+    /// Select the base database-level identity.
     Base,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// PSB identity and ordered PCB definitions; order supplies PCB numbering to consumers.
 pub struct ImsPsbMetadata {
+    /// PSB identity unique across PSBs and database names after normalization.
     pub name: String,
+    /// Declared current/base database level.
     pub database_level: ImsDbLevel,
+    /// Ordered PCB definitions bounded by the PSB limit.
     pub pcbs: Vec<ImsPcbMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Single shared metadata authority serialized and hashed only after bounded cross-reference validation.
 pub struct ImsMetadataCatalog {
+    /// Must equal the supported owned metadata schema identity.
     pub schema_version: String,
+    /// Nonempty bounded database definitions.
     pub databases: Vec<ImsDatabaseMetadata>,
+    /// Bounded PSB definitions referencing catalog databases.
     pub psbs: Vec<ImsPsbMetadata>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Validated collection counts and domain-separated catalog digest, without conformance credit.
 pub struct ImsMetadataIdentity {
+    /// Number of validated database definitions.
     pub databases: usize,
+    /// Aggregate segment-definition count.
     pub segments: usize,
+    /// Aggregate physical field-definition count.
     pub fields: usize,
+    /// Aggregate secondary-index definition count.
     pub secondary_indexes: usize,
+    /// Aggregate logical-relationship definition count.
     pub logical_relationships: usize,
+    /// Number of validated PSB definitions.
     pub psbs: usize,
+    /// Aggregate PCB-definition count.
     pub pcbs: usize,
+    /// SHA-256 identity of domain-separated serialized catalog bytes, including their order.
     pub digest: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Explicit metadata validation or encoding failure before publication.
 pub enum ImsMetadataProblem {
+    /// The catalog schema identity is not supported.
     UnsupportedSchema,
+    /// A required collection, size or numeric bound is violated.
     LimitExceeded,
+    /// A resource name is empty, too long or outside the admitted character set.
     InvalidName,
+    /// Normalized identities or a required unique reference repeat.
     DuplicateName,
+    /// A required named resource or parent cannot be resolved.
     MissingReference,
+    /// The segment parent graph contains a cycle.
     Cycle,
+    /// PROCOPT text is malformed or an unadmitted combination.
     InvalidOption,
+    /// A field range or sequence-field placement is invalid.
     InvalidOffset,
+    /// Resolved resources have incompatible organization, hierarchy, version or options.
     IncompatibleReference,
+    /// Owned catalog serialization failed while producing its identity.
     Encoding,
 }
 
+/// Validate bounds, hierarchy, options and references, then return counts and the catalog digest.
 pub fn validate_ims_metadata(
     catalog: &ImsMetadataCatalog,
     limits: ImsMetadataLimits,

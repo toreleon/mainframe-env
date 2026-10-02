@@ -9,8 +9,11 @@ use crate::{
 /// to one official row and exact pinned topic; special rules check their pin below.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqValidationSource {
+    /// Exact official catalog row supporting the checked call signature.
     pub official_row: &'static str,
+    /// Committed pinned source topic locator.
     pub topic_path: &'static str,
+    /// Expected pinned source-body SHA-256 identity.
     pub topic_sha256: &'static str,
 }
 
@@ -30,47 +33,72 @@ impl From<&'static MqMqiContractDescriptor> for MqValidationSource {
 pub enum MqArgumentValue<'a> {
     /// A source-permitted null pointer in an otherwise present parameter slot.
     Null,
+    /// Observed handle role, without exposing an external handle implementation.
     Handle(MqMqiHandleRole),
+    /// Observed signed scalar, checked for signed 32-bit fit where the signature requires it.
     Scalar(i64),
+    /// Observed symbolic length identity admitted only by call-specific rules.
     SymbolicLength(&'a str),
+    /// Supplied byte-area capacity, not its contents.
     ByteArea(usize),
+    /// Supplied array element count, not byte capacity.
     ArraySlots(usize),
+    /// Observed structure identity, version category and symbolic option names.
     Structure {
+        /// Exact structure-family identity required by the signature.
         identity: &'a str,
+        /// Symbolic, numeric or inapplicable version observation; numeric legality may remain pending.
         version: MqStructureVersion<'a>,
+        /// Observed symbolic options; exact numeric legality remains separately pending.
         options: &'a [&'a str],
     },
+    /// Observed selector/option symbol names checked for declared family membership.
     Symbols(&'a [&'a str]),
+    /// Present output slot, without supplying an input value.
     OutputSlot,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Observed structure-version category; a numeric value does not supply missing legality authority.
 pub enum MqStructureVersion<'a> {
     /// A symbolic family identity only; no numeric version is inferred.
     Symbolic(&'a str),
     /// A numeric version needs a separately pinned legality source.
     Numeric(i32),
+    /// The signature assigns no applicable structure-version identity.
     NotApplicable,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Named call-shape observation in signature order; it is not an executable MQI argument.
 pub struct MqArgument<'a> {
+    /// Exact parameter name required at this signature position.
     pub name: &'a str,
+    /// Observed parameter shape checked against the declared role.
     pub value: MqArgumentValue<'a>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Unresolved checks preserved by a shape report instead of being silently treated as valid.
 pub enum MqPendingDisposition {
+    /// The call signature does not establish numeric structure-version legality.
     NumericVersionNotStated,
+    /// Symbol families are known but exact option-value legality is unresolved.
     OptionValueLegalityNotStated,
+    /// Selector family is known but exact selector-value legality is unresolved.
     SelectorValueLegalityNotStated,
+    /// Object-specific applicability has not been validated.
     ObjectApplicabilityNotChecked,
+    /// Only part of the attribute-output relationship can be checked.
     PartialAttributeOutput,
+    /// The attribute's exact output width remains unresolved.
     AttributeWidthNotResolved,
+    /// The shape-only validator cannot inspect a terminator in caller bytes.
     NullTerminationNotInspected,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Execution admission remains explicitly unsupported by this shape-only contract.
 pub enum MqExecutionDisposition {
     /// The identity and shape contract does not register an MQI handler.
     Unsupported,
@@ -80,30 +108,49 @@ pub enum MqExecutionDisposition {
 /// It never authorizes an MQI handler or grants conformance/licensed credit.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MqValidationReport {
+    /// Pinned signature authority for the successful bounded shape checks.
     pub source: MqValidationSource,
+    /// Distinct unresolved semantic checks retained in the report.
     pub pending: Vec<MqPendingDisposition>,
+    /// Unsupported execution disposition; successful shape checks never install a handler.
     pub execution: MqExecutionDisposition,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Reason a call-shape observation fails the shared signature validator.
 pub enum MqValidationProblem {
+    /// No shared descriptor matches the requested call label.
     UnknownCall,
+    /// The signature itself is not accepted for shape validation.
     PendingSignature,
+    /// The call-specific rule does not match its required row and source pin.
     SourcePinMismatch,
+    /// Observed parameter count differs from the signature.
     ParameterCount,
+    /// An observed parameter name differs from its ordered signature slot.
     ParameterName,
+    /// Observed value category is incompatible with the declared parameter role.
     ParameterShape,
+    /// Observed structure identity differs from the signature family.
     StructureIdentity,
+    /// Observed version category/identity conflicts with the signature.
     StructureVersionIdentity,
+    /// A symbol is outside the declared selector or option family.
     SymbolFamily,
+    /// Call-specific symbolic operands form a rejected combination.
     InvalidCombination,
+    /// Scalar length and observed area/count relationship disagree.
     LengthRelationship,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Bounded validation failure with optional pinned source and parameter context.
 pub struct MqValidationError {
+    /// Resolved pinned signature context; None when no source descriptor can be selected.
     pub source: Option<MqValidationSource>,
+    /// Affected signature parameter, or None for a call-wide failure.
     pub parameter: Option<&'static str>,
+    /// Closed failure category, without execution or coverage authority.
     pub problem: MqValidationProblem,
 }
 
