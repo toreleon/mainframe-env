@@ -295,6 +295,35 @@ precision. FLOAT(n) aliases, character/graphic CCSID/collation and datetime-stri
 combination still require source-backed binding/context. No statement-catalog
 numerator, durable route, shared signature preimage or parent milestone changes.
 
+## Fifth-wave parser and freeze preparation
+
+The manager declares four conflict-isolated CLI lanes after the fourth-wave
+public boundary is sealed. Two syntax kernels remain private until manager
+review and separate public integration. The other two lanes are read-only
+preparation reports, not accepted schemas, coverage evidence or completed parent
+milestones. All use gpt-6.1-sol/high, goals and default service tier with fast
+mode disabled. No orchestration skill or nested workers are used.
+
+| Lane | Exact ownership and boundaries |
+|---|---|
+| `DB2-1201.drop-common-object-syntax` | Only `src/drop_syntax.rs` and `db2-drop-common-object-syntax.toml`. SQL0072 common DROP TABLE/VIEW/INDEX/ALIAS structure, effective owned names, explicit supported alias-designator spelling and complete located bounds/errors. Unsupported DROP portfolios fail explicitly; no catalog validity, dependency deletion, package invalidation, authorization or execution. No full DROP-row credit. |
+| `DB2-1201.rename-common-object-syntax` | Only `src/rename_syntax.rs` and `db2-rename-common-object-syntax.toml`. SQL0105 RENAME TABLE/INDEX source TO unqualified new identifier. Preserve source qualification and explicit destination spelling; current-server object applicability, alias resolution, dependencies, privileges and runtime mutation remain binding-owned. No statement dispatch or full-row credit. |
+| Exact 174-row freeze preparation | Read-only proposed common/deferred obligation map for every pinned SQL and SQL PL row, independent of passing tests. Preserve every row, source locator and owner; identify partial recognition and mandatory remaining obligations. Missing sources remain explicit pending reviews. Do not change catalogs, denominator, IR, ledgers or status; the manager must review and integrate any normative freeze through existing authorities. |
+| Typed catalog wire-design preparation | Read-only concrete actual-blob schema and codec/canonical-vector proposal under ADR-0028. Resolve metadata/default/cell/name/string-policy/version ownership and exact generated projections/gates before schema mutation. Do not install a second catalog, change package signatures, persist typed data or claim migration/acceptance. |
+
+Pinned DROP `db2z_sql_drop.html` (320964 bytes,
+`5f75fdde9c96290ba968fb9b2629ca73d9274de9d8b8bd1002e56c341cd446a0`)
+and RENAME `db2z_sql_rename.html` (25184 bytes,
+`ea6063fba847a91a891db54d4b1741f6dc379a7dbf61c8f15069867365f63984`)
+were hash-verified locally under the Db2 13 baseline; ordinary reader remains
+TOC-blocked. Invocation/authorization and catalog-dependent restrictions are
+not parser proof. Parser checks cover valid/negative/source-location/effective
+identifier and exact/one-beyond input/token/name bounds with owned outputs,
+plus package/MSRV, format, policy, statement-catalog, changelog/docs and exact
+path seals. Pure parser slices do not affect backend or durability routes.
+Source review of the 174-row map is a required scoped freeze prerequisite, not
+a whole-cache refresh/audit; no network or browser request is authorized.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
