@@ -439,6 +439,15 @@ that original borrow. Trusted lifecycle owner minting, SAF, durable dispatch,
 returned-handle authority and public registration remain manager-owned. No
 standalone MQI digest may replace the shared journal identity.
 
+The manager owns `MQ-1501.trusted-lifecycle-directory`: a new private volatile
+host lifecycle directory and tests, one facade hook, the handle registry's
+process-termination primitive, ADR 0030 and one fragment. Opaque host-minted
+process/frame leases map already-admitted invocations to non-reused numeric
+owners; application envelopes cannot select them. Explicit CICS child admission
+preserves the parent task, IMS syncpoint retirement advances its owner epoch,
+and process termination retires shared handles. This is not host attestation,
+durable UOW identity, a SAF permit, public dispatch or a new lifecycle journal.
+
 The manager delegates the declared `MQ-1501.host-effect-contract` to retained
 lane M. Lanes N and O receive the following disjoint next slices, keeping three
 CLI workers plus manager, `gpt-6.1-sol`, high effort, goal mode/bypass and fast off.

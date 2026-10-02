@@ -587,6 +587,27 @@ impl MqHandleRegistry {
         Ok(())
     }
 
+    /// Host-owned process termination, not MQDISC or application authorization.
+    /// Retires shared connections and every volatile child/unassociated handle
+    /// in this exact environment/host/process, including in-flight handles.
+    /// The service's existing UOW coordinator must resolve durable work separately.
+    pub fn end_process(&mut self, owner: MqHandleOwner) -> Result<(), MqHandleProblem> {
+        Self::check_owner(owner)?;
+        let belongs = |candidate: MqHandleOwner| {
+            candidate.environment == owner.environment
+                && candidate.host_id == owner.host_id
+                && candidate.process_id == owner.process_id
+        };
+        for slot in &mut self.slots {
+            if slot.entry.is_some_and(|entry| belongs(entry.owner)) {
+                Self::retire_slot(slot);
+                self.active -= 1;
+            }
+        }
+        self.defaults.retain(|(candidate, _)| !belongs(*candidate));
+        Ok(())
+    }
+
     fn check_owner(owner: MqHandleOwner) -> Result<(), MqHandleProblem> {
         if owner.valid() {
             Ok(())

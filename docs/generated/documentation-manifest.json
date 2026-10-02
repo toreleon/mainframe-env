@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 225,
+    "markdown_documents": 226,
     "navigation_groups": 6,
-    "normative_documents": 59,
+    "normative_documents": 60,
     "xtask_commands": 213
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 115,
-      "sha256": "sha256:a5b495ebd4673832072d857d59dcc84d4b372da2256e44240086021e22ed06c6",
+      "relative_links": 116,
+      "sha256": "sha256:afd24994461caeac692e6d651b8f222d8cf4c23940e55edb77da97fd70a2f7eb",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -975,6 +975,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0030-mq-host-lifecycle-directory.md",
+      "relative_links": 0,
+      "scope": "volatile trusted-service composition, not public route acceptance",
+      "sha256": "sha256:687b04d5799f9c49a07b0d038c054efb7cfa98c96cce24bf58b0d596d0a21b4d",
+      "status": "Proposed",
+      "title": "Private MQ host lifecycle directory",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 28,
@@ -1486,7 +1498,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:293caeb7c63aca6b45100f7171cbac9e9a38a8491e41c7a2cd0d60a8baf04dde",
+      "sha256": "sha256:d487966bdb40965b49bf4d80278f8fbaccbbc48c2ec0f665c2c324a34bff8bd7",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2268,6 +2280,10 @@
           "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
         },
         {
+          "label": "ADR-0030: Private MQ host lifecycle directory",
+          "path": "docs/decisions/0030-mq-host-lifecycle-directory.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2516,7 +2532,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:02719151bf45b1ebc4452154df2bc9a6ae3374987c65c28f3cfadbe03b0bce94",
+  "registry_sha256": "sha256:f04b53c68975b056c643b6182fa375ac4e58412316c71f6c7d05fb863c8cac82",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
