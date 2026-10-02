@@ -1114,3 +1114,41 @@ and payload-limit failure with physical reopen and no redispatch. Default
 registration ignores earn zero credit; the four explicit runs remain separate.
 Mandatory gates must pass before this bounded seal. Scoped routing/close and
 application acceptance remain pending.
+
+### Manager scoped terminal observation (2026-10-02)
+
+`CIC-902.program-task.frames.scoped-terminal-observation` is the serialized
+manager-owned consumer of sealed terminal capture `5726a469`. It owns new
+instance/scoped/terminal.rs and its tests, one private module registration and
+one read-only live lease invocation accessor. It must combine an exact current
+thread-confined managed lease, full stored instance bytes/version, actual live
+GOBACK/EXIT PROGRAM marker and fresh captured image with the exact stored core
+Completed state/event/version/attempt/tick and checkpoint identity/generation/
+interfaces/bytes/size/digest. Fresh control must reject cancellation, deadline
+or time regression. Cold images and an earlier checkpoint beside Completed
+remain insufficient. The result is a private non-serializable read observation,
+never permission to close, redispatch or reconstruct a lease; the publisher
+retains member/root/CALL CAS and quiescence ownership. Actual native-return unit
+fixtures and rehashed stale/context/checkpoint/control failures must prove these
+bindings without mutation; source calling flow/rules, mandatory guards and clean
+targets apply. Scope close and application acceptance stay pending.
+
+The stronger checkpoint PostgreSQL follow-up passed six selected cases against
+sealed `5726a469`, with real server stop/start, fsync on, actual GOBACK row-quota
+publication failure and malformed digest/size rejection. The worker's earlier
+loopback-bind denial remains a separate zero-execution receipt; the manager
+performed these new current-library executions and stopped its owned server.
+
+This observation also owns the existing kernel normal-return witness and its
+completion hook for one immutable captured return_code plus read-only getter.
+It records the code from the actual successful Completion, preserving volatile
+reset/restore rules and every snapshot codec. This avoids cloning a full machine
+snapshot and lets the consumer reject a Completed event whose return code was
+produced by another capture publisher. Kernel normal-return/completion regressions
+must run again for these changed inputs; prior checkpoint receipts remain bound
+to `5726a469` and are never relabeled.
+
+Terminal observation current-input checks: five exact live/store/control tests
+plus seventeen native-return and ten capture regressions pass with zero ignores.
+The private observer writes no state; mandatory policy gates precede its bounded
+seal. Full scoped admission/close and application gates stay pending.

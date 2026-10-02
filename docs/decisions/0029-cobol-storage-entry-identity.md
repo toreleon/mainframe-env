@@ -190,6 +190,33 @@ Tests use real atomic MemoryStore mutations for coupled rollback, known version
 adoption and committed-but-unacknowledged publication; fixtures earn no selected
 product-route, recovered, licensed or parent credit.
 
+## Exact live terminal observation
+
+The serialized scope owner observes a completed managed member only while its
+exact thread-confined lease is current. The complete stored member bytes/version
+must still equal that lease. The actual ReferenceMachine's successful native
+return witness must carry the same entire invocation and actual return code
+captured from Completion, rather than an inferred return PC or reconstructed
+snapshot. The optional freshly captured image must exist. Constructors and cold
+restores retain no marker; no additional snapshot field/version is introduced.
+
+The existing core row must be Completed with the exact execution/run/selector/
+artifact/principal/attempt, terminal tick and final event version. Its single
+matching final Completed event must agree on identity, sequence, attempt, tick
+and the witness's return code. The checkpoint must equal the actual fresh
+image's bytes, byte length, SHA-256, generation, interfaces, effect sequence and
+all existing identity/session/transaction/security metadata. A generic publisher
+using another machine's image cannot substitute its different completion code.
+Fresh control rejects cancellation, expiry and time regression. The observer
+rechecks the current lease after its bounded reads and writes nothing.
+
+This private non-serializable result is a historical observation, not a lease
+or close grant. The actual publisher must still require current live ownership,
+revalidate exact terminal/member/CALL/root records, prove scope quiescence and
+win the mixed CAS publication. Dropping the lease or an unknown store outcome
+does not permit cleanup using a retained observation. Actual compiled route,
+scope close, abnormal exits and cold recovery remain separate obligations.
+
 ## Source authority and acceptance
 
 Catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0138` LINK, command-body baseline

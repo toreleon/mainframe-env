@@ -23,8 +23,12 @@ impl ReferenceMachine {
         operation: &Operation,
     ) -> Result<MachineDrive<EffectRequest>, MachineProblem> {
         let completion = self.complete()?;
-        self.normal_return =
-            normal_return::NormalReturnMarker::completed(operation, self.pc, self.executed_steps);
+        self.normal_return = normal_return::NormalReturnMarker::completed(
+            operation,
+            self.pc,
+            self.executed_steps,
+            completion.return_code,
+        );
         Ok(MachineDrive::Completed(completion))
     }
 

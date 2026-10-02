@@ -110,6 +110,10 @@ impl LiveLease {
             .map_err(|_| HostProblem::UnknownOutcome)
     }
 
+    pub(super) fn invocation(&self) -> &Invocation {
+        &self.0.invocation
+    }
+
     pub(super) fn entry(&self) -> &Entry {
         &self.0.entry
     }

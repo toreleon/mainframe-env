@@ -20,6 +20,7 @@ pub struct InstalledProgramReturn {
     kind: InstalledProgramReturnKind,
     program_counter: usize,
     executed_steps: u64,
+    return_code: i32,
 }
 
 impl InstalledProgramReturn {
@@ -31,6 +32,11 @@ impl InstalledProgramReturn {
     /// Native return operation that successfully completed.
     pub fn kind(&self) -> InstalledProgramReturnKind {
         self.kind
+    }
+
+    /// Return code produced by that exact successful native completion.
+    pub fn return_code(&self) -> i32 {
+        self.return_code
     }
 
     /// Program counter of the executed terminal operation.
@@ -49,14 +55,21 @@ pub(super) struct NormalReturnMarker {
     kind: InstalledProgramReturnKind,
     pc: usize,
     steps: u64,
+    return_code: i32,
 }
 
 impl NormalReturnMarker {
-    pub(super) fn completed(operation: &Operation, pc: usize, steps: u64) -> Option<Self> {
+    pub(super) fn completed(
+        operation: &Operation,
+        pc: usize,
+        steps: u64,
+        return_code: i32,
+    ) -> Option<Self> {
         Some(Self {
             kind: return_kind(operation)?,
             pc,
             steps,
+            return_code,
         })
     }
 }
@@ -97,6 +110,7 @@ impl ReferenceMachine {
             kind: marker.kind,
             program_counter: marker.pc,
             executed_steps: marker.steps,
+            return_code: marker.return_code,
         })
     }
 
