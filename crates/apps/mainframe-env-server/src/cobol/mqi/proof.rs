@@ -207,7 +207,10 @@ pub(super) fn admitted<'a>(
         return Err(HostProblem::Unsupported);
     };
     if !name.as_str().eq_ignore_ascii_case(&artifact.name)
-        || payload.schema() != "mainframe-env.program.input@1"
+        || !matches!(
+            payload.schema(),
+            "mainframe-env.program.input@1" | "mainframe-env.cobol.call@1"
+        )
     {
         return Err(HostProblem::Unauthorized);
     }

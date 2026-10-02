@@ -850,7 +850,15 @@ impl CobolProgram {
         };
         let mut writes = Vec::new();
         let result = if payload.schema() == "mainframe-env.cobol.call@1" {
-            self.execute_admitted(parent, program, admitted, payload, &key, &mut writes)
+            self.execute_admitted(
+                parent,
+                program,
+                admitted,
+                payload,
+                &key,
+                &mut writes,
+                Some(&original_call),
+            )
         } else {
             self.execute_installed_batch_from_call(
                 parent,

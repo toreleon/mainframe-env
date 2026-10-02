@@ -2,8 +2,10 @@
 
 use super::*;
 use mainframe_env_interpreter::MqMqiProgramFrame;
+mod configured;
 mod proof;
 mod session;
+pub use configured::{ConfiguredInstalledMqHost, InstalledMqHostBounds};
 pub use proof::InstalledBatchAdmission;
 pub use session::InstalledMqFrameSession;
 pub(super) use session::SessionGuard;

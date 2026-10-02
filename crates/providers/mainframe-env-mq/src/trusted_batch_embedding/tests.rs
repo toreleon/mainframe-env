@@ -15,6 +15,7 @@ use std::sync::{
 
 mod connection_warning;
 mod flows;
+mod installed_fixture;
 mod lifecycle;
 mod publication;
 mod refusals;

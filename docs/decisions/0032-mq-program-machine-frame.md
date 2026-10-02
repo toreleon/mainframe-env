@@ -156,6 +156,43 @@ and historical-handle adoption support remains pending.
 
 ### Deliberate Rust trusted-host facet
 
+`ConfiguredInstalledMqHost` is deliberate server Rust setup over that SAME
+facet. It requires strict existing rich rows, the actual PlatformStore,
+mandatory enterprise authorizer and one MqReplayClock. It constructs the frozen
+ProgramExecutionControl from that exact clock and original cancellation/probe,
+not a sentinel Invocation or matching tick values. Setup registers the SAME Arc
+as HostProvider and uses physical registry selection before consuming genuine
+InstalledBatchAdmission. ProductServer's default remains unchanged; startup
+does not initialize, import, normalize or advance deployment fences.
+
+Finite host maps retain opaque roots/closed frames and exact original Invocations.
+Count slots and a conservative aggregate invocation-memory charge under frozen
+HostLimits.max_state_bytes are reserved before callbacks or snapshot cloning.
+Shared payload bytes are conservatively charged without deep copying; this host
+memory budget is neither a canonical encoding nor a durable authority.
+Root parentNone and already-retained nested parents are checked separately;
+configuration independently chooses ordinary SAME TASK, never inferring host
+admission from bindings or matching identifiers. Map locks are released before
+clock/store/SAF/facet callbacks. Per-frame exclusion and pre/post revocation guard
+profile, current-unit lookup, explicit ordinary CONNX ABI observation and ORIGINAL
+typed effect dispatch. The existing service remains the sole registry/UOW/queue,
+SAF, canonical intent, receipt, replay and audited physical publication authority.
+
+Preparation abort affects only a new predispatch child. Only a returned Completed
+CALL outcome permits explicit nonfinal child return; other raw outcomes fence and
+retain uncertainty rather than guess a task-end or UOW decision. Session Drop
+only revokes host transport access: it calls no service/durable cleanup, detached
+work or automatic retry. Revoked/uncertain retained entries cannot become fresh
+roots/frames. The atomic provider audit and coordinator dispatch observation both
+remain required under their existing independent storage ordering. Test-only
+normalized setup rows are reproducibly captured from the existing quiescent
+import planner; this is not a production normalization route or execution credit.
+
+Deployment normalization, final task-end, typed checkpoint, retention, shared
+participant, full26 and CardDemo acceptance remain separately required. This
+explicit configured profile does not change the public default or grant licensed
+credit.
+
 `MqTrustedBatchRuntime` is an explicit privileged Rust embedding facet over one
 selected `MqService`, its same physical `Arc<dyn PlatformStore>`, mandatory
 enterprise authorizer/clock and frozen provider/host/MQI profiles. Opening uses
@@ -311,10 +348,25 @@ requires queue-manager coordination and the same connection's UOW. CICS, IMS
 transaction-manager and RRS/shared resource work are not admitted by this port.
 
 ProductServer still opens and registers the previous MQ profile. It does not
-automatically configure this factory. A real factory must bridge the admitted
-installed program CHILD topology to the selected private directory; pretending
-it is a parentless root is prohibited. Actual service/SAF/UOW/receipt publication,
-handle-valued Completed replay, fenced Unknown recovery, frame-end policy,
-checkpoint/retention and all applicable 26-call contexts must compose before
-readiness. The source signatures and compiled-program/journal fixture tests prove
-only this handoff, not owned MQ mutation, participant or CardDemo acceptance.
+automatically configure this factory. The explicit configured factory bridges
+the genuinely admitted installed CHILD topology to the selected directory;
+pretending it is a parentless root is prohibited. Ordinary `cobol.call@1` now
+forwards its existing winning CALL proof into the same session seam as batch
+input. The proof accepts these two original payload schemas while retaining all
+original core/control/catalog/reservation checks. The owning execution method
+is extracted into a bounded child; session preparation aborts once, parent/core
+controls are rechecked during execution, and finish receives the untouched raw
+outcome before cursor/linkage/CALL mapping. Original run-end and replay protocols
+remain their existing owners.
+
+Real compiled/catalog-published nested and successive ordinary CALL tests on
+Memory and owned SQLite exercise the configured selected CONN/CONNX/CMIT/BACK/DISC
+profile, prior issued connection, current UOW, both actual audit layers and
+original actor-specific core/receipts. They test late proof/control/SAF/CAS failure,
+normal nonfinal return, escaped transport and cold-incarnation fencing. Generic
+rich fixture setup is generated through the existing quiescent import planner,
+not production normalization. These fixture authorizers are recording/denying
+ports, not installed RACF or shared-participant proof. Deployment normalization,
+final task-end/recovery, typed checkpoint/retention, all applicable 26-call
+contexts and CardDemo still require their own composed acceptance before broader
+readiness.
