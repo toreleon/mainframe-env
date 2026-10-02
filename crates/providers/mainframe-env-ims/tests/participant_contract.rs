@@ -84,6 +84,7 @@ fn catalog() -> ImsMetadataCatalog {
                 name: "BINDPCB".into(),
                 database: "BINDDB".into(),
                 database_version: Some(1),
+                secondary_index: None,
                 processing_options: "AP".into(),
                 sensitive_segments: vec![ImsSensitiveSegmentMetadata {
                     name: "ROOT".into(),

@@ -175,6 +175,10 @@ pub struct ImsDatabasePcbMetadata {
     pub name: String,
     pub database: String,
     pub database_version: Option<u32>,
+    /// XDFLD identity selecting the secondary processing sequence. Historical
+    /// descriptors omit this field and retain the primary processing sequence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary_index: Option<String>,
     pub processing_options: String,
     pub sensitive_segments: Vec<ImsSensitiveSegmentMetadata>,
 }
@@ -439,7 +443,7 @@ fn validate_database(
         *count += 1;
         if *count > limits.max_secondary_indexes_per_segment
             || index.source_fields.is_empty()
-            || index.source_fields.len() > limits.max_fields_per_segment
+            || index.source_fields.len() > limits.max_fields_per_segment.min(5)
         {
             return Err(ImsMetadataProblem::LimitExceeded);
         }
@@ -448,6 +452,22 @@ fn validate_database(
             .iter()
             .filter_map(|field| field.name.as_ref().map(|name| (normalize(name), field)))
             .collect::<BTreeMap<_, _>>();
+        let mut ancestor = Some(*source);
+        while ancestor.is_some_and(|segment| normalize(&segment.name) != normalize(&target.name)) {
+            ancestor = ancestor
+                .and_then(|segment| segment.parent.as_deref())
+                .and_then(|parent| segments.get(&normalize(parent)).copied());
+        }
+        if ancestor.is_none()
+            || target.fields.iter().any(|field| {
+                field
+                    .name
+                    .as_deref()
+                    .is_some_and(|name| normalize(name) == normalize(&index.name))
+            })
+        {
+            return Err(ImsMetadataProblem::IncompatibleReference);
+        }
         let mut length = 0usize;
         let mut selected = BTreeSet::new();
         for field in &index.source_fields {
@@ -625,6 +645,20 @@ fn validate_psb(
                 if pcb.sensitive_segments.is_empty() {
                     return Err(ImsMetadataProblem::MissingReference);
                 }
+                if let Some(name) = &pcb.secondary_index {
+                    validate_name(name)?;
+                    let index = database
+                        .secondary_indexes
+                        .iter()
+                        .find(|index| normalize(&index.name) == normalize(name))
+                        .ok_or(ImsMetadataProblem::MissingReference)?;
+                    if pcb.processing_options.contains('L')
+                        || normalize(&pcb.sensitive_segments[0].name)
+                            != normalize(&index.target_segment)
+                    {
+                        return Err(ImsMetadataProblem::IncompatibleReference);
+                    }
+                }
                 sensitive_count = sensitive_count
                     .checked_add(pcb.sensitive_segments.len())
                     .ok_or(ImsMetadataProblem::LimitExceeded)?;
@@ -773,6 +807,7 @@ mod tests {
                     name: "AUTHPCB".into(),
                     database: "AUTHDB".into(),
                     database_version: Some(7),
+                    secondary_index: None,
                     processing_options: "AP".into(),
                     sensitive_segments: vec![
                         ImsSensitiveSegmentMetadata {
@@ -810,6 +845,53 @@ mod tests {
         assert_eq!(
             validate_ims_metadata(&decoded, ImsMetadataLimits::default()).unwrap(),
             identity
+        );
+    }
+
+    #[test]
+    fn secondary_selector_absence_preserves_historical_metadata_bytes_and_identity() {
+        let catalog = catalog();
+        let old_pcb = r#"{"kind":"database","name":"AUTHPCB","database":"AUTHDB","database_version":7,"processing_options":"AP","sensitive_segments":[{"name":"ROOT","parent":null,"processing_options":null},{"name":"CHILD","parent":"ROOT","processing_options":"G"}]}"#;
+        assert_eq!(
+            serde_json::to_string(&catalog.psbs[0].pcbs[0]).unwrap(),
+            old_pcb
+        );
+        let encoded = serde_json::to_vec(&catalog).unwrap();
+        let identity = validate_ims_metadata(&catalog, ImsMetadataLimits::default()).unwrap();
+        let mut value = serde_json::to_value(&catalog).unwrap();
+        value["psbs"][0]["pcbs"][0]["secondary_index"] = serde_json::Value::Null;
+        let decoded = serde_json::from_value(value).unwrap();
+        assert_eq!(serde_json::to_vec(&decoded).unwrap(), encoded);
+        assert_eq!(
+            validate_ims_metadata(&decoded, ImsMetadataLimits::default()).unwrap(),
+            identity
+        );
+    }
+
+    #[test]
+    fn secondary_selector_references_and_source_target_ancestry_are_validated() {
+        let mut metadata = catalog();
+        metadata.databases[0].secondary_indexes[0].target_segment = "ROOT".into();
+        let ImsPcbMetadata::Database(pcb) = &mut metadata.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.secondary_index = Some("AUTHX".into());
+        assert!(validate_ims_metadata(&metadata, ImsMetadataLimits::default()).is_ok());
+        let mut invalid = metadata.clone();
+        let ImsPcbMetadata::Database(pcb) = &mut invalid.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.secondary_index = Some("MISSING".into());
+        assert_eq!(
+            validate_ims_metadata(&invalid, ImsMetadataLimits::default()),
+            Err(ImsMetadataProblem::MissingReference)
+        );
+        let mut invalid = metadata;
+        invalid.databases[0].secondary_indexes[0].source_segment = "ROOT".into();
+        invalid.databases[0].secondary_indexes[0].target_segment = "CHILD".into();
+        assert_eq!(
+            validate_ims_metadata(&invalid, ImsMetadataLimits::default()),
+            Err(ImsMetadataProblem::IncompatibleReference)
         );
     }
 

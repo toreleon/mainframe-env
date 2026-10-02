@@ -79,8 +79,31 @@ database images; a child read includes the linked parent data, and paired
 parent deletion removes linked children in one provider-row CAS publication.
 Insertion identifies one logical parent with parent-segment field qualifiers.
 An unpaired parent with live children rejects deletion. Composite secondary
-indexes remain outside this route. Legacy and generic catalogs may coexist
+indexes concatenate one to five source fields in their declared order. Pointer
+entries resolve to the source occurrence or its physical ancestor target.
+An optional DB PCB `secondary_index` selects a full-function physical-root
+target processing sequence. GU/GN/GNP and holds retain independent pointer
+cursors per PCB; named qualifiers use the index's XDFLD identity on its target.
+Primary and selected updates maintain the same index. Selected target ISRT/DLET
+are rejected, and successful indexed target replacement or search-byte changes
+lose selected parentage. Nonroot restructuring/aliases, Fast Path secondary
+processing, optional search fields in selected sequences, NULLVAL/exits and
+SUBSEQ/user pointer data remain unavailable in this bounded shape. Legacy and generic catalogs may coexist
 when their database and PSB names do not overlap.
+
+Historical metadata without a PCB selector, single-field engine descriptors and
+positions without a pointer cursor retain their serialized bytes and identities.
+Engine images rebuild pointer maps from retained records and validate target
+ancestry and uniqueness before use. Extended descriptors and selected cursors
+are additive reader inputs. Extended engine descriptors write `source_field`
+instead of the old required `field`, forcing prior readers to reject rather
+than silently ignore extensions; old metadata/position readers reject selected
+PCB/cursor fields. Before
+admitting extended metadata or writing such images, drain older writers and take
+a coherent backup of metadata/package generations, database images, sessions,
+checkpoints, UOW/undo and replay rows. Binary rollback requires stopping admission
+and restoring that pre-feature backup with its referenced artifacts. Removing
+fields from live rows is not a rollback or an identity-preserving migration.
 
 TM admission records a provider-row intent before adding work. An exact retry
 or `repair_schedules` repairs that bounded cross-interface gap without executing

@@ -23,6 +23,11 @@ pub(in crate::service) fn prepare(
         return Err(HostProblem::Unsupported);
     }
     let pcb = session_pcb(state, run, navigation.request.pcb)?;
+    // Rich predicates do not yet have a secondary-sequence planner. Never
+    // silently execute them using primary order for an indexed PCB.
+    if pcb.secondary_index.is_some() {
+        return Err(HostProblem::Unsupported);
+    }
     let engine = restored(state, &normalize(&pcb.database), limits)?;
     let ssas = navigation
         .ssas

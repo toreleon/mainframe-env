@@ -92,8 +92,42 @@ pub(super) fn validate_definition(
         else {
             return Err(EngineProblem::InvalidDefinition);
         };
+        let target = definition
+            .segments
+            .iter()
+            .find(|segment| segment.name == index.target_segment())
+            .ok_or(EngineProblem::InvalidDefinition)?;
+        let mut ancestor = Some(segment);
+        while ancestor.is_some_and(|segment| segment.name != target.name) {
+            ancestor = ancestor
+                .and_then(|segment| segment.parent.as_deref())
+                .and_then(|parent| {
+                    definition
+                        .segments
+                        .iter()
+                        .find(|segment| segment.name == parent)
+                });
+        }
+        let mut fields = BTreeSet::new();
+        let mut length = 0usize;
+        for name in index.fields() {
+            let field = segment
+                .fields
+                .iter()
+                .find(|field| field.name == name)
+                .ok_or(EngineProblem::InvalidDefinition)?;
+            if !fields.insert(name) {
+                return Err(EngineProblem::InvalidDefinition);
+            }
+            length = length
+                .checked_add(field.length)
+                .ok_or(EngineProblem::InvalidDefinition)?;
+        }
         if !valid_name(&index.name, limits.max_name_bytes)
-            || !segment.fields.iter().any(|field| field.name == index.field)
+            || ancestor.is_none()
+            || fields.len() > limits.max_fields_per_segment.min(5)
+            || length > limits.max_segment_bytes.min(240)
+            || target.fields.iter().any(|field| field.name == index.name)
         {
             return Err(EngineProblem::InvalidDefinition);
         }

@@ -100,6 +100,7 @@ fn metadata(version: u32) -> ImsMetadataCatalog {
                 name: "AUTHPCB".into(),
                 database: "AUTHDB".into(),
                 database_version: Some(version),
+                secondary_index: None,
                 processing_options: "AP".into(),
                 sensitive_segments: vec![
                     ImsSensitiveSegmentMetadata {

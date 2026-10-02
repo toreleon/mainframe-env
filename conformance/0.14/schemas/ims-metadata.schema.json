@@ -148,7 +148,7 @@
         "source_fields": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 255,
+          "maxItems": 5,
           "items": {
             "$ref": "#/$defs/name"
           }
@@ -327,6 +327,12 @@
         },
         "database": {
           "$ref": "#/$defs/name"
+        },
+        "secondary_index": {
+          "oneOf": [
+            { "$ref": "#/$defs/name" },
+            { "type": "null" }
+          ]
         },
         "database_version": {
           "oneOf": [

@@ -266,7 +266,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
       "relative_links": 2,
-      "sha256": "sha256:27f64508e1cab816fa57c9c23c9b937196917a46b28a59310eb40e17bb758fa2",
+      "sha256": "sha256:986a6cc03667827bd26efacd88387ea762efc7ce623193ab0889e963b6af0842",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -1402,7 +1402,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 7,
-      "sha256": "sha256:034c48d07b5fb7ab04f60fb14321975565107a8c0a8d6f4adeda8aee95ae0be1",
+      "sha256": "sha256:7425bb3177ba54345ca24a37295810af0f006f85da1537040217959a7e1965c7",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 4
     },

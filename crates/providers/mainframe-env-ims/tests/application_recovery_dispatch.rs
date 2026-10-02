@@ -63,6 +63,7 @@ fn catalog() -> ImsMetadataCatalog {
                 database: "LOGDB".into(),
                 database_version: Some(1),
                 processing_options: "AP".into(),
+                secondary_index: None,
                 sensitive_segments: vec![ImsSensitiveSegmentMetadata {
                     name: "ROOT".into(),
                     parent: None,

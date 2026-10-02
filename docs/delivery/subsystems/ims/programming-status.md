@@ -1381,3 +1381,152 @@ The local assurance checker also follows the moved `ImsOperation` enum to its
 new source file; handler names, executable-test requirements and zero-credit
 disposition are unchanged. Its initial stale-path failure and passing runtime
 checks are retained in `ssa-integration-initial-failure.log`.
+## IMS-1403.secondary-access-paths (bounded local slice, 2026-10-02)
+
+Parent: IMS-1403; entry HEAD: `2f6a8d8e`. The external acceptance audit is
+`v014-completion-20261002/acceptance-audit/audit-report.md`. Preserve integrated
+checkpoint, selected-PCB sensitivity, UOW ownership and provider-row CAS repairs.
+This slice owns engine index definition/validation, composite source bytes,
+source-to-self/ancestor target resolution, maintenance and selected secondary
+navigation through the existing provider. It adds no engine, store, coordinator,
+host request/canonical shape, SSA parser or rich-predicate authority.
+
+Inspection correction: this entry's metadata DB PCB has no `secondary_index`
+field (the legacy database definition does). Minimal shared edits add the
+optional PCB selector, its schema/reference validation and constructor defaults;
+absent selectors retain existing serialization and metadata digest identities.
+Engine descriptor extensions likewise omit default fields. Selected nonroot
+target processing requires restructured hierarchy/alias metadata unavailable in
+this shape and is rejected before installation; index maintenance/lookup can
+resolve an ancestor target without equating source with target. Fast Path
+secondary processing is outside this full-function slice and rejected explicitly.
+
+Catalog rows: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`
+(GU/GN/GNP/Get Hold), `:0008/:0015/:0004` (ISRT/REPL/DLET), with existing
+local commit/rollback/checkpoint and replay contracts as recovery guardrails.
+Mandatory local obligations: ordered concatenated field bytes; target occurrence
+resolution; independent primary/secondary PCB position/parentage/hold; indexed
+qualification using the XDFLD name; maintenance on primary and selected updates;
+exact GE/GB/GP/AK and validation failures; no mutation on invalid definitions,
+authorization/context rejection or conflict; replay/rollback/CAS and fresh
+Memory/SQLite reopen. Regressions must fail before implementation. Owners are
+bounded database and generic helper/test modules, minimal metadata/schema and
+shared constructor edits, this status, one fragment and routine docs manifest.
+
+Source review uses hash-verified offline IMS 15.6 database-contracts baseline
+`ibm-ims-15.6-database-contracts-2026-09-11`, topics
+`ims_secondaryindexlogicalrelationships.htm` (e924f4e2c9c336d4ecdc8a6e2ccf4ff0369b0ab2332788ca015e215c14d5bd53),
+`ims_ssassecondaryindex.htm` (4b3a1ee3cc0eabbbb4984d23a0eb60fe93be50887e1853643e0f382710139900),
+`ims_howhierrstruc_fullfunction.htm` (8535859c6dfc8e9683b34d307535bc524321cdc445bb6b94c1143d8d0206d1ca),
+and `ims_howseindexmaint.htm` (910d3494d8be6d834eb24844d86153ce675f67566fd49a455056d8da230cb086),
+plus metadata PCB/XDFLD and programming positioning topics below. Retained
+topic paths are absent for the four database topics; exact SHA archive bytes and
+reader cache match the committed hashes/counts and repository parser reads.
+No refresh or publication bodies in Git; source review earns zero credit.
+
+Acceptance: focused selected-provider/engine/index/PCB/security/replay/rollback
+regressions on Memory and SQLite; strict scoped no-deps Clippy, fmt, affected
+metadata/catalog/schema generators, dependency policy, docs/changelog and
+applicable architecture guards. External receipts remain outside Cargo targets.
+Seal only this ID with target 0.14.0. Parent, official and licensed completion
+remain pending; organization admission alone does not prove its semantics.
+
+Implementation: the existing engine stores source-occurrence pointer identities
+under concatenated search bytes and resolves each pointer to the declared self
+or ancestor target. Search lists are bounded to five fields / 240 bytes and
+validate ancestry, references, duplicate fields and XDFLD/physical-field name
+collisions before admission. Insert, replace, subtree delete and restore share
+that construction. A partial composite fails before image mutation; historical
+single optional-field descriptors retain their prior behavior. Selected sequences
+require search fields available at the source's minimum length. The selected
+physical-root sequence uses the same hierarchy/matching/hold authority, with a
+bounded per-PCB index/source cursor to distinguish repeated target pointers.
+Indexed target replacement/search-byte changes lose selected parentage;
+selected target insertion/deletion returns AM without changing the image.
+
+Shared integration is limited to the optional metadata PCB field/schema,
+constructor defaults in host/server/participant/CardDemo fixtures, one logical
+delete position initializer, generic PCB reader validation and metadata
+publication admission. Existing `ImsRequest`, canonical effects, checkpoint
+commit/reset, PCB sensitivity, undo and provider-row atomic/CAS owners remain.
+The assurance checker found fourteen pre-existing stale generic-test file
+locators after the integrated test extraction; these now name the existing
+`service/generic/tests/mod.rs`. No case, operation mapping, count, credit or
+checker criterion changes. The audit's limits on what those local bindings
+actually prove remain applicable.
+
+Compatibility: valid historical metadata without selectors, single-field index
+descriptors, images and plain positions preserve exact serialization/identity.
+Extended descriptors write `source_field` instead of the old required `field`:
+old engine readers therefore reject instead of ignoring extension fields and
+misinterpreting composite keys/targets. New readers accept both bounded forms.
+Prior metadata/position readers reject selector/cursor fields. Drain older
+writers and preserve a coherent pre-feature backup of selected and retained
+metadata/package generations, images, sessions, checkpoints, undo and replay
+references before admitting extensions. Prior-binary rollback restores that
+backup and referenced artifacts; stripping fields from live rows is forbidden.
+Previously metadata-only admissions of impossible shapes are not reinterpreted
+as executable access paths. These are local compatibility tests, not a complete
+backup/restore or mixed-resource certification claim.
+
+Additional reviewed pins: `ibm-ims-15.6-metadata-contracts-2026-09-11`,
+`ims_psbgendlipcbstmt.htm` (0dad54edd1a9940ca9a6988e06412836ff35a706cc2e1f7fbd36eb14fa02cfba),
+`ims_xdfldstmt.htm` (1954204faddc7fc6f55e5942342c3edbd2114781c136e4c0276794dc1818fce8);
+`ibm-ims-15.6-programming-contracts-2026-09-11`,
+`ims_gnpghnpcall.htm` (6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762)
+and `ims_currentpos.htm` (07aafcddb9b30591eef1da5ad50bfe8bc3c1e9b9e9e51b56b27d39bf6adf5673).
+The exact SHA archive bodies and repository parser verified all eight selected
+pins. `ibm_docs.py search/read` used the existing 1403/1402/1401 reader caches.
+The external `secondary-access-paths/offline-sources.json` retains only bounded
+identities, hashes, counts and zero-credit source-review provenance.
+
+Local verification passes focused engine, selected-provider/generic/PCB,
+metadata, participant, context and signed-package compatibility tests, fresh
+Memory/SQLite readers, replay/rollback/CAS and denial-before-observation/mutation.
+The conformance consumer compiles. Strict IMS-only Clippy uses
+`--all-targets --no-deps -- -D warnings`; formatting, catalog generator/check,
+shared spec, deny, changelog, license/supply-chain and execution/effect/row/
+durable/security/retention/participant guards pass. Receipts remain in the
+external `v014-completion-20261002/secondary-access-paths` directory. Zero-test
+filtered binaries supply no credit. Runtime checks are pre-seal local runs,
+not relabeled official candidate receipts.
+
+Aggregate blockers are unchanged: selecting the whole shared host-API package
+for strict Clippy finds MQ `mq_validation.rs` collapsible-if/manual-contains
+lints; the module guard finds server `product.rs` at 6,291 versus its 6,008-line
+ceiling. Touched production modules remain below 1,200 lines. `architecture-fast`
+stops on CICS `SSJL4D_6.x/fundamentals/connections/dfht1c0079.html`: the committed
+3,031-byte pin `cb6ff139ab0b7bb2832dc03dd4f53672181657f11d0740a417aab84819aaf254`
+is absent at the retained topic path and SHA archive path. No refresh or gate
+weakening occurs. Nonroot secondary restructuring, Fast Path processing,
+NULLVAL/exits, SUBSEQ/pointer user data, rich SSA operands, PostgreSQL-specific
+selected-path execution, official and licensed gates remain outside this slice.
+The manager owns integration and aggregate closure; no parent completion,
+organization-wide equivalence, release promotion or licensed credit is claimed.
+
+### Secondary access manager integration
+
+Integrate the existing UOW image witnesses and selected-PCB helpers rather than
+replace their publication authority. The source review of
+`ims_ssassecondaryindex.htm` (pin `4b3a1ee3...`) requires loss of parentage when
+the selected XDFLD changes, not on every target REPL. Add a failing unchanged
+index/ancestor-target parentage regression before repairing that edge. The rich
+SSA route must reject an unimplemented selected-secondary combination before
+mutation instead of silently performing a primary-order read. Add a public
+regression for that honest boundary; a rich SSA/index bridge remains pending.
+Receipts and exact integration re-seal stay separate from original worker runs.
+The first combined run passed 129 unit cases and failed three inherited fixture
+assumptions. Update unchanged-XDFLD parentage expectations and force the session
+CAS race after the shared UOW refresh, before atomic publication. Do not remove
+the conflict/no-database-mutation assertion or weaken fresh-reader behavior.
+
+The repaired integrated runtime passes 132 IMS unit tests and 27 integration
+tests, six selected metadata tests and 11 signed IMS package tests. Strict
+three-package Clippy, the global module ratchet, IMS assurance and docs checks
+pass in `secondary-integration-fixed.log`; that receipt is not the original
+worker candidate. `secondary-integration-red.log` preserves both intended
+runtime failures before repair. A test-only store shim forces the session CAS
+race after refresh and before the real atomic store batch on both backends.
+The metadata/schema and local feature seal remain zero-credit preparation for
+official IR and licensed equivalence. Rich SSA with a selected secondary index
+remains explicitly unsupported, not a successful primary-order substitute.

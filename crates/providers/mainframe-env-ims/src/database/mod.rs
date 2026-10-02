@@ -77,13 +77,59 @@ pub struct SegmentDefinition {
     pub fields: Vec<FieldDefinition>,
 }
 
-/// A secondary access path maintained from one source-segment field.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// A secondary access path. Historical descriptors use `field` alone and
+/// point to their source; extensions preserve that descriptor's serialized bytes.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct SecondaryIndexDefinition {
     pub name: String,
     pub source_segment: String,
+    #[serde(alias = "source_field")]
     pub field: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_fields: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_segment: Option<String>,
     pub unique: bool,
+}
+
+impl Serialize for SecondaryIndexDefinition {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let extended = !self.additional_fields.is_empty() || self.target_segment.is_some();
+        let mut state = serializer.serialize_struct(
+            "SecondaryIndexDefinition",
+            4 + usize::from(!self.additional_fields.is_empty())
+                + usize::from(self.target_segment.is_some()),
+        )?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("source_segment", &self.source_segment)?;
+        // Prior descriptor readers ignore unknown fields. Omitting their required
+        // `field` key forces them to reject an extended image instead of silently
+        // using its first source field and returning its source occurrence.
+        state.serialize_field(if extended { "source_field" } else { "field" }, &self.field)?;
+        if !self.additional_fields.is_empty() {
+            state.serialize_field("additional_fields", &self.additional_fields)?;
+        }
+        if self.target_segment.is_some() {
+            state.serialize_field("target_segment", &self.target_segment)?;
+        }
+        state.serialize_field("unique", &self.unique)?;
+        state.end()
+    }
+}
+
+impl SecondaryIndexDefinition {
+    pub fn target_segment(&self) -> &str {
+        self.target_segment
+            .as_deref()
+            .unwrap_or(&self.source_segment)
+    }
+
+    fn fields(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.field.as_str())
+            .chain(self.additional_fields.iter().map(String::as_str))
+    }
 }
 
 /// Immutable metadata consumed by the algorithm foundation.
@@ -174,10 +220,20 @@ pub struct PcbPosition {
     parentage: Option<RecordId>,
     held: Option<HeldRecord>,
     after_end: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    secondary: Option<SecondaryPosition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SecondaryPosition {
+    index: String,
+    source: RecordId,
 }
 
 impl PcbPosition {
     pub fn set_current(&mut self, id: RecordId) {
+        self.secondary = None;
         self.current = Some(id);
         self.parentage = Some(id);
         self.held = None;
@@ -194,6 +250,12 @@ impl PcbPosition {
 
     pub fn is_held(&self) -> bool {
         self.held.is_some()
+    }
+
+    pub(crate) fn secondary_index(&self) -> Option<&str> {
+        self.secondary
+            .as_ref()
+            .map(|selected| selected.index.as_str())
     }
 }
 
@@ -289,6 +351,7 @@ pub struct DatabaseEngineImage {
 mod definition;
 mod logical;
 mod navigation;
+mod secondary;
 mod ssa;
 mod store;
 
@@ -496,6 +559,15 @@ impl DatabaseEngine {
         if rebuilt.indexes != self.indexes {
             return Err(EngineProblem::InvalidData);
         }
+        for index in &self.definition.secondary_indexes {
+            if index.unique
+                && self.indexes[&index.name]
+                    .values()
+                    .any(|sources| sources.len() > 1)
+            {
+                return Err(EngineProblem::InvalidData);
+            }
+        }
         Ok(())
     }
 
@@ -512,6 +584,7 @@ impl DatabaseEngine {
     }
 
     pub fn validate_position(&self, position: &PcbPosition) -> Result<(), EngineProblem> {
+        self.validate_secondary_position(position)?;
         if position
             .current
             .is_some_and(|id| !self.records.contains_key(&id))
@@ -549,5 +622,7 @@ impl DatabaseEngine {
     }
 }
 
+#[cfg(test)]
+mod secondary_tests;
 #[cfg(test)]
 mod tests;

@@ -65,6 +65,7 @@ pub(crate) fn catalog() -> ImsMetadataCatalog {
                 name: "GENPCB".into(),
                 database: "GENDB".into(),
                 database_version: Some(1),
+                secondary_index: None,
                 processing_options: "AP".into(),
                 sensitive_segments: vec![
                     ImsSensitiveSegmentMetadata {

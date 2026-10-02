@@ -1,5 +1,7 @@
 use super::*;
 
+mod secondary_tests;
+
 fn two_pcb_catalog() -> ImsMetadataCatalog {
     let mut metadata = catalog();
     let mut hidden = metadata.databases[0].segments[1].clone();

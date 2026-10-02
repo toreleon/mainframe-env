@@ -73,6 +73,7 @@ impl DatabaseEngine {
                 version: record.version,
             }),
             after_end: false,
+            secondary: None,
         };
         self.delete(&mut position)
     }

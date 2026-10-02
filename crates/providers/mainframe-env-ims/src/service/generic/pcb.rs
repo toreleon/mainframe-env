@@ -221,6 +221,16 @@ pub(super) fn validate_sessions(state: &State, limits: ImsLimits) -> Result<(), 
             if !position(session, number).valid_retained_shape() {
                 return Err(HostProblem::InfrastructureFailure);
             }
+            if position(session, number)
+                .secondary_index()
+                .is_some_and(|name| {
+                    pcb.secondary_index
+                        .as_deref()
+                        .is_none_or(|selected| normalize(selected) != name)
+                })
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             if live {
                 restored(state, &normalize(&pcb.database), limits)?
                     .validate_position(&position(session, number))

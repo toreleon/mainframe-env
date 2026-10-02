@@ -20,6 +20,7 @@ fn public_route_selects_every_pinned_organization_from_metadata() {
             name: "GENPCB".into(),
             database: "GENDB".into(),
             database_version: Some(1),
+            secondary_index: None,
             processing_options: "AP".into(),
             sensitive_segments: vec![ImsSensitiveSegmentMetadata {
                 name: "ROOT".into(),
@@ -193,6 +194,7 @@ fn relationship_catalog(paired: bool) -> ImsMetadataCatalog {
             name: "PPCB".into(),
             database: "PARENTDB".into(),
             database_version: Some(1),
+            secondary_index: None,
             processing_options: "AP".into(),
             sensitive_segments: vec![ImsSensitiveSegmentMetadata {
                 name: "PROOT".into(),

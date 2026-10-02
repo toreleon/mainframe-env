@@ -1,4 +1,4 @@
-use super::navigation::{field_value, optional_field_value};
+use super::navigation::field_value;
 use super::*;
 
 impl DatabaseEngine {
@@ -156,6 +156,22 @@ impl DatabaseEngine {
             id: record.id,
             version,
         });
+        if position.secondary.as_ref().is_some_and(|selected| {
+            old_values
+                .iter()
+                .zip(&new_values)
+                .any(|(old, new)| old.0 == selected.index && old != new)
+        }) {
+            position.parentage = None;
+        }
+        if position.secondary.as_ref().is_some_and(|selected| {
+            selected.source == record.id
+                && new_values
+                    .iter()
+                    .any(|(name, value)| name == &selected.index && value.is_none())
+        }) {
+            *position = PcbPosition::default();
+        }
         Ok(self.view(record.id))
     }
 
@@ -214,6 +230,13 @@ impl DatabaseEngine {
         position.after_end = false;
         if position.parentage.is_some_and(|id| removed.contains(&id)) {
             position.parentage = None;
+        }
+        if position
+            .secondary
+            .as_ref()
+            .is_some_and(|selected| removed.contains(&selected.source))
+        {
+            *position = PcbPosition::default();
         }
         Ok(removed.len())
     }
@@ -287,7 +310,7 @@ impl DatabaseEngine {
             .map(|index| {
                 Ok((
                     index.name.clone(),
-                    optional_field_value(definition, &index.field, data)?,
+                    self.index_value(index, definition, data)?,
                 ))
             })
             .collect()

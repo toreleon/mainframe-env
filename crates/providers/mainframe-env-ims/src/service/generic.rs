@@ -10,6 +10,7 @@ pub(super) mod isolation;
 mod load_image;
 mod logical;
 pub(super) mod pcb;
+mod secondary;
 pub(super) mod ssa;
 
 /// Ordered bulk image; each parent refers to an earlier record by zero-based index.
@@ -85,15 +86,18 @@ pub(super) fn definition(
     }
     let mut secondary_indexes = Vec::new();
     for index in &database.secondary_indexes {
-        if index.source_fields.len() != 1
-            || normalize(&index.source_segment) != normalize(&index.target_segment)
-        {
-            return Err(HostProblem::Unsupported);
-        }
         secondary_indexes.push(SecondaryIndexDefinition {
             name: normalize(&index.name),
             source_segment: normalize(&index.source_segment),
-            field: normalize(&index.source_fields[0]),
+            field: normalize(index.source_fields.first().ok_or(HostProblem::Malformed)?),
+            additional_fields: index
+                .source_fields
+                .iter()
+                .skip(1)
+                .map(|field| normalize(field))
+                .collect(),
+            target_segment: (normalize(&index.target_segment) != normalize(&index.source_segment))
+                .then(|| normalize(&index.target_segment)),
             unique: false,
         });
     }
@@ -112,6 +116,7 @@ pub(super) fn install_metadata(
     let identity = validate_ims_metadata(&metadata, ImsMetadataLimits::default())
         .map_err(|_| HostProblem::Malformed)?
         .digest;
+    service.validate_secondary_metadata(&metadata)?;
     let mut images = BTreeMap::new();
     for database in &metadata.databases {
         let engine = DatabaseEngine::new(definition(database)?, engine_limits(service.limits))
@@ -569,10 +574,15 @@ fn read(
     let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
     let mut position = pcb::position(session, request.pcb);
     let parent_qualification = pcb::gnp_target_below_parent(&engine, &position, &read);
-    let outcome = engine.read_visible(&mut position, &read, |segment| {
+    let visible = |segment: &str| {
         read.target.is_some()
             || (allowed(&pcb, segment, request.operation) && !pcb::key_only(&pcb, segment))
-    });
+    };
+    let outcome = if let Some(index) = &pcb.secondary_index {
+        engine.read_secondary_visible(&normalize(index), &mut position, &read, visible)
+    } else {
+        engine.read_visible(&mut position, &read, visible)
+    };
     pcb::set_position(session, request.pcb, position);
     match outcome {
         Ok(_)
@@ -648,6 +658,9 @@ fn mutate(
     if !allowed(&pcb, &target, request.operation) {
         return Ok(status("AM"));
     }
+    if secondary::restricted_mutation(&engine, &pcb, &target, request.operation) {
+        return Ok(status("AM"));
+    }
     isolation::ensure_writer(state, run, &name)?;
     if request.operation == ImsOperation::Delete {
         let (count, images) = match logical::delete_cascade(state, limits, &name, &mut position) {
@@ -708,7 +721,17 @@ fn mutate(
                         .qualifiers
                         .retain(|qualifier| ancestry.contains(&normalize(&qualifier.segment)));
                     let query = read_request(&lookup, &engine)?;
-                    match engine.read(&mut PcbPosition::default(), &query) {
+                    let found = if let Some(index) = &pcb.secondary_index {
+                        engine.read_secondary_visible(
+                            &normalize(index),
+                            &mut PcbPosition::default(),
+                            &query,
+                            |_| true,
+                        )
+                    } else {
+                        engine.read(&mut PcbPosition::default(), &query)
+                    };
+                    match found {
                         Ok(view) => Some(view.id),
                         Err(problem) => return Ok(status(engine_status(problem))),
                     }
@@ -731,8 +754,18 @@ fn mutate(
                         }
                         Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
                     }
-                    position.set_current(view.id);
-                    Ok(1usize)
+                    if let Some(index) = &pcb.secondary_index {
+                        engine
+                            .position_after_secondary_insert(
+                                &normalize(index),
+                                &mut position,
+                                view.id,
+                            )
+                            .map(|()| 1usize)
+                    } else {
+                        position.set_current(view.id);
+                        Ok(1usize)
+                    }
                 }
                 Err(problem) => Err(problem),
             }
@@ -870,6 +903,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
     };
     validate_ims_metadata(metadata, ImsMetadataLimits::default())
         .map_err(|_| HostProblem::InfrastructureFailure)?;
+    secondary::validate_catalog(metadata).map_err(|_| HostProblem::InfrastructureFailure)?;
     let names = metadata
         .databases
         .iter()

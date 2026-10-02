@@ -12,6 +12,12 @@ impl PcbPosition {
                 .is_some_and(|held| held.version == 0 || self.current != Some(held.id))
             && (!self.after_end
                 || (self.current.is_none() && self.parentage.is_none() && self.held.is_none()))
+            && self.secondary.as_ref().is_none_or(|selected| {
+                selected.source.0 != 0
+                    && !selected.index.is_empty()
+                    && self.current.is_some()
+                    && !self.after_end
+            })
     }
 }
 
@@ -125,20 +131,19 @@ impl DatabaseEngine {
         Ok(self.view(id))
     }
 
-    /// Replace the current held occurrence. Primary keys cannot change and all
-    /// secondary index changes are validated before the image is modified.
+    /// Resolve pointer entries to target occurrences, preserving duplicate
+    /// pointers when distinct sources index the same target.
     pub fn lookup_index(&self, name: &str, value: &[u8]) -> Result<Vec<RecordView>, EngineProblem> {
         let entries = self
             .indexes
             .get(name)
             .ok_or(EngineProblem::InvalidRequest)?;
         let ids = entries.get(value).cloned().unwrap_or_default();
-        Ok(self
-            .hierarchy_order()
+        self.hierarchy_order()
             .into_iter()
             .filter(|id| ids.contains(id))
-            .map(|id| self.view(id))
-            .collect())
+            .map(|id| self.index_target(name, id).map(|target| self.view(target)))
+            .collect()
     }
 
     pub(super) fn validate_read(&self, request: &ReadRequest) -> Result<(), EngineProblem> {
@@ -341,7 +346,7 @@ pub(super) fn optional_field_value(
     Ok(data.get(field.offset..end).map(<[u8]>::to_vec))
 }
 
-fn compare(actual: &[u8], expected: &[u8], relation: Relation) -> bool {
+pub(super) fn compare(actual: &[u8], expected: &[u8], relation: Relation) -> bool {
     let ordering = actual.cmp(expected);
     match relation {
         Relation::Equal => ordering == Ordering::Equal,

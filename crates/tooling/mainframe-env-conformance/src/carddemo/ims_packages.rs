@@ -197,6 +197,7 @@ pub(super) fn metadata(corpus: &Path) -> Result<ImsMetadataCatalog, CorpusProble
                 name: pcb.1.clone(),
                 database: operand(&pcb.2, "DBDNAME")?.into(),
                 database_version: Some(1),
+                secondary_index: None,
                 processing_options: operand(&pcb.2, "PROCOPT")?.into(),
                 sensitive_segments,
             })],
