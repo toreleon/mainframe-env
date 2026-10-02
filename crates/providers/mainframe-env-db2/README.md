@@ -79,12 +79,21 @@ Fullselect and inline cursor integration remain pending. This syntax has no
 execution route or whole-row recognition credit.
 
 The proposed common CREATE TABLE parser owns one named-table definition with
-bounded columns, built-in or distinct type syntax, NOT NULL, constant or NULL
-defaults, and table PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints with the
+bounded columns, built-in or distinct type syntax, NOT NULL, operand-less,
+constant or NULL defaults, and table PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints with the
 recorded ON DELETE actions. It rejects unsupported column and physical-table
 clauses, including CHECK, before binding or execution. The public syntax is
 disconnected from the SQL execution route and earns no whole-row recognition
 or conformance credit.
+
+Omitted default clauses remain distinct from present operand-less type defaults
+and explicit NULL/literal operands. `Db2ColumnDefault::value()` now returns
+`Option<&Db2Literal>`; `None` is a present type-default clause, never an inferred
+NULL or zero. Clause/operand spans preserve original source; numeric operands
+also retain separate sign and number-token spans across intervening trivia.
+This intentional development API adjustment changes no accepted wire/durable
+contract. Quoted names decode escapes once. Default values/applicability and
+all binding or insertion effects remain unresolved by this syntax API.
 
 The proposed common type boundary resolves the owned AST's built-in type syntax
 to bounded numeric, character, graphic, binary, and datetime shapes. It exposes

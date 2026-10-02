@@ -522,6 +522,68 @@ archive HTML was read offline under the Db2 13 baseline, with normal reader
 TOC-blocked. The typed catalog, default resolver and all ordinary value families
 remain required implementation, not narrowed to these initial numeric slices.
 
+The reviewed Stage A syntax-harness commit is integrated without code changes.
+Its nine focused tests compare 73 fixed authored cases and comparator mutants
+through the actual public DROP/RENAME APIs. On the manager candidate before
+default integration, conformance package tests pass 269 unit and 19 integration
+tests after supplying the existing clean, pinned local CardDemo corpus at
+`59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`; the worker's four missing-environment
+failures are retained in their original receipts. Two existing PostgreSQL/manual
+Zowe tests are ignored and earn no credit. No official Db2 binding or driver
+installation was added. Full selected global CI remains pending, including
+unchanged contract API-doc, dependency Clippy and architecture/source blockers.
+
+Located CREATE TABLE default intents are also integrated without production
+edits. The combined manager Db2 candidate passes six focused public regressions,
+290 unit tests and 58 integration tests, zero failures/skips, plus Rust 1.95
+all-target/all-feature checking. The intentional optional `value()` adjustment
+preserves omitted/type-default/explicit NULL distinctions and original clause,
+operand, sign and number-token locations; no inferred value or effect is claimed.
+Its source remains SQL0050 under the pinned Db2 13 baseline. The pure parser and
+ordinary test harness do not complete SQL0050, SQL0072, SQL0105 or a parent milestone.
+
+The manager declares `DB2-1202.literal-string-values` as the next ordinary value
+prerequisite, owning `type_system/mod.rs` only for child-module registration,
+new `type_system/string_constants.rs` and the unique
+`changes/unreleased/db2-literal-string-values.toml`. Use the existing type owner,
+lexer, location/limit shapes and bounded resolved-type authority. A located
+opaque proof must distinguish Unicode UTF-8 character text/hex character forms
+from BX binary forms, preserve empty versus NULL, decode escaped delimiters or
+hex once, retain the matching natural VARCHAR/VARBINARY length and NOT NULL,
+and own original source spans. Natural empty constants may have length zero;
+column/type-syntax length minima must not be relaxed. Unicode character metadata
+must explicitly retain CCSID 1208/MIXED rather than infer a host encoding; binary
+constants have no invented CCSID. No arbitrary raw type/value constructor or
+default/assignment/cell/wire/execution claim is admitted. Unsupported encoding,
+delimiter, graphic and other ordinary families remain explicit implementation
+pending, not silently converted or normatively deferred.
+
+Review constantsintro (17915 bytes, bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8),
+characterstokens (14271 bytes, ed63dd289fc68abe18ec5863756239f79d93941cd525968ba48f962d1299d4ae),
+charstrings (17888 bytes, 54c3f8ec1620479ffb002788e198c788050d8616e1ee4fbac431fb45bb59d835)
+and binarystringsintro (3946 bytes, 69af1d1645cf137f58d372fe93589e1f299a76937c4e9d1284ad1aa6e2643036)
+under `SSEPEK_13.0.0/sqlref/src/tpc/`, plus actual relevant encoding context.
+Retained selected files are absent; matching archive identities are verified,
+normal reading is TOC-blocked. Source presence grants no execution credit.
+Tests require independently fixed decoded bytes, empty/NULL distinctions,
+unescaped-length/type proofs, Unicode/CRLF endpoints, malformed and incompatible
+forms, configured/compiled source/token/literal bounds and original-source
+ceilings before allocation. Private source verification must not lex unrelated
+source outside the selected constant or change numeric span authority. Full
+package/MSRV, required policy and exact three-path sealing precede its commit.
+
+The manager separately declares `DB2-1202.db2-clippy-readiness` to repair the
+observed scoped Db2 lint failures without changing semantics or suppressing lints.
+Ownership is `arithmetic_types.rs`, `create_view_syntax.rs`, `update_syntax.rs`,
+`numeric_constant_types.rs`, `numeric_constant_values.rs` and unique
+`changes/unreleased/db2-clippy-readiness.toml`. Only the existing doc paragraph,
+range-loop/match and test-initializer diagnostics are in scope. Preserve original
+source transfer, bounds, diagnostics, opaque proofs and all regressions; no parser,
+type rule, baseline, accepted contract, dependency or gate criterion changes.
+Run affected regressions/package/MSRV and strict package Clippy with `--no-deps`;
+global dependency Clippy failures remain distinct and are not repeated unchanged.
+Seal all six exact paths and clean the assigned checkout after verification.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
