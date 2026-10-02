@@ -3,7 +3,7 @@ use super::*;
 pub(in crate::machine) fn finish(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
-    container_identity: Option<&(String, Option<String>)>,
+    container_identity: Option<&container_set::ContainerIdentity>,
     container_set_base: Option<usize>,
     response: CicsResponse,
     responded: bool,
@@ -11,11 +11,19 @@ pub(in crate::machine) fn finish(
     if response.response == 0 && response.disposition == CicsDisposition::Complete {
         container_set::on_success(machine, operation, container_identity);
         if operation == CicsOperation::GetContainer
-            && let Some((channel, Some(container))) = container_identity
             && let Some(base) = container_set_base
-            && machine.bases.len() == base + 1
         {
-            container_set::record(machine, channel, container);
+            match container_identity {
+                Some(container_set::ContainerIdentity::Channel(channel, Some(container)))
+                    if machine.bases.len() == base + 1 =>
+                {
+                    container_set::record(machine, channel, container)
+                }
+                Some(container_set::ContainerIdentity::BtsSet { .. }) => {
+                    container_set::record_bts(machine, base)?
+                }
+                _ => {}
+            }
         }
     }
     eib::write_context(machine, operation, &response)?;
@@ -23,9 +31,32 @@ pub(in crate::machine) fn finish(
     Ok(())
 }
 
-pub(in crate::machine) fn write_response_state(
+// Private call context keeps the observed hook with output preparation without
+// growing the frozen machine facade. No serialized or host ABI type changes.
+pub(in crate::machine) struct ResponseCommand<'a>(
+    CicsOperation,
+    Option<&'a container_set::ContainerIdentity>,
+);
+
+impl<'a> From<(CicsOperation, Option<&'a container_set::ContainerIdentity>)>
+    for ResponseCommand<'a>
+{
+    fn from(command: (CicsOperation, Option<&'a container_set::ContainerIdentity>)) -> Self {
+        Self(command.0, command.1)
+    }
+}
+
+// Existing direct response-conversion tests supply no pending loan context.
+#[cfg(test)]
+impl From<CicsOperation> for ResponseCommand<'_> {
+    fn from(operation: CicsOperation) -> Self {
+        Self(operation, None)
+    }
+}
+
+pub(in crate::machine) fn write_response_state<'a>(
     machine: &mut ReferenceMachine,
-    operation: CicsOperation,
+    command: impl Into<ResponseCommand<'a>>,
     storage64_intent: Option<Storage64Intent>,
     response_target: Option<&CicsTarget>,
     response2_target: Option<&CicsTarget>,
@@ -33,6 +64,8 @@ pub(in crate::machine) fn write_response_state(
     outputs: &BTreeMap<String, CicsTarget>,
     response: &CicsResponse,
 ) -> Result<Option<usize>, MachineProblem> {
+    let ResponseCommand(operation, container_identity) = command.into();
+    container_set::observed(machine, container_identity, response)?;
     storage64::validate_response(operation, storage64_intent, response)?;
     if let (CicsOperation::GetContainer64, Some(Storage64Intent::GetContainer(Some((address, _))))) =
         (operation, storage64_intent)

@@ -6743,6 +6743,9 @@ mod tests {
     #[path = "program_abend_exit.rs"]
     mod program_abend_exit;
 
+    #[path = "bts_set_lifetime.rs"]
+    mod bts_set_lifetime;
+
     #[path = "program_default_abend.rs"]
     mod program_default_abend;
 

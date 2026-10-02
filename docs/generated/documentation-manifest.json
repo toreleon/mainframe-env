@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 224,
+    "markdown_documents": 225,
     "navigation_groups": 6,
-    "normative_documents": 58,
+    "normative_documents": 59,
     "xtask_commands": 212
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 114,
-      "sha256": "sha256:5418836a0e358de5dc83f6ecbdb00705e4fe6e0b17ed81a73f4d3db1da5637a5",
+      "relative_links": 115,
+      "sha256": "sha256:97bae6b91dc9278323476fa6c78329aa917c8cbef76b29bb73b256a1c17990b8",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -963,10 +963,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "Interpreter and selected execution maintainers",
+      "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md",
+      "relative_links": 0,
+      "scope": "explicit BTS GET CONTAINER SET in one root machine",
+      "sha256": "sha256:200f32e338811c2e9b893b30ef3b3623aadf610619636ca234190d0b45f6a011",
+      "status": "Proposed; bounded root proofs recorded; parent acceptance pending",
+      "title": "ADR-0028: Explicit BTS SET loans in the checked interpreter",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 27,
-      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
+      "relative_links": 28,
+      "sha256": "sha256:5373a652b624f8912d59c6ba8999c201adf804575aab06252f64de0370d230ed",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1266,7 +1278,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:6d9d86988f9d0c54deb81f106f3ce655ca2a5c90f63f446b3acddef4adad4b20",
+      "sha256": "sha256:20540ed5927a52a9c7c266586cb6d9ba93d7ec14f2b1d8ffe20d055c428e8c30",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },
@@ -2252,6 +2264,10 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Explicit BTS SET loan lifetime",
+          "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2500,7 +2516,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:08240a952807eaf4035eece2e89762297490f259993d574750f8f0b3dd53f617",
+  "registry_sha256": "sha256:2c6d6d5b860b3ed92fea6153eac4d625647ca3c95e2d8764befad58e0d3d9abd",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

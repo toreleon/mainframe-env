@@ -809,3 +809,43 @@ dependent runtime integration waves. Do not refresh sources or widen into
 unrelated application/batch implementation merely to clear these prerequisites.
 Independent source-context inventories may still be prepared from the sealed
 command-body pins, without consuming these candidates as semantic authority.
+
+### Bounded LINK run-unit ownership design (2026-10-02)
+
+`CIC-902.program-task.frames.link-run-unit-design` assigns the idle frame worker
+a read-only proposal for the reproduced repeated-LINK and native-CALL/LINK/CALL
+storage failures. It owns only external proposal artifacts, reads the sealed
+`cics-cobol-calling-context` and `cics-program-storage-context` pins and the
+existing invocation, CALL protocol, instance, retention, cursor and selected
+route contracts. The manager owns every shared type, schema, codec, namespace,
+registry, generator, status and runtime edit. The worker must preserve its eight
+prior dirty paths and retained handoffs, use no nested workers or refresh, and
+propose exact context inheritance, fresh LINK entry, native CALL level-local
+retention, owner/row binding, CANCEL/end/ABEND, replay and unknown-outcome fences.
+It must not invent a shadow store or equate the transaction UOW with a COBOL run
+unit, and must state backward compatibility and source gaps explicitly.
+Acceptance is a reviewable design and preservation receipt; no implementation,
+new API reservation, test, execution, recovered or licensed credit is assigned.
+The regression worker owns only `product/tests/program_identity.rs`; the BTS
+worker owns its separately declared six paths. Parent CIC-902 and v0.9 remain
+unaccepted.
+
+### Bounded explicit BTS root SET repair (2026-10-02)
+
+`CIC-904.bts-container.explicit-root-lifetime` integrates the exact six-path worker
+patch after independent source and diff review. Two previously red compiled
+ordinary LINKAGE expiry tests now have their ignore attributes removed; the four
+controls retain their independent seeds. The private response boundary expires
+only the captured BTS area on a matching observed response, including real
+CONTAINERERR 110/10, and keeps INTO/NODATA, channel loans and unobserved host
+failures separate. Existing bases/freed entries carry bounded private labels,
+with no public codec/schema or task memory authority added. ADR-0028 records
+compatibility, downgrade and unresolved legacy unmarked/cross-frame/task-end/
+cold-recovery obligations. Manager integrated regressions pass: 6 compiled root and 17 lifecycle tests
+plus 1 channel64 control, with no ignores. Required policy gates accompany the
+exact candidate receipt outside disposable targets.
+No official row, Recovered, licensed or parent completion credit is assigned.
+
+The user retained CICSMESSAGE's internal execution requirement on 2026-10-02.
+Its 263-row identity and all six required pending gates remain unchanged; the
+source-only public-admission proposal does not grant execution or recovery.

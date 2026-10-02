@@ -31,8 +31,8 @@
     "docs/contracts/DURABLE-STORAGE-PROFILE.md",
     "docs/contracts/EFFECT-CANONICAL-V1.md",
     "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
-    "docs/contracts/RETENTION-LIFECYCLE-V1.md",
     "docs/contracts/RELEASE-BUILD-V1.md",
+    "docs/contracts/RETENTION-LIFECYCLE-V1.md",
     "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
     "docs/decisions/0001-technology-stack.md",
     "docs/decisions/0002-deterministic-core.md",
@@ -61,6 +61,7 @@
     "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
+    "docs/decisions/0028-explicit-bts-set-loan-lifetime.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -287,6 +288,10 @@
         {
           "label": "ADR-0027: CICS task ownership across logical program frames",
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
+        },
+        {
+          "label": "ADR-0028: Explicit BTS SET loan lifetime",
+          "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md"
         },
         {
           "label": "Decision index and template",

@@ -369,7 +369,7 @@ enum PendingKind {
         operation: CicsOperation,
         storage64_intent: Option<typed_cics::Storage64Intent>,
         argument_summary: String,
-        container: Option<(String, Option<String>)>,
+        container: Option<typed_cics::container_set::ContainerIdentity>,
         into: Option<typed_cics::CicsTarget>,
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
         response: Option<typed_cics::CicsTarget>,
@@ -2051,7 +2051,7 @@ impl ReferenceMachine {
                 let responded = response_target.is_some() || no_handle;
                 let load_base = typed_cics::write_response_state(
                     self,
-                    operation,
+                    (operation, container.as_ref()),
                     storage64_intent,
                     response_target.as_ref(),
                     response2_target.as_ref(),

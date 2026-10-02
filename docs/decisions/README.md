@@ -32,5 +32,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 | [0027](0027-cics-logical-program-frames.md) | shared CICS task ownership and bounded logical program frames | Proposed |
 
+| [0028](0028-explicit-bts-set-loan-lifetime.md) | bounded explicit BTS SET lifetime in existing checked storage | Proposed |
+
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.
