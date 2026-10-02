@@ -4801,3 +4801,81 @@ the revised fence input is separately bound in root runtime-inputs.json. Final
 relevant policy, normal docs and seventeen-path seal/check are packaging gates;
 external root receipts record their actual disposition, not CI or full-minor
 acceptance. Original worker/base-only null failures keep their identities.
+
+## IMS-1401.ssa-position-command-sources — declared source-only leaf
+
+Clean entry `6e3e24d014cfb4a58c6b79efff88e9b999bfc9cc`, target 0.14.0.
+The manager authorizes registration of exactly four previously audited IMS 15.6
+F/U/V/W archive topics, not runtime implementation or acceptance. Register scope
+`ims-ssa-position-commands`, baseline
+`ibm-ims-15.6-ssa-position-commands-2026-09-11`, snapshot 2026-09-11,
+product SSEPH2_15.6.0 and TOC
+`aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618`.
+The existing L/success/failure scope stays separate. Preserve every existing pin
+and registry entry; semantic authority remains false and coverage credit zero.
+
+Exact five-path allowlist, declared before source edits:
+
+- `conformance/0.14/manifests/ims-ssa-position-command-topics.json` (new)
+- `conformance/0.14/manifests/index.json`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-ssa-position-command-sources-20261003.toml` (new)
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+Proof: first check retained topic_path against expected SHA/bytes, then verify
+matching archive fallback, immutable metadata/run/TOC binding and the existing
+topic-set digest definition. Import only these four bodies and their TOC into
+an external scoped cache through the existing reader; actual search/read must
+fully read all four bounded topics. Publication text stays outside Git.
+Required local checks are existing registry/source-reader consumers, selected
+schemas/spec/catalog/assurance, normal docs generation/check, changelog,
+formatting, offline dependency policy and coverage inventory. Exact-path feature
+seal, full generated completion message, commit and committed --check follow
+only after these gates pass. Clean this checkout's target after each actual
+build/test/lint/generator sequence, failures included; receipts remain external
+under worker-receipts/v014-completion-20261002/ssa-position-command-sources/.
+
+No runtime/source-reader/checker rewrite, schema, dependency, semantic rule,
+denominator, HUMAN/licensed/certification credit, raw CALL/TM/participant
+extension or full-minor completion is authorized. ADR-0039 belongs to L;
+any later private U/V design requires separately reviewed ADR-0040.
+
+Source outcome: the four retained topic paths are absent; matching immutable
+archive fallback verifies all four metadata hashes, the run/product/TOC binding,
+exact TOC membership and body SHA/byte counts. No selected source is missing or
+mismatched. F/U/V/W are respectively 7,545 / 5,269 / 3,557 / 2,614 bytes,
+18,985 total. Topic-set digest is
+`f99728026ed7f14fcc8e104678bc55939581af2defee68385bc3bf35b170e8b9`;
+manifest-byte digest is
+`6890befdceb5c0209670b26bd665ba10d5f070cb0a8374818431ceea2081f544`.
+Archive metadata has no recorded HTTP Last-Modified value; the manifest states
+that absence instead of treating the body's Last Updated label as that header.
+All eleven preexisting manifest pins and registry rows remain identical.
+
+Actual scoped import publishes four topics and one TOC; status verifies 4/4 and
+1/1. Four command searches and four full reader calls pass, reading all 187
+plain-text lines. The existing source-reader suite passes 23 cases. Selected
+schemas/spec (134 Python cases), IMS catalog/assurance, coverage inventory,
+formatting, offline deny advisories/bans/licenses/sources, normal docs generation
+and docs/changelog checks pass. Cargo clean ends the sequence. Final status
+packaging regenerates the documentation manifest and verifies the exact
+five-path feature seal and committed --check; its receipts remain external.
+No runtime suite, global architecture retry, campaign, licensed or HUMAN
+acceptance was run or inferred. The unchanged audit remains historical source
+review, not current-candidate runtime evidence. Only this source registration
+leaf is ready for its content seal; IMS-1401 and the full minor remain incomplete.
+
+### Root composition of positioning command source pins
+
+Root integrates source worker 1c4b71fd53d0f12c5b8e878c0023e0ff6737c418 onto
+680c571d4e7194b4b5fe03fec4be11e1266315e3 with the same five-path allowlist.
+The manager independently verifies retained absence/archive SHA and byte counts,
+the existing topic-set digest, and actual registered search/full read of all
+four topics (187 lines) from the clean source worker checkout. Manifest and
+registry bytes are unchanged during composition; all prior pins stay identical.
+These are source-review identities, never execution or HUMAN acceptance.
+Root keeps both logical/L status additions, regenerates the manifest normally,
+and selects the source reader, coverage registry and docs/changelog/policy/seal
+checks for this metadata-only composition. No Rust runtime repeat or CICS cache
+retry is justified by these unchanged semantic inputs. F/U/V/W behavior and the
+proposed private positioning authority remain unfinished; full v0.14 stays open.
