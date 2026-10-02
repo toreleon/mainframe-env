@@ -21,7 +21,7 @@ impl<'a> CreateTableParser<'a> {
                     ));
                 }
                 if default.as_ref().is_some_and(|clause: &Db2ColumnDefault| {
-                    matches!(clause.value(), Db2Literal::Null)
+                    matches!(clause.value(), Some(Db2Literal::Null))
                 }) {
                     return Err(self.diagnostic_previous(
                         Db2SyntaxDiagnosticCode::InvalidStatementOperand,
@@ -32,6 +32,7 @@ impl<'a> CreateTableParser<'a> {
                 continue;
             }
 
+            let clause_start = self.tokens[self.position].span;
             let spelling = if self.take_word("WITH") {
                 self.expect_word("DEFAULT")?;
                 Some(Db2DefaultSpelling::WithDefault)
@@ -47,20 +48,20 @@ impl<'a> CreateTableParser<'a> {
                         "column DEFAULT is specified more than once",
                     ));
                 }
-                let value = self.default_value()?;
-                if not_null && matches!(value, Db2Literal::Null) {
+                let clause = self.default_clause(spelling, clause_start)?;
+                if not_null && matches!(clause.value(), Some(Db2Literal::Null)) {
                     return Err(self.diagnostic_previous(
                         Db2SyntaxDiagnosticCode::InvalidStatementOperand,
                         "DEFAULT NULL conflicts with NOT NULL",
                     ));
                 }
-                default = Some(Db2ColumnDefault { spelling, value });
+                default = Some(clause);
                 continue;
             }
 
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::UnsupportedStatement,
-                "column clause is outside NOT NULL and constant/NULL DEFAULT syntax",
+                "column clause is outside NOT NULL and type/constant/NULL DEFAULT syntax",
             ));
         }
 
@@ -78,9 +79,38 @@ impl<'a> CreateTableParser<'a> {
         })
     }
 
-    fn default_value(&mut self) -> Result<Db2Literal, Db2SyntaxDiagnostic> {
+    fn default_clause(
+        &mut self,
+        spelling: Db2DefaultSpelling,
+        start: Db2SourceSpan,
+    ) -> Result<Db2ColumnDefault, Db2SyntaxDiagnostic> {
+        let mut clause = Db2ColumnDefault {
+            spelling,
+            value: None,
+            span: Db2SourceSpan {
+                end_byte: self.tokens[self.position - 1].span.end_byte,
+                end: self.previous_end(),
+                ..start
+            },
+            value_span: None,
+            numeric_sign_span: None,
+            numeric_token_span: None,
+        };
+        // Only element boundaries or the next admitted option may end a
+        // type-default clause. Duplicate options are diagnosed by the caller.
+        if self.at_element_end()
+            || matches!(self.word(), Some("NOT" | "DEFAULT"))
+            || (self.word() == Some("WITH") && self.word_at(self.position + 1) == Some("DEFAULT"))
+        {
+            return Ok(clause);
+        }
+        let operand_start = self.tokens[self.position].span;
         if self.take_word("NULL") {
-            return Ok(Db2Literal::Null);
+            clause.value = Some(Db2Literal::Null);
+            clause.value_span = Some(operand_start);
+            clause.span.end_byte = operand_start.end_byte;
+            clause.span.end = operand_start.end;
+            return Ok(clause);
         }
         let sign = if self.take_symbol(Db2Symbol::Plus) {
             Some('+')
@@ -89,6 +119,9 @@ impl<'a> CreateTableParser<'a> {
         } else {
             None
         };
+        if sign.is_some() {
+            clause.numeric_sign_span = Some(operand_start);
+        }
         let Some(token) = self.tokens.get(self.position) else {
             return Err(self.diagnostic_here(
                 Db2SyntaxDiagnosticCode::MissingToken,
@@ -97,6 +130,7 @@ impl<'a> CreateTableParser<'a> {
         };
         let literal = match &token.kind {
             Db2TokenKind::Number(value) => {
+                clause.numeric_token_span = Some(token.span);
                 let mut value = value.clone();
                 if let Some(sign) = sign {
                     value.insert(0, sign);
@@ -124,8 +158,16 @@ impl<'a> CreateTableParser<'a> {
                 "DEFAULT constant exceeds the configured literal byte limit",
             ));
         }
+        clause.value = Some(literal);
+        clause.value_span = Some(Db2SourceSpan {
+            end_byte: token.span.end_byte,
+            end: token.span.end,
+            ..operand_start
+        });
+        clause.span.end_byte = token.span.end_byte;
+        clause.span.end = token.span.end;
         self.position += 1;
-        Ok(literal)
+        Ok(clause)
     }
 
     fn data_type(&mut self) -> Result<Db2DataType, Db2SyntaxDiagnostic> {

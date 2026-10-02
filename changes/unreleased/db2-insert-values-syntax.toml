@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded owned Db2 INSERT VALUES syntax with decoded identifiers, unique columns, preserved rows, aggregate bounds and column-free expressions; binding, execution and official row credit remain pending."

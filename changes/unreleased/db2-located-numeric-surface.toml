@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose original-source Db2 numeric operand classification/materialization across bounded SQL trivia, with independent public signed-boundary, decimal, provenance, malformed-component and budget regressions; actual default admission and execution remain pending."

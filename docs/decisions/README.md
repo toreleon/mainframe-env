@@ -31,7 +31,16 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0025](0025-licence-and-provenance-policy.md) | licence and provenance policy for IBM oracle evidence | Proposed |
 | [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 | [0027](0027-cics-logical-program-frames.md) | shared CICS task ownership and bounded logical program frames | Proposed |
-| [0028](0028-mq-shared-handle-kernel.md) | one volatile MQ handle authority across properties and pub/sub | Proposed |
+| [0028 (Db2)](0028-db2-typed-catalog-evolution.md) | typed Db2 catalog evolution through signed packages, existing generations and versioned persistence | Proposed |
+| [0028 (MQ)](0028-mq-shared-handle-kernel.md) | one volatile MQ handle authority across properties and pub/sub | Proposed |
+| [0029 (publication)](0029-audited-provider-publication.md) | audited provider publication under one retained core intent | Proposed |
+| [0029 (Db2)](0029-db2-core-participant-evolution.md) | versioned local Db2 core participant binding before mutating integration, preserving frozen CICS v1 | Proposed |
+| [0030](0030-mq-host-lifecycle-directory.md) | private volatile MQ lifecycle directory with explicit persisted restart fencing prerequisite | Proposed |
+| [0031](0031-mq-selected-service-authority.md) | one selected legacy/rich MQ service authority and strict same-store opener | Proposed |
+
+Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
+Their distinct full filenames and subsystem-qualified labels identify each
+proposal; no historical decision body or reference has been replaced.
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

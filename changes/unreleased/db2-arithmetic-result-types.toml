@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added private numeric arithmetic result metadata with explicit decimal context, verified integer-constant provenance and runtime truncation, range and division obligations; ambiguous mixed DECFLOAT conversions remain deferred without evaluation or execution credit."

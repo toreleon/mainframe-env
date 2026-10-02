@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add dormant bounded DROP/RENAME conformance adapters with independent typed syntax fixtures, strict observation comparison and harness mutation checks; no official Db2 bindings, row credit or licensed evidence."

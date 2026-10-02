@@ -61,8 +61,10 @@
     "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
+    "docs/decisions/0028-db2-typed-catalog-evolution.md",
     "docs/decisions/0028-mq-shared-handle-kernel.md",
     "docs/decisions/0029-audited-provider-publication.md",
+    "docs/decisions/0029-db2-core-participant-evolution.md",
     "docs/decisions/0030-mq-host-lifecycle-directory.md",
     "docs/decisions/0031-mq-selected-service-authority.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
@@ -293,12 +295,20 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
           "label": "ADR-0028: Shared MQ handle-family kernel",
           "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
         },
         {
           "label": "ADR-0029: Audited provider publication under a retained intent",
           "path": "docs/decisions/0029-audited-provider-publication.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
           "label": "ADR-0030: Private MQ host lifecycle directory",

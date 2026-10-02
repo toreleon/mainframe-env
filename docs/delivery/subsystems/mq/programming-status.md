@@ -8,6 +8,11 @@ Status: **Implementation active**
 
 - Completion branch: `codex/mq-v015-continuation`
 - Continuation-wave base: `213ed878` (current main after PR #381 merged)
+- Subsequent base integration: `f0727cf8` (accepted Db2 PR #385); MQ production
+  inputs remain unchanged. Documentation registry/navigation preserve both
+  subsystems' distinct proposed ADR filenames, including shared numeric prefixes.
+  Fresh dependency policy is required for the imported Db2 manifest/lock edges;
+  unchanged MQ execution receipts retain their original candidate identities.
 
 This recovery ports lost commits `afe2b893`, `6026c4b9`, `2b7968e3`,
 `01eb5ebb`, `83223a6f`, and `972fab3a` onto current main. The first adds the identity-only registry for all 26 unique IBM MQ

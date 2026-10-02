@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose exact natural INTEGER/BIGINT/DECIMAL literal values paired with verified types and original locations, reusing the foundation decimal primitive; assignment/default conversion and execution remain pending."
