@@ -585,7 +585,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 1,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:79bdbc5f19c709961e7457faf7a6f114067e1b656f9ae27d60c81d6e9f6a5c4f",
+      "sha256": "sha256:05ea49088a2b52aebf803b8aaf5f7b7e8e9aa1328d884d99791a314dd1341d54",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1522,7 +1522,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:a0efeaf3ec9abcf27e35d979db37d0fd64ce81aaa0603cb40e7a046d4ece18be",
+      "sha256": "sha256:c1f06737f27a68d8de5ba1700db8ef318bdba2a3e01b17577df216eed3c89a97",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

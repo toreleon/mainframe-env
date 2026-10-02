@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added private original MQI admission binding to a real retained canonical coordinator intent and the same PlatformStore audited publication, with exact identity/live-control checks and bounded MQ mutation shapes; service, SAF, UOW, replay and participant readiness remain separate."

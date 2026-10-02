@@ -254,6 +254,51 @@ second child. Fresh installed-call protocol schema 3 explicitly admits this
 domain; counter-era active protocol state cannot authorize it. Retained unknown
 calls are not redispatched to reconstruct a frame.
 
+## Private MQI core-intent binding
+
+The private MQ service binding accepts only an actual original
+`MqMqiAdmission::ServiceValidation` with ordinary `CoreEffect` provenance. It
+borrows one `PlatformStore` for both `IdempotencyStore::effect` observation and
+audited provider publication; no separately supplied intent or store can replace
+them. Trusted host/lifecycle admission remains a construction precondition.
+Nested CICS actor/root composition is pending: its outer key cannot substitute
+for a same-actor canonical intent.
+
+The observed record must be an unresolved, unrecovered canonical-host intent
+matching the original execution/run, sequence/key, full shared HostRequest
+digest, dispatch owner/attempt, capability, canonical audit resource and
+invocation key. Creation is positive and no later than observation; the finite
+recovery boundary equals the coordinator's minimum invocation/effect deadline.
+The current execution must match the original principal, attempt, program
+selector and artifact and remain running. The retained epoch is observed, never
+inferred from an envelope or reconstructed. Backend lock/transaction checks
+remain the final intent, execution, lease, clock and CAS authority.
+
+Preparation rechecks live controls and monotonic observations, validates exact
+typed audit identity, and bounds MQ-owned `mq-` mutation shapes to the shared
+4,096-mutation ceiling and 64 MiB aggregate payload/identity budget. This is not
+a row-schema or queue/UOW semantic validator. Only an actual successful decision
+may accompany mutations; other known decisions are audit-only. Explicit unknown
+outcome fails through shared `HostProblem::UnknownOutcome`. An audit decision is
+not a SAF permit. The caller must first obtain the real resource/state/output
+decision, preserving pending/unknown/duplicate outcomes and source-specific
+statuses rather than treating result preflight as execution permission.
+
+The borrowed prepared publication cannot replace the intent/store and is
+consumed by the existing `publish_provider_states_audited` transaction. Its
+final observation must equal the audit's decision tick; if time advances, the
+caller drops/reprepares with a newly observed actual audit. Live cancellation,
+deadline and time regression are checked again before publication. Failure has
+no sequential row/audit fallback or automatic retry.
+
+Publication does not complete the core intent/outbox or adopt queue state.
+Binding is not at-most-once: the caller supplies actual replay/UOW/CAS
+dependencies, adopts next state only after commit, and translates uncertainty
+after dispatch through shared effect reconciliation. Selected queue authority,
+durable UOW ownership, SAF, typed result/replay/retention, nested composition and
+participant/public-route readiness remain separately required. No durable
+schema, legacy canonical bytes or licensed credit changes here.
+
 ## Golden digests
 
 HostRequest::State(StateRequest::Get { key: "one" }): 150 preimage bytes,

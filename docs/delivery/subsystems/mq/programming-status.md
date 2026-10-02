@@ -652,6 +652,18 @@ introduced. Minimal pure delivery-codec reuse must retain existing cold/live
 bytes. Actual receipt/CAS/core-reference/retention and historical handle replay
 remain manager obligations, not omitted v0.15 scope.
 
+The manager integrates M's final sealed `af2e56bc` original-effect/core-intent
+binding. It recomputes digest, capability and origin from the immutable original,
+observes the real retained intent/execution on the same borrowed PlatformStore,
+and retains monotonic observation time even after an expired boundary. Exact
+audit identity and bounded MQ-owned mutations pass to the existing audited
+transaction; its core completion/outbox remains coordinator-owned. Fifteen
+final worker boundary tests and 30 admission regressions retain their original
+candidate; fresh manager integration runs those affected tests and exact gates.
+Earlier unpublished 27698b56 was superseded by the summary-substitution repair.
+Nested CICS composition, actual SAF/queue/UOW validation and receipt deduplication
+remain pending. No fabricated intent or replacement store can enter the binding.
+
 The manager owns actual selected service/ABI/host admission, separately durable
 UOW ownership, SAF/security context and audit/replay composition, participant
 minimum acceptance and public capability proof. All 26-call gates, CardDemo and

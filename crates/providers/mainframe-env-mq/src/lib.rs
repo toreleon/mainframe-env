@@ -15,6 +15,7 @@ mod object_service;
 mod pubsub;
 mod retention;
 mod service;
+mod service_mqi_intent;
 
 pub use delivery::{
     MQ_DELIVERY_SCHEMA, MqDeliveryError, MqDeliveryGet, MqDeliveryKernel, MqDeliveryLimits,
