@@ -335,6 +335,35 @@ Full rollback and savepoint rollback cannot share a blanket CICS/IMS rejection:
 SQL0026 prohibits COMMIT there; SQL0119 permits only savepoint rollback there.
 Diagnostic/context sources and actual binding remain pending before mutation.
 
+The typed wire-design review completed against `29eba935` with a clean,
+read-only checkout and no executed gates. Its closed-shape, strict bounded
+preflight, generated DTO/tag and independent-vector proposals inform the next
+implementation, not an accepted schema. In particular, the manager does not
+freeze a permanent `metadata_only` representation tag as the final installable
+catalog contract. Private preparation is an admission stage; final catalog,
+typed cells, defaults, string policies, package references and durable migration
+must retain the actual requested end state. Non-NULL default constants and
+checks cannot be passed off as validated SQL values or predicates today.
+
+Before catalog schema mutation, the manager declares
+`DB2-1202.exact-numeric-constant-values`: only
+`src/numeric_constant_values.rs` and
+`changes/unreleased/db2-exact-numeric-constant-values.toml` are worker-owned.
+Construct exact INTEGER/BIGINT/DECIMAL literal values from the existing bounded
+original-source classifier and reuse the foundation `DecimalValue` primitive;
+do not create another decimal arithmetic engine. The manager adds that existing
+workspace dependency and private module registration at the coordination base.
+Outputs retain existing resolved types, original spans and owned values. This
+is natural literal materialization, not assignment/default conversion, numeric
+expression evaluation, persistence or canonical catalog identity. Float/DECFLOAT,
+string, binary and datetime values and NULL cells remain explicit later work.
+Source pins are the verified constants/datatype topics already declared above;
+these language elements have no standalone statement row. Acceptance requires
+fixed expected coefficients/scales and signed range/precision boundaries,
+UTF-8/CRLF locations, bounds and all existing classifier rejections, owned output,
+package/MSRV, formatting, dependency policy, catalog/changelog/docs and exact
+path seals. No public route, backend or licensed credit changes.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

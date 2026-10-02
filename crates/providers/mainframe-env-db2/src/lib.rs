@@ -16,6 +16,7 @@ mod generated_statement_catalog;
 mod insert_syntax;
 mod name_resolution;
 mod numeric_constant_types;
+mod numeric_constant_values;
 mod rename_syntax;
 mod result_combination_types;
 mod retention;
