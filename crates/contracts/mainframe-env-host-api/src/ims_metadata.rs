@@ -107,7 +107,7 @@ impl ImsDatabaseOrganization {
     fn segment_limit(self, limits: ImsMetadataLimits) -> usize {
         match self {
             Self::Dedb => limits.max_dedb_segments,
-            Self::Gsam | Self::Msdb => 1,
+            Self::Gsam | Self::Msdb | Self::Shsam | Self::Shisam => 1,
             _ => limits.max_segments_per_database,
         }
     }
@@ -500,8 +500,12 @@ fn validate_database(
         {
             return Err(ImsMetadataProblem::LimitExceeded);
         }
-        if database.organization == ImsDatabaseOrganization::Shisam
-            && segment.min_length != segment.max_length
+        if matches!(
+            database.organization,
+            ImsDatabaseOrganization::Hsam
+                | ImsDatabaseOrganization::Shsam
+                | ImsDatabaseOrganization::Shisam
+        ) && segment.min_length != segment.max_length
         {
             return Err(ImsMetadataProblem::IncompatibleReference);
         }
@@ -888,6 +892,108 @@ fn normalize(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn seq_layout_host_catalog(
+        organization: ImsDatabaseOrganization,
+        two: bool,
+    ) -> ImsMetadataCatalog {
+        let mut value = shisam_fixed_catalog(organization);
+        if two {
+            let mut child = value.databases[0].segments[0].clone();
+            child.name = "SEQCHILD".into();
+            child.parent = Some(value.databases[0].segments[0].name.clone());
+            value.databases[0].segments.push(child);
+            let ImsPcbMetadata::Database(pcb) = &mut value.psbs[0].pcbs[0] else {
+                unreachable!()
+            };
+            pcb.sensitive_segments.push(ImsSensitiveSegmentMetadata {
+                name: "SEQCHILD".into(),
+                parent: Some(pcb.sensitive_segments[0].name.clone()),
+                processing_options: None,
+            });
+        }
+        value
+    }
+
+    fn seq_layout_host_observe(
+        value: &ImsMetadataCatalog,
+    ) -> Result<ImsMetadataIdentity, ImsMetadataProblem> {
+        let actual = validate_ims_metadata(value, ImsMetadataLimits::default());
+        eprintln!(
+            "SEQ_LAYOUT_HOST_METADATA={}; ACTUAL={actual:?}",
+            serde_json::to_string(value).unwrap()
+        );
+        actual
+    }
+
+    #[test]
+    fn seq_layout_host_shisam_multiple_types() {
+        assert_eq!(
+            seq_layout_host_observe(&seq_layout_host_catalog(
+                ImsDatabaseOrganization::Shisam,
+                true
+            )),
+            Err(ImsMetadataProblem::LimitExceeded)
+        );
+    }
+    #[test]
+    fn seq_layout_host_shsam_multiple_types() {
+        assert_eq!(
+            seq_layout_host_observe(&seq_layout_host_catalog(
+                ImsDatabaseOrganization::Shsam,
+                true
+            )),
+            Err(ImsMetadataProblem::LimitExceeded)
+        );
+    }
+    fn seq_layout_host_variable(organization: ImsDatabaseOrganization, index: usize) {
+        let mut value =
+            seq_layout_host_catalog(organization, organization == ImsDatabaseOrganization::Hsam);
+        validate_ims_metadata(&value, ImsMetadataLimits::default()).unwrap();
+        value.databases[0].segments[index].max_length = 4;
+        assert_eq!(
+            seq_layout_host_observe(&value),
+            Err(ImsMetadataProblem::IncompatibleReference)
+        );
+    }
+    #[test]
+    fn seq_layout_host_hsam_variable_root() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Hsam, 0);
+    }
+    #[test]
+    fn seq_layout_host_hsam_variable_dependent() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Hsam, 1);
+    }
+    #[test]
+    fn seq_layout_host_shsam_variable() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Shsam, 0);
+    }
+    #[test]
+    fn seq_layout_host_shisam_variable_control() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Shisam, 0);
+    }
+    #[test]
+    fn seq_layout_host_fixed_and_ranged_controls() {
+        for organization in [
+            ImsDatabaseOrganization::Hsam,
+            ImsDatabaseOrganization::Shsam,
+            ImsDatabaseOrganization::Shisam,
+            ImsDatabaseOrganization::Hisam,
+            ImsDatabaseOrganization::Hidam,
+        ] {
+            let mut value = seq_layout_host_catalog(
+                organization,
+                organization == ImsDatabaseOrganization::Hsam,
+            );
+            if matches!(
+                organization,
+                ImsDatabaseOrganization::Hisam | ImsDatabaseOrganization::Hidam
+            ) {
+                value.databases[0].segments[0].max_length = 4;
+            }
+            assert!(seq_layout_host_observe(&value).is_ok());
+        }
+    }
 
     fn shisam_fixed_catalog(organization: ImsDatabaseOrganization) -> ImsMetadataCatalog {
         let mut value = catalog();

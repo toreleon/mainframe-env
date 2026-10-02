@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Require one segment type for SHSAM and SHISAM and fixed lengths for every HSAM, SHSAM and SHISAM segment through existing metadata and engine validators; reject invalid admission and retained layouts without changing stored formats or coercing records."

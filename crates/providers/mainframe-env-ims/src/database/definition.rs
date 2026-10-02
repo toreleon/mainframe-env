@@ -47,6 +47,11 @@ pub(super) fn validate_definition(
         {
             return Err(EngineProblem::InvalidDefinition);
         }
+        if definition.organization == DatabaseOrganization::Hsam
+            && segment.min_length != segment.max_length
+        {
+            return Err(EngineProblem::InvalidDefinition);
+        }
         let mut fields = BTreeSet::new();
         for field in &segment.fields {
             let end = field.offset.checked_add(field.length);

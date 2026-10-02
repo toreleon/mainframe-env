@@ -1,5 +1,202 @@
 use super::*;
 
+fn seq_layout_engine_definition(
+    organization: DatabaseOrganization,
+    two: bool,
+) -> DatabaseDefinition {
+    let mut value = definition(organization);
+    value.segments.truncate(if two { 2 } else { 1 });
+    for segment in &mut value.segments {
+        segment.max_length = segment.min_length;
+    }
+    value.secondary_indexes.clear();
+    value
+}
+
+fn seq_layout_engine_hsam_variable(index: usize) {
+    let mut value = seq_layout_engine_definition(DatabaseOrganization::Hsam, true);
+    DatabaseEngine::new(value.clone(), EngineLimits::default()).unwrap();
+    value.segments[index].max_length = 4;
+    let actual = DatabaseEngine::new(value, EngineLimits::default());
+    eprintln!("SEQ_LAYOUT_ENGINE_HSAM_LEVEL={index}; ACTUAL={actual:?}");
+    if let Ok(mut accepted) = actual.clone() {
+        let root = insert(
+            &mut accepted,
+            "ROOT",
+            None,
+            if index == 0 { b"A1XY" } else { b"A1X" },
+        );
+        insert(
+            &mut accepted,
+            "CHILD",
+            Some(root),
+            if index == 1 { b"C1XY" } else { b"C1Y" },
+        );
+        let bytes = serde_json::to_vec(&accepted.image()).unwrap();
+        eprintln!(
+            "SEQ_LAYOUT_ENGINE_INVALID_IMAGE={}",
+            String::from_utf8(bytes.clone()).unwrap()
+        );
+        let restored = DatabaseEngine::restore(
+            serde_json::from_slice(&bytes).unwrap(),
+            EngineLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(serde_json::to_vec(&restored.image()).unwrap(), bytes);
+        if let Some(directory) = std::env::var_os("SEQ_LAYOUT_RECEIPT_DIR") {
+            let path = std::path::PathBuf::from(directory).join(format!(
+                "engine-hsam-level-{index}-{}.json",
+                std::process::id()
+            ));
+            std::fs::write(path, bytes).unwrap();
+        }
+    }
+    assert_eq!(actual, Err(EngineProblem::InvalidDefinition));
+}
+
+#[test]
+fn seq_layout_engine_hsam_variable_root() {
+    seq_layout_engine_hsam_variable(0);
+}
+#[test]
+fn seq_layout_engine_hsam_variable_dependent() {
+    seq_layout_engine_hsam_variable(1);
+}
+#[test]
+fn seq_layout_engine_shsam_multiple_types_control() {
+    assert_eq!(
+        DatabaseEngine::new(
+            seq_layout_engine_definition(DatabaseOrganization::Shsam, true),
+            EngineLimits::default()
+        ),
+        Err(EngineProblem::InvalidDefinition)
+    );
+}
+#[test]
+fn seq_layout_engine_shisam_multiple_types_control() {
+    assert_eq!(
+        DatabaseEngine::new(
+            seq_layout_engine_definition(DatabaseOrganization::Shisam, true),
+            EngineLimits::default()
+        ),
+        Err(EngineProblem::InvalidDefinition)
+    );
+}
+#[test]
+fn seq_layout_engine_shsam_variable_control() {
+    let mut value = seq_layout_engine_definition(DatabaseOrganization::Shsam, false);
+    value.segments[0].max_length = 4;
+    assert_eq!(
+        DatabaseEngine::new(value, EngineLimits::default()),
+        Err(EngineProblem::InvalidDefinition)
+    );
+}
+#[test]
+fn seq_layout_engine_shisam_variable_control() {
+    let mut value = seq_layout_engine_definition(DatabaseOrganization::Shisam, false);
+    value.segments[0].max_length = 4;
+    assert_eq!(
+        DatabaseEngine::new(value, EngineLimits::default()),
+        Err(EngineProblem::InvalidDefinition)
+    );
+}
+#[test]
+fn seq_layout_engine_fixed_and_ranged_controls() {
+    for organization in [
+        DatabaseOrganization::Hsam,
+        DatabaseOrganization::Shsam,
+        DatabaseOrganization::Shisam,
+        DatabaseOrganization::Hisam,
+        DatabaseOrganization::Hidam,
+    ] {
+        let mut value =
+            seq_layout_engine_definition(organization, organization == DatabaseOrganization::Hsam);
+        if matches!(
+            organization,
+            DatabaseOrganization::Hisam | DatabaseOrganization::Hidam
+        ) {
+            value.segments[0].max_length = 4;
+        }
+        let mut engine = DatabaseEngine::new(value, EngineLimits::default()).unwrap();
+        let root = insert(&mut engine, "ROOT", None, b"A1X");
+        if organization == DatabaseOrganization::Hsam {
+            insert(&mut engine, "CHILD", Some(root), b"C1Y");
+        }
+        let bytes = serde_json::to_vec(&engine.image()).unwrap();
+        assert_eq!(
+            serde_json::to_vec(
+                &DatabaseEngine::restore(
+                    serde_json::from_slice(&bytes).unwrap(),
+                    EngineLimits::default()
+                )
+                .unwrap()
+                .image()
+            )
+            .unwrap(),
+            bytes
+        );
+    }
+}
+
+#[test]
+#[ignore = "capture actual old/new GOOD engine bytes outside target"]
+fn seq_layout_capture_engine_good() {
+    let directory = std::path::PathBuf::from(std::env::var_os("SEQ_LAYOUT_RECEIPT_DIR").unwrap());
+    for org in [
+        DatabaseOrganization::Hsam,
+        DatabaseOrganization::Shsam,
+        DatabaseOrganization::Shisam,
+        DatabaseOrganization::Hisam,
+        DatabaseOrganization::Hidam,
+    ] {
+        let mut definition = seq_layout_engine_definition(org, org == DatabaseOrganization::Hsam);
+        if matches!(
+            org,
+            DatabaseOrganization::Hisam | DatabaseOrganization::Hidam
+        ) {
+            definition.segments[0].max_length = 4;
+        }
+        let mut engine = DatabaseEngine::new(definition, Default::default()).unwrap();
+        let root = insert(&mut engine, "ROOT", None, b"A1X");
+        if org == DatabaseOrganization::Hsam {
+            insert(&mut engine, "CHILD", Some(root), b"C1Y");
+        }
+        insert(&mut engine, "ROOT", None, b"B2Y");
+        let bytes = serde_json::to_vec(&engine.image()).unwrap();
+        let path = directory.join(format!("good-{org:?}.json"));
+        std::fs::write(&path, bytes).unwrap();
+        eprintln!("SEQ_LAYOUT_GOOD_ENGINE_ARTIFACT={}", path.display());
+    }
+    eprintln!("SEQ_LAYOUT_GOOD_ENGINE_CAPTURE_PASS");
+}
+
+#[test]
+#[ignore = "requires exact externally retained old/new engine image"]
+fn seq_layout_reader_engine_pure() {
+    let path = std::path::PathBuf::from(std::env::var_os("SEQ_LAYOUT_READER_IMAGE").unwrap());
+    let bytes = std::fs::read(&path).unwrap();
+    let image = serde_json::from_slice(&bytes).unwrap();
+    let result = DatabaseEngine::restore(image, Default::default());
+    if std::env::var("SEQ_LAYOUT_READER_EXPECT").unwrap() == "invalid" {
+        assert_eq!(result, Err(EngineProblem::InvalidDefinition));
+    } else {
+        let engine = result.unwrap();
+        assert_eq!(serde_json::to_vec(&engine.image()).unwrap(), bytes);
+        assert_eq!(
+            engine.export_records()[0].data,
+            if engine.definition().segments[0].max_length == 4
+                && engine.definition().organization == DatabaseOrganization::Hsam
+            {
+                b"A1XY".as_slice()
+            } else {
+                b"A1X".as_slice()
+            }
+        );
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    eprintln!("SEQ_LAYOUT_ENGINE_PURE_READER_PASS");
+}
+
 fn shisam_fixed_definition(organization: DatabaseOrganization) -> DatabaseDefinition {
     let mut value = definition(organization);
     value.segments.truncate(1);
@@ -765,8 +962,11 @@ fn all_pinned_organizations_have_bounded_engine_or_index_only_behavior() {
         if matches!(organization, Gsam | Index | Msdb | Psindex | Shisam | Shsam) {
             descriptor.segments.truncate(1);
         }
-        if matches!(organization, Shsam | Shisam) {
-            descriptor.segments[0].max_length = descriptor.segments[0].min_length;
+        if matches!(organization, Hsam | Shsam | Shisam) {
+            for segment in &mut descriptor.segments {
+                segment.max_length = segment.min_length;
+                assert_eq!(segment.max_length, segment.min_length);
+            }
         }
         let mut engine = DatabaseEngine::new(descriptor, EngineLimits::default()).unwrap();
         let before = engine.state_digest();

@@ -6,6 +6,46 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root sequential-layout admission integration — 2026-10-03
+
+Root composes worker `d2850f8c8418a09c9dc8073be7112b5aa0c2f38f` onto
+`af5f5c7c2000a3118b1fb1b1f3a2eaa82890781d` with the exact nine paths below.
+Manager reviews all three existing predicates, every runtime addition against
+the previously reviewed six test inputs, complete handoff and retained proof.
+Independent audit verifies 624 packet files, 317 immutable prior packet files,
+33 unchanged worker owners, 177 actual artifacts including 167 read-only SQLite
+files, eight linked binaries, 58 reviewed cases, four fresh count fail-first
+assertions, 82 executed reader boundaries and 22 configured PostgreSQL cases.
+Twenty-three worker policy/contract/generator gates retain original inputs.
+
+All 77 pure-reader boundaries require exact original/copy file identities; no
+exception is granted. Five actual whole-server availability rejections preserve
+every non-clock SQL table and retention singleton/epoch. Only the pre-existing
+startup duration clock tick advances; physical database bytes differ, so these
+five checks are not byte-exact pure-reader compatibility. Original setup and
+failed assertions stay uncredited. Invalid retained layouts can block deployment
+availability; no repair/migration or rolling downgrade is supplied.
+
+All six worker Rust inputs and the fragment remain byte-exact. Intervening U/V
+and HISAM commits changed eight transitive owners, so root runs the 58 focused
+host/engine/public/signed cases on this composed candidate, strict combined
+host/IMS/server lint, formatting and required OSS/policy/docs/changelog/coverage/
+module/typed checks. Actual PostgreSQL and retained-reader histories are not
+rerun merely for the commit; their original candidate identities remain visible.
+Only normal docs generation updates the manifest; every complete status lane
+survives composition. Exact nine-path generated seal/committed check and root
+Cargo cleanup conclude the sequence. Any observed composition failure must be
+diagnosed; unchanged global infrastructure exploration is not repeated.
+
+The typed fixed-layout/simple-type fence does not prove literal DBDGEN defaults,
+minbytes/compression, physical media or full-context programming. Host and engine
+already enforce exactly one root segment type; an old generic remaining-root
+phrase is not evidence of a new missing root-count predicate. One-type HSAM
+DBDGEN normalization and full-family proof remain distinct obligations. All 25
+mandatory rows, official/HUMAN0/25, shared ADR0031/0033, raw CALL/TM/participant
+and parent v0.14 remain incomplete. Licensed certification stays excluded;
+mandatory OSS license policy stays required.
+
 ## Root DEDB subset-pointer source integration — 2026-10-03
 
 Root composes source-only worker `6a603bf39613eca32d4336f92d9c98a394770dfe`
@@ -356,6 +396,203 @@ The first normal docs generation rejects the newly registered ADR because its
 navigation entry was omitted. Repair only that authorized registry entry; preserve
 the exit-1 packaging receipt/cleanup and rerun changed docs generation/check.
 No runtime, lint or policy result is relabeled or repeated for this docs repair.
+
+## IMS-1403.sequential-layout-admission — runtime declaration, 2026-10-03
+
+Entry `5a7118d94d889de5d670fca953080d712a0a057c` with exactly six reviewed owned
+test-only inputs, empty index/target absent; branch
+`codex/v014-sequential-layout-runtime-20261003`; target **0.14.0**.
+Manager review is reference evidence, not runtime execution. Original test-only
+packet and prior SHISAM seal/receipts/artifacts/binaries remain immutable.
+
+Exact maximum nine-path allowlist declared before runtime edits:
+
+- `crates/contracts/mainframe-env-host-api/src/ims_metadata.rs`
+- `crates/providers/mainframe-env-ims/src/database/definition.rs`
+- `crates/providers/mainframe-env-ims/src/database/tests.rs`
+- `crates/providers/mainframe-env-ims/tests/sequential_layout_admission.rs`
+- `crates/apps/mainframe-env-server/src/product.rs` (cfg(test) declaration only)
+- `crates/apps/mainframe-env-server/src/product/tests/sequential_layout_admission_tests.rs`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-sequential-layout-admission-20261003.toml`
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+Approved existing private predicates: SHSAM/SHISAM segment_limit1 (existing
+LimitExceeded count guard); shared per-segment HSAM/SHSAM/SHISAM equality after
+numeric bounds (IncompatibleReference); engine per-segment HSAM equality EVERY
+level (InvalidDefinition), retaining existing simple guards. Manager approves
+exactly four signed multiple-type literals ResourceExhausted via existing host
+LimitExceeded/installer LimitExceeded/server transport, with fresh pre-predicate
+Ok-vs-ResourceExhausted fail-first execution. Variable errors remain Malformed.
+No package/preflight/server production error mapping or public authority change.
+All-organization fixtures may repair fixed HSAM root/child and host HSAM/SHSAM;
+nonsequential ranges remain. One-type HSAM defaulting is separate/unapproved.
+
+Rows 0005/0006/0008/0009/0019 remain existing DL/I consumers; all25 mandatory,
+official/HUMAN0/25. Reverify metadata-contracts DBD190–221/SEGM303–354, retained
+topic_path-first SHA/length and archive fallback, actual offline search/read.
+Typed bounds do not certify literal minbytes/compression/physical VSAM/tape.
+Existing typed Batch legacy DTO/public/provider/signed selected routes only.
+
+Proof: all58 cases with four reviewed literals green, all-row and generation/
+selection no-mutation on rejection, twenty full fixed/ranged programming/replay/
+reopen histories. Before predicates capture actual pure old-reader selectors,
+linked binaries and exact GOOD engine/public/signed bytes. New readers consume
+exact old GOOD and reject genuine old INVALID engine/public/registry/selected
+bytes through distinct existing errors without retained mutation. Actually run
+old read-only readers against new GOOD; registry unselected-invalid availability
+and full-server rejection no-row-change are separate assertions. No old whole
+server open as a read-only compatibility claim; no fabricated/empty replacement,
+coercion/re-signing/migration. Stop/drain and downgrade risks remain explicit.
+
+Mandatory scoped configured PostgreSQL public/signed six rejection classes and
+five fixed/ranged programming/replay/reopen controls use isolated task resources,
+fsync on, actual profile/row/generation identities, teardown on every outcome;
+no skip/version-only/injected-Memory credit. Strict affected host-api/IMS/server
+all-target/all-feature no-deps Clippy -D warnings, fmt, offline deny/license/
+supply-chain; normal docs/changelog/catalog/assurance/schema/spec/coverage and
+affected execution/effect/rows/storage/SAF/retention/participant/generator/typed/
+module/API guards. Each build/test/lint/generator sequence cleans only intended
+target, retaining fresh receipts externally under `sequential-layout-runtime/`.
+No peer production files, schemas/pins/rules/floors/ratchets/dependencies/ADR,
+root integration/push/PR, global CICS retry/full CardDemo/fuzz/licensed campaign.
+Seal only this finite leaf after actual gates; parent v0.14/raw CALL/shared TM/
+participant/ADR0031/0033 remain unfinished, no human approval inferred.
+
+Runtime results: **Complete, bounded existing-validator leaf only**. All58
+reviewed cases pass: host7, engine7, public22 and signed22. The four reviewed
+signed count-limit literals independently fail Ok-vs-ResourceExhausted before
+the predicates, then pass; original21-red/37-green test-only evidence remains
+immutable. Focused host regressions add9 passing cases, engine GOOD capture1,
+and affected organization/image/package/publication regressions15. Final signed
+test bytes independently pass22 cases and strict affected three-package Clippy.
+
+Before repair, actual old linked pure readers and genuine GOOD/INVALID state
+were retained;31 old-reader boundary executions pass. Actual old pure readers
+read new GOOD engine/public/signed bytes (15 boundary executions), preserving
+every byte and provider payload/version. New readers pass14 engine/public and
+17 signed pure boundaries against old GOOD/INVALID bytes; five actual whole-
+server unselected-invalid availability boundaries reject with all provider,
+registry, generation, selection and other SQL rows unchanged. The existing
+auxiliary startup retention clock tick can advance, with epoch unchanged; this
+is separately recorded and is not a byte-exact/read-only whole-server claim.
+Pure readers have no byte/row exception. Invalid engine images reject with
+InvalidDefinition, public open with InfrastructureFailure, registry decode with
+ResourceExhausted (multiple types) or Malformed (variable), and selected metadata
+with InfrastructureFailure. An unselected invalid generation can block server
+availability. No invalid image is replaced, records coerced, package re-signed
+or automatic migration invented. Stop/drain and operator review remain needed;
+old validators still accept unsafe invalid layouts, so downgrade is not seamless.
+
+Actual PostgreSQL18.6 parity executes11 public and11 configured signed cases,
+each with its own task database, fsync/full_page_writes/synchronous_commit on:
+six invalid classes and five fixed/ranged programming/replay/reopen histories.
+Signed uses the real configured Postgres store and Shared artifact owner.
+Clusters are loopback-only, stopped and resolved task data removed on every
+outcome. Earlier Local-vs-Shared test setup and receipt callback failures earn0
+matrix credit; repaired final signed11 pass with final Rust input identity.
+Memory/file SQLite rejection preserves every provider row/version and registry/
+selection; twenty positive histories exercise existing typed Batch operations.
+Positive replay's existing durable/SAF audit deltas are logged separately, never
+exempted for rejection. Reopen is not process restart, backup or certification.
+
+Fresh metadata source review reads84 selected lines, after retained-path absence
+and exact archive SHA/bytes verification; source credit0. Required policy,
+inventory/contract guards, documentation generation/check and strict affected
+lint pass with external per-command input/log identities. Earlier failed
+physical-file assertions on whole-server startup remain original diagnostics;
+their provider rows were unchanged. All prior SHISAM receipts/artifacts/binaries
+and33 unrelated owner identities remain preserved. Only the approved engine
+all-organization HSAM fixture fixes EVERY level; other organizations' ranges
+and original SHISAM tests remain. External packet: `sequential-layout-runtime/`.
+No literal DBDGEN, physical media, one-type HSAM defaulting, all-context/operation,
+shared approval, official/HUMAN or parent-v0.14 completion credit is claimed.
+
+## IMS-1403.sequential-layout-failfirst — test-only declaration, 2026-10-03
+
+Entry `5a7118d94d889de5d670fca953080d712a0a057c`, clean/target absent;
+branch `codex/v014-sequential-layout-failfirst-20261003`, target **0.14.0**.
+This phase only adds independent fail-first witnesses for shared SHSAM/SHISAM
+single-segment-type limits, shared HSAM/SHSAM fixed lengths and engine HSAM
+fixed lengths at every level. Two-type fixtures use valid fixed root/dependent
+hierarchy, named unique sequence fields and correctly sensitive parent/child
+PCB; variable fixtures change only one max_length from3 to4. One-type HSAM
+DBD defaulting to SHSAM is distinct from the two-type HSAM restriction.
+
+Exact maximum six-path allowlist, declared before test edits:
+
+- `crates/contracts/mainframe-env-host-api/src/ims_metadata.rs` (cfg(test) only)
+- `crates/providers/mainframe-env-ims/src/database/tests.rs` (tests only)
+- `crates/providers/mainframe-env-ims/tests/sequential_layout_admission.rs` (new)
+- `crates/apps/mainframe-env-server/src/product.rs` (cfg(test) declaration only)
+- `crates/apps/mainframe-env-server/src/product/tests/sequential_layout_admission_tests.rs` (new)
+- `docs/delivery/subsystems/ims/programming-status.md`
+
+Existing shared segment_limit/validate_database and engine definition validation
+remain production owners, unchanged. Normative host errors are LimitExceeded for
+simple multiple types, IncompatibleReference for variable sequential layouts;
+engine InvalidDefinition; public/signed malformed admission with no partial
+rows/generation/selection. Observe and retain actual accepted identity/images/
+stage/publication and public-created invalid SQLite state before red assertions.
+Distinguish existing engine/public rejection controls from genuine host/signed
+stage failures. Fixed two-level HSAM, fixed single-level SHSAM/SHISAM and ranged
+HISAM/HIDAM are controls, with actual programming/replay/reopen where supported
+through typed Batch provider and signed selected routes on Memory/file SQLite.
+Unsupported operations remain negative controls, not all-context certification.
+
+Sources: metadata-contracts DBD190–221/SEGM303–354, retained topic_path first and
+exact archive fallback, actual offline search/read, source credit0. Unchanged
+original call/status review is reused with original identities. Catalog rows
+0008 ISRT, 0005 retrieval, 0006 hold, 0019 scheduling remain under the existing
+DL/I catalog; all25 mandatory, official/HUMAN0/25 unchanged.
+
+Focused new tests, strict affected all-target/all-feature no-deps Clippy with
+`-D warnings`, fmt, offline deny/supply-chain/license policy are phase gates.
+Expected assertion exit101 is fail-first evidence, not runtime completion.
+Setup/compiler/fixture failures earn0 credit; only changed tests are repaired.
+Every Cargo sequence cleans only this checkout target; external receipts under
+`sequential-layout-failfirst/`. Preserve prior SHISAM seal/packet/test inputs and
+all HISAM/TM/U/V owners. No production/definition edit, staging/commit/seal,
+changelog/generator/ADR/schema/source/rule/ratchet/dependency or shared authority
+is authorized. No automatic PG/backup/CardDemo/fuzz/global CICS/licensed run.
+Deliver design/handoff for manager decision before any repair. ADR0031/0033,
+raw CALL/shared TM/participant and parent IMS/full v0.14 remain unfinished.
+
+Test-only results: **packet complete; runtime repair pending manager review**.
+Across 58 distinct executed cases, 21 reach genuine normative rejection
+failures and 37 are green controls. Original `failfirst-v1` executes 58 cases:
+host2/5, engine5/2, signed2/20, public13/9 (pass/fail), including 15 genuine
+red and 21 uncredited observer/control fixture failures. `repair-v2` changes
+only those test observers/replay helpers and executes 30 cases: signed10/10,
+public10/0. All ten signed stage assertions now genuinely fail; unchanged host,
+engine/public rejection witnesses and SHISAM rejection controls retain their
+original input identities. Total actual invocations88, ignored0; filtered
+existing cases and setup errors earn no credit. Neither exit101 is runtime pass.
+
+Shared validation accepts simple multiple types and HSAM/SHSAM ranges; engine
+accepts HSAM variable root and dependent. Public HSAM variable install/load/
+commit/reopen works. Signed simple multiple types/SHSAM variable stage AND
+metadata publication succeed; Schedule later returns Malformed. Signed HSAM
+variable stage/publication/load/commit succeed. Retained actual invalid images
+and public/signed SQLite bytes remain external. Fixed two-level HSAM and fixed
+SHSAM use existing Load/reprocessing controls; SHISAM and ranged HISAM/HIDAM
+use ISRT. Twenty public/signed Memory/SQLite positive histories complete keyed
+GU/GHU/GN, canonical replay and reopen with unchanged selected generation.
+Replay preserves all non-audit rows; durable/SAF audit version changes are
+observed separately. Rejected admission still requires ALL provider payload/
+version rows and selection unchanged. No all-operation/context certification.
+
+Fresh strict affected Clippy all-target/all-feature/no-deps -D warnings, fmt,
+offline deny, supply-chain and license notices pass. Compile-only retained
+proof binaries earn no test execution credit. All three Cargo sequences clean
+this checkout target; prior SHISAM seal/packet and 34 unchanged owner identities
+are preserved. No production repair/commit/seal or parent credit. External
+design identifies three existing predicate repairs and retained-invalid reader/
+availability consequences. Existing LimitExceeded maps through installer to
+signed ResourceExhausted, conflicting with the four requested multiple-type
+Malformed stage assertions; manager must resolve that exact contract precision
+before a runtime phase. New/old reader compatibility and scoped available PG
+proof remain future runtime requirements, unrun here.
 
 ## IMS-1403.shisam-fixed-layout-admission — runtime leaf declaration, 2026-10-03
 
