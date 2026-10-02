@@ -170,3 +170,48 @@ narrow these limits. Live resume and persistent-only cold restart/backout polici
 unchanged. Public runtime/ABI selection, non-quiescent migration, lifecycle owner
 minting, typed replay, SAF, audit/coordinator composition and participant
 acceptance remain integration requirements.
+
+## Private MQ composed publication and persisted fence
+
+`MQ-1505.rich-state-publication-fence` plans from the same captured rich
+authority. Ordinary delivery candidates publish at its exact catalog,
+generation and fence. A separate explicit fence-only plan derives the next
+fence as checked old-plus-one in the positive SQL-compatible domain. Neither
+API accepts independently supplied old marker, catalog, versions or owners.
+Catalog/generation replacement is refused and requires distinct migration.
+
+Every logical plan includes the existing delivery metadata CAS, exact old v2
+marker CAS and retained catalog dependency CAS. Ordinary marker/catalog payloads
+keep their captured bytes while physical versions advance by one. A fence-only
+plan changes marker and metadata identity together; all delivery member payloads
+and versions, pending/final decisions, cursors and live state remain unchanged.
+The metadata helper never runs an implicit cold-restart/backout policy or
+reprojects per-message rows. Import provenance versions remain historical lower
+bounds, permitting these physical dependency advances.
+
+Planning does not access or mutate the store. It reuses the strict reader on
+immutable captured row projections and the existing delivery delta/checkpoint
+validation, including the retained reader profile and combined snapshot budget.
+It returns one composable mutation batch and one validated next authority for
+adoption only after the full transaction succeeds. Retained replay payloads,
+versions, owner metadata and core references are unchanged; numeric legacy
+handles do not become fresh opaque handles. Stale plans fail explicit CAS with
+no partial publication, never automatic mutation replay or premature adoption.
+
+The private publication profile permits at most 1,024 mutations, 64 MiB per
+put and 64 MiB aggregate put bytes, with smaller profiles allowed. Marker,
+catalog and metadata dependencies count in these limits. This is smaller than
+the shared audited ceiling of 4,096 mutations; the service must also bound its
+FULL composed batch including replay/UOW additions. Oversized logical batches
+fail before publication, with no silent batching or cap increase. Reader/import
+combined 128 MiB capacity and v1 semantics are unchanged.
+
+Memory and SQLite regression fixtures compose these plans through the existing
+`AuditedProviderPublication` under real retained, attributed canonical core
+intents and typed audits. Both race orders, dependency CAS failure, trailing
+composed failure and audit saturation roll back rows and audit together. This
+proves the private store composition, not an admitted public MQ operation.
+The persisted fence is not a coordinator permit, UOW decision or owner lease.
+Fresh plans under one still-live intent are not intent-wide deduplication:
+actual original-effect/replay/UOW binding, lifecycle retirement, SAF, service
+selection, core completion and participant/licensed acceptance remain required.

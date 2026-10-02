@@ -75,6 +75,25 @@ pub(crate) struct DeliveryRowIdentity {
 }
 
 impl DeliveryRowIdentity {
+    /// Private checked persisted-fence step; not a coordinator or recovery permit.
+    pub(crate) fn next_fence(&self) -> Result<Self, DeliveryRowError> {
+        let fence = self
+            .fence
+            .checked_add(1)
+            .filter(|f| *f <= i64::MAX as u64)
+            .ok_or(DeliveryRowError::Identity)?;
+        if self.generation == 0 || self.generation > i64::MAX as u64 || self.fence == 0 {
+            return Err(DeliveryRowError::Identity);
+        }
+        Ok(Self {
+            fence,
+            ..self.clone()
+        })
+    }
+
+    pub(crate) fn generation_and_fence(&self) -> (u64, u64) {
+        (self.generation, self.fence)
+    }
     pub(crate) fn new(
         catalog: &MqObjectCatalog,
         generation: u64,
@@ -156,6 +175,52 @@ impl DeliveryRowDelta {
 }
 
 impl DeliveryRows {
+    /// Immutable physical projection for same-authority composed validation.
+    /// This neither scans a store nor exposes mutable row or message state.
+    pub(crate) fn captured_records(&self) -> impl Iterator<Item = &ProviderStateRecord> {
+        self.records.values()
+    }
+
+    /// Metadata-only checked fence step. Preserve every member payload/version,
+    /// including pending/final/cursor state, without reprojecting live policy.
+    pub(crate) fn next_fence_delta(&self) -> Result<DeliveryRowDelta, DeliveryRowError> {
+        self.limits.validate()?;
+        let mut metadata = self.metadata.clone();
+        metadata.identity = metadata.identity.next_fence()?;
+        let old = self
+            .records
+            .get(&key(META, META_KEY))
+            .ok_or(DeliveryRowError::Corrupt)?;
+        let mut records: Records = self
+            .records
+            .iter()
+            .filter(|(k, _)| k.0 != META)
+            .map(|(k, r)| (k.clone(), r.clone()))
+            .collect();
+        let mut bytes = records
+            .values()
+            .try_fold(0usize, |n, r| n.checked_add(r.payload.len()))
+            .ok_or(DeliveryRowError::Bounds)?;
+        let mut mutations = Vec::new();
+        put(
+            META,
+            META_KEY,
+            encode_object_row(META_KEY, &metadata).map_err(|_| DeliveryRowError::Corrupt)?,
+            Some(old),
+            &mut records,
+            &mut mutations,
+            self.limits,
+            &mut bytes,
+        )?;
+        Ok(DeliveryRowDelta {
+            mutations,
+            next: Self {
+                records,
+                metadata,
+                limits: self.limits,
+            },
+        })
+    }
     /// Explicit creation only. The service must authorize creating/migrating this
     /// authority and reconcile legacy state before calling this. Never falls back
     /// from failed restore. Orphan rich rows prohibit initialization.

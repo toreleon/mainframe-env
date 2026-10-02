@@ -13,6 +13,9 @@ use mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN;
 #[path = "service_rich_state/strict.rs"]
 mod strict;
 
+#[path = "service_rich_state/publication.rs"]
+pub(super) mod publication;
+
 /// Physical snapshot budget, separately from each original authority's limits.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ReaderLimits {
@@ -139,9 +142,10 @@ pub(super) struct RichStoredState {
     pub(super) retained_records: Vec<ProviderStateRecord>,
     /// Legacy replay values, never interpreted as issued opaque handle tokens.
     pub(super) replay: BTreeMap<String, RecordedResult>,
+    limits: ReaderLimits,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RichMarker {
     schema_version: String,
@@ -368,6 +372,7 @@ fn decode_records(
                 versions,
                 retained_records,
                 replay,
+                limits,
             }))
         }
         _ => Err(ReadError::Corrupt),

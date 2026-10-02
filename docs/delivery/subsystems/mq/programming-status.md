@@ -634,6 +634,24 @@ and affected module ceilings (service 1120/1331, selection 115/1200) passed.
 No dependencies, schema or canonical bytes changed. The strict opener stores one
 authority and grants no connection, UOW, mutation, recovery or SAF permission.
 
+The manager integrates N's sealed `720d0b21` bounded publication/fence plans
+against this selected service union. Marker, metadata and catalog CAS are one
+composed audited batch; fence-only changes preserve live member and replay bytes.
+The ordinary/fence race has one winner in both orders. Fresh integration covers
+the affected service (including selection), delivery and object-service tests,
+row guard/mutants and required freshness/seal gates. Audited-store production
+bytes are unchanged; its 17 worker regressions retain their separate candidate.
+The plan is not a UOW decision, recovery permit or automatic adoption authority.
+
+N next owns `MQ-1505.typed-result-replay-codec`: a private bounded strict storage
+projection for actual typed non-handle MQI outputs and their full shared canonical
+result identity. It preserves pending/unknown/duplicate outcomes and refuses
+opaque handle outputs without live/historical authority. No public token
+reconstruction, new journal/pruner, reader namespace allowance or readiness is
+introduced. Minimal pure delivery-codec reuse must retain existing cold/live
+bytes. Actual receipt/CAS/core-reference/retention and historical handle replay
+remain manager obligations, not omitted v0.15 scope.
+
 The manager owns actual selected service/ABI/host admission, separately durable
 UOW ownership, SAF/security context and audit/replay composition, participant
 minimum acceptance and public capability proof. All 26-call gates, CardDemo and
