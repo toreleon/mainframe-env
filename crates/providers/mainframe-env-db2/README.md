@@ -134,6 +134,17 @@ a verified type/value pair. All classifier limits and deferred-form errors
 remain intact. This value surface is not assignment/default conversion, numeric
 expression evaluation, typed cell persistence or a catalog canonical preimage.
 
+The exact numeric assignment surface converts only opaque materialized literal
+proofs into validated SMALLINT/INTEGER/BIGINT/DECIMAL targets. Results own the
+matching target type/value and original span. Whole-part bounds precede decimal
+scale expansion; fractional digits are truncated toward zero, not rounded.
+Conversion observations distinguish discarded digits from discarded nonzero
+digits and retain INTEGER/BIGINT temporary DECIMAL(11,0)/(19,0) attributes.
+They do not invent SQLCA warnings or SQLCODE. Compatible but unimplemented
+floating, DECFLOAT and nonnumeric conversions remain distinct from datatype
+incompatibility. This surface does not establish binder/default applicability,
+evaluate expressions, assign host memory or implement typed cells/catalogs.
+
 The searched DELETE/UPDATE surfaces own qualified targets and optional common
 search conditions; UPDATE also owns unique single-column expression/DEFAULT/
 NULL assignments. Scalar/predicate structure is validated at every expression

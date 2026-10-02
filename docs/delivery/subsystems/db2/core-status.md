@@ -463,6 +463,30 @@ route, missing/duplicate output and bounds mutants. Rejection of a legal deferre
 form records a product limitation, never official recognition evidence. Existing
 six-gate applicability, 174 rows and licensed-pending disposition stay unchanged.
 
+The manager declares `DB2-1202.exact-numeric-assignment-surface` to expose the
+separately sealed, reviewed literal-assignment kernel without production edits.
+Exact ownership is `lib.rs`, `tests/numeric_constant_assignment.rs`, provider
+README, this status, `changes/unreleased/db2-exact-numeric-assignment-surface.toml`
+and the derived documentation manifest. Public fixed-vector regressions cover
+signed target boundaries after fractional truncation, DECIMAL precision/scale
+31, overflow before expansion, independent fractional-loss observations,
+11,0/19,0 temporary attributes, nullable target metadata, compatibility versus
+unsupported conversions and owned original UTF-8/CRLF spans. The prerequisite
+kernel's 20 focused tests, 287 unit and 46 integration tests passed on its own
+base; these are not relabeled as manager-candidate evidence. Public integration
+requires current package/MSRV and policy/catalog/changelog/docs/seal checks.
+The numeric-assignment and assignment/comparison pins above remain authority;
+they are language elements without standalone catalog rows. Binder/default
+legality, other ordinary value families, execution and licensed differential
+remain pending, with zero official recognition or row/gate credit added.
+
+The public assignment surface passes six focused tests and the current combined
+Db2 package: 287 unit tests and 52 integration tests, zero failures or skips.
+Rust 1.95 all-target/all-feature checking also passes. The integrated private
+value-owner blob is unchanged from the worker's sealed commit; public consumers
+receive only existing proof constructors and read-only metadata. These local
+results do not discharge default applicability or oracle obligations.
+
 The manager declares `DB2-1201.located-column-default-intents` before typed
 catalog/default binding. The current CREATE TABLE parser cannot represent the
 valid operand-less DEFAULT form and discards individual operand locations.

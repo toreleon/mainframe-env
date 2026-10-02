@@ -86,8 +86,10 @@ pub use numeric_constant_types::{
     Db2NumericConstantType, classify_db2_numeric_constant,
 };
 pub use numeric_constant_values::{
-    Db2MaterializedNumericConstant, Db2NumericConstantValue, Db2NumericConstantValueError,
-    Db2NumericConstantValueErrorCode, materialize_db2_numeric_constant,
+    Db2AssignedNumericConstant, Db2AssignedNumericValue, Db2MaterializedNumericConstant,
+    Db2NumericAssignmentConversion, Db2NumericAssignmentError, Db2NumericAssignmentErrorCode,
+    Db2NumericConstantValue, Db2NumericConstantValueError, Db2NumericConstantValueErrorCode,
+    assign_db2_numeric_constant, materialize_db2_numeric_constant,
 };
 pub use rename_syntax::{Db2RenameObjectKind, Db2RenameStatement, parse_db2_rename_statement};
 pub use result_combination_types::{

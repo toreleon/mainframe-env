@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose reviewed exact Db2 literal-to-target numeric assignment proofs with independent public boundary, fractional-loss, temporary-type and located ownership regressions; binder/default applicability, other value families, execution and licensed differential remain pending."
