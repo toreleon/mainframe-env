@@ -3003,3 +3003,42 @@ actual Draft202012 definition and browse instance validation. Private 278-comman
 projection (239 SPI and 39 FEPI), 4577 operands/7814 case candidates and all
 62 numeric domains/217 numeric records remain unchanged. TERMINAL source input
 still awaits independent final review/integration; runtime acceptance pending.
+
+TERMINAL integration child SPI-1001.spi-terminal-sessions-source-contracts is
+manager-owned after full-family and different-thread combined final review.
+All 27 rows, 505 operands, 200 numeric response clauses plus two unmapped
+NOTFOUND case clauses, 145 domains/487 symbols, ten forms and 1133 whole cases
+retain source scope. Exactly five string and seven citation-array changes affect
+ten cases; 1123 whole cases and all IDs/order/gaps/grammar remain exact. Manager
+read every actual old/new field and all ten entire cases/relations, accounted all
+161 old citation members (109 retained/52 coalesced), and inspected complete
+qualified clauses around compacted anchors plus two specific fullword additions.
+Manager whole-byte forward/reverse replay, 74 artifact identities and 14 fresh
+pinned offline calls on six topics/eight actual pages pass. USERDATALEN maximum255
+has no fabricated minimum; BGAM/BSAM NETNAME binding/output equality remain
+unresolved. Pool syncpoint/early exception concerns recoverable task work without
+installed-definition rollback. NQNAME relogon and device catalog origins differ;
+terminal trace policy/SUPPRESSED and TYPETERM receipt/PROFILE presentation remain
+separate. APPC parallel SESSIONS excludes SNASVCMG and DF recoverability can defer
+CLS1 until commit. OPEN partial attainment, unsupported interval reset, component
+fullwords/conditional59 bounds and closed-ACB later delivery remain qualified.
+Baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12, product SSJL4D_6.x; exact
+catalog rows/topic pins stay in spi-terminal-sessions.json. Unknown linked pins,
+NOTFOUND numeric identity, omitted extent/defaults, BMS/PROFILE/printing/CREATESESS
+source oppositions, exact SAF/ABI and recovery remain precise Pending. No guessed
+alias, universal success, caller-UOW atomic rollback or automatic redispatch.
+Manager exclusively owns schema/types/generator/IR/status and serial integration.
+Only this bounded source child seals after actual family/all-family instances,
+projection preservation, focused and mandatory gates. Parent SPI-1001, all six
+per-command gates, application dependency, selected route, recovery/restart and
+licensed acceptance remain Pending, credit0; no routing is advertised.
+
+TERMINAL integrated candidate passes 31 generator and nine IR regressions plus
+actual Draft202012 family instance and all-18-family validation. Private source
+projection has 305 commands (266 SPI and 39 FEPI), 5082 head operands and 8947
+case candidates. Removing only 27 added TERMINAL rows restores the exact prior
+278-command grammar projection, including all FILE/CSD domains and all62 numeric
+domains/217 records. Three official raw PERFORM rows remain without source joins;
+269 SPI /39 FEPI denominator and mandatory behavioral obligations are unchanged.
+All18 mapped source families are enrolled; source inventory is not execution,
+application dependency or complete parent/acceptance evidence.
