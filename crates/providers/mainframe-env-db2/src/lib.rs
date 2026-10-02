@@ -85,6 +85,10 @@ pub use numeric_constant_types::{
     Db2NumericConstantError, Db2NumericConstantErrorCode, Db2NumericConstantLimits,
     Db2NumericConstantType, classify_db2_numeric_constant,
 };
+pub use numeric_constant_values::{
+    Db2MaterializedNumericConstant, Db2NumericConstantValue, Db2NumericConstantValueError,
+    Db2NumericConstantValueErrorCode, materialize_db2_numeric_constant,
+};
 pub use rename_syntax::{Db2RenameObjectKind, Db2RenameStatement, parse_db2_rename_statement};
 pub use result_combination_types::{
     Db2CaseElse, Db2CombinedResultOperand, Db2CombinedResultType, Db2ResultCombinationContext,

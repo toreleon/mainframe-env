@@ -397,6 +397,72 @@ pins remain unavailable; no source refresh has been authorized. The user has
 confirmed no licensed Db2 13 environment and requested continued implementation
 with differential pending, without substituting local tests for oracle evidence.
 
+The manager declares `DB2-1202.exact-numeric-value-surface` to expose the
+reviewed, separately sealed literal materializer. Exact manager ownership is
+`lib.rs`, `tests/numeric_constant_values.rs`, provider README, this status,
+`changes/unreleased/db2-exact-numeric-value-surface.toml` and the derived docs
+manifest. Public consumers receive an opaque verified type/span/value pairing;
+DECIMAL reuses the existing foundation `DecimalValue` without an alternate
+arithmetic engine. Public tests cover natural INTEGER/BIGINT boundaries,
+independently expected DECIMAL coefficients/precision/scale, signed zero,
+original UTF-8/CRLF locations, owned output and inherited limits/rejections.
+Assignment/default conversions, expression evaluation, NULL cells, all other
+literal families, catalog wire/canonical identities and durable effects remain
+distinct implementation work; no full-row or licensed credit is granted.
+
+Two read-only followups run independently of the numeric implementation: the
+existing Conformance IR/driver admission design for partial SQL0072/SQL0105,
+and native SQL PL ATOMIC, handler/RESIGNAL and transaction-context resolution.
+They may propose concrete paths and independently sourced obligations, but
+cannot self-accept reviewed rules, mutate the IR or change gate applicability.
+
+The reviewed private literal kernel is integrated without production edits.
+Its public surface passes six focused tests and the combined Db2 package:
+278 unit tests and 46 integration tests, zero failures or skips. Verified
+constants/datatype language-element pins have no standalone statement row;
+publication review and local tests do not discharge licensed obligations.
+
+The next declared worker slice is
+`DB2-1202.exact-numeric-literal-assignment`, owning only the existing
+`src/numeric_constant_values.rs` value owner and
+`changes/unreleased/db2-exact-numeric-literal-assignment.toml`. Add a bounded
+conversion from the opaque materialized INTEGER/BIGINT/DECIMAL literal to an
+existing resolved SMALLINT/INTEGER/BIGINT/DECIMAL target. Retain the matching
+target type, exact value and source span in an owned opaque result; use the
+existing assignment compatibility and `DecimalValue` authorities. Preserve
+whole parts, truncate decimal fractional digits toward zero, scale up exactly
+only within target precision, and report discarded fractional digits separately
+from invented SQLCA warnings or SQLCODE. Integer-to-decimal temporary attributes
+must retain the pinned 11,0/19,0 rule. Overflow fails before an output is admitted.
+Do not broaden into floating/DECFLOAT/NULL/string/datetime, arbitrary raw-value
+constructors, default-expression legality, wire/cell/catalog/persistence or
+general arithmetic evaluation. These remain required common implementation,
+not reclassified as deferred because this slice is narrower. The exact numeric
+assignment pin is `db2z_numericassignments.html`, 18430 bytes,
+`3f6ba8a8290190c2e36590aa348fb816fff6a166c7483b97d1b51cc53bbd8302`;
+compatibility uses `db2z_assignmentandcomparison.html`, 40605 bytes,
+`2cc975449a25d1d825cbd8a6551f5ea9c6dfc6ed5dc9956643f0e1dc9948af8a`.
+Both match the Db2 13 archive; retained files are absent and normal reading
+is TOC-blocked. Independent conversion/range/scale/truncation/location/ownership
+regressions, package/MSRV and required policy/docs/seal checks precede its commit.
+
+The IR followup found that adding only passing syntax obligations could falsely
+pass a whole row gate. The manager therefore declares
+`DB2-1201.syntax-harness-foundation`: a real DROP/RENAME driver, independent
+typed fixtures and strict observation comparators in the existing conformance
+tooling, with zero official Db2 bindings or credit until maintainer acceptance.
+Worker ownership is only `src/db2_syntax.rs`, `src/db2_syntax_fixtures.rs` and
+module/export registration in the conformance crate's `lib.rs`, plus
+`changes/unreleased/db2-syntax-harness-foundation.toml`. No xtask/framework/spec,
+schema, ledger or reviewed-rule registry mutation is allowed. Handlers install
+only when actual compiled references exist; unknown/missing/extra handlers and
+malformed output fail closed. Drivers call the public parsers with source and
+limits, not row IDs; comparators use independent fixed expectations, not a
+product-computed success flag. Tests exercise generic-success/wrong-field/span/
+route, missing/duplicate output and bounds mutants. Rejection of a legal deferred
+form records a product limitation, never official recognition evidence. Existing
+six-gate applicability, 174 rows and licensed-pending disposition stay unchanged.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

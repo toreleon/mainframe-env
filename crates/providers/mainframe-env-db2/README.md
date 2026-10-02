@@ -125,6 +125,15 @@ verified byte/line/column endpoints. Fixed errors distinguish invalid input
 from deferred exponent/special/comma/long-integer forms. It performs no numeric
 evaluation, conversion or expression binding, and does not lift lexer fences.
 
+The exact natural numeric-literal materializer pairs that verified type and
+original span with an owned INTEGER/BIGINT/DECIMAL value. DECIMAL uses the
+foundation `DecimalValue` fixed-point primitive, preserving scale and natural
+precision, including leading/trailing zeroes; numeric negative zero becomes
+zero. It never passes through floating-point arithmetic or lets callers forge
+a verified type/value pair. All classifier limits and deferred-form errors
+remain intact. This value surface is not assignment/default conversion, numeric
+expression evaluation, typed cell persistence or a catalog canonical preimage.
+
 The searched DELETE/UPDATE surfaces own qualified targets and optional common
 search conditions; UPDATE also owns unique single-column expression/DEFAULT/
 NULL assignments. Scalar/predicate structure is validated at every expression
