@@ -8,6 +8,7 @@ mod host_context;
 mod message;
 mod message_handle;
 mod object;
+pub mod object_inquiry;
 mod object_service;
 mod pubsub;
 mod retention;
