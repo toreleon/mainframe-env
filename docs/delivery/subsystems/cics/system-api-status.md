@@ -2905,3 +2905,39 @@ TRANSACTION integrated candidate passes 31 generator and nine IR regressions
 plus actual Draft202012 family validation. Private projection has 259 commands
 (220 SPI and 39 FEPI), 4247 head operands and 7252 case candidates. Two of 18
 enrolled family inputs remain unintegrated; all-family and runtime gates pending.
+
+### Pre-dispatch spi-terminal-sessions-combined-final-review
+
+SPI-1001.spi-terminal-sessions-combined-final-review depends on terminal source candidate and bounded existing source contracts. Different retained CLI task owns external reports only; repository paths remain manager-owned.
+Independent combined final review; reviewer must differ from original/repair author01a0fd23-a3ae-7732-aa5c-78e740726af8 and cannot self-approve. EXACT combined12 changed properties: five TSRR01/02 strings and seven source_lines arrays, ten affected whole cases, 1123 unchanged whole cases relative75289. Current finale973cf223105abaf5f3827ca093406e1d778611281ecfb86377dcb3f9b0f17c9; intermediate1cc30eef used only to isolate lastseven arrays. Review all actual12 before/after fields and complete10 request/receiver/preconditions/expectations/citation relationships, all161 original citation-member dispositions (109retained/52coalesced), two fullword declaration additions. Each array sorted unique1..16; no first16 truncation/generic-heading substitution or unsupported loss. Fresh pinned search/read of four relevant originaltopics plus any bounded primary needed for five earlier strings: CREATE TERMINAL9fa44fcc (full133lines), INQUIRE TERMINAL4b76c162 (472-584,745-784), SET MODENAME0e557e82 (full113), SET VTAMe74032ca (full193). Preserve partialpool implicit-syncpoint/earlyexception UOW, NQNAME relogon/warm/emergency origin, tracing-policyvsSUPPRESSED, TYPETERMreceiptvsPROFILEpresentation, APPC/SNASVCMG/MAXIMUM/DFqueue recoverability-dependent wait, OPEN/ACB partialattainment/PSDINT reset, interval bounds/fullword and deferred CLOSEDACBdelivery. No source contradiction or ABI/context/range/order/recovery unknown discarded. Exactall27rows505operands200numericconditions+two unmappedNOTFOUNDcaseclauses145parentdomains10forms1133IDs/allgaps/current719schema. Reuse immutable fullfamily priorreview only after exact endpoint/report/body/SVG/source-command receipt hashes; no repeat unchanged whole-source campaign. Wholebyte combined/intermediate/original forwardreverse and fulladdition diff must restore exactfiles/keyorder/allunchangedfacts. Actual Rust Draft202012 validation and allintegrationtests/sealing remain manager-owned Pending. Only externalreviewreports, no candidate/source edits.
+Exact rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0001`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0018`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0021`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0022`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0025`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0027`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0030`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0034`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0064`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0080`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0083`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0087`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0098`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0099`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0102`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0138`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0144`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0149`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0154`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0172`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0189`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0207`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0209`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0233`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0237`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0252`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0265`.
+Shared schema/IR/generator/status/security/UOW/runtime remain manager-owned. Independent source review and manager actual instance/projection/focused/mandatory checks required before serial child seal; all six and parent/application/route/recovery/licensed Pending credit0. Input hashes: {'conformance/0.10/cics/families/spi-terminal-sessions.json': 'e973cf223105abaf5f3827ca093406e1d778611281ecfb86377dcb3f9b0f17c9'}.
+
+PLATFORM child SPI-1001.spi-platform-programs-source-contracts is manager-owned
+and bounded to 19 enrolled platform/exit-program rows, 115 obligations, 330
+options, 150 conditions, 19 forms, 75 domains/221 members and 562 source cases.
+Exact final 4c005d771472af8b7b678346e3ff03029f12d03e254d9cf8f8fbd7f5dc01ff82
+passed prior full-family and different-thread final seven-precondition review.
+Manager inspected every final actual field and all seven complete case relations;
+whole-byte replay preserves 555 other cases, all IDs/order, all 206 gaps and 87
+output-fixture gaps. Original ENABLE identity/default ENTRYNAME, explicit-global
+EXIT(XFCREQ), option-specific NOTAPPLIC and omitted-EXIT global-as-TRUE NOSPI
+remain qualified; PGMIDERR/1's not-enabled/missing-EXIT/global/TRUE alternatives
+replace unsupported source attribution without choosing a failure or precedence.
+Manager fresh search/three reads cover 41 decisive primary lines at row0125,
+INQUIRE EXITPROGRAM cb04d56bb29100d1536fb1cc5ea48ed2fc76c2e2a1dd8a4ac63c66cc23edeb22,
+baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12. Full earlier 221-property
+source review is immutable provenance; 31 final referenced artifacts verified,
+using its immutable status-read snapshot for the historical manager declaration.
+All candidate source pins/catalog rows remain enrolled in spi-platform-programs.json.
+Source metadata stays private/non-routing. Manager exclusively owns schema,
+generator/IR facade/status and serial integration; no duplicate runtime/condition/
+resource/security/UOW/persistence authority. Only this bounded child may seal
+after actual family instance, focused regressions and mandatory integration gates;
+all six command gates, parent, application dependency, selected route, physical
+recovery/restart and licensed acceptance remain Pending, credit0.
+
+PLATFORM integrated candidate passes 31 generator and nine IR regressions plus
+actual Draft202012 family instance validation. Private projection has 278 commands
+(239 SPI and 39 FEPI), 4577 head operands and 7814 case candidates. One of 18
+enrolled family inputs remains unintegrated; all-family and runtime gates pending.
