@@ -208,7 +208,7 @@ the repository offline reader; they do not refresh sources or spawn workers.
 
 | Lane | Declared slice | Exclusive implementation ownership |
 |---|---|---|
-| J | `MQ-1501.mqi-request-boundary` | Additive typed MQI request/result vocabulary and canonical encoding in host API new modules, with minimal facade export; all 26 identities stay source-bound, unsupported wire/status details explicit. Shared `HostRequest` dispatch and providers remain manager-owned. |
+| J | `MQ-1501.mqi-request-boundary` | Additive typed MQI request/result vocabulary and canonical encoding in host API new modules, with minimal facade/encoder hooks and crate-private opaque-handle identity projection; all 26 identities stay source-bound, unsupported wire/status details explicit. Shared `HostRequest` dispatch and providers remain manager-owned. |
 | K | `MQ-1502.object-inquiry-kernel` | New bounded provider object-inquiry module, exact catalog-backed attributes supported by pinned MQINQ, with minimal facade export; unsupported selectors and MQSET remain explicit pending, no second catalog. |
 | L | `MQ-1505.delivery-checkpoint-kernel` | Delivery module and child codec modules only: strict live checkpoint preserving pending operations versus existing restart/backout snapshot policy, bounds, recovery and atomic malformed-input rejection. No private durable journal or provider service. |
 
@@ -217,3 +217,22 @@ feature commit. Facade-only overlaps are reconciled and re-sealed by the manager
 Service, shared dispatch enums, documentation, evidence and public capability
 registration remain manager-owned. These prerequisites do not grant licensed
 credit or imply that all 26 calls are publicly executable.
+
+J binds all 26 catalog identities and requires bounded, distinct typed inputs,
+deterministic canonical identities, malformed/capacity rejection, and explicit
+pending wire/result forms. K binds rows `0016` MQINQ, `0019` MQOPEN and `0022`
+MQSET: catalog identity versus resolved identity, selector order/duplicates,
+access applicability, output capacities and rejection without mutation. L binds
+rows `0001` MQBACK, `0007` MQCMIT, `0015` MQGET, `0020` MQPUT and `0021` MQPUT1:
+pending-operation retention, explicit resume versus cold recovery, monotonic
+identities, no duplicate commit/backout, expiry and atomic bounds/corrupt-state
+rejection. All are internal contracts/kernels, with backend/public-route and
+licensed gates pending, not excluded.
+
+The manager also owns `MQ-1501.shared-handle-kernel`, limited to message-handle
+and pub/sub provider modules, new focused tests and a unique change fragment.
+Rows `0008` MQCONN, `0010` MQCRTMH, `0012` MQDISC and `0025` MQSUB require one
+connection/handle authority across both kernels: property and subscription
+tokens share a registry, disconnect/unit/epoch retirement is coherent, and stale
+or foreign tokens fail without mutation. No numeric/wire or public-route claims
+are added. Shared lifecycle semantics remain those of the frozen registry.
