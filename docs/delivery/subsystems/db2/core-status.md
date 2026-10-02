@@ -544,14 +544,17 @@ ordinary test harness do not complete SQL0050, SQL0072, SQL0105 or a parent mile
 
 The manager declares `DB2-1202.literal-string-values` as the next ordinary value
 prerequisite, owning `type_system/mod.rs` only for child-module registration,
-new `type_system/string_constants.rs` and the unique
+new `type_system/string_constants.rs`, `syntax.rs` only for first-class BX
+binary-token admission and its focused regressions, and the unique
 `changes/unreleased/db2-literal-string-values.toml`. Use the existing type owner,
 lexer, location/limit shapes and bounded resolved-type authority. A located
 opaque proof must distinguish Unicode UTF-8 character text/hex character forms
 from BX binary forms, preserve empty versus NULL, decode escaped delimiters or
 hex once, retain the matching natural VARCHAR/VARBINARY length and NOT NULL,
 and own original source spans. Natural empty constants may have length zero;
-column/type-syntax length minima must not be relaxed. Unicode character metadata
+column/type-syntax length minima must not be relaxed. The new Binary string-kind
+variant is an intentional development API extension, not an accepted wire change;
+existing lexer forms, spans and numeric fences remain unchanged. Unicode character metadata
 must explicitly retain CCSID 1208/MIXED rather than infer a host encoding; binary
 constants have no invented CCSID. No arbitrary raw type/value constructor or
 default/assignment/cell/wire/execution claim is admitted. Unsupported encoding,
@@ -570,7 +573,7 @@ unescaped-length/type proofs, Unicode/CRLF endpoints, malformed and incompatible
 forms, configured/compiled source/token/literal bounds and original-source
 ceilings before allocation. Private source verification must not lex unrelated
 source outside the selected constant or change numeric span authority. Full
-package/MSRV, required policy and exact three-path sealing precede its commit.
+package/MSRV, required policy and exact four-path sealing precede its commit.
 
 The manager separately declares `DB2-1202.db2-clippy-readiness` to repair the
 observed scoped Db2 lint failures without changing semantics or suppressing lints.
