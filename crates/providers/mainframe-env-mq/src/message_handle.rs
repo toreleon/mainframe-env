@@ -60,7 +60,7 @@ struct Properties {
 /// token lifetime, kind, connection, owner and in-use state. No snapshot API exists.
 #[derive(Debug)]
 pub struct MqHandleKernel {
-    registry: MqHandleRegistry,
+    pub(crate) registry: MqHandleRegistry,
     limits: MqMessageLimits,
     properties: Vec<Properties>,
 }

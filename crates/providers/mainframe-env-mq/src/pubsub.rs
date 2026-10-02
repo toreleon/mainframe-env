@@ -1,10 +1,12 @@
 //! Pure, bounded queue-manager pub/sub state. The selected host route is pending.
 
 mod codec;
+mod lifecycle;
+use lifecycle::handle_kernel_problem;
 
 use crate::{
-    MqObjectCapability, MqObjectCatalog, MqObjectDefinition, MqObjectError, MqObjectLookup,
-    MqObjectName, MqSubscriptionDestination,
+    MqHandleKernel, MqHandleKernelProblem, MqObjectCapability, MqObjectCatalog, MqObjectDefinition,
+    MqObjectError, MqObjectLookup, MqObjectName, MqSubscriptionDestination,
 };
 use mainframe_env_host_api::{
     MqDeliveryOutcome, MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHconn,
@@ -203,6 +205,7 @@ struct State {
 
 #[derive(Clone, Copy, Debug)]
 struct Binding {
+    owner: MqHandleOwner,
     hconn: MqHconn,
     handles: MqSubscriptionHandles,
 }
@@ -217,6 +220,7 @@ struct Callback {
 
 #[derive(Clone, Copy, Debug)]
 struct ConnectionControl {
+    owner: MqHandleOwner,
     hconn: MqHconn,
     state: MqCallbackState,
 }
@@ -238,7 +242,7 @@ enum Mutation {
 pub struct MqPubsubKernel {
     catalog: MqObjectCatalog,
     limits: MqPubsubLimits,
-    handles: MqHandleRegistry,
+    handles: MqHandleKernel,
     state: State,
     bindings: Vec<(MqObjectName, Binding)>,
     callbacks: Vec<Callback>,
@@ -257,7 +261,8 @@ impl MqPubsubKernel {
         Ok(Self {
             catalog,
             limits,
-            handles: MqHandleRegistry::new(epoch, max_handles)?,
+            handles: MqHandleKernel::new(epoch, max_handles, limits.message)
+                .map_err(handle_kernel_problem)?,
             state: State {
                 subscriptions: BTreeMap::new(),
                 retained: BTreeMap::new(),
@@ -270,9 +275,11 @@ impl MqPubsubKernel {
         })
     }
 
-    /// Connections are still minted and validated by the frozen handle registry.
+    /// Low-level compatibility access to the single frozen handle registry.
+    /// Use this kernel's lifecycle methods and `message_handles_mut` for message
+    /// creation/retirement so property and subscription state is reclaimed too.
     pub fn handles_mut(&mut self) -> &mut MqHandleRegistry {
-        &mut self.handles
+        &mut self.handles.registry
     }
 
     pub fn describe_publish(
@@ -353,7 +360,7 @@ impl MqPubsubKernel {
         authorization: MqPubsubAuthorization,
     ) -> Result<MqSubscriptionHandles, MqPubsubError> {
         authorization.require()?;
-        self.handles.validate_connection(owner, hconn)?;
+        self.handles.registry.validate_connection(owner, hconn)?;
         self.describe_subscribe(name)?;
         let (topic, destination, durable) = self.definition(name)?;
         match mode {
@@ -395,12 +402,16 @@ impl MqPubsubKernel {
             }
             MqSubscriptionMode::Resume => None,
         };
-        let hsub = self.handles.create_subscription(owner, hconn)?;
-        let hobj = match self.handles.create_object(owner, hconn) {
+        let hsub = self.handles.registry.create_subscription(owner, hconn)?;
+        let hobj = match self.handles.registry.create_object(owner, hconn) {
             Ok(value) => value,
             Err(error) => {
-                self.handles
-                    .release(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
+                self.handles.registry.release(
+                    owner,
+                    hconn,
+                    hsub.into(),
+                    MqHandleKind::Subscription,
+                )?;
                 return Err(error.into());
             }
         };
@@ -408,8 +419,14 @@ impl MqPubsubKernel {
         if let Some(entry) = created {
             self.state.subscriptions.insert(name.clone(), entry);
         }
-        self.bindings
-            .push((name.clone(), Binding { hconn, handles }));
+        self.bindings.push((
+            name.clone(),
+            Binding {
+                owner,
+                hconn,
+                handles,
+            },
+        ));
         Ok(handles)
     }
 
@@ -420,6 +437,7 @@ impl MqPubsubKernel {
         hsub: MqHsub,
     ) -> Result<(), MqPubsubError> {
         self.handles
+            .registry
             .validate(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
         let index = self
             .bindings
@@ -427,7 +445,7 @@ impl MqPubsubKernel {
             .position(|(_, binding)| binding.hconn == hconn && binding.handles.hsub == hsub)
             .ok_or(MqPubsubError::NoSubscription)?;
         let (name, binding) = &self.bindings[index];
-        self.handles.validate(
+        self.handles.registry.validate(
             owner,
             hconn,
             binding.handles.hobj.into(),
@@ -436,8 +454,10 @@ impl MqPubsubKernel {
         let name = name.clone();
         let hobj = binding.handles.hobj;
         self.handles
+            .registry
             .release(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
         self.handles
+            .registry
             .release(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         self.bindings.remove(index);
         self.callbacks.retain(|callback| callback.hobj != hobj);
@@ -463,6 +483,7 @@ impl MqPubsubKernel {
     ) -> Result<(), MqPubsubError> {
         authorization.require()?;
         self.handles
+            .registry
             .validate(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         if !self
             .bindings
@@ -500,6 +521,7 @@ impl MqPubsubKernel {
         hobj: MqHobj,
     ) -> Result<(), MqPubsubError> {
         self.handles
+            .registry
             .validate(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         let index = self
             .callbacks
@@ -518,6 +540,7 @@ impl MqPubsubKernel {
         suspended: bool,
     ) -> Result<(), MqPubsubError> {
         self.handles
+            .registry
             .validate(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         let callback = self
             .callbacks
@@ -534,7 +557,7 @@ impl MqPubsubKernel {
         hconn: MqHconn,
         operation: MqCallbackControl,
     ) -> Result<MqCallbackState, MqPubsubError> {
-        self.handles.validate_connection(owner, hconn)?;
+        self.handles.registry.validate_connection(owner, hconn)?;
         let index = self.controls.iter().position(|item| item.hconn == hconn);
         let old = index.map_or(MqCallbackState::Stopped, |i| self.controls[i].state);
         let next = match operation {
@@ -575,7 +598,11 @@ impl MqPubsubKernel {
             if self.controls.len() >= self.limits.max_callbacks {
                 return Err(MqPubsubError::ResourceExhausted);
             }
-            self.controls.push(ConnectionControl { hconn, state: next });
+            self.controls.push(ConnectionControl {
+                owner,
+                hconn,
+                state: next,
+            });
         }
         Ok(next)
     }
@@ -621,6 +648,7 @@ impl MqPubsubKernel {
     ) -> Result<(), MqPubsubError> {
         authorization.require()?;
         self.handles
+            .registry
             .validate(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
         let name = self
             .bindings

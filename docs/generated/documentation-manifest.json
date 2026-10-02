@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 224,
+    "markdown_documents": 225,
     "navigation_groups": 6,
-    "normative_documents": 58,
+    "normative_documents": 59,
     "xtask_commands": 211
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 114,
-      "sha256": "sha256:5418836a0e358de5dc83f6ecbdb00705e4fe6e0b17ed81a73f4d3db1da5637a5",
+      "relative_links": 115,
+      "sha256": "sha256:a5b495ebd4673832072d857d59dcc84d4b372da2256e44240086021e22ed06c6",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -963,10 +963,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0028-mq-shared-handle-kernel.md",
+      "relative_links": 0,
+      "scope": "private v0.15 MQ kernel composition, not public route acceptance",
+      "sha256": "sha256:547d87150de0e82def6780792317ed1472f3bdda5226022acc545ac205cc1d05",
+      "status": "Proposed",
+      "title": "Shared MQ handle-family kernel",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 27,
-      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
+      "relative_links": 28,
+      "sha256": "sha256:6ad473f1614a24cf703bb54467a9836579fbc09acc727ac98bb273493ee300d0",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1474,7 +1486,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:d9ea2faff266248eaaf3637b7c2ea0118679abca1625473f3122062607c9a708",
+      "sha256": "sha256:3c48efa1e8fed0c9d8c254e3e30a833871a9776ae0d4cc3b825024a3a0b86ead",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 0
     },
@@ -2252,6 +2264,10 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Shared MQ handle-family kernel",
+          "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2500,7 +2516,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:08240a952807eaf4035eece2e89762297490f259993d574750f8f0b3dd53f617",
+  "registry_sha256": "sha256:02719151bf45b1ebc4452154df2bc9a6ae3374987c65c28f3cfadbe03b0bce94",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
