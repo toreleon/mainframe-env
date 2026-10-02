@@ -71,7 +71,33 @@ pub struct CicsAdministrativeGrammarContract {
     pub dependencies: &'static [CicsApplicationOptionDependency],
     /// Groups whose members cannot occur together.
     pub mutual_exclusion_groups: &'static [&'static [&'static str]],
+    /// Optional source-reviewed forms using the common CICS operand types.
+    pub forms: &'static [CicsAdministrativeGrammarForm],
     /// Completeness of all grammar facts, including conditional forms.
+    pub constraint_status: CicsApplicationConstraintStatus,
+}
+
+/// Partial operand facts for a source-reviewed administrative command form.
+///
+/// Selector options are required clauses within this closed form. The facts do
+/// not perform recognition, select a handler, or grant compiler admission.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsAdministrativeGrammarForm {
+    /// Stable form identity within one normative command contract.
+    pub id: &'static str,
+    /// Positive source selectors, separate from runtime dispatch.
+    pub selector_options: &'static [&'static str],
+    /// Form-specific shapes/directions using the existing CICS operand type.
+    pub options: &'static [CicsApplicationOptionDescriptor],
+    /// Unconditional required clauses within this form.
+    pub required_options: &'static [&'static str],
+    /// Required or optional choices using the existing CICS constraint type.
+    pub alternative_groups: &'static [CicsApplicationOptionAlternative],
+    /// Form-local source option dependencies.
+    pub dependencies: &'static [CicsApplicationOptionDependency],
+    /// Form-local groups whose clauses cannot occur together.
+    pub mutual_exclusion_groups: &'static [&'static [&'static str]],
+    /// Completeness remains independent from runtime readiness.
     pub constraint_status: CicsApplicationConstraintStatus,
 }
 
@@ -247,6 +273,10 @@ mod tests {
     fn unresolved_inquire_browse_is_not_promoted_to_complete_typing() {
         let inquire = program_contract("0155");
         assert!(inquire.required_options.is_empty());
+        assert!(
+            inquire.forms.is_empty(),
+            "unresolved browse must not acquire guessed forms"
+        );
         let at = inquire
             .options
             .iter()

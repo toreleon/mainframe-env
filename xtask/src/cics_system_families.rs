@@ -224,54 +224,34 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
             "CICS family source pin mismatch",
         )?;
         let grammar = &command["grammar"];
-        let options = array(grammar, "options", path)?;
-        let option_names = options
-            .iter()
-            .map(|option| text(option, "name", path))
-            .collect::<TaskResult<Vec<_>>>()?;
-        require(
-            !option_names.is_empty() && option_names.windows(2).all(|pair| pair[0] < pair[1]),
-            "CICS family options must be nonempty, unique and sorted",
-        )?;
-        let known = option_names.into_iter().collect::<BTreeSet<_>>();
-        let references = |list: &Value| -> TaskResult {
+        let known = validate_grammar(grammar, path)?;
+        if grammar.get("forms").is_some() {
+            let forms = array(grammar, "forms", path)?;
+            let ids = forms
+                .iter()
+                .map(|form| text(form, "id", path))
+                .collect::<TaskResult<Vec<_>>>()?;
             require(
-                names(list, path)?.iter().all(|name| known.contains(name)),
-                "CICS family constraint names an undeclared option",
-            )
-        };
-        references(&grammar["required"])?;
-        for group in array(grammar, "exclusive", path)? {
-            require(
-                names(group, path)?.len() >= 2,
-                "CICS family exclusion group must contain at least two options",
+                ids.windows(2).all(|pair| pair[0] < pair[1]),
+                "CICS family forms must have unique sorted IDs",
             )?;
-            references(group)?;
-        }
-        if grammar.get("alternative_groups").is_some() {
-            let mut groups = BTreeSet::new();
-            for group in array(grammar, "alternative_groups", path)? {
-                references(&group["members"])?;
-                let mut members = names(&group["members"], path)?;
-                members.sort_unstable();
+            for form in forms {
+                let form_grammar = &form["grammar"];
+                let form_known = validate_grammar(form_grammar, path)?;
                 require(
-                    groups.insert(members),
-                    "duplicate CICS family alternative group",
+                    form_known.is_subset(&known),
+                    "CICS form declares an option outside the parent source union",
+                )?;
+                let required = names(&form_grammar["required"], path)?;
+                let selectors = names(&form["selector_options"], path)?;
+                require(
+                    selectors.windows(2).all(|pair| pair[0] < pair[1])
+                        && selectors
+                            .iter()
+                            .all(|option| form_known.contains(option) && required.contains(option)),
+                    "CICS form selectors must be sorted declared required options",
                 )?;
             }
-        }
-        let mut dependency_heads = BTreeSet::new();
-        for dependency in array(grammar, "dependencies", path)? {
-            let head = text(dependency, "option", path)?;
-            let targets = names(&dependency["requires"], path)?;
-            require(
-                known.contains(head)
-                    && dependency_heads.insert(head)
-                    && !targets.is_empty()
-                    && !targets.contains(&head),
-                "invalid or duplicate CICS family dependency",
-            )?;
-            references(&dependency["requires"])?;
         }
         let obligations = array(command, "obligations", path)?;
         require(
@@ -303,6 +283,59 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
         }
     }
     Ok(commands.len())
+}
+
+fn validate_grammar<'a>(grammar: &'a Value, path: &Path) -> TaskResult<BTreeSet<&'a str>> {
+    let options = array(grammar, "options", path)?;
+    let option_names = options
+        .iter()
+        .map(|option| text(option, "name", path))
+        .collect::<TaskResult<Vec<_>>>()?;
+    require(
+        !option_names.is_empty() && option_names.windows(2).all(|pair| pair[0] < pair[1]),
+        "CICS family options must be nonempty, unique and sorted",
+    )?;
+    let known = option_names.into_iter().collect::<BTreeSet<_>>();
+    let references = |list: &Value| -> TaskResult {
+        require(
+            names(list, path)?.iter().all(|name| known.contains(name)),
+            "CICS family constraint names an undeclared option",
+        )
+    };
+    references(&grammar["required"])?;
+    for group in array(grammar, "exclusive", path)? {
+        require(
+            names(group, path)?.len() >= 2,
+            "CICS family exclusion group must contain at least two options",
+        )?;
+        references(group)?;
+    }
+    if grammar.get("alternative_groups").is_some() {
+        let mut groups = BTreeSet::new();
+        for group in array(grammar, "alternative_groups", path)? {
+            references(&group["members"])?;
+            let mut members = names(&group["members"], path)?;
+            members.sort_unstable();
+            require(
+                groups.insert(members),
+                "duplicate CICS family alternative group",
+            )?;
+        }
+    }
+    let mut dependency_heads = BTreeSet::new();
+    for dependency in array(grammar, "dependencies", path)? {
+        let head = text(dependency, "option", path)?;
+        let targets = names(&dependency["requires"], path)?;
+        require(
+            known.contains(head)
+                && dependency_heads.insert(head)
+                && !targets.is_empty()
+                && !targets.contains(&head),
+            "invalid or duplicate CICS family dependency",
+        )?;
+        references(&dependency["requires"])?;
+    }
+    Ok(known)
 }
 
 #[cfg(test)]
@@ -522,6 +555,80 @@ mod tests {
         assert!(check_file(&root, "spi-program", &path).is_err());
         assert!(check(&directory, Some("spi-program")).is_err());
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    fn form_fixture() -> Value {
+        let mut value = fixture("spi-program");
+        let grammar = value["commands"][0]["grammar"].clone();
+        value["commands"][0]["grammar"]["forms"] = json!([{"id":"named", "selector_options":["NAME"], "grammar":grammar, "source_lines":[1]}]);
+        value
+    }
+
+    #[test]
+    fn bounded_forms_reuse_common_constraints_and_keep_legacy_inputs() {
+        assert_eq!(valid("spi-program", &fixture("spi-program")).unwrap(), 4);
+        let mut value = form_fixture();
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        value["commands"][0]["grammar"]["forms"][0]["grammar"]["options"][0]["direction"] =
+            json!("output");
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+    }
+
+    #[test]
+    fn malformed_or_admitting_forms_fail_closed() {
+        for mutation in 0..14 {
+            let mut value = form_fixture();
+            let forms = &mut value["commands"][0]["grammar"]["forms"];
+            match mutation {
+                0 => {
+                    let copy = forms[0].clone();
+                    forms.as_array_mut().unwrap().push(copy);
+                }
+                1 => forms[0]["selector_options"] = json!(["OTHER"]),
+                2 => forms[0]["grammar"]["required"] = json!([]),
+                3 => forms[0]["grammar"]["options"][0]["name"] = json!("OTHER"),
+                4 => {
+                    forms[0]["grammar"]["dependencies"] =
+                        json!([{"option":"NAME", "requires":["MISSING"]}])
+                }
+                5 => {
+                    let copy = forms[0]["grammar"]["options"][0].clone();
+                    forms[0]["grammar"]["options"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(copy);
+                }
+                6 => forms[0]["grammar"]["forms"] = json!([]),
+                7 => forms[0]["constraint_status"] = json!("resolved"),
+                8 => {
+                    let copy = forms[0].clone();
+                    *forms = json!(
+                        (0..17)
+                            .map(|i| {
+                                let mut form = copy.clone();
+                                form["id"] = json!(format!("named-{i:02}"));
+                                form
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                }
+                9 => forms[0]["source_lines"] = json!([]),
+                10 => {
+                    let mut copy = forms[0].clone();
+                    forms[0]["id"] = json!("z");
+                    copy["id"] = json!("a");
+                    forms.as_array_mut().unwrap().push(copy);
+                }
+                11 => forms[0]["selector_options"] = json!(["NAME", "NAME"]),
+                12 => forms[0]["selector_options"] = json!([1]),
+                13 => forms[0]["grammar"]["options"] = json!([]),
+                _ => unreachable!(),
+            }
+            assert!(
+                valid("spi-program", &value).is_err(),
+                "form mutation {mutation}"
+            );
+        }
     }
 
     fn alternative_fixture() -> Value {

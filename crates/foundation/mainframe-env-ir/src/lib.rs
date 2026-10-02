@@ -30,7 +30,7 @@ pub use cics_administrative::{
     CICS_SPI_FEPI_PUBLIC_ROUTES, CICS_SPI_FEPI_RUNTIME_HANDLERS, CICS_SPI_FEPI_SEMANTIC_AUTHORITY,
     CICS_SPI_FEPI_SOURCE_AUTHORITY_SHA256, CICS_SPI_FEPI_SOURCE_TOPIC,
     CICS_SPI_FEPI_SOURCE_TOPIC_SHA256, CicsAdministrativeCommandIdentity,
-    CicsAdministrativeGrammarContract, CicsAdministrativeInterface,
+    CicsAdministrativeGrammarContract, CicsAdministrativeGrammarForm, CicsAdministrativeInterface,
     cics_administrative_grammar_for_official_row, cics_administrative_identities_for_eibfn,
     cics_administrative_identity_for_official_row,
 };

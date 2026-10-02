@@ -1596,3 +1596,41 @@ synthetic cohorts), 20 current generator tests and seven unchanged IR contract
 checks, with no ignores. Current two inputs pass exact linkage; absent future
 inputs remain pending. Identity/grammar output bytes do not change until a
 reviewed input is added. Mandatory gates precede this infrastructure seal.
+
+## Form-specific private operand projection
+
+Manager declares `SPI-1001.family-form-constraints` before implementation. The
+existing union option projection cannot represent PROGRAM/POOL/NODE receiver
+direction changes between named inquiry and NEXT or bare resource keywords in
+START/END. This shared slice adds optional bounded forms using the same existing
+CICS operand/alternative/dependency types. Each form has a stable local fact ID,
+positive selector options, its own closed option/constraint set and primary-source
+line locators. Form options must be a subset of the parent source union; selector
+options must be required and declared in that form. Forms are source facts, not
+a parser, dispatch selector, case predicate DSL, runtime capability or ConformanceIR.
+
+Manager owns schema, actual xtask validator, existing sole generator, IR source
+fact type/facade and generated projection, focused structural regressions, one
+fragment, status and docs. Current six workers keep their frozen schemas and
+exclusive family paths; optional fields preserve their inputs. No existing
+contract receives guessed form facts. Absent/empty forms preserve the previous
+product-fact digest; nonempty forms affect it while case/lifecycle/source-line
+metadata stays excluded. All parent and form completeness remain Pending. No
+execution identity, plan codec, compiler admission, provider/host route, resource
+state, permission, response mapping or public capability changes. Numeric CVDA
+domains, supplemental citations, value-dependent/context/version rules and full
+grammar completeness remain explicit later obligations.
+
+Acceptance proves old input compatibility, bounded and sorted unique form IDs,
+closed per-form constraints/selectors, direction-preserving deterministic product
+projection and digest sensitivity, unknown-field/invalid-reference/oversized-form
+rejection, plus all mandatory gates. Synthetic forms exercise infrastructure,
+not IBM behavior. Full source reviewed forms are a later independently gated
+input enrichment through the same owner, not implied by this infrastructure seal.
+
+Form infrastructure passes thirteen focused actual-validator tests, including
+fourteen malformed form payloads, 23 generator checks and seven IR regressions,
+without ignores. Current inputs retain their prior product-fact digest; no form
+facts are invented. Synthetic form projection preserves direction and excludes
+source-line/case metadata. Mandatory policy/shape/architecture/docs gates precede
+this bounded infrastructure seal; all administrative execution credit stays zero.

@@ -149,6 +149,53 @@ class AdministrativeGrammarTests(unittest.TestCase):
                 self.assertEqual(topic["sha256"], "sha256:" + pinned[topic["topic_path"]]["sha256"])
         self.assertEqual(len(seen), 118)
 
+    def form_fixture(self):
+        family = copy.deepcopy(self.family)
+        grammar = family["commands"][0]["grammar"]
+        shape = copy.deepcopy(grammar)
+        grammar["forms"] = [{"id": "named", "selector_options": ["PROGRAM"],
+                              "grammar": shape, "source_lines": [1]}]
+        return family
+
+    def test_absent_and_empty_forms_retain_the_prior_product_fact_preimage(self) -> None:
+        family = copy.deepcopy(self.family)
+        family["commands"][0]["grammar"]["forms"] = []
+        self.assertEqual(self.project(), self.project(family))
+        self.assertEqual(catalog_tool.render_grammar_facts(self.project()),
+                         catalog_tool.render_grammar_facts(self.project(family)))
+
+    def test_form_projection_preserves_direction_and_ignores_source_line_metadata(self) -> None:
+        family = self.form_fixture()
+        before = catalog_tool.render_grammar_facts(self.project(family))
+        form = family["commands"][0]["grammar"]["forms"][0]
+        form["source_lines"] = [2, 3]
+        form["grammar"]["options"][0]["source_lines"] = [4]
+        self.assertEqual(before, catalog_tool.render_grammar_facts(self.project(family)))
+        form["grammar"]["options"][0]["direction"] = "output"
+        after = catalog_tool.render_grammar_facts(self.project(family))
+        self.assertNotEqual(before, after)
+        self.assertIn(b"CicsAdministrativeGrammarForm", after)
+        self.assertIn(b"selector_options: &[\"PROGRAM\"]", after)
+        self.assertEqual(after.count(b"CicsApplicationConstraintStatus::Pending"), 5)
+        self.assertNotIn(b"CicsResponse", after)
+
+    def test_form_projection_rejects_unbound_selectors_duplicate_ids_and_nested_forms(self) -> None:
+        for mutation in range(5):
+            family = self.form_fixture()
+            forms = family["commands"][0]["grammar"]["forms"]
+            if mutation == 0:
+                forms[0]["selector_options"] = ["MISSING"]
+            elif mutation == 1:
+                forms[0]["grammar"]["required"] = []
+            elif mutation == 2:
+                forms.append(copy.deepcopy(forms[0]))
+            elif mutation == 3:
+                forms[0]["grammar"]["forms"] = []
+            else:
+                forms[0]["grammar"]["options"][0]["name"] = "MISSING"
+            with self.assertRaises(catalog_tool.CatalogError):
+                self.project(family)
+
     def project(self, family=None):
         return catalog_tool.project_family_grammar(
             self.family if family is None else family, self.mapping, self.manifest

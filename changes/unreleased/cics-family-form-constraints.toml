@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepare bounded form-specific SPI/FEPI operand facts using shared CICS types while preserving pending admission and absent-form digest compatibility."

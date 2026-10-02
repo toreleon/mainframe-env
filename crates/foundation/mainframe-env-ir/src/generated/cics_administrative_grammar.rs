@@ -40,6 +40,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "TARGETNUM", requires: &["TARGETLIST"] },
         ],
         mutual_exclusion_groups: &[&["ACQSTATUS", "ACQUIRED", "RELEASED"], &["INSERVICE", "OUTSERVICE", "SERVSTATUS"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -70,6 +72,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "TARGETNUM", requires: &["TARGETLIST"] },
         ],
         mutual_exclusion_groups: &[],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -92,6 +96,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -136,6 +142,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["END", "NEXT", "START"], &["FJOURNALNAME", "FJOURNALNUM"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -173,6 +181,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "TARGETNUM", requires: &["TARGETLIST"] },
         ],
         mutual_exclusion_groups: &[&["ACQSTATUS", "ACQUIRED", "RELEASED"], &["INSERVICE", "OUTSERVICE", "SERVSTATUS"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -204,6 +214,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["INSERVICE", "OUTSERVICE", "SERVSTATUS"], &["POOL", "POOLLIST"], &["POOL", "POOLNUM"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -232,6 +244,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -254,6 +268,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -327,6 +343,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["END", "NEXT", "START"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
@@ -375,6 +393,8 @@ pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarCont
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["CEDF", "CEDFSTATUS", "NOCEDF"], &["COPY", "NEWCOPY", "PHASEIN"], &["DPLSUBSET", "EXECUTIONSET", "FULLAPI"], &["NOREPLICATOR", "REPLICATION", "REPLICATOR"], &["JVM", "NOJVM", "RUNTIME"], &["PRIVATE", "SHARED", "SHARESTATUS"], &["DISABLED", "ENABLED", "STATUS"]],
+        forms: &[
+        ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
 ];

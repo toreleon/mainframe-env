@@ -91,40 +91,38 @@
             "additionalProperties": false,
             "properties": {
               "options": {
+                "$ref": "#/$defs/option-array"
+              },
+              "required": {
+                "$ref": "#/$defs/option-names"
+              },
+              "exclusive": {
+                "$ref": "#/$defs/exclusion-groups"
+              },
+              "dependencies": {
+                "$ref": "#/$defs/option-dependencies"
+              },
+              "alternative_groups": {
+                "$ref": "#/$defs/option-alternatives"
+              },
+              "forms": {
                 "type": "array",
+                "maxItems": 16,
+                "uniqueItems": true,
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "name": {
+                    "id": {
                       "type": "string",
-                      "pattern": "^[A-Z][A-Z0-9]*$",
+                      "pattern": "^[a-z][a-z0-9-]*$",
                       "maxLength": 64
                     },
-                    "value_shape": {
-                      "enum": [
-                        "flag",
-                        "value",
-                        "optional-value",
-                        "unresolved"
-                      ]
+                    "selector_options": {
+                      "$ref": "#/$defs/option-names"
                     },
-                    "direction": {
-                      "enum": [
-                        "input",
-                        "output",
-                        "input-output",
-                        "none",
-                        "unresolved"
-                      ]
-                    },
-                    "source_max_value_bytes": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "minimum": 0,
-                      "maximum": 67108864
+                    "grammar": {
+                      "$ref": "#/$defs/form-grammar"
                     },
                     "source_lines": {
                       "type": "array",
@@ -139,97 +137,10 @@
                     }
                   },
                   "required": [
-                    "name",
-                    "value_shape",
-                    "direction",
-                    "source_max_value_bytes",
+                    "id",
+                    "selector_options",
+                    "grammar",
                     "source_lines"
-                  ]
-                },
-                "maxItems": 256,
-                "uniqueItems": true
-              },
-              "required": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9]*$",
-                  "maxLength": 64
-                },
-                "maxItems": 256,
-                "uniqueItems": true
-              },
-              "exclusive": {
-                "type": "array",
-                "items": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[A-Z][A-Z0-9]*$",
-                    "maxLength": 64
-                  },
-                  "maxItems": 64,
-                  "uniqueItems": true
-                },
-                "maxItems": 256,
-                "uniqueItems": true
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "option": {
-                      "type": "string",
-                      "pattern": "^[A-Z][A-Z0-9]*$",
-                      "maxLength": 64
-                    },
-                    "requires": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[A-Z][A-Z0-9]*$",
-                        "maxLength": 64
-                      },
-                      "maxItems": 64,
-                      "uniqueItems": true
-                    }
-                  },
-                  "required": [
-                    "option",
-                    "requires"
-                  ]
-                },
-                "maxItems": 256,
-                "uniqueItems": true
-              },
-              "alternative_groups": {
-                "type": "array",
-                "maxItems": 256,
-                "uniqueItems": true,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "members": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[A-Z][A-Z0-9]*$",
-                        "maxLength": 64
-                      },
-                      "maxItems": 64,
-                      "uniqueItems": true,
-                      "minItems": 2
-                    },
-                    "required": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "members",
-                    "required"
                   ]
                 }
               }
@@ -536,5 +447,177 @@
     "family",
     "runtime_binding",
     "commands"
-  ]
+  ],
+  "$defs": {
+    "option-array": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]*$",
+            "maxLength": 64
+          },
+          "value_shape": {
+            "enum": [
+              "flag",
+              "value",
+              "optional-value",
+              "unresolved"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "input",
+              "output",
+              "input-output",
+              "none",
+              "unresolved"
+            ]
+          },
+          "source_max_value_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 67108864
+          },
+          "source_lines": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "name",
+          "value_shape",
+          "direction",
+          "source_max_value_bytes",
+          "source_lines"
+        ]
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "option-names": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9]*$",
+        "maxLength": 64
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "exclusion-groups": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]*$",
+          "maxLength": 64
+        },
+        "maxItems": 64,
+        "uniqueItems": true
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "option-dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "option": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]*$",
+            "maxLength": 64
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9]*$",
+              "maxLength": 64
+            },
+            "maxItems": 64,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "option",
+          "requires"
+        ]
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "option-alternatives": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9]*$",
+              "maxLength": 64
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "minItems": 2
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "members",
+          "required"
+        ]
+      }
+    },
+    "form-grammar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "options": {
+          "$ref": "#/$defs/option-array"
+        },
+        "required": {
+          "$ref": "#/$defs/option-names"
+        },
+        "exclusive": {
+          "$ref": "#/$defs/exclusion-groups"
+        },
+        "dependencies": {
+          "$ref": "#/$defs/option-dependencies"
+        },
+        "alternative_groups": {
+          "$ref": "#/$defs/option-alternatives"
+        }
+      },
+      "required": [
+        "options",
+        "required",
+        "exclusive",
+        "dependencies"
+      ]
+    }
+  }
 }
