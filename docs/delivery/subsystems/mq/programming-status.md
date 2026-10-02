@@ -6,6 +6,17 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1506.host-api-doc-repair` composes sealed worker `d3c7b274` with the
+execution/store repair below. The genuine global API-documentation gate now
+passes at exact counts compiler 70, coverage 386, execution 0, host 931 and
+store 72. No limit increases, suppressions or new exemptions are introduced.
+Three request-family groups move behind unchanged public reexports; independent
+reconstruction preserves declaration/implementation tokens and literal bytes.
+The actual request-module allowance decreases 2268 to 1701; all new children
+stay below 1200. The combined checkout passes 233 host tests, zero ignored,
+and required policy/row/module/fmt/docs gates. Historical failed receipts keep
+their original candidate identities; this fresh repair is not a release waiver.
+
 `MQ-1503.full-message-boundary` adds complete FullPut/FullPutOne/FullGet requests
 and FullPut/FullGot observations to the existing 26-call authority, composing
 every MQMD1/2 field and ordered properties in the sole canonical encoder.
@@ -50,9 +61,10 @@ Private provider fixtures do not prove the configured installed/public route.
 execution/participant and audited publication/CAS boundaries without changing
 executable code. Exact missing-documentation ratchets decrease from execution
 303/176 and store 98/95 to execution 0 and store 72; no ceiling increases or
-exemptions are introduced. The original host failure 2546/1128 remains unwaived
-and is being repaired separately. Verified selected-package diagnostics are not
-a global API-documentation pass, licensed evidence or release acceptance.
+exemptions are introduced. The original host failure 2546/1128 retains its
+historical candidate identity; the separate host repair above supplies a fresh
+passing combined global gate. Documentation still grants no licensed evidence
+or release acceptance.
 
 Next configured installed-batch bridge slice (parent `MQ-1505`) must consume
 genuine private installed artifact/core/CALL admission and independently retain
@@ -99,9 +111,9 @@ Worker `71d66481`, ADR0033 and original rows `0015/0020/0021`, supplemental MQMD
 `q097390_/q097395_/q091870_` and the point-layout scalar/encoding pins define this
 slice. Full-message request/result/replay value composition is integrated above;
 actual PUT/GET, context/SAF, delivery and durable evolution remain pending.
-The worker's original global API-doc failure
-retains its candidate identity; the bounded execution/store repair above does
-not waive the remaining host failure or constitute a global pass.
+The worker's original global API-doc failure retains its candidate identity;
+the separate repairs above pass a fresh combined gate without waiving or
+relabeling that failure.
 
 The compiled typed adapter now recognizes original MQCONNX VERSION1 calls through
 an additive, default-Unsupported trusted profile/encoding port. It checks real

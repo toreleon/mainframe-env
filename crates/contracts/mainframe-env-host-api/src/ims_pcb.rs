@@ -1,90 +1,147 @@
 //! Bounded IMS PCB mask layout and execution-context contracts.
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Explicit IMS execution environment used for mask and call applicability checks.
 pub enum ImsExecutionContext {
+    /// Combined database/data-communications context.
     DbDc,
+    /// Database-control context.
     Dbctl,
+    /// Data-communications-control context.
     Dcctl,
+    /// Database batch context.
     DbBatch,
+    /// Transaction-manager batch context.
     TmBatch,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Closed PCB layout family; kind identity does not allocate or authorize a PCB.
 pub enum ImsPcbKind {
+    /// Database PCB mask.
     Database,
+    /// GSAM PCB mask.
     Gsam,
+    /// Input/output PCB mask.
     Io,
+    /// Alternate destination PCB mask.
     Alternate,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Field identity in a generated PCB declaration; widths and applicability come from its descriptor.
 pub enum ImsPcbField {
+    /// Database identity bytes; width and context meaning are supplied by the mask descriptor.
     DatabaseName,
+    /// Segment depth bytes; width and context meaning are supplied by the mask descriptor.
     SegmentLevelNumber,
+    /// Two-byte application status; width and context meaning are supplied by the mask descriptor.
     StatusCode,
+    /// PROCOPT declaration bytes; width and context meaning are supplied by the mask descriptor.
     ProcessingOptions,
+    /// Reserved IMS bytes; width and context meaning are supplied by the mask descriptor.
     ReservedForIms,
+    /// Observed segment identity bytes; width and context meaning are supplied by the mask descriptor.
     SegmentName,
+    /// Declared feedback byte length; width and context meaning are supplied by the mask descriptor.
     KeyFeedbackLength,
+    /// Sensitive-segment count field; width and context meaning are supplied by the mask descriptor.
     SensitiveSegmentCount,
+    /// Variable feedback bytes; width and context meaning are supplied by the mask descriptor.
     KeyFeedbackArea,
+    /// GSAM combined feedback/undefined-length area; width and context meaning are supplied by the mask descriptor.
     KeyFeedbackAndUndefinedLength,
+    /// GSAM record-search bytes; width and context meaning are supplied by the mask descriptor.
     RecordSearchArgument,
+    /// Undefined record-length field; width and context meaning are supplied by the mask descriptor.
     UndefinedRecordLength,
+    /// Logical terminal identity bytes; width and context meaning are supplied by the mask descriptor.
     LogicalTerminalName,
+    /// Local date bytes; width and context meaning are supplied by the mask descriptor.
     LocalDate,
+    /// Local time bytes; width and context meaning are supplied by the mask descriptor.
     LocalTime,
+    /// Input message sequence field; width and context meaning are supplied by the mask descriptor.
     InputMessageSequenceNumber,
+    /// Output descriptor identity bytes; width and context meaning are supplied by the mask descriptor.
     MessageOutputDescriptorName,
+    /// User identity bytes; width and context meaning are supplied by the mask descriptor.
     UserId,
+    /// Group identity bytes; width and context meaning are supplied by the mask descriptor.
     GroupName,
+    /// Extended date bytes; width and context meaning are supplied by the mask descriptor.
     ExtendedDate,
+    /// Extended time bytes; width and context meaning are supplied by the mask descriptor.
     ExtendedTime,
+    /// UTC offset bytes; width and context meaning are supplied by the mask descriptor.
     UtcOffset,
+    /// User identity indicator; width and context meaning are supplied by the mask descriptor.
     UserIdIndicator,
+    /// Reserved extension bytes; width and context meaning are supplied by the mask descriptor.
     ReservedExtension,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// PCB field byte-width rule resolved under explicit variable-area bounds.
 pub enum ImsPcbFieldWidth {
+    /// Exactly the declared byte width.
     Fixed(usize),
+    /// Caller-selected key feedback bytes bounded by complete-mask capacity.
     VariableKeyFeedback,
+    /// Caller-selected width must exactly match one declared alternative.
     OneOf(&'static [usize]),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Whether a PCB field is application-defined, reserved or unused in the selected mask.
 pub enum ImsPcbSemanticValue {
+    /// Meaningful application field in applicable contexts.
     Application,
+    /// Reserved bytes, not application-defined output.
     Reserved,
+    /// Field present in layout but unused for this mask family.
     Unused,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Ordered mask field, byte-width rule and context applicability without native memory access.
 pub struct ImsPcbFieldDescriptor {
+    /// Generated field identity in declaration order.
     pub field: ImsPcbField,
+    /// Byte-width rule resolved by checked layout construction.
     pub width: ImsPcbFieldWidth,
+    /// Application/reserved/unused classification preserved separately from raw width.
     pub semantic_value: ImsPcbSemanticValue,
+    /// Exact contexts in which this field is meaningful.
     pub applicable_contexts: &'static [ImsExecutionContext],
 }
 
 impl ImsPcbFieldDescriptor {
     #[must_use]
+    /// Test exact field-context membership without changing the mask layout.
     pub fn applies_in(&self, context: ImsExecutionContext) -> bool {
         self.applicable_contexts.contains(&context)
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Source-pinned PCB mask declaration with explicit allowed contexts and ordered fields.
 pub struct ImsPcbMaskDescriptor {
+    /// Closed layout family selected by the caller.
     pub kind: ImsPcbKind,
+    /// Pinned publication topic locator; metadata presence earns no execution credit.
     pub source_topic: &'static str,
+    /// Expected source-body SHA-256, binding the descriptor to retained source bytes.
     pub source_sha256: &'static str,
+    /// Exact contexts permitted for the entire mask.
     pub allowed_contexts: &'static [ImsExecutionContext],
+    /// Generated field order used for offsets; never sorted by field name.
     pub fields: &'static [ImsPcbFieldDescriptor],
 }
 
 impl ImsPcbMaskDescriptor {
     #[must_use]
+    /// Test exact whole-mask execution-context membership.
     pub fn allowed_in(&self, context: ImsExecutionContext) -> bool {
         self.allowed_contexts.contains(&context)
     }
@@ -93,7 +150,9 @@ impl ImsPcbMaskDescriptor {
 include!("generated/ims_pcb_masks.rs");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Maximum complete PCB mask size in bytes; zero refuses layout construction.
 pub struct ImsPcbLimits {
+    /// Maximum complete resolved mask byte size; zero rejects every layout.
     pub max_mask_bytes: usize,
 }
 
@@ -106,13 +165,18 @@ impl Default for ImsPcbLimits {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Layout refusal preserving context, variable-area and capacity failures.
 pub enum ImsPcbProblem {
+    /// The selected mask is not allowed in this context.
     ForbiddenExecutionContext,
+    /// Variable bytes supplied to a fixed mask or not one of its declared alternatives.
     InvalidVariableAreaLength,
+    /// Zero capacity, arithmetic overflow, multiple variable fields or total mask bound exceeded.
     ResourceExhausted,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Checked byte layout retaining its exact generated mask and resolved variable field size.
 pub struct ImsPcbLayout {
     mask: &'static ImsPcbMaskDescriptor,
     variable_field_bytes: usize,
@@ -121,16 +185,19 @@ pub struct ImsPcbLayout {
 
 impl ImsPcbLayout {
     #[must_use]
+    /// Borrow the exact generated mask used by this checked layout.
     pub const fn mask(self) -> &'static ImsPcbMaskDescriptor {
         self.mask
     }
 
     #[must_use]
+    /// Return complete resolved mask capacity in bytes.
     pub const fn total_bytes(self) -> usize {
         self.total_bytes
     }
 
     #[must_use]
+    /// Return the resolved field byte width by zero-based declaration index; unknown index returns None.
     pub fn field_width(self, index: usize) -> Option<usize> {
         self.mask
             .fields
@@ -139,6 +206,7 @@ impl ImsPcbLayout {
     }
 
     #[must_use]
+    /// Return the checked zero-based byte offset in declaration order; unknown index or overflow returns None.
     pub fn field_offset(self, index: usize) -> Option<usize> {
         if index >= self.mask.fields.len() {
             return None;
@@ -151,6 +219,7 @@ impl ImsPcbLayout {
     }
 
     #[must_use]
+    /// Return the byte offset of the declared status field, if present.
     pub fn status_offset(self) -> Option<usize> {
         self.mask
             .fields
@@ -161,11 +230,13 @@ impl ImsPcbLayout {
 }
 
 #[must_use]
+/// Borrow the complete generated mask registry; this does not allocate PCB storage.
 pub fn ims_pcb_masks() -> &'static [ImsPcbMaskDescriptor] {
     IMS_PCB_MASKS
 }
 
 #[must_use]
+/// Select the generated mask for a closed kind; panics only if the generated registry violates closed-kind coverage.
 pub fn ims_pcb_mask(kind: ImsPcbKind) -> &'static ImsPcbMaskDescriptor {
     IMS_PCB_MASKS
         .iter()
@@ -173,6 +244,7 @@ pub fn ims_pcb_mask(kind: ImsPcbKind) -> &'static ImsPcbMaskDescriptor {
         .expect("generated IMS PCB mask registry must cover every closed kind")
 }
 
+/// Resolve fields with checked arithmetic, exact context and at most one variable area; reject overflow, invalid alternate widths or total capacity excess.
 pub fn ims_pcb_layout(
     kind: ImsPcbKind,
     context: ImsExecutionContext,
