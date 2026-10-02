@@ -8,7 +8,7 @@ use std::path::Path;
 const SCHEMA: &str = "conformance/0.10/schemas/cics-system-family-contract.schema.json";
 const DIRECTORY: &str = "conformance/0.10/cics/families";
 const MAX_ARTIFACT_BYTES: u64 = 4 * 1024 * 1024;
-const FAMILIES: [&str; 12] = [
+const FAMILIES: [&str; 18] = [
     "spi-program",
     "fepi-pool",
     "spi-file",
@@ -21,6 +21,12 @@ const FAMILIES: [&str; 12] = [
     "fepi-session-data",
     "spi-web-resources",
     "spi-queue-storage",
+    "spi-network-connections",
+    "spi-terminal-sessions",
+    "spi-database-messaging",
+    "spi-platform-programs",
+    "spi-event-policy",
+    "spi-transaction-resources",
 ];
 
 fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
@@ -87,6 +93,52 @@ fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
                 "0011", "0014", "0017", "0029", "0033", "0071", "0074", "0075", "0086", "0090",
                 "0107", "0117", "0118", "0132", "0133", "0134", "0162", "0170", "0171", "0179",
                 "0180", "0181", "0182", "0219", "0228", "0229", "0250", "0251", "0259", "0260",
+            ],
+        )),
+        "spi-network-connections" => Ok((
+            "spi",
+            &[
+                "0005", "0013", "0028", "0066", "0073", "0085", "0108", "0112", "0124", "0128",
+                "0129", "0130", "0131", "0168", "0169", "0194", "0196", "0210", "0214", "0225",
+                "0226", "0227", "0248", "0249",
+            ],
+        )),
+        "spi-terminal-sessions" => Ok((
+            "spi",
+            &[
+                "0001", "0018", "0021", "0022", "0025", "0027", "0030", "0034", "0064", "0080",
+                "0083", "0087", "0098", "0099", "0102", "0138", "0144", "0149", "0154", "0172",
+                "0189", "0207", "0209", "0233", "0237", "0252", "0265",
+            ],
+        )),
+        "spi-database-messaging" => Ok((
+            "spi",
+            &[
+                "0006", "0007", "0008", "0019", "0020", "0067", "0068", "0069", "0078", "0079",
+                "0109", "0110", "0111", "0140", "0141", "0142", "0211", "0212", "0213", "0235",
+                "0236",
+            ],
+        )),
+        "spi-platform-programs" => Ok((
+            "spi",
+            &[
+                "0015", "0016", "0062", "0076", "0077", "0093", "0094", "0125", "0135", "0136",
+                "0137", "0143", "0145", "0146", "0147", "0197", "0230", "0231", "0232",
+            ],
+        )),
+        "spi-event-policy" => Ok((
+            "spi",
+            &[
+                "0103", "0104", "0105", "0106", "0119", "0120", "0121", "0122", "0123", "0126",
+                "0151", "0152", "0158", "0200", "0220", "0221", "0222", "0223", "0242",
+            ],
+        )),
+        "spi-transaction-resources" => Ok((
+            "spi",
+            &[
+                "0010", "0024", "0031", "0032", "0082", "0088", "0089", "0115", "0153", "0156",
+                "0167", "0176", "0178", "0188", "0192", "0217", "0240", "0247", "0256", "0258",
+                "0264", "0268",
             ],
         )),
         _ => Err(format!("unknown CICS system family {family}")),
@@ -444,13 +496,13 @@ mod tests {
                 );
             }
         }
-        assert_eq!(identities.len(), 173);
+        assert_eq!(identities.len(), 305);
         assert_eq!(
             identities
                 .iter()
                 .filter(|(interface, _)| *interface == "spi")
                 .count(),
-            134
+            266
         );
         assert_eq!(
             identities
@@ -476,6 +528,12 @@ mod tests {
             ("fepi-session-data", 19),
             ("spi-web-resources", 25),
             ("spi-queue-storage", 30),
+            ("spi-network-connections", 24),
+            ("spi-terminal-sessions", 27),
+            ("spi-database-messaging", 21),
+            ("spi-platform-programs", 19),
+            ("spi-event-policy", 19),
+            ("spi-transaction-resources", 22),
         ] {
             assert_eq!(valid(family, &fixture(family)).unwrap(), count);
         }

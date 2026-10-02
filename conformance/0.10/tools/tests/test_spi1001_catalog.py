@@ -147,7 +147,16 @@ class AdministrativeGrammarTests(unittest.TestCase):
                 self.assertEqual(row["state"], "mapped")
                 topic = row["topic"]
                 self.assertEqual(topic["sha256"], "sha256:" + pinned[topic["topic_path"]]["sha256"])
-        self.assertEqual(len(seen), 173)
+        self.assertEqual(len(seen), 305)
+        all_mapped = set()
+        unresolved = set()
+        for interface in ["spi", "fepi"]:
+            mapping = json.loads((root / f"conformance/0.10/cics/{interface}-command-source-map.json").read_text())
+            for row in mapping["rows"]:
+                (all_mapped if row["state"] == "mapped" else unresolved).add(row["official_row"])
+        self.assertEqual(seen, all_mapped)
+        self.assertEqual({row.rsplit(":", 1)[-1] for row in unresolved}, {"0201", "0203", "0204"})
+        self.assertTrue(seen.isdisjoint(unresolved))
 
     def form_fixture(self):
         family = copy.deepcopy(self.family)

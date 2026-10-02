@@ -24,7 +24,13 @@
         "spi-region-lifecycle",
         "fepi-session-data",
         "spi-web-resources",
-        "spi-queue-storage"
+        "spi-queue-storage",
+        "spi-network-connections",
+        "spi-terminal-sessions",
+        "spi-database-messaging",
+        "spi-platform-programs",
+        "spi-event-policy",
+        "spi-transaction-resources"
       ]
     },
     "runtime_binding": {
