@@ -264,6 +264,22 @@ contracts and explicit migration, and preserves old signature preimages and
 legacy byte behavior. The proposal is not owner acceptance, schema freeze or
 runtime completion. It fixes the direction before catalog mutation.
 
+Before public integration, the manager declares
+`DB2-1202.numeric-expression-type-surface`: export only the reviewed arithmetic
+and result-combination metadata APIs through `lib.rs`, add
+`tests/numeric_expression_types.rs` and one unique
+`db2-numeric-expression-type-surface.toml` fragment, and update the provider
+README and status/derived documentation. The independent kernels are sealed
+as worker `8125ea3a` (manager `1623045f`) and worker `3cd84d9c`
+(manager `477ad7f6`). Public regression checks cover explicit arithmetic
+context, verified constant provenance, runtime obligations, ordered combination,
+NULL/application context, owned outputs, original spans and bounded failures.
+Run affected package/MSRV, format, statement-catalog, changelog/docs and exact
+path seals; reuse dependency policy only with unchanged policy inputs.
+No shared dispatcher, binder, typed catalog, evaluator or durable route changes.
+Language elements have no standalone statement row; full-row recognition,
+common/deferred freeze and licensed differential remain pending.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
