@@ -117,7 +117,7 @@ impl RichStoredState {
         candidate: &MqDeliveryKernel,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(candidate, false, Vec::new(), limits)
+        self.plan(candidate, false, false, Vec::new(), limits)
     }
 
     /// Owner and receipt changes are validated with the delivery delta as one
@@ -128,7 +128,7 @@ impl RichStoredState {
         additions: Vec<ProviderStateMutation>,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(candidate, false, additions, limits)
+        self.plan(candidate, false, false, additions, limits)
     }
 
     /// Explicit next persisted fence, same catalog/generation and live state.
@@ -137,13 +137,14 @@ impl RichStoredState {
         &self,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(&self.delivery, true, Vec::new(), limits)
+        self.plan(&self.delivery, true, false, Vec::new(), limits)
     }
 
-    fn plan(
+    pub(super) fn plan(
         &self,
         candidate: &MqDeliveryKernel,
         advance: bool,
+        upgrade: bool,
         additions: Vec<ProviderStateMutation>,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
@@ -191,7 +192,16 @@ impl RichStoredState {
         };
         // Delta is the original semantic/projection authority. It rejects lost
         // pending/final references, regressed counters and catalog replacement.
-        let delta = if advance {
+        let delta = if upgrade {
+            if advance
+                || !additions.is_empty()
+                || source.ownership.control.is_some()
+                || self.runtime.is_some()
+            {
+                return Err(PublicationError::Source);
+            }
+            source.rows.upgrade_delta(candidate, &source.catalog)?
+        } else if advance {
             source.rows.next_fence_delta()?
         } else {
             source

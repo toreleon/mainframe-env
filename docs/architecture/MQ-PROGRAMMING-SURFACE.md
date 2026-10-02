@@ -84,6 +84,18 @@ policy and retained receipt integration. No automatic migration or new executabl
 permission follows from exact representation (see ADR0033 full-MD value). Raw structs
 do not create an alternate effect journal or bypass canonical result bounds.
 
+The same delivery kernel now holds tagged partial/complete entries in homogeneous
+queue profiles. Additive cold/live/delivery-row @2 projections share the existing
+checkpoint validator, MD value codec and property vocabulary. A private explicit
+pre-activation quiescent upgrade retains the unchanged rich marker identity and
+composes marker/catalog/metadata CAS in one bounded transaction. Populated partial
+queues retain their profile; full switches require drained queues, no pending
+units/cursors and no selected control/runtime. Previously activated service
+retirement needs an owner-approved seam. Ordinary deltas preserve the loaded
+schema/profile, @1 bytes stay exact, old readers reject @2 and open never rewrites
+state. This is durable storage preparation, not selected full PUT/GET admission,
+operator authorization, context/GMT/ID policy, retention or participant acceptance.
+
 Sources are the MQ9.4 original baseline `ibm-mq-9.4-mqi-2026-08-31`, rows
 0006/0015/0019/0020/0021, the existing programming supplement baseline
 `ibm-mq-9.4-programming-supplements-2026-09-12` (declarations q098100_, q097390_,

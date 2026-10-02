@@ -259,6 +259,21 @@ The shared reader and registry keep separate scope closure and zero credit.
 This supplies sources for subsequent reviewed layout projections, not numeric
 admission, wire execution, a new browser capture or licensed certification.
 
+The complete-payload delivery storage feature is integrated in the existing
+kernel: homogeneous partial/complete queue profiles, strict additive cold/live/
+row @2 projections and a private pre-activation quiescent upgrade plan under the
+unchanged rich marker/catalog/metadata fences. Old @1 partial bytes remain exact;
+wrong profiles refuse before adoption. Actual selected full GET/PUT/PUT1, trusted
+context/IDs/GMT/expiry policy, activated-service retirement and authorized operator
+deployment/backup/rollback remain pending. No automatic rewrite or public-ready
+claim is added. The composed candidate passes90 focused delivery/rich/import/
+selected-retention/server/coordinator tests, zero ignored,13 tooling policy tests,
+required guards/four actual namespace mutants, module945/34/4/1, fmt/docs/changelog.
+Worker path/test-input/source and corrected stable-receipt identities were
+independently verified; its original self-stdout inventory failure is preserved.
+Only source registration/storage/private tests are credited to their boundaries;
+full26/participant/CardDemo acceptance remains required and licensed0/26 skipped.
+
 The independent `mq-property-sources` scope now registers twelve retained topics
 for property names/restrictions, descriptor mapping, variable strings and property
 option/structure/copy constants, baseline

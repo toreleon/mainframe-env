@@ -8,18 +8,22 @@ impl MqDeliveryKernel {
     /// Restart snapshots contain committed persistent state and backed-out
     /// persistent gets. Staged puts and all cursors are intentionally absent.
     pub fn encode(&self) -> Result<Vec<u8>, MqDeliveryError> {
+        self.check_profiles()?;
+        if self.schema_two {
+            return super::checkpoint::projection::encode_cold(self);
+        }
         let mut queues = Vec::with_capacity(self.queues.len());
         for (name, entries) in &self.queues {
             let mut retained: Vec<Entry> = entries
                 .iter()
-                .filter(|entry| entry.message.descriptor.persistence == MqPersistence::Persistent)
+                .filter(|entry| entry.persistent())
                 .cloned()
                 .collect();
             for operations in self.pending.values() {
                 for operation in operations {
                     if let Pending::Get { queue, entry } = operation
                         && queue == name
-                        && entry.message.descriptor.persistence == MqPersistence::Persistent
+                        && entry.persistent()
                     {
                         retained.push(entry.clone());
                     }
@@ -107,16 +111,20 @@ impl MqDeliveryKernel {
                 prior = item.id;
                 let entry = item.into_entry()?;
                 entry
-                    .message
+                    .partial()?
                     .validate(message_limits)
                     .map_err(|_| MqDeliveryError::CorruptSnapshot)?;
-                validate_supported_message(&entry.message)
+                validate_supported_message(entry.partial()?)
                     .map_err(|_| MqDeliveryError::CorruptSnapshot)?;
                 validate_group_and_segment(&restored, &entry, true)
                     .map_err(|_| MqDeliveryError::CorruptSnapshot)?;
                 restored.push(entry);
             }
-            *kernel.queues.get_mut(&actual.name).expect("checked queue") = restored;
+            kernel
+                .queues
+                .get_mut(&actual.name)
+                .expect("checked queue")
+                .entries = restored;
         }
         let mut prior = 0;
         for finalization in snapshot.finalized {
@@ -174,7 +182,7 @@ impl SnapshotEntry {
         Ok(Self {
             id: entry.id,
             expires_at: entry.expires_at,
-            message: SnapshotMessage::from_message(&entry.message)?,
+            message: SnapshotMessage::from_message(entry.partial()?)?,
         })
     }
 
@@ -182,14 +190,14 @@ impl SnapshotEntry {
         Ok(Entry {
             id: self.id,
             expires_at: self.expires_at,
-            message: self.message.into_message()?,
+            message: Payload::Partial(self.message.into_message()?),
         })
     }
 }
 
 /// Storage projection only. Public requests and results use the frozen host
 /// message contract directly.
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct SnapshotMessage {
     message_id: Option<Vec<u8>>,
@@ -318,7 +326,7 @@ impl SnapshotMessage {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct SnapshotProperty {
     name: String,

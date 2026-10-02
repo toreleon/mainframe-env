@@ -627,7 +627,7 @@ fn resign(records: &mut [ProviderStateRecord]) {
         .unwrap();
     let mut metadata: Metadata = decode(record).unwrap();
     metadata.counts = counts(&map);
-    metadata.rows_sha256 = digest_rows(&map);
+    metadata.rows_sha256 = digest_rows(&map, false);
     record.payload = encode_object_row(META_KEY, &metadata).unwrap();
 }
 

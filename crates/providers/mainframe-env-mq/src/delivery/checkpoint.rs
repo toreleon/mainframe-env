@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::io::{self, Write};
 
+mod preflight;
+pub(super) mod projection;
 pub(crate) mod rows;
+use projection::StoredMessage;
 
 impl MqDeliveryKernel {
     pub const LIVE_CHECKPOINT_SCHEMA: &str = "mainframe-env.mq-delivery-live@1";
@@ -26,11 +29,11 @@ impl MqDeliveryKernel {
             for message in messages {
                 entries.push(Entry {
                     id: candidate.allocate_id()?,
-                    message,
+                    message: Payload::Partial(message),
                     expires_at: None,
                 });
             }
-            candidate.queues.insert(name, entries);
+            candidate.queues.insert(name, entries.into());
         }
         let bytes = candidate.encode_live_checkpoint()?;
         Self::decode_live_checkpoint(
@@ -53,15 +56,23 @@ impl MqDeliveryKernel {
     /// never resume an older checkpoint after a newer fenced publication.
     /// For cold restart's persistent-only backout policy use `encode`/`decode`.
     pub fn encode_live_checkpoint(&self) -> Result<Vec<u8>, MqDeliveryError> {
+        if self.schema_two {
+            return projection::encode(&self.live_projection()?, self.limits.snapshot_bytes);
+        }
         encode_projection(&self.live_projection()?, self.limits.snapshot_bytes)
     }
 
     fn live_projection(&self) -> Result<Checkpoint, MqDeliveryError> {
         let mut candidate = self.clone();
-        candidate.advance_tick(self.tick)?;
+        candidate.purge_expired();
         candidate.check_bounds()?;
         Ok(Checkpoint {
-            schema_version: Self::LIVE_CHECKPOINT_SCHEMA.into(),
+            schema_version: if candidate.schema_two {
+                projection::LIVE_SCHEMA
+            } else {
+                Self::LIVE_CHECKPOINT_SCHEMA
+            }
+            .into(),
             manager: candidate.manager.clone(),
             default_persistent: candidate.default_persistence == MqPersistence::Persistent,
             tick: candidate.tick,
@@ -73,6 +84,7 @@ impl MqDeliveryKernel {
                 .map(|(name, entries)| {
                     Ok(LiveQueue {
                         name: name.clone(),
+                        profile: entries.profile,
                         messages: entries
                             .iter()
                             .map(LiveEntry::from_entry)
@@ -143,15 +155,28 @@ impl MqDeliveryKernel {
         if bytes.len() > limits.snapshot_bytes {
             return Err(MqDeliveryError::ResourceExhausted);
         }
+        #[derive(Deserialize)]
+        struct Header {
+            schema_version: String,
+        }
+        let header: Header =
+            serde_json::from_slice(bytes).map_err(|_| MqDeliveryError::CorruptSnapshot)?;
+        if header.schema_version != Self::LIVE_CHECKPOINT_SCHEMA {
+            return Err(MqDeliveryError::UnsupportedSchema);
+        }
         let snapshot: Checkpoint =
             serde_json::from_slice(bytes).map_err(|_| MqDeliveryError::CorruptSnapshot)?;
+        if snapshot.schema_version != Self::LIVE_CHECKPOINT_SCHEMA {
+            return Err(MqDeliveryError::UnsupportedSchema);
+        }
         Self::restore_projection(snapshot, kernel)
     }
 
     fn restore_projection(snapshot: Checkpoint, mut kernel: Self) -> Result<Self, MqDeliveryError> {
         let limits = kernel.limits;
         let default_persistence = kernel.default_persistence;
-        if snapshot.schema_version != Self::LIVE_CHECKPOINT_SCHEMA {
+        let two = snapshot.schema_version == projection::LIVE_SCHEMA;
+        if snapshot.schema_version != Self::LIVE_CHECKPOINT_SCHEMA && !two {
             return Err(MqDeliveryError::UnsupportedSchema);
         }
         if snapshot.manager != kernel.manager
@@ -165,6 +190,14 @@ impl MqDeliveryKernel {
         {
             return Err(MqDeliveryError::CorruptSnapshot);
         }
+        if two
+            && [snapshot.next_id, snapshot.next_cursor, snapshot.tick]
+                .into_iter()
+                .any(|v| v > i64::MAX as u64)
+        {
+            return Err(MqDeliveryError::CorruptSnapshot);
+        }
+        kernel.schema_two = two;
         kernel.tick = snapshot.tick;
         kernel.next_id = snapshot.next_id;
         kernel.next_cursor = snapshot.next_cursor;
@@ -174,19 +207,28 @@ impl MqDeliveryKernel {
             if row.name != expected || row.messages.len() > limits.depth_per_queue {
                 return Err(MqDeliveryError::CorruptSnapshot);
             }
+            kernel
+                .queues
+                .get_mut(&row.name)
+                .expect("checked queue")
+                .profile = row.profile;
             let mut prior = 0;
             let mut entries = Vec::new();
             for item in row.messages {
                 let entry = restore_entry(item, &kernel, &row.name, &mut prior, &mut ids)?;
                 entries.push(entry);
             }
-            kernel.queues.insert(row.name, entries);
+            kernel
+                .queues
+                .get_mut(&row.name)
+                .expect("checked queue")
+                .entries = entries;
         }
         let mut prior_unit = 0;
         let mut operation_count = 0usize;
         let mut pending_put_ids = BTreeSet::new();
         for row in snapshot.pending {
-            if row.unit <= prior_unit {
+            if row.unit <= prior_unit || (two && row.unit > i64::MAX as u64) {
                 return Err(MqDeliveryError::CorruptSnapshot);
             }
             prior_unit = row.unit;
@@ -228,7 +270,10 @@ impl MqDeliveryKernel {
         }
         let mut prior = 0;
         for row in snapshot.finalized {
-            if row.unit <= prior || kernel.pending.contains_key(&row.unit) {
+            if row.unit <= prior
+                || (two && row.unit > i64::MAX as u64)
+                || kernel.pending.contains_key(&row.unit)
+            {
                 return Err(MqDeliveryError::CorruptSnapshot);
             }
             prior = row.unit;
@@ -287,12 +332,15 @@ impl MqDeliveryKernel {
             candidate.apply_backout(*unit)?;
         }
         candidate.check_bounds()?;
+        if candidate.schema_two {
+            candidate.encode_live_checkpoint()?;
+        }
         *self = candidate;
         Ok(())
     }
 }
 
-fn encode_projection(snapshot: &Checkpoint, limit: usize) -> Result<Vec<u8>, MqDeliveryError> {
+fn encode_projection(snapshot: &impl Serialize, limit: usize) -> Result<Vec<u8>, MqDeliveryError> {
     let mut writer = BoundedWriter {
         bytes: Vec::new(),
         limit,
@@ -323,7 +371,29 @@ fn restore_entry(
         return Err(MqDeliveryError::CorruptSnapshot);
     }
     *prior = item.id;
-    let mut message = item.message.into_message()?;
+    if let StoredMessage::Complete(message) = item.message {
+        full_message::validate_full(&message, kernel.message_limits)
+            .map_err(|_| MqDeliveryError::CorruptSnapshot)?;
+        if !kernel.schema_two
+            || !kernel.queues[queue].profile.accepts(&message)
+            || item.persistent != (message.descriptor.fields().persistence == 1)
+            || item.expires_at.is_some()
+        {
+            return Err(MqDeliveryError::CorruptSnapshot);
+        }
+        return Ok(Entry {
+            id: item.id,
+            message: Payload::Complete(message),
+            expires_at: None,
+        });
+    }
+    if kernel.queues[queue].profile != QueueProfile::Partial {
+        return Err(MqDeliveryError::CorruptSnapshot);
+    }
+    let StoredMessage::Partial(snapshot) = item.message else {
+        unreachable!()
+    };
+    let mut message = snapshot.into_message()?;
     message.descriptor.persistence = if item.persistent {
         MqPersistence::Persistent
     } else {
@@ -340,11 +410,11 @@ fn restore_entry(
     // checked, without inventing missing handle-owned group history.
     let entry = Entry {
         id: item.id,
-        message,
+        message: Payload::Partial(message),
         expires_at: item.expires_at,
     };
     validate_group_and_segment(&[], &entry, true).map_err(|_| MqDeliveryError::CorruptSnapshot)?;
-    match (entry.message.descriptor.expiry, entry.expires_at) {
+    match (entry.partial()?.descriptor.expiry, entry.expires_at) {
         (MqExpiry::Unlimited, None) => {}
         (MqExpiry::RelativeHostTicks(duration), Some(expiry))
             if expiry
@@ -394,6 +464,8 @@ struct Checkpoint {
 #[serde(deny_unknown_fields)]
 struct LiveQueue {
     name: MqObjectName,
+    #[serde(skip)]
+    profile: QueueProfile,
     messages: Vec<LiveEntry>,
 }
 
@@ -419,8 +491,8 @@ struct LiveEntry {
     #[serde(deserialize_with = "required_option")]
     expires_at: Option<u64>,
     persistent: bool,
-    #[serde(with = "super::restart::LiveMessage")]
-    message: SnapshotMessage,
+    #[serde(with = "projection::legacy_message")]
+    message: StoredMessage,
 }
 
 fn required_option<'de, D: serde::Deserializer<'de>>(
@@ -434,8 +506,13 @@ impl LiveEntry {
         Ok(Self {
             id: entry.id,
             expires_at: entry.expires_at,
-            persistent: entry.message.descriptor.persistence == MqPersistence::Persistent,
-            message: SnapshotMessage::from_live_message(&entry.message)?,
+            persistent: entry.persistent(),
+            message: match &entry.message {
+                Payload::Partial(m) => {
+                    StoredMessage::Partial(SnapshotMessage::from_live_message(m)?)
+                }
+                Payload::Complete(m) => StoredMessage::Complete(m.clone()),
+            },
         })
     }
 }

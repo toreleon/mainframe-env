@@ -501,7 +501,7 @@
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
       "relative_links": 2,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:5b6f085ce2b07573131a7beccb891647235e59400803baabf67186f5df45e26b",
+      "sha256": "sha256:c5825ad463f3a13251f0541e83b689648f5a4a89f7917eaa7bd9b49f730b0d8c",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -1061,7 +1061,7 @@
       "path": "docs/decisions/0033-mq-full-md-value.md",
       "relative_links": 0,
       "scope": "complete descriptor/message values and codecs, not executable message policy",
-      "sha256": "sha256:c7f6f63fc67a064b9408cb8426d7265e2306227d0fa30c194be28ab736df29ee",
+      "sha256": "sha256:90231034a250304c882d5eae9a3fb6461a069f18f16f659e21c2abb6b8b8a16e",
       "status": "Proposed",
       "title": "Complete MQMD value primitive",
       "xtask_commands": 0
@@ -1598,7 +1598,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:cda23d9cd65d68509bf0a1eec90d1a8ca9faa8b3a04de1b41cd4e052cca27e4c",
+      "sha256": "sha256:d9fed7f18c0db400a18bae98a83e9455333a4d1a18396d876f3b6c47d3cf4f5f",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

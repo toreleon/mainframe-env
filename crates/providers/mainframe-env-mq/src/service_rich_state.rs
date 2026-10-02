@@ -15,6 +15,8 @@ mod strict;
 
 #[path = "service_rich_state/publication.rs"]
 pub(super) mod publication;
+#[path = "service_rich_state/upgrade.rs"]
+mod upgrade;
 
 /// Physical snapshot budget, separately from each original authority's limits.
 #[derive(Clone, Copy, Debug)]

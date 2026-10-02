@@ -22,6 +22,8 @@ const FINAL: &str = "mq-delivery-live-v1-final";
 const CURSOR: &str = "mq-delivery-live-v1-cursor";
 const META_KEY: &str = "state";
 const SCHEMA: &str = "mainframe-env.mq-delivery-rows@1";
+const SCHEMA_TWO: &str = "mainframe-env.mq-delivery-rows@2";
+mod upgrade;
 type Key = (String, String);
 type Records = BTreeMap<Key, ProviderStateRecord>;
 
@@ -290,6 +292,7 @@ impl DeliveryRows {
             if record.payload.len() > limits.row_bytes || total > limits.total_bytes {
                 return Err(DeliveryRowError::Bounds);
             }
+            preflight::check(&record.payload, kernel_limits, message_limits)?;
             if ![META, QUEUE, PENDING, FINAL, CURSOR].contains(&record.namespace.as_str())
                 || record.validate_write(limits.row_bytes).is_err()
                 || map
@@ -303,7 +306,7 @@ impl DeliveryRows {
             .get(&key(META, META_KEY))
             .ok_or(DeliveryRowError::Corrupt)?;
         let metadata: Metadata = decode(meta_record)?;
-        if metadata.schema_version != SCHEMA {
+        if metadata.schema_version != SCHEMA && metadata.schema_version != SCHEMA_TWO {
             return Err(DeliveryRowError::Corrupt);
         }
         if metadata.identity != expected
@@ -311,7 +314,7 @@ impl DeliveryRows {
         {
             return Err(DeliveryRowError::Identity);
         }
-        if metadata.rows_sha256 != digest_rows(&map)
+        if metadata.rows_sha256 != digest_rows(&map, metadata.schema_version == SCHEMA_TWO)
             || map.values().any(|r| r.version > meta_record.version)
         {
             return Err(DeliveryRowError::Corrupt);
@@ -326,7 +329,12 @@ impl DeliveryRows {
             return Err(DeliveryRowError::Bounds);
         }
         let mut snapshot = Checkpoint {
-            schema_version: MqDeliveryKernel::LIVE_CHECKPOINT_SCHEMA.into(),
+            schema_version: if metadata.schema_version == SCHEMA_TWO {
+                projection::LIVE_SCHEMA
+            } else {
+                MqDeliveryKernel::LIVE_CHECKPOINT_SCHEMA
+            }
+            .into(),
             manager: metadata.manager.clone(),
             default_persistent: metadata.default_persistent,
             tick: metadata.tick,
@@ -341,13 +349,21 @@ impl DeliveryRows {
             let expected_key = match record.namespace.as_str() {
                 META => META_KEY.into(),
                 QUEUE => {
-                    let row: LiveQueue = decode(record)?;
+                    let row: LiveQueue = if metadata.schema_version == SCHEMA_TWO {
+                        decode::<projection::QueueTwo>(record)?.into_live()?
+                    } else {
+                        decode(record)?
+                    };
                     let id = row.name.as_str().to_string();
                     snapshot.queues.push(row);
                     id
                 }
                 PENDING => {
-                    let row: LiveUnit = decode(record)?;
+                    let row: LiveUnit = if metadata.schema_version == SCHEMA_TWO {
+                        decode::<projection::UnitTwo>(record)?.into_live()?
+                    } else {
+                        decode(record)?
+                    };
                     let id = number_key(row.unit);
                     snapshot.pending.push(row);
                     id
@@ -371,7 +387,7 @@ impl DeliveryRows {
             }
         }
         // Existing projection/decoder owns all message and cross-row semantics.
-        encode_projection(&snapshot, kernel_limits.snapshot_bytes)?;
+        encode_current(&snapshot, kernel_limits.snapshot_bytes)?;
         let restored = MqDeliveryKernel::restore_projection(snapshot, kernel)?;
         Ok((
             Self {
@@ -403,6 +419,23 @@ impl DeliveryRows {
             || kernel.next_cursor < self.metadata.next_cursor
         {
             return Err(DeliveryRowError::Identity);
+        }
+        if kernel.schema_two != (self.metadata.schema_version == SCHEMA_TWO) {
+            return Err(DeliveryRowError::Identity);
+        }
+        for record in self.records.values().filter(|r| r.namespace == QUEUE) {
+            let row = if kernel.schema_two {
+                decode::<projection::QueueTwo>(record)?.into_live()?
+            } else {
+                decode::<LiveQueue>(record)?
+            };
+            if kernel
+                .queues
+                .get(&row.name)
+                .is_none_or(|q| q.profile != row.profile)
+            {
+                return Err(DeliveryRowError::Identity);
+            }
         }
         // Kernel lifetime retains decisions and empty pending units. A caller
         // cannot replace a loaded authority with a newly seeded kernel and
@@ -438,7 +471,7 @@ fn prepare(
         return Err(DeliveryRowError::Identity);
     }
     let snapshot = kernel.live_projection()?;
-    encode_projection(&snapshot, kernel.limits.snapshot_bytes)?;
+    encode_current(&snapshot, kernel.limits.snapshot_bytes)?;
     let validated = MqDeliveryKernel::restore_projection(
         snapshot,
         MqDeliveryKernel::new(
@@ -464,10 +497,15 @@ fn prepare(
     let mut mutations = Vec::new();
     let mut records_bytes = 0usize;
     for row in &snapshot.queues {
-        project(
+        project_encoded(
             QUEUE,
             row.name.as_str(),
-            row,
+            &if kernel.schema_two {
+                encode_object_row(row.name.as_str(), &projection::QueueTwo::from_live(row)?)
+                    .map_err(|_| DeliveryRowError::Corrupt)?
+            } else {
+                encode_object_row(row.name.as_str(), row).map_err(|_| DeliveryRowError::Corrupt)?
+            },
             current,
             &mut records,
             &mut mutations,
@@ -476,10 +514,16 @@ fn prepare(
         )?;
     }
     for row in &snapshot.pending {
-        project(
+        project_encoded(
             PENDING,
             &number_key(row.unit),
-            row,
+            &if kernel.schema_two {
+                encode_object_row(&number_key(row.unit), &projection::UnitTwo::from_live(row)?)
+                    .map_err(|_| DeliveryRowError::Corrupt)?
+            } else {
+                encode_object_row(&number_key(row.unit), row)
+                    .map_err(|_| DeliveryRowError::Corrupt)?
+            },
             current,
             &mut records,
             &mut mutations,
@@ -526,7 +570,12 @@ fn prepare(
         }
     }
     let metadata = Metadata {
-        schema_version: SCHEMA.into(),
+        schema_version: if kernel.schema_two {
+            SCHEMA_TWO
+        } else {
+            SCHEMA
+        }
+        .into(),
         identity,
         manager: snapshot.manager,
         default_persistent: snapshot.default_persistent,
@@ -534,7 +583,7 @@ fn prepare(
         next_id: snapshot.next_id,
         next_cursor: snapshot.next_cursor,
         counts: counts(&records),
-        rows_sha256: digest_rows(&records),
+        rows_sha256: digest_rows(&records, kernel.schema_two),
     };
     // Metadata comes last so backends must also roll back earlier object changes
     // if a competing generation wins this fence.
@@ -591,6 +640,29 @@ fn project<T: Serialize>(
     records_bytes: &mut usize,
 ) -> Result<(), DeliveryRowError> {
     let payload = encode_object_row(id, value).map_err(|_| DeliveryRowError::Corrupt)?;
+    project_encoded(
+        namespace,
+        id,
+        &payload,
+        current,
+        records,
+        mutations,
+        limits,
+        records_bytes,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn project_encoded(
+    namespace: &str,
+    id: &str,
+    payload: &[u8],
+    current: Option<&DeliveryRows>,
+    records: &mut Records,
+    mutations: &mut Vec<ProviderStateMutation>,
+    limits: DeliveryRowLimits,
+    records_bytes: &mut usize,
+) -> Result<(), DeliveryRowError> {
     let old = current.and_then(|c| c.records.get(&key(namespace, id)));
     if let Some(old) = old.filter(|r| r.payload == payload) {
         check_record_budget(records, records_bytes, old.payload.len(), limits)?;
@@ -600,7 +672,7 @@ fn project<T: Serialize>(
     put(
         namespace,
         id,
-        payload,
+        payload.to_vec(),
         old,
         records,
         mutations,
@@ -682,9 +754,13 @@ fn counts(records: &Records) -> [usize; 4] {
     counts
 }
 
-fn digest_rows(records: &Records) -> [u8; 32] {
+fn digest_rows(records: &Records, two: bool) -> [u8; 32] {
     let mut hash = Sha256::new();
-    hash.update(b"mainframe-env.mq-delivery-rows-content@1\0");
+    hash.update(if two {
+        b"mainframe-env.mq-delivery-rows-content@2\0"
+    } else {
+        b"mainframe-env.mq-delivery-rows-content@1\0"
+    });
     for row in records.values().filter(|r| r.namespace != META) {
         for bytes in [
             row.namespace.as_bytes(),
@@ -706,5 +782,16 @@ fn number_key(value: u64) -> String {
     format!("{value:020}")
 }
 
+fn encode_current(snapshot: &Checkpoint, limit: usize) -> Result<Vec<u8>, MqDeliveryError> {
+    if snapshot.schema_version == projection::LIVE_SCHEMA {
+        projection::encode(snapshot, limit)
+    } else {
+        encode_projection(snapshot, limit)
+    }
+}
+
+#[cfg(test)]
+#[path = "rows/full_tests.rs"]
+mod full_tests;
 #[cfg(test)]
 mod tests;

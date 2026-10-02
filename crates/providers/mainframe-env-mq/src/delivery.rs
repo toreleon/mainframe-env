@@ -1,8 +1,10 @@
 //! Pure, bounded point-to-point MQ queue-manager transitions.
 
 pub(crate) mod checkpoint;
+pub(crate) mod full_message;
 pub(crate) mod replay;
 mod restart;
+use full_message::{Payload, PayloadGet, QueueProfile, QueueState};
 
 use crate::{
     MqObjectCapability, MqObjectCatalog, MqObjectDefinition, MqObjectError, MqObjectLookup,
@@ -106,7 +108,7 @@ pub struct MqDeliveryGet {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Entry {
     id: u64,
-    message: MqMessage,
+    message: Payload,
     expires_at: Option<u64>,
 }
 
@@ -127,7 +129,8 @@ struct Cursor {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MqDeliveryKernel {
     manager: MqObjectName,
-    queues: BTreeMap<MqObjectName, Vec<Entry>>,
+    queues: BTreeMap<MqObjectName, QueueState>,
+    schema_two: bool,
     pending: BTreeMap<u64, Vec<Pending>>,
     finalized: BTreeMap<u64, bool>,
     cursors: BTreeMap<u64, Cursor>,
@@ -157,11 +160,11 @@ impl MqDeliveryKernel {
         let mut queues = BTreeMap::new();
         for definition in catalog.definitions() {
             if let MqObjectDefinition::LocalQueue { name, .. } = definition {
-                queues.insert(name.clone(), Vec::new());
+                queues.insert(name.clone(), Vec::new().into());
             }
         }
         for instance in catalog.model_instances() {
-            queues.insert(instance.name.clone(), Vec::new());
+            queues.insert(instance.name.clone(), Vec::new().into());
         }
         if queues.len() > limits.queues {
             return Err(MqDeliveryError::ResourceExhausted);
@@ -169,6 +172,7 @@ impl MqDeliveryKernel {
         Ok(Self {
             manager: catalog.queue_manager().name.clone(),
             queues,
+            schema_two: false,
             pending: BTreeMap::new(),
             finalized: BTreeMap::new(),
             cursors: BTreeMap::new(),
@@ -183,7 +187,7 @@ impl MqDeliveryKernel {
 
     #[must_use]
     pub fn depth(&self, queue: &MqObjectName) -> Option<usize> {
-        self.queues.get(queue).map(Vec::len)
+        self.queues.get(queue).map(|q| q.len())
     }
 
     #[must_use]
@@ -235,6 +239,12 @@ impl MqDeliveryKernel {
             .iter()
             .map(|name| self.resolve(catalog, name, MqObjectCapability::Output))
             .collect::<Result<Vec<_>, _>>()?;
+        if targets
+            .iter()
+            .any(|q| self.queues[q].profile != QueueProfile::Partial)
+        {
+            return Err(MqDeliveryError::Unsupported);
+        }
         let mut next = self.clone();
         if message.descriptor.identifiers.message_id.is_none() {
             let mut id = vec![0; 24];
@@ -257,7 +267,7 @@ impl MqDeliveryKernel {
             let id = next.allocate_id()?;
             let entry = Entry {
                 id,
-                message: message.clone(),
+                message: Payload::Partial(message.clone()),
                 expires_at,
             };
             if let Some(unit) = unit {
@@ -290,6 +300,9 @@ impl MqDeliveryKernel {
             }
         }
         next.check_bounds()?;
+        if next.schema_two {
+            next.encode_live_checkpoint()?;
+        }
         let result = MqDistributionResult {
             items: destinations
                 .iter()
@@ -315,6 +328,25 @@ impl MqDeliveryKernel {
         request: &MqGetContract,
         unit: Option<u64>,
     ) -> Result<MqDeliveryGet, MqDeliveryError> {
+        let got = self.get_payload(catalog, queue, request, unit, QueueProfile::Partial)?;
+        Ok(MqDeliveryGet {
+            disposition: got.disposition,
+            cursor: got.cursor,
+            message: got.message.map(|p| match p {
+                Payload::Partial(m) => m,
+                Payload::Complete(_) => unreachable!("profile checked before mutation"),
+            }),
+        })
+    }
+
+    fn get_payload(
+        &mut self,
+        catalog: &MqObjectCatalog,
+        queue: &MqObjectName,
+        request: &MqGetContract,
+        unit: Option<u64>,
+        profile: QueueProfile,
+    ) -> Result<PayloadGet, MqDeliveryError> {
         request.validate(self.message_limits)?;
         validate_unit(self, unit)?;
         let capability = match request.mode {
@@ -322,6 +354,9 @@ impl MqDeliveryKernel {
             _ => MqObjectCapability::Input,
         };
         let target = self.resolve(catalog, queue, capability)?;
+        if self.queues[&target].profile != profile {
+            return Err(MqDeliveryError::Unsupported);
+        }
         let cursor = match request.mode {
             MqGetMode::BrowseNext { cursor } | MqGetMode::RemoveUnderCursor { cursor } => {
                 let current = self
@@ -347,15 +382,11 @@ impl MqDeliveryKernel {
                 }
                 _ => true,
             };
-            in_range
-                && matches_identifiers(
-                    &entry.message.descriptor.identifiers,
-                    &request.selection.identifiers,
-                )
+            in_range && entry.message.matches(&request.selection.identifiers)
         });
         let staged_position = if position.is_none() && matches!(request.mode, MqGetMode::Remove) {
             unit.and_then(|unit| self.pending.get(&unit)).and_then(|operations| operations.iter().position(|operation| {
-                matches!(operation, Pending::Put { queue, entry } if queue == &target && matches_identifiers(&entry.message.descriptor.identifiers, &request.selection.identifiers))
+                matches!(operation, Pending::Put { queue, entry } if queue == &target && entry.message.matches(&request.selection.identifiers))
             }))
         } else {
             None
@@ -364,7 +395,7 @@ impl MqDeliveryKernel {
             if matches!(request.mode, MqGetMode::RemoveUnderCursor { .. }) {
                 return Err(MqDeliveryError::InvalidCursor);
             }
-            return Ok(MqDeliveryGet {
+            return Ok(PayloadGet {
                 disposition: if request.wait == MqWait::NoWait {
                     MqGetDisposition::NoMessage
                 } else {
@@ -384,7 +415,7 @@ impl MqDeliveryKernel {
                 _ => unreachable!("staged selection is a put"),
             }
         };
-        let required = entry.message.body.len();
+        let required = entry.message.body().len();
         let copied = required.min(request.buffer_capacity);
         let truncated = required > request.buffer_capacity;
         let removes = matches!(
@@ -403,9 +434,9 @@ impl MqDeliveryKernel {
             MqTruncationDisposition::Complete { length: required }
         };
         let mut returned = entry.message.clone();
-        returned.body.truncate(copied);
+        returned.body_mut().truncate(copied);
         if truncated && request.truncation == MqTruncation::Reject {
-            return Ok(MqDeliveryGet {
+            return Ok(PayloadGet {
                 disposition: MqGetDisposition::Message(disposition),
                 message: Some(returned),
                 cursor: None,
@@ -446,8 +477,11 @@ impl MqDeliveryKernel {
             result_cursor = Some(token);
         }
         next.check_bounds()?;
+        if next.schema_two {
+            next.encode_live_checkpoint()?;
+        }
         *self = next;
-        Ok(MqDeliveryGet {
+        Ok(PayloadGet {
             disposition: MqGetDisposition::Message(disposition),
             message: Some(returned),
             cursor: result_cursor,
@@ -486,6 +520,9 @@ impl MqDeliveryKernel {
         next.pending.remove(&unit);
         next.finalized.insert(unit, true);
         next.check_bounds()?;
+        if next.schema_two {
+            next.encode_live_checkpoint()?;
+        }
         *self = next;
         Ok(MqDeliveryOutcome::Accepted)
     }
@@ -503,6 +540,9 @@ impl MqDeliveryKernel {
         let mut next = self.clone();
         next.apply_backout(unit)?;
         next.check_bounds()?;
+        if next.schema_two {
+            next.encode_live_checkpoint()?;
+        }
         *self = next;
         Ok(MqDeliveryOutcome::Rejected)
     }
@@ -533,23 +573,35 @@ impl MqDeliveryKernel {
     /// Only the trusted host advances logical time. Expiry never runs during a
     /// rejected put/get, so those paths leave queues and cursors unchanged.
     pub fn advance_tick(&mut self, tick: u64) -> Result<(), MqDeliveryError> {
+        if self.schema_two && tick > i64::MAX as u64 {
+            return Err(MqDeliveryError::ResourceExhausted);
+        }
         if tick < self.tick {
             return Err(MqDeliveryError::ClockRegression);
         }
         let mut next = self.clone();
         next.tick = tick;
-        for entries in next.queues.values_mut() {
+        next.purge_expired();
+        if next.schema_two {
+            next.check_bounds()?;
+            next.encode_live_checkpoint()?;
+        }
+        *self = next;
+        Ok(())
+    }
+
+    fn purge_expired(&mut self) {
+        let tick = self.tick;
+        for entries in self.queues.values_mut() {
             entries.retain(|entry| entry.expires_at.is_none_or(|expiry| expiry > tick));
         }
-        for operations in next.pending.values_mut() {
+        for operations in self.pending.values_mut() {
             operations.retain(|operation| match operation {
                 Pending::Put { entry, .. } | Pending::Get { entry, .. } => {
                     entry.expires_at.is_none_or(|expiry| expiry > tick)
                 }
             });
         }
-        *self = next;
-        Ok(())
     }
 
     fn resolve(
@@ -573,6 +625,9 @@ impl MqDeliveryKernel {
 
     fn allocate_id(&mut self) -> Result<u64, MqDeliveryError> {
         let id = self.next_id;
+        if self.schema_two && id >= i64::MAX as u64 {
+            return Err(MqDeliveryError::ResourceExhausted);
+        }
         self.next_id = id
             .checked_add(1)
             .ok_or(MqDeliveryError::ResourceExhausted)?;
@@ -581,6 +636,9 @@ impl MqDeliveryKernel {
 
     fn allocate_cursor(&mut self) -> Result<u64, MqDeliveryError> {
         let id = self.next_cursor;
+        if self.schema_two && id >= i64::MAX as u64 {
+            return Err(MqDeliveryError::ResourceExhausted);
+        }
         self.next_cursor = id
             .checked_add(1)
             .ok_or(MqDeliveryError::ResourceExhausted)?;
@@ -588,6 +646,20 @@ impl MqDeliveryKernel {
     }
 
     fn check_bounds(&self) -> Result<(), MqDeliveryError> {
+        self.check_profiles()?;
+        if self.schema_two
+            && ([self.next_id, self.next_cursor]
+                .into_iter()
+                .any(|v| v == 0 || v > i64::MAX as u64)
+                || self.tick > i64::MAX as u64
+                || self
+                    .pending
+                    .keys()
+                    .chain(self.finalized.keys())
+                    .any(|v| *v == 0 || *v > i64::MAX as u64))
+        {
+            return Err(MqDeliveryError::ResourceExhausted);
+        }
         if self.queues.len() > self.limits.queues
             || self.pending.len() > self.limits.pending_operations
             || self.cursors.len() > self.limits.cursors
@@ -600,7 +672,7 @@ impl MqDeliveryKernel {
         let mut reserved_depth = BTreeMap::<&MqObjectName, usize>::new();
         for (queue, entries) in &self.queues {
             reserved_depth.insert(queue, entries.len());
-            for entry in entries {
+            for entry in entries.iter() {
                 bytes = bytes
                     .checked_add(entry_bytes(entry)?)
                     .ok_or(MqDeliveryError::ResourceExhausted)?;
@@ -679,7 +751,10 @@ fn matches_identifiers(actual: &MqMessageIdentifiers, selection: &MqMessageIdent
 }
 
 fn entry_bytes(entry: &Entry) -> Result<usize, MqDeliveryError> {
-    let message = &entry.message;
+    let message = match &entry.message {
+        Payload::Partial(message) => message,
+        Payload::Complete(message) => return full_message::full_bytes(message),
+    };
     let mut size = message.body.len() + 128;
     for id in [
         &message.descriptor.identifiers.message_id,
@@ -707,25 +782,52 @@ fn validate_group_and_segment(
     incoming: &Entry,
     restart_suffix: bool,
 ) -> Result<(), MqDeliveryError> {
-    let descriptor = &incoming.message.descriptor;
+    let Payload::Partial(message) = &incoming.message else {
+        return Ok(());
+    };
+    let descriptor = &message.descriptor;
     let ids = &descriptor.identifiers;
     let order = &descriptor.ordering;
     if let Some(offset) = order.segment_offset {
-        if incoming.message.body.is_empty() {
+        if message.body.is_empty() {
             return Err(MqDeliveryError::Segment);
         }
         let prior = entries.iter().rev().find(|entry| {
-            entry.message.descriptor.identifiers.message_id == ids.message_id
-                && entry.message.descriptor.identifiers.group_id == ids.group_id
-                && entry.message.descriptor.ordering.group_sequence == order.group_sequence
+            entry
+                .partial()
+                .expect("homogeneous partial queue")
+                .descriptor
+                .identifiers
+                .message_id
+                == ids.message_id
+                && entry
+                    .partial()
+                    .expect("homogeneous partial queue")
+                    .descriptor
+                    .identifiers
+                    .group_id
+                    == ids.group_id
+                && entry
+                    .partial()
+                    .expect("homogeneous partial queue")
+                    .descriptor
+                    .ordering
+                    .group_sequence
+                    == order.group_sequence
         });
         match prior {
             None if offset != 0 && !restart_suffix => return Err(MqDeliveryError::Segment),
             Some(previous) => {
-                let previous_order = &previous.message.descriptor.ordering;
-                let expected = previous_order
-                    .segment_offset
-                    .and_then(|start| start.checked_add(previous.message.body.len() as u64));
+                let previous_order = &previous.partial()?.descriptor.ordering;
+                let expected = previous_order.segment_offset.and_then(|start| {
+                    start.checked_add(
+                        previous
+                            .partial()
+                            .expect("homogeneous partial queue")
+                            .body
+                            .len() as u64,
+                    )
+                });
                 if previous_order.last_segment || expected != Some(offset) {
                     return Err(MqDeliveryError::Segment);
                 }
@@ -734,16 +836,22 @@ fn validate_group_and_segment(
         }
     }
     if let Some(group) = &ids.group_id {
-        let prior = entries
-            .iter()
-            .rev()
-            .find(|entry| entry.message.descriptor.identifiers.group_id.as_ref() == Some(group));
+        let prior = entries.iter().rev().find(|entry| {
+            entry
+                .partial()
+                .expect("homogeneous partial queue")
+                .descriptor
+                .identifiers
+                .group_id
+                .as_ref()
+                == Some(group)
+        });
         match prior {
             None if order.group_sequence != Some(1) && !restart_suffix => {
                 return Err(MqDeliveryError::Group);
             }
             Some(previous) => {
-                let prior_order = &previous.message.descriptor.ordering;
+                let prior_order = &previous.partial()?.descriptor.ordering;
                 if prior_order.last_in_group {
                     return Err(MqDeliveryError::Group);
                 }
@@ -752,7 +860,7 @@ fn validate_group_and_segment(
                     if order.segment_offset.is_none()
                         || prior_order.segment_offset.is_none()
                         || prior_order.last_segment
-                        || previous.message.descriptor.identifiers.message_id != ids.message_id
+                        || previous.partial()?.descriptor.identifiers.message_id != ids.message_id
                     {
                         return Err(MqDeliveryError::Group);
                     }

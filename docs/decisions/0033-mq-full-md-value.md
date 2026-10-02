@@ -142,3 +142,58 @@ PUT/GET, full-MD durable delivery/restart, generated IDs and property/conversion
 policy still require manager composition. The global public API docs ratchet is
 unwaived; added API items are documented. Only the
 licensed IBM differential oracle is human-skipped, with zero licensed credit.
+
+## Same-kernel complete delivery storage
+
+`MQ-1503.full-message-delivery` tags each existing entry as Partial or Complete.
+One queue entry list owns its homogeneous profile: Partial, or Complete with
+exact descriptor version (1/2) and structure character profile. Queues of both
+profiles coexist in the same kernel/catalog. Wrong routes or full version/
+characters refuse before IDs, UOWs, cursors or expiry change. There is no
+incompatible-head skipping, narrowing, fabricated MD or second queue inventory.
+
+Complete storage retains the sole MD value codec, exact body and ordered shared
+properties. Only explicit persistence 0/1 (`q092170_`, MQPER_NOT_PERSISTENT/
+MQPER_PERSISTENT) and unlimited expiry -1 (`q097390_`, MQEI_UNLIMITED) are stored.
+Unknown/default persistence and other expiry observations fail pending. Other
+signed/fixed observations remain exact; these private storage primitives do not
+admit flags, context, conversion, generated IDs/GMT, segmentation or backout-count
+policy. Public FullPut/FullPutOne/FullGet execution still returns Unsupported.
+
+Cold `mq-delivery@2`, live `mq-delivery-live@2` and `mq-delivery-rows@2` are
+explicit additive schema selections within the same owning codecs/namespaces.
+Every profile, tag, nullable field and payload field is required. The @2 DTO
+converts to the same checkpoint cross-reference/entry validator; its strict
+JSON preflight precedes typed allocation. MD bytes use the owned bounded value
+decoder and properties reuse the original typed property projection. SQL-range
+IDs/counters and queued plus pending payload overhead are bounded. Prospective
+JSON expansion and rich-plus-retained snapshot quotas are checked before
+adoption. Every @1 partial byte/default/digest remains exact. Old public @1
+readers refuse @2; private stored reads select the actual schema. No accepted @1
+export drops complete fields. Cold @2 retains only persistent queued/backed-out
+GET entries, discards staged puts/nonpersistent messages/pending/cursors and
+retains prior decisions. Live @2 preserves pending (including empty units),
+nonpersistent entries and browse positions. Neither changes MD/backout/time or
+resurrects volatile authority.
+
+The explicit rich upgrade builds one composable batch; open never upgrades.
+Its first profile is pre-activation globally quiescent: pending units and cursors
+must be absent, and any selected control/runtime is refused. An owner-approved
+retirement/quiescence seam is still required for previously activated services;
+this module does not parse/retire the selected owner directory. Populated partial
+queues stay partial; changing a queue profile requires it drained. The unchanged
+rich marker @2 shape/catalog/generation/fence is jointly CAS-bound with metadata
+and exact catalog bytes. Selected activation/old writers must use that same
+marker/meta publication, so stale @1 versus upgrade has one winner. Ordinary
+deltas preserve the loaded schema/profile; an explicit plan alone may change it.
+Unaffected final/cursor/replay/core/CALL/audit records retain bytes and versions.
+Plan limits remain 1024 mutations/64 MiB, delivery 64 MiB, combined reader 128 MiB;
+no silent split or retry. Adoption requires the entire known atomic commit.
+
+The planner carries no operator/core/SAF authorization. The manager owns drained
+deployment, verified backup/rollback and an accepted new-reader selection; old
+binaries cannot resume @2, and downgrade never strips fields or relabels schema.
+Memory/owned SQLite private storage and audited-transaction tests are storage
+evidence only. Actual selected full PUT/GET, trusted behavioral/context producer,
+retention description, SAF, participant, full-26 and CardDemo acceptance remain
+incomplete; unknown outcomes never authorize rollback or redispatch.
