@@ -2,7 +2,7 @@
 
 Status: **Proposed**
 Owner: **MQ host contract maintainers**
-Scope: **complete descriptor value and codec, not per-call admission or message execution**
+Scope: **complete descriptor/message values and codecs, not executable message policy**
 Applies from: **mainframe-env 0.15.0**
 
 ## Decision
@@ -57,14 +57,67 @@ lengths and trailing bytes fail closed. Independent fixtures freeze complete
 version-one and version-two preimages and SHA-256 digests; every field and the
 character profile affects the digest.
 
-This is a value codec for later composition with the one effect/replay authority.
-It is not an accepted new HostRequest, result, checkpoint, replay or storage
-schema. Every old DTO literal and canonical domain/preimage remains unchanged.
+This value codec composes with the one effect/replay authority below. It does not
+define a checkpoint or delivery storage schema. Every old DTO literal and
+canonical domain/preimage remains unchanged.
 `MqRawCapture::try_typed_descriptor` continues returning
 `DescriptorRepresentationPending`; silently reducing a complete MQMD to the old
-partial DTO is forbidden. Full-message request/result, delivery, replay and
-persistence evolution require a separate sealed composition and compatibility
-decision.
+partial DTO is forbidden. Durable delivery evolution requires a separate sealed
+composition and compatibility decision before full-message execution.
+
+## Additive complete-message boundary
+
+`MqFullMessage` retains `MqMdValue`, exact body bytes and the existing ordered
+typed property vocabulary. `FullPut` and `FullPutOne` carry `MqMqiFullPut`;
+`FullGet` carries `MqMqiFullGet`. They map to the original MQPUT, MQPUT1 and MQGET
+call identities and source positions. No old `MqMessage`, descriptor, Put or Get
+field/literal changes. The sole MQI canonical encoder emits distinct new variant
+tags and composes the owned MD encoder directly within the unchanged host @1
+domains. Fixed arrays and signed numbers are not reduced to the partial DTO.
+
+Complete representation is not accepted report/flag/context/option/identifier
+policy. Existing typed controls are reused, including finite wait/capacity,
+truncation and UOW intent. Full requests remain pending in host review and private
+provider admission; the selected route returns Unsupported before queue
+transition. No generic success or live-handle construction is introduced.
+
+`FullPut` output retains the exact returned MD. `FullGot` retains a complete
+message observation plus required optional `data_length` and `cursor` fields.
+Complete GET requires body length = DataLength = complete disposition length.
+Truncated GET retains the full MD and copied prefix, copied < required and
+DataLength = required. Both lengths are independently bounded; original capacity,
+mode/truncation and reviewed status must agree. Source MQGET fills the descriptor
+also on rejected truncation. No-message/wait-expired/unknown have no message,
+DataLength or cursor. Undefined error-buffer contents are not synthesized.
+Conversion/property size-report forms remain pending; these controls do not
+pretend to implement MQGMO conversion, match flags or arbitrary numeric options.
+Input/output descriptor version and structure character profile must agree.
+
+Shared message limits bound body, IDs/format, property count/type/width/name/
+aggregate bytes; HostLimits add field/record/state budgets. Body and DataLength
+are nonnegative MQLONG-representable; present cursor/local unit storage identities
+are positive SQL-compatible observations, never ownership proof. Explicit
+character profile stays independent of body Encoding/CCSID. Historical handle
+observations retain identity but fail live registry access.
+
+## Existing result replay codec evolution
+
+The same private `mqi_replay` codec emits EXACT storage@1 for every old result
+shape. Only FullPut/FullGot outputs use
+`mainframe-env.mq-mqi-result-storage@2`, with distinct output tags and `md_value`
+containing the bounded owned MD value codec. FullGot uses the shared property
+projection directly; it never goes through the partial SnapshotMessage.
+Storage@1 refuses new full outputs; storage@2 refuses old shapes. Older readers
+fail closed at @2. No namespace, journal, dispatcher or parallel schema owner
+is added; the manager must update retained receipt selection before public use.
+
+Both versions require strict fields (including optional fields), reject duplicate
+or unknown fields, preflight finite bytes/counts before typed allocation, validate
+the public result and recompute the FULL `HostResult::MqMqi` canonical digest.
+Unknown/trailing/truncated/reordered/wrong-width MD payloads, inconsistent GET
+lengths and digest mutations fail closed. @2 is a private storage compatibility
+decision, not IBM wire, status calculation, delivery-row migration or new
+capability readiness. No old row is rewritten or automatically migrated.
 
 ## Sources and acceptance
 
@@ -83,5 +136,9 @@ the local SHA-addressed archive; no source refresh or publication body is in Git
 Source review grants zero execution or licensed credit. Tests prove complete
 value/capture/codec behavior and old canonical compatibility. Real full-message
 PUT/GET, SAF/context/generation admission, durable storage/replay, participant,
-full-26 and CardDemo acceptance remain manager-owned and incomplete. Only the
+full-26 and CardDemo acceptance remain manager-owned and incomplete. Full-message
+request/result/replay tests establish this value boundary only; actual selected
+PUT/GET, full-MD durable delivery/restart, generated IDs and property/conversion
+policy still require manager composition. The global public API docs ratchet is
+unwaived; added API items are documented. Only the
 licensed IBM differential oracle is human-skipped, with zero licensed credit.

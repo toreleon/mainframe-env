@@ -125,6 +125,37 @@ impl MqMqiRequestEnvelope {
                 unit(value.unit)?;
                 Some(value.connection)
             }
+            R::FullGet(value) => {
+                super::full_message::descriptor(&value.descriptor, message)?;
+                value
+                    .controls()
+                    .validate(message)
+                    .map_err(MqMqiProblem::Message)?;
+                super::full_message::unit(value.unit)?;
+                Some(value.connection)
+            }
+            R::FullPut {
+                connection, put, ..
+            }
+            | R::FullPutOne {
+                connection, put, ..
+            } => {
+                put.message.validate(message)?;
+                super::full_message::unit(put.unit)?;
+                if matches!(
+                    &self.request,
+                    R::FullPutOne {
+                        lookup: MqRouteLookup::Queue {
+                            dynamic_pattern: Some(_),
+                            ..
+                        },
+                        ..
+                    }
+                ) {
+                    return Err(MqMqiProblem::Connection);
+                }
+                Some(*connection)
+            }
             R::Put {
                 connection, put, ..
             }
@@ -306,6 +337,35 @@ impl MqMqiRequestEnvelope {
     /// Every request remains non-executable here, even when its shape is valid.
     pub fn review(&self) -> Result<MqMqiPending, MqMqiProblem> {
         self.validate()?;
+        match &self.request {
+            MqMqiRequest::FullPut { put, .. } | MqMqiRequest::FullPutOne { put, .. } => {
+                if matches!(put.unit, MqMqiUnitOfWork::ExternalPending { .. }) {
+                    return Ok(MqMqiPending::ExternalUnitOfWork);
+                }
+                if put.context != MqMqiMessageContext::Default
+                    || matches!(
+                        &self.request,
+                        MqMqiRequest::FullPutOne {
+                            alternate_user: Some(_),
+                            ..
+                        }
+                    )
+                {
+                    return Ok(MqMqiPending::TrustedContextAndAuthorization);
+                }
+                return Ok(MqMqiPending::StructureAndWireMapping);
+            }
+            MqMqiRequest::FullGet(get) => {
+                return Ok(
+                    if matches!(get.unit, MqMqiUnitOfWork::ExternalPending { .. }) {
+                        MqMqiPending::ExternalUnitOfWork
+                    } else {
+                        MqMqiPending::StructureAndWireMapping
+                    },
+                );
+            }
+            _ => {}
+        }
         Ok(MqMqiPending::PublicDispatch)
     }
 }
@@ -352,6 +412,42 @@ pub(super) fn validate_output(
         return Ok(());
     }
     let matched = match (call, output) {
+        (
+            C::Get,
+            O::FullGot {
+                disposition,
+                message,
+                data_length,
+                cursor,
+            },
+        ) => {
+            super::full_message::got(
+                *disposition,
+                message.as_ref(),
+                *data_length,
+                *cursor,
+                limits.message,
+            )?;
+            status.is_none()
+                || matches!(
+                    disposition,
+                    MqGetDisposition::Message(crate::MqTruncationDisposition::Complete { .. })
+                )
+        }
+        (
+            C::Put | C::PutOne,
+            O::FullPut {
+                descriptor,
+                outcome,
+            },
+        ) => {
+            super::full_message::descriptor(descriptor, limits.message)?;
+            status.is_none()
+                || matches!(
+                    outcome,
+                    MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
+                )
+        }
         (C::Connect | C::ConnectExtended, O::Connected(connection)) => {
             *connection != MqHconn::Unassociated
         }

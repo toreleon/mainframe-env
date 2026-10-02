@@ -94,6 +94,7 @@ impl Budget {
         let m = self.mqi;
         let p = m.message;
         match field {
+            "md_value" => MQ_MD_VALUE_MAX_BYTES,
             "body" => h.max_record_bytes.min(p.body_bytes),
             "bytes" => h.max_record_bytes.min(m.buffer_bytes),
             "characters" => h.max_record_bytes.min(m.attribute_bytes),

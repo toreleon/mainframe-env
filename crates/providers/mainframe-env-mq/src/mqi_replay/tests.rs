@@ -3,6 +3,7 @@ use mainframe_env_host_api::mq_status::{MqStatusReview, mq_status_calls};
 use serde_json::{Value, json};
 
 mod bounds;
+mod full_message;
 mod historical_handles;
 mod reviewed_output;
 

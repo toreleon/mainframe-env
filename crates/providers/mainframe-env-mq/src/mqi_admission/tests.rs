@@ -6,6 +6,7 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{HostRequest, MqHandleSharing, MqHconn, MqMqiHostRequest};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
+mod full_message;
 
 fn invocation() -> Invocation {
     let l = InvocationLimits::default();

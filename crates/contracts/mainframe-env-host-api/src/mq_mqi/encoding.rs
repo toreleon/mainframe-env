@@ -37,6 +37,7 @@ macro_rules! variants {
     };
 }
 
+mod full_message;
 mod md_value;
 mod payload;
 mod values;

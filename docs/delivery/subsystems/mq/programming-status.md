@@ -6,6 +6,18 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.full-message-boundary` adds complete FullPut/FullPutOne/FullGet requests
+and FullPut/FullGot observations to the existing 26-call authority, composing
+every MQMD1/2 field and ordered properties in the sole canonical encoder.
+GET binds actual copied prefix, DataLength, original capacity/truncation and
+reviewed status, including returned MD on rejected truncation. The same replay
+codec preserves exact old storage@1 and uses strict storage@2 only for full
+outputs; historical reconstruction grants no live authority. Sealed worker
+`f4bccf48`, ADR0033 and original rows `0015/0020/0021` define this value boundary.
+Full requests remain explicitly pending/Unsupported before selected mutation;
+source-bound per-call policy, delivery/checkpoint/receipt evolution and actual
+PUT/GET/PUT1 execution remain required. This is not new executable call credit.
+
 `MQ-1501.typed-connection-warning` now preserves the exact reviewed warning
 `1/2002` and defined nonhistorical issued HCONN for compiled CONN/CONNX, reusing
 the same ABI alias or recording a child's first observation without minting a
@@ -85,8 +97,9 @@ primitives. Original effect/result/replay/storage/checkpoint bytes and the old
 partial descriptor remain unchanged; partial projection still refuses pending.
 Worker `71d66481`, ADR0033 and original rows `0015/0020/0021`, supplemental MQMD
 `q097390_/q097395_/q091870_` and the point-layout scalar/encoding pins define this
-slice. Full-message request/result, actual PUT/GET, context/SAF, delivery and
-durable evolution remain pending. The worker's original global API-doc failure
+slice. Full-message request/result/replay value composition is integrated above;
+actual PUT/GET, context/SAF, delivery and durable evolution remain pending.
+The worker's original global API-doc failure
 retains its candidate identity; the bounded execution/store repair above does
 not waive the remaining host failure or constitute a global pass.
 

@@ -360,6 +360,11 @@ fn pending_form(
             })
     };
     match request {
+        // Complete-message execution requires rich delivery integration; never
+        // route a new descriptor through the legacy partial delivery authority.
+        R::FullGet(_) | R::FullPut { .. } | R::FullPutOne { .. } => {
+            Some(P::StructureAndWireMapping)
+        }
         R::Connect(value) | R::ConnectExtended(value) => options(value.options),
         // MQBEGIN's source global-coordination semantics are not the private
         // delivery kernel's local begin. Its participant mapping stays pending.

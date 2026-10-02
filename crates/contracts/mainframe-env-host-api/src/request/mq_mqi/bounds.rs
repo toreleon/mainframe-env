@@ -68,6 +68,34 @@ fn get(value: &MqGetContract, limits: HostLimits) -> Result<(), HostProblem> {
     }
     bound(value.buffer_capacity, limits.max_record_bytes)
 }
+fn full_descriptor(limits: HostLimits) -> Result<(), HostProblem> {
+    bound(48, limits.max_record_bytes)?;
+    bound(48, limits.max_name_bytes)
+}
+fn full_message(value: &MqFullMessage, limits: HostLimits) -> Result<(), HostProblem> {
+    full_descriptor(limits)?;
+    bound(value.body.len(), limits.max_record_bytes)?;
+    bound(value.properties.len(), limits.max_fields)?;
+    let mut total = 0usize;
+    for p in &value.properties {
+        property(p, limits)?;
+        total = total
+            .checked_add(p.name.len())
+            .and_then(|n| n.checked_add(p.value.len()))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        bound(total, limits.max_state_bytes)?;
+    }
+    Ok(())
+}
+fn full_put(value: &MqMqiFullPut, limits: HostLimits) -> Result<(), HostProblem> {
+    full_message(&value.message, limits)?;
+    if let MqMqiMessageContext::SetIdentityPending { user }
+    | MqMqiMessageContext::SetAllPending { user } = &value.context
+    {
+        alternate(Some(user), limits)?;
+    }
+    Ok(())
+}
 
 fn query(value: &MqPropertyQuery, limits: HostLimits) -> Result<(), HostProblem> {
     match value {
@@ -140,6 +168,21 @@ pub(super) fn request(value: &MqMqiRequest, limits: HostLimits) -> Result<(), Ho
             alternate(value.modifiers().alternate_user.as_ref(), limits)
         }
         R::Get(value) => get(&value.get, limits),
+        R::FullGet(value) => {
+            full_descriptor(limits)?;
+            bound(value.buffer_capacity, limits.max_record_bytes)
+        }
+        R::FullPut { put, .. } => full_put(put, limits),
+        R::FullPutOne {
+            lookup: route,
+            alternate_user,
+            put,
+            ..
+        } => {
+            lookup(route, limits)?;
+            alternate(alternate_user.as_ref(), limits)?;
+            full_put(put, limits)
+        }
         R::Put { put: value, .. } => put(value, limits),
         R::PutOne {
             lookup: route,
@@ -214,6 +257,23 @@ pub(super) fn result(value: &MqMqiResult, limits: HostLimits) -> Result<(), Host
         }
     };
     match output {
+        O::FullPut { .. } => full_descriptor(limits),
+        O::FullGot {
+            message,
+            data_length,
+            ..
+        } => {
+            if let Some(value) = message {
+                full_message(value, limits)?;
+            }
+            if let Some(n) = data_length {
+                bound(
+                    usize::try_from(*n).map_err(|_| HostProblem::Malformed)?,
+                    limits.max_record_bytes,
+                )?;
+            }
+            Ok(())
+        }
         O::Opened { dynamic, .. } => {
             if let Some(value) = dynamic {
                 name(value.model.as_str(), limits)?;

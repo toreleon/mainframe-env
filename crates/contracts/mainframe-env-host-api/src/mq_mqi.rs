@@ -12,6 +12,8 @@
 //! Unknown outcomes require fenced reconciliation, never automatic redispatch.
 
 mod encoding;
+mod full_message;
+pub use full_message::{MqFullMessage, MqMqiFullGet, MqMqiFullPut};
 mod reviewed_output;
 #[cfg(test)]
 mod tests;
@@ -297,6 +299,8 @@ pub enum MqMqiRequest {
         options: MqMqiOptions,
     },
     Get(MqMqiGet),
+    /// Complete descriptor input; source matching/conversion execution is pending.
+    FullGet(MqMqiFullGet),
     Inquire(MqMqiInquiry),
     InquireProperty(MqMqiPropertyInquiry),
     HandleToBuffer(MqMqiBuffer),
@@ -311,6 +315,26 @@ pub enum MqMqiRequest {
         lookup: MqRouteLookup,
         alternate_user: Option<MqRouteAlternateUser>,
         put: MqMqiPut,
+    },
+    /// Complete MQPUT intent; does not select the partial delivery route.
+    FullPut {
+        /// Independently admitted connection.
+        connection: MqHconn,
+        /// Independently admitted output object.
+        object: MqHobj,
+        /// Exact complete message intent.
+        put: MqMqiFullPut,
+    },
+    /// Complete MQPUT1 intent with the existing catalog route vocabulary.
+    FullPutOne {
+        /// Independently admitted connection.
+        connection: MqHconn,
+        /// Catalog lookup observation, not a provider service selector.
+        lookup: MqRouteLookup,
+        /// Existing pending alternate-user intent.
+        alternate_user: Option<MqRouteAlternateUser>,
+        /// Exact complete message intent.
+        put: MqMqiFullPut,
     },
     Set(MqMqiSet),
     SetProperty {
@@ -353,13 +377,13 @@ impl MqMqiRequest {
             Self::Disconnect { .. } => MqMqiCall::Disconnect,
             Self::DeleteMessageHandle { .. } => MqMqiCall::DeleteMessageHandle,
             Self::DeleteProperty { .. } => MqMqiCall::DeleteProperty,
-            Self::Get(_) => MqMqiCall::Get,
+            Self::Get(_) | Self::FullGet(_) => MqMqiCall::Get,
             Self::Inquire(_) => MqMqiCall::Inquire,
             Self::InquireProperty(_) => MqMqiCall::InquireProperty,
             Self::HandleToBuffer(_) => MqMqiCall::HandleToBuffer,
             Self::Open(_) => MqMqiCall::Open,
-            Self::Put { .. } => MqMqiCall::Put,
-            Self::PutOne { .. } => MqMqiCall::PutOne,
+            Self::Put { .. } | Self::FullPut { .. } => MqMqiCall::Put,
+            Self::PutOne { .. } | Self::FullPutOne { .. } => MqMqiCall::PutOne,
             Self::Set(_) => MqMqiCall::Set,
             Self::SetProperty { .. } => MqMqiCall::SetProperty,
             Self::Stat { .. } => MqMqiCall::Stat,
@@ -429,6 +453,24 @@ pub enum MqMqiStatus {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqMqiOutput {
+    /// Complete descriptor observation from MQPUT/MQPUT1, not queue mutation proof.
+    FullPut {
+        /// Exact returned MQMD1/2 observation.
+        descriptor: crate::mq_md_value::MqMdValue,
+        /// Existing delivery observation, never inferred from a status pair.
+        outcome: MqDeliveryOutcome,
+    },
+    /// Complete meaningful MQGET observation; undefined error fields stay absent.
+    FullGot {
+        /// Complete/retained/removed/browsed/absent/unknown observation.
+        disposition: MqGetDisposition,
+        /// Exact complete descriptor and copied application prefix when meaningful.
+        message: Option<MqFullMessage>,
+        /// Actual nonnegative MQLONG length, including uncopied bytes on truncation.
+        data_length: Option<i32>,
+        /// Existing bounded cursor observation, not live registry permission.
+        cursor: Option<u64>,
+    },
     Connected(MqHconn),
     Opened {
         object: MqHobj,
@@ -511,6 +553,8 @@ pub struct MqMqiResult {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqMqiProblem {
+    /// Exact full descriptor representation failure, not numeric policy admission.
+    FullDescriptor(crate::mq_md_value::MqMdValueProblem),
     Limits,
     Context,
     Connection,

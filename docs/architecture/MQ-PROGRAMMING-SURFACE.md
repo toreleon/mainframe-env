@@ -72,8 +72,16 @@ actual retained HCONN for PUT1, independently of names or options.
 Complete MQMD projection into the current typed message descriptor rejects with
 `DescriptorRepresentationPending`: Report, MsgType, Feedback, body encoding/CCSID,
 backout/reply/context/origin and OriginalLength lack lossless typed fields. The
-manager must add source-bound typed fields and their full canonical/replay support
-before using these observations as durable GET results. These non-Serde raw structs
+additive `MqMdValue` and `MqFullMessage` boundary retains those observations with
+explicit FullPut/FullPutOne/FullGet and FullPut/FullGot tags in the existing MQI
+canonical authority. Complete GET binds copied bytes, DataLength, original
+capacity/truncation and reviewed status without losing the returned MD on rejected
+truncation. The existing private result replay codec keeps old storage@1 bytes
+exact and uses strict storage@2 only for these full outputs, composing the owned
+MD value codec and full host result digest. Full requests remain pending and the
+selected provider route explicitly Unsupported until full-MD delivery/checkpoint,
+policy and retained receipt integration. No automatic migration or new executable
+permission follows from exact representation (see ADR0033 full-MD value). Raw structs
 do not create an alternate effect journal or bypass canonical result bounds.
 
 Sources are the MQ9.4 original baseline `ibm-mq-9.4-mqi-2026-08-31`, rows

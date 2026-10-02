@@ -12,11 +12,14 @@ use mainframe_env_host_api::*;
 use serde::{Deserialize, Serialize};
 
 mod budget;
+mod full_message;
 mod handles;
 mod shape;
 use shape::{StoredOutcome, StoredResult};
 
 pub(crate) const SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@1";
+// Same codec/authority, distinct admitted output vocabulary; old bytes stay @1.
+pub(crate) const FULL_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@2";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReplayPending {
@@ -58,7 +61,12 @@ pub(crate) fn encode(
     refuse_special_connections(result)?;
     let digest = validate_and_digest(result, host, mqi)?;
     let stored = StoredResult {
-        schema_version: SCHEMA.into(),
+        schema_version: if full_output(result) {
+            FULL_SCHEMA
+        } else {
+            SCHEMA
+        }
+        .into(),
         call: result.call.label().into(),
         outcome: StoredOutcome::from_result(result)?,
         host_result_digest: digest,
@@ -86,7 +94,9 @@ pub(crate) fn decode(
     // Bounds every collection, nesting, map/key set and catches duplicate keys.
     budget::preflight(bytes, host, mqi)?;
     let stored: StoredResult = serde_json::from_slice(bytes).map_err(|_| ReplayError::Malformed)?;
-    if stored.schema_version != SCHEMA {
+    if !matches!(stored.schema_version.as_str(), SCHEMA | FULL_SCHEMA)
+        || (stored.schema_version == FULL_SCHEMA) != stored.outcome.is_full()
+    {
         return Err(ReplayError::UnsupportedSchema);
     }
     let call = MqMqiCall::ALL
@@ -101,6 +111,12 @@ pub(crate) fn decode(
         return Err(ReplayError::DigestMismatch);
     }
     Ok(result)
+}
+
+fn full_output(value: &MqMqiResult) -> bool {
+    matches!(&value.outcome, MqMqiOutcome::Completed { output, .. }
+        | MqMqiOutcome::StatusPending { output } | MqMqiOutcome::ReviewedOutput { output, .. }
+        if matches!(output, MqMqiOutput::FullPut {..} | MqMqiOutput::FullGot {..}))
 }
 
 fn limits(host: HostLimits, mqi: MqMqiLimits, bytes: usize) -> Result<(), ReplayError> {
@@ -151,7 +167,7 @@ fn validate_and_digest(
     {
         let id = match output {
             MqMqiOutput::UnitOfWork { unit } => Some(*unit),
-            MqMqiOutput::Got { cursor, .. } => *cursor,
+            MqMqiOutput::Got { cursor, .. } | MqMqiOutput::FullGot { cursor, .. } => *cursor,
             _ => None,
         };
         if id.is_some_and(|n| n == 0 || n > i64::MAX as u64) {

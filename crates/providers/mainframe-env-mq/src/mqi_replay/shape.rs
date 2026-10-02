@@ -162,6 +162,19 @@ pub(super) struct Item {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum Output {
+    FullPut {
+        md_value: Vec<u8>,
+        outcome: Delivery,
+    },
+    FullGot {
+        disposition: Get,
+        #[serde(deserialize_with = "required_option")]
+        message: Option<super::full_message::Message>,
+        #[serde(deserialize_with = "required_option")]
+        data_length: Option<i32>,
+        #[serde(deserialize_with = "required_option")]
+        cursor: Option<u64>,
+    },
     Put {
         descriptor: ReplayDescriptor,
         outcome: Delivery,
@@ -214,6 +227,27 @@ pub(super) enum Output {
 impl Output {
     fn from_output(value: &MqMqiOutput) -> Result<Self, ReplayError> {
         Ok(match value {
+            MqMqiOutput::FullPut {
+                descriptor,
+                outcome,
+            } => Self::FullPut {
+                md_value: super::full_message::capture_md(descriptor)?,
+                outcome: outcome.clone().into(),
+            },
+            MqMqiOutput::FullGot {
+                disposition,
+                message,
+                data_length,
+                cursor,
+            } => Self::FullGot {
+                disposition: (*disposition).into(),
+                message: message
+                    .as_ref()
+                    .map(super::full_message::Message::capture)
+                    .transpose()?,
+                data_length: *data_length,
+                cursor: *cursor,
+            },
             MqMqiOutput::Put {
                 descriptor,
                 outcome,
@@ -288,6 +322,23 @@ impl Output {
     }
     fn into_output(self) -> Result<MqMqiOutput, ReplayError> {
         Ok(match self {
+            Self::FullPut { md_value, outcome } => MqMqiOutput::FullPut {
+                descriptor: super::full_message::restore_md(&md_value)?,
+                outcome: outcome.into(),
+            },
+            Self::FullGot {
+                disposition,
+                message,
+                data_length,
+                cursor,
+            } => MqMqiOutput::FullGot {
+                disposition: disposition.into(),
+                message: message
+                    .map(super::full_message::Message::restore)
+                    .transpose()?,
+                data_length,
+                cursor,
+            },
             Self::Put {
                 descriptor,
                 outcome,
@@ -383,6 +434,10 @@ pub(super) enum StoredOutcome {
     DuplicatePossible {},
 }
 impl StoredOutcome {
+    pub(super) fn is_full(&self) -> bool {
+        matches!(self, Self::Completed { output, .. } | Self::StatusPending { output }
+            | Self::ReviewedOutput { output, .. } if matches!(output, Output::FullPut {..} | Output::FullGot {..}))
+    }
     pub(super) fn from_result(value: &MqMqiResult) -> Result<Self, ReplayError> {
         Ok(match &value.outcome {
             MqMqiOutcome::Completed { status, output } => Self::Completed {

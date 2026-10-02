@@ -201,7 +201,7 @@ macro_rules! payload_enum {
 }
 
 payload_enum!(MqMqiRequest {
-    tuples { BufferToHandle, Close, Connect, ConnectExtended, Get, Inquire, InquireProperty,
+    tuples { BufferToHandle, Close, Connect, ConnectExtended, Get, FullGet, Inquire, InquireProperty,
         HandleToBuffer, Open, Set, Subscribe }
     named {
         Back { connection, unit },
@@ -216,6 +216,8 @@ payload_enum!(MqMqiRequest {
         DeleteProperty { connection, handle, options, query },
         Put { connection, object, put },
         PutOne { alternate_user, connection, lookup, put },
+        FullPut { connection, object, put },
+        FullPutOne { alternate_user, connection, lookup, put },
         SetProperty { connection, handle, options, property },
         Stat { connection, kind, options },
         SubscriptionRequest { connection, options, subscription, unit }
@@ -229,6 +231,8 @@ payload_enum!(MqMqiOutput {
         Subscribed { object, subscription },
         Got { cursor, disposition, message },
         Put { descriptor, outcome },
+        FullGot { cursor, data_length, disposition, message },
+        FullPut { descriptor, outcome },
         Buffer { bytes, data_length, descriptor },
         Attributes { characters, integers },
         UnitOfWork { unit },

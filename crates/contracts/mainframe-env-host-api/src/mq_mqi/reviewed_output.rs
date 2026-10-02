@@ -36,12 +36,18 @@ pub(super) fn validate(
     // Its pending-mode shape check does not claim a reviewed completion.
     super::validation::validate_output(call, None, output, limits)?;
     let shape = match (status.completion(), status.reason_symbol(), output) {
-        (MqCompletion::Ok, "MQRC_NONE", MqMqiOutput::Got { disposition, .. }) => {
+        (
+            MqCompletion::Ok,
+            "MQRC_NONE",
+            MqMqiOutput::Got { disposition, .. } | MqMqiOutput::FullGot { disposition, .. },
+        ) => {
             matches!(disposition, MqGetDisposition::Message(T::Complete { .. }))
         }
-        (MqCompletion::Ok, "MQRC_NONE", MqMqiOutput::Put { outcome, .. }) => {
-            *outcome == MqDeliveryOutcome::Accepted
-        }
+        (
+            MqCompletion::Ok,
+            "MQRC_NONE",
+            MqMqiOutput::Put { outcome, .. } | MqMqiOutput::FullPut { outcome, .. },
+        ) => *outcome == MqDeliveryOutcome::Accepted,
         (MqCompletion::Ok, "MQRC_NONE", MqMqiOutput::Distribution(_)) => {
             // Per-destination return pairing is not represented by this output.
             false
@@ -60,7 +66,7 @@ pub(super) fn validate(
         (
             MqCompletion::Warning,
             "MQRC_TRUNCATED_MSG_ACCEPTED",
-            MqMqiOutput::Got { disposition, .. },
+            MqMqiOutput::Got { disposition, .. } | MqMqiOutput::FullGot { disposition, .. },
         ) => {
             matches!(
                 disposition,
@@ -74,6 +80,11 @@ pub(super) fn validate(
                 disposition,
                 cursor,
                 ..
+            }
+            | MqMqiOutput::FullGot {
+                disposition,
+                cursor,
+                ..
             },
         ) => {
             // No browse-cursor advancement is reported for rejected truncation.
@@ -83,7 +94,11 @@ pub(super) fn validate(
                     MqGetDisposition::Message(T::RejectedRetained { .. })
                 )
         }
-        (MqCompletion::Failed, "MQRC_NO_MSG_AVAILABLE", MqMqiOutput::Got { disposition, .. }) => {
+        (
+            MqCompletion::Failed,
+            "MQRC_NO_MSG_AVAILABLE",
+            MqMqiOutput::Got { disposition, .. } | MqMqiOutput::FullGot { disposition, .. },
+        ) => {
             matches!(
                 disposition,
                 MqGetDisposition::NoMessage | MqGetDisposition::WaitExpired
@@ -122,6 +137,12 @@ impl MqMqiResult {
     pub fn validate_reviewed_output_for(&self, request: &MqMqiRequest) -> Result<(), MqMqiProblem> {
         if self.call != request.call() {
             return Err(MqMqiProblem::OutputCallMismatch);
+        }
+        if let MqMqiOutcome::ReviewedOutput { output, .. }
+        | MqMqiOutcome::Completed { output, .. }
+        | MqMqiOutcome::StatusPending { output } = &self.outcome
+        {
+            super::full_message::bind(request, output)?;
         }
         let MqMqiOutcome::ReviewedOutput { output, .. } = &self.outcome else {
             return Ok(());
