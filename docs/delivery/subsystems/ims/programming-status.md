@@ -4488,3 +4488,49 @@ participant generation, offline runtime/dependency/license policy, normal docs,
 changelog, catalog/assurance/schema/spec/coverage and exact existing API ratchets
 pass. Final packaging regenerates documentation and the exact thirteen-path
 feature seal/check; it does not rerun unchanged runtime suites for this prose.
+
+## IMS-1406.integration-dependency-inventory — declared metadata repair
+
+Root entry is the clean private-retention seal
+`d800c089d98168775cf43850682807d465bb5ec1`, target 0.14.0. The logical-feedback
+worker's actual architecture-fast failure and unchanged-base comparison expose
+the existing `mainframe-env-db2 -> mainframe-env-encoding` normal dependency
+absent from the declared graph. Cargo.toml already owns that dependency; this
+leaf changes no dependency, library, runtime behavior, semantic rule or boundary.
+IBM lookup is not required for this infrastructure inventory correction.
+
+Use one current-release additions artifact under conformance/0.14/inventory and
+the existing shared graph comparator's ordered additions list. Do not rewrite
+the historical 0.1 graph or earlier release additions, suppress graph comparison,
+change Cargo.lock/manifests, or weaken layer/module/API policy. Scope is exactly
+the new dependency-additions.json, one lookup entry in xtask/src/main.rs,
+this status, the unique v014-db2-encoding-dependency-inventory-20261002.toml
+fragment and normal generated documentation-manifest.json (five paths).
+
+Required proof: the original missing-edge failure remains external; actual
+architecture-fast must progress past the exact graph comparator after repair.
+Any later unrelated prerequisite failure remains a global-gate blocker, never
+called architecture pass. Negative missing/stale declarations must still fail
+comparison. Selected metadata/schema/spec, strict xtask lint, formatting,
+dependency policy, normal docs/changelog and exact-path seal/check are required;
+no runtime suite or full source/cache/backend campaign for an inventory-only
+delta. Cargo clean ends the sequence. Receipts are external, old worker/CI
+identities are not relabeled, and the full minor stays incomplete.
+
+The composed actual architecture-fast run now progresses past dependency graph
+comparison and the execution/participant/effect/row/storage/SAF/retention checks.
+It stops at the previously diagnosed CICS sources-a review prerequisite:
+missing cached SSJL4D_6.x/applications/designing/dfhp37p.html. That global gate
+remains failed; no source refresh, acceptance waiver or whole-cache audit occurs.
+Actual comparator probes with the new declaration temporarily empty and with
+one extra DB2-to-coverage edge independently reject the exact missing and stale
+edges. The final additions artifact contains only the real encoding edge.
+These probes preserve exact equality rather than relaxing it. Final scoped
+policy, documentation and packaging outcomes remain pending until execution.
+
+Strict xtask all-target lint, schemas, spec (including 134 Python cases), module
+and typed-boundary checks pass. The first dependency-policy invocation placed
+--offline after check and was rejected without policy credit; its sequence
+cleans Cargo output. The corrected cargo deny --offline check and formatting
+pass and clean. Normal docs/changelog and exact five-path content sealing are
+the remaining packaging checks, with actual outcomes recorded externally.
