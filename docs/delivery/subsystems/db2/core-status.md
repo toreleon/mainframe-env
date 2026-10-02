@@ -858,6 +858,32 @@ commit is authorized. Source review and local kernels grant zero official gate
 or licensed credit; exact common/deferred freeze and licensed differential stay
 pending. The user confirmed implementation should continue without an oracle.
 
+The manager additionally declares `DB2-1202.search-condition-truth-surface`:
+root `lib.rs` exports, new `tests/search_condition_truth.rs`, provider README,
+this status, unique `changes/unreleased/db2-search-condition-truth-surface.toml`
+and derived documentation manifest. It exposes the sealed predicate domain and
+tests independent fixed tables/NULL outcomes, UNKNOWN-preserving compositions,
+TRUE-only qualification and owned const results through the public crate route.
+No evaluator, Boolean scalar, SQL null-storage or backend mutation is added.
+Acceptance is focused/public and package tests, Rust checks including 1.95,
+strict scoped Clippy, formatting and applicable policy/catalog/changelog/docs,
+exact-path sealing and target cleanup. Root export must discharge the private
+reachability warning. Parser/executor integration and official/licensed gates
+remain pending; no accepted mutable or durable contract changes.
+
+The truth prerequisite is integrated from its three-path private seal; main read
+the complete 218-line module, all fixed tests, fragment and full worker handoff.
+Private checks passed eight focused tests, 333 unit plus 86 integration tests,
+both Rust checks and policy/catalog/docs/spec; clean-candidate evidence-fast and
+committed seal checks also passed. Their original worker identity is retained.
+The manager public integration adds four independent tests and only a root
+export in production. It passes 333 unit plus 90 integration tests, Rust 1.98/1.95,
+strict scoped Clippy, formatting, catalog/changelog/docs and unchanged private
+seal checks. Dependency/advisory/license/source policy inputs are unchanged;
+the private worker's actual policy receipt is reused without relabeling its
+execution identity. These local proofs add no official recognition/execution
+or licensed numerator, and no evaluator consumes the predicate domain yet.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

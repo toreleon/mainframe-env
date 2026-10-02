@@ -135,6 +135,7 @@ pub use type_system::string_constants::{
     Db2StringConstantError, Db2StringConstantErrorCode, Db2StringConstantLimits,
     Db2StringConstantValue, materialize_db2_string_constant,
 };
+pub use type_system::truth::Db2TruthValue;
 pub use type_system::{
     Db2AssignmentCompatibility, Db2AssignmentContext, Db2AssignmentNullability,
     Db2ComparisonCompatibility, Db2ComparisonContext, Db2ConversionKind, Db2Nullability,

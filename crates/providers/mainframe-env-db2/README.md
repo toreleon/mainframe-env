@@ -222,6 +222,15 @@ FLOAT declarations use the existing REAL/DOUBLE combination rules; retained
 unresolved Float shapes still fail closed. Neither surface parses expressions, resolves function overloads,
 changes the durable SQL route or grants licensed or statement-row credit.
 
+The search-condition truth surface exposes an owned True/False/Unknown predicate
+outcome domain. AND/OR/NOT preserve the pinned three-valued rules, and only True
+qualifies; rejecting Unknown for qualification does not turn it into False before
+negation. NULL predicates take explicit value nullness and never yield Unknown.
+These fixed, allocation-free operations are not SQL Boolean scalar values,
+nullable cells, a comparison policy, expression evaluation or row filtering.
+Neither parser precedence nor evaluation/short-circuit order changes. This public
+kernel and its independent fixed vectors grant no statement-row or licensed credit.
+
 Common DROP syntax exposes TABLE/VIEW/INDEX and non-PUBLIC ALIAS names, keeping
 an omitted alias designator distinct from explicit FOR TABLE. RENAME exposes
 TABLE/INDEX source names and an explicit unqualified destination. TABLE, VIEW
