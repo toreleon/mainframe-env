@@ -302,3 +302,26 @@ success. Licensed MQ 9.4 verification remains
 exact external pins. Harness structure and mutant tests are not licensed runs.
 The next manager-owned step is trusted public dispatch and service composition
 through existing provider-row/effect/UOW authorities, without a private journal.
+
+## Active service-integration wave
+
+The next three CLI lanes start from `070e45e8` and retain `gpt-6.1-sol`, high
+effort, goal mode, bypass and fast mode off. They must not advertise the new
+MQI surface before dependency identities, participant binding and integrated
+service proofs pass. The existing public legacy service remains unchanged
+until its queue authority and the rich delivery authority are reconciled.
+
+| Lane / parent slice | Exclusive ownership | Source rows / required proof |
+|---|---|---|
+| M / `MQ-1501.mqi-effect-admission` | New provider `mqi_admission.rs` and child tests, private facade hook, unique fragment; reuse existing trusted host-context decoder via a minimal crate-private hook only. No HostRequest variant or provider registration. | `0001`, `0002`, `0007`, `0008`, `0009`, `0004`, `0005`, `0011`: invocation/run/principal/grant, trusted owner/context, mutation sequence/key, finite deadlines/live cancellation and exact forbidden syncpoint disposition before state access. Caller assertions cannot mint trusted identity. |
+| N / `MQ-1505.delivery-provider-rows` | Delivery checkpoint/row codec child modules and minimal delivery hooks, focused Memory/SQLite backend tests, unique fragment. No legacy service edits or new dispatcher/journal. | `0001`, `0007`, `0015`, `0020`, `0021`: bounded per-queue/UOW/final-decision metadata projections, strict restore, atomic row CAS/delta failure, restart/backout and fencing. The existing provider-state store is the physical adapter; a private whole-manager blob is forbidden. |
+| O / `MQ-1501.completion-reason-catalog` | Normative completion/reason catalog, focused generator/schema/verifier/tests and generated host status modules with minimal facade hook, unique fragment. No service/state/context edits. | All `0001`–`0026`, preserving callback-function status non-applicability and 27 source positions: exact source-reviewed call-specific completion/reason pairs, numeric/symbolic consistency, strict unknown rejection and deterministic generation. Source projection is not execution credit. |
+
+The manager owns dependency-consumption audit, shared HostRequest/canonical
+integration, service composition/migration, early participant acceptance,
+documentation/ADR and public route advertisement. These lanes build the actual
+admission, status and durable boundaries needed for that integration; they do
+not replace the required 26-call final outcome with private-kernel completion.
+Existing replay, audit, canonical effect and transaction authorities must be
+reused. Parent work packages and all official execution/differential gates
+remain in progress.
