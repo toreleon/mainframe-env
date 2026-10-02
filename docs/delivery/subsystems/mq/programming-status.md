@@ -423,6 +423,22 @@ row or licensed numerator is increased by these contract/kernel proofs.
 
 ### Next isolated service-composition lanes
 
+`MQ-1501.host-effect-contract` is integrated as `7ed1ed79`, re-sealed after
+reconciling the reviewed-status result arm. The integration passed 142 host-API
+unit and nine integration tests, documentation/changelog/formatting and the
+canonical-effect guard. Original-effect extraction is immutable; all typed
+occurrences retain exact replay identity. Request/canonical parents now meet
+their unchanged line ceilings. No public handler or licensed credit is added.
+
+The retained M lane next owns `MQ-1501.mqi-original-effect-binding`: the private
+admission module/children, focused tests, narrow canonical contract prose and
+one fragment. Replace metadata-only projections and independently supplied
+envelope/mutation inputs with the actual validated typed host occurrence; bind
+the full canonical host request identity and result call/limits/capacities to
+that original borrow. Trusted lifecycle owner minting, SAF, durable dispatch,
+returned-handle authority and public registration remain manager-owned. No
+standalone MQI digest may replace the shared journal identity.
+
 The manager delegates the declared `MQ-1501.host-effect-contract` to retained
 lane M. Lanes N and O receive the following disjoint next slices, keeping three
 CLI workers plus manager, `gpt-6.1-sol`, high effort, goal mode/bypass and fast off.
