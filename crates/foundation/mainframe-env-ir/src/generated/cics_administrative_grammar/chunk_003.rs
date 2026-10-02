@@ -352,6 +352,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "COMPATMODE", values: &["COMPAT", "NOCOMPAT"] },
+            CicsApplicationCvdaDomain { option: "RESTYPE", values: &["ATOMSERVICE", "BUNDLE", "CONNECTION", "CORBASERVER", "DB2CONN", "DB2ENTRY", "DB2TRAN", "DJAR", "DOCTEMPLATE", "DUMPCODE", "ENQMODEL", "FILE", "IPCONN", "JOURNALMODEL", "JVMSERVER", "LIBRARY", "LSRPOOL", "MAPSET", "MQCONN", "MQMONITOR", "PARTITIONSET", "PARTNER", "PIPELINE", "PROCESSTYPE", "PROFILE", "PROGRAM", "REQUESTMODEL", "SESSIONS", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANSACTION", "TSMODEL", "TYPETERM", "URIMAP", "WEBSERVICE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -456,6 +458,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "DUPACTION", values: &["DUPERROR", "DUPNOREPLACE", "DUPREPLACE"] },
+            CicsApplicationCvdaDomain { option: "RESTYPE", values: &["ATOMSERVICE", "BUNDLE", "CONNECTION", "CORBASERVER", "DB2CONN", "DB2ENTRY", "DB2TRAN", "DJAR", "DOCTEMPLATE", "DUMPCODE", "ENQMODEL", "FILE", "IPCONN", "JOURNALMODEL", "JVMSERVER", "LIBRARY", "LSRPOOL", "MAPSET", "MQCONN", "MQMONITOR", "PARTITIONSET", "PARTNER", "PIPELINE", "PROCESSTYPE", "PROFILE", "PROGRAM", "REQUESTMODEL", "SESSIONS", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANSACTION", "TSMODEL", "TYPETERM", "URIMAP", "WEBSERVICE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -569,6 +573,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "COMPATMODE", values: &["COMPAT", "NOCOMPAT"] },
+            CicsApplicationCvdaDomain { option: "RESTYPE", values: &["ATOMSERVICE", "BUNDLE", "CONNECTION", "CORBASERVER", "DB2CONN", "DB2ENTRY", "DB2TRAN", "DJAR", "DOCTEMPLATE", "DUMPCODE", "ENQMODEL", "FILE", "IPCONN", "JOURNALMODEL", "JVMSERVER", "LIBRARY", "LSRPOOL", "MAPSET", "MQCONN", "MQMONITOR", "PARTITIONSET", "PARTNER", "PIPELINE", "PROCESSTYPE", "PROFILE", "PROGRAM", "REQUESTMODEL", "SESSIONS", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANSACTION", "TSMODEL", "TYPETERM", "URIMAP", "WEBSERVICE"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -639,6 +645,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "LISTACTION", values: &["REMOVE"] },
+            CicsApplicationCvdaDomain { option: "RESTYPE", values: &["ATOMSERVICE", "BUNDLE", "CONNECTION", "CORBASERVER", "DB2CONN", "DB2ENTRY", "DB2TRAN", "DJAR", "DOCTEMPLATE", "DUMPCODE", "ENQMODEL", "FILE", "IPCONN", "JOURNALMODEL", "JVMSERVER", "LIBRARY", "LSRPOOL", "MAPSET", "MQCONN", "PARTITIONSET", "PARTNER", "PIPELINE", "PROCESSTYPE", "PROFILE", "PROGRAM", "REQUESTMODEL", "SESSIONS", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANSACTION", "TSMODEL", "TYPETERM", "URIMAP", "WEBSERVICE"] },
         ],
         cvda_numeric_domains: &[
         ],

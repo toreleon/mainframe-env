@@ -1433,6 +1433,71 @@
             ],
             "required": true
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "COMPATMODE",
+            "values": [
+              "COMPAT",
+              "NOCOMPAT"
+            ],
+            "source_lines": [
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46
+            ]
+          },
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "CONNECTION",
+              "CORBASERVER",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DJAR",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "MQMONITOR",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "REQUESTMODEL",
+              "SESSIONS",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              16,
+              38,
+              39
+            ]
+          }
         ]
       },
       "responses": [
@@ -2221,7 +2286,8 @@
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
         "Encoded low-error facts above are retained, but @1 has no tagged RESP2 high-offset/high-keyword form or attribute-resource domain registry. Existing responses use null for the value family with exact source citation; manager should add bounded typed diagnostic references, not a universal DSL. Mandatory fixtures for every applicable resource/diagnostic partition remain pending, rather than discarded or called covered by BOGUSKEY.",
         "Supplemental dfha817 keyword table TRANCLASS PURGEACTION97 is labelled 6.2 and later at parser1915-1917; low704 is labelled 6.3 and later at785-788. Exact pinned table sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4. Preserve qualifiers with the existing resource/version owner; do not infer every TS6.x service level. RESP2 high-halfword packing/signedness and resource-specific attributes cannot be widened from @1 integer bounds.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains."
       ]
     },
     {
@@ -3051,6 +3117,73 @@
               "WEBSERVICE"
             ],
             "required": false
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "DUPACTION",
+            "values": [
+              "DUPERROR",
+              "DUPNOREPLACE",
+              "DUPREPLACE"
+            ],
+            "source_lines": [
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42
+            ]
+          },
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "CONNECTION",
+              "CORBASERVER",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DJAR",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "MQMONITOR",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "REQUESTMODEL",
+              "SESSIONS",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              16,
+              45,
+              46
+            ]
           }
         ]
       },
@@ -3947,7 +4080,8 @@
         "COPY diagram line 16 places AS and TO on alternative branches and shows GROUP explicitly only on the whole-group branch; prose lines 25-27,33-34,47-49 describes a source group and within/different-group forms. Combined AS+TO validity and GROUP syntax placement remain pending. No AS/TO exclusion is projected, avoiding an unsupported rejection. Conditional RESID->one selector cannot be represented by the existing unconditional alternatives/dependencies.",
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
         "COPY GROUP is not projected as universally required: the whole-group diagram branch requires GROUP while its individual branch omits it, despite the source-group option prose. This partial catalog must not authorize omission or reject it as complete grammar. Manager must resolve individual-form GROUP placement and encode branch-specific requirements before runtime; whole-group GROUP+TO obligation is retained in prose/cases.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains. DUPACTION membership does not resolve the preserved COPY individual-form GROUP or AS/TO syntax conflicts."
       ]
     },
     {
@@ -4533,6 +4667,71 @@
               "WEBSERVICE"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "COMPATMODE",
+            "values": [
+              "COMPAT",
+              "NOCOMPAT"
+            ],
+            "source_lines": [
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46
+            ]
+          },
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "CONNECTION",
+              "CORBASERVER",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DJAR",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "MQMONITOR",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "REQUESTMODEL",
+              "SESSIONS",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              16,
+              38,
+              39
+            ]
           }
         ]
       },
@@ -5322,7 +5521,8 @@
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
         "Encoded low-error facts above are retained, but @1 has no tagged RESP2 high-offset/high-keyword form or attribute-resource domain registry. Existing responses use null for the value family with exact source citation; manager should add bounded typed diagnostic references, not a universal DSL. Mandatory fixtures for every applicable resource/diagnostic partition remain pending, rather than discarded or called covered by BOGUSKEY.",
         "Supplemental dfha817 keyword table TRANCLASS PURGEACTION97 is labelled 6.2 and later at parser1915-1917; low704 is labelled 6.3 and later at785-788. Exact pinned table sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4. Preserve qualifiers with the existing resource/version owner; do not infer every TS6.x service level. RESP2 high-halfword packing/signedness and resource-specific attributes cannot be widened from @1 integer bounds.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains."
       ]
     },
     {
@@ -6086,6 +6286,68 @@
             ],
             "required": false
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LISTACTION",
+            "values": [
+              "REMOVE"
+            ],
+            "source_lines": [
+              37,
+              38,
+              39,
+              40,
+              41
+            ]
+          },
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "CONNECTION",
+              "CORBASERVER",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DJAR",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "REQUESTMODEL",
+              "SESSIONS",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              14,
+              47,
+              48,
+              49
+            ]
+          }
         ]
       },
       "responses": [
@@ -6775,7 +7037,8 @@
         "Precise early-exception cutpoint, CSD mutation atomicity versus prior recoverable task work, later caller rollback, command/record locks and crash-gap reconciliation are not fixed by the syncpoint paragraph. Do not broaden it to automatic compensation or identical transactionality across CSD commands.",
         "Conditional resource selector requirement when RESID exists, and whether LISTACTION/REMOVE is permitted on a single-definition DELETE, need shared conditional grammar review; do not impose an unconditional RESTYPE requirement or silently drop LISTACTION.",
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains. DELETE syntax14 and RESTYPE47-49 enumerate 36 resource names, omitting MQMONITOR that appears in other CSD operations. Do not import those other lists or infer a universal service-level exclusion. LISTACTION37-41 describes REMOVE for group deletion; single-definition applicability stays pending."
       ]
     },
     {
@@ -7623,6 +7886,53 @@
             ],
             "required": true
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              17,
+              35,
+              36,
+              37,
+              55,
+              56,
+              57
+            ]
+          }
         ]
       },
       "responses": [
@@ -8317,7 +8627,8 @@
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
         "RESID requires a selector only in the single-resource form. Existing dependencies express selector->RESID and GROUP ownership, but cannot express RESID->one selector from a required alternative set without requiring a selector on whole-group/list forms. Request additive shared conditional alternative facts through existing compiler owner; keep pending grammar, no new DSL.",
         "Supplemental dfha817 keyword table TRANCLASS PURGEACTION97 is labelled 6.2 and later at parser1915-1917; low704 is labelled 6.3 and later at785-788. Exact pinned table sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4. Preserve qualifiers with the existing resource/version owner; do not infer every TS6.x service level. RESP2 high-halfword packing/signedness and resource-specific attributes cannot be widened from @1 integer bounds.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains. INSTALL syntax17 and RESTYPE55-57 enumerate 31 resource names, separately from LIST syntax15. CONNECTION, CORBASERVER, DJAR, MQMONITOR, REQUESTMODEL and SESSIONS are absent from this selector list. Description35-37 prohibits single-resource installation of CONNECTION, SESSIONS and TERMINAL pools and describes GROUP/LIST installation for CONNECTION and TERMINAL pools. The TERMINAL member does not waive that restriction; conditional selector grammar, resource dependencies and live installation outcome remain pending."
       ]
     },
     {
@@ -10191,6 +10502,55 @@
             ],
             "required": true
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "CONNECTION",
+              "CORBASERVER",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DJAR",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "MQMONITOR",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "REQUESTMODEL",
+              "SESSIONS",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              16,
+              51,
+              52
+            ]
+          }
         ]
       },
       "responses": [
@@ -10838,7 +11198,8 @@
         "Unknown post-dispatch mutation outcome must remain unknown and undergo fenced service-specific observation; never automatically redispatch or infer rollback. This is project policy from EXECUTION-AND-DURABILITY/EFFECT-CANONICAL-V1, not an IBM command-body restart guarantee.",
         "Precise early-exception cutpoint, CSD mutation atomicity versus prior recoverable task work, later caller rollback, command/record locks and crash-gap reconciliation are not fixed by the syncpoint paragraph. Do not broaden it to automatic compensation or identical transactionality across CSD commands.",
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains. RENAME has no RESTYPE option paragraph: its literal RESTYPE(cvda) alternatives at syntax16 supply the membership, with invalid-type condition51-52. No default or branch requiredness is inferred from diagram geometry."
       ]
     },
     {
@@ -12081,6 +12442,71 @@
             ],
             "required": true
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "COMPATMODE",
+            "values": [
+              "COMPAT",
+              "NOCOMPAT"
+            ],
+            "source_lines": [
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44
+            ]
+          },
+          {
+            "option": "RESTYPE",
+            "values": [
+              "ATOMSERVICE",
+              "BUNDLE",
+              "CONNECTION",
+              "CORBASERVER",
+              "DB2CONN",
+              "DB2ENTRY",
+              "DB2TRAN",
+              "DJAR",
+              "DOCTEMPLATE",
+              "DUMPCODE",
+              "ENQMODEL",
+              "FILE",
+              "IPCONN",
+              "JOURNALMODEL",
+              "JVMSERVER",
+              "LIBRARY",
+              "LSRPOOL",
+              "MAPSET",
+              "MQCONN",
+              "MQMONITOR",
+              "PARTITIONSET",
+              "PARTNER",
+              "PIPELINE",
+              "PROCESSTYPE",
+              "PROFILE",
+              "PROGRAM",
+              "REQUESTMODEL",
+              "SESSIONS",
+              "TCPIPSERVICE",
+              "TDQUEUE",
+              "TERMINAL",
+              "TRANCLASS",
+              "TRANSACTION",
+              "TSMODEL",
+              "TYPETERM",
+              "URIMAP",
+              "WEBSERVICE"
+            ],
+            "source_lines": [
+              16,
+              49,
+              50
+            ]
+          }
         ]
       },
       "responses": [
@@ -12942,7 +13368,8 @@
         "Case input @... strings denote bounded candidate storage bindings; null denotes omitted option, not a null IBM operand. precondition is independent fixture prose, not a production command option. Case material must be bound by existing ConformanceIR owner before execution; exact source-ambiguous fixtures remain pending.",
         "Encoded low-error facts above are retained, but @1 has no tagged RESP2 high-offset/high-keyword form or attribute-resource domain registry. Existing responses use null for the value family with exact source citation; manager should add bounded typed diagnostic references, not a universal DSL. Mandatory fixtures for every applicable resource/diagnostic partition remain pending, rather than discarded or called covered by BOGUSKEY.",
         "Supplemental dfha817 keyword table TRANCLASS PURGEACTION97 is labelled 6.2 and later at parser1915-1917; low704 is labelled 6.3 and later at785-788. Exact pinned table sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4. Preserve qualifiers with the existing resource/version owner; do not infer every TS6.x service level. RESP2 high-halfword packing/signedness and resource-specific attributes cannot be widened from @1 integer bounds.",
-        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending."
+        "CVDA extent source: dfha80x.html, ibm-cics-ts-6x-application-api-sources-b-2026-09-10, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 7-15. source_max_value_bytes=4 records the internal fullword binary CVDA representation and receiving-area extent, not a cap on caller sender expressions. Sender data-value conversion uses dfhp4_argumentvalues.html, ibm-cics-ts-6x-application-api-sources-a-2026-09-10, sha256:44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70, parser lines 33-43, 103-111, 166-175, 258-260. Symbolic/numeric domains, language bindings and any documented direction conflict remain pending.",
+        "Finite symbolic membership is now recorded only for the operands in this command's cvda_domains and only for its pinned body. This narrows the earlier symbolic-domain gap for those operands; numeric encodings and aliases, language binding, service-level applicability and execution remain pending. Numeric fullwords RESP/RESP2 and ATTRLEN are not CVDA domains."
       ]
     }
   ]

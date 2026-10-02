@@ -2972,3 +2972,34 @@ actual Draft202012 FILE instance validation. Private 278-command projection
 (239 SPI and 39 FEPI), 4577 operands/7814 case candidates and all 62 numeric
 domains/217 numeric records are unchanged. One of 18 enrolled family inputs
 remains unintegrated; all-family/runtime/acceptance gates remain Pending.
+
+CSD integration child SPI-1001.spi-csd-cvda-domains is manager-owned after the
+independent no-actionable-defect review of exactly 16 additions: seven parent
+arrays with 12 symbolic domains/262 members and nine precise pending gaps.
+All 25 rows, 443 complete operands, 250 responses, 475 whole cases and their
+IDs/order, obligations/forms and 306 original gaps remain exact. Manager verified
+whole-byte forward/reverse replay, all actual domains/symbols, nine entire gaps
+and qualifiers, 533 referenced artifact identities and 26 fresh offline calls
+on 12 pinned topics, with all 14 actual bounded parser pages read. Own raw SVG
+labels independently confirm each operation's selector list. ALTER/DEFINE/
+USERDEFINE COMPATMODE defaults, COPY DUPACTION and forms, DELETE's own 36-name
+list lacking MQMONITOR, INSTALL's own 31-name list/TERMINAL pool prohibition,
+partial installation/CSDE and implicit-syncpoint early-exception rules remain
+qualified. RENAME gains no fabricated default/requiredness. GETNEXTRSRCE output
+membership and INQUIRERSRCE direction remain unresolved without finite domains.
+Common fullword/direction and global all-command table do not close a receiver.
+Primary baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12; exact rows/topic
+pins stay in both CSD family inputs. Context baselines remain sources-a/b and
+ibm-cics-ts-6x-misc-tail-cvda-2026-09-23. No numeric encodings, operand/form/case,
+receiver geometry, runtime route or separate resource/UOW authority is added.
+Manager solely owns schema/types/generator/IR facade/status and serial integration.
+Only this bounded source child seals after actual CSD instances, projection,
+focused and mandatory gates. All six per-command, parent/application/selected
+route/recovery/restart/licensed gates remain Pending, credit0. Three deferred
+v0.9 identities stay catalogued; no application acceptance is inferred.
+
+CSD domain integrated candidate passes 31 generator and nine IR regressions and
+actual Draft202012 definition and browse instance validation. Private 278-command
+projection (239 SPI and 39 FEPI), 4577 operands/7814 case candidates and all
+62 numeric domains/217 numeric records remain unchanged. TERMINAL source input
+still awaits independent final review/integration; runtime acceptance pending.
