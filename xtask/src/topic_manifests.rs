@@ -484,13 +484,14 @@ mod tests {
         check_later_registry(&root, config_015()).expect("shipped independent scopes");
         let registry = json(&root.join(config_015().registry_path)).unwrap();
         let entries = registry["manifests"].as_array().unwrap();
-        assert_eq!(entries.len(), 5);
+        assert_eq!(entries.len(), 6);
         for (scope, count) in [
             ("mq-programming-supplements", 80),
             ("mq-point-layout-sources", 12),
             ("mq-property-sources", 12),
             ("mq-recovery-policy-sources", 1),
             ("mq-producer-attribute-sources", 9),
+            ("mq-rfh2-sources", 15),
         ] {
             let entry = entries
                 .iter()
@@ -500,6 +501,34 @@ mod tests {
             assert_eq!(entry["semantic_authority"], false);
             assert_eq!(entry["coverage_credit"], 0);
         }
+    }
+
+    #[test]
+    fn later_015_rfh2_scope_matches_the_independent_reference_fixture() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered RFH2 source pins");
+        let fixture =
+            json(&root.join("conformance/tools/tests/fixtures/mq-rfh2-source-pins.json")).unwrap();
+        let manifest_path = root.join("conformance/0.15/manifests/mq-rfh2-sources-topics.json");
+        let manifest = json(&manifest_path).unwrap();
+        assert_eq!(manifest["topics"], fixture["topics"]);
+        assert_eq!(manifest["baseline_id"], fixture["baseline_id"]);
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 15);
+        assert_eq!(manifest["total_bytes"], 478_640);
+        assert_eq!(
+            format!(
+                "sha256:{:x}",
+                Sha256::digest(fs::read(&manifest_path).unwrap())
+            ),
+            fixture["manifest_sha256"].as_str().unwrap()
+        );
+        assert_eq!(
+            manifest["topic_manifest_digest"],
+            fixture["topic_manifest_digest"]
+        );
+        assert_eq!(manifest["toc_sha256"], fixture["toc_sha256"]);
+        assert_eq!(manifest["coverage_credit"], 0);
     }
 
     #[test]

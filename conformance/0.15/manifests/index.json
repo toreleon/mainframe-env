@@ -58,6 +58,17 @@
       "topic_manifest_sha256": "sha256:bc78af054eb037a938d7224d8e7caa6ea37d834ccb043f30157079087d703f81",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-rfh2-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-rfh2-sources-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-rfh2-sources-topics.json",
+      "manifest_sha256": "sha256:117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a",
+      "topic_count": 15,
+      "topic_manifest_sha256": "sha256:b0a9b4656c10ea8ec8a23999935d47cf559f5164a707a0aa3e078d3d2266afdc",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

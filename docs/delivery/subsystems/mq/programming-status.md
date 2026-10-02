@@ -6,6 +6,33 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1501.rfh2-source-pins` consumes sealed workerd317512d3 after independent
+eight-path/blob,124historical binding,61command receipt,17external artifact,
+15source pin,five pre-run snapshot and32dependency checks. The independent scope
+`mq-rfh2-sources`, baseline `ibm-mq-9.4-rfh2-sources-2026-09-12`, pins15topics/
+478640bytes; manifest SHA
+`117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a`.
+Original BUFMHrow0003/MHBUFrow0018 sourcepositions3/18/25 remain26unique/27total;
+original27/supplement80/layout12/property12/recovery1 and new producer9 manifests,
+1030statuses/10pending reasons and old runtime/codec/projection bytes stay exact.
+Hash-verified retained-first metadata/TOC/publication headings and actual offline
+shared-reader search/read pass. Registration is reference identity only; source
+semantic/execution/official/licensed credit0, with archive reproduction/freshness
+caveats unchanged. No network/browser refresh or publication body in Git.
+Manager composes both append-only scopes, retains both reader/registry test
+families and frozen preexisting row digests; only shared merge points conflict.
+Derived documentation is regenerated normally. Fresh main33reader+13policy=
+46Python and15Rust topic-registry tests pass, zero ignored; empty fixtures0credit.
+Actual guards/four mutants/module968/34/4/1/generator reproduction/fmt/normaldocs/
+check/changelog/whitespace pass. Ledger-only docs checks are separate; every
+sequence and seal/HEADcheck cleans the intended target. Worker repaired external
+cache-key/inventory-path helpers retain original failures; manager initial date
+regex failed, corrected HTMLParser verification passes unchanged worker bytes.
+Unchanged API retains exact9e1a combined global pass; dependency policy reuses
+originald8/all32inputs, not fresh deny/CI. Actual RFH2 conversion now has its own
+isolated implementation assignment, not acceptance from source pins. All
+nonlicensed parent gates remain required; licensed oracle ONLY skipped0/26.
+
 `MQ-1503.complete-get-md-writeback` supplies the complete returned descriptor
 writer for later compiled forwarding. It maps every actual MQMD1/2 output field
 through the existing generated raw policy and one atomic prefix copy, with exact

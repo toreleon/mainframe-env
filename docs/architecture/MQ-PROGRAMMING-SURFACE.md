@@ -473,6 +473,29 @@ are zero. The archive remains in-progress without independent browser
 reproduction, predates the MQINQ issue337 re-pin and establishes no freshness or
 snapshot equivalence. No publication bodies or refreshed sources are in Git.
 
+### Additive RFH2 source scope
+
+The independent `mq-rfh2-sources` scope registers fifteen retained topics under
+`ibm-mq-9.4-rfh2-sources-2026-09-12`, product `SSFKSJ_9.4.0`: BMHO/MHBO/RFH
+constants, RFH2 declarations and field details, the mapping overview and eight
+detailed property-mapping topics, and the JMS-header padding/lexical reference.
+The shared topic-manifest
+and registry authorities bind exact hashes, bytes and the existing pinned TOC.
+The retained topic path is checked first; matching archive bytes supply absent
+files. Publication dates come from verified `lastModifiedDate` markup, not fetch
+time. Versioned endpoints, TOC headings and archive metadata establish bounded
+source identity; missing independent HTML product attributes are not invented.
+
+This is source registration only for original MQBUFMH row `0003` and MQMHBUF
+row `0018` (source positions `3`, `18`, `25`). Original 27-topic, supplemental
+80-topic, layout 12-topic, property 12-topic and recovery single-topic manifests,
+26-call denominator, 1030 status declarations and ten pending reasons remain
+unchanged. Numeric/layout/descriptor/option projection and actual RFH2 conversion
+require subsequent explicit review and execution. Semantic authority and coverage
+credit are zero. The archive remains in-progress, predates the MQINQ issue337
+re-pin and has no independent browser reproduction, freshness or same-snapshot
+claim. No publication bodies or refreshed sources are retained in Git.
+
 ### Historical handle observation
 
 The strict private typed-result storage codec can preserve issued handle outputs

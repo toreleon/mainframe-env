@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tarfile
 import tempfile
@@ -540,6 +541,7 @@ class CacheTests(unittest.TestCase):
         self.assertIn("mq-property-sources", scopes)
         self.assertIn("mq-recovery-policy-sources", scopes)
         self.assertIn("mq-producer-attribute-sources", scopes)
+        self.assertIn("mq-rfh2-sources", scopes)
         supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
         self.assertEqual(len(supplemental), 80)
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
@@ -600,10 +602,11 @@ class CacheTests(unittest.TestCase):
                          "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
         registry = json.loads((docs_api.REPOSITORY /
                                "conformance/0.15/manifests/index.json").read_text())
-        self.assertEqual(len(registry["manifests"]), 5)
+        self.assertEqual(len(registry["manifests"]), 6)
         old_rows = [row for row in registry["manifests"]
                     if row["scope_id"] not in {
-                        "mq-recovery-policy-sources", "mq-producer-attribute-sources"}]
+                        "mq-recovery-policy-sources", "mq-producer-attribute-sources",
+                        "mq-rfh2-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old_rows, sort_keys=True, separators=(",", ":")).encode()),
             "d21d08a6548a9088640374f8ebfa6fcd5344104c3748678b8002406bd9985033")
@@ -665,7 +668,7 @@ class CacheTests(unittest.TestCase):
         self.assertFalse(row["semantic_authority"])
         self.assertEqual(row["coverage_credit"], 0)
         old = [row for row in registry["manifests"]
-               if row["scope_id"] != "mq-producer-attribute-sources"]
+               if row["scope_id"] not in {"mq-producer-attribute-sources", "mq-rfh2-sources"}]
         self.assertEqual([row["topic_count"] for row in old], [80, 12, 12, 1])
         for prior in old:
             self.assertEqual(prior["manifest_sha256"], "sha256:" + docs_api.digest(
@@ -727,6 +730,98 @@ class CacheTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 ibm_docs.cached_body(self.cache, next(pin for pin in pins if pin not in selected))
         self.assertEqual(first_path.read_bytes(), first_bytes)
+
+    def test_rfh2_scope_matches_fixed_reference_pins_without_other_body_caches(self):
+        fixture = json.loads((Path(__file__).parent /
+                              "fixtures/mq-rfh2-source-pins.json").read_text())
+        pins, tocs = ibm_docs.load_pins()
+        selected, selected_tocs = ibm_docs.select(pins, tocs, "mq-rfh2-sources", None)
+        self.assertEqual(len(selected), 15)
+        self.assertEqual(len(selected_tocs), 1)
+        self.assertEqual(selected_tocs[0].sha256, fixture["toc_sha256"])
+        self.assertEqual(sorted((p.topic, p.sha256, p.size) for p in selected),
+                         sorted((p["topic_path"], p["sha256"], p["bytes"])
+                                for p in fixture["topics"]))
+        self.assertTrue(all(p.baseline == fixture["baseline_id"] for p in selected))
+        root = docs_api.REPOSITORY
+        registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
+        old = [r for r in registry["manifests"]
+               if r["scope_id"] not in {"mq-rfh2-sources", "mq-producer-attribute-sources"}]
+        self.assertEqual(docs_api.digest(json.dumps(
+            old, sort_keys=True, separators=(",", ":")).encode()),
+            fixture["old_registry_rows_sha256"])
+        row = next(r for r in registry["manifests"] if r["scope_id"] == "mq-rfh2-sources")
+        self.assertFalse(row["semantic_authority"])
+        self.assertEqual(row["coverage_credit"], 0)
+        self.assertEqual(row["manifest_sha256"], fixture["manifest_sha256"])
+        self.assertEqual(row["topic_manifest_sha256"], "sha256:" + fixture["topic_manifest_digest"])
+        manifest = json.loads((root / row["manifest"]).read_text())
+        self.assertEqual(manifest["topics"], fixture["topics"])
+        self.assertEqual(manifest["product"], fixture["product"])
+        self.assertFalse(self.cache.exists())  # No unrelated external HTML is required.
+
+    def test_rfh2_registered_artifact_mutants_fail_before_cache_access(self):
+        root = Path(self.directory.name) / "rfh2-registry"
+        directory = root / "conformance/0.15/manifests"
+        directory.mkdir(parents=True)
+        source = docs_api.REPOSITORY / "conformance/0.15/manifests"
+        for path in source.glob("*.json"):
+            shutil.copyfile(path, directory / path.name)
+        registry_path = directory / "index.json"
+        manifest_path = directory / "mq-rfh2-sources-topics.json"
+        original_registry = json.loads(registry_path.read_text())
+        original_manifest = json.loads(manifest_path.read_text())
+        scope = next(i for i, row in enumerate(original_registry["manifests"])
+                     if row["scope_id"] == "mq-rfh2-sources")
+        with patch.object(docs_api, "REPOSITORY", root):
+            for field, value in [("manifest_sha256", "sha256:" + "0" * 64),
+                                 ("topic_manifest_sha256", "sha256:" + "0" * 64),
+                                 ("topic_count", 14), ("subsystem", "ims"),
+                                 ("semantic_authority", True), ("coverage_credit", 1)]:
+                with self.subTest(registry_field=field):
+                    registry = deepcopy(original_registry)
+                    registry["manifests"][scope][field] = value
+                    registry_path.write_text(json.dumps(registry))
+                    with self.assertRaises(ValueError):
+                        ibm_docs.registered_sources(registry_path)
+            for mutation in ["hash", "bytes", "missing", "duplicate", "foreign", "version"]:
+                with self.subTest(manifest_mutation=mutation):
+                    manifest = deepcopy(original_manifest)
+                    if mutation == "hash":
+                        manifest["topics"][0]["sha256"] = "0" * 64
+                    elif mutation == "bytes":
+                        manifest["topics"][0]["bytes"] += 1
+                    elif mutation == "missing":
+                        manifest["topics"].pop()
+                    elif mutation == "duplicate":
+                        manifest["topics"].append(deepcopy(manifest["topics"][0]))
+                    elif mutation == "foreign":
+                        manifest["topics"][0]["topic_path"] = "FOREIGN/ref/topic.html"
+                    else:
+                        manifest["target_version"] = "0.14.0"
+                    manifest_path.write_text(json.dumps(manifest))
+                    registry = deepcopy(original_registry)
+                    registry["manifests"][scope]["manifest_sha256"] = (
+                        "sha256:" + docs_api.digest(manifest_path.read_bytes()))
+                    registry_path.write_text(json.dumps(registry))
+                    with self.assertRaises(ValueError):
+                        ibm_docs.registered_sources(registry_path)
+            manifest_path.write_text(json.dumps(original_manifest))
+            registry = deepcopy(original_registry)
+            registry["manifests"][scope]["manifest_sha256"] = (
+                "sha256:" + docs_api.digest(manifest_path.read_bytes()))
+            registry_path.write_text(json.dumps(registry))
+            ibm_docs.registered_sources(registry_path)
+            duplicate = deepcopy(registry)
+            duplicate["manifests"].append(deepcopy(duplicate["manifests"][scope]))
+            registry_path.write_text(json.dumps(duplicate))
+            with self.assertRaises(ValueError):
+                ibm_docs.registered_sources(registry_path)
+            registry_path.write_text(json.dumps(registry))
+            manifest_path.unlink()
+            with self.assertRaises(OSError):
+                ibm_docs.registered_sources(registry_path)
+        self.assertFalse(self.cache.exists())
 
     def registry_015(self):
         root, index, old_registry = self.source_repository()
