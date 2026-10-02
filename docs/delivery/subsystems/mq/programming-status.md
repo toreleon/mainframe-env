@@ -6,6 +6,23 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1501.recovery-source-pins` consumes sealed worker `95ad8e9d4` and registers
+exactly one independent zero-credit source: HardenGetBackout `q103230_`, baseline
+`ibm-mq-9.4-recovery-policy-sources-2026-09-12`. Exact archive metadata, pinned
+TOC, retained-first SHA/bytes, publication date and incoming verified
+`q097395_ -> q102970_ -> q103230_` links bind the source. The original 27-call,
+80-supplemental, 12-layout and 12-property manifest bytes and prior registry rows
+are unchanged, as is the 26-call/27-position denominator. The shared offline
+reader/registry supplies the new scope without a production authority change.
+Manager verification independently binds seven worker paths, 2,272 matching
+final tested inputs plus one normally regenerated docs manifest, 51 finalized
+receipts, one source pin, six frozen prior files and 32 dependency-policy inputs.
+The source archive remains in-progress, without independent browser reproduction
+or freshness/snapshot-equivalence claims. This closes a reference-source gap,
+not crash-accurate BackoutCount, queue defaults, root/task-end/recovery,
+participant, CardDemo or all26 acceptance. Only the licensed oracle is skipped;
+all other parent requirements remain active.
+
 `MQ-1503.zos-backout-policy` adds an explicit private live delivery candidate for
 the reviewed MQ9.4 BackoutCount rule (`q097395_` lines1498–1508, supplemental
 baseline2026-09-12; original MQBACK/MQGET rows0001/0015). Complete messages

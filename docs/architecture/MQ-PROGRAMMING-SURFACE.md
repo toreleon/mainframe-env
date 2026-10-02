@@ -421,6 +421,28 @@ credit is zero; the archive remains in-progress without independent browser
 reproduction, predates the MQINQ re-pin and establishes no freshness or snapshot
 equivalence. No publication bodies or refreshed sources are retained in Git.
 
+### Additive recovery-policy source scope
+
+The independent `mq-recovery-policy-sources` scope registers exactly
+`SSFKSJ_9.4.0/refdev/q103230_.html` (HardenGetBackout) under
+`ibm-mq-9.4-recovery-policy-sources-2026-09-12`. Its source-owner pin is bound to
+the exact existing archive publication metadata, official MQ 9.4 content
+endpoint, pinned TOC locator and matching raw HTML. The retained topic path was
+checked first; the existing hash-addressed archive supplies the absent retained
+file. The pinned queue-attribute list `q102970_.html`, reached from the pinned
+MQMD BackoutCount topic `q097395_.html`, supplies the exact incoming link.
+Publication `last_modified` comes from verified HTML `lastModifiedDate`, not
+capture time. The shared reader and registry bind the manifest bytes and single
+topic-set digest. Original call, supplemental, layout and property manifests
+and the 26-call/27-position denominator remain unchanged.
+
+This is source registration only. HardenGetBackout defaults, BackoutCount crash
+accuracy, abnormal/final task-end policy and recovery semantics require later
+owned source review and execution proof. Semantic authority and coverage credit
+are zero. The archive remains in-progress without independent browser
+reproduction, predates the MQINQ issue337 re-pin and establishes no freshness or
+snapshot equivalence. No publication bodies or refreshed sources are in Git.
+
 ### Historical handle observation
 
 The strict private typed-result storage codec can preserve issued handle outputs

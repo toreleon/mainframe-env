@@ -484,11 +484,12 @@ mod tests {
         check_later_registry(&root, config_015()).expect("shipped independent scopes");
         let registry = json(&root.join(config_015().registry_path)).unwrap();
         let entries = registry["manifests"].as_array().unwrap();
-        assert_eq!(entries.len(), 3);
+        assert_eq!(entries.len(), 4);
         for (scope, count) in [
             ("mq-programming-supplements", 80),
             ("mq-point-layout-sources", 12),
             ("mq-property-sources", 12),
+            ("mq-recovery-policy-sources", 1),
         ] {
             let entry = entries
                 .iter()
@@ -498,6 +499,31 @@ mod tests {
             assert_eq!(entry["semantic_authority"], false);
             assert_eq!(entry["coverage_credit"], 0);
         }
+    }
+
+    #[test]
+    fn later_015_recovery_scope_binds_exact_harden_get_backout_source() {
+        let root = repository_root().expect("repository");
+        check_later_registry(&root, config_015()).expect("registered recovery source");
+        let manifest =
+            json(&root.join("conformance/0.15/manifests/mq-recovery-policy-sources-topics.json"))
+                .unwrap();
+        assert_eq!(
+            manifest["baseline_id"],
+            "ibm-mq-9.4-recovery-policy-sources-2026-09-12"
+        );
+        assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
+        assert_eq!(manifest["topic_count"], 1);
+        assert_eq!(manifest["total_bytes"], 3691);
+        assert_eq!(
+            manifest["topics"],
+            serde_json::json!([{
+                "topic_path": "SSFKSJ_9.4.0/refdev/q103230_.html",
+                "sha256": "22ee650c2f0fb23bc181d928ff70d401f0b4e288a0039d47110a012b9702a8a1",
+                "bytes": 3691,
+                "last_modified": "2026-05-18"
+            }])
+        );
     }
 
     #[test]

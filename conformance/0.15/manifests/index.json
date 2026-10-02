@@ -36,6 +36,17 @@
       "topic_manifest_sha256": "sha256:cbef5b608afc3f12945f69656c666cae80b19049bcf78b67ff598f855038369e",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-recovery-policy-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-recovery-policy-sources-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-recovery-policy-sources-topics.json",
+      "manifest_sha256": "sha256:07457101d143b0418032d979a3f499ddcad37e6b43fbb63ffb8213054502bae2",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:414608491fdbefa8ec0b8b2b1adf8742a4dbc5553cd488344db649ef945bba11",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

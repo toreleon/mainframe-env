@@ -538,6 +538,7 @@ class CacheTests(unittest.TestCase):
         self.assertIn("mq-programming-supplements", scopes)
         self.assertIn("mq-point-layout-sources", scopes)
         self.assertIn("mq-property-sources", scopes)
+        self.assertIn("mq-recovery-policy-sources", scopes)
         supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
         self.assertEqual(len(supplemental), 80)
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
@@ -580,6 +581,57 @@ class CacheTests(unittest.TestCase):
             index_digest,
             "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
         )
+
+    def test_recovery_scope_is_one_independent_frozen_zero_credit_source(self):
+        pins, tocs = ibm_docs.load_pins()
+        selected, selected_tocs = ibm_docs.select(
+            pins, tocs, "mq-recovery-policy-sources", None
+        )
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(len(selected_tocs), 1)
+        pin = selected[0]
+        self.assertEqual(pin.topic, "SSFKSJ_9.4.0/refdev/q103230_.html")
+        self.assertEqual(pin.sha256,
+                         "22ee650c2f0fb23bc181d928ff70d401f0b4e288a0039d47110a012b9702a8a1")
+        self.assertEqual(pin.size, 3691)
+        self.assertEqual(pin.baseline, "ibm-mq-9.4-recovery-policy-sources-2026-09-12")
+        self.assertEqual(selected_tocs[0].sha256,
+                         "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
+        registry = json.loads((docs_api.REPOSITORY /
+                               "conformance/0.15/manifests/index.json").read_text())
+        self.assertEqual(len(registry["manifests"]), 4)
+        old_rows = [row for row in registry["manifests"]
+                    if row["scope_id"] != "mq-recovery-policy-sources"]
+        self.assertEqual(docs_api.digest(json.dumps(
+            old_rows, sort_keys=True, separators=(",", ":")).encode()),
+            "d21d08a6548a9088640374f8ebfa6fcd5344104c3748678b8002406bd9985033")
+        recovery = next(row for row in registry["manifests"]
+                        if row["scope_id"] == "mq-recovery-policy-sources")
+        self.assertFalse(recovery["semantic_authority"])
+        self.assertEqual(recovery["coverage_credit"], 0)
+        self.assertEqual(recovery["topic_count"], 1)
+        self.assertEqual(recovery["manifest_sha256"],
+                         "sha256:07457101d143b0418032d979a3f499ddcad37e6b43fbb63ffb8213054502bae2")
+        self.assertEqual(recovery["topic_manifest_sha256"],
+                         "sha256:414608491fdbefa8ec0b8b2b1adf8742a4dbc5553cd488344db649ef945bba11")
+        frozen = {
+            "conformance/0.2/catalogs/index.json":
+                "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
+            "conformance/0.2/catalogs/mq.json":
+                "62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7",
+            "conformance/0.2/manifests/mq-topics.json":
+                "f5d2fbc4d05cfc8b461b94e72048fffe34d04bafffbd1e711ca2fb8175d65562",
+            "conformance/0.15/manifests/mq-programming-supplements-topics.json":
+                "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a",
+            "conformance/0.15/manifests/mq-point-layout-sources-topics.json":
+                "128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa",
+            "conformance/0.15/manifests/mq-property-sources-topics.json":
+                "f1537d0ab7feba5c7260e5dced3e9878b5bf999b274e0254f888fc1d78d96ba7",
+        }
+        for relative, digest in frozen.items():
+            with self.subTest(path=relative):
+                self.assertEqual(docs_api.digest(
+                    (docs_api.REPOSITORY / relative).read_bytes()), digest)
 
     def registry_015(self):
         root, index, old_registry = self.source_repository()
