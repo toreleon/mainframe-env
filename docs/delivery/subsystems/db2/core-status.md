@@ -778,6 +778,86 @@ do not discharge global blockers, source gaps, reviewed-rule acceptance or any
 official Db2/ licensed gate. The final documentation reconciliation changes no
 tested production bytes; its generated hashes are checked before commit/cleanup.
 
+## Next scalar/default implementation cohort
+
+The manager declares three independent DB2-1202 prerequisite slices from the
+combined scalar candidate. Each has one conflict-isolated CLI worker, its own
+feature seal and unique fragment; manager owns public integration. Workers use
+gpt-6.1-sol high, goals/bypass and fast mode disabled. The latest fetched
+`origin/main` is already an ancestor; no integration merge is needed.
+
+`DB2-1202.column-default-binding` owns
+`src/statement/create_table/mod.rs` (child registration only), new
+`src/statement/create_table/default_binding.rs` and
+`changes/unreleased/db2-column-default-binding.toml`. Paths under `src/` are in
+the existing Db2 provider. Its bounded entry reparses the original CREATE TABLE
+source, resolves each column through the existing type owner, and distinguishes
+omitted nullable NULL, omitted NOT NULL with no default, explicit NULL, bare
+operand-less DEFAULT producers, and assigned numeric/string constant proofs.
+Numeric and string conversion reuse the existing opaque authorities; character
+default UTF-8 length is checked against 1536 before target trimming/padding.
+Current date/time/timestamp defaults remain insertion-time producers, not
+CREATE-time clock reads or fabricated literal proofs. No constraints, names,
+privileges, installed catalog or execution are implied by this column-only
+binding result. SQL0050 is partial; its actual default obligations remain in the
+174-row denominator. The contradictory WITH DEFAULT prose is explicitly pending
+at binding, without changing its syntactic representation or guessing meaning.
+
+`DB2-1202.finite-decfloat-assignment` owns existing
+`src/numeric_constant_values.rs` (child registration only), new
+`src/numeric_constant_values/decfloat_assignment.rs`, provider `Cargo.toml`,
+`Cargo.lock`, new `docs/delivery/subsystems/db2/decfloat-primitive-decision.md`,
+and `changes/unreleased/db2-finite-decfloat-assignment.toml`. It converts only
+existing opaque INTEGER/BIGINT/DECIMAL constant proofs to resolved DECFLOAT(16/34),
+with caller-explicit owned rounding mode/context and owned finite coefficient,
+exponent and inexact observation. The existing pinned dec 0.4.11 is a candidate
+standards primitive behind the adapter, not Db2 policy. Its dependency decision
+must record exact license/MSRV/features/transitives/failure/determinism/removal
+before production adoption; required supply-chain checks must pass. No external
+types/bytes enter public or durable identity. Exponent/special SQL literals, HFP,
+general scalar conversion, arithmetic, SQLCA and catalog cells remain required
+pending work. This language-element slice has no standalone catalog row.
+
+`DB2-1202.search-condition-truth` owns existing `src/type_system/mod.rs` (child
+registration only), new `src/type_system/truth.rs`, and
+`changes/unreleased/db2-search-condition-truth.toml`. A closed owned predicate
+truth domain implements the pinned nine AND/OR pairs, three NOT outcomes and
+TRUE-only row qualification. NULL predicates never produce UNKNOWN. This is not
+a SQL Boolean scalar type, parser extension or expression evaluator; no statement
+execution, comparison, short-circuit order, filtering or durable row claim follows.
+This language-element slice has no standalone catalog row.
+
+All three slices are deterministic non-mutating kernels: memory-only unit tests
+exercise values/plans, not backend authorization, UOW, restart or recovery routes.
+Those routes are unchanged, not waived for later mutating integration. Acceptance
+requires independently fixed positive/negative/boundary vectors, owned lifetimes,
+applicable limits/provenance, affected package tests/checks, Rust 1.95, formatting,
+dependency/catalog/changelog/docs policy, exact-path seal and target cleanup.
+Private reachability warnings alone may await manager exports; all other new
+diagnostics must be repaired. Public selected-route tests and strict scoped
+Clippy are required at each subsequent public integration.
+
+Pinned baseline remains `ibm-db2-for-zos-13-2026-08-13`, product SSEPEK_13.0.0.
+Main verified/read SQL0050 DEFAULT lines 380–524 and numeric assignments (99
+lines), plus complete CURRENT DECFLOAT ROUNDING MODE (62), DECFLOAT rounding
+mode (8), DECFLOAT function (71), search conditions (101), NULL predicate (26).
+Existing constants/datatype/string assignment pins remain unchanged. Relevant
+topic paths are `sqlref/src/tpc/db2z_currentdecfloatroundingmode.html` (6515 bytes,
+`f560f8647556aa0d8b8c56f96cbcfae7cbab9edb694a5ecc24f8382568c86932`),
+`db2z_decfloatroundmode.html` (1723,
+`edeb3384e9752fa02caf746884d51e8c47e5765cb526481c8f0d4cd9d81122cf`),
+`db2z_bif_decfloat.html` (21071,
+`22ef060c92f35e04190a11ac5403b0a196dbf5961b36db0f3524987dacc0d74b`),
+`db2z_searchconditionssql.html` (27571,
+`79fafaf79779ef1f7b947502d99efd2ab7d87bf1046ff65602076b8fbf4e5627`), and
+`db2z_nullpredicate.html` (8909,
+`c1ca9abcb98036bf0666b6710fd37c26c1499fbd8e787b670fa67a8c5c02ef9d`).
+Normal readers remain TOC-blocked; retained paths were checked first, then exact
+raw archive bytes verified and parsed locally. No refresh or publication-body
+commit is authorized. Source review and local kernels grant zero official gate
+or licensed credit; exact common/deferred freeze and licensed differential stay
+pending. The user confirmed implementation should continue without an oracle.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
