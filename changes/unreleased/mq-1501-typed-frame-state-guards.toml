@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Serialized installed MQ factory/runtime/control setup while preserving legacy late-control installation, and made typed-source machine snapshots diagnostic-only so cross-instance restore cannot silently lose frame admission or opaque aliases; typed durable recovery remains pending."

@@ -413,6 +413,7 @@ struct Pending {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MachineSnapshot {
+    /// Zero marks a diagnostic-only typed MQ frame snapshot, never accepted by restore.
     pub schema_version: u32,
     pub program_counter: usize,
     pub effect_sequence: u64,
@@ -909,9 +910,11 @@ impl ReferenceMachine {
     }
 
     #[must_use]
+    /// Typed MQ frames export diagnostic schema zero because their live authority is not
+    /// represented here. This is not a checkpoint version; legacy snapshots remain schema 12.
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 12,
+            schema_version: if self.mqi.is_some() { 0 } else { 12 },
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -993,7 +996,7 @@ impl ReferenceMachine {
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
         // The old schema has no opaque MQI alias/lifecycle references. Never
         // restore it under a new typed frame and silently mint replacement access.
-        if self.mqi.is_some() {
+        if self.mqi.is_some() || snapshot.schema_version == 0 {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
         if !matches!(snapshot.schema_version, 1..=12)

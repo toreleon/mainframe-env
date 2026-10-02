@@ -16,6 +16,14 @@ Contradictory CICS task/outer/child provenance is rejected, not erased. The
 factory must independently admit process/frame topology and use the selected
 service's lifecycle/registry authority; decoding this binding is not attestation.
 
+Factory installation and runtime publication use one setup guard. Repeated or
+partial runtime setup fails before publishing new fields. Typed runtime publication
+also freezes the first execution-control binding; legacy embeddings retain their
+existing control installation after construction and before dispatch. Admission
+copies the configured factory/store under that guard and releases it before
+invoking embedding callbacks. This guard is not the complete trusted producer's
+service/store/authorizer/clock bundle, which remains a separate obligation.
+
 The returned `MqMqiProgramFrame` is explicitly installed on the reference
 machine before driving. Its profile supplies the independently minted owner
 and bounded MQI limits. The machine rechecks that profile before constructing
@@ -43,6 +51,15 @@ checkpoint/handle replay is still required before public profile acceptance;
 this explicit refusal is not an inapplicable-gate disposition. Legacy machines
 and their checkpoint schema/bytes remain unchanged. Their earlier MQ adapter is
 mechanically extracted to a child module to preserve the production-line ratchet.
+
+Public in-process `snapshot()` exports a typed source only as diagnostic schema
+zero, which no restore accepts, including a fresh unbound destination. Zero is
+not an accepted machine/checkpoint version. Manual binary projection retains that
+invalid marker; `MachineSnapshot` has no Serde projection that removes it. The
+existing destination frame refusal also remains. Legacy sources still export
+schema 12 and unchanged checkpoint bytes. Editing public diagnostic fields cannot
+create provider lifecycle or registry authority. Actual typed durable snapshot
+and historical-handle adoption support remains pending.
 
 ## Sources and acceptance boundary
 

@@ -88,6 +88,15 @@ impl DefaultProgramRouter {
         &self,
         source: Arc<dyn ProgramExecutionControl>,
     ) -> Result<(), HostProblem> {
+        let _setup = self
+            .cobol
+            .setup
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        // Preserve legacy setup after construction; typed setup freezes at runtime publication.
+        if self.cobol.mqi_host.get().is_some() && self.cobol.host.get().is_some() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         self.cobol
             .control
             .set(source)
@@ -107,18 +116,13 @@ impl DefaultProgramRouter {
         store: Arc<dyn PlatformStore>,
         artifacts: Arc<dyn ArtifactStore>,
     ) -> Result<(), HostProblem> {
+        let setup = self
+            .cobol
+            .setup
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
         self.cobol
-            .host
-            .set(host)
-            .map_err(|_| HostProblem::IdempotencyConflict)?;
-        self.cobol
-            .store
-            .set(store)
-            .map_err(|_| HostProblem::IdempotencyConflict)?;
-        self.cobol
-            .artifacts
-            .set(artifacts)
-            .map_err(|_| HostProblem::IdempotencyConflict)
+            .bind_runtime_locked(&setup, host, store, artifacts)
     }
 }
 impl HostProvider for DefaultProgramRouter {
@@ -229,6 +233,7 @@ fn persist_batch_file_cursors(
 }
 
 struct CobolProgram {
+    setup: std::sync::Mutex<()>,
     host: OnceLock<Arc<ScopedHostService>>,
     store: OnceLock<Arc<dyn PlatformStore>>,
     artifacts: OnceLock<Arc<dyn ArtifactStore>>,
@@ -243,6 +248,7 @@ struct CobolProgram {
 impl CobolProgram {
     fn new() -> Self {
         Self {
+            setup: std::sync::Mutex::new(()),
             host: OnceLock::new(),
             store: OnceLock::new(),
             artifacts: OnceLock::new(),

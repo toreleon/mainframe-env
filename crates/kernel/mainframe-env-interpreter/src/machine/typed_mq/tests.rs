@@ -95,12 +95,8 @@ fn field(machine: &mut ReferenceMachine, name: &str, bytes: Vec<u8>, numeric: bo
         },
     );
 }
-fn fixture() -> (ReferenceMachine, Arc<Frame>) {
+fn unbound_fixture() -> ReferenceMachine {
     let invocation = super::super::tests::invocation();
-    let frame = Arc::new(Frame {
-        invocation: invocation.clone(),
-        changed: AtomicBool::new(false),
-    });
     let mut machine = ReferenceMachine::from_binary(
         &super::super::tests::binary(),
         invocation,
@@ -111,6 +107,14 @@ fn fixture() -> (ReferenceMachine, Arc<Frame>) {
     for name in ["HCONN", "CC", "REASON"] {
         field(&mut machine, name, vec![0; 4], true);
     }
+    machine
+}
+fn fixture() -> (ReferenceMachine, Arc<Frame>) {
+    let mut machine = unbound_fixture();
+    let frame = Arc::new(Frame {
+        invocation: machine.invocation.clone(),
+        changed: AtomicBool::new(false),
+    });
     machine.bind_mqi_program_frame(frame.clone()).unwrap();
     (machine, frame)
 }
@@ -353,6 +357,73 @@ fn typed_frame_cannot_rebind_or_silently_restore_legacy_checkpoint() {
     assert!(!is_call("'MQ-USER-PROGRAM'"));
     let (mut machine, _) = fixture();
     assert!(call(&mut machine, &["MQPUT1", "USING", "HCONN"]).is_err());
+}
+
+#[test]
+fn typed_source_snapshots_refuse_unbound_restore_before_and_after_connect_without_changes() {
+    for connected in [false, true] {
+        let (mut source, _) = fixture();
+        if connected {
+            let effect = connect(&mut source);
+            reply(
+                &mut source,
+                &effect,
+                MqMqiOutcome::Completed {
+                    status: MqMqiStatus::OkNone,
+                    output: MqMqiOutput::Connected(issued()),
+                },
+            )
+            .unwrap();
+            assert_eq!(source.mqi.as_ref().unwrap().connections.len(), 1);
+        }
+        let snapshot = source.snapshot();
+        assert_eq!(snapshot.schema_version, 0);
+        assert!(source.checkpoint().is_none());
+        let mut destination = unbound_fixture();
+        destination.write("HCONN", &[0x33; 4]).unwrap();
+        let before = destination.snapshot();
+        assert_eq!(
+            destination.restore(snapshot.clone()),
+            Err(MachineProblem::IncompatibleSnapshot)
+        );
+        assert_eq!(destination.snapshot(), before);
+        assert!(destination.mqi.is_none());
+        // The manual binary codec retains the invalid source marker, too. MachineSnapshot
+        // has no Serde implementation that could erase it into a valid legacy projection.
+        let bytes = snapshot_codec::encode_snapshot(&snapshot).unwrap();
+        let diagnostic = BoundedPayload::new(
+            "mainframe-env.reference-machine-checkpoint@12",
+            bytes,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            destination.restore_checkpoint(&diagnostic),
+            Err(MachineProblem::IncompatibleSnapshot)
+        );
+        assert_eq!(destination.snapshot(), before);
+        assert_eq!(
+            source.restore(snapshot),
+            Err(MachineProblem::IncompatibleSnapshot)
+        );
+    }
+}
+
+#[test]
+fn legacy_cross_instance_snapshot_and_checkpoint_restore_keep_exact_bytes() {
+    let mut source = unbound_fixture();
+    source.write("HCONN", &[0x22; 4]).unwrap();
+    let snapshot = source.snapshot();
+    assert_eq!(snapshot.schema_version, 12);
+    let checkpoint = source.checkpoint().unwrap();
+    let mut destination = unbound_fixture();
+    destination.restore(snapshot.clone()).unwrap();
+    assert_eq!(destination.snapshot(), snapshot);
+    assert_eq!(destination.checkpoint(), Some(checkpoint.clone()));
+    let mut reopened = unbound_fixture();
+    reopened.restore_checkpoint(&checkpoint).unwrap();
+    assert_eq!(reopened.snapshot(), snapshot);
+    assert_eq!(reopened.checkpoint(), Some(checkpoint));
 }
 
 #[test]

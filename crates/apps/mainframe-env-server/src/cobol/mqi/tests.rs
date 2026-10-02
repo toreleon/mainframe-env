@@ -5,6 +5,7 @@ use mainframe_env_interpreter::MqMqiProgramProfile;
 use mainframe_env_store::MemoryStore;
 use std::sync::Mutex;
 mod installed;
+mod setup;
 
 struct Admission {
     observed: Mutex<Vec<Invocation>>,

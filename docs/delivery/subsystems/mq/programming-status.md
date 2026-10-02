@@ -860,7 +860,8 @@ execution claims. It found two concrete safety gaps: factory installation can
 race runtime publication, and an exported typed-source MachineSnapshot can
 restore into a fresh unbound destination while silently dropping admission and
 aliases. Existing same-instance refusal and coordinator checkpoint=None do not
-cover that direct cross-instance API. Both remain outstanding, not waived.
+cover that direct cross-instance API. Both findings are repaired by the bounded
+state-guard integration below; real producer and typed recovery remain required.
 
 The next isolated N feature is `MQ-1501.typed-frame-state-guards`, based on sealed
 manager `3f758db2`. It owns narrow server setup serialization/typed control freeze
@@ -910,3 +911,24 @@ candidate identities; they are not relabeled. Rust 1.98 results are unchanged.
 Dependency policy reuse verifies the original receipt and all 32 unchanged
 inputs. The unrelated batch module overage remains unwaived. Only the licensed
 oracle is skipped with zero credit; full v0.15 acceptance remains incomplete.
+
+## Typed frame setup and source-snapshot guards
+
+`MQ-1501.typed-frame-state-guards` integrates sealed worker `7f7f9b04`.
+A common setup mutex serializes factory/control/runtime publication, prechecks
+all runtime fields and freezes typed setup. It preserves the legacy first
+control installation after runtime construction. External factory callbacks run
+after the mutex is released. A typed source's direct snapshot exports diagnostic
+schema zero, rejected before restore can mutate any destination, including a
+fresh unbound machine and the manual binary projection. No accepted typed
+checkpoint schema or executable-token serialization is introduced. Legacy
+schema 12 and checkpoint codec bytes are unchanged.
+
+The composed candidate passes 13 typed-machine, two legacy checkpoint, ten
+server admission/setup and four legacy control tests (29 total, no failures or
+ignored tests). Fresh guards, four provider-row tests, formatting, docs and
+changelog checks use pinned Python/Rust. Original baseline rows `0008/0012`
+remain the reviewed source boundary; source review gives zero execution credit.
+Worker receipts retain their original candidate identity. The actual admitted
+parent/artifact/call proof, same-service host bridge, lifecycle disposition,
+selected SAF/UOW/replay composition and full typed recovery remain required.
