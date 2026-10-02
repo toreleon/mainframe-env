@@ -750,6 +750,34 @@ trivia support is not host-language/tool-specific comment applicability. Actual
 NULL/type-default/constant-default admission, ordinary value closure, typed
 catalogs and licensed evidence remain subsequent required implementation.
 
+The string storage and located numeric prerequisites are integrated as separately
+sealed private/public features. Public integration adds six independent tests
+for each and discharges the private reachability warnings through exports. The
+last numeric public candidate passes 325 unit plus 76 integration tests, strict
+scoped Clippy, both Rust checks and applicable policy/catalog/changelog/docs/seal
+checks, with clean tree and absent target. Those receipts retain their exact
+pre-FLOAT candidate identity, not a claim for a later combined candidate.
+
+The FLOAT feature is also integrated from its own final five-path seal. Main
+review found missing alias-specific CASE/COALESCE tests; the same worker added
+three fixed-context tests and resealed its unpublished feature, preserving the
+initial receipts separately. Main read the full final diff/test additions and
+handoff; production remains only source-backed resolve_float normalization.
+The new tests retain omitted/present/NULL ELSE, COALESCE nullable/nonnull/untyped
+NULL, ordered owned results and invalid/all-untyped context fences. They establish
+metadata behavior, not CASE/COALESCE execution or floating values. HFP conversion,
+other ordinary values, default binding, typed catalogs and full conformance
+remain required pending work; licensed differential remains pending as requested.
+
+The combined FLOAT integration candidate passes ten focused alias tests and
+325 unit plus 86 integration tests, with zero failures/skips. Both Rust checks,
+strict scoped Clippy, formatting, catalog/changelog/docs and committed private
+seal checks pass. Unchanged dependency-policy inputs reuse the prior numeric
+candidate receipt without relabeling its execution identity. These local results
+do not discharge global blockers, source gaps, reviewed-rule acceptance or any
+official Db2/ licensed gate. The final documentation reconciliation changes no
+tested production bytes; its generated hashes are checked before commit/cleanup.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

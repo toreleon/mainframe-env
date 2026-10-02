@@ -102,7 +102,10 @@ nullability and timestamp time-zone distinctions. Distinct types, LOBs, ROWID,
 XML, explicit CCSID/collation, and context-sensitive datetime strings remain
 explicitly rejected or deferred. This pure boundary performs no conversion or
 execution. Float and decfloat *type shapes* use the pinned data-type topic;
-float, decfloat, and Boolean *constants* remain fenced on #350.
+float, decfloat, and Boolean *constants* remain fenced on #350. FLOAT(1..21)
+declarations resolve to canonical REAL; FLOAT(22..53) and omitted precision
+resolve to DOUBLE using the SQL0050 declaration rule, while the AST retains its
+original spelling/arguments. This does not implement HFP values or host conversion.
 
 The common schema-qualification surface returns owned candidates for alias,
 index, table and view names under explicit static or dynamic RUN/BIND/DEFINE/
@@ -214,8 +217,9 @@ Ordered result-type combination exposes numeric, binary and same-family datetime
 shapes with verified original UTF-8 locations, aggregate operand bounds, explicit
 untyped NULL and CASE/COALESCE application context. Precision caps retain whole-part
 preservation and conversion obligations, including each ordered candidate step.
-Character/graphic CCSID/collation, datetime strings and FLOAT(n) alias binding
-remain pending. Neither surface parses expressions, resolves function overloads,
+Character/graphic CCSID/collation and datetime strings remain pending. Canonical
+FLOAT declarations use the existing REAL/DOUBLE combination rules; retained
+unresolved Float shapes still fail closed. Neither surface parses expressions, resolves function overloads,
 changes the durable SQL route or grants licensed or statement-row credit.
 
 Common DROP syntax exposes TABLE/VIEW/INDEX and non-PUBLIC ALIAS names, keeping
