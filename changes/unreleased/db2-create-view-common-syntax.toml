@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded common Db2 CREATE VIEW syntax using the owned SELECT core, decoded identifiers and result naming, CHECK OPTION spelling, definition restrictions, aggregate limits and original-source spans. Binding and execution remain pending; partial SQL 0059 syntax grants no official coverage credit."
