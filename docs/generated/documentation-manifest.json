@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 232,
+    "markdown_documents": 233,
     "navigation_groups": 6,
-    "normative_documents": 65,
+    "normative_documents": 66,
     "xtask_commands": 213
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 121,
-      "sha256": "sha256:3e7e034394a129c54c4b042edaeb2e6e611f10b85ff07f7289a84b500efd6f75",
+      "relative_links": 122,
+      "sha256": "sha256:571e6b4c16b46bbd6a7cfdd579013fc089b85a1296baf5c754cba725f2583661",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -491,9 +491,9 @@
       "normative": true,
       "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:0ad28b4f1580d85b84e4b46a1c7d56ba18b52c42f90cdc4da47d3d0c17de0cfd",
+      "sha256": "sha256:7b4b0f021f40a26206c7a0d23afc38f1cdb4c572b272a4228bbb9c2c54e924e1",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -595,9 +595,9 @@
       "normative": true,
       "owner": "Db2, IMS, MQ, and store-contract maintainers",
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
-      "relative_links": 1,
+      "relative_links": 2,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:926c57a5fb59660a21d56b083698ff2464f2c4a6670368784b1f4f4f2a43831a",
+      "sha256": "sha256:acbb6ca7aaf82345718d44ca240c3c08c0826789a638de0b0e8a322793d6e93a",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -1047,10 +1047,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0033-mq-historical-handle-observation.md",
+      "relative_links": 2,
+      "scope": "typed result storage and readonly existing-handle lookup, not service acceptance",
+      "sha256": "sha256:79cd0b0cc58466676e59d752d9fd932efe4d46f32a8668655ccf10619922f583",
+      "status": "Proposed",
+      "title": "MQ historical handle observation",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 34,
-      "sha256": "sha256:f22b4643666b75f47f1e1ae21822b0752402ca5a16514966faec1af65f00c2dc",
+      "relative_links": 35,
+      "sha256": "sha256:6f9ad3188c8ed1d83905d3fab844f033dae6102222368ad67e1e173ae97b366d",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1566,7 +1578,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:0ffd69ec9fab3603bc520c060a6c8a93289d5f24f8a0ac68b4d3fd5c4c4f21fa",
+      "sha256": "sha256:52ad61b1a86f4b895e251e1dc931225397391f5d948ccebf7982eb9b665aa9a7",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2372,6 +2384,10 @@
           "path": "docs/decisions/0032-mq-program-machine-frame.md"
         },
         {
+          "label": "ADR-0033: MQ historical handle observation",
+          "path": "docs/decisions/0033-mq-historical-handle-observation.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2620,7 +2636,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:219abf066676e4143f7a21ba8d5a5965b64ad7ffe26f0c160eb1102b693dc79e",
+  "registry_sha256": "sha256:c0eade1c746869d0fd7e3fdb5170fdd1d6b85faa27f216a12b26289cb740713d",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

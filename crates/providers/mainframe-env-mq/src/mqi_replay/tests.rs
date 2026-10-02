@@ -3,6 +3,7 @@ use mainframe_env_host_api::mq_status::{MqStatusReview, mq_status_calls};
 use serde_json::{Value, json};
 
 mod bounds;
+mod historical_handles;
 
 const BYTES: usize = 8 << 20;
 fn host(value: &MqMqiResult, limits: MqMqiLimits) -> Result<HostResult, HostProblem> {
@@ -652,78 +653,26 @@ fn full_host_digest_binds_outcome_contents_and_exact_mqi_profile() {
 }
 
 #[test]
-fn opaque_outputs_are_explicitly_refused_without_reconstructing_any_tokens() {
-    let owner = MqHandleOwner {
-        environment: MqHostEnvironment::ZosBatch,
-        host_id: 1,
-        process_id: 2,
-        thread_id: 3,
-        task_id: 4,
-        syncpoint_epoch: 5,
-    };
-    let mut registry = MqHandleRegistry::new(7, 16).unwrap();
-    let connection = registry
-        .connect(owner, MqHandleSharing::SharedBlock)
-        .unwrap();
-    let object = registry.create_object(owner, connection).unwrap();
-    let handle = registry.create_message(owner, connection).unwrap();
-    let subscription = registry.create_subscription(owner, connection).unwrap();
-    for (call, tag, output) in [
-        (
-            MqMqiCall::Connect,
-            "Connected",
-            MqMqiOutput::Connected(connection),
-        ),
-        (
-            MqMqiCall::Open,
-            "Opened",
-            MqMqiOutput::Opened {
-                object,
-                dynamic: None,
-            },
-        ),
-        (
-            MqMqiCall::CreateMessageHandle,
-            "MessageHandle",
-            MqMqiOutput::MessageHandle(handle),
-        ),
-        (
-            MqMqiCall::Subscribe,
-            "Subscribed",
-            MqMqiOutput::Subscribed {
-                object,
-                subscription,
-            },
-        ),
-    ] {
+fn historical_special_connections_are_explicitly_refused() {
+    for connection in [MqHconn::Default, MqHconn::Unassociated] {
         for completed in [false, true] {
             assert_eq!(
                 encode(
-                    &result(call, output.clone(), completed),
+                    &result(
+                        MqMqiCall::Connect,
+                        MqMqiOutput::Connected(connection),
+                        completed
+                    ),
                     HostLimits::default(),
                     MqMqiLimits::default(),
                     BYTES
                 ),
                 Err(ReplayError::Unsupported(
-                    ReplayPending::HistoricalHandleAuthority
+                    ReplayPending::HistoricalSpecialConnection
                 ))
             );
-            let mut v = as_value(&MqMqiResult {
-                call,
-                outcome: MqMqiOutcome::UnknownOutcome,
-            });
-            v["outcome"] = json!({"kind":"StatusPending","output":{"kind":tag}});
-            assert_eq!(
-                restore(&serde_json::to_vec(&v).unwrap()),
-                Err(ReplayError::Unsupported(
-                    ReplayPending::HistoricalHandleAuthority
-                ))
-            );
-            v["outcome"]["output"]["token"] = json!(19);
-            reject(&v);
         }
     }
-    assert_eq!(registry.active_handles(), 4);
 }
 
 #[test]

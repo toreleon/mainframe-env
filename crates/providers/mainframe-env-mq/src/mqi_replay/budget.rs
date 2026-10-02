@@ -119,6 +119,7 @@ impl Budget {
                 .max_name_bytes
                 .min(self.mqi.message.destination_bytes),
             "format" => self.host.max_name_bytes.min(self.mqi.message.format_bytes),
+            "model_name" | "queue_name" => self.host.max_name_bytes.min(MQ_ROUTE_NAME_BYTES),
             _ => 128, // fixed schema, enum tags and admitted reason symbols
         }
     }

@@ -119,8 +119,8 @@ pub use mq_contract::{
 };
 pub use mq_handles::{
     MQ_MAX_HANDLE_SLOTS, MQHC_DEF_HCONN, MQHC_UNASSOCIATED_HCONN, MqConnectionId, MqHandle,
-    MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHandleSharing, MqHconn,
-    MqHmsg, MqHobj, MqHsub,
+    MqHandleKind, MqHandleObservation, MqHandleOwner, MqHandleProblem, MqHandleRegistry,
+    MqHandleSharing, MqHconn, MqHmsg, MqHobj, MqHsub,
 };
 pub use mq_message_contract::{
     MQ_MESSAGE_CONTRACT, MQ_MESSAGE_PENDING, MQ_MESSAGE_SOURCES, MqDeliveryOutcome,

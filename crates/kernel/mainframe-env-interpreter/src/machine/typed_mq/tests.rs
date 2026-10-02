@@ -402,3 +402,30 @@ fn explicit_reference_arguments_preserve_the_default_signature_and_unusable_repl
         assert_eq!(machine.decimal(name).unwrap().coefficient, 0);
     }
 }
+
+#[test]
+fn historical_connection_reply_cannot_install_a_live_abi_alias() {
+    let (mut machine, _) = fixture();
+    let effect = connect(&mut machine);
+    let original = issued();
+    let historical = mainframe_env_host_api::MqHandleObservation::capture_connection(original)
+        .unwrap()
+        .historical_connection()
+        .unwrap();
+    assert!(historical.is_historical());
+    assert_eq!(
+        reply(
+            &mut machine,
+            &effect,
+            MqMqiOutcome::Completed {
+                status: MqMqiStatus::OkNone,
+                output: MqMqiOutput::Connected(historical),
+            },
+        ),
+        Err(MachineProblem::Host(HostProblem::UnknownOutcome))
+    );
+    assert!(machine.mqi.as_ref().unwrap().connections.is_empty());
+    for name in ["HCONN", "CC", "REASON"] {
+        assert_eq!(machine.decimal(name).unwrap().coefficient, 0);
+    }
+}

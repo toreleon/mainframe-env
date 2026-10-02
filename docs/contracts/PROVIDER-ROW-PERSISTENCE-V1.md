@@ -257,11 +257,28 @@ uses a bounded writer. The original frozen validators still own public shape
 and resource legality; this storage schema is not IBM wire or a second public
 request encoding.
 
-Connected, Opened, MessageHandle and Subscribed are explicitly unsupported pending
-historical handle authority, even when their supplied live tokens are valid.
-No numeric token representation or reconstruction exists. The manager must later
-observe/adopt historical handles through the sole registry and compose typed
-receipt rows, exact original effect/UOW/core references, CAS and existing retention
-proofs. The strict stored-authority reader accepts no new namespace here. Public
-service/host dispatch, SAF, durable UOWs, replay publication/retention, participant,
-CardDemo and licensed acceptance remain required.
+The historical-handle extension preserves issued Connected, Opened with exact
+nullable dynamic metadata, MessageHandle and both Subscribed roles in the SAME
+codec through host-owned `MqHandleObservation`. Non-handle bytes and schema stay
+unchanged. Only the bounded strict observation supports Serde, not executable
+tokens. Successful decode returns the actual typed output with an irreversible
+historical disposition: exact original registry/slot/generation/epoch and role
+remain canonical, but every registry access denies permission even for coincident
+live IDs. Symbolic Default/Unassociated connection reconstruction remains
+explicitly unsupported and cannot acquire the current CICS task's connection.
+
+Readonly resolution can return only an already-existing exact-owner/role/epoch
+entry on an independently admitted live connection. It allocates/resurrects
+nothing. Service must first prove the exact retained receipt/core occurrence,
+original actor/run, request/result and current frame under the same locked
+registry; observation or digest alone attests none of them. Historical result
+identity is retained even if a service/ABI separately resolves an existing live
+alias. Restart exposure still requires service-owned persisted epoch advancement;
+numeric legacy handles, process counters and aliases never establish authority.
+See [ADR 0033](../decisions/0033-mq-historical-handle-observation.md).
+
+The manager still must compose typed receipt rows, exact original effect/UOW/core
+references, CAS and existing retention proofs. The strict stored-authority reader
+accepts no new namespace here. Public service/host dispatch, SAF, durable UOWs,
+replay publication/retention, participant and CardDemo remain required. Only the
+licensed IBM MQ differential oracle is human-skipped, with zero licensed credit.

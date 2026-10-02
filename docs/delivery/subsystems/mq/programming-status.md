@@ -792,3 +792,34 @@ the manager's machine/server route. Historical reconstruction cannot mint live
 authority; caller option bits cannot mint UOW/SAF or erase unsupported modes.
 Only sealed commits will be consumed, with generated/facade overlaps reconciled
 and final composed checks retained under their actual candidate identity.
+
+## Historical handle storage integration
+
+`MQ-1505.historical-handle-result-replay` is integrated from sealed `8023d2cb`.
+Issued CONNECT/OPEN/dynamic/message/subscription outputs preserve their original
+canonical identity and metadata as historical observations. All registry entry
+and mutation paths refuse historical tokens before lookup, including coincident
+live slot identities. Checked resolution is read-only lookup of an exact existing
+owner/role/connection/epoch entry, never allocation or resurrection. The machine
+also refuses historical CONNECT output before any live ABI alias or writeback.
+The caller must independently attest retained receipt/core occurrence and current
+host frame before resolving; observation or canonical equality is not permission.
+Historical symbolic Default/Unassociated results remain explicitly unsupported.
+
+The composed candidate passes 13 handle, 21 codec, 11 shared-handle, ten CICS
+callback-scope, ten typed-machine and five installed-batch tests (70 total, zero
+failures/ignored). Worker89-test receipts retain their own candidate identity.
+Documentation conflicts preserve both manager ADR0032 and worker ADR0033 plus
+accepted Db2 decision paths; normal generation reconciles their manifest. No
+source refresh or licensed execution is performed. Reviewed baseline/catalog
+rows are `0008/0009/0010/0012/0019/0025` under
+`ibm-mq-9.4-mqi-2026-08-31`, with exact pins in ADR0033 and the worker handoff.
+Durable cold registry incarnation, actual receipt authority and selected route
+acceptance remain required; this identity-only feature supplies none of them.
+
+N's next isolated section is a read-only installed-batch trusted-producer design
+review against sealed `1da5490c`. It owns external design/identity receipts only,
+not M's service/UOW publication, O's numeric options or the manager's production
+host bridge. Actual parentSome topology, real artifact provenance, same-store
+admission, cancellation/probe, frame cleanup and durable recovery must compose;
+the review cannot turn binding parsing or a test provider into attestation.

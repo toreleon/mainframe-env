@@ -195,12 +195,21 @@ pub(super) enum Output {
         count: usize,
     },
     NoOutput {},
-    // Recognized refusal tags have NO handle-valued fields. Tokens cannot be
-    // serialized or manufactured even by a syntactically valid stored record.
-    Connected {},
-    Opened {},
-    MessageHandle {},
-    Subscribed {},
+    Connected {
+        connection: MqHandleObservation,
+    },
+    Opened {
+        object: MqHandleObservation,
+        #[serde(deserialize_with = "required_option")]
+        dynamic: Option<super::handles::Dynamic>,
+    },
+    MessageHandle {
+        message: MqHandleObservation,
+    },
+    Subscribed {
+        object: MqHandleObservation,
+        subscription: MqHandleObservation,
+    },
 }
 impl Output {
     fn from_output(value: &MqMqiOutput) -> Result<Self, ReplayError> {
@@ -258,14 +267,23 @@ impl Output {
                 Self::PublicationsRequested { count: *count }
             }
             MqMqiOutput::NoOutput => Self::NoOutput {},
-            MqMqiOutput::Connected(_)
-            | MqMqiOutput::Opened { .. }
-            | MqMqiOutput::MessageHandle(_)
-            | MqMqiOutput::Subscribed { .. } => {
-                return Err(ReplayError::Unsupported(
-                    ReplayPending::HistoricalHandleAuthority,
-                ));
-            }
+            MqMqiOutput::Connected(value) => Self::Connected {
+                connection: MqHandleObservation::capture_connection(*value)?,
+            },
+            MqMqiOutput::Opened { object, dynamic } => Self::Opened {
+                object: MqHandleObservation::from(MqHandle::Object(*object)),
+                dynamic: dynamic.as_ref().map(super::handles::Dynamic::capture),
+            },
+            MqMqiOutput::MessageHandle(value) => Self::MessageHandle {
+                message: MqHandleObservation::from(MqHandle::Message(*value)),
+            },
+            MqMqiOutput::Subscribed {
+                object,
+                subscription,
+            } => Self::Subscribed {
+                object: MqHandleObservation::from(MqHandle::Object(*object)),
+                subscription: MqHandleObservation::from(MqHandle::Subscription(*subscription)),
+            },
         })
     }
     fn into_output(self) -> Result<MqMqiOutput, ReplayError> {
@@ -315,11 +333,23 @@ impl Output {
             Self::UnitOfWork { unit } => MqMqiOutput::UnitOfWork { unit },
             Self::PublicationsRequested { count } => MqMqiOutput::PublicationsRequested { count },
             Self::NoOutput {} => MqMqiOutput::NoOutput,
-            Self::Connected {} | Self::Opened {} | Self::MessageHandle {} | Self::Subscribed {} => {
-                return Err(ReplayError::Unsupported(
-                    ReplayPending::HistoricalHandleAuthority,
-                ));
+            Self::Connected { connection } => {
+                MqMqiOutput::Connected(connection.historical_connection()?)
             }
+            Self::Opened { object, dynamic } => MqMqiOutput::Opened {
+                object: object.historical_object()?,
+                dynamic: dynamic.map(super::handles::Dynamic::restore).transpose()?,
+            },
+            Self::MessageHandle { message } => {
+                MqMqiOutput::MessageHandle(message.historical_message()?)
+            }
+            Self::Subscribed {
+                object,
+                subscription,
+            } => MqMqiOutput::Subscribed {
+                object: object.historical_object()?,
+                subscription: subscription.historical_subscription()?,
+            },
         })
     }
 }

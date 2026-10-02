@@ -1,13 +1,18 @@
 //! Private strict typed-result storage conversion, not a receipt or dispatch authority.
-//! No token reconstruction, namespace selection, owner minting or status calculation.
+//! Historical tokens have no live registry authority. No namespace selection,
+//! owner minting or status calculation.
 
 use crate::delivery::replay::{ReplayDescriptor, ReplayMessage, ReplayProperty};
 use mainframe_env_host_api::mq_mqi::*;
+use mainframe_env_host_api::mq_object_route::{
+    MQ_ROUTE_NAME_BYTES, MqDynamicQueueOpenResult, MqRouteDynamicKind, MqRouteName,
+};
 use mainframe_env_host_api::mq_status::{MqReviewedStatus, MqStatusProblem};
 use mainframe_env_host_api::*;
 use serde::{Deserialize, Serialize};
 
 mod budget;
+mod handles;
 mod shape;
 use shape::{StoredOutcome, StoredResult};
 
@@ -15,7 +20,7 @@ pub(crate) const SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReplayPending {
-    HistoricalHandleAuthority,
+    HistoricalSpecialConnection,
 }
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ReplayError {
@@ -28,6 +33,12 @@ pub(crate) enum ReplayError {
     Mqi(MqMqiProblem),
     Status(MqStatusProblem),
     MessageProjection,
+    Handle(MqHandleProblem),
+}
+impl From<MqHandleProblem> for ReplayError {
+    fn from(value: MqHandleProblem) -> Self {
+        Self::Handle(value)
+    }
 }
 impl From<crate::MqDeliveryError> for ReplayError {
     fn from(_: crate::MqDeliveryError) -> Self {
@@ -44,7 +55,7 @@ pub(crate) fn encode(
     byte_ceiling: usize,
 ) -> Result<Vec<u8>, ReplayError> {
     limits(host, mqi, byte_ceiling)?;
-    refuse_handles(result)?;
+    refuse_special_connections(result)?;
     let digest = validate_and_digest(result, host, mqi)?;
     let stored = StoredResult {
         schema_version: SCHEMA.into(),
@@ -110,19 +121,16 @@ fn limits(host: HostLimits, mqi: MqMqiLimits, bytes: usize) -> Result<(), Replay
     mqi.validate().map_err(ReplayError::Mqi)
 }
 
-fn refuse_handles(value: &MqMqiResult) -> Result<(), ReplayError> {
+fn refuse_special_connections(value: &MqMqiResult) -> Result<(), ReplayError> {
     if let MqMqiOutcome::Completed { output, .. } | MqMqiOutcome::StatusPending { output } =
         &value.outcome
         && matches!(
             output,
-            MqMqiOutput::Connected(_)
-                | MqMqiOutput::Opened { .. }
-                | MqMqiOutput::MessageHandle(_)
-                | MqMqiOutput::Subscribed { .. }
+            MqMqiOutput::Connected(MqHconn::Default | MqHconn::Unassociated)
         )
     {
         return Err(ReplayError::Unsupported(
-            ReplayPending::HistoricalHandleAuthority,
+            ReplayPending::HistoricalSpecialConnection,
         ));
     }
     Ok(())

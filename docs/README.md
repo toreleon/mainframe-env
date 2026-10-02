@@ -100,6 +100,7 @@ explicitly names that authority as superseded.
 - [ADR-0030: Private MQ host lifecycle directory](decisions/0030-mq-host-lifecycle-directory.md)
 - [ADR-0031: One selected MQ service authority](decisions/0031-mq-selected-service-authority.md)
 - [ADR-0032: MQ program-to-machine frame handoff](decisions/0032-mq-program-machine-frame.md)
+- [ADR-0033: MQ historical handle observation](decisions/0033-mq-historical-handle-observation.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

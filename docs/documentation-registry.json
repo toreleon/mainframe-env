@@ -68,6 +68,7 @@
     "docs/decisions/0030-mq-host-lifecycle-directory.md",
     "docs/decisions/0031-mq-selected-service-authority.md",
     "docs/decisions/0032-mq-program-machine-frame.md",
+    "docs/decisions/0033-mq-historical-handle-observation.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -322,6 +323,10 @@
         {
           "label": "ADR-0032: MQ program-to-machine frame handoff",
           "path": "docs/decisions/0032-mq-program-machine-frame.md"
+        },
+        {
+          "label": "ADR-0033: MQ historical handle observation",
+          "path": "docs/decisions/0033-mq-historical-handle-observation.md"
         },
         {
           "label": "Decision index and template",

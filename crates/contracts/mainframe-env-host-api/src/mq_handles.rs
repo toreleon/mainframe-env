@@ -7,6 +7,9 @@
 use crate::MqHostEnvironment;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod observation;
+pub use observation::MqHandleObservation;
+
 static NEXT_REGISTRY_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Upper bound on live and reusable handle slots in one registry.
@@ -18,6 +21,9 @@ struct HandleId {
     slot: u32,
     generation: u64,
     epoch: u64,
+    // Canonical identity is observation, not execution permission. Only the
+    // observation factory creates this disposition; no public clearing API.
+    historical: bool,
 }
 
 /// An MQHCONN identity, including the two distinct IBM special values.
@@ -57,10 +63,16 @@ macro_rules! canonical_identity {
         impl $token {
             /// Read-only host canonical identity: registry, slot, generation,
             /// epoch. These are not MQ wire values. No reconstruction API is
-            /// exposed; lifetime validation remains registry-owned.
+            /// exposed for live authority; lifetime validation remains registry-owned.
             pub(crate) const fn canonical_parts(self) -> (u64, u32, u64, u64) {
-                let HandleId { registry, slot, generation, epoch } = self.0;
+                let HandleId { registry, slot, generation, epoch, .. } = self.0;
                 (registry, slot, generation, epoch)
+            }
+
+            /// A replay identity that every registry access refuses. Canonical
+            /// equality with a live token does not confer authority equality.
+            pub const fn is_historical(self) -> bool {
+                self.0.historical
             }
         }
     )+};
@@ -197,6 +209,8 @@ pub enum MqHandleProblem {
     AlreadyConnected,
     InUse,
     EpochNotAdvanced,
+    /// A stored identity is never directly executable, even for a live slot.
+    Historical,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -558,6 +572,7 @@ impl MqHandleRegistry {
                     slot: slot as u32,
                     generation: item.generation,
                     epoch: self.epoch,
+                    historical: false,
                 })
             })
             .collect();
@@ -578,6 +593,7 @@ impl MqHandleRegistry {
                     slot: slot as u32,
                     generation: item.generation,
                     epoch: self.epoch,
+                    historical: false,
                 })
             })
             .collect();
@@ -712,6 +728,9 @@ impl MqHandleRegistry {
     }
 
     fn entry(&self, id: HandleId) -> Result<&Entry, MqHandleProblem> {
+        if id.historical {
+            return Err(MqHandleProblem::Historical);
+        }
         if id.registry != self.registry_id || id.epoch != self.epoch {
             return Err(MqHandleProblem::Stale);
         }
@@ -726,6 +745,9 @@ impl MqHandleRegistry {
     }
 
     fn entry_mut(&mut self, id: HandleId) -> Result<&mut Entry, MqHandleProblem> {
+        if id.historical {
+            return Err(MqHandleProblem::Historical);
+        }
         if id.registry != self.registry_id || id.epoch != self.epoch {
             return Err(MqHandleProblem::Stale);
         }
@@ -767,6 +789,7 @@ impl MqHandleRegistry {
             slot: index as u32,
             generation: slot.generation,
             epoch: self.epoch,
+            historical: false,
         })
     }
 
@@ -795,6 +818,7 @@ impl MqHandleRegistry {
                         slot: slot as u32,
                         generation: item.generation,
                         epoch: self.epoch,
+                        historical: false,
                     })
             })
             .collect();

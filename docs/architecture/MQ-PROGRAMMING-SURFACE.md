@@ -142,6 +142,25 @@ behavioral, licensed or execution claim follows from this review.
 
 ## Coverage boundary
 
+### Historical handle observation
+
+The strict private typed-result storage codec can preserve issued handle outputs
+through the fixed-field `MqHandleObservation` projection. Only observations have
+Serde; opaque executable tokens retain private construction. Decoded tokens have
+an irreversible historical disposition, while exact canonical identity/bytes
+remain unchanged. Every registry access rejects that disposition, including
+lifetime observation. Canonical equality does not mean authority equality.
+Readonly resolution can return an already-existing exact-owner/role/connection/
+epoch entry only after the caller independently proves the retained receipt/core
+occurrence and current admitted frame. It never connects, allocates or resurrects.
+Historical Default/Unassociated connection reconstruction remains unsupported;
+replay cannot acquire a current CICS task's default. Cold exposure still requires
+service-owned persisted epoch advancement. See
+[ADR 0033](../decisions/0033-mq-historical-handle-observation.md); no service,
+SAF, receipt/retention, UOW or public readiness is supplied by this pure boundary.
+
+### Coverage identity
+
 The MQ-1506 licensed adapter at
 `conformance/0.15/oracles/mq-licensed-differential.json` binds the 26-call
 denominator to independent fixture identities and a bounded external receipt.

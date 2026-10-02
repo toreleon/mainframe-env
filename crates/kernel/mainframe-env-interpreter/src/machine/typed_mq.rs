@@ -252,7 +252,7 @@ impl ReferenceMachine {
                     (
                         MqMqiCall::Connect,
                         MqMqiOutput::Connected(connection @ MqHconn::Issued(_)),
-                    ) => Some(connection),
+                    ) if !connection.is_historical() => Some(connection),
                     (MqMqiCall::Disconnect, MqMqiOutput::NoOutput) => None,
                     _ => return Err(MachineProblem::UnexpectedHostResult),
                 };
