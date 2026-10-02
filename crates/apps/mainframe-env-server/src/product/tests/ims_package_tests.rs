@@ -445,6 +445,132 @@ fn signed_carddemo_package_executes_generic_database_and_tm_on_memory() {
 }
 
 #[test]
+fn selected_signed_package_ssa_navigation_uses_public_selection_fences() {
+    let trust = Arc::new(test_package_trust());
+    let server = ProductServer::memory_with_package_trust(config(), trust.clone()).unwrap();
+    let run = "selected-ssa";
+    let req = mainframe_env_host_api::ImsNavigationRequest {
+        request: carddemo_request(ImsOperation::GetUnique, 3, vec![]),
+        context: mainframe_env_host_api::ImsExecutionContext::DbBatch,
+        ssas: vec![b"PAUTSUM0*O(00010006GE000001)".to_vec()],
+    };
+    assert_eq!(
+        server.ims_navigation_selected("CARDDEMO-IMS", &tm_invocation(run, "ssa"), &req),
+        Err(HostProblem::NotFound)
+    );
+    let mut package = signed_carddemo_package(&trust, 1);
+    let catalog = package.sections.ims_metadata.as_mut().unwrap();
+    let mut second_pcb = catalog.psbs[0].pcbs[0].clone();
+    if let ImsPcbMetadata::Database(pcb) = &mut second_pcb {
+        pcb.name = "SSAOTHER".into();
+    }
+    catalog.psbs[0].pcbs.push(second_pcb);
+    resign_package(&mut package, &trust);
+    let staged = server.install_application_package_v2(&package).unwrap();
+    server.publish_application_generation(&staged).unwrap();
+    server
+        .bootstrap_administrator("IBMUSER", b"TESTPASS")
+        .unwrap();
+    for (class, name) in [("IMSPSB", "PSBPAUTB"), ("IMSDB", "DBPAUTP0")] {
+        server
+            .racf
+            .define_profile(class, name, "IBMUSER", Some(AccessIntent::Control))
+            .unwrap();
+    }
+    server
+        .ims_execute_selected(
+            "CARDDEMO-IMS",
+            &tm_invocation(run, "schedule"),
+            &carddemo_request(ImsOperation::Schedule, 1, vec![]),
+        )
+        .unwrap();
+    let mut root = vec![0xff; 100];
+    root[..6].copy_from_slice(b"000001");
+    server
+        .ims_execute_selected(
+            "CARDDEMO-IMS",
+            &tm_invocation(run, "insert"),
+            &carddemo_request(ImsOperation::Insert, 2, root.clone()),
+        )
+        .unwrap();
+    let found = server
+        .ims_navigation_selected("CARDDEMO-IMS", &tm_invocation(run, "ssa"), &req)
+        .unwrap();
+    assert_eq!(found.status, "  ");
+    assert_eq!(found.segments[0].data, root);
+    assert_eq!(
+        server
+            .ims_navigation_selected("CARDDEMO-IMS", &tm_invocation(run, "ssa"), &req)
+            .unwrap(),
+        found
+    );
+    let mut second = req.clone();
+    second.request = carddemo_request(ImsOperation::GetHoldUnique, 5, vec![]);
+    second.request.pcb = 3;
+    let held = server
+        .ims_navigation_selected("CARDDEMO-IMS", &tm_invocation(run, "hold-pcb3"), &second)
+        .unwrap();
+    assert_eq!(held, found);
+    let next = mainframe_env_host_api::ImsNavigationRequest {
+        request: carddemo_request(ImsOperation::GetNext, 6, vec![]),
+        context: second.context,
+        ssas: vec![b"PAUTSUM0 ".to_vec()],
+    };
+    assert_eq!(
+        server
+            .ims_navigation_selected("CARDDEMO-IMS", &tm_invocation(run, "next-pcb1"), &next)
+            .unwrap()
+            .status,
+        "GE"
+    );
+    assert_eq!(
+        server
+            .ims_navigation_selected("CARDDEMO-IMS", &tm_invocation(run, "hold-pcb3"), &second)
+            .unwrap(),
+        held
+    );
+    let mut replacement = root;
+    replacement[99] = 0x80;
+    let mut replace = carddemo_request(ImsOperation::Replace, 7, replacement.clone());
+    replace.pcb = 3;
+    assert_eq!(
+        server
+            .ims_execute_selected(
+                "CARDDEMO-IMS",
+                &tm_invocation(run, "replace-pcb3"),
+                &replace
+            )
+            .unwrap()
+            .status,
+        "  "
+    );
+    let before = server
+        .store
+        .get_provider_state("ims-v1-generic-database", "DBPAUTP0")
+        .unwrap();
+    let mut forbidden = req;
+    forbidden.request.mutation.as_mut().unwrap().sequence = 8;
+    forbidden.request.mutation.as_mut().unwrap().idempotency_key =
+        IdempotencyKey::new("selected-ssa-forbidden", InvocationLimits::default()).unwrap();
+    forbidden.ssas = vec![b"PAUTSUM0*L ".to_vec()];
+    assert_eq!(
+        server.ims_navigation_selected(
+            "CARDDEMO-IMS",
+            &tm_invocation(run, "forbidden"),
+            &forbidden
+        ),
+        Err(HostProblem::Unsupported)
+    );
+    assert_eq!(
+        server
+            .store
+            .get_provider_state("ims-v1-generic-database", "DBPAUTP0")
+            .unwrap(),
+        before
+    );
+}
+
+#[test]
 fn signed_carddemo_package_executes_generic_database_and_tm_on_sqlite() {
     let directory = std::env::temp_dir().join(format!(
         "carddemo-ims-package-{}-{}",

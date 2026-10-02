@@ -9,6 +9,26 @@ impl ProductServer {
         invocation: &Invocation,
         request: &mainframe_env_host_api::ImsRequest,
     ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
+        self.ims_execute_selected_with(application, |ims| ims.execute(invocation, request))
+    }
+
+    /// SSA navigation uses the same signed selection and metadata publication fences.
+    pub fn ims_navigation_selected(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        request: &mainframe_env_host_api::ImsNavigationRequest,
+    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
+        self.ims_execute_selected_with(application, |ims| {
+            ims.execute_navigation(invocation, request)
+        })
+    }
+
+    fn ims_execute_selected_with(
+        &self,
+        application: &str,
+        execute: impl FnOnce(&ImsService) -> Result<mainframe_env_host_api::ImsResult, HostProblem>,
+    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
         let _publication = self
             .application_publication
             .lock()
@@ -51,9 +71,8 @@ impl ProductServer {
             return Err(HostProblem::NotFound);
         }
         self.ims.install_metadata(published.catalog)?;
-        self.ims.execute(invocation, request)
+        execute(&self.ims)
     }
-
     /// Admit a message only against the complete selected signed package.
     pub fn ims_tm_enqueue(
         &self,

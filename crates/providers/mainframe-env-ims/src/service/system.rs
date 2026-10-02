@@ -61,7 +61,7 @@ fn runtime(state: &State) -> Result<&ImsSystemRuntimeDefinition, HostProblem> {
         .ok_or(HostProblem::NotFound)
 }
 
-fn metadata_pcb<'a>(
+pub(super) fn metadata_pcb<'a>(
     state: &'a State,
     psb: &str,
     pcb: u16,
@@ -130,7 +130,7 @@ fn metadata_pcb<'a>(
     Ok((&database.name, &item.processing_options, &database.access))
 }
 
-fn processing_option(raw: &str) -> Result<ImsProcessingOptionClass, HostProblem> {
+pub(super) fn processing_option(raw: &str) -> Result<ImsProcessingOptionClass, HostProblem> {
     if raw.contains('A') {
         Ok(ImsProcessingOptionClass::All)
     } else if raw.contains('O') {

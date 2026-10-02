@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Connected bounded raw IMS SSA Get operands to selected metadata and the existing provider/engine route, preserving binary relations, offset fields, conjunction/disjunction, concatenated keys and C/O/D/P behavior with replay and rollback; unsupported command and mixed Boolean classes fail explicitly, with zero official coverage credit."

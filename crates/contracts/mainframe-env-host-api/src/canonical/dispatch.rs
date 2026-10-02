@@ -69,6 +69,11 @@ impl Canonical for HostRequest {
                 out.text("0")?;
                 v0.encode(out)
             }
+            Self::ImsNavigation(v0) => {
+                out.variant("HostRequest", "ImsNavigation", 1)?;
+                out.text("0")?;
+                v0.encode(out)
+            }
             Self::Mq(v0) => {
                 out.variant("HostRequest", "Mq", 1)?;
                 out.text("0")?;

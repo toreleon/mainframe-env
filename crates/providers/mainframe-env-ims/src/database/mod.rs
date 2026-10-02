@@ -289,6 +289,7 @@ pub struct DatabaseEngineImage {
 mod definition;
 mod logical;
 mod navigation;
+mod ssa;
 mod store;
 
 impl DatabaseEngine {

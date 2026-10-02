@@ -10,6 +10,7 @@ pub(super) mod isolation;
 mod load_image;
 mod logical;
 pub(super) mod pcb;
+pub(super) mod ssa;
 
 /// Ordered bulk image; each parent refers to an earlier record by zero-based index.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

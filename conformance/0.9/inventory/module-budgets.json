@@ -54,7 +54,7 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2278,
+      "max_production_lines": 1938,
       "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
       "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
     },
@@ -120,7 +120,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-ims/src/service.rs",
-      "max_production_lines": 1752,
+      "max_production_lines": 1744,
       "responsibility": "IMS session, PSB/database resolution, DL/I operations, unit-of-work state, and replay share one service module.",
       "split_boundary": "Separate session/PSB binding, database operation handlers, and unit-of-work persistence/replay."
     },

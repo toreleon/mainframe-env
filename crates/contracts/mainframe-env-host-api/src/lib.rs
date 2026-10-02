@@ -17,6 +17,7 @@ mod enterprise;
 mod ims;
 mod ims_applicability;
 mod ims_metadata;
+mod ims_navigation;
 mod ims_pcb;
 mod ims_recovery;
 mod ims_status;
@@ -77,6 +78,7 @@ pub use ims_metadata::{
     ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
     ImsTerminalPcbMetadata, validate_ims_metadata,
 };
+pub use ims_navigation::ImsNavigationRequest;
 pub use ims_pcb::{
     IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
     IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,

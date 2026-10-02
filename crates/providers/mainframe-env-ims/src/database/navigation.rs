@@ -36,18 +36,26 @@ impl DatabaseEngine {
             return Err(EngineProblem::Unsupported);
         }
         self.validate_read(request)?;
+        self.read_matching(position, request, |id| {
+            let target = request.target.as_deref().or_else(|| {
+                (request.kind == ReadKind::Unique)
+                    .then_some(self.definition.segments[0].name.as_str())
+            });
+            visible(&self.records[&id].segment) && self.matches(id, target, &request.path)
+        })
+    }
+
+    pub(super) fn read_matching(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        matches: impl Fn(RecordId) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
         let mut next = position.clone();
         next.held = None;
         let order = self.hierarchy_order();
         let selected = match request.kind {
-            ReadKind::Unique => {
-                let root = &self.definition.segments[0].name;
-                let target = request.target.as_deref().unwrap_or(root);
-                order.iter().copied().find(|id| {
-                    visible(&self.records[id].segment)
-                        && self.matches(*id, Some(target), &request.path)
-                })
-            }
+            ReadKind::Unique => order.iter().copied().find(|id| matches(*id)),
             ReadKind::Next => {
                 let start = if next.after_end {
                     0
@@ -56,10 +64,7 @@ impl DatabaseEngine {
                         .and_then(|current| order.iter().position(|id| *id == current))
                         .map_or(0, |index| index + 1)
                 };
-                order[start..].iter().copied().find(|id| {
-                    visible(&self.records[id].segment)
-                        && self.matches(*id, request.target.as_deref(), &request.path)
-                })
+                order[start..].iter().copied().find(|id| matches(*id))
             }
             ReadKind::NextInParent => {
                 let parent = next.parentage.ok_or(EngineProblem::ParentageRequired)?;
@@ -80,10 +85,7 @@ impl DatabaseEngine {
                             .position(|id| *id == current)
                     })
                     .map_or(parent_index + 1, |offset| parent_index + 2 + offset);
-                order[start..stop].iter().copied().find(|id| {
-                    visible(&self.records[id].segment)
-                        && self.matches(*id, request.target.as_deref(), &request.path)
-                })
+                order[start..stop].iter().copied().find(|id| matches(*id))
             }
         };
         let Some(id) = selected else {

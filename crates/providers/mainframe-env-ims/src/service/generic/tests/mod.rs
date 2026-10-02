@@ -24,6 +24,7 @@ mod basic_checkpoint_tests;
 mod closure_tests;
 mod isolation_tests;
 mod pcb_tests;
+mod ssa_tests;
 
 pub(crate) fn catalog() -> ImsMetadataCatalog {
     fn field(name: &str, offset: usize, sequence: bool) -> ImsFieldMetadata {

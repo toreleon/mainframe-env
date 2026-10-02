@@ -6,6 +6,117 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1401.public-ssa-navigation (bounded slice implemented)
+
+Parent: IMS-1401. Candidate base: `4040bfef`, incorporating manager commits
+`2f6a8d8e` (per-PCB sensitivity), `2f70b82f` (witnessed local UOW fences),
+and `6f3dd74b` (equivalent baseline lint repairs), after CardDemo `587bf70e`.
+The consumed dependency identities
+below and integrated checkpoint/participant-preparation/CardDemo repairs remain
+in force. Scope: additive bounded raw display-code SSA navigation request on the
+existing host provider and selected signed-package database route; catalog
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`.
+Local obligations: exact named/one-based offset binary predicates, relations and
+Boolean grouping, concatenated hierarchy keys, supported command semantics,
+status/output/position after successful and unsuccessful navigation, hold/update,
+malformed/context/limit/authorization rejection without mutation, canonical replay,
+rollback and Memory/SQLite reopen. Host contracts own the additive DTO/encoding;
+IMS metadata, engine, generic service, SAF and shared row/effect/UOW authorities
+retain their existing ownership. No new engine, store, coordinator, durable schema,
+recovery DTO, secondary access path, PCB map, TM or shared IR registry is owned here.
+No dependency/runtime is added. Legacy `ImsRequest` canonical bytes remain frozen.
+GSAM RSA and embedded all-family dispatch are subsequent slices. Source basis:
+IMS 15.6 `ibm-ims-15.6-programming-contracts-2026-09-11`, pinned
+`ims_ssas.htm`, `ims_ssacodingrules.htm`, `ims_ssas_cmdcodes.htm`,
+`ims_cmdcodref.htm`, `ims_ccmdcode.htm`, `ims_gnghncall.htm`, `ims_currentpos.htm`.
+Exact retained/root and SHA-archive bytes are verified offline and read with
+`ibm_docs.py`; no refresh or publication bodies enter Git. Local tests and this
+feature seal grant zero official row/verdict or licensed credit; parent remains
+open. Acceptance: fail-first public-provider tests, focused host/provider/selected
+product regressions, strict scoped Clippy, formatting, affected catalog/schema
+checks and mandatory dependency/docs/changelog gates. Existing unrelated aggregate
+architecture cache/module blockers are reported without repeated campaigns.
+
+### Bounded route and explicit remaining equivalence classes
+
+The additive `HostRequest::ImsNavigation(ImsNavigationRequest)` accepts raw
+display-code SSA syntax with exact binary comparative values, execution context,
+and the unchanged legacy request envelope. GU/GN/GNP/GHU/GHN/GHNP use the existing
+selected metadata, parser field resolver, generic provider, engine selection,
+per-PCB sensitivity/position/hold helpers, SAF, canonical replay and atomic row
+publication. The signed-package entry point shares the existing publication
+fences. Named fields, one-based `O` offsets, all parsed binary relations, uniform
+conjunction (`&`, `*`, `#`) and uniform disjunction (`+`, `|`) are implemented.
+`C` selects exact concatenated physical hierarchy keys, `D` returns the marked
+ancestors plus the lowest segment, and one `P` establishes parentage at the
+marked occurrence. Key-only segments produce no data. Independent selected DB
+PCBs retain separate position/hold state, and authorization targets the requested
+PCB's database before observation or replay. GSAM is explicitly unsupported.
+
+Source-backed classes still unimplemented in this route:
+
+- Mixed OR/AND and independent/dependent grouping precedence are not established
+  by the pinned coding-rules topic. Expressions mixing OR and conjunction fail
+  `Unsupported`; nested Boolean expressions are not accepted by the parser.
+- Command codes `A/F/G/L/M/N/Q/R/S/U/V/W/Z`, including numbered subset pointers,
+  fail `Unsupported`. The command reference's literal dash/null placeholder
+  remains a parser rejection; empty command slots in `*()` are supported.
+- Multiple `P` operands, DEDB `D/P`, and all MSDB command codes fail explicitly.
+  Source-backed first/last/current positioning, subset pointer, locking/enqueue,
+  path-update and segment-sensitive command-code equivalence is still pending.
+- `C` resolves only a physical hierarchy whose levels have sequence keys. It
+  does not establish logical-child virtual concatenated keys, unkeyed levels,
+  secondary-index selection/ordering or secondary-maintenance equivalence.
+- Raw update/path-update operands, GSAM RSA and embedded all-family dispatch
+  remain subsequent slices. Existing broader engine positioning/locking limits
+  remain visible; this slice does not establish full IBM navigation equivalence.
+
+Catalog rows remain
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`; there is no shared
+Conformance IR binding, official row/verdict, licensed or full-parent credit.
+The programming topic-set SHA-256 is
+`a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594`.
+Additional positioning and sensitivity topics read offline are
+`ims_gnpghnpcall.htm`, `ims_ssacodingformats.htm`, and `ims_processingoptions.htm`.
+
+Integration exceptions are bounded: extracting the selected DB adapter from
+`product.rs`, exporting two existing metadata/applicability helpers inside the
+IMS service, adding the exhaustive host/canonical enum arm, and documenting the
+additive effect contract. TM, recovery, secondary-index, UOW and PCB-map owners'
+modules are unchanged. No schema migration is introduced. Existing canonical
+IMS golden vectors remain stable; the new variant has its own frozen vector.
+Downgrade requires stopping new SSA dispatch and preserving completed replay
+receipts; the integrated per-PCB/UOW base's drain/reconciliation requirements
+still apply. Reverting this feature does not revert those manager repairs.
+
+### Local verification and wider gate failures
+
+Fail-first public-provider regression returned `Unsupported` before connection.
+The final focused route has **11 passing public SSA regressions**, including all
+six Get/Hold operations, exact bytes/status/position, unsuccessful navigation,
+malformed/context/limits/SAF rejection, independent selected PCBs, replay conflict,
+hold/replace, rollback and Memory/SQLite fresh reopen. The host suite passed
+106 unit and 9 integration tests, preserving the legacy IMS golden encoding;
+the provider suite passed 117 tests before the final position assertions/test;
+the selected signed-package suite passed 9 tests. Strict host/IMS Clippy uses
+`--all-targets --no-deps -- -D warnings` without suppression. IMS catalog,
+assurance matrix, schemas, shared spec, offline dependency policy and changelog
+checks pass. The matrix repair changes only 14 stale local-test file locators
+from `generic.rs` to `generic/tests/mod.rs`, preserving rows/cases/credit.
+
+The wider server strict Clippy run fails on 11 existing diagnostics in COBOL
+replay, CICS token, dataset capability selection and retention/test helpers;
+none is suppressed or counted as passing. The aggregate module-size guard also
+fails against stale pre-existing ceilings: `product.rs` is reduced from 6291 to
+6240 production lines (ceiling 6008). Minimal required enum/dispatch integration
+adds 6 lines to the existing canonical encoder (base 3070, ceiling 3046), 5 to
+the host request module (base 2336, ceiling 2300), and 48 to the existing IMS
+service (base 2109, ceiling 1959). New bounded modules remain below 1200 lines.
+These wider failures are retained for manager integration, not hidden by a
+baseline refresh. They do not establish full-parent gate or promotion success.
+All receipts are outside Git and disposable Cargo targets under the worker's
+`v014-completion-20261002/IMS-1401.public-ssa-navigation` receipt directory.
+
 ## 2026-10-02 nonlicensed continuation
 
 The user explicitly excluded licensed certification for this continuation.
@@ -1254,3 +1365,19 @@ docs checks pass. Preserve the initial module/lint failures in the external
 `v014-completion-20261002/module-boundary-*.log` receipts; the final gate log
 records the repairs, and all sequences ended with Cargo cleanup. This gives
 no new official or licensed IMS credit and does not close the parent release.
+
+### Public SSA manager integration
+
+After `aaf3c2a7`, selected SSA dispatch is folded into the existing bounded
+`product/ims.rs`, the additive canonical arm into `canonical/dispatch.rs`, and
+original host validation/provider factory helpers move unchanged into bounded
+child modules. Both LOG and SSA use the same factory and retain their distinct
+canonical identities. Request/service module ceilings ratchet lower; no removed
+helper or duplicated selected method remains. Original worker receipts and
+aggregate failures remain historical. Combined-candidate checks and its exact
+re-seal are recorded separately in `v014-completion-20261002/ssa-integration.log`,
+not relabeled worker evidence.
+The local assurance checker also follows the moved `ImsOperation` enum to its
+new source file; handler names, executable-test requirements and zero-credit
+disposition are unchanged. Its initial stale-path failure and passing runtime
+checks are retained in `ssa-integration-initial-failure.log`.

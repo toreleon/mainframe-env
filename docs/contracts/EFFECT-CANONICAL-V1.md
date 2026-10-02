@@ -56,6 +56,18 @@ disposition are additive named variants: they do not alter the canonical bytes
 of any existing value, and their exact variant-name bytes are frozen by golden
 tests.
 
+`HostRequest::ImsNavigation` is an additive tuple variant containing
+`ImsNavigationRequest`, whose sorted fields are `context`, `request`, and `ssas`.
+The embedded `ImsRequest` uses its existing encoding; each SSA is an exact raw
+byte vector in an ordered sequence. The context, selected PCB, binary comparative
+values and mutation identity therefore participate in replay identity. The
+678-byte golden preimage has SHA-256
+`5041ceeecb7d1766c994d0bd120dea0c2dba666f4c9de86020be2eb5b4e88c0b`.
+The variant returns the existing `ImsResult` encoding and introduces no durable
+row schema. Older binaries cannot dispatch the new variant; stop new navigation
+calls before downgrading and retain completed canonical replay receipts without
+rewriting or redispatching them. Existing IMS request/result bytes remain fixed.
+
 `SecurityRequest::ValidatePrincipal` is likewise an additive named variant. It
 contains only the bounded `PrincipalId`, is non-mutating, and returns the
 existing `SecurityDecision` vocabulary. Its exact canonical variant, field, and

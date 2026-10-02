@@ -25,6 +25,8 @@ use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 
 mod application_recovery;
 mod generic;
+mod providers;
+pub use providers::ims_providers;
 mod rows;
 pub use application_recovery::ims_providers_with_recovery;
 use rows::*;
@@ -436,12 +438,38 @@ impl ImsService {
         self.execute_at(invocation, request, invocation.deadline_tick)
     }
 
+    pub fn execute_navigation(
+        &self,
+        invocation: &Invocation,
+        request: &mainframe_env_host_api::ImsNavigationRequest,
+    ) -> Result<ImsResult, HostProblem> {
+        self.execute_operands_at(
+            invocation,
+            &request.request,
+            invocation.deadline_tick,
+            Some(request),
+        )
+    }
+
     fn execute_at(
         &self,
         invocation: &Invocation,
         request: &ImsRequest,
         resolution_lower_bound: u64,
     ) -> Result<ImsResult, HostProblem> {
+        self.execute_operands_at(invocation, request, resolution_lower_bound, None)
+    }
+
+    fn execute_operands_at(
+        &self,
+        invocation: &Invocation,
+        request: &ImsRequest,
+        resolution_lower_bound: u64,
+        navigation: Option<&mainframe_env_host_api::ImsNavigationRequest>,
+    ) -> Result<ImsResult, HostProblem> {
+        if let Some(navigation) = navigation {
+            navigation.validate(mainframe_env_host_api::HostLimits::default())?;
+        }
         if resolution_lower_bound == 0 {
             return Err(HostProblem::Malformed);
         }
@@ -465,7 +493,18 @@ impl ImsService {
             }
         }
         refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let request_sha256 = request_digest(request)?;
+        let prepared = navigation
+            .map(|navigation| {
+                generic::ssa::prepare(&durable.state, invocation, navigation, self.limits)
+            })
+            .transpose()?;
+        let request_sha256 = if let Some(navigation) = navigation {
+            mainframe_env_host_api::canonical_request_digest(&HostRequest::ImsNavigation(
+                navigation.clone(),
+            ))?
+        } else {
+            request_digest(request)?
+        };
         let replay_key = request
             .mutation
             .as_ref()
@@ -499,7 +538,9 @@ impl ImsService {
         }
         let mut next = durable.state.scoped_snapshot();
         let run = invocation.run_unit_id.as_str();
-        let result = if request.operation == ImsOperation::System {
+        let result = if let Some(prepared) = prepared {
+            generic::ssa::read(&mut next, run, request, &prepared, self.limits)?
+        } else if request.operation == ImsOperation::System {
             system::apply_request(&mut next, run, request, self.limits)?
         } else if generic::is_generic(&next, run, request) {
             generic::apply_request(&mut next, run, request, self.limits)?
@@ -1699,55 +1740,6 @@ fn store_error(problem: StoreError) -> HostProblem {
         }
         _ => HostProblem::InfrastructureFailure,
     }
-}
-
-struct ImsProvider {
-    service: Arc<ImsService>,
-    descriptor: CapabilityDescriptor,
-}
-
-impl HostProvider for ImsProvider {
-    fn descriptor(&self) -> &CapabilityDescriptor {
-        &self.descriptor
-    }
-
-    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
-        let sequence = effect.sequence;
-        let resolution_tick = effect.deadline_tick.max(invocation.deadline_tick);
-        let outcome = match effect.request {
-            HostRequest::Ims(request) => self
-                .service
-                .execute_at(invocation, &request, resolution_tick)
-                .map(HostResult::Ims),
-            _ => Err(HostProblem::Malformed),
-        };
-        EffectResult { sequence, outcome }
-    }
-}
-
-pub fn ims_providers(
-    service: Arc<ImsService>,
-    limits: InvocationLimits,
-) -> Vec<Arc<dyn HostProvider>> {
-    ["host.ims.read", "host.ims.write"]
-        .into_iter()
-        .map(|capability| {
-            Arc::new(ImsProvider {
-                service: service.clone(),
-                descriptor: CapabilityDescriptor {
-                    capability: CapabilityId::new(capability, limits)
-                        .expect("static IMS capability"),
-                    provider_id: "mainframe-env-ims".into(),
-                    generation: "1".into(),
-                    request_schema: "mainframe-env.ims-request@1".into(),
-                    result_schema: "mainframe-env.ims-result@1".into(),
-                    max_request_bytes: 4 * 1024 * 1024,
-                    max_result_bytes: 16 * 1024 * 1024,
-                    ready: true,
-                },
-            }) as Arc<dyn HostProvider>
-        })
-        .collect()
 }
 
 #[cfg(test)]

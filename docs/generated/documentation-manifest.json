@@ -585,7 +585,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 1,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:39c55bdde6e2a748dba95e5e436c83eba4a6344b87ad98f529ec1d7cbe698451",
+      "sha256": "sha256:897340e5ff831c34d1fe9ebbdf4bd828bc47c9b7c859ee59f8e27d9f599e0039",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1402,7 +1402,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 7,
-      "sha256": "sha256:850871b60ed49521b63eac00340e43a70e7122228ec77af34b9947461741194e",
+      "sha256": "sha256:034c48d07b5fb7ab04f60fb14321975565107a8c0a8d6f4adeda8aee95ae0be1",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 4
     },
