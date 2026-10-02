@@ -71,6 +71,113 @@ generated privately; the active seventeen-letter inventory, twenty-five-row
 denominator, accepted IR rules, public DTOs and historical canonical fixtures
 are unchanged. Raw/TM owner approvals and full-minor acceptance remain open.
 
+## IMS-1403.ssa-last-direct-child (verified bounded local runtime leaf)
+
+Parent IMS-1403 and full v0.14 remain incomplete. Entry is the preserved source
+seal `6bca4715d3ebac54aec1d89bc70a8095c6e187b9`, target 0.14.0. Manager review
+authorizes only DbBatch primary HIDAM, exactly two physical levels and one
+direct-child type, uniquely fully keyed fixed-length root/child, valid existing
+primary root parentage, current root/direct child, exactly one unqualified child SSA
+with exactly one active L command. Root prefixes, other contexts/operations,
+logical/secondary/other organizations, deeper/multiple/unkeyed/nonunique levels,
+qualified child, other commands and unresolved retained positions stay excluded.
+Null command slots belong to the manager lane and are not imported here.
+
+The last occurrence is selected in the remaining forward parent interval by
+the existing navigation owner using a private selection policy. Success retains
+root parentage and ordinary versioned GHNP hold; empty/exhausted fresh calls
+return GE, retain current anchor/root parentage, cancel only this PCB's old hold,
+and never cross the next root. Pre-validation rejection and exact replay do not
+mutate position/hold or rows. Root-level qualification ambiguity stays pending.
+No public request/position/schema, traversal, namespace, coordinator, permission,
+raw CALL/TM boundary or accepted IR extension is authorized.
+
+The manager's source-backed parentage disposition uses the existing GNP topic
+lines 94–111: GU/GN or a preceding P call may establish root parentage. A
+GU/GHU-only history marker is neither required nor admitted. Proof includes real
+GU/GHU, GN/GHN and prior P setups, while this L request contains no P. Existing
+AC/AM condition receipts and observer/canonical publication are preserved with
+no cursor, hold or database mutation; HostProblem shape/SAF rejection and failed
+atomic publication preserve the stronger no-mutation boundary.
+
+Logical exclusion inspects participation in declarations anywhere in the full
+existing catalog plus actual retained engine links, not only the selected
+database's local declaration list. The already-declared `last_tests/fences.rs`
+owns remote-only declaration, local declaration and retained-link negative
+controls with real root positioning and pre-validation no-mutation checks.
+
+Dependencies: the preserved `ims-ssa-last-position` zero-credit source baseline,
+existing GNP/GHNP and GU/GHU/GHN pins, selected metadata/SSA/current/hold owner,
+canonical replay, atomic row/CAS publication and actual CHKP/XRST owner.
+Acceptance: independent literal fail-first provider and signed selected-route
+C3 witnesses; finite starts/GE/continuation/holds/update/backout/checkpoint,
+per-PCB isolation, sensitivity/processing/SAF/no-mutation and unsupported shape
+fences, exact replay/conflicts/capacity/CAS; Memory and file SQLite reopen and
+real separate-process restart; focused regressions, strict affected all-target
+all-feature no-deps Clippy, fmt/deny/docs/changelog/catalog/assurance/schema/spec/
+coverage and execution/effect/rows/storage/security/retention/participant/typed/
+module/public-API/supply-chain policy gates. No source refresh, full campaigns,
+licensed/HUMAN/official/parent acceptance, push or PR. Receipts stay outside
+targets under worker-receipts/v014-completion-20261002/ssa-last-runtime;
+Cargo cleanup ends every build/test/lint/generator sequence, including failures.
+
+Exact initial/final-intended allowlist (any addition requires declaration):
+
+```text
+crates/providers/mainframe-env-ims/src/database/navigation.rs
+crates/providers/mainframe-env-ims/src/database/ssa.rs
+crates/providers/mainframe-env-ims/src/service/generic/ssa.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/last_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/last_tests/fences.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/last_tests/recovery.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/last_tests/publication.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/ssa_last_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/ssa_last_tests/recovery_tests.rs
+docs/delivery/subsystems/ims/programming-status.md
+docs/decisions/0039-last-direct-child-ssa-selection.md
+changes/unreleased/ims-last-direct-child-20261002.toml
+docs/documentation-registry.json
+docs/README.md
+docs/generated/documentation-manifest.json
+```
+
+The bounded implementation is locally verified. Independent fail-first Memory
+and SQLite public-provider and signed-coordinator C3 witnesses failed with
+Unsupported before runtime admission; setup errors are retained separately.
+Final provider proof executes 14 tests, including 12 root/intermediate/last
+GNP/GHNP cases, four separate empty-root cases and six GU-independent GN/GHN/P
+parentage cases across the two backends. Signed proof executes six test identities:
+five pass in `candidate-04`, and the corrected real CHKP/XRST test passes in
+`candidate-05`; the earlier aggregate failure is not relabeled. Signed finite
+starts include 16 forward cases, four empty-root cases and four AC/AM conditions.
+Both routes prove separate-process SQLite retained versioned holds and exact
+replay, while file reopen and actual CHKP/XRST prove child parentage/no hold and
+explicit root GU reestablishment. Canonical execution-context changes conflict;
+exact replay uses the original identity and never recreates a hold.
+
+Remote-only/local logical declarations each have genuine public negative controls
+on both backends with empty-child physical graphs and real GHU root parentage;
+four real retained-link cases also exercise the engine exclusion. Proposal replay
+capacity, real session CAS conflict and lost acknowledgement retain existing
+publication/UnknownOutcome owners. AC/AM preserve cursor/hold/database contents
+while existing observer/receipt publication may advance row versions. Real
+deletion on another PCB invalidates removed authority through the existing owner.
+
+Affected regressions pass: 25 provider SSA tests, 46 actual checkpoint/recovery
+tests and nine signed secondary SSA tests. Strict affected all-target/all-feature
+no-deps Clippy, fmt/deny/docs/changelog/IMS catalog/assurance matrix/schemas/spec/
+coverage and all declared boundary, API and supply-chain policy gates pass.
+Receipts are external under `ssa-last-runtime`, with original candidate hashes,
+commands, failures/repairs and Cargo cleanup. Documentation-only final packaging
+rechecks the changed docs and source-credit gate; unchanged runtime receipts keep
+their original identities. No tests return early for a missing PostgreSQL URL.
+PostgreSQL parity, raw CALL/TM, root qualification ambiguity, broader L forms,
+manager integration, accepted IR/HUMAN/official/licensed and full IMS-1403/IMS-1401/
+v0.14 obligations remain pending. ADR-0039 stays Proposed. Source pins, source-only
+seal and zero source credit are preserved; no null-slot lane is imported.
+
 ## IMS-1401.ssa-last-position-sources (declared source-only leaf)
 
 Parent IMS-1401 and the full v0.14 manager goal remain incomplete. This leaf
@@ -4653,3 +4760,44 @@ source/catalog/assurance/API-ratchet inputs retain their earlier passing root
 and worker policy receipts; no unchanged exploratory suite is repeated. Final
 boundary/dependency/docs/changelog and exact-path packaging outcome is recorded
 externally; the broader CICS prerequisite remains failed, not waived.
+
+### Root composition declaration for last-direct-child selection
+
+Root integrates worker ad6358eba0ed51e16e5fd90f45c7ced9c817df08 onto
+091ab017e436b1be2b6ed0290cae9a5acd8b60f0 with the same seventeen-path
+allowlist. Preserve both provider last/null test modules, server logical/null/L
+modules, Proposed ADR-0036/0037/0038/0039 and earlier source declarations.
+The three reviewed production files are identical to the worker seal. Source
+pins, active-command inventory, private cursor fields and public contracts stay
+unchanged. Normal documentation generation resolves generated packaging.
+
+Before proof, root updates only the existing declared fences test and ADR-0039
+null-slot integration note. The worker's literal L-minus malformed assertion
+belongs to its pre-null base and must not be relabeled as composed behavior.
+Instead the composed literal CHILD *-L- request must select C3S/A1 with real
+root parentage, cancel old hold, and conflict with different raw bytes under
+the same canonical request identity. Null slots cannot admit a second active
+command or weaken the finite L shape. All existing negative/public/signed
+recovery controls remain required. This is a test composition correction, not
+a new production recipe or a rewrite of worker evidence.
+
+Root selects all fourteen L provider and six signed test identities, prior
+logical feedback and the signed null control, then strict affected all-target/
+all-feature lint and relevant mandatory policy/docs/changelog/seal checks.
+Worker's passing unaffected recovery/secondary and unchanged source/API policy
+inputs retain their original receipt identities. No PostgreSQL L parity, global
+CICS-source retry, licensed work, HUMAN/official/participant or parent completion
+is inferred. Cargo clean ends each intended-checkout sequence.
+
+Root outcome: all fourteen L provider and six signed test identities pass on
+the composed candidate, including actual SQLite cold children and CHKP/XRST.
+The revised null-slot control returns literal C3S/A1 with current 5/root parentage
+2/no hold; different raw SSA bytes under the same request key conflict without
+mutation. A second active command still rejects before publication. Both prior
+signed logical backend cases and the exact signed null case execute and pass.
+Strict affected all-target/all-feature Clippy and fmt pass; Cargo clean removes
+6.5 GiB. The three production file hashes match the reviewed worker seal, while
+the revised fence input is separately bound in root runtime-inputs.json. Final
+relevant policy, normal docs and seventeen-path seal/check are packaging gates;
+external root receipts record their actual disposition, not CI or full-minor
+acceptance. Original worker/base-only null failures keep their identities.

@@ -13,6 +13,8 @@ mod logical_feedback_tests;
 mod null_ssa_tests;
 #[path = "ims_package_tests/secondary_checkpoint_tests.rs"]
 mod secondary_checkpoint_tests;
+#[path = "ims_package_tests/ssa_last_tests.rs"]
+mod ssa_last_tests;
 
 #[path = "ims_secondary_ssa_tests.rs"]
 mod secondary_ssa;

@@ -11,6 +11,61 @@ pub(in crate::service) struct Prepared {
     sensitivity: Option<&'static str>,
 }
 
+/// The engine owns the live occurrence path; the scheduled catalog owns the
+/// uniqueness and logical metadata omitted from its physical definition.
+fn validate_last_metadata(
+    state: &State,
+    pcb: &ImsDatabasePcbMetadata,
+    navigation: &ImsNavigationRequest,
+    engine: &DatabaseEngine,
+) -> Result<(), HostProblem> {
+    if navigation.context != mainframe_env_host_api::ImsExecutionContext::DbBatch
+        || !matches!(
+            navigation.request.operation,
+            ImsOperation::GetNextParent | ImsOperation::GetHoldNextParent
+        )
+        || pcb.secondary_index.is_some()
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    let catalog = state.metadata.as_ref().ok_or(HostProblem::Unsupported)?;
+    let name = normalize(&pcb.database);
+    let database = catalog
+        .databases
+        .iter()
+        .find(|db| normalize(&db.name) == name)
+        .ok_or(HostProblem::Unsupported)?;
+    if database.organization != crate::ImsDatabaseOrganization::Hidam
+        || database.segments.len() != 2
+        || catalog
+            .databases
+            .iter()
+            .flat_map(|db| &db.logical_relationships)
+            .any(|relationship| {
+                normalize(&relationship.parent_database) == name
+                    || normalize(&relationship.child_database) == name
+            })
+        || definition(database)? != *engine.definition()
+        || database.segments.iter().any(|segment| {
+            let mut keys = segment.fields.iter().filter(|field| field.sequence);
+            segment.min_length != segment.max_length
+                || keys.next().is_none_or(|key| {
+                    !key.unique
+                        || key.name.is_none()
+                        || key.length == 0
+                        || key
+                            .offset
+                            .checked_add(key.length)
+                            .is_none_or(|end| end > segment.min_length)
+                })
+                || keys.next().is_some()
+        })
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    Ok(())
+}
+
 pub(in crate::service) fn prepare(
     state: &State,
     invocation: &Invocation,
@@ -58,7 +113,7 @@ pub(in crate::service) fn prepare(
         if ssa
             .commands
             .iter()
-            .any(|c| !matches!(c.code, b'C' | b'O' | b'D' | b'P'))
+            .any(|c| !matches!(c.code, b'C' | b'O' | b'D' | b'P' | b'L'))
             || engine.definition().organization == crate::ImsDatabaseOrganization::Msdb
                 && !ssa.commands.is_empty()
             || engine.definition().organization == crate::ImsDatabaseOrganization::Dedb
@@ -94,6 +149,20 @@ pub(in crate::service) fn prepare(
             EngineProblem::LimitExceeded => HostProblem::ResourceExhausted,
             _ => HostProblem::Malformed,
         })?;
+    if ssas
+        .iter()
+        .any(|ssa| ssa.commands.iter().any(|c| c.code == b'L'))
+    {
+        validate_last_metadata(state, pcb, navigation, &engine)?;
+        engine
+            .validate_last_direct_child(
+                &pcb::position(session, navigation.request.pcb),
+                &read,
+                &ssas,
+                secondary,
+            )
+            .map_err(|_| HostProblem::Unsupported)?;
+    }
     let form = if ssas.iter().any(|s| s.concatenated_key.is_some()) {
         ImsSsaForm::ConcatenatedKey
     } else if ssas

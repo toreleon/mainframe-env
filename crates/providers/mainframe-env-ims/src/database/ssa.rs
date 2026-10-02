@@ -1,4 +1,5 @@
 //! Metadata-resolved SSA selection on the existing navigation authority.
+use super::navigation::Selection;
 use super::*;
 use mainframe_env_host_api::{
     ImsSsa, ImsSsaBoolean, ImsSsaField, ImsSsaFieldResolver, ImsSsaRelation,
@@ -66,6 +67,69 @@ impl ImsSsaFieldResolver for SsaFields<'_> {
 }
 
 impl DatabaseEngine {
+    /// Validate the live physical path before admitting last-direct-child selection.
+    /// Uniqueness/logical metadata and call context remain with the PCB adapter.
+    pub(crate) fn validate_last_direct_child(
+        &self,
+        position: &PcbPosition,
+        request: &ReadRequest,
+        ssas: &[ImsSsa],
+        secondary: Option<&str>,
+    ) -> Result<(), EngineProblem> {
+        let [root, child] = self.definition.segments.as_slice() else {
+            return Err(EngineProblem::Unsupported);
+        };
+        let [ssa] = ssas else {
+            return Err(EngineProblem::Unsupported);
+        };
+        if self.definition.organization != DatabaseOrganization::Hidam
+            || secondary.is_some()
+            || !self.logical_links().is_empty()
+            || request.kind != ReadKind::NextInParent
+            || root.parent.is_some()
+            || child.parent.as_deref() != Some(root.name.as_str())
+            || root.key_field.is_none()
+            || child.key_field.is_none()
+            || root.min_length != root.max_length
+            || child.min_length != child.max_length
+            || request.target.as_deref() != Some(child.name.as_str())
+            || ssa.segment != child.name
+            || ssa.concatenated_key.is_some()
+            || !ssa.predicates.is_empty()
+            || !ssa.connectors.is_empty()
+            || ssa.commands.len() != 1
+            || ssa.commands[0].code != b'L'
+            || ssa.commands[0].subset_pointer.is_some()
+            || !position.valid_retained_shape()
+            || position.after_end
+            || position.secondary.is_some()
+            || position.secondary_restart.is_some()
+        {
+            return Err(EngineProblem::Unsupported);
+        }
+        let parent = position.parentage.ok_or(EngineProblem::Unsupported)?;
+        let current = position.current.ok_or(EngineProblem::Unsupported)?;
+        let parent_path = self
+            .record_path(parent)
+            .map_err(|_| EngineProblem::Unsupported)?;
+        let current_path = self
+            .record_path(current)
+            .map_err(|_| EngineProblem::Unsupported)?;
+        if parent_path.as_slice() != [parent]
+            || self.records[&parent].segment != root.name
+            || !(current_path.as_slice() == [parent]
+                || current_path.as_slice() == [parent, current]
+                    && self.records[&current].segment == child.name
+                    && self.records[&current].parent == Some(parent))
+            || position.held.is_some_and(|held| {
+                held.id != current || held.version != self.records[&current].version
+            })
+        {
+            return Err(EngineProblem::Unsupported);
+        }
+        Ok(())
+    }
+
     pub(crate) fn ssa_fields<'a>(&'a self, secondary: Option<&'a str>) -> SsaFields<'a> {
         SsaFields {
             engine: self,
@@ -82,6 +146,12 @@ impl DatabaseEngine {
         visible: impl Fn(&str) -> bool,
     ) -> Result<RecordView, EngineProblem> {
         self.validate_ssas(request, ssas, secondary)?;
+        let last = ssas
+            .iter()
+            .any(|ssa| ssa.commands.iter().any(|c| c.code == b'L'));
+        if last {
+            self.validate_last_direct_child(position, request, ssas, secondary)?;
+        }
         if request.kind == ReadKind::NextInParent {
             let parent = position.parentage.ok_or(EngineProblem::ParentageRequired)?;
             self.validate_parent_path(parent, request)?;
@@ -133,7 +203,16 @@ impl DatabaseEngine {
                 |id, key| matches(id, Some((name, key))),
             )
         } else {
-            self.read_matching(position, request, |id| matches(id, None))
+            self.read_matching_selected(
+                position,
+                request,
+                if last {
+                    Selection::Last
+                } else {
+                    Selection::First
+                },
+                |id| matches(id, None),
+            )
         }?;
         if let Some(parent) = ssas
             .iter()

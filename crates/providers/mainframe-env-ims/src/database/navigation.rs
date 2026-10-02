@@ -1,6 +1,12 @@
 use super::*;
 use std::cmp::Ordering;
 
+/// Call-local choice within the existing forward interval; never retained.
+pub(super) enum Selection {
+    First,
+    Last,
+}
+
 impl PcbPosition {
     /// Check intrinsic retained PCB invariants without requiring a checkpoint's
     /// historical occurrences to exist in the current live database image.
@@ -69,6 +75,16 @@ impl DatabaseEngine {
         request: &ReadRequest,
         matches: impl Fn(RecordId) -> bool,
     ) -> Result<RecordView, EngineProblem> {
+        self.read_matching_selected(position, request, Selection::First, matches)
+    }
+
+    pub(super) fn read_matching_selected(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        selection: Selection,
+        matches: impl Fn(RecordId) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
         let mut next = position.clone();
         next.held = None;
         let order = self.hierarchy_order();
@@ -103,7 +119,18 @@ impl DatabaseEngine {
                             .position(|id| *id == current)
                     })
                     .map_or(parent_index + 1, |offset| parent_index + 2 + offset);
-                order[start..stop].iter().copied().find(|id| matches(*id))
+                let mut candidates = order[start..stop].iter().copied();
+                match selection {
+                    Selection::First => candidates.find(|id| matches(*id)),
+                    Selection::Last => {
+                        candidates.fold(
+                            None,
+                            |selected, id| {
+                                if matches(id) { Some(id) } else { selected }
+                            },
+                        )
+                    }
+                }
             }
         };
         let Some(id) = selected else {

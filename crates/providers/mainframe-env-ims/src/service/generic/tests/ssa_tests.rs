@@ -1,6 +1,7 @@
 use super::*;
 use mainframe_env_host_api::{HostLimits, ImsNavigationRequest};
 
+mod last_tests;
 mod null_slot_tests;
 mod pcb_tests;
 
