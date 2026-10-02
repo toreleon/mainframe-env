@@ -19,6 +19,44 @@ use super::retention::{
 const RUN_OWNER_BINDING: &str = "cobol.run-owner-execution";
 const RUN_OWNER_BINDING_SCHEMA: &str = "mainframe-env.cobol.run-owner@1";
 
+/// Constructed only in the successful original CALL reservation branch below.
+pub(super) struct WinningInstalledCall<'a> {
+    parent: &'a Invocation,
+    effect: &'a EffectRequest,
+    store: &'a Arc<dyn PlatformStore>,
+    reservation: &'a ProviderStateRecord,
+    child_execution: &'a str,
+}
+impl WinningInstalledCall<'_> {
+    pub(super) fn parent(&self) -> &Invocation {
+        self.parent
+    }
+    pub(super) fn effect(&self) -> &EffectRequest {
+        self.effect
+    }
+    pub(super) fn store(&self) -> &Arc<dyn PlatformStore> {
+        self.store
+    }
+    pub(super) fn reservation(&self) -> &ProviderStateRecord {
+        self.reservation
+    }
+    pub(super) fn child_execution(&self) -> &str {
+        self.child_execution
+    }
+    pub(super) fn recheck(&self) -> Result<(), HostProblem> {
+        if self
+            .store
+            .get_provider_state(&self.reservation.namespace, &self.reservation.key)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .as_ref()
+            != Some(self.reservation)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Reply {
@@ -751,6 +789,9 @@ impl CobolProgram {
             return Ok(result);
         }
         let admitted = preflight()?;
+        if payload.schema() == "mainframe-env.program.input@1" {
+            self.validate_typed_parent(parent, effect)?;
+        }
         self.ensure_call_protocol_identity(parent, outer_identity, true)?;
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"
@@ -784,7 +825,7 @@ impl CobolProgram {
             payload: serde_json::to_vec(&receipt)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
         };
-        if let Err(problem) = store.put_provider_state(pending, None) {
+        if let Err(problem) = store.put_provider_state(pending.clone(), None) {
             if matches!(problem, StoreError::Conflict | StoreError::AlreadyExists) {
                 return match store.get_provider_state(CALL_REPLAY_NAMESPACE, &key) {
                     Ok(Some(record)) => {
@@ -800,22 +841,36 @@ impl CobolProgram {
             return Err(HostProblem::InfrastructureFailure);
         }
         // No call can dispatch without winning the durable reservation.
+        let original_call = WinningInstalledCall {
+            parent,
+            effect,
+            store,
+            reservation: &pending,
+            child_execution: &receipt.child_execution,
+        };
         let mut writes = Vec::new();
         let result = if payload.schema() == "mainframe-env.cobol.call@1" {
             self.execute_admitted(parent, program, admitted, payload, &key, &mut writes)
         } else {
-            self.execute_installed_batch(parent, program, admitted, payload, &key)
-                .and_then(|output| {
-                    serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
-                })
-                .and_then(|bytes| {
-                    BoundedPayload::new(
-                        "mainframe-env.program.output@1",
-                        bytes,
-                        InvocationLimits::default(),
-                    )
-                    .map_err(|_| HostProblem::ResourceExhausted)
-                })
+            self.execute_installed_batch_from_call(
+                parent,
+                program,
+                admitted,
+                payload,
+                &key,
+                Some(&original_call),
+            )
+            .and_then(|output| {
+                serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
+            })
+            .and_then(|bytes| {
+                BoundedPayload::new(
+                    "mainframe-env.program.output@1",
+                    bytes,
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)
+            })
         }?;
         receipt.reply = Some(Reply {
             schema: result.schema().into(),

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Carried validated installed artifact, actual parent/child, original canonical core call and winning CALL reservation provenance through a server-local MQ admission proof, with bounded preparation abort and once-only raw-outcome session finish that preserves uncertainty and legacy compatibility; real selected host-root/lifecycle integration remains pending."

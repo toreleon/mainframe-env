@@ -5,10 +5,13 @@ use mainframe_env_interpreter::MqMqiProgramProfile;
 use mainframe_env_store::MemoryStore;
 use std::sync::Mutex;
 mod installed;
+mod sessions;
 mod setup;
 
 struct Admission {
     observed: Mutex<Vec<Invocation>>,
+    events: Arc<Mutex<Vec<ExecutionOutcome>>>,
+    aborts: Arc<Mutex<Vec<HostProblem>>>,
     refuse: bool,
 }
 struct Frame(Invocation);
@@ -33,23 +36,70 @@ impl MqMqiProgramFrame for Frame {
         })
     }
 }
+struct Session {
+    frame: Arc<dyn MqMqiProgramFrame>,
+    events: Arc<Mutex<Vec<ExecutionOutcome>>>,
+    aborts: Arc<Mutex<Vec<HostProblem>>>,
+    store: Arc<dyn PlatformStore>,
+    control: Arc<dyn ProgramExecutionControl>,
+}
+impl InstalledMqFrameSession for Session {
+    fn store(&self) -> &Arc<dyn PlatformStore> {
+        &self.store
+    }
+    fn execution_control(&self) -> &Arc<dyn ProgramExecutionControl> {
+        &self.control
+    }
+    fn program_frame(&self) -> Result<Arc<dyn MqMqiProgramFrame>, HostProblem> {
+        Ok(self.frame.clone())
+    }
+    fn abort_preparation(&mut self, problem: &HostProblem) -> Result<(), HostProblem> {
+        self.aborts.lock().unwrap().push(problem.clone());
+        Ok(())
+    }
+    fn finish(&mut self, outcome: &ExecutionOutcome) -> Result<(), HostProblem> {
+        self.events.lock().unwrap().push(outcome.clone());
+        Ok(())
+    }
+}
 impl ProgramMqHostAdmission for Admission {
     fn admit_installed_batch(
         &self,
-        invocation: &Invocation,
-        _: &dyn PlatformStore,
-    ) -> Result<Arc<dyn MqMqiProgramFrame>, HostProblem> {
+        proof: &InstalledBatchAdmission<'_>,
+    ) -> Result<Box<dyn InstalledMqFrameSession>, HostProblem> {
+        let invocation = proof.child();
+        assert_eq!(
+            proof.core_intent().execution_id,
+            proof.parent().execution_id
+        );
+        assert_eq!(
+            proof.catalog_record().unwrap().payload,
+            proof.artifact().as_str().as_bytes()
+        );
+        assert!(
+            proof
+                .artifact_metadata()
+                .validates_payload(&proof.content_digest())
+        );
         self.observed.lock().unwrap().push(invocation.clone());
         if self.refuse {
             Err(HostProblem::Unauthorized)
         } else {
-            Ok(Arc::new(Frame(invocation.clone())))
+            Ok(Box::new(Session {
+                frame: Arc::new(Frame(invocation.clone())),
+                events: self.events.clone(),
+                aborts: self.aborts.clone(),
+                store: proof.store().clone(),
+                control: proof.execution_control().clone(),
+            }))
         }
     }
 }
 fn admission(refuse: bool) -> Arc<Admission> {
     Arc::new(Admission {
         observed: Mutex::new(vec![]),
+        events: Arc::new(Mutex::new(vec![])),
+        aborts: Arc::new(Mutex::new(vec![])),
         refuse,
     })
 }
@@ -59,12 +109,17 @@ fn unset_factory_preserves_existing_batch_profile_without_state_access() {
     let program = CobolProgram::new();
     let mut invocation = super::super::hardening::parent();
     let before = invocation.clone();
-    assert!(program.admit_batch_mqi(&mut invocation).unwrap().is_none());
+    assert!(
+        program
+            .admit_batch_mqi(&mut invocation, None, None)
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(invocation, before);
 }
 
 #[test]
-fn configured_factory_observes_actual_identity_and_host_selected_context() {
+fn configured_direct_helper_cannot_fabricate_an_original_call() {
     let program = CobolProgram::new();
     let factory = admission(false);
     assert!(program.mqi_host.set(factory.clone()).is_ok());
@@ -74,64 +129,15 @@ fn configured_factory_observes_actual_identity_and_host_selected_context() {
             .set(Arc::new(MemoryStore::new(Default::default())))
             .is_ok()
     );
+    assert!(program.control.set(setup::control()).is_ok());
     let mut invocation = super::super::hardening::parent();
-    invocation.bindings.insert(
-        "mq.host-context".into(),
-        BoundedPayload::new(
-            "mainframe-env.mq.host-context@1",
-            b"other-bindings|queue-manager".to_vec(),
-            InvocationLimits::default(),
-        )
-        .unwrap(),
-    );
-    let mut expected = invocation.clone();
-    let frame = program.admit_batch_mqi(&mut invocation).unwrap().unwrap();
-    expected.bindings = invocation.bindings.clone();
-    assert_eq!(invocation, expected);
-    let binding = &invocation.bindings["mq.host-context"];
-    assert_eq!(binding.bytes(), b"zos-batch|queue-manager");
-    assert_eq!(binding.schema(), "mainframe-env.mq.host-context@1");
-    assert_eq!(
-        factory.observed.lock().unwrap().as_slice(),
-        &[invocation.clone()]
-    );
-    assert!(frame.profile(&invocation).is_ok());
-}
-
-#[test]
-fn unsupported_nested_provenance_is_not_erased_and_denial_stops_admission() {
-    let program = CobolProgram::new();
-    let factory = admission(true);
-    assert!(program.mqi_host.set(factory.clone()).is_ok());
-    assert!(
-        program
-            .store
-            .set(Arc::new(MemoryStore::new(Default::default())))
-            .is_ok()
-    );
-    for key in [
-        "cics.execution-context",
-        "cics.nested-effect-origin",
-        "cics.outer-effect-origin",
-    ] {
-        let mut invocation = super::super::hardening::parent();
-        invocation.bindings.insert(
-            key.into(),
-            BoundedPayload::new("schema", vec![1], InvocationLimits::default()).unwrap(),
-        );
-        let before = invocation.clone();
-        assert!(matches!(
-            program.admit_batch_mqi(&mut invocation),
-            Err(HostProblem::Unsupported)
-        ));
-        assert_eq!(invocation, before);
-    }
-    assert!(factory.observed.lock().unwrap().is_empty());
-    let mut invocation = super::super::hardening::parent();
+    let before = invocation.clone();
     assert!(matches!(
-        program.admit_batch_mqi(&mut invocation),
-        Err(HostProblem::Unauthorized)
+        program.admit_batch_mqi(&mut invocation, None, None),
+        Err(HostProblem::Unsupported)
     ));
+    assert_eq!(invocation, before);
+    assert!(factory.observed.lock().unwrap().is_empty());
 }
 
 #[test]

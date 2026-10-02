@@ -43,7 +43,7 @@ mod runtime;
 mod selected_link;
 mod staged_invocation;
 use artifact::{AdmittedProgram, admit_published_artifact};
-pub use mqi::ProgramMqHostAdmission;
+pub use mqi::{InstalledBatchAdmission, InstalledMqFrameSession, ProgramMqHostAdmission};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
 use runtime::with_compatible_runtime_services;
@@ -316,6 +316,7 @@ impl CobolProgram {
             artifact,
             executable,
             name,
+            ..
         } = admitted;
         let call_values = decode_cobol_call_values(payload)?;
         let limits = InvocationLimits::default();
@@ -493,6 +494,7 @@ impl CobolProgram {
         }
     }
 
+    #[cfg(test)]
     fn execute_installed_batch(
         &self,
         parent: &Invocation,
@@ -501,13 +503,20 @@ impl CobolProgram {
         payload: &BoundedPayload,
         identity: &str,
     ) -> Result<ProgramOutput, HostProblem> {
+        self.execute_installed_batch_from_call(parent, program, admitted, payload, identity, None)
+    }
+
+    fn execute_installed_batch_from_call(
+        &self,
+        parent: &Invocation,
+        program: &str,
+        admitted: AdmittedProgram,
+        payload: &BoundedPayload,
+        identity: &str,
+        original_call: Option<&replay::WinningInstalledCall<'_>>,
+    ) -> Result<ProgramOutput, HostProblem> {
         let input: ProgramInput =
             serde_json::from_slice(payload.bytes()).map_err(|_| HostProblem::Malformed)?;
-        let AdmittedProgram {
-            artifact,
-            executable,
-            ..
-        } = admitted;
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
@@ -560,7 +569,7 @@ impl CobolProgram {
             Some(parent.execution_id.clone()),
             Selector::new(format!("program:{}", program.to_ascii_uppercase()), limits)
                 .map_err(|_| HostProblem::Malformed)?,
-            artifact,
+            admitted.artifact.clone(),
             Principal::new(
                 parent.principal.id().clone(),
                 parent.principal.grants().clone(),
@@ -586,27 +595,63 @@ impl CobolProgram {
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
         invocation.cancellation_probe = parent.cancellation_probe.clone();
-        let mqi_frame = self.admit_batch_mqi(&mut invocation)?;
-        let mut machine = ReferenceMachine::from_binary(
-            executable.payload(),
-            invocation.clone(),
-            CodecLimits::default(),
-        )
-        .map_err(|_| HostProblem::ProviderFailure)?;
-        if let Some(frame) = mqi_frame {
-            machine
-                .bind_mqi_program_frame(frame)
-                .map_err(|_| HostProblem::ProviderFailure)?;
-        }
-        install_batch_environment(&mut machine, &input)?;
+        let mut session = self.admit_batch_mqi(&mut invocation, Some(&admitted), original_call)?;
+        let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut machine = ReferenceMachine::from_binary(
+                admitted.executable.payload(),
+                invocation.clone(),
+                CodecLimits::default(),
+            )
+            .map_err(|_| HostProblem::ProviderFailure)?;
+            if let Some(session) = &session {
+                machine
+                    .bind_mqi_program_frame(session.frame(&invocation)?)
+                    .map_err(|problem| match problem {
+                        mainframe_env_interpreter::MachineProblem::Host(problem) => problem,
+                        _ => HostProblem::ProviderFailure,
+                    })?;
+            }
+            install_batch_environment(&mut machine, &input)?;
+            Ok(machine)
+        }))
+        .unwrap_or(Err(HostProblem::UnknownOutcome));
+        let mut machine = match prepared {
+            Ok(machine) => machine,
+            Err(problem) => {
+                return Err(session
+                    .as_mut()
+                    .map_or(problem.clone(), |session| session.abort(problem)));
+            }
+        };
         let coordinator = ExecutionCoordinator::durable(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
             Arc::clone(self.store.get().ok_or(HostProblem::InfrastructureFailure)?),
             CoordinatorLimits::default(),
         );
-        match coordinator.execute_with_control(&mut machine, &invocation, || {
-            self.observe_execution_control(&invocation)
-        }) {
+        let mut parent_tick = session.as_ref().map_or(0, |session| session.observed_tick);
+        let outcome = coordinator.execute_with_control(&mut machine, &invocation, || {
+            let control = self.observe_execution_control(&invocation)?;
+            if let Some(call) = original_call
+                && session.is_some()
+            {
+                mqi::recheck_driving_parent(
+                    self,
+                    call,
+                    control,
+                    &mut parent_tick,
+                    session
+                        .as_ref()
+                        .and_then(|session| session.original_core.as_ref())
+                        .ok_or(ExecutionControlError::Unavailable)?,
+                )
+                .map_err(|_| ExecutionControlError::Unavailable)?;
+            }
+            Ok(control)
+        });
+        if let Some(session) = &mut session {
+            session.finish(&outcome)?;
+        }
+        match outcome {
             ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
                 return_code: completion.return_code,
                 records: completion

@@ -491,9 +491,9 @@
       "normative": true,
       "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
-      "relative_links": 1,
+      "relative_links": 2,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:32455aa5200b95093c2602e3eb30fa895169bfd836475647397b13ddcf54fae7",
+      "sha256": "sha256:c62114189c2e996425c6a0438998e519ddfc3212e1c8ab53d5ffb8b643ba7a62",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -1041,7 +1041,7 @@
       "path": "docs/decisions/0032-mq-program-machine-frame.md",
       "relative_links": 0,
       "scope": "explicit typed installed-batch handoff, not MQ public readiness",
-      "sha256": "sha256:614f82ef8182b3ff807a1270df78ce019b54573711246ab5ef68f1dfa08a53dd",
+      "sha256": "sha256:d7ff7a537de14e4f063949e43d4ce2f10ab4031125757058bf4a57527efe66f7",
       "status": "Proposed",
       "title": "MQ program-to-machine frame handoff",
       "xtask_commands": 0
@@ -1578,7 +1578,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:1c532c21c8b673f27bfb743a6e55290c1ab02943f9821aadacbc934a0bdb8f3a",
+      "sha256": "sha256:167e73fb25291b8d97cd1c7f76bb1f6aff1c278697807a3b05c8dcef07a035dc",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

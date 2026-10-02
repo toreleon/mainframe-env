@@ -23,7 +23,7 @@ fn runtime(
     )
 }
 
-fn control() -> Arc<dyn ProgramExecutionControl> {
+pub(super) fn control() -> Arc<dyn ProgramExecutionControl> {
     Arc::new(|_: &Invocation| {
         Ok(ExecutionControl {
             now_tick: 1,
@@ -75,13 +75,10 @@ fn factory_first_serializes_runtime_publication_and_freezes_typed_control() {
         Err(HostProblem::IdempotencyConflict)
     );
     let mut invocation = super::super::super::hardening::parent();
-    assert!(
-        router
-            .cobol
-            .admit_batch_mqi(&mut invocation)
-            .unwrap()
-            .is_some()
-    );
+    assert!(matches!(
+        router.cobol.admit_batch_mqi(&mut invocation, None, None),
+        Err(HostProblem::Unsupported)
+    ));
 }
 
 #[test]
@@ -122,7 +119,7 @@ fn runtime_first_blocks_factory_then_refuses_late_profile_but_keeps_legacy_contr
     assert!(
         router
             .cobol
-            .admit_batch_mqi(&mut invocation)
+            .admit_batch_mqi(&mut invocation, None, None)
             .unwrap()
             .is_none()
     );
@@ -172,41 +169,4 @@ fn partial_setup_conflict_publishes_no_host_or_artifacts() {
     assert!(Arc::ptr_eq(router.cobol.store.get().unwrap(), &occupied));
 }
 
-struct ReentrantAdmission(std::sync::Weak<DefaultProgramRouter>);
-impl ProgramMqHostAdmission for ReentrantAdmission {
-    fn admit_installed_batch(
-        &self,
-        invocation: &Invocation,
-        _: &dyn PlatformStore,
-    ) -> Result<Arc<dyn MqMqiProgramFrame>, HostProblem> {
-        let router = self.0.upgrade().unwrap();
-        assert!(
-            router.cobol.setup.try_lock().is_ok(),
-            "factory callback holds no setup lock"
-        );
-        assert_eq!(
-            router.bind_execution_control(control()),
-            Err(HostProblem::IdempotencyConflict)
-        );
-        Ok(Arc::new(Frame(invocation.clone())))
-    }
-}
-
-#[test]
-fn external_factory_runs_outside_setup_guard() {
-    let root = super::super::super::hardening::TestRoot::new();
-    let router = default_program_router();
-    router
-        .bind_mqi_program_host(Arc::new(ReentrantAdmission(Arc::downgrade(&router))))
-        .unwrap();
-    let (host, store, artifacts) = runtime(&root);
-    router.bind_runtime(host, store, artifacts).unwrap();
-    let mut invocation = super::super::super::hardening::parent();
-    assert!(
-        router
-            .cobol
-            .admit_batch_mqi(&mut invocation)
-            .unwrap()
-            .is_some()
-    );
-}
+// Callback reentry is covered on the real reserved/coordinator path in installed.rs.

@@ -180,6 +180,13 @@ pub(super) struct AdmittedProgram {
     pub(super) artifact: ArtifactRef,
     pub(super) executable: ValidatedArtifact,
     pub(super) name: String,
+    pub(super) provenance: AdmittedProgramProvenance,
+    pub(super) metadata: ExecutableArtifactMetadata,
+}
+
+pub(super) enum AdmittedProgramProvenance {
+    Catalog(mainframe_env_store_api::ProviderStateRecord),
+    Selected(mainframe_env_host_api::ProgramLinkSelection),
 }
 
 impl CobolProgram {
@@ -201,6 +208,8 @@ impl CobolProgram {
             artifact: selection.artifact.clone(),
             executable,
             name: program.to_ascii_uppercase(),
+            provenance: AdmittedProgramProvenance::Selected(selection.clone()),
+            metadata: record.executable.ok_or(HostProblem::ProviderFailure)?,
         })
     }
 
@@ -231,7 +240,9 @@ impl CobolProgram {
                 })?,
         };
         let artifact = ArtifactRef::new(
-            String::from_utf8(catalog.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
+            std::str::from_utf8(&catalog.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .to_owned(),
             InvocationLimits::default(),
         )
         .map_err(|_| HostProblem::InfrastructureFailure)?;
@@ -254,6 +265,8 @@ impl CobolProgram {
             artifact,
             executable,
             name,
+            provenance: AdmittedProgramProvenance::Catalog(catalog),
+            metadata: record.executable.ok_or(HostProblem::ProviderFailure)?,
         })
     }
 }

@@ -9,9 +9,15 @@ Applies from: **mainframe-env 0.15.0**
 
 The installed-program host can be configured with a single
 `ProgramMqHostAdmission` before runtime binding. After actual installed artifact
-admission and construction of the program's Invocation, the batch executor
-selects its fixed batch/queue-manager context and calls that factory with the
-same physical PlatformStore. Application bindings cannot choose the factory.
+admission and the winning original durable CALL reservation, the batch executor
+constructs a nonserializable `InstalledBatchAdmission` for that factory. Its
+private constructor preserves actual parent and parentSome child Invocations,
+catalog namespace/key/version or selected-program provenance, validated artifact
+reference/content/manifest and original compiler/interface metadata, original
+enclosing ProgramCall, retained canonical core intent and running parent, exact
+CALL reservation and frozen physical store/control/host/artifact-store references.
+The proof has read-only accessors, no Clone/Serde or public numeric constructor.
+Application bindings cannot choose the factory.
 Contradictory CICS task/outer/child provenance is rejected, not erased. The
 factory must independently admit process/frame topology and use the selected
 service's lifecycle/registry authority; decoding this binding is not attestation.
@@ -24,7 +30,31 @@ copies the configured factory/store under that guard and releases it before
 invoking embedding callbacks. This guard is not the complete trusted producer's
 service/store/authorizer/clock bundle, which remains a separate obligation.
 
-The returned `MqMqiProgramFrame` is explicitly installed on the reference
+With typed configuration, the original parent occurrence must be retained on
+that configured store as an unrecovered canonical intent with exact execution,
+run, attempt, sequence/key, full request digest, capability, audit attribution
+and finite live deadline. The current parent must remain running with its exact
+principal/selector/artifact. The pending CALL record and admitted catalog are
+rechecked before and after the factory; clock regression/cancellation/deadline
+and changed observations reject preparation. Driving rechecks the original core
+and CALL dependency while leaving cancellation/timeout classification with the
+existing coordinator. No protected reservation is deleted or automatically
+retried. Legacy paths without a typed factory keep their existing behavior.
+Direct scheduler/helper paths without a real retained original occurrence are
+Unsupported for typed admission; they cannot manufacture an enclosing call.
+
+This is **admission provenance**, not independently admitted host-root/process
+attestation, an MQ lifecycle lease, SAF or an atomic publication permit. The
+real selected bridge must match the proof's physical Arc store and frozen setup
+to its SAME service, independently admit actual host parent/process/task topology
+and current incarnation, and retain core/CAS/audit ownership. Equal rows in a
+foreign store and decoded binding/owner bytes cannot perform that check. The
+observed core/execution reads do not create whole-store serialization or a
+coordinator permit; physical publication and live lifecycle fencing remain
+their original authorities.
+
+The factory returns a bounded `InstalledMqFrameSession`. Its `program_frame`
+uses the existing `MqMqiProgramFrame`, explicitly installed on the reference
 machine before driving. Its profile supplies the independently minted owner
 and bounded MQI limits. The machine rechecks that profile before constructing
 the original typed effect and before consuming its result. A changed owner or
@@ -32,6 +62,28 @@ profile cannot rewrite an already journaled effect. The existing effect builder
 owns sequence, key, run, deadline and Mutation identity. ScopedHostService and
 the durable coordinator retain capability, audit, original intent and completion
 ownership. This port grants no SAF, queue, UOW, recovery or participant permission.
+
+The session declares its physical store and execution-control Arcs. The server
+compares both against the frozen admission setup before installing any frame;
+equal record/observation bytes on different adapters are rejected and preparation
+is aborted. This necessary composition check is not independently admitted
+service/root identity. A real selected factory must still bind its own SAME
+service authority and host root, rather than merely echoing observed Arcs.
+
+The server owns one session guard per admitted child. All binary/frame/environment
+preparation failures receive one `abort_preparation`; all returned raw coordinator
+outcomes receive one `finish` before ProgramOutput/HostProblem mapping. Completed,
+Condition, Abend, Cancelled, TimedOut, ResourceExhausted, ProviderFailure (including
+Unknown), InfrastructureFailure, Rejected, Suspended, Invoke and Transfer retain
+their original distinctions. Neither return nor Condition proves task/process
+end. Abort/finish failure or panic becomes protected UnknownOutcome. The transport
+is invalidated before callback invocation, and a callback is never retried. Drop
+only invalidates bounded executable transport: it invokes no cleanup callback,
+commit/backout/MQDISC or detached queue. Unwind with no returned raw outcome leaves
+the original CALL/core uncertainty protected by the existing host protocol.
+Factories must roll back only newly owned volatile preparation on admission
+error and must not perform durable cleanup in session Drop. Actual source-bound
+UOW/task-end and fallible retirement policy belongs to the real selected bridge.
 
 The first adapter maps MQCONN/MQDISC for ordinary z/OS batch. It validates exact
 argument count, MQCHAR48 input and signed fullword output storage before dispatch,

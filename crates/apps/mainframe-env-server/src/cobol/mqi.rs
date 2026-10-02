@@ -2,6 +2,11 @@
 
 use super::*;
 use mainframe_env_interpreter::MqMqiProgramFrame;
+mod proof;
+mod session;
+pub use proof::InstalledBatchAdmission;
+pub use session::InstalledMqFrameSession;
+pub(super) use session::SessionGuard;
 
 /// Configured at product setup, before runtime binding. The embedding must use
 /// the selected MQ service's same store and independently admitted lifecycle;
@@ -11,9 +16,8 @@ use mainframe_env_interpreter::MqMqiProgramFrame;
 pub trait ProgramMqHostAdmission: Send + Sync {
     fn admit_installed_batch(
         &self,
-        invocation: &Invocation,
-        store: &dyn PlatformStore,
-    ) -> Result<Arc<dyn MqMqiProgramFrame>, HostProblem>;
+        admission: &InstalledBatchAdmission<'_>,
+    ) -> Result<Box<dyn InstalledMqFrameSession>, HostProblem>;
 }
 
 impl DefaultProgramRouter {
@@ -67,11 +71,32 @@ impl CobolProgram {
             .map_err(|_| HostProblem::IdempotencyConflict)
     }
 
+    pub(super) fn validate_typed_parent(
+        &self,
+        parent: &Invocation,
+        effect: &EffectRequest,
+    ) -> Result<(), HostProblem> {
+        if self.mqi_host.get().is_none() {
+            return Ok(());
+        }
+        let now = self
+            .observe_execution_control(parent)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        check_controls(parent, now, 0)?;
+        if self.control.get().is_none() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        proof::observe_parent(self, parent, effect, now.now_tick)?;
+        Ok(())
+    }
+
     pub(super) fn admit_batch_mqi(
         &self,
         invocation: &mut Invocation,
-    ) -> Result<Option<Arc<dyn MqMqiProgramFrame>>, HostProblem> {
-        let (host, store) = {
+        admitted: Option<&AdmittedProgram>,
+        call: Option<&replay::WinningInstalledCall<'_>>,
+    ) -> Result<Option<SessionGuard>, HostProblem> {
+        let (host, store, control) = {
             let _setup = self
                 .setup
                 .lock()
@@ -79,8 +104,19 @@ impl CobolProgram {
             let Some(host) = self.mqi_host.get() else {
                 return Ok(None);
             };
+            if call.is_none() || admitted.is_none() {
+                return Err(HostProblem::Unsupported);
+            }
+            if self.host.get().is_none() || self.artifacts.get().is_none() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
             let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
-            (Arc::clone(host), Arc::clone(store))
+            // A typed producer cannot silently select a different clock domain.
+            let control = self
+                .control
+                .get()
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            (Arc::clone(host), Arc::clone(store), Arc::clone(control))
         };
         // Invoke embedding code only after releasing setup; it may call back into the router.
         // This first frame profile does not admit nested CICS/task or IMS
@@ -93,6 +129,17 @@ impl CobolProgram {
         {
             return Err(HostProblem::Unsupported);
         }
+        let call = call.ok_or(HostProblem::Unsupported)?;
+        let admitted = admitted.ok_or(HostProblem::Unsupported)?;
+        let before = self
+            .observe_execution_control(call.parent())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        check_controls(call.parent(), before, 0)?;
+        if !invocation.bindings.contains_key("mq.host-context")
+            && invocation.bindings.len() >= InvocationLimits::default().max_bindings
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
         invocation.bindings.insert(
             "mq.host-context".into(),
             BoundedPayload::new(
@@ -102,9 +149,98 @@ impl CobolProgram {
             )
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
-        host.admit_installed_batch(invocation, store.as_ref())
-            .map(Some)
+        let admission = proof::admitted(
+            self,
+            call.parent(),
+            invocation,
+            admitted,
+            call,
+            &store,
+            &control,
+            before,
+        )?;
+        let session = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            host.admit_installed_batch(&admission)
+        }))
+        .map_err(|_| HostProblem::UnknownOutcome)??;
+        let mut guard = SessionGuard::new(session);
+        guard.original_core = Some(admission.core_intent().clone());
+        // Callback may cancel, advance time or change retained admission state.
+        let recheck = (|| {
+            guard.matches_setup(&store, &control)?;
+            let after = self
+                .observe_execution_control(call.parent())
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            check_controls(call.parent(), after, before.now_tick)?;
+            guard.observed_tick = after.now_tick;
+            let current = proof::admitted(
+                self,
+                call.parent(),
+                invocation,
+                admitted,
+                call,
+                &store,
+                &control,
+                after,
+            )?;
+            if current.core_intent() != admission.core_intent()
+                || current.running_parent() != admission.running_parent()
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
+            Ok(())
+        })();
+        if let Err(problem) = recheck {
+            return Err(guard.abort(problem));
+        }
+        Ok(Some(guard))
     }
+}
+
+pub(super) fn recheck_driving_parent(
+    program: &CobolProgram,
+    call: &replay::WinningInstalledCall<'_>,
+    control: ExecutionControl,
+    floor: &mut u64,
+    expected_core: &mainframe_env_store_api::EffectRecord,
+) -> Result<(), HostProblem> {
+    if control.now_tick < *floor || control.now_tick == 0 || control.now_tick > i64::MAX as u64 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    *floor = control.now_tick;
+    // Preserve the coordinator's own raw cancellation/deadline dispositions.
+    if control.cancellation_requested
+        || call.parent().cancellation_requested()
+        || control.now_tick >= call.parent().deadline_tick
+    {
+        return Ok(());
+    }
+    let (core, _) = proof::observe_parent(program, call.parent(), call.effect(), control.now_tick)?;
+    if &core != expected_core {
+        return Err(HostProblem::UnknownOutcome);
+    }
+    call.recheck()
+}
+
+fn check_controls(
+    invocation: &Invocation,
+    control: ExecutionControl,
+    floor: u64,
+) -> Result<(), HostProblem> {
+    if control.now_tick < floor
+        || control.now_tick == 0
+        || control.now_tick > i64::MAX as u64
+        || invocation.deadline_tick > i64::MAX as u64
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    if control.cancellation_requested || invocation.cancellation_requested() {
+        return Err(HostProblem::Cancelled);
+    }
+    if control.now_tick >= invocation.deadline_tick {
+        return Err(HostProblem::TimedOut);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

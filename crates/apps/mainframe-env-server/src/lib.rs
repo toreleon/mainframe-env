@@ -15,8 +15,9 @@ mod recovery_tests;
 mod retention_maintenance;
 
 pub use cobol::{
-    DefaultProgramRouter, ProgramExecutionControl, ProgramMqHostAdmission,
-    compatible_system_services, default_program_router,
+    DefaultProgramRouter, InstalledBatchAdmission, InstalledMqFrameSession,
+    ProgramExecutionControl, ProgramMqHostAdmission, compatible_system_services,
+    default_program_router,
 };
 pub use config::{
     ArtifactProfile, BootstrapConfig, ConfigOverrides, RetentionConfig, ServerConfig, StoreProfile,

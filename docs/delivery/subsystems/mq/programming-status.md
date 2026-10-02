@@ -6,6 +6,22 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The installed server now supplies a private-constructor, non-Clone/non-Serde
+admission observation only after validated artifact/catalog selection and winning
+the original durable CALL reservation. It preserves the actual parent and
+parentSome child, original core intent/running parent/CALL identity and frozen
+physical store/control/host/artifact adapters. One explicit frame-session guard
+invalidates transport before once-only abort/finish, observes every untouched raw
+coordinator outcome before output mapping, and makes no durable decision on Drop.
+Factory callbacks run outside setup locks; foreign physical store/control,
+late provenance/control changes and uncertain notifications fail closed.
+Fixtures prove actual compiled child/core/CALL dispatch, not an owned selected
+MQ service or independent root/topology. Actual host bridge, guarded local-UOW
+lookup forwarding and inherited-context contradiction checks remain composition
+obligations before public registration. Source baseline
+`ibm-mq-9.4-mqi-2026-08-31`, rows `0008/0009/0012`, distinguishes actual task
+end from child return; raw outcomes are not invented task-end authority.
+
 Checked raw COBOL prefixes now retain every MQOD1/MQMD1/MQMD2/GMO1/PMO1
 field byte and actual capacity, with explicit trusted integer/character encoding.
 The independent raw-layout projection is generated from the existing single

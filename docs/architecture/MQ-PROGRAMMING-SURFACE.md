@@ -328,6 +328,39 @@ service-owned persisted epoch advancement. See
 [ADR 0033](../decisions/0033-mq-historical-handle-observation.md); no service,
 SAF, receipt/retention, UOW or public readiness is supplied by this pure boundary.
 
+### Installed admission and explicit frame session
+
+The server's configured installed-batch factory receives the privately
+constructed, nonserializable `InstalledBatchAdmission` after artifact validation
+and the winning existing CALL reservation. It observes actual parent/child
+linkage, catalog/version and validated artifact/compiler/interface provenance,
+the original enclosing ProgramCall and retained parent canonical intent/running
+execution, and the frozen physical store/control/host/artifact-store references.
+Typed admission rejects absent/stale/mismatched original observations and
+rechecks pending CALL/catalog and live monotonic controls around callbacks.
+Legacy routing remains unchanged when no typed factory is configured. A direct
+scheduler entry lacking that original core occurrence stays pending/Unsupported.
+
+The returned `InstalledMqFrameSession` provides the existing machine frame plus
+explicit preparation abort and raw-outcome finish. One server guard disables
+executable use if the session's physical store/control differs from frozen
+setup, even when all copied records or control observations match. It disables
+executable transport before either once-only notification; callback failure or
+panic preserves UnknownOutcome. Drop disables use without MQDISC/commit/backout,
+parent-state mutation or a cleanup queue. Child return, Condition, suspension or
+transfer does not establish task end. Protected CALL/core/replay retention stays
+with its existing protocol. See [ADR 0032](../decisions/0032-mq-program-machine-frame.md).
+
+Admission provenance is not a host-root/lifecycle lease or SAF/public readiness.
+The selected factory must independently bind the SAME service and physical
+store, actual admitted parent/process/task, current incarnation, original effect
+publication and task/UOW disposition. Equal stored rows or binding/owner bytes
+cannot substitute for that authority. The compiler/published-child/coordinator
+fixtures verify server transport with fixture frames/providers; they do not
+prove a real selected service, compiled scheduler producer or participant.
+Actual host producer, all applicable 26-call contexts, durable typed checkpoint,
+SAF/UOW/replay/recovery and participant/CardDemo acceptance remain required.
+
 ### Coverage identity
 
 The MQ-1506 licensed adapter at
