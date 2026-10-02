@@ -79,12 +79,27 @@ coverage or licensed execution credit.
 The immutable 0.2 catalog index remains unchanged. Later zero-credit source
 sets are registered separately in a target-owned
 `conformance/<minor>/manifests/index.json`. The shared offline reader currently
-loads the 0.9 and 0.14 registries. Each registry row binds the exact manifest
+loads the 0.9, 0.10 and 0.14 registries. Each registry row binds the exact manifest
 bytes, topic-set digest, count, baseline, subsystem and scope while fixing
 `semantic_authority=false` and `coverage_credit=0`. The shared registry schema,
 offline reader, and xtask checker reject unregistered, missing, changed or
 cross-version manifests. Adding another target registry requires extending the
 shared bounded registry list; do not create a target-specific reader.
+
+The 0.10 `cics-spi-command-bodies` and `cics-fepi-command-bodies` scopes
+pin retained CICS TS 6.x command HTML from the 2026-09-12 archive against the
+already pinned CICS TOC. The SPI scope contains 277 command-topic bodies;
+the FEPI scope contains 36. These are topic counts, not the official 269 SPI
+and 39 FEPI command denominators. Shared pages and extra TOC command topics
+cannot alter catalog row identity or grant semantic coverage. Scope registration
+does not certify the archive's overall retrieval, browser reproduction,
+row-to-topic review, grammar, runtime or licensed conformance. Only the bounded
+selected bodies and TOC need an offline import; no refresh is required.
+
+```bash
+python3 -B conformance/tools/ibm_docs.py status --scope cics-spi-command-bodies
+python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-command-bodies
+```
 
 The 0.14 IMS programming-contract scope is checked offline with:
 

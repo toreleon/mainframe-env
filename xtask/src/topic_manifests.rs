@@ -33,6 +33,12 @@ const LATER_REGISTRIES: &[LaterRegistry] = &[
         target_version: "0.9.0",
     },
     LaterRegistry {
+        registry_path: "conformance/0.10/manifests/index.json",
+        manifest_directory: "conformance/0.10/manifests",
+        manifest_prefix: "conformance/0.10/manifests/",
+        target_version: "0.10.0",
+    },
+    LaterRegistry {
         registry_path: "conformance/0.14/manifests/index.json",
         manifest_directory: "conformance/0.14/manifests",
         manifest_prefix: "conformance/0.14/manifests/",

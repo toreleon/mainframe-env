@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Registered bounded retained CICS SPI and FEPI command-body pins for offline source review, with zero behavioral or licensed credit."
