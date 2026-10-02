@@ -981,7 +981,7 @@
       "path": "docs/decisions/0029-cobol-storage-entry-identity.md",
       "relative_links": 0,
       "scope": "language storage identity, before atomic instance admission and close",
-      "sha256": "sha256:4d3fcf23cf5f40d0e47bee16843614ea6a0f3540e204d27bc21158152df3c8bb",
+      "sha256": "sha256:fa5c14382eb7c66b136a4b4ca8a03dbe9c6fd4aa1adaabc2f89d2a38ea99417e",
       "status": "Proposed; private codec prerequisite; runtime writers disabled",
       "title": "ADR-0029: COBOL storage-entry identity within one CICS task",
       "xtask_commands": 0
@@ -1290,7 +1290,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:34174c82105aac99fc5c16ebf28823dbc175c174db13051dafa0716b01f63edc",
+      "sha256": "sha256:cecac0344c50b6e5e3fc8173e03f5bfbe423b65c5a19b3ebf810e9a1a5964ea9",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },

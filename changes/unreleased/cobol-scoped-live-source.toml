@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Fence scoped COBOL live source leases on exit and uncertain atomic publication, with exact source CAS adoption coupled to the root member index; runtime admission remains pending."

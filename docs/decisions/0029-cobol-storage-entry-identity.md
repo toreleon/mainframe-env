@@ -162,6 +162,34 @@ Runtime admission, live source-version adoption, original CALL5 proof, terminal
 checkpoint publication, atomic close and task-end/recovery remain pending.
 No public registration, official gate or parent completion is granted.
 
+## Thread-confined live source guard
+
+The private scoped implementation owns a weak thread-local stack keyed by the
+exact router instance and original invocation. Only the serialized admission
+owner may register a lease after a known successful pending CALL/root/member
+transaction. A canonical busy row or restored binding never registers one.
+The lease is thread-confined and bounds stack depth by the actual invocation
+frame limit and root-wide member ceiling. Drop revokes activity before touching
+the registry, including while a borrowed registry or retained observation exists.
+
+Preparing a source fence requires the current exact live invocation, stored row
+bytes/version and transient owner. Publication stages a byte-preserving source
+CAS in the same mixed transaction as a coupled root-index CAS. The root index
+must retain the source scope/actor, busy phase, exact payload digest and advanced
+source row version. Duplicate or competing mutations of that source key fail
+before publication. The source token adopts a version only on known success.
+Any store error, including acknowledgement loss after a real commit, preserves
+the old observed token and permanently fences this lease; no read-and-adopt or
+cold reconstruction clears uncertainty. Source-row borrows never span a registry
+borrow or grant a second authority.
+
+This primitive has no routing consumer yet. Current core/control provenance,
+original LINK attestation, selected target, original pending CALL, full root
+member/quota validation and terminal close remain mandatory factory checks.
+Tests use real atomic MemoryStore mutations for coupled rollback, known version
+adoption and committed-but-unacknowledged publication; fixtures earn no selected
+product-route, recovered, licensed or parent credit.
+
 ## Source authority and acceptance
 
 Catalog `ibm-cics-ts-6x-2026-08-31:api-commands:0138` LINK, command-body baseline

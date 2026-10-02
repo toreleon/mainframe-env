@@ -8,6 +8,7 @@ use super::*;
 use crate::cobol::storage_scope::Entry;
 use std::collections::BTreeMap;
 
+mod live;
 #[cfg(test)]
 mod tests;
 

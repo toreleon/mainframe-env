@@ -1014,7 +1014,7 @@ module/API/format/schema/docs/dependency gates; clean targets and external recei
 No ceiling increase, suppression, nested workers, source refresh or acceptance
 change. Internal CICSMESSAGE and licensed requirements remain pending.
 
-The manager's scoped row reader child remains private and unsealed. It extends
+The manager's scoped row reader child is sealed at `4d508ad9`, remaining private. It extends
 the existing root retention reader with RunState3/Instance3 integrity, immutable
 scope creators, exact member version/payload index, root-wide 256-member/16-scope
 and monotonic original-CALL receipt charges. Reader hashes provide no live source
@@ -1023,3 +1023,43 @@ mutations; the earlier ten scoped, eight entry and four retention checks passed
 before the later original-CALL identity/creator-member changes. Current-input integrated checks pass: ten scoped, eight entry and four existing
 retention tests, zero ignores, plus mandatory module/API/schema/format/architecture/
 docs/changelog/dependency gates; historical receipts remain separate. Runtime writers remain off.
+
+### Manager live source fence (2026-10-02)
+
+`CIC-902.program-task.frames.scoped-live-source` owns new scoped instance
+`live.rs` and its tests plus one private module registration. The existing
+manager-owned scope lane keeps registration private to known atomic admissions.
+A thread-confined weak lookup stack observes only the current exact router and
+invocation. An owned lease revokes lookup on exit even while an observation is
+retained or a registry borrow is active. Readers and cold busy rows cannot mint
+these tokens. The source fence revalidates full stored bytes and version, stages
+a byte-preserving CAS, requires a coupled root member-index CAS and adopts the
+new source version only after known atomic success. A store error retains the
+old observed version and fences further admission, including lost acknowledgement
+after commit. Current-core/control/LINK origin, target/pending CALL preparation
+and actual scoped runtime wiring remain manager obligations, with no recovery
+or official credit from this bounded source primitive. Focused tests require
+cold/thread/context/lease-exit rejection, stale observation rejection, coupled
+root conflict rollback, known retokening and actual after-commit ack loss; source
+flow/rules pins apply and targets must be cleaned. No shared ledger or new root
+identity is introduced.
+
+### Terminal checkpoint PostgreSQL follow-up (2026-10-02)
+
+The existing scoped terminal-checkpoint worker resumes from its local unsealed
+`a5d0d1a6` candidate for a bounded backend evidence follow-up. It owns only its
+external test harness, task-specific PostgreSQL data/server and receipts; no
+tracked file edits are authorized. It must use local PostgreSQL 18.6, an isolated
+loopback port/database, the exact current worker libraries or verified retained
+binary, and stop the server and clean its own Cargo target after the sequence.
+Required selectors cover actual GOBACK and EXIT PROGRAM atomic terminal images,
+close/reopen, Completed/Completing no redispatch, invalid image and configured
+payload/capacity publication failure preserving Completing without partial
+checkpoint/events. Earlier ignored selectors remain historical zero credit.
+No source refresh, licensed run, nested worker, manager checkout write or parent
+completion is authorized. These worker receipts require later integrated-candidate
+verification and cannot replace live scope admission or close authority.
+
+Integrated live source primitive: six focused tests pass with zero ignores;
+mandatory policy gates must pass before its bounded seal. Actual scope routing
+and application acceptance remain pending.
