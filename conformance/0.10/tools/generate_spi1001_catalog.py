@@ -347,6 +347,7 @@ def project_family_grammar(
                 "required": grammar["required"],
                 "exclusive": grammar["exclusive"],
                 "dependencies": grammar["dependencies"],
+                "alternative_groups": grammar.get("alternative_groups", []),
             },
         })
     return facts
@@ -407,6 +408,16 @@ def render_grammar_facts(facts: list[dict[str, Any]]) -> bytes:
             )
         lines.append("        ],")
         lines.append(f"        required_options: {rust_string_slice(grammar['required'])},")
+        lines.append("        alternative_groups: &[")
+        for group in grammar["alternative_groups"]:
+            required = str(group["required"]).lower()
+            require(type(group["required"]) is bool, "alternative requirement is not boolean")
+            lines.append(
+                "            CicsApplicationOptionAlternative { "
+                f"members: {rust_string_slice(group['members'])}, required: {required} "
+                "},"
+            )
+        lines.append("        ],")
         lines.append("        dependencies: &[")
         for dependency in grammar["dependencies"]:
             lines.append(

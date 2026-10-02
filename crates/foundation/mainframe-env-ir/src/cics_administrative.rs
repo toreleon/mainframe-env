@@ -5,9 +5,9 @@
 //! The existing application-command and CICS runtime authorities are unchanged.
 
 use crate::{
-    CicsApplicationConstraintStatus, CicsApplicationOptionDependency,
-    CicsApplicationOptionDescriptor, CicsApplicationOptionDirection,
-    CicsApplicationOptionValueShape,
+    CicsApplicationConstraintStatus, CicsApplicationOptionAlternative,
+    CicsApplicationOptionDependency, CicsApplicationOptionDescriptor,
+    CicsApplicationOptionDirection, CicsApplicationOptionValueShape,
 };
 
 /// CICS administrative programming interface that owns an official identity.
@@ -65,6 +65,8 @@ pub struct CicsAdministrativeGrammarContract {
     pub options: &'static [CicsApplicationOptionDescriptor],
     /// Unconditional required operands only.
     pub required_options: &'static [&'static str],
+    /// Required or optional alternatives, using the existing CICS constraint type.
+    pub alternative_groups: &'static [CicsApplicationOptionAlternative],
     /// Source-reviewed option-presence dependencies only.
     pub dependencies: &'static [CicsApplicationOptionDependency],
     /// Groups whose members cannot occur together.

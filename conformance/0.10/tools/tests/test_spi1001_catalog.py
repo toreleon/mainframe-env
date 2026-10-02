@@ -202,6 +202,28 @@ class AdministrativeGrammarTests(unittest.TestCase):
         self.assertEqual(expected, catalog_tool.render_grammar())
         self.assertEqual(expected, (catalog_tool.ROOT / catalog_tool.GRAMMAR_OUTPUT_PATH).read_bytes())
 
+    def test_optional_alternative_field_is_backward_compatible(self) -> None:
+        original = catalog_tool.render_grammar_facts(self.project())
+        explicit_empty = copy.deepcopy(self.family)
+        for command in explicit_empty["commands"]:
+            command["grammar"]["alternative_groups"] = []
+        self.assertEqual(original, catalog_tool.render_grammar_facts(self.project(explicit_empty)))
+
+    def test_alternatives_preserve_requirement_and_reject_nonboolean(self) -> None:
+        changed = copy.deepcopy(self.family)
+        changed["commands"][0]["grammar"]["alternative_groups"] = [
+            {"members": ["LOG", "NOLOG"], "required": True}
+        ]
+        required = catalog_tool.render_grammar_facts(self.project(changed)).decode()
+        self.assertIn('members: &["LOG", "NOLOG"], required: true', required)
+        changed["commands"][0]["grammar"]["alternative_groups"][0]["required"] = False
+        optional = catalog_tool.render_grammar_facts(self.project(changed)).decode()
+        self.assertIn('members: &["LOG", "NOLOG"], required: false', optional)
+        self.assertNotEqual(required, optional)
+        changed["commands"][0]["grammar"]["alternative_groups"][0]["required"] = "true"
+        with self.assertRaisesRegex(catalog_tool.CatalogError, "not boolean"):
+            catalog_tool.render_grammar_facts(self.project(changed))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -195,6 +195,35 @@
                 },
                 "maxItems": 256,
                 "uniqueItems": true
+              },
+              "alternative_groups": {
+                "type": "array",
+                "maxItems": 256,
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9]*$",
+                        "maxLength": 64
+                      },
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "minItems": 2
+                    },
+                    "required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "members",
+                    "required"
+                  ]
+                }
               }
             },
             "required": [

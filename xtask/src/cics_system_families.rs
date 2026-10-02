@@ -191,6 +191,18 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
             )?;
             references(group)?;
         }
+        if grammar.get("alternative_groups").is_some() {
+            let mut groups = BTreeSet::new();
+            for group in array(grammar, "alternative_groups", path)? {
+                references(&group["members"])?;
+                let mut members = names(&group["members"], path)?;
+                members.sort_unstable();
+                require(
+                    groups.insert(members),
+                    "duplicate CICS family alternative group",
+                )?;
+            }
+        }
         let mut dependency_heads = BTreeSet::new();
         for dependency in array(grammar, "dependencies", path)? {
             let head = text(dependency, "option", path)?;
@@ -411,5 +423,48 @@ mod tests {
         assert!(check_file(&root, "spi-program", &path).is_err());
         assert!(check(&directory, Some("spi-program")).is_err());
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    fn alternative_fixture() -> Value {
+        let mut value = fixture("spi-program");
+        let grammar = &mut value["commands"][0]["grammar"];
+        let mut other = grammar["options"][0].clone();
+        other["name"] = json!("OTHER");
+        grammar["options"].as_array_mut().unwrap().push(other);
+        grammar["required"] = json!([]);
+        grammar["alternative_groups"] = json!([{"members":["NAME","OTHER"],"required":true}]);
+        value
+    }
+
+    #[test]
+    fn required_optional_and_absent_alternatives_validate_without_promotion() {
+        let mut value = alternative_fixture();
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        value["commands"][0]["grammar"]["alternative_groups"][0]["required"] = json!(false);
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        assert_eq!(valid("spi-program", &fixture("spi-program")).unwrap(), 4);
+    }
+
+    #[test]
+    fn dangling_small_duplicate_or_nonboolean_alternatives_fail() {
+        for mode in 0..6 {
+            let mut value = alternative_fixture();
+            let groups = &mut value["commands"][0]["grammar"]["alternative_groups"];
+            match mode {
+                0 => groups[0]["members"] = json!(["NAME", "FOREIGN"]),
+                1 => groups[0]["members"] = json!(["NAME"]),
+                2 => groups[0]["members"] = json!(["NAME", "NAME"]),
+                3 => groups[0]["required"] = json!("true"),
+                4 => groups
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"members":["OTHER","NAME"],"required":true})),
+                _ => groups
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"members":["NAME","OTHER"],"required":false})),
+            }
+            assert!(valid("spi-program", &value).is_err(), "mode {mode}");
+        }
     }
 }

@@ -1398,3 +1398,28 @@ project 97 typed operand facts through existing CICS operand types. Every
 contract retains Pending completeness; source candidates/response/lifecycle
 prose and verdicts do not generate product behavior. Identity catalog bytes and
 269/39 denominators are unchanged. Mandatory gates precede this bounded seal.
+
+## Required alternative groups in shared family contracts
+
+Manager declares `SPI-1001.family-alternative-constraints` before implementation.
+The frozen family schema supports exclusions and dependencies but cannot state
+that one selector from a group must be present. FEPI named/list selection thus
+remains only prose, even though the existing CICS IR already has a bounded
+CicsApplicationOptionAlternative type. This infrastructure slice adds optional
+alternative_groups (members plus required) to the family schema, validates
+declared unique members/groups, and projects them through that existing type.
+Manager exclusively owns the schema, xtask validator, current generator/tests,
+administrative IR module/derived projection, fragment and status/docs. Active
+reviewer frozen schemas and contract bytes are unchanged. No command-specific
+alternative is inferred or inserted by this slice; future reviewed contract
+repairs supply actual groups. Acceptance includes backwards-compatible absent
+groups, required/optional round trip, stale/dangling/duplicate group rejection,
+Pending completeness and mandatory shared gates. No conditional expression DSL,
+new parser or runtime admission is introduced.
+
+Alternative-group infrastructure passes ten focused validator tests,
+19 generator tests and seven IR compatibility tests, with no ignores.
+Old family inputs remain valid and no command-specific alternatives are
+invented. Dangling/duplicate/nonboolean groups fail validation; required
+flags survive the common IR projection. Pending completeness, private
+binding and zero behavioral credit remain. Mandatory gates precede seal.
