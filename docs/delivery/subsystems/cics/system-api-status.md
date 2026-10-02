@@ -3319,3 +3319,56 @@ family instances, including the common condition-name/RESP authority. Private
 and all 62 numeric domains/217 numeric records remain unchanged. FEPI pool/resource
 extent/domain review and application dependency audit retain separate gates;
 runtime and parent acceptance remain Pending.
+
+FEPI pool/resource integration child SPI-1001.fepi-pool-resource-cvda-extents
+is manager-owned after different-thread independent review of all 70 operations:
+40 source-backed null-to-4 extent replacements, 15 parent arrays with 40 domains/
+125 member occurrences and 15 exact Pending binding gaps. All 20 rows, 255
+operands, 306 response objects, 91 obligations, 362 whole cases and 175 original
+gaps retain exact values/types/key/array/ID order except the 40 authorized extent
+scalars; the other 215 whole operand objects and every old citation are unchanged.
+No option, direction, form, response or case is added. Manager independently
+proved whole original/candidate forward/reverse bytes and actual full/delta patch
+replay; all 102 current declared artifact references match hashes. Manager read
+all 70 changed-property records, 40 own domain/qualifier records and 15 independent
+gap dispositions. Fresh manager offline source consultation used 33 successful
+search/read calls on 16 exact topics, with all 17 actual pages/1116 parser lines
+read completely. Primary baseline ibm-cics-ts-6x-fepi-command-bodies-2026-09-12;
+exact own catalog row/topic/hash identities stay in the three family inputs.
+Extent authority joins common dfha80x sources-b 2026-09-10 hash
+81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25 parser7-15,
+FEPI SPI applicability dfhp7k4 context-candidates 2026-09-12 hash
+ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712 parser3-7,
+and each own CVDA header and settled sender/receiver role. Complete argument-values
+dfhp4_argumentvalues sources-b hash44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70
+corroborates fullword binary with FIXED BIN(31). Four-byte source projection does
+not establish native C long width, ABI/alignment/endian/numeric encoding, aliases
+or actual receiver allocation. All such bindings remain Pending.
+Query GOINGOUT, ACQUIRING/RELEASING and NOTAPPLIC remain separate from SET/INSTALL
+sender domains. DEVICE/SLU mode, FORMAT character attributes, CONTENTION,
+INITIALDATA recommendation, journal direction, unsolicited-data acknowledgment
+and optional outputs retain own paragraph qualifications. Handler/TD queue names
+remain names, without invented finite domains or omitted defaults. Property-set
+inquiry specified-pool wording remains ambiguous. Existing NODE body174/index176
+OPEN ACB and ADD/INSTALL zero-count oppositions remain exact and Pending. General
+FEPI error no-change wording does not override list partial successes, including
+valid-pool installation with failed node lists. Requests can return before
+attainment; event/TD loss, EXCEPTIONQ/CSZX routing, journal versus durable platform
+audit, caller UOW/recovery and uncertain-outcome retry remain separate obligations.
+The prior 15-gap-only external prototype was never integrated; exact root inputs
+are the preimage, and only its extra blockers are superseded externally. Historical
+prototype bodies/reports are immutable. No schema/guard is loosened, no shared
+shadow authority or runtime route is added. Manager solely owns shared schema/
+types/generator/IR/status and serialized integration. Only this bounded child
+seals after actual affected instances/projection/focused/mandatory gates. All six
+command gates, parent/application/route/recovery/restart/licensed acceptance stay
+Pending, credit0. The three user-deferred v0.9 identities remain catalogued/Pending.
+
+FEPI pool/resource integrated source candidate passes 31 generator and nine IR
+regressions, all three actual affected Draft202012 family instances and all 18
+actual family instances, including common condition-name/RESP authority. Private
+305-command projection (266 SPI and39 FEPI),5082 operands/8947 case candidates
+and all62 numeric domains/217 numeric records stay unchanged. Exactly40 source
+extent scalars and40 scoped symbolic domains are added to the existing authority.
+Application dependency audit retains its separate evidence gate; runtime and
+parent acceptance remain Pending.

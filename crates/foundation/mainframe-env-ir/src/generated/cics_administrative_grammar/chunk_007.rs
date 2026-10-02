@@ -4,6 +4,63 @@
 /// Partial source-reviewed grammar contracts, with Pending completeness and no routes.
 pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
     CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0107",
+        family: "spi-queue-storage",
+        label: "INQUIRE CFDTPOOL",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquirecfdtpool.html",
+        source_sha256: "sha256:c5cd217ddcda7ad18d66d8e3415e1ce40d3131d90b1ff4d645cdbcf3ae3f8f4e",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "CFDTPOOL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "CONNSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "END", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NEXT", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "START", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "CONNSTATUS", values: &["CONNECTED", "UNAVAILABLE", "UNCONNECTED"] },
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &[],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["END", "NEXT", "START"]],
+        forms: &[
+            CicsAdministrativeGrammarForm {
+                id: "named-cfdtpool",
+                selector_options: &["CFDTPOOL"],
+                options: &[
+                    CicsApplicationOptionDescriptor { name: "CFDTPOOL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+                    CicsApplicationOptionDescriptor { name: "CONNSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+                    CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+                    CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+                    CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+                ],
+                cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "CONNSTATUS", values: &["CONNECTED", "UNAVAILABLE", "UNCONNECTED"] },
+                ],
+                cvda_numeric_domains: &[
+                ],
+                required_options: &["CFDTPOOL"],
+                alternative_groups: &[
+                ],
+                dependencies: &[
+                    CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+                ],
+                mutual_exclusion_groups: &[],
+                constraint_status: CicsApplicationConstraintStatus::Pending,
+            },
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0108",
         family: "spi-network-connections",
         label: "INQUIRE CONNECTION",

@@ -29,7 +29,7 @@
             "name": "ACQSTATUS",
             "value_shape": "value",
             "direction": "input",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               17,
               20
@@ -132,7 +132,7 @@
             "name": "SERVSTATUS",
             "value_shape": "value",
             "direction": "input",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               36,
               45
@@ -203,6 +203,34 @@
             "option": "TARGETNUM",
             "requires": [
               "TARGETLIST"
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACQSTATUS",
+            "values": [
+              "ACQUIRED",
+              "RELEASED"
+            ],
+            "source_lines": [
+              17,
+              21,
+              24,
+              26
+            ]
+          },
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              36,
+              40,
+              43,
+              45
             ]
           }
         ]
@@ -915,7 +943,8 @@
         "Inherited NOHANDLE and RESP2-with-RESP use existing application option conventions. The FEPI overview names them but does not restate complete global format/handler semantics; the manager must bind the existing shared compiler authority.",
         "Numeric source_lines refer only to this command body; inherited conditions/options are separately cited inline. Condition numeric identities reuse cics-eibresp-condition-name@1 from conformance/0.9/generated/cics-application-command-contracts.json, not a new response mapper.",
         "The generic RESP2 index [SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html sha256:0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4 parser lines 537-610; cics-fepi-context-candidates] calls zero counts invalid, whereas this command explicitly documents 0..256. Preserve the command-specific inclusive range, expose this source disagreement for review and do not silently reject zero.",
-        "RESP2 175 remains the sourced duplicate-connection mapping, but an isolated reachable graph excluding duplicate-node/target conditions and its response precedence are unresolved. No fixed-outcome 175 candidate is executable until additional source/fixture authority establishes that graph; the mixed duplicate/new-node candidate proves supported list partial success instead."
+        "RESP2 175 remains the sourced duplicate-connection mapping, but an isolated reachable graph excluding duplicate-node/target conditions and its response precedence are unresolved. No fixed-outcome 175 candidate is executable until additional source/fixture authority establishes that graph; the mixed duplicate/new-node candidate proves supported list partial success instead.",
+        "Pending CVDA ABI and runtime binding for ACQSTATUS, SERVSTATUS: the extent 4 records only the source fullword binary CVDA representation, joined through the FEPI SPI common-command rules and this command's own CVDA option paragraphs. It does not establish native C long size, host ABI, alignment, endian, numeric encoding, aliases, receiver binding, or source-case execution. Closed membership does not settle existing form/optional-output, device/applicability, requested-versus-attained state, response-precedence, UOW or recovery gaps. [Common CVDA SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10; parser 7-15. FEPI SPI SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; parser 3-7]. All behavioral gates remain Pending with credit 0."
       ]
     },
     {
@@ -2034,7 +2063,7 @@
             "name": "CONTENTION",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               22,
               30
@@ -2044,7 +2073,7 @@
             "name": "DEVICE",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               31,
               58
@@ -2103,7 +2132,7 @@
             "name": "FORMAT",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               70,
               78
@@ -2113,7 +2142,7 @@
             "name": "INITIALDATA",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               79,
               85
@@ -2123,7 +2152,7 @@
             "name": "INSTLSTATUS",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               86,
               91
@@ -2143,7 +2172,7 @@
             "name": "MSGJRNL",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               96,
               106
@@ -2212,7 +2241,7 @@
             "name": "SERVSTATUS",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               111,
               119
@@ -2251,7 +2280,7 @@
             "name": "UNSOLDATACK",
             "value_shape": "value",
             "direction": "output",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               126,
               134
@@ -2297,6 +2326,142 @@
             "option": "RESP2",
             "requires": [
               "RESP"
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CONTENTION",
+            "values": [
+              "LOSE",
+              "WIN"
+            ],
+            "source_lines": [
+              22,
+              26,
+              29,
+              30
+            ]
+          },
+          {
+            "option": "DEVICE",
+            "values": [
+              "LUP",
+              "T3278M2",
+              "T3278M3",
+              "T3278M4",
+              "T3278M5",
+              "T3279M2",
+              "T3279M3",
+              "T3279M4",
+              "T3279M5",
+              "TPS55M2",
+              "TPS55M3",
+              "TPS55M4"
+            ],
+            "source_lines": [
+              31,
+              35,
+              37,
+              39,
+              41,
+              43,
+              45,
+              47,
+              49,
+              51,
+              53,
+              55,
+              57,
+              58
+            ]
+          },
+          {
+            "option": "FORMAT",
+            "values": [
+              "DATASTREAM",
+              "FORMATTED",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              70,
+              73,
+              75,
+              77,
+              78
+            ]
+          },
+          {
+            "option": "INITIALDATA",
+            "values": [
+              "INBOUND",
+              "NOTINBOUND"
+            ],
+            "source_lines": [
+              79,
+              82,
+              84,
+              85
+            ]
+          },
+          {
+            "option": "INSTLSTATUS",
+            "values": [
+              "INSTALLED",
+              "NOTINSTALLED"
+            ],
+            "source_lines": [
+              86,
+              88,
+              90,
+              91
+            ]
+          },
+          {
+            "option": "MSGJRNL",
+            "values": [
+              "INOUT",
+              "INPUT",
+              "NOMSGJRNL",
+              "OUTPUT"
+            ],
+            "source_lines": [
+              96,
+              99,
+              101,
+              103,
+              105,
+              106
+            ]
+          },
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "GOINGOUT",
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              111,
+              113,
+              115,
+              117,
+              119
+            ]
+          },
+          {
+            "option": "UNSOLDATACK",
+            "values": [
+              "NEGATIVE",
+              "NOTAPPLIC",
+              "POSITIVE"
+            ],
+            "source_lines": [
+              126,
+              129,
+              131,
+              133,
+              134
             ]
           }
         ]
@@ -2770,7 +2935,8 @@
         "IBM lock ordering, browse consistency under concurrent install/discard/set, and atomic snapshots of the pool/connection graph are unstated. Repository lock/CAS order is an integration obligation, not a sourced IBM isolation guarantee.",
         "Inherited NOHANDLE and RESP2-with-RESP use existing application option conventions. The FEPI overview names them but does not restate complete global format/handler semantics; the manager must bind the existing shared compiler authority.",
         "Numeric source_lines refer only to this command body; inherited conditions/options are separately cited inline. Condition numeric identities reuse cics-eibresp-condition-name@1 from conformance/0.9/generated/cics-application-command-contracts.json, not a new response mapper.",
-        "Flat grammar cannot fully express the conditional POOL shape/direction or legal output groups on browse forms; the existing compiler must consume the explicit form requirements above. No competing parser is introduced."
+        "Flat grammar cannot fully express the conditional POOL shape/direction or legal output groups on browse forms; the existing compiler must consume the explicit form requirements above. No competing parser is introduced.",
+        "Pending CVDA ABI and runtime binding for CONTENTION, DEVICE, FORMAT, INITIALDATA, INSTLSTATUS, MSGJRNL, SERVSTATUS, UNSOLDATACK: the extent 4 records only the source fullword binary CVDA representation, joined through the FEPI SPI common-command rules and this command's own CVDA option paragraphs. It does not establish native C long size, host ABI, alignment, endian, numeric encoding, aliases, receiver binding, or source-case execution. Closed membership does not settle existing form/optional-output, device/applicability, requested-versus-attained state, response-precedence, UOW or recovery gaps. [Common CVDA SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10; parser 7-15. FEPI SPI SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; parser 3-7]. All behavioral gates remain Pending with credit 0."
       ]
     },
     {
@@ -2802,7 +2968,7 @@
             "name": "ACQSTATUS",
             "value_shape": "value",
             "direction": "input",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               20,
               28
@@ -2915,7 +3081,7 @@
             "name": "SERVSTATUS",
             "value_shape": "value",
             "direction": "input",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               42,
               51
@@ -2987,6 +3153,34 @@
             "option": "TARGETNUM",
             "requires": [
               "TARGETLIST"
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACQSTATUS",
+            "values": [
+              "ACQUIRED",
+              "RELEASED"
+            ],
+            "source_lines": [
+              20,
+              24,
+              26,
+              28
+            ]
+          },
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              42,
+              46,
+              49,
+              51
             ]
           }
         ]
@@ -3742,7 +3936,8 @@
         "IBM lock ordering, browse consistency under concurrent install/discard/set, and atomic snapshots of the pool/connection graph are unstated. Repository lock/CAS order is an integration obligation, not a sourced IBM isolation guarantee.",
         "Inherited NOHANDLE and RESP2-with-RESP use existing application option conventions. The FEPI overview names them but does not restate complete global format/handler semantics; the manager must bind the existing shared compiler authority.",
         "Numeric source_lines refer only to this command body; inherited conditions/options are separately cited inline. Condition numeric identities reuse cics-eibresp-condition-name@1 from conformance/0.9/generated/cics-application-command-contracts.json, not a new response mapper.",
-        "The generic RESP2 index [SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html sha256:0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4 parser lines 537-610; cics-fepi-context-candidates] calls zero counts invalid, whereas this command explicitly documents 0..256. Preserve the command-specific inclusive range, expose this source disagreement for review and do not silently reject zero."
+        "The generic RESP2 index [SSJL4D_6.x/reference-applications/commands-fepi/dfhp708.html sha256:0860fdc18a36442fc888ce25b1fc511cd9eb26debd4a45f7ec5e74400dcac6b4 parser lines 537-610; cics-fepi-context-candidates] calls zero counts invalid, whereas this command explicitly documents 0..256. Preserve the command-specific inclusive range, expose this source disagreement for review and do not silently reject zero.",
+        "Pending CVDA ABI and runtime binding for ACQSTATUS, SERVSTATUS: the extent 4 records only the source fullword binary CVDA representation, joined through the FEPI SPI common-command rules and this command's own CVDA option paragraphs. It does not establish native C long size, host ABI, alignment, endian, numeric encoding, aliases, receiver binding, or source-case execution. Closed membership does not settle existing form/optional-output, device/applicability, requested-versus-attained state, response-precedence, UOW or recovery gaps. [Common CVDA SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10; parser 7-15. FEPI SPI SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; parser 3-7]. All behavioral gates remain Pending with credit 0."
       ]
     },
     {
@@ -3846,7 +4041,7 @@
             "name": "SERVSTATUS",
             "value_shape": "value",
             "direction": "input",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               21,
               31
@@ -3906,6 +4101,21 @@
               "POOLLIST"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              21,
+              24,
+              26,
+              31
+            ]
           }
         ]
       },
@@ -4447,7 +4657,8 @@
         "IBM lock ordering, browse consistency under concurrent install/discard/set, and atomic snapshots of the pool/connection graph are unstated. Repository lock/CAS order is an integration obligation, not a sourced IBM isolation guarantee.",
         "Inherited NOHANDLE and RESP2-with-RESP use existing application option conventions. The FEPI overview names them but does not restate complete global format/handler semantics; the manager must bind the existing shared compiler authority.",
         "Numeric source_lines refer only to this command body; inherited conditions/options are separately cited inline. Condition numeric identities reuse cics-eibresp-condition-name@1 from conformance/0.9/generated/cics-application-command-contracts.json, not a new response mapper.",
-        "The frozen grammar shape lacks an exactly-one selector group; the POOL versus POOLLIST/POOLNUM requirement is normative in lifecycle preconditions and independent cases, not encoded by inventing a universal expression DSL."
+        "The frozen grammar shape lacks an exactly-one selector group; the POOL versus POOLLIST/POOLNUM requirement is normative in lifecycle preconditions and independent cases, not encoded by inventing a universal expression DSL.",
+        "Pending CVDA ABI and runtime binding for SERVSTATUS: the extent 4 records only the source fullword binary CVDA representation, joined through the FEPI SPI common-command rules and this command's own CVDA option paragraphs. It does not establish native C long size, host ABI, alignment, endian, numeric encoding, aliases, receiver binding, or source-case execution. Closed membership does not settle existing form/optional-output, device/applicability, requested-versus-attained state, response-precedence, UOW or recovery gaps. [Common CVDA SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10; parser 7-15. FEPI SPI SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; parser 3-7]. All behavioral gates remain Pending with credit 0."
       ]
     }
   ]

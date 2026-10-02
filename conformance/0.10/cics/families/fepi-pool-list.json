@@ -100,7 +100,7 @@
             "name": "SERVSTATUS",
             "value_shape": "value",
             "direction": "input",
-            "source_max_value_bytes": null,
+            "source_max_value_bytes": 4,
             "source_lines": [
               21,
               31
@@ -163,6 +163,21 @@
               "POOLLIST"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "SERVSTATUS",
+            "values": [
+              "INSERVICE",
+              "OUTSERVICE"
+            ],
+            "source_lines": [
+              21,
+              24,
+              26,
+              31
+            ]
           }
         ]
       },
@@ -640,7 +655,8 @@
         "Source does not establish IBM lock order, graph snapshot isolation, browse visibility during concurrent install/discard/set, persistence encoding, retention or restart. These remain manager integration gaps.",
         "The @1 schema cannot condition operand direction on named/NEXT browse mode, express CVDA-value compatibility, or encode all context predicates. Explicit variant/value rules below require bounded extensions in the existing compiler; this artifact is not Frozen-ready.",
         "Numeric source_lines only locate this body. Inherited facts use separately cited path/pin/parser lines, and condition numeric identities reuse cics-eibresp-condition-name@1 from the existing application contracts. No second response mapper.",
-        "Shared-body list-only responses are preserved with explicit applicability; valid named forms cannot supply the list count. @1 lacks a first-class official-row variant descriptor, so compiler projection must preserve these reviewed identities."
+        "Shared-body list-only responses are preserved with explicit applicability; valid named forms cannot supply the list count. @1 lacks a first-class official-row variant descriptor, so compiler projection must preserve these reviewed identities.",
+        "Pending CVDA ABI and runtime binding for SERVSTATUS: the extent 4 records only the source fullword binary CVDA representation, joined through the FEPI SPI common-command rules and this command's own CVDA option paragraphs. It does not establish native C long size, host ABI, alignment, endian, numeric encoding, aliases, receiver binding, or source-case execution. Closed membership does not settle existing form/optional-output, device/applicability, requested-versus-attained state, response-precedence, UOW or recovery gaps. [Common CVDA SSJL4D_6.x/system-programming/intro/dfha80x.html sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25; baseline ibm-cics-ts-6x-application-api-sources-b-2026-09-10; parser 7-15. FEPI SPI SSJL4D_6.x/reference-applications/commands-fepi/dfhp7k4.html sha256:ceb549cbc97f724aab9d489ec464d708d45e487d38e6479703de507d2d726712; baseline ibm-cics-ts-6x-fepi-context-candidates-2026-09-12; parser 3-7]. All behavioral gates remain Pending with credit 0."
       ]
     }
   ]
