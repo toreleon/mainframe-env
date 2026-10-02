@@ -99,6 +99,7 @@ explicitly names that authority as superseded.
 - [ADR-0037: Private IMS recovery retention fence](decisions/0037-private-ims-recovery-retention-fence.md)
 - [ADR-0038: Real logical child physical-path key feedback](decisions/0038-logical-child-physical-key-feedback.md)
 - [ADR-0039: Last remaining direct child SSA selection](decisions/0039-last-direct-child-ssa-selection.md)
+- [ADR-0041: First direct child SSA selection](decisions/0041-first-direct-child-ssa-selection.md)
 - [ADR-0033: Raw COBOL DL/I CALL and PCB binding contract](decisions/0033-cobol-dli-call-boundary.md)
 - [ADR-0028: Db2 typed catalog evolution](decisions/0028-db2-typed-catalog-evolution.md)
 - [ADR-0029: Db2 core participant evolution](decisions/0029-db2-core-participant-evolution.md)

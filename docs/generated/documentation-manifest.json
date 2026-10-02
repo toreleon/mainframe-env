@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 239,
+    "markdown_documents": 240,
     "navigation_groups": 6,
-    "normative_documents": 70,
+    "normative_documents": 71,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 126,
-      "sha256": "sha256:e7ff7c0406271a3b00353e9026371dbf7b663ad66e9efca8692cf4b17812a319",
+      "relative_links": 127,
+      "sha256": "sha256:5de502e988da26a6feccf26f994b519550c5afd797a65ed61cbaba21dc9a54f5",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1107,6 +1107,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0041-first-direct-child-ssa-selection.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.ssa-first-direct-child, bounded local runtime leaf",
+      "sha256": "sha256:623abfdb216f3c212fbc738f1e32a738f5b282af6ea4b4bbe838b2601e226763",
+      "status": "Proposed",
+      "title": "ADR-0041: First direct child SSA selection",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 35,
@@ -1562,7 +1574,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 18,
-      "sha256": "sha256:89b8ac873b8c23b069e868b25903f428f140c7d731f976cfbb485fd98f2722ee",
+      "sha256": "sha256:01f0feac9d7dab1972c6651e8de90a79bd7144604f8086ec4d463ae55b4451ee",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2444,6 +2456,10 @@
           "path": "docs/decisions/0039-last-direct-child-ssa-selection.md"
         },
         {
+          "label": "ADR-0041: First direct child SSA selection",
+          "path": "docs/decisions/0041-first-direct-child-ssa-selection.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
@@ -2716,7 +2732,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:86f3f5f48df2c202627c22b1da3a00c1dc4f7aa6e8723f8ceae9cd7e99d5881b",
+  "registry_sha256": "sha256:da5911f655dbcb1e65cfeb4f48ae9192ba159871cf6bd44bcc7f9182127cd53b",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

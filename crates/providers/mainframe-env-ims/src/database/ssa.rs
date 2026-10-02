@@ -67,8 +67,9 @@ impl ImsSsaFieldResolver for SsaFields<'_> {
 }
 
 impl DatabaseEngine {
-    /// Validate the live physical path before admitting last-direct-child selection.
+    /// Shared live-path fence for the finite F/L direct-child selections.
     /// Uniqueness/logical metadata and call context remain with the PCB adapter.
+    /// The historical method name remains for existing L regression callers.
     pub(crate) fn validate_last_direct_child(
         &self,
         position: &PcbPosition,
@@ -98,7 +99,8 @@ impl DatabaseEngine {
             || !ssa.predicates.is_empty()
             || !ssa.connectors.is_empty()
             || ssa.commands.len() != 1
-            || ssa.commands[0].code != b'L'
+            || !matches!(ssa.commands[0].code, b'F' | b'L')
+            || ssa.commands[0].code == b'F' && !self.definition.secondary_indexes.is_empty()
             || ssa.commands[0].subset_pointer.is_some()
             || !position.valid_retained_shape()
             || position.after_end
@@ -146,10 +148,10 @@ impl DatabaseEngine {
         visible: impl Fn(&str) -> bool,
     ) -> Result<RecordView, EngineProblem> {
         self.validate_ssas(request, ssas, secondary)?;
-        let last = ssas
+        let direct_child_selection = ssas
             .iter()
-            .any(|ssa| ssa.commands.iter().any(|c| c.code == b'L'));
-        if last {
+            .any(|ssa| ssa.commands.iter().any(|c| matches!(c.code, b'F' | b'L')));
+        if direct_child_selection {
             self.validate_last_direct_child(position, request, ssas, secondary)?;
         }
         if request.kind == ReadKind::NextInParent {
@@ -206,10 +208,14 @@ impl DatabaseEngine {
             self.read_matching_selected(
                 position,
                 request,
-                if last {
-                    Selection::Last
-                } else {
-                    Selection::First
+                match ssas
+                    .first()
+                    .and_then(|ssa| ssa.commands.first())
+                    .map(|c| c.code)
+                {
+                    Some(b'F') => Selection::FirstInParent,
+                    Some(b'L') => Selection::Last,
+                    _ => Selection::First,
                 },
                 |id| matches(id, None),
             )

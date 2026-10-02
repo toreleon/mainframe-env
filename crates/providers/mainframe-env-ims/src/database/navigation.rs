@@ -1,10 +1,11 @@
 use super::*;
 use std::cmp::Ordering;
 
-/// Call-local choice within the existing forward interval; never retained.
+/// Call-local start/selection choice in the sole traversal; never retained.
 pub(super) enum Selection {
     First,
     Last,
+    FirstInParent,
 }
 
 impl PcbPosition {
@@ -111,7 +112,7 @@ impl DatabaseEngine {
                     .iter()
                     .position(|id| !self.is_descendant(*id, parent))
                     .map_or(order.len(), |offset| parent_index + 1 + offset);
-                let start = next
+                let forward_start = next
                     .current
                     .and_then(|current| {
                         order[parent_index + 1..stop]
@@ -119,9 +120,15 @@ impl DatabaseEngine {
                             .position(|id| *id == current)
                     })
                     .map_or(parent_index + 1, |offset| parent_index + 2 + offset);
+                let start = match selection {
+                    Selection::FirstInParent => parent_index + 1,
+                    Selection::First | Selection::Last => forward_start,
+                };
                 let mut candidates = order[start..stop].iter().copied();
                 match selection {
-                    Selection::First => candidates.find(|id| matches(*id)),
+                    Selection::First | Selection::FirstInParent => {
+                        candidates.find(|id| matches(*id))
+                    }
                     Selection::Last => {
                         candidates.fold(
                             None,

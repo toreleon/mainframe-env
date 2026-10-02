@@ -6,6 +6,157 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root F integration declaration — 2026-10-03
+
+Root consumes worker `31fd19d85d95cbf4c6f591dc11aaf72f00db522f` from the same
+entry `dd097038e761730f394098b58f01ffca3906eda7`, using the identical declared
+seventeen-path leaf allowlist. All three production files must remain byte-exact
+to that reviewed worker. Its scoped runtime, source and mandatory gate receipts
+retain their own candidate identities; they are not relabeled as a new root run.
+The manager fully reviewed the external handoff and committed seal/check, the
+production diff, finite fences and actual signed/replay/child proof.
+
+One test-only integration repair makes the independently authored ordinary
+pre-F retained root-parent fixture literal C1Q, rather than C2R. Real later REPL
+changes that same C1 to C1Z, while retained replay must still return old C1Q
+without moving today's position or changing the original row bytes. The fixture
+remains compatibility proof, not a captured historical/official run. It changes
+no live handler, old stored receipt, canonical encoding or source rule.
+
+Changed-input root proof is the exact compatibility test on substantive Memory
+and file SQLite, strict affected IMS all-target/all-feature no-deps lint and
+formatting. The unchanged worker F/L/ordinary/signed/null/logical/source/policy
+results are reused only with their actual input identities. Changed normal docs,
+changelog, coverage inventory and exact root seal/check are required; no suite
+repeat merely for prose/commit/PR or unchanged global CICS-source gate. Every
+sequence cleans this intended root Cargo target, keeping receipts external under
+worker-receipts/v014-completion-20261002/ssa-first-root-*. The exact compatibility
+test passes one entry with real Memory and file-SQLite scenarios; strict affected
+all-target/all-feature lint and fmt pass. All ten unchanged worker Rust inputs,
+including the three production files, independently match their original hashes.
+This sequence cleans 1.7 GiB of root Cargo output. The first docs attempt rejects
+the integration section preceding required subsystem header metadata; moving
+that unchanged metadata back to the header repairs it, and the failed receipt
+and 6.1 GiB cleanup remain recorded. Only changed documentation/packaging needs
+retry; no runtime suite repeats. The finite F leaf, ADR0041 Proposed status and
+all broader SSA/raw/TM/official/HUMAN/participant/v0.14 limitations remain unchanged.
+
+## IMS-1403.ssa-first-direct-child (bounded runtime leaf declared, 2026-10-03)
+
+Entry: `dd097038e761730f394098b58f01ffca3906eda7` on
+`codex/v014-ssa-first-direct-child-20261003`, target 0.14.0. Parent IMS-1403,
+IMS-1401 and full v0.14 remain incomplete. The manager authorizes only typed
+CALL/public-provider and signed-selected DbBatch GNP/GHNP, primary HIDAM with
+exactly two physical levels and one child type, uniquely named fixed-length
+sequence keys, live root parentage and current root or that root's direct child,
+one unqualified child SSA with one active F. Existing null slots may surround F;
+their raw bytes and slot bounds remain authoritative. No deeper child dependents
+exist in this finite class, so same-occurrence satisfaction has no dependent
+position to reset. Other required F classes remain unfinished, not inapplicable.
+
+Sources: independently verified retained-topic-path-first, exact archive fallback,
+repository plain-text parse and actual offline search/read for the committed
+`ims-ssa-position-commands` baseline
+`ibm-ims-15.6-ssa-position-commands-2026-09-11`, set
+`f99728026ed7f14fcc8e104678bc55939581af2defee68385bc3bf35b170e8b9`.
+`ims_fcmdcode.htm` SHA-256
+`425e453bd01c99b47f2a513fcf74678a9b5ff84cd16c719d83696053e9e47cd0`,
+7545 bytes, lines 8–33 supplies first-under-parent restart and same-occurrence
+satisfaction. Existing L/success/failure pins and programming-contracts
+GNP/GHNP/hold topics supply parentage/failure/hold composition. Catalog context:
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`, composed
+REPL/backout/CHKP/XRST `:0015/:0004/:0002/:0023/:0025`. Local tests grant no
+official row, accepted IR, HUMAN, licensed, participant or source execution credit.
+
+Owners: the existing navigation matcher/position/hold authority, narrowly
+generalized L metadata and live-path fence, SSA parser, PCB sensitivity/PROCOPT,
+SAF, unpublished proposal/CAS/row/replay and selected package/coordinator/recovery.
+F restarts that same traversal at the established root's first child, selecting
+literal C1Q/A1 from root/C1/C2/C3 and repeatedly C1. L retains remaining-forward
+Last, ordinary First/Unique/Next/NextInParent stays unchanged. Fresh empty-root F
+returns GE/no segment, keeps root anchor/parentage and cancels only its old hold.
+Pre-validation exclusions, AC/AM, SAF and publication failures retain their
+existing distinct condition/no-mutation boundaries. No new public request,
+cursor/schema/history witness, traversal/search pass, store/coordinator or shared
+raw CALL/TM authority. U/V design and all broader F forms remain separate.
+
+Proof map: independent public and signed Memory/file-SQLite fail-first against
+Unsupported; root/intermediate/last/repeated F starts, GNP/GHNP versioned hold,
+ordinary C2 continuations, empty A0/B2 graph, per-PCB isolation, real REPL/backout/
+CHKP/XRST, deletion fencing, catalog-wide logical and secondary/shape exclusions,
+AC/AM/key-only/PROCOPT/SAF, raw-null conflicts and exact replay after mutation,
+capacity/real session CAS/lost ack, historical cursor/receipt compatibility,
+reopen and substantive independent writer/reader processes with phase proof.
+Affected L/ordinary SSA, signed logical/null regression controls, strict affected
+all-target/all-feature no-deps Clippy, fmt, deny, docs/changelog/catalog/assurance/
+schema/spec/coverage, execution/effect/rows/storage/SAF/retention/participant/typed/
+module/API/supply-chain gates are required. PostgreSQL remains unrun unless
+actually configured/executed; no early-return helper or local reopen earns full
+backend/backup/official acceptance. No unchanged global architecture/CICS retry.
+
+Exact declared seventeen-path allowlist (including normal ADR packaging):
+
+```text
+crates/providers/mainframe-env-ims/src/database/navigation.rs
+crates/providers/mainframe-env-ims/src/database/ssa.rs
+crates/providers/mainframe-env-ims/src/service/generic/ssa.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/first_tests.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/first_tests/fences.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/first_tests/recovery.rs
+crates/providers/mainframe-env-ims/src/service/generic/tests/ssa_tests/first_tests/publication.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/ssa_first_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_package_tests/ssa_first_tests/recovery_tests.rs
+docs/delivery/subsystems/ims/programming-status.md
+docs/decisions/0041-first-direct-child-ssa-selection.md
+changes/unreleased/ims-first-direct-child-20261003.toml
+docs/documentation-registry.json
+docs/README.md
+docs/generated/documentation-manifest.json
+```
+
+ADR-0041 stays Proposed. Preserve ADR-0039 and all prior navigation entries;
+ADR-0040 is reserved for separate U/V review. No pin/catalog denominator,
+shared contract/metadata/retention/null/logical lane, ratchet or policy changes.
+Receipts stay outside Git under worker-receipts/v014-completion-20261002/
+ssa-first-runtime, with original candidate inputs and failed/repair logs retained.
+Every build/test/lint/generator sequence ends in this checkout's cargo clean.
+Seal only this finite leaf after declared gates pass; no push or PR operation.
+
+Local verification is complete for this finite class. The original fail-first
+fixture accidentally duplicated C1's unique key; its Malformed setup failures
+are retained separately. After repair, all four independent public/signed
+Memory/SQLite witnesses fail with Unsupported against literal C1Q/A1 before
+runtime edits. Candidate-01 passed twelve provider and all six signed entries;
+two negative fixtures required valid mixed-C syntax and metadata-installation
+rejection for invalid HIDAM roots. Candidate-02 passed fourteen provider entries
+and strict lint; its remaining null-F fixture still contained L. That operand
+was corrected, with no runtime relaxation. All original receipts remain external.
+
+Final runtime proof passes fifteen new provider and six new signed entries.
+The full affected SSA filter also passes fourteen L and forty substantive
+ordinary/null/mixed/secondary controls; signed controls add six L, one ordinary,
+one null and two logical cases. The runner reports 87 passes, zero failures or
+ignored; two unconfigured inherited process-helper entries earn zero credit,
+leaving 85 substantive entries. New F writer/reader parents each require two
+actual independent SQLite child processes to execute one exact test and pass.
+Literal full-result fields, canonical result digest, actual physical paths and
+versioned holds agree. Empty-root GE also preserves the other PCB. An independent
+base-shaped ordinary receipt and legacy cursor-field fixture retain exact bytes
+through mutation/reopen/replay; this is not historical licensed execution.
+
+Strict affected all-target/all-feature no-deps Clippy, fmt, offline deny and
+license notices, normal docs/changelog, catalog/assurance/schema/spec/coverage,
+execution/effect/rows/storage/SAF/retention/participant/typed/module/API,
+assurance inventory and offline supply-chain gates pass. Structural coverage
+checks earn zero new official credit. Final prose requires only normal docs
+generation/check and exact allowlist seal/check, not another runtime campaign.
+PostgreSQL, full backup/backend acceptance, broader F, U/V witnesses, raw CALL/TM
+approvals, accepted IR/HUMAN/official/licensed/participant and parent IMS-1401/
+IMS-1403/v0.14 remain pending. The unchanged global CICS cache prerequisite is
+not retried or claimed green. ADR-0041 remains Proposed; this is one local leaf.
+
 ## IMS-1401.null-ssa-command-slots (bounded leaf declared, 2026-10-02)
 
 Parent IMS-1401 and v0.14 remain open. Entry candidate is

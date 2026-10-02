@@ -13,11 +13,12 @@ pub(in crate::service) struct Prepared {
 
 /// The engine owns the live occurrence path; the scheduled catalog owns the
 /// uniqueness and logical metadata omitted from its physical definition.
-fn validate_last_metadata(
+fn validate_direct_child_metadata(
     state: &State,
     pcb: &ImsDatabasePcbMetadata,
     navigation: &ImsNavigationRequest,
     engine: &DatabaseEngine,
+    first: bool,
 ) -> Result<(), HostProblem> {
     if navigation.context != mainframe_env_host_api::ImsExecutionContext::DbBatch
         || !matches!(
@@ -37,6 +38,7 @@ fn validate_last_metadata(
         .ok_or(HostProblem::Unsupported)?;
     if database.organization != crate::ImsDatabaseOrganization::Hidam
         || database.segments.len() != 2
+        || first && !database.secondary_indexes.is_empty()
         || catalog
             .databases
             .iter()
@@ -113,7 +115,7 @@ pub(in crate::service) fn prepare(
         if ssa
             .commands
             .iter()
-            .any(|c| !matches!(c.code, b'C' | b'O' | b'D' | b'P' | b'L'))
+            .any(|c| !matches!(c.code, b'C' | b'O' | b'D' | b'P' | b'F' | b'L'))
             || engine.definition().organization == crate::ImsDatabaseOrganization::Msdb
                 && !ssa.commands.is_empty()
             || engine.definition().organization == crate::ImsDatabaseOrganization::Dedb
@@ -151,9 +153,12 @@ pub(in crate::service) fn prepare(
         })?;
     if ssas
         .iter()
-        .any(|ssa| ssa.commands.iter().any(|c| c.code == b'L'))
+        .any(|ssa| ssa.commands.iter().any(|c| matches!(c.code, b'F' | b'L')))
     {
-        validate_last_metadata(state, pcb, navigation, &engine)?;
+        let first = ssas
+            .iter()
+            .any(|ssa| ssa.commands.iter().any(|c| c.code == b'F'));
+        validate_direct_child_metadata(state, pcb, navigation, &engine, first)?;
         engine
             .validate_last_direct_child(
                 &pcb::position(session, navigation.request.pcb),
