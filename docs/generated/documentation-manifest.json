@@ -1486,7 +1486,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:3c48efa1e8fed0c9d8c254e3e30a833871a9776ae0d4cc3b825024a3a0b86ead",
+      "sha256": "sha256:3a3accab02283a3652f4796281106ca4529c2d7a78f2f4a8923a9902aeea991b",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 0
     },

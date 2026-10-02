@@ -236,3 +236,19 @@ connection/handle authority across both kernels: property and subscription
 tokens share a registry, disconnect/unit/epoch retirement is coherent, and stale
 or foreign tokens fail without mutation. No numeric/wire or public-route claims
 are added. Shared lifecycle semantics remain those of the frozen registry.
+
+The manager declares the review repair `MQ-1501.handle-access-guard`: scoped
+registry/message-kernel access, lifetime-only registry observation, and bounded
+reclamation of properties, bindings and callbacks after low-level retirement.
+Owned paths are host-API `mq_handles.rs`, provider `message_handle.rs`,
+`pubsub.rs`, `pubsub/lifecycle.rs`, facade exports, focused shared-handle tests,
+the existing shared-kernel ADR and a unique fragment. Row `0012` MQDISC and
+`0010` MQCRTMH retain the same source pins and special-handle semantics.
+Generated documentation is manager-owned. No provider route or licensed claim
+is introduced by this repair.
+
+A separate review repair `MQ-1504.cics-callback-scope` owns pub/sub callback
+control/dispatch matching, focused task-isolation regressions and a unique
+fragment. Special default connections must retain registry-defined CICS task
+identity, rather than sharing control state because their symbolic Hconn values
+are equal. This is private-kernel isolation, not acceptance of CICS MQOP_START.
