@@ -1209,3 +1209,48 @@ guards, IMS catalog, spec integrity, formatting and dependency policy pass.
 The spec check is integrity evidence only; no new official IMS binding exists.
 The final docs/changelog and exact-path seal/check remain the packaging steps;
 the external handoff records their executed results and the completion commit.
+## IMS-1406.module-boundary-repair (declared infrastructure slice, 2026-10-02)
+
+Entry HEAD: `66e8bce0`. This slice moves unchanged provider-row persistence
+helpers, product subsystem facades, and unchanged host dispatch/IMS records into
+bounded owned modules. It preserves
+public methods, shared storage/CAS authority, publication ordering and retained
+schemas. No IBM semantics, dependency policy, licensed admission or coverage
+credit changes. The existing oversized-module ceilings must only ratchet down;
+new modules remain below the 1,200-production-line limit. Integrate later SSA
+selected-route additions into this boundary without retaining duplicate methods.
+
+The first global module check found three additional pre-existing shared
+boundary violations in application preflight, interpreter accessors and MQ row
+persistence. Move those unchanged helpers into their existing owner boundaries
+and remove or lower exemptions; do not raise a limit. The first combined strict
+Clippy run found eleven existing server warnings. Apply equivalent expressions,
+test-module placement and an internal boxed decoded receipt, without changing
+serialized receipt bytes, authorization, replay or retention policy. These are
+required verification-infrastructure repairs, not new subsystem semantics.
+The complete inventory scan also found one non-exempt TM service above 1,200
+lines. Move its unchanged conversational helpers into a bounded child module;
+keep settlement, message and shared work-store behavior intact.
+Strict MQ verification then exposed four existing equivalent-expression/test
+initialization warnings. Repair those without changing message bytes, delivery
+contracts or limits; run the affected delivery cases and retain earlier passing
+row-persistence results rather than repeat an unchanged full package suite.
+
+Verification: affected IMS and product route regressions, module-boundary guard,
+warnings-denied scoped Clippy, formatting, dependency policy, docs and changelog.
+Preserve receipts outside targets and clean the intended Cargo target after the
+sequence. Seal only this infrastructure feature, not the parent IMS milestone.
+
+Executed verification: the global module guard passes across 795 production
+modules. Application package tests (15), MQ row/package tests (59 unit plus 10
+integration), the changed machine-output regression (1), TM runtime tests (8),
+server replay tests (12), retention safety tests (3), signed IMS package tests
+(10), changed MQ delivery cases (11), and compiled VERIFY TOKEN (1) pass.
+The earlier host (104 unit plus 11 integration) and IMS (107 unit plus 27
+integration) results cover the moved host/provider helpers; those inputs were
+not changed again. Strict five-package all-target Clippy with `--no-deps`
+and `-D warnings`, formatting, dependency policy, changelog and regenerated
+docs checks pass. Preserve the initial module/lint failures in the external
+`v014-completion-20261002/module-boundary-*.log` receipts; the final gate log
+records the repairs, and all sequences ended with Cargo cleanup. This gives
+no new official or licensed IMS credit and does not close the parent release.

@@ -351,6 +351,7 @@ pub fn canonical_result_size(
 
 mod browse;
 mod cics;
+mod dispatch;
 mod generated;
 mod ims_recovery;
 mod ims_system;

@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6008,
+      "max_production_lines": 5991,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -48,21 +48,15 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 3046,
+      "max_production_lines": 2845,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2300,
+      "max_production_lines": 2278,
       "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
       "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
-    },
-    {
-      "path": "crates/kernel/mainframe-env-application/src/package_v2.rs",
-      "max_production_lines": 1314,
-      "responsibility": "Application package v2 validation, identity, signatures, generations, and installation transitions are co-located.",
-      "split_boundary": "Separate manifest validation and identity/signature verification from generation-selection and install-state transitions."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",
@@ -102,7 +96,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11940,
+      "max_production_lines": 11915,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -126,15 +120,9 @@
     },
     {
       "path": "crates/providers/mainframe-env-ims/src/service.rs",
-      "max_production_lines": 1959,
+      "max_production_lines": 1752,
       "responsibility": "IMS session, PSB/database resolution, DL/I operations, unit-of-work state, and replay share one service module.",
       "split_boundary": "Separate session/PSB binding, database operation handlers, and unit-of-work persistence/replay."
-    },
-    {
-      "path": "crates/providers/mainframe-env-mq/src/service.rs",
-      "max_production_lines": 1331,
-      "responsibility": "MQ queue semantics, unit-of-work transitions, durable object rows, replay identity, and retention-clock finalization share one service authority; host-context validation and canonical message identity are extracted.",
-      "split_boundary": "Continue extracting replay envelopes and clock finalization from queue operations and durable object-row persistence behind the existing MQ service."
     },
     {
       "path": "crates/providers/mainframe-env-racf/src/authority.rs",

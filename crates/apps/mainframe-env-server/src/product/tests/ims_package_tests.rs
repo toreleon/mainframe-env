@@ -243,9 +243,11 @@ fn carddemo_request(operation: ImsOperation, sequence: u64, data: Vec<u8>) -> Im
         operation,
         psb: (operation == ImsOperation::Schedule).then(|| "PSBPAUTB".into()),
         pcb: 1,
-        segments: (operation == ImsOperation::Insert)
-            .then(|| vec!["PAUTSUM0".into()])
-            .unwrap_or_default(),
+        segments: if operation == ImsOperation::Insert {
+            vec!["PAUTSUM0".into()]
+        } else {
+            Vec::new()
+        },
         data,
         qualifiers: Vec::new(),
         checkpoint_id: None,
