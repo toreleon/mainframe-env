@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Restore server and conformance module ceilings by extracting existing batch controller, dataset, and fixture source helpers without changing routes or report behavior."
