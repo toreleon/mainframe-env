@@ -27,6 +27,8 @@ use crate::{
 };
 use std::fmt;
 
+pub mod storage_assignment;
+
 const MAX_STRING_BODY_BYTES: usize = 32_704;
 
 /// Installation flag, independent of Unicode strings' always-MIXED subtype.
