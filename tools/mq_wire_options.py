@@ -38,6 +38,8 @@ def historical_sha(path):
         keys.add('wire_options')
     if 'raw_layout' in catalog:
         keys.add('raw_layout')
+    if 'property_profile' in catalog:
+        keys.add('property_profile')
     if set(catalog) != keys:
         raise ValueError('historical MQ catalog root fields differ')
     if 'wire_options' in catalog:

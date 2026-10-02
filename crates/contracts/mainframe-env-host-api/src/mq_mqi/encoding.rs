@@ -40,6 +40,7 @@ macro_rules! variants {
 mod full_message;
 mod md_value;
 mod payload;
+mod property;
 mod values;
 pub use md_value::{
     MQ_MD_VALUE_DOMAIN, MQ_MD_VALUE_MAX_BYTES, MQ_MD_VALUE_SCHEMA, mq_md_value_bytes,

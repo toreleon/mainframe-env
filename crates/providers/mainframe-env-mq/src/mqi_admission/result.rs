@@ -95,6 +95,19 @@ fn copied_capacities(request: &MqMqiRequest, outcome: &MqMqiOutcome) -> Result<(
             Ok(())
         }
         (
+            R::Property(MqPropertyRequest::Inquire {
+                name_capacity,
+                value_capacity,
+                ..
+            }),
+            O::PropertyObservation(MqPropertyObservation::Inquired(value)),
+        ) => {
+            bound(value.returned_name.len(), *name_capacity)?;
+            bound(value.copied_value.len(), *value_capacity)
+        }
+        (R::Property(MqPropertyRequest::Create { .. }), O::MessageHandle(_))
+        | (R::Property(_), O::PropertyObservation(_)) => Ok(()),
+        (
             R::Get(request),
             O::Got {
                 disposition,

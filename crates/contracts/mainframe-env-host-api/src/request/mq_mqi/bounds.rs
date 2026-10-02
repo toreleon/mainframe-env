@@ -156,6 +156,25 @@ fn put(value: &MqMqiPut, limits: HostLimits) -> Result<(), HostProblem> {
 pub(super) fn request(value: &MqMqiRequest, limits: HostLimits) -> Result<(), HostProblem> {
     use MqMqiRequest as R;
     match value {
+        R::Property(value) => {
+            if let Some(value) = value.name() {
+                name(value.as_str(), limits)?;
+            }
+            match value {
+                MqPropertyRequest::Set { value, .. } => {
+                    bound(value.bytes.len(), limits.max_record_bytes)
+                }
+                MqPropertyRequest::Inquire {
+                    name_capacity,
+                    value_capacity,
+                    ..
+                } => {
+                    bound(*name_capacity, limits.max_name_bytes)?;
+                    bound(*value_capacity, limits.max_record_bytes)
+                }
+                _ => Ok(()),
+            }
+        }
         R::Connect(value) | R::ConnectExtended(value) => {
             if let Some(manager) = &value.manager {
                 name(manager.as_str(), limits)?;
@@ -257,6 +276,19 @@ pub(super) fn result(value: &MqMqiResult, limits: HostLimits) -> Result<(), Host
         }
     };
     match output {
+        O::PropertyObservation(MqPropertyObservation::Inquired(value)) => {
+            bound(value.returned_name.len(), limits.max_name_bytes)?;
+            bound(
+                usize::try_from(value.name_length).map_err(|_| HostProblem::Malformed)?,
+                limits.max_name_bytes,
+            )?;
+            bound(value.copied_value.len(), limits.max_record_bytes)?;
+            bound(
+                usize::try_from(value.data_length).map_err(|_| HostProblem::Malformed)?,
+                limits.max_record_bytes,
+            )
+        }
+        O::PropertyObservation(_) => Ok(()),
         O::FullPut { .. } => full_descriptor(limits),
         O::FullGot {
             message,

@@ -94,6 +94,8 @@ impl Budget {
         let m = self.mqi;
         let p = m.message;
         match field {
+            "returned_name" => h.max_name_bytes.min(p.property_name_bytes),
+            "copied_value" => h.max_record_bytes.min(p.property_value_bytes),
             "md_value" => MQ_MD_VALUE_MAX_BYTES,
             "body" => h.max_record_bytes.min(p.body_bytes),
             "bytes" => h.max_record_bytes.min(m.buffer_bytes),
@@ -184,7 +186,10 @@ impl<'de> Visitor<'de> for Walk<'_> {
             if n > limit {
                 return Err(serde::de::Error::custom("replay collection bounds"));
             }
-            if self.field == "value" {
+            if matches!(
+                self.field.as_str(),
+                "value" | "copied_value" | "returned_name"
+            ) {
                 self.budget
                     .property_bytes(1)
                     .map_err(|_| serde::de::Error::custom("replay aggregate property bounds"))?;

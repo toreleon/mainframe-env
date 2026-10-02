@@ -14,12 +14,14 @@ use serde::{Deserialize, Serialize};
 mod budget;
 mod full_message;
 mod handles;
+mod property;
 mod shape;
 use shape::{StoredOutcome, StoredResult};
 
 pub(crate) const SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@1";
 // Same codec/authority, distinct admitted output vocabulary; old bytes stay @1.
 pub(crate) const FULL_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@2";
+pub(crate) const PROPERTY_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@3";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReplayPending {
@@ -61,7 +63,9 @@ pub(crate) fn encode(
     refuse_special_connections(result)?;
     let digest = validate_and_digest(result, host, mqi)?;
     let stored = StoredResult {
-        schema_version: if full_output(result) {
+        schema_version: if property_output(result) {
+            PROPERTY_SCHEMA
+        } else if full_output(result) {
             FULL_SCHEMA
         } else {
             SCHEMA
@@ -94,8 +98,11 @@ pub(crate) fn decode(
     // Bounds every collection, nesting, map/key set and catches duplicate keys.
     budget::preflight(bytes, host, mqi)?;
     let stored: StoredResult = serde_json::from_slice(bytes).map_err(|_| ReplayError::Malformed)?;
-    if !matches!(stored.schema_version.as_str(), SCHEMA | FULL_SCHEMA)
-        || (stored.schema_version == FULL_SCHEMA) != stored.outcome.is_full()
+    if !matches!(
+        stored.schema_version.as_str(),
+        SCHEMA | FULL_SCHEMA | PROPERTY_SCHEMA
+    ) || (stored.schema_version == FULL_SCHEMA) != stored.outcome.is_full()
+        || (stored.schema_version == PROPERTY_SCHEMA) != stored.outcome.is_property()
     {
         return Err(ReplayError::UnsupportedSchema);
     }
@@ -113,6 +120,10 @@ pub(crate) fn decode(
     Ok(result)
 }
 
+fn property_output(value: &MqMqiResult) -> bool {
+    matches!(&value.outcome,MqMqiOutcome::Completed {output,..}|MqMqiOutcome::StatusPending {output}|MqMqiOutcome::ReviewedOutput {output,..}
+        if matches!(output,MqMqiOutput::PropertyObservation(_)))
+}
 fn full_output(value: &MqMqiResult) -> bool {
     matches!(&value.outcome, MqMqiOutcome::Completed { output, .. }
         | MqMqiOutcome::StatusPending { output } | MqMqiOutcome::ReviewedOutput { output, .. }

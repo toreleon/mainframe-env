@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 mod observation;
 pub use observation::MqHandleObservation;
+mod message_candidate;
+pub use message_candidate::{MqMessageAdoption, MqMessageCandidate};
 
 static NEXT_REGISTRY_ID: AtomicU64 = AtomicU64::new(1);
 

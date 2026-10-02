@@ -6,6 +6,35 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.selected-property-family` consumes sealed worker927e8c4ac after full
+production/tests/schema/generator/source review and independent46path/blob/
+77frozenreceipt/21pin/106locator/32dependency checks. The existing selected
+runtime executes CRTMH/SETMP/INQMP/DLTMP/DLTMH with complete associated MQMD1,
+exact partial inquiry MQPD/type/Encoding/string-only CCSID/returned name/
+VSLength/DataLength/copied prefixes and reviewed status. Same-registry exclusive
+staging holds across the original core/SAF/physical audited publication;
+provisional handles remain historical, known commit alone adopts live state.
+Strict storage@3 extends the sole result codec; old@1/@2 bytes remain exact.
+Unknown retains/fences; cold receipt replay cannot revive properties/handles.
+Manager composition preserves selected fullGET/backout/CCSID admission and
+both pre-publication error audit branches. Only shared facade conflicts are
+reconciled; generated documentation is normally regenerated. Public contracts
+changed, so a fresh composed global API gate is required, not reuse of54bc.
+That genuine composed gate now passes exact compiler70/coverage386/execution0/
+host931/store72 ceilings. Main232 host unit+9 integration,100 selected-service,
+34 admission,32 replay,11 property-kernel and11 shared-handle integration tests
+pass (429 Rust tests, zero ignored; empty doctests0 credit). Forty-one tooling
+tests, actual guards/four mutants, module965/34/4/1, offline source reproduction,
+fmt/normaldocs+check/changelog/whitespace pass. Worker working-candidate receipts
+keep their original identities, not relabeled as this composed execution.
+Original rows0010/0013/0014/0017/0023, property baseline2026-09-12 and pinned
+supplemental sources define this finite ordinary ZosBatch version1/default
+ASCII-name/explicitUTF8/native785 signed-integer profile. MQPD initializer
+table conflict stays recorded; explicit support1/copy22 symbols define values.
+No broader RFH2/conversion/cursor/context/MD2/nativeinstalled/public/full26
+acceptance is inferred. Participant/recovery/CardDemo and every nonlicensed
+parent gate remain required; licensed oracle ONLY skipped0/26.
+
 `MQ-1503.selected-get-ccsid-boundary` distinguishes lossless full-storage
 observations from executable selected GET output. The finite unformatted profile
 now requires a stored explicit positive body CCSID, refusing Q_MGR/INHERIT and

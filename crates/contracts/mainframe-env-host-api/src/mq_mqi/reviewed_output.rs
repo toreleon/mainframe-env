@@ -35,6 +35,13 @@ pub(super) fn validate(
     // Borrow the same exhaustive bounded shape authority used by old outcomes.
     // Its pending-mode shape check does not claim a reviewed completion.
     super::validation::validate_output(call, None, output, limits)?;
+    if let MqMqiOutput::PropertyObservation(value) = output {
+        return if value.validate_status(status) {
+            Ok(())
+        } else {
+            Err(MqMqiProblem::StatusCallMismatch)
+        };
+    }
     let shape = match (status.completion(), status.reason_symbol(), output) {
         (
             MqCompletion::Ok,
@@ -143,6 +150,7 @@ impl MqMqiResult {
         | MqMqiOutcome::StatusPending { output } = &self.outcome
         {
             super::full_message::bind(request, output)?;
+            super::property::mq_property_bind(request, output).map_err(MqMqiProblem::Property)?;
         }
         let MqMqiOutcome::ReviewedOutput { output, .. } = &self.outcome else {
             return Ok(());

@@ -7,6 +7,8 @@ use mainframe_env_host_api::{
     MqPersistence, MqPriority, MqPropertyQuery, MqPropertyType,
 };
 
+mod associated_descriptor;
+
 const MAGIC: &[u8; 4] = b"MHK1";
 const MAX_KERNEL_PROPERTY_BYTES: usize = 16 * 1024 * 1024;
 
@@ -53,7 +55,35 @@ struct Properties {
     handle: MqHmsg,
     owner: MqHandleOwner,
     connection: MqHconn,
-    values: Vec<MqMessageProperty>,
+    contents: PropertyContents,
+}
+
+#[derive(Debug)]
+enum PropertyContents {
+    Legacy(Vec<MqMessageProperty>),
+    Reviewed(associated_descriptor::AssociatedProperties),
+}
+impl Properties {
+    fn legacy(&self) -> Result<&Vec<MqMessageProperty>, MqHandleKernelProblem> {
+        match &self.contents {
+            PropertyContents::Legacy(values) => Ok(values),
+            PropertyContents::Reviewed(_) => Err(MqHandleKernelProblem::UnsupportedWire),
+        }
+    }
+    fn legacy_mut(&mut self) -> Result<&mut Vec<MqMessageProperty>, MqHandleKernelProblem> {
+        match &mut self.contents {
+            PropertyContents::Legacy(values) => Ok(values),
+            PropertyContents::Reviewed(_) => Err(MqHandleKernelProblem::UnsupportedWire),
+        }
+    }
+    fn bytes(&self) -> Option<usize> {
+        match &self.contents {
+            PropertyContents::Legacy(values) => values.iter().try_fold(0usize, |n, v| {
+                n.checked_add(v.name.len())?.checked_add(v.value.len())
+            }),
+            PropertyContents::Reviewed(values) => values.bytes(),
+        }
+    }
 }
 
 /// Volatile properties keyed by registry-issued HMSG. The registry alone decides
@@ -120,7 +150,7 @@ impl MqHandleKernel {
             handle,
             owner,
             connection,
-            values: Vec::new(),
+            contents: PropertyContents::Legacy(Vec::new()),
         });
         Ok(handle)
     }
@@ -213,14 +243,14 @@ impl MqHandleKernel {
         self.validate(owner, connection, handle)?;
         check_option(option)?;
         let index = self.index(handle)?;
-        let mut next = self.properties[index].values.clone();
+        let mut next = self.properties[index].legacy()?.clone();
         match next.binary_search_by(|existing| existing.name.cmp(&property.name)) {
             Ok(position) => next[position] = property,
             Err(position) => next.insert(position, property),
         }
         validate_properties(&next, self.limits)?;
         self.check_total(index, &next)?;
-        self.properties[index].values = next;
+        self.properties[index].contents = PropertyContents::Legacy(next);
         Ok(())
     }
 
@@ -240,10 +270,10 @@ impl MqHandleKernel {
         query.validate(self.limits)?;
         let index = self.index(handle)?;
         if let Ok(position) = self.properties[index]
-            .values
+            .legacy()?
             .binary_search_by(|item| item.name.cmp(name))
         {
-            self.properties[index].values.remove(position);
+            self.properties[index].legacy_mut()?.remove(position);
             Ok(true)
         } else {
             Ok(false)
@@ -270,7 +300,7 @@ impl MqHandleKernel {
             MqPropertyQuery::Exact(name.into()).validate(self.limits)?;
         }
         let item = self.properties[self.index(handle)?]
-            .values
+            .legacy()?
             .iter()
             .find(|item| {
                 matches_query(query, &item.name)
@@ -298,7 +328,7 @@ impl MqHandleKernel {
         check_codec(codec)?;
         query.validate(self.limits)?;
         let selected: Vec<_> = self.properties[self.index(handle)?]
-            .values
+            .legacy()?
             .iter()
             .filter(|item| matches_query(query, &item.name))
             .cloned()
@@ -326,6 +356,8 @@ impl MqHandleKernel {
     ) -> Result<Vec<u8>, MqHandleKernelProblem> {
         self.validate(owner, connection, handle)?;
         check_codec(codec)?;
+        let index = self.index(handle)?;
+        self.properties[index].legacy()?;
         let maximum = self
             .limits
             .property_total_bytes
@@ -344,8 +376,7 @@ impl MqHandleKernel {
                 MqMessageProblem::BodyTooLong,
             ));
         }
-        let index = self.index(handle)?;
-        let mut next = self.properties[index].values.clone();
+        let mut next = self.properties[index].legacy()?.clone();
         for property in incoming {
             match next.binary_search_by(|existing| existing.name.cmp(&property.name)) {
                 Ok(position) => next[position] = property,
@@ -359,7 +390,7 @@ impl MqHandleKernel {
         } else {
             buffer.to_vec()
         };
-        self.properties[index].values = next;
+        self.properties[index].contents = PropertyContents::Legacy(next);
         Ok(result)
     }
 
@@ -394,15 +425,15 @@ impl MqHandleKernel {
             .iter()
             .enumerate()
             .try_fold(0usize, |total, (index, entry)| {
-                let values: &[MqMessageProperty] = if index == replaced {
-                    next
+                let bytes = if index == replaced {
+                    next.iter().try_fold(0usize, |sum, item| {
+                        sum.checked_add(item.name.len())?
+                            .checked_add(item.value.len())
+                    })?
                 } else {
-                    &entry.values
+                    entry.bytes()?
                 };
-                values.iter().try_fold(total, |sum, item| {
-                    sum.checked_add(item.name.len())?
-                        .checked_add(item.value.len())
-                })
+                total.checked_add(bytes)
             })
             .ok_or(MqHandleKernelProblem::Capacity)?;
         if total > MAX_KERNEL_PROPERTY_BYTES {

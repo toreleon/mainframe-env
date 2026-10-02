@@ -6,6 +6,15 @@ fn payload_mutations_for_every_call_change_the_digest() {
     for base in f.requests() {
         let mut altered = base.clone();
         match &mut altered {
+            MqMqiRequest::Property(value) => match value {
+                MqPropertyRequest::Create { connection, .. }
+                | MqPropertyRequest::Set { connection, .. }
+                | MqPropertyRequest::Inquire { connection, .. }
+                | MqPropertyRequest::Delete { connection, .. }
+                | MqPropertyRequest::DeleteHandle { connection, .. } => {
+                    *connection = Fixture::new(7).connection
+                }
+            },
             MqMqiRequest::Back { unit, .. }
             | MqMqiRequest::Begin { unit, .. }
             | MqMqiRequest::Commit { unit, .. } => *unit += 1,

@@ -14,6 +14,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mq_wire_options as wire
 import mq_raw_layout as raw_layout
+import mq_property_profile as property_profile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -644,6 +645,7 @@ def check(root: Path = ROOT) -> None:
         (CONTRACT_OUTPUT_PATH, render_contract(root)),
         (wire.OUTPUT, wire.render(root)),
         (raw_layout.OUTPUT, raw_layout.render(root)),
+        (property_profile.OUTPUT, property_profile.render(root)),
     ]:
         output = root / output_path
         if not output.is_file() or output.read_text() != expected:
@@ -656,7 +658,16 @@ def main() -> int:
     parser.add_argument("--cache", type=Path, help="offline selected supplemental fact reproduction")
     parser.add_argument("--layout-cache", type=Path, help="offline point-layout source cache")
     parser.add_argument("--original-cache", type=Path, help="offline original MQ call corroboration")
+    parser.add_argument("--property-cache", type=Path, help="offline property source reproduction")
     args = parser.parse_args()
+    if args.property_cache:
+        if not args.cache or not args.original_cache:
+            parser.error("--property-cache requires --cache and --original-cache")
+        property_profile.verify_source(ROOT, {
+            "mq-property-sources": args.property_cache,
+            "mq-programming-supplements": args.cache,
+            "ibm-mq-9.4-mqi-2026-08-31": args.original_cache,
+        })
     if args.cache:
         wire.verify_source(ROOT, args.cache)
     if args.layout_cache:
@@ -675,6 +686,7 @@ def main() -> int:
             (CONTRACT_OUTPUT_PATH, render_contract(ROOT)),
             (wire.OUTPUT, wire.render(ROOT)),
             (raw_layout.OUTPUT, raw_layout.render(ROOT)),
+            (property_profile.OUTPUT, property_profile.render(ROOT)),
         ]:
             output = ROOT / output_path
             output.parent.mkdir(parents=True, exist_ok=True)

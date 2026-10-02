@@ -360,6 +360,7 @@ fn pending_form(
             })
     };
     match request {
+        R::Property(_) => None,
         // Full GET has one finite private selected profile. ContractDefault is
         // kernel intent, NEVER evidence for arbitrary native MQGMO option bits.
         R::FullGet(value) => options(value.options)

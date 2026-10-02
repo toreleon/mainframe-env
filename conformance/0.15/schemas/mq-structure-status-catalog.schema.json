@@ -19,7 +19,8 @@
     "licensed_execution_credit",
     "calls",
     "wire_options",
-    "raw_layout"
+    "raw_layout",
+    "property_profile"
   ],
   "properties": {
     "schema_version": {"const": "mainframe-env.mq-structure-status-catalog@2"},
@@ -36,6 +37,7 @@
     "licensed_execution_credit": {"const": 0},
     "wire_options": {"$ref": "#/$defs/wire-options"},
     "raw_layout": {"$ref": "#/$defs/raw-layout"},
+    "property_profile": {"$ref": "#/$defs/property-profile"},
     "calls": {
       "type": "array",
       "minItems": 26,
@@ -44,6 +46,279 @@
     }
   },
   "$defs": {
+    "property-locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "topic_sha256",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/(refdev|develop)/q[0-9]+_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "property-profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "semantic_execution_credit",
+        "historical_catalog_sha256",
+        "raw_layout_projection_sha256",
+        "sources",
+        "facts",
+        "identifiers",
+        "semantics",
+        "descriptor_layout",
+        "descriptor_excluded_fields",
+        "default_symbol_conflict",
+        "explicit_string_ccsid",
+        "value_widths"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.mq-property-profile@1"
+        },
+        "semantic_execution_credit": {
+          "const": 0
+        },
+        "historical_catalog_sha256": {
+          "const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"
+        },
+        "raw_layout_projection_sha256": {
+          "const": "2f6d7c679543891ccc768f099963813d981871d2abd35fa7b49aa4e70732ae6a"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope_id",
+              "baseline_id",
+              "topic_manifest"
+            ],
+            "properties": {
+              "scope_id": {
+                "enum": [
+                  "mq-property-sources",
+                  "mq-programming-supplements",
+                  "ibm-mq-9.4-mqi-2026-08-31"
+                ]
+              },
+              "baseline_id": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "topic_manifest": {
+                "$ref": "#/$defs/file-binding"
+              }
+            }
+          }
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 77,
+          "maxItems": 77,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "decimal",
+              "hexadecimal",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "pattern": "^MQ[A-Z0-9_]+$"
+              },
+              "decimal": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "hexadecimal": {
+                "type": "string",
+                "pattern": "^[0-9A-F]{8}$"
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              },
+              "platform": {
+                "const": "z/OS"
+              }
+            }
+          }
+        },
+        "identifiers": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "value",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "pattern": "^MQ[A-Z0-9_]+$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 4
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "semantics": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "purpose",
+              "source"
+            ],
+            "properties": {
+              "purpose": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "descriptor_layout": {
+          "const": "Md1"
+        },
+        "descriptor_excluded_fields": {
+          "const": [
+            "StrucId",
+            "Version"
+          ]
+        },
+        "default_symbol_conflict": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "structure_table",
+            "numeric_authority",
+            "disposition"
+          ],
+          "properties": {
+            "structure_table": {
+              "$ref": "#/$defs/property-locator"
+            },
+            "numeric_authority": {
+              "const": [
+                "MQPD_SUPPORT_OPTIONAL",
+                "MQCOPY_DEFAULT"
+              ]
+            },
+            "disposition": {
+              "const": "explicit-constants-define-symbol-values-structure-table-numeric-columns-conflict"
+            }
+          }
+        },
+        "value_widths": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "bytes",
+              "source"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "Boolean",
+                  "ByteString",
+                  "Int8",
+                  "Int16",
+                  "Int32",
+                  "Int64",
+                  "Float32",
+                  "Float64",
+                  "String",
+                  "Null"
+                ]
+              },
+              "bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 8
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "explicit_string_ccsid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decimal",
+            "source"
+          ],
+          "properties": {
+            "decimal": {
+              "const": 1208
+            },
+            "source": {
+              "$ref": "#/$defs/property-locator"
+            }
+          }
+        }
+      }
+    },
     "raw-locator": {
       "type": "object",
       "additionalProperties": false,

@@ -493,6 +493,63 @@ prove a real selected service, compiled scheduler producer or participant.
 Actual host producer, all applicable 26-call contexts, durable typed checkpoint,
 SAF/UOW/replay/recovery and participant/CardDemo acceptance remain required.
 
+### Selected message properties
+
+The private selected service admits a finite ordinary nonshared
+z/OS batch/queue-manager profile for MQCRTMH, MQSETMP, MQINQMP, MQDLTMP and
+MQDLTMH. Its checked `Property` request preserves explicit encoding/CCSID,
+version-one default option flags, exact ASCII names, complete MQPD1 and
+null/bytes/UTF-8/signed-integer values. It supports exact `Root.MQMD.Field`
+case for the common MQMD1 fields, excluding StrucId/Version. Each issued HMSG
+owns the associated default descriptor in its existing registry entry; setting
+or resetting a field preserves its full fixed width. Stored descriptor scalars
+are observations, not PUT legality, expiry-clock conversion, context permission
+or a SAF principal. MQMD2/MQMDE extensions remain unsupported in this profile.
+
+An exclusive message candidate holds the actual registry and touched property
+entry through publication under the existing selected mutex. Prospective HMSG
+observations are permanently historical; abort preserves generations/counters,
+and only known adoption returns the issued live token with the committed full
+host-result identity. The original retained core intent, logical current unit,
+physical store, live controls and mandatory MQUOW/CURRENT resource authorizer
+remain independent requirements. Provider rows, the insert-only result receipt
+and typed audit publish in one transaction; no property journal or scheduler is
+introduced. Host publication uses the existing success-audit convention even
+when its exact reviewed MQ result is a defined failure observation. SAF denial
+or authorizer failure publishes an audit-only decision, without property changes.
+
+INQMP observations retain MQPD, type, actual returned Encoding/CCSID, returned
+name prefix/VSLength, copied value prefix and complete DataLength. Short name
+and short value failures retain their exact reviewed FAILED reason pairs;
+simultaneously short buffers remain unsupported because precedence is not
+reviewed. Absent properties retain the call-specific FAILED inquiry or WARNING
+delete result. Undefined nonstring returned CCSID stays absent. New observations
+use the sole replay codec's strict storage@3; existing storage@1/@2 and canonical
+forms keep their bytes. Readers lacking @3 must refuse it, not down-convert it.
+
+Property handles and associated payloads are volatile. Durable receipts preserve
+observations and retained core/UOW dependencies, but cold reopen has no issued
+handle or adopted cache proof and cannot revive properties or aliases. A
+postpublication UnknownOutcome fences the runtime and retains the receipt;
+it grants no redispatch/backout/adoption decision. Legacy KernelV1 conversion
+rejects these reviewed entries rather than discard MQPD/CCSID/descriptor fields.
+BUFMH/MHBUF RFH2 conversion, wildcard/cursor/conversion/context/special-connection
+forms, durable payload integration and installed/compiler/participant/CardDemo
+acceptance remain required follow-up work; these private fixtures grant no
+official 26-call or public readiness credit.
+
+The ONE structure/status catalog owns the independent private property source
+projection; historical call/status/wire/raw projection identities remain frozen.
+Sources are original rows0010/0013/0014/0017/0023 in
+`ibm-mq-9.4-mqi-2026-08-31`, the pinned programming supplements, and
+`ibm-mq-9.4-property-sources-2026-09-12` (including q022960 descriptor properties).
+The explicit constants define MQPD_SUPPORT_OPTIONAL=1 and MQCOPY_DEFAULT=22;
+the pinned MQPD structure table's inconsistent zero columns are recorded in
+the projection and are not substituted for those definitions. This review
+changes none of the ten pending reason declarations and earns zero execution
+credit. Archive work remains in progress; no freshness or browser reproduction
+claim follows from these offline pinned reads.
+
 ### Coverage identity
 
 The MQ-1506 licensed adapter at

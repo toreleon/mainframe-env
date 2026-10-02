@@ -1,6 +1,16 @@
 //! Actual resolved SAF resources retained for output replay, not policy permits.
 use super::*;
 const MAX_RESOURCES: usize = 512;
+pub(super) fn authorize_property(
+    authorizer: &dyn EnterpriseAuthorizer,
+    invocation: &Invocation,
+    intent: AccessIntent,
+) -> Result<(), HostProblem> {
+    authorizer.authorize(
+        invocation.principal.id(),
+        &EnterpriseResource::new(EnterpriseResourceClass::MqUnitOfWork, "CURRENT", intent)?,
+    )
+}
 pub(super) fn bounded_resources<'de, D: serde::Deserializer<'de>>(
     decoder: D,
 ) -> Result<Vec<StoredResource>, D::Error> {

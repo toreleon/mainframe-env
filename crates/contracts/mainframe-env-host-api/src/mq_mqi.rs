@@ -13,7 +13,12 @@
 
 mod encoding;
 mod full_message;
+pub mod property;
 pub use full_message::{MqFullMessage, MqMqiFullGet, MqMqiFullPut};
+pub use property::{
+    MqPropertyData, MqPropertyDescriptor, MqPropertyInquiryObservation, MqPropertyName,
+    MqPropertyObservation, MqPropertyOptions, MqPropertyProblem, MqPropertyRequest,
+};
 mod reviewed_output;
 #[cfg(test)]
 mod tests;
@@ -303,6 +308,8 @@ pub enum MqMqiRequest {
     FullGet(MqMqiFullGet),
     Inquire(MqMqiInquiry),
     InquireProperty(MqMqiPropertyInquiry),
+    /// Checked source-profile property request; older private property DTOs stay exact.
+    Property(MqPropertyRequest),
     HandleToBuffer(MqMqiBuffer),
     Open(MqObjectOpenRequest),
     Put {
@@ -380,6 +387,7 @@ impl MqMqiRequest {
             Self::Get(_) | Self::FullGet(_) => MqMqiCall::Get,
             Self::Inquire(_) => MqMqiCall::Inquire,
             Self::InquireProperty(_) => MqMqiCall::InquireProperty,
+            Self::Property(value) => value.call(),
             Self::HandleToBuffer(_) => MqMqiCall::HandleToBuffer,
             Self::Open(_) => MqMqiCall::Open,
             Self::Put { .. } | Self::FullPut { .. } => MqMqiCall::Put,
@@ -494,6 +502,8 @@ pub enum MqMqiOutput {
     /// mapping remains pending when any item is rejected or uncertain.
     Distribution(crate::MqDistributionResult),
     Property(MqMessageProperty),
+    /// Lossless defined property observations, including size-failed copied prefixes.
+    PropertyObservation(MqPropertyObservation),
     Buffer {
         descriptor: MqMessageDescriptor,
         bytes: Vec<u8>,
@@ -553,6 +563,8 @@ pub struct MqMqiResult {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqMqiProblem {
+    /// Checked property profile/observation failure; grants no operation permission.
+    Property(MqPropertyProblem),
     /// Exact full descriptor representation failure, not numeric policy admission.
     FullDescriptor(crate::mq_md_value::MqMdValueProblem),
     Limits,

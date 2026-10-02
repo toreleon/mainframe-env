@@ -29,6 +29,8 @@ mod batch_child;
 mod explicit_context;
 #[path = "service_selected_operation/ownership.rs"]
 mod ownership;
+#[path = "service_selected_operation/property.rs"]
+mod property;
 #[path = "service_selected_operation/receipt.rs"]
 pub(in crate::service) mod receipt;
 #[path = "service_selected_operation/rows.rs"]
@@ -280,7 +282,9 @@ impl MqService {
                 if preflight.host_result_digest != stored.value.result_digest {
                     return Err(HostProblem::UnknownOutcome);
                 }
-                if transition::has_handle_reply(&reply) {
+                if transition::has_handle_reply(&reply)
+                    || matches!(&admitted.envelope.request, MqMqiRequest::Property(_))
+                {
                     // This runtime originally adopted the reply only after the
                     // exact atomic publication. A coherent substituted handle
                     // observation is not that reply, even if another live entry
@@ -348,9 +352,12 @@ impl MqService {
                 }
                 Err(
                     error @ (HostProblem::ProviderFailure | HostProblem::InfrastructureFailure),
-                ) if matches!(admitted.envelope.request, MqMqiRequest::FullGet(_)) => {
-                    // This finite prepare error occurred before any complete
-                    // delivery candidate could be published. Use the SAME bound
+                ) if matches!(admitted.envelope.request, MqMqiRequest::FullGet(_))
+                    || (error == HostProblem::InfrastructureFailure
+                        && matches!(admitted.envelope.request, MqMqiRequest::Property(_))) =>
+                {
+                    // This finite prepare error occurred before either complete
+                    // delivery or property state could publish. Use the SAME bound
                     // original intent, never a sequential audit fallback.
                     let decision = if error == HostProblem::ProviderFailure {
                         AuditDecision::ProviderFailure
@@ -372,6 +379,23 @@ impl MqService {
                 Err(error) => return Err(error),
             };
             let attempt = (|| {
+                let mut access = if candidate.property.is_some() {
+                    Some(runtime.handles.message_handles_mut())
+                } else {
+                    None
+                };
+                let stage = match (&mut access, &candidate.property) {
+                    (Some(access), Some(request)) => Some(
+                        access
+                            .stage_property(owner, request, admitted.envelope.limits)
+                            .map_err(property::kernel_error)?,
+                    ),
+                    _ => None,
+                };
+                if let Some(stage) = &stage {
+                    candidate.output = stage.output.clone();
+                    candidate.reviewed_status = Some(stage.status);
+                }
                 let result = if let Some(status) = candidate.reviewed_status {
                     MqMqiResult::reviewed_output(
                         status,
@@ -416,7 +440,7 @@ impl MqService {
                         },
                     }
                 };
-                let reply = EffectResult {
+                let mut reply = EffectResult {
                     sequence: admitted.effect().sequence,
                     outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
                         limits: admitted.envelope.limits,
@@ -462,6 +486,9 @@ impl MqService {
                 let (mutations, next) = plan.into_parts();
                 let publish = binding
                     .prepare(
+                        // Known host publication succeeded, including a lossless
+                        // MQ failure observation. Its exact MQCC/MQRC remains in
+                        // the original result; core failure audits publish no rows.
                         audit(admitted, decision_tick, AuditDecision::Success),
                         mutations,
                         decision_tick,
@@ -475,6 +502,30 @@ impl MqService {
                 // All physical rows and audit committed. Only now adopt delivery,
                 // owner/bindings and cached reply; core completion stays external.
                 *state = next;
+                if stage.is_some() && self.unknown_after_persist.swap(false, Ordering::SeqCst) {
+                    // Durable receipt exists, but no live/provisional property
+                    // mutation may be adopted on an uncertain publication boundary.
+                    return Err(HostProblem::UnknownOutcome);
+                }
+                if let Some(stage) = stage {
+                    if let Some(live) = stage.adopt() {
+                        let Ok(HostResult::MqMqi(value)) = &mut reply.outcome else {
+                            return Err(HostProblem::UnknownOutcome);
+                        };
+                        let MqMqiOutcome::ReviewedOutput { output, .. } = &mut value.result.outcome
+                        else {
+                            return Err(HostProblem::UnknownOutcome);
+                        };
+                        *output = MqMqiOutput::MessageHandle(live);
+                    }
+                    if mainframe_env_host_api::canonical_result_digest(&reply.outcome)
+                        .map_err(|_| HostProblem::UnknownOutcome)?
+                        != receipt.result_digest
+                    {
+                        return Err(HostProblem::UnknownOutcome);
+                    }
+                }
+                drop(access);
                 transition::adopt(&mut runtime, owner, &mut candidate)?;
                 runtime.control = candidate.control.clone();
                 runtime.connections = candidate.connections.clone();

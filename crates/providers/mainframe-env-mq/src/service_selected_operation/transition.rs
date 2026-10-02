@@ -45,6 +45,7 @@ pub(super) struct Candidate {
     pub(super) reviewed_status: Option<MqReviewedStatus>,
     pub(super) handle: HandleAction,
     pub(super) unit_dependencies: Vec<u64>,
+    pub(super) property: Option<MqPropertyRequest>,
 }
 
 fn handle_error(_: mainframe_env_host_api::MqHandleProblem) -> HostProblem {
@@ -86,8 +87,10 @@ pub(super) fn prepare(
         reviewed_status: None,
         handle: HandleAction::None,
         unit_dependencies: Vec::new(),
+        property: None,
     };
     let connection = match request {
+        MqMqiRequest::Property(request) => Some(request.connection()),
         MqMqiRequest::Open(open) => Some(open.connection()),
         MqMqiRequest::Put { connection, .. }
         | MqMqiRequest::PutOne { connection, .. }
@@ -150,6 +153,9 @@ pub(super) fn prepare(
     // Actual clock expiry changes only the candidate, never the current queues.
     next.delivery.advance_tick(now).map_err(delivery_error)?;
     match request {
+        MqMqiRequest::Property(request) => {
+            super::property::prepare(runtime, invocation, owner, request, authorizer, &mut next)?
+        }
         MqMqiRequest::Connect(connect) | MqMqiRequest::ConnectExtended(connect) => {
             // A checked SAME TASK child can establish this processing unit's
             // first connection. Registry ownership comes from the directory;
@@ -442,7 +448,7 @@ pub(super) fn prepare(
     Ok(next)
 }
 
-fn require_connection(
+pub(super) fn require_connection(
     runtime: &mut SelectedRuntime,
     owner: MqHandleOwner,
     connection: MqHconn,
@@ -700,6 +706,9 @@ pub(super) fn resolve_reply(
     let Ok(HostResult::MqMqi(reply)) = &mut reply.outcome else {
         return Err(HostProblem::UnknownOutcome);
     };
+    if let MqMqiRequest::Property(request) = request {
+        return super::property::replay(state, runtime, logical, owner, request, reply);
+    }
     match (&mut reply.result.outcome, request) {
         (_, MqMqiRequest::FullGet(get)) => {
             full_get::require_replay(state, runtime, logical, owner, get, invocation, authorizer)

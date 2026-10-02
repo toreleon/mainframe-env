@@ -16,6 +16,8 @@ mod failures;
 mod full_get;
 #[path = "tests/historical.rs"]
 mod historical;
+#[path = "tests/property.rs"]
+mod property;
 #[path = "tests/restart.rs"]
 mod restart;
 #[path = "tests/retention_dependencies.rs"]

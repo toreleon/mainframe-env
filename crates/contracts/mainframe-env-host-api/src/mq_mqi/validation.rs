@@ -310,6 +310,17 @@ impl MqMqiRequestEnvelope {
                 unit(*value)?;
                 Some(*connection)
             }
+            R::Property(value) => {
+                value
+                    .validate(self.limits)
+                    .map_err(MqMqiProblem::Property)?;
+                if owner.environment != crate::MqHostEnvironment::ZosBatch
+                    || self.context.syncpoint_owner != MqSyncpointOwner::QueueManager
+                {
+                    return Err(MqMqiProblem::Context);
+                }
+                Some(value.connection())
+            }
             R::CreateMessageHandle { connection, .. }
             | R::DeleteMessageHandle { connection, .. }
             | R::Disconnect { connection }
@@ -412,6 +423,13 @@ pub(super) fn validate_output(
         return Ok(());
     }
     let matched = match (call, output) {
+        (_, O::PropertyObservation(value)) => {
+            value
+                .validate(call, limits)
+                .map_err(MqMqiProblem::Property)?;
+            // Exact reviewed pairing is mandatory for the new output vocabulary.
+            status.is_none()
+        }
         (
             C::Get,
             O::FullGot {

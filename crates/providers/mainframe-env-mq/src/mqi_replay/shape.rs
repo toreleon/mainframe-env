@@ -10,7 +10,7 @@ pub(super) struct StoredResult {
     pub(super) host_result_digest: [u8; 32],
 }
 
-fn required_option<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+pub(super) fn required_option<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     d: D,
 ) -> Result<Option<T>, D::Error> {
     Option::deserialize(d)
@@ -162,6 +162,9 @@ pub(super) struct Item {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum Output {
+    PropertyObservation {
+        observation: super::property::Observation,
+    },
     FullPut {
         md_value: Vec<u8>,
         outcome: Delivery,
@@ -227,6 +230,9 @@ pub(super) enum Output {
 impl Output {
     fn from_output(value: &MqMqiOutput) -> Result<Self, ReplayError> {
         Ok(match value {
+            MqMqiOutput::PropertyObservation(v) => Self::PropertyObservation {
+                observation: super::property::Observation::capture(v),
+            },
             MqMqiOutput::FullPut {
                 descriptor,
                 outcome,
@@ -322,6 +328,9 @@ impl Output {
     }
     fn into_output(self) -> Result<MqMqiOutput, ReplayError> {
         Ok(match self {
+            Self::PropertyObservation { observation } => {
+                MqMqiOutput::PropertyObservation(observation.restore()?)
+            }
             Self::FullPut { md_value, outcome } => MqMqiOutput::FullPut {
                 descriptor: super::full_message::restore_md(&md_value)?,
                 outcome: outcome.into(),
@@ -434,6 +443,10 @@ pub(super) enum StoredOutcome {
     DuplicatePossible {},
 }
 impl StoredOutcome {
+    pub(super) fn is_property(&self) -> bool {
+        matches!(self,Self::Completed {output,..}|Self::StatusPending {output}|Self::ReviewedOutput {output,..}
+            if matches!(output,Output::PropertyObservation {..}))
+    }
     pub(super) fn is_full(&self) -> bool {
         matches!(self, Self::Completed { output, .. } | Self::StatusPending { output }
             | Self::ReviewedOutput { output, .. } if matches!(output, Output::FullPut {..} | Output::FullGot {..}))

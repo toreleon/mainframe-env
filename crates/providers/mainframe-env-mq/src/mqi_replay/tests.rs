@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 mod bounds;
 mod full_message;
 mod historical_handles;
+mod property;
 mod reviewed_output;
 
 const BYTES: usize = 8 << 20;
