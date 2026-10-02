@@ -701,3 +701,36 @@ for this continuation, with zero licensed credit. The clean `eb9483bc` licensed 
 reported missing external receipt/pins and pending 0/26; that older candidate
 receipt is not relabeled as evidence for these newer commits. No release or
 parent work package is complete.
+
+## Selected-flow composition wave
+
+All lanes start from the committed `adc911f0` integration candidate, except N's
+already active non-handle codec on its recorded `576e236f` plus rich-publication
+prerequisite. Direct CLI workers use `gpt-6.1-sol`, high effort, default service
+tier and fast mode off. At most three workers run beside the manager; no nested
+workers or orchestration skill are used. The licensed-only user exception above
+applies to every lane.
+
+| Slice / owner | Scope and contract ownership | Required focused acceptance |
+|---|---|---|
+| `MQ-1505.selected-operation-publication` / M | Actual private selected service flow and independently durable UOW/operation ownership under the existing sole mutex; reuse catalog, registry, lifecycle, delivery, original core intent and audited store publication. Own new service operation/UOW/receipt modules and narrow selected reader/authority integration, not host result encoding or machine/server routing. | Source-reviewed ordinary batch CONNECT/OPEN/PUT/PUT1/GET/CMIT/BACK/CLOSE/DISC first-flow composition, actual HCONN and resolved SAF checks, Memory/SQLite operation collision/replay and late CAS/audit/quota rollback, pending-work preservation and physical reopen; trusted host and handle-replay dependencies remain explicit until integrated. |
+| `MQ-1505.lossless-reviewed-output` / O | Additive reviewed completion plus exact typed output in the existing host result contract and original-request preflight. Preserve every old encoding and status inventory. Own host result definition/validation/encoding and narrow admission-result preflight, not the service or N's storage codec. | Exact warning/failure GET descriptor/buffer/required-length observations, request/call/status/output coherence, copied-capacity bounds, pending/unknown separation, old canonical goldens and focused host/admission regressions. |
+| `MQ-1505.typed-result-replay-codec` / N | Previously declared non-handle strict codec; refuse reconstruction of opaque authority. No concurrent result enum changes are consumed from another worker's dirty checkout. | Exact full-host canonical identity and storage round trip; malformed/duplicate/missing/unknown fields and bounds; existing delivery snapshot bytes unchanged. The manager must extend the codec deliberately for O's additive result after both features seal. |
+
+These units compose the first real selected flow; they do not reduce the final
+26-call denominator. The manager owns the actual trusted program host/ABI route
+and shared handoff integration. Production `ProductServer` still opens the legacy
+service, and selected legacy provider registration is deliberately empty. Do not
+switch it merely because these private primitives compile. The host must issue
+context/lifecycle provenance before constructing the original typed effect;
+equal application bindings are not that provenance. PUT1 still requires a live
+HCONN. Durable UOW ownership is not a caller's integer or volatile lease ID.
+
+The read-only composition review bound exact selected/rich/core commits and found
+no actionable defect within their stated primitive guarantees. It did not execute
+a combined public route. The next composed route must prove one audited physical
+publication, adoption after success, coordinator-owned completion, exact Completed
+receipt replay and fenced Unknown resolution. Warning/error output, opaque handle
+replay, nested CICS/IMS ownership and all remaining applicable contexts are not
+waived by a successful first ordinary batch flow. Public readiness, participant
+acceptance and full v0.15 completion remain unclaimed.
