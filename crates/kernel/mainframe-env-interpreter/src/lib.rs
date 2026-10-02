@@ -13,8 +13,8 @@ pub use coordinator::{
     CoordinatorLimits, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
 };
 pub use machine::{
-    MachineProblem, MachineSnapshot, MqMqiProgramFrame, MqMqiProgramProfile, ReferenceMachine,
-    SUPPORTED_LAYOUT_CATEGORIES, encode_cobol_call_result, supported_operations,
+    MachineProblem, MachineSnapshot, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile,
+    ReferenceMachine, SUPPORTED_LAYOUT_CATEGORIES, encode_cobol_call_result, supported_operations,
 };
 pub use recovery::{
     EffectRecoveryLimits, EffectRecoveryReport, EffectRecoveryResolution, StaleEffectRecoveryWorker,

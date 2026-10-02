@@ -53,7 +53,7 @@ mod legacy_mq;
 mod snapshot_codec;
 mod typed_cics;
 mod typed_mq;
-pub use typed_mq::{MqMqiProgramFrame, MqMqiProgramProfile};
+pub use typed_mq::{MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile};
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};
 use decimal_capacity::decimal_exceeds_picture;

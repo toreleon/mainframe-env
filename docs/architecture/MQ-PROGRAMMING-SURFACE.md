@@ -114,6 +114,40 @@ execution or licensed credit and does not broaden the accepted replay schema.
 
 ## Authority boundary
 
+The compiled machine's ordinary batch adapter now accepts MQCONNX VERSION1
+through `MqMqiProgramFrame::connx_profile`, a read-only interpreter-owned profile
+port that defaults to Unsupported. The embedding must independently select the
+ordinary owned nonshared profile and explicit big-endian/ASCII-compatible
+structure encoding; those are the actual compiled storage rules, not native
+endianness, MQMD.Encoding or decoded Invocation bindings. Other encodings,
+sharing/client/fallback/binding/security profiles and newer versions fail closed.
+The first admitted profile is frozen and compared around lookup callbacks,
+before original effect allocation and again before output writeback. Refusal,
+panic, changed frame/profile and unusable post-dispatch replies preserve Unknown.
+
+All five CONNX operands must be reference storage. The adapter checks MQCHAR48
+manager naming, the real fixed group declaration and direct prefix member types
+(also the one source-defined level01/level10 COPY wrapper),
+offsets/widths against generated Cno1 descriptors, signed fullword outputs and
+all input/output overlaps. CNO capacity is explicitly bounded to 1,024 bytes;
+only its twelve-byte VERSION1 prefix is interpreted. Existing raw capture/decode
+admits exact options0/32. The original ConnectExtended effect keeps existing
+sequence/key/deadline/mutation/context and the separately admitted Invocation.
+All input bytes, including CNO Options and suffix, are retained unchanged.
+Captured layouts, views and bytes are rechecked before a preencoded bounded
+atomic output batch. Only a usable provider-issued opaque token installs an
+existing ABI alias. Failed reviewed status preserves undefined HCONN bytes.
+Unrepresented warning/handle output, including ALREADY_CONNECTED, remains
+protected Unknown until its existing host-result owner adds the required shape.
+No profile/options grant SAF, lifecycle or UOW authority; no conditional Options
+output is fabricated. Sources are original row0009 q101770_ (signature8–18,
+scope26–66), MQCONN row0008 q101760_ (manager14–46), and the supplemental
+q091060_/q095410_/q095415_ pins above. Compiler-generated machine fixtures provide
+no installed selected-provider, SAF or licensed acceptance. Existing
+CONNECT/DISC/CMIT/BACK, canonical and checkpoint bytes stay unchanged; typed
+source schema0/checkpoint refusal remains. The manager owns live session
+forwarding, the actual trusted producer/service route and full26 acceptance.
+
 `mainframe-env-mq` is the one owned semantic authority for queue managers,
 objects, handles, messages, callbacks, properties, delivery and recovery.
 Stable host contracts live in `mainframe-env-host-api`; application packages

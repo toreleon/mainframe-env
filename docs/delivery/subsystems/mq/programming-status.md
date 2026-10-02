@@ -6,6 +6,19 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The compiled typed adapter now recognizes original MQCONNX VERSION1 calls through
+an additive, default-Unsupported trusted profile/encoding port. It checks real
+compiled direct/COPY-wrapper CNO group layouts, all five reference ranges and
+unchanged input bytes; only independently selected ordinary nonshared big-endian
+ASCII-compatible storage is admitted. Exact issued-token aliases and bounded
+atomic CONNX writeback reuse the existing machine authority. Original row `0009`
+(`q101770_` signature and COBOL lines 220–228), row `0008` (`q101760_` name rules)
+and supplemental `q091060_/q095410_/q095415_` define the source review. The worker
+is sealed as `8fdbcd93`; its compiler fixtures are not installed-provider/SAF
+acceptance. Server forwarding, actual selected service production, warning handle
+writeback, conditional Options output and accepted typed checkpoints remain
+separate composition work. Legacy canonical and checkpoint identities stay exact.
+
 The existing reviewed-output contract now retains MQCONN/MQCONNX's exact
 `MQCC_WARNING/MQRC_ALREADY_CONNECTED` pairing with its defined connection output.
 Other warning/failure output pairings remain closed. The existing strict replay

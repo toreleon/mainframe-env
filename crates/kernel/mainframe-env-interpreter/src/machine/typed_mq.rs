@@ -13,6 +13,9 @@ use mainframe_env_host_api::{
 };
 use std::sync::Arc;
 
+mod connx;
+pub use connx::MqMqiConnxProfile;
+
 /// A trusted embedding's already-admitted program frame. Implementations must
 /// independently mint/check lifecycle ownership under the selected MQ authority,
 /// not derive an owner from request assertions or equal binding bytes. This port
@@ -20,6 +23,13 @@ use std::sync::Arc;
 /// responsible for supplying the same frame to its selected provider route.
 pub trait MqMqiProgramFrame: Send + Sync {
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem>;
+
+    /// Independently selected structure ABI and ordinary connection profile.
+    /// No invocation binding or application Options value attests this input.
+    /// Existing embeddings refuse CONNX until deliberately forwarding this port.
+    fn connx_profile(&self, _invocation: &Invocation) -> Result<MqMqiConnxProfile, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 
     /// Read-only current local-UOW assertion for an actual live connection.
     /// The selected provider must still check original intent, logical owner,
@@ -47,6 +57,7 @@ pub(super) struct State {
     // ABI aliases only. The MQ registry alone checks token lifetime/access.
     connections: BTreeMap<i32, MqHconn>,
     next_connection: i32,
+    connx_profile: Option<MqMqiConnxProfile>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,6 +68,7 @@ pub(super) struct Targets {
     reason: String,
     disconnected: Option<i32>,
     unit: Option<u64>,
+    connx: Option<connx::Capture>,
 }
 
 pub(super) fn is_call(program: &str) -> bool {
@@ -100,6 +112,7 @@ impl ReferenceMachine {
             profile,
             connections: BTreeMap::new(),
             next_connection: 1,
+            connx_profile: None,
         });
         Ok(())
     }
@@ -108,7 +121,11 @@ impl ReferenceMachine {
         let call = args.first().ok_or(MachineProblem::InvalidOperation)?;
         let call = normalize(call.trim_matches(['\'', '"']));
         let state = self.mqi.as_ref().ok_or(MachineProblem::UnsupportedForm)?;
-        let profile = state.current(&self.invocation)?;
+        let profile = if call == "MQCONNX" {
+            connx::contained(|| state.current(&self.invocation))?
+        } else {
+            state.current(&self.invocation)?
+        };
         let using = position(args, "USING").ok_or(MachineProblem::InvalidOperation)?;
         // The initial source signatures require reference arguments. Do not
         // silently erase BY VALUE/CONTENT or output/exception clauses.
@@ -172,9 +189,11 @@ impl ReferenceMachine {
                         reason: parameters[3].clone(),
                         disconnected: None,
                         unit: None,
+                        connx: None,
                     },
                 )
             }
+            "MQCONNX" => self.prepare_connx(&parameters)?,
             "MQDISC" => {
                 if parameters.len() != 3 {
                     return Err(MachineProblem::InvalidOperation);
@@ -200,6 +219,7 @@ impl ReferenceMachine {
                         reason: parameters[2].clone(),
                         disconnected: Some(wire),
                         unit: None,
+                        connx: None,
                     },
                 )
             }
@@ -250,12 +270,17 @@ impl ReferenceMachine {
                         reason: parameters[2].clone(),
                         disconnected: None,
                         unit: Some(unit),
+                        connx: None,
                     },
                 )
             }
             _ => return Err(MachineProblem::UnsupportedForm),
         };
-        self.effect(
+        if let Some(capture) = &targets.connx {
+            self.recheck_connx(capture)?;
+        }
+        let connx_profile = targets.connx.as_ref().map(|capture| capture.profile);
+        let step = self.effect(
             HostRequest::MqMqi(MqMqiHostRequest {
                 envelope: MqMqiRequestEnvelope {
                     context: profile.context,
@@ -265,7 +290,14 @@ impl ReferenceMachine {
                 mutation: self.mutation()?,
             }),
             PendingKind::MqMqi(targets),
-        )
+        )?;
+        if let Some(profile) = connx_profile {
+            self.mqi
+                .as_mut()
+                .ok_or(MachineProblem::InvalidOperation)?
+                .connx_profile = Some(profile);
+        }
+        Ok(step)
     }
 
     fn mq_long_target(&self, target: &str) -> Result<(), MachineProblem> {
@@ -319,7 +351,12 @@ impl ReferenceMachine {
             .mqi
             .as_ref()
             .ok_or(MachineProblem::UnexpectedHostResult)?;
-        let profile = state.current(&self.invocation)?;
+        let profile = if let Some(capture) = &targets.connx {
+            self.recheck_connx(capture)?;
+            connx::contained(|| state.current(&self.invocation))?
+        } else {
+            state.current(&self.invocation)?
+        };
         if value.result.call != targets.call || value.limits != profile.limits {
             return Err(MachineProblem::UnexpectedHostResult);
         }
@@ -347,7 +384,7 @@ impl ReferenceMachine {
             } => {
                 let connection = match (targets.call, output) {
                     (
-                        MqMqiCall::Connect,
+                        MqMqiCall::Connect | MqMqiCall::ConnectExtended,
                         MqMqiOutput::Connected(connection @ MqHconn::Issued(_)),
                     ) if !connection.is_historical() => Some(connection),
                     (MqMqiCall::Disconnect, MqMqiOutput::NoOutput) => None,
@@ -421,33 +458,39 @@ impl ReferenceMachine {
         } else {
             None
         };
-        // Preflight *all* writebacks before changing any application storage.
-        for target in [&targets.connection, &targets.completion, &targets.reason] {
-            self.mq_long_target(target)?;
-        }
-        if let Some(wire) = wire {
+        // CONNX uses captured compiled views and one preflighted bounded batch.
+        // The established routes retain their exact writeback behavior.
+        if let Some(capture) = &targets.connx {
+            self.write_connx(capture, &targets, wire, completion, reason)?;
+        } else {
+            // Preflight *all* writebacks before changing any application storage.
+            for target in [&targets.connection, &targets.completion, &targets.reason] {
+                self.mq_long_target(target)?;
+            }
+            if let Some(wire) = wire {
+                self.write_decimal(
+                    &targets.connection,
+                    Decimal {
+                        coefficient: i128::from(wire),
+                        scale: 0,
+                    },
+                )?;
+            }
             self.write_decimal(
-                &targets.connection,
+                &targets.completion,
                 Decimal {
-                    coefficient: i128::from(wire),
+                    coefficient: i128::from(completion),
+                    scale: 0,
+                },
+            )?;
+            self.write_decimal(
+                &targets.reason,
+                Decimal {
+                    coefficient: i128::from(reason),
                     scale: 0,
                 },
             )?;
         }
-        self.write_decimal(
-            &targets.completion,
-            Decimal {
-                coefficient: i128::from(completion),
-                scale: 0,
-            },
-        )?;
-        self.write_decimal(
-            &targets.reason,
-            Decimal {
-                coefficient: i128::from(reason),
-                scale: 0,
-            },
-        )?;
         let state = self
             .mqi
             .as_mut()
