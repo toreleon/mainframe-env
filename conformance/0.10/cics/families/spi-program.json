@@ -305,7 +305,22 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "LOGMESSAGE",
+                  "values": [
+                    "LOG",
+                    "NOLOG"
+                  ],
+                  "source_lines": [
+                    74,
+                    75,
+                    76,
+                    78
+                  ]
+                }
+              ]
             },
             "source_lines": [
               15,
@@ -319,6 +334,21 @@
               80,
               81,
               82
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              74,
+              75,
+              76,
+              78
             ]
           }
         ]
@@ -987,7 +1017,8 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": []
             },
             "source_lines": [
               15,
@@ -998,7 +1029,8 @@
               43
             ]
           }
-        ]
+        ],
+        "cvda_domains": []
       },
       "responses": [
         {
@@ -2630,7 +2662,383 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "APIST",
+                  "values": [
+                    "CICSAPI",
+                    "OPENAPI"
+                  ],
+                  "source_lines": [
+                    110,
+                    111,
+                    124,
+                    125,
+                    132
+                  ]
+                },
+                {
+                  "option": "CEDFSTATUS",
+                  "values": [
+                    "CEDF",
+                    "NOCEDF",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    173,
+                    174,
+                    176,
+                    177,
+                    182,
+                    184
+                  ]
+                },
+                {
+                  "option": "CHANGEAGENT",
+                  "values": [
+                    "AUTOINSTALL",
+                    "CREATESPI",
+                    "CSDAPI",
+                    "CSDBATCH",
+                    "DREPAPI",
+                    "DYNAMIC",
+                    "OVERRIDE",
+                    "SYSTEM"
+                  ],
+                  "source_lines": [
+                    187,
+                    188,
+                    189,
+                    190,
+                    192,
+                    194,
+                    196,
+                    198,
+                    200,
+                    202,
+                    204
+                  ]
+                },
+                {
+                  "option": "COBOLTYPE",
+                  "values": [
+                    "COBOL",
+                    "COBOLII",
+                    "NOTAPPLIC",
+                    "NOTINIT"
+                  ],
+                  "source_lines": [
+                    215,
+                    216,
+                    218,
+                    219,
+                    223,
+                    226,
+                    229
+                  ]
+                },
+                {
+                  "option": "CONCURRENCY",
+                  "values": [
+                    "QUASIRENT",
+                    "REQUIRED",
+                    "THREADSAFE"
+                  ],
+                  "source_lines": [
+                    232,
+                    233,
+                    234,
+                    235,
+                    238,
+                    243
+                  ]
+                },
+                {
+                  "option": "COPY",
+                  "values": [
+                    "NOTREQUIRED",
+                    "REQUIRED"
+                  ],
+                  "source_lines": [
+                    265,
+                    266,
+                    273,
+                    274,
+                    278
+                  ]
+                },
+                {
+                  "option": "DATALOCATION",
+                  "values": [
+                    "ANY",
+                    "BELOW",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    280,
+                    281,
+                    282,
+                    283,
+                    285,
+                    287
+                  ]
+                },
+                {
+                  "option": "DYNAMSTATUS",
+                  "values": [
+                    "DYNAMIC",
+                    "NOTDYNAMIC"
+                  ],
+                  "source_lines": [
+                    297,
+                    298,
+                    299,
+                    300,
+                    304
+                  ]
+                },
+                {
+                  "option": "EXECKEY",
+                  "values": [
+                    "CICSEXECKEY",
+                    "NOTAPPLIC",
+                    "USEREXECKEY"
+                  ],
+                  "source_lines": [
+                    320,
+                    321,
+                    325,
+                    326,
+                    328,
+                    330
+                  ]
+                },
+                {
+                  "option": "EXECUTIONSET",
+                  "values": [
+                    "DPLSUBSET",
+                    "FULLAPI",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    332,
+                    333,
+                    338,
+                    339,
+                    340,
+                    342,
+                    344
+                  ]
+                },
+                {
+                  "option": "HOLDSTATUS",
+                  "values": [
+                    "HOLD",
+                    "NOHOLD",
+                    "NOTAPPLIC"
+                  ],
+                  "source_lines": [
+                    347,
+                    348,
+                    349,
+                    350,
+                    352,
+                    354
+                  ]
+                },
+                {
+                  "option": "INSTALLAGENT",
+                  "values": [
+                    "AUTOINSTALL",
+                    "BUNDLE",
+                    "CREATESPI",
+                    "CSDAPI",
+                    "DYNAMIC",
+                    "GRPLIST",
+                    "SYSTEM"
+                  ],
+                  "source_lines": [
+                    356,
+                    357,
+                    358,
+                    359,
+                    361,
+                    363,
+                    365,
+                    368,
+                    370,
+                    372
+                  ]
+                },
+                {
+                  "option": "LANGDEDUCED",
+                  "values": [
+                    "ASSEMBLER",
+                    "C",
+                    "COBOL",
+                    "JAVA",
+                    "LE370",
+                    "NOTAPPLIC",
+                    "NOTDEFINED",
+                    "PL1",
+                    "PLI"
+                  ],
+                  "source_lines": [
+                    389,
+                    390,
+                    393,
+                    394,
+                    396,
+                    398,
+                    400,
+                    402,
+                    404,
+                    407,
+                    410
+                  ]
+                },
+                {
+                  "option": "LANGUAGE",
+                  "values": [
+                    "ASSEMBLER",
+                    "C",
+                    "COBOL",
+                    "LE370",
+                    "NOTAPPLIC",
+                    "NOTDEFINED",
+                    "PL1",
+                    "PLI"
+                  ],
+                  "source_lines": [
+                    412,
+                    413,
+                    416,
+                    417,
+                    418,
+                    420,
+                    422,
+                    424,
+                    426,
+                    429,
+                    431
+                  ]
+                },
+                {
+                  "option": "LPASTATUS",
+                  "values": [
+                    "LPA",
+                    "NOTAPPLIC",
+                    "NOTLPA"
+                  ],
+                  "source_lines": [
+                    465,
+                    466,
+                    467,
+                    468,
+                    471,
+                    473
+                  ]
+                },
+                {
+                  "option": "PROGTYPE",
+                  "values": [
+                    "MAP",
+                    "MAPSET",
+                    "PARTITIONSET",
+                    "PROGRAM"
+                  ],
+                  "source_lines": [
+                    489,
+                    490,
+                    491,
+                    492,
+                    493,
+                    494,
+                    495,
+                    497
+                  ]
+                },
+                {
+                  "option": "REPLICATION",
+                  "values": [
+                    "NOREPLICATOR",
+                    "REPLICATOR"
+                  ],
+                  "source_lines": [
+                    510,
+                    511,
+                    512,
+                    515
+                  ]
+                },
+                {
+                  "option": "RESIDENCY",
+                  "values": [
+                    "NONRESIDENT",
+                    "RESIDENT"
+                  ],
+                  "source_lines": [
+                    524,
+                    525,
+                    526,
+                    527,
+                    529
+                  ]
+                },
+                {
+                  "option": "RUNTIME",
+                  "values": [
+                    "JVM",
+                    "LE370",
+                    "NONLE370",
+                    "NOTAPPLIC",
+                    "UNKNOWN",
+                    "XPLINK"
+                  ],
+                  "source_lines": [
+                    531,
+                    532,
+                    533,
+                    534,
+                    538,
+                    541,
+                    543,
+                    546,
+                    551
+                  ]
+                },
+                {
+                  "option": "SHARESTATUS",
+                  "values": [
+                    "NOTAPPLIC",
+                    "PRIVATE",
+                    "SHARED"
+                  ],
+                  "source_lines": [
+                    553,
+                    554,
+                    555,
+                    556,
+                    560,
+                    563
+                  ]
+                },
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    566,
+                    567,
+                    568,
+                    569,
+                    571
+                  ]
+                }
+              ]
             },
             "source_lines": [
               15,
@@ -2649,6 +3057,382 @@
               486,
               487,
               488
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "APIST",
+            "values": [
+              "CICSAPI",
+              "OPENAPI"
+            ],
+            "source_lines": [
+              110,
+              111,
+              124,
+              125,
+              132
+            ]
+          },
+          {
+            "option": "CEDFSTATUS",
+            "values": [
+              "CEDF",
+              "NOCEDF",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              173,
+              174,
+              176,
+              177,
+              182,
+              184
+            ]
+          },
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "AUTOINSTALL",
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "DYNAMIC",
+              "OVERRIDE",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              187,
+              188,
+              189,
+              190,
+              192,
+              194,
+              196,
+              198,
+              200,
+              202,
+              204
+            ]
+          },
+          {
+            "option": "COBOLTYPE",
+            "values": [
+              "COBOL",
+              "COBOLII",
+              "NOTAPPLIC",
+              "NOTINIT"
+            ],
+            "source_lines": [
+              215,
+              216,
+              218,
+              219,
+              223,
+              226,
+              229
+            ]
+          },
+          {
+            "option": "CONCURRENCY",
+            "values": [
+              "QUASIRENT",
+              "REQUIRED",
+              "THREADSAFE"
+            ],
+            "source_lines": [
+              232,
+              233,
+              234,
+              235,
+              238,
+              243
+            ]
+          },
+          {
+            "option": "COPY",
+            "values": [
+              "NOTREQUIRED",
+              "REQUIRED"
+            ],
+            "source_lines": [
+              265,
+              266,
+              273,
+              274,
+              278
+            ]
+          },
+          {
+            "option": "DATALOCATION",
+            "values": [
+              "ANY",
+              "BELOW",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              280,
+              281,
+              282,
+              283,
+              285,
+              287
+            ]
+          },
+          {
+            "option": "DYNAMSTATUS",
+            "values": [
+              "DYNAMIC",
+              "NOTDYNAMIC"
+            ],
+            "source_lines": [
+              297,
+              298,
+              299,
+              300,
+              304
+            ]
+          },
+          {
+            "option": "EXECKEY",
+            "values": [
+              "CICSEXECKEY",
+              "NOTAPPLIC",
+              "USEREXECKEY"
+            ],
+            "source_lines": [
+              320,
+              321,
+              325,
+              326,
+              328,
+              330
+            ]
+          },
+          {
+            "option": "EXECUTIONSET",
+            "values": [
+              "DPLSUBSET",
+              "FULLAPI",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              332,
+              333,
+              338,
+              339,
+              340,
+              342,
+              344
+            ]
+          },
+          {
+            "option": "HOLDSTATUS",
+            "values": [
+              "HOLD",
+              "NOHOLD",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              347,
+              348,
+              349,
+              350,
+              352,
+              354
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "AUTOINSTALL",
+              "BUNDLE",
+              "CREATESPI",
+              "CSDAPI",
+              "DYNAMIC",
+              "GRPLIST",
+              "SYSTEM"
+            ],
+            "source_lines": [
+              356,
+              357,
+              358,
+              359,
+              361,
+              363,
+              365,
+              368,
+              370,
+              372
+            ]
+          },
+          {
+            "option": "LANGDEDUCED",
+            "values": [
+              "ASSEMBLER",
+              "C",
+              "COBOL",
+              "JAVA",
+              "LE370",
+              "NOTAPPLIC",
+              "NOTDEFINED",
+              "PL1",
+              "PLI"
+            ],
+            "source_lines": [
+              389,
+              390,
+              393,
+              394,
+              396,
+              398,
+              400,
+              402,
+              404,
+              407,
+              410
+            ]
+          },
+          {
+            "option": "LANGUAGE",
+            "values": [
+              "ASSEMBLER",
+              "C",
+              "COBOL",
+              "LE370",
+              "NOTAPPLIC",
+              "NOTDEFINED",
+              "PL1",
+              "PLI"
+            ],
+            "source_lines": [
+              412,
+              413,
+              416,
+              417,
+              418,
+              420,
+              422,
+              424,
+              426,
+              429,
+              431
+            ]
+          },
+          {
+            "option": "LPASTATUS",
+            "values": [
+              "LPA",
+              "NOTAPPLIC",
+              "NOTLPA"
+            ],
+            "source_lines": [
+              465,
+              466,
+              467,
+              468,
+              471,
+              473
+            ]
+          },
+          {
+            "option": "PROGTYPE",
+            "values": [
+              "MAP",
+              "MAPSET",
+              "PARTITIONSET",
+              "PROGRAM"
+            ],
+            "source_lines": [
+              489,
+              490,
+              491,
+              492,
+              493,
+              494,
+              495,
+              497
+            ]
+          },
+          {
+            "option": "REPLICATION",
+            "values": [
+              "NOREPLICATOR",
+              "REPLICATOR"
+            ],
+            "source_lines": [
+              510,
+              511,
+              512,
+              515
+            ]
+          },
+          {
+            "option": "RESIDENCY",
+            "values": [
+              "NONRESIDENT",
+              "RESIDENT"
+            ],
+            "source_lines": [
+              524,
+              525,
+              526,
+              527,
+              529
+            ]
+          },
+          {
+            "option": "RUNTIME",
+            "values": [
+              "JVM",
+              "LE370",
+              "NONLE370",
+              "NOTAPPLIC",
+              "UNKNOWN",
+              "XPLINK"
+            ],
+            "source_lines": [
+              531,
+              532,
+              533,
+              534,
+              538,
+              541,
+              543,
+              546,
+              551
+            ]
+          },
+          {
+            "option": "SHARESTATUS",
+            "values": [
+              "NOTAPPLIC",
+              "PRIVATE",
+              "SHARED"
+            ],
+            "source_lines": [
+              553,
+              554,
+              555,
+              556,
+              560,
+              563
+            ]
+          },
+          {
+            "option": "STATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              566,
+              567,
+              568,
+              569,
+              571
             ]
           }
         ]
@@ -4107,7 +4891,125 @@
                   ]
                 }
               ],
-              "alternative_groups": []
+              "alternative_groups": [],
+              "cvda_domains": [
+                {
+                  "option": "CEDFSTATUS",
+                  "values": [
+                    "CEDF",
+                    "NOCEDF"
+                  ],
+                  "source_lines": [
+                    50,
+                    51,
+                    53,
+                    54,
+                    59
+                  ]
+                },
+                {
+                  "option": "COPY",
+                  "values": [
+                    "NEWCOPY",
+                    "PHASEIN"
+                  ],
+                  "source_lines": [
+                    62,
+                    63,
+                    89,
+                    90,
+                    96
+                  ]
+                },
+                {
+                  "option": "EXECUTIONSET",
+                  "values": [
+                    "DPLSUBSET",
+                    "FULLAPI"
+                  ],
+                  "source_lines": [
+                    100,
+                    101,
+                    108,
+                    109,
+                    113
+                  ]
+                },
+                {
+                  "option": "REPLICATION",
+                  "values": [
+                    "NOREPLICATOR",
+                    "REPLICATOR"
+                  ],
+                  "source_lines": [
+                    160,
+                    161,
+                    162,
+                    165
+                  ]
+                },
+                {
+                  "option": "RUNTIME",
+                  "values": [
+                    "JVM",
+                    "NOJVM"
+                  ],
+                  "source_lines": [
+                    168,
+                    169,
+                    170,
+                    171,
+                    172,
+                    174
+                  ]
+                },
+                {
+                  "option": "SHARESTATUS",
+                  "values": [
+                    "PRIVATE",
+                    "SHARED"
+                  ],
+                  "source_lines": [
+                    178,
+                    179,
+                    182,
+                    183,
+                    184,
+                    187
+                  ]
+                },
+                {
+                  "option": "STATUS",
+                  "values": [
+                    "DISABLED",
+                    "ENABLED"
+                  ],
+                  "source_lines": [
+                    191,
+                    192,
+                    193,
+                    194,
+                    197
+                  ]
+                },
+                {
+                  "option": "VERSION",
+                  "values": [
+                    "NEWCOPY",
+                    "OLDCOPY"
+                  ],
+                  "source_lines": [
+                    204,
+                    205,
+                    206,
+                    207,
+                    208,
+                    212,
+                    213,
+                    215
+                  ]
+                }
+              ]
             },
             "source_lines": [
               14,
@@ -4126,6 +5028,124 @@
               178,
               191,
               204
+            ]
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "CEDFSTATUS",
+            "values": [
+              "CEDF",
+              "NOCEDF"
+            ],
+            "source_lines": [
+              50,
+              51,
+              53,
+              54,
+              59
+            ]
+          },
+          {
+            "option": "COPY",
+            "values": [
+              "NEWCOPY",
+              "PHASEIN"
+            ],
+            "source_lines": [
+              62,
+              63,
+              89,
+              90,
+              96
+            ]
+          },
+          {
+            "option": "EXECUTIONSET",
+            "values": [
+              "DPLSUBSET",
+              "FULLAPI"
+            ],
+            "source_lines": [
+              100,
+              101,
+              108,
+              109,
+              113
+            ]
+          },
+          {
+            "option": "REPLICATION",
+            "values": [
+              "NOREPLICATOR",
+              "REPLICATOR"
+            ],
+            "source_lines": [
+              160,
+              161,
+              162,
+              165
+            ]
+          },
+          {
+            "option": "RUNTIME",
+            "values": [
+              "JVM",
+              "NOJVM"
+            ],
+            "source_lines": [
+              168,
+              169,
+              170,
+              171,
+              172,
+              174
+            ]
+          },
+          {
+            "option": "SHARESTATUS",
+            "values": [
+              "PRIVATE",
+              "SHARED"
+            ],
+            "source_lines": [
+              178,
+              179,
+              182,
+              183,
+              184,
+              187
+            ]
+          },
+          {
+            "option": "STATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              191,
+              192,
+              193,
+              194,
+              197
+            ]
+          },
+          {
+            "option": "VERSION",
+            "values": [
+              "NEWCOPY",
+              "OLDCOPY"
+            ],
+            "source_lines": [
+              204,
+              205,
+              206,
+              207,
+              208,
+              212,
+              213,
+              215
             ]
           }
         ]

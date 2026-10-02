@@ -1290,7 +1290,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:219c918e1ab6d27ec6cab20d221ef66095ac01cc19c320b660747e6710bec42a",
+      "sha256": "sha256:fd619da2a1593dc648d3d4d55c42ded52c04f16430a46ff269dec11df4a735fb",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },

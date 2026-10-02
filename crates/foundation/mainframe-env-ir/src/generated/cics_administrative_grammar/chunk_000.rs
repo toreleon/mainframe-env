@@ -786,6 +786,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"] },
         ],
         required_options: &["ATTRIBUTES", "PROGRAM"],
         alternative_groups: &[
@@ -811,6 +812,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                     CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
                 ],
                 cvda_domains: &[
+                    CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"] },
                 ],
                 required_options: &["ATTRIBUTES", "PROGRAM"],
                 alternative_groups: &[

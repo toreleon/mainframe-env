@@ -363,4 +363,51 @@ mod tests {
         );
         assert!(!set.options.iter().any(|option| option.name == "JVMPOOL"));
     }
+
+    #[test]
+    fn program_cvda_domains_keep_inquiry_and_update_values_distinct() {
+        fn values(
+            contract: &CicsAdministrativeGrammarContract,
+            option: &str,
+        ) -> &'static [&'static str] {
+            contract
+                .cvda_domains
+                .iter()
+                .find(|domain| domain.option == option)
+                .expect("source-reviewed CVDA domain")
+                .values
+        }
+
+        let create = program_contract("0026");
+        let discard = program_contract("0084");
+        let inquire = program_contract("0155");
+        let set = program_contract("0241");
+        assert_eq!(values(create, "LOGMESSAGE"), &["LOG", "NOLOG"]);
+        assert!(discard.cvda_domains.is_empty());
+        assert_eq!(values(inquire, "COPY"), &["NOTREQUIRED", "REQUIRED"]);
+        assert_eq!(values(set, "COPY"), &["NEWCOPY", "PHASEIN"]);
+        assert_eq!(
+            values(inquire, "RUNTIME"),
+            &["JVM", "LE370", "NONLE370", "NOTAPPLIC", "UNKNOWN", "XPLINK"]
+        );
+        assert_eq!(values(set, "RUNTIME"), &["JVM", "NOJVM"]);
+        assert_eq!(values(set, "VERSION"), &["NEWCOPY", "OLDCOPY"]);
+        assert!(
+            !inquire
+                .cvda_domains
+                .iter()
+                .any(|domain| domain.option == "VERSION")
+        );
+        assert_eq!(
+            values(inquire, "PROGTYPE"),
+            &["MAP", "MAPSET", "PARTITIONSET", "PROGRAM"]
+        );
+        for contract in [create, discard, inquire, set] {
+            assert_eq!(contract.forms[0].cvda_domains, contract.cvda_domains);
+            assert_eq!(
+                contract.constraint_status,
+                CicsApplicationConstraintStatus::Pending
+            );
+        }
+    }
 }

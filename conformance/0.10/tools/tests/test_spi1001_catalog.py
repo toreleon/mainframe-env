@@ -220,6 +220,10 @@ class AdministrativeGrammarTests(unittest.TestCase):
 
     def test_absent_empty_cvda_domains_preserve_product_fact_digest(self) -> None:
         absent = copy.deepcopy(self.family)
+        for command in absent["commands"]:
+            command["grammar"].pop("cvda_domains", None)
+            for form in command["grammar"].get("forms", []):
+                form["grammar"].pop("cvda_domains", None)
         empty = copy.deepcopy(absent)
         for command in empty["commands"]:
             command["grammar"]["cvda_domains"] = []

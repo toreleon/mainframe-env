@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Retain source-scoped PROGRAM CVDA domains in private parent and named-form facts, preserving distinct inquiry/update values and pending administrative admission."
