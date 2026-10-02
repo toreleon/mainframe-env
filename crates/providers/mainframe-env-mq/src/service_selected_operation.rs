@@ -299,7 +299,9 @@ impl MqService {
                 // Receipt/core/frame/limits/SAF proof above precedes every
                 // observation lookup. Resolution never allocates or resurrects.
                 transition::resolve_reply(
+                    state,
                     &mut runtime,
+                    &logical,
                     owner,
                     &admitted.envelope.request,
                     &mut reply,
@@ -345,7 +347,14 @@ impl MqService {
                 Err(error) => return Err(error),
             };
             let attempt = (|| {
-                let result = if let MqMqiOutput::Got { disposition, .. } = &candidate.output {
+                let result = if let Some(status) = candidate.reviewed_status {
+                    MqMqiResult::reviewed_output(
+                        status,
+                        candidate.output.clone(),
+                        admitted.envelope,
+                    )
+                    .map_err(|_| HostProblem::Malformed)?
+                } else if let MqMqiOutput::Got { disposition, .. } = &candidate.output {
                     let (completion, reason) = match disposition {
                         MqGetDisposition::Message(MqTruncationDisposition::Complete { .. }) => {
                             ("MQCC_OK", "MQRC_NONE")

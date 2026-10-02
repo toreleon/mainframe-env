@@ -13,6 +13,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
+mod connection_warning;
 mod flows;
 mod lifecycle;
 mod publication;

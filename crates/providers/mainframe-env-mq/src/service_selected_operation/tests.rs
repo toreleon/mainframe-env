@@ -8,6 +8,8 @@ use mainframe_env_store_api::*;
 mod batch_child;
 #[path = "tests/bounds.rs"]
 mod bounds;
+#[path = "tests/connection_warning.rs"]
+mod connection_warning;
 #[path = "tests/failures.rs"]
 mod failures;
 #[path = "tests/historical.rs"]

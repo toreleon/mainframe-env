@@ -353,7 +353,7 @@ fn memory_sqlite_child_rejects_parent_intent_and_receipt_collisions_before_saf()
 }
 
 #[test]
-fn memory_sqlite_preparation_substitution_rollback_and_already_connected_child_fail_closed() {
+fn memory_sqlite_preparation_substitution_rollback_and_checked_child_connection_warning() {
     for sqlite in [false, true] {
         let f = Fixture::new(sqlite);
         let (c, _, unit) = parent_pending(&f);
@@ -407,15 +407,19 @@ fn memory_sqlite_preparation_substitution_rollback_and_already_connected_child_f
         );
         child.seed(&f, &e);
         let calls = f.saf.calls.load(Ordering::SeqCst);
-        assert_eq!(child.execute(&f, &e), Err(HostProblem::Unsupported));
-        assert_eq!(f.saf.calls.load(Ordering::SeqCst), calls);
+        let reply = child.execute(&f, &e).unwrap();
+        super::connection_warning::warning(reply.clone(), c, MqMqiCall::Connect);
+        assert_eq!(f.saf.calls.load(Ordering::SeqCst), calls + 1);
+        let published = f.rows();
+        assert_ne!(published, rows);
+        assert_eq!(child.execute(&f, &e).unwrap(), reply);
         f.service.abort_selected_batch_child(child.binding).unwrap();
         assert!(
             f.service
                 .selected_batch_owner(child.binding.frame(), &child.inv)
                 .is_err()
         );
-        assert_eq!(f.rows(), rows);
+        assert_eq!(f.rows(), published);
         assert_pending(&f, unit);
     }
 }

@@ -8,6 +8,9 @@ use mainframe_env_host_api::{
     MqPersistence,
 };
 
+#[path = "transition/connection_warning.rs"]
+mod connection_warning;
+
 #[derive(Clone)]
 pub(super) struct ConnectionBinding {
     pub(super) connection: MqHconn,
@@ -37,6 +40,7 @@ pub(super) struct Candidate {
     pub(super) connections: Vec<ConnectionBinding>,
     pub(super) objects: Vec<ObjectBinding>,
     pub(super) output: MqMqiOutput,
+    pub(super) reviewed_status: Option<MqReviewedStatus>,
     pub(super) handle: HandleAction,
     pub(super) unit_dependencies: Vec<u64>,
 }
@@ -77,6 +81,7 @@ pub(super) fn prepare(
         connections: runtime.connections.clone(),
         objects: runtime.objects.clone(),
         output: MqMqiOutput::NoOutput,
+        reviewed_status: None,
         handle: HandleAction::None,
         unit_dependencies: Vec::new(),
     };
@@ -104,6 +109,33 @@ pub(super) fn prepare(
             .require_owner(logical, &binding.key, &next.control, binding.unit)?;
         next.unit_dependencies.push(binding.unit);
     }
+    if let MqMqiRequest::Connect(connect) | MqMqiRequest::ConnectExtended(connect) = request {
+        connection_warning::validate_profile(state, connect)?;
+        if let Some(binding) = connection_warning::prior(state, runtime, logical, owner)? {
+            authorize(
+                authorizer,
+                invocation,
+                &[resource(
+                    EnterpriseResourceClass::MqUnitOfWork,
+                    "CURRENT",
+                    AccessIntent::Execute,
+                )?],
+            )?;
+            next.unit_dependencies.push(binding.unit);
+            next.output = MqMqiOutput::Connected(binding.connection);
+            next.reviewed_status = Some(
+                MqReviewedStatus::from_symbols(
+                    request.call(),
+                    "MQCC_WARNING",
+                    "MQRC_ALREADY_CONNECTED",
+                )
+                .map_err(|_| HostProblem::Unsupported)?,
+            );
+            // Reuse is not queue activity or expiry. Publish only the original
+            // occurrence plus existing control/UOW/catalog/marker dependencies.
+            return Ok(next);
+        }
+    }
     // Actual clock expiry changes only the candidate, never the current queues.
     next.delivery.advance_tick(now).map_err(delivery_error)?;
     match request {
@@ -112,30 +144,6 @@ pub(super) fn prepare(
             // first connection. Registry ownership comes from the directory;
             // durable provenance retains its logical origin and this caller's
             // original CONNECT key. Ordinary CALL return does not end that task.
-            if connect.options != MqMqiOptions::ContractDefault
-                || connect.sharing != MqHandleSharing::NonShared
-            {
-                return Err(HostProblem::Unsupported);
-            }
-            if connect
-                .manager
-                .as_ref()
-                .is_some_and(|n| n.as_str() != state.catalog.queue_manager().name.as_str())
-            {
-                return Err(HostProblem::NotFound);
-            }
-            // First ordinary profile has one nonshared connection per frozen
-            // processing unit. Warning+existing-handle output needs its reviewed
-            // lossless form; do not allocate a second connection as success.
-            if runtime.connections.iter().any(|binding| {
-                runtime
-                    .handles
-                    .handles_mut()
-                    .validate_connection(owner, binding.connection)
-                    .is_ok()
-            }) {
-                return Err(HostProblem::Unsupported);
-            }
             authorize(
                 authorizer,
                 invocation,
@@ -664,7 +672,9 @@ pub(super) fn has_handle_reply(reply: &EffectResult) -> bool {
 }
 
 pub(super) fn resolve_reply(
+    state: &rich_state::RichStoredState,
     runtime: &mut SelectedRuntime,
+    logical: &LogicalBatchOwner,
     owner: MqHandleOwner,
     request: &MqMqiRequest,
     reply: &mut EffectResult,
@@ -693,6 +703,12 @@ pub(super) fn resolve_reply(
                 .resolve_observed_connection(owner, observation)
                 .map_err(|_| HostProblem::UnknownOutcome)?;
             require_connection(runtime, owner, live).map_err(|_| HostProblem::UnknownOutcome)?;
+            let prior = connection_warning::prior(state, runtime, logical, owner)
+                .map_err(|_| HostProblem::UnknownOutcome)?
+                .ok_or(HostProblem::UnknownOutcome)?;
+            if prior.connection != live {
+                return Err(HostProblem::UnknownOutcome);
+            }
             *connection = live;
             Ok(())
         }

@@ -258,8 +258,20 @@ the logical origin and that child's original CONNECT key. Its core intent, SAF,
 audit and receipt retain the actual child actor. A surviving admitted parent or
 next same-task child can use the retained connection, objects and current UOW;
 explicit CMIT/BACK/DISC still require that caller's original controls, authority
-and whole audited publication. Repeated CONNECT remains explicitly unsupported
-until its existing-connection warning/output policy is composed.
+and whole audited publication. Repeated default, nonshared MQCONN/MQCONNX now
+returns the exact already-issued connection through the existing reviewed-output
+WARNING/ALREADY_CONNECTED pair. Under the same mutex, unique live registry/index
+and retained logical owner/current unit/CONNECT key/control provenance precede
+mandatory SAF and original core-intent publication. The warning allocates no
+connection or unit, reassigns no owner and does not advance delivery expiry or
+change queue, cursor, object or pending work. Its new occurrence receipt and audit
+commit atomically with exact current UOW/control/catalog/marker dependencies;
+dependency versions may advance while semantic payloads remain unchanged.
+Cached warning delivery retains the full original canonical result and requires
+current physical incarnation, original core/actor/limits, SAF, issued reply and
+live registry/UOW proof. Corruption, ambiguity and uncertainty fail closed without
+automatic redispatch. Shared/client, subtasks and host-owned contexts gain no
+authority from the warning.
 
 This rule relies on the trusted host proving an ordinary CALL in the same
 continuing task. MQCONN's nonshared z/OS scope is the task, excluding subtasks;
@@ -281,6 +293,13 @@ defines the name, nonshared scope and returned Hconn. Row `0012` MQDISC,
 defines the input/output Hconn and undefined z/OS value after success. Completion
 numbers come from the existing reviewed status authority, not another table.
 Offline source review grants zero execution/licensed credit.
+
+The warning review uses the same baseline row `0008`, MQCONN usage line 271
+(same prior Hconn), and row `0009`, `SSFKSJ_9.4.0/refdev/q101770_.html`, SHA-256
+`41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633`,
+return lines 76–78 and nonshared task scope lines 30–54. FAILED leaves Hconn
+undefined (MQCONN 273, MQCONNX 41–42); no defined failure handle is synthesized.
+Ordinary nonfinal CALL return still makes no implicit disconnect or UOW decision.
 
 The syncpoint handoff also reviews baseline `ibm-mq-9.4-mqi-2026-08-31`,
 row `0007` MQCMIT, `SSFKSJ_9.4.0/refdev/q101750_.html`, SHA-256
