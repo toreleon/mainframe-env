@@ -122,25 +122,10 @@ fn source_exact_syncpoint_matrix_does_not_select_a_coordinator() {
                     },
                 };
                 let m = mutation();
-                let e = effect(&inv, &m);
+                let e = effect(&inv, &m, &env);
                 let p = provider();
-                let scope = MqMqiServiceScope::for_host_dispatch(
-                    &inv,
-                    trusted_owner,
-                    &env,
-                    &m,
-                    MqMqiEffectOccurrence::from_effect(&e),
-                    &p,
-                );
-                let result = admit_mqi(
-                    &scope,
-                    &inv,
-                    &env,
-                    &m,
-                    MqMqiEffectOccurrence::from_effect(&e),
-                    1,
-                )
-                .unwrap();
+                let scope = scope(&inv, trusted_owner, &e, &p).unwrap();
+                let result = admit_mqi(&scope, &inv, 1).unwrap();
                 let before = protected.get();
                 if matches!(&result, MqMqiAdmission::ServiceValidation(_)) {
                     protected.set(before + 1);
@@ -208,25 +193,11 @@ fn cics_binding_is_sufficient_without_invented_application_fields() {
         env.context.syncpoint_owner = MqSyncpointOwner::HostCoordinator;
         let mut m = mutation();
         nested(&mut inv, &mut m, b"outer-cics-effect");
-        let e = effect(&inv, &m);
+        let e = effect(&inv, &m, &env);
         let p = provider();
-        let scope = MqMqiServiceScope::for_host_dispatch(
-            &inv,
-            trusted_owner,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            &p,
-        );
-        let MqMqiAdmission::ServiceValidation(identity) = admit_mqi(
-            &scope,
-            &inv,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            1,
-        )
-        .unwrap() else {
+        let scope = scope(&inv, trusted_owner, &e, &p).unwrap();
+        let MqMqiAdmission::ServiceValidation(identity) = admit_mqi(&scope, &inv, 1).unwrap()
+        else {
             panic!("valid nested intent")
         };
         assert_eq!(identity.origin, MqReplayOwnerKind::CicsNested);
@@ -236,9 +207,9 @@ fn cics_binding_is_sufficient_without_invented_application_fields() {
         );
         assert_eq!(identity.owner, trusted_owner);
         assert_eq!(identity.principal(), inv.principal.id());
-        assert_eq!(identity.effect().sequence(), 7);
+        assert_eq!(identity.effect().sequence, 7);
         assert_eq!(
-            identity.effect().idempotency_key(),
+            identity.effect().idempotency_key.as_ref(),
             Some(&m.idempotency_key)
         );
     }
@@ -272,26 +243,11 @@ fn exact_nested_origin_never_authorizes_direct_application_syncpoint() {
         env.context.owner = trusted_owner;
         env.context.syncpoint_owner = MqSyncpointOwner::HostCoordinator;
         env.request = request;
-        let e = effect(&inv, &m);
+        let e = effect(&inv, &m, &env);
         let p = provider();
-        let scope = MqMqiServiceScope::for_host_dispatch(
-            &inv,
-            trusted_owner,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            &p,
-        );
+        let scope = scope(&inv, trusted_owner, &e, &p).unwrap();
         assert!(matches!(
-            admit_mqi(
-                &scope,
-                &inv,
-                &env,
-                &m,
-                MqMqiEffectOccurrence::from_effect(&e),
-                1
-            )
-            .unwrap(),
+            admit_mqi(&scope, &inv, 1).unwrap(),
             MqMqiAdmission::ForbiddenContext(_)
         ));
     }
@@ -409,28 +365,10 @@ fn malformed_or_forged_bindings_fail_even_in_a_service_scope() {
         let mut env = envelope();
         env.context.owner = trusted_owner;
         env.context.syncpoint_owner = MqSyncpointOwner::HostCoordinator;
-        let e = effect(&inv, &m);
+        let e = effect(&inv, &m, &env);
         let p = provider();
-        let scope = MqMqiServiceScope::for_host_dispatch(
-            &inv,
-            trusted_owner,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            &p,
-        );
-        assert!(
-            admit_mqi(
-                &scope,
-                &inv,
-                &env,
-                &m,
-                MqMqiEffectOccurrence::from_effect(&e),
-                1
-            )
-            .is_err(),
-            "binding case {case}"
-        );
+        let scope = scope(&inv, trusted_owner, &e, &p).unwrap();
+        assert!(admit_mqi(&scope, &inv, 1).is_err(), "binding case {case}");
     }
 }
 
@@ -503,25 +441,10 @@ fn host_owned_uow_and_source_callback_restrictions_are_specific_pending_forms() 
             env.context.syncpoint_owner = MqSyncpointOwner::HostCoordinator;
             env.request = request;
             let m = mutation();
-            let e = effect(&inv, &m);
+            let e = effect(&inv, &m, &env);
             let p = provider();
-            let scope = MqMqiServiceScope::for_host_dispatch(
-                &inv,
-                trusted_owner,
-                &env,
-                &m,
-                MqMqiEffectOccurrence::from_effect(&e),
-                &p,
-            );
-            let result = admit_mqi(
-                &scope,
-                &inv,
-                &env,
-                &m,
-                MqMqiEffectOccurrence::from_effect(&e),
-                1,
-            )
-            .unwrap();
+            let scope = scope(&inv, trusted_owner, &e, &p).unwrap();
+            let result = admit_mqi(&scope, &inv, 1).unwrap();
             if pending {
                 assert!(matches!(result, MqMqiAdmission::Pending { .. }));
             } else {

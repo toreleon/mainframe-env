@@ -1,9 +1,9 @@
 use super::*;
 use mainframe_env_execution_api::{
-    ArtifactRef, BoundedPayload, CancellationProbe, ExecutionId, InvocationLimits, Principal,
-    RequestId, ResourceLimits, Selector, ServiceClass, TraceId,
+    ArtifactRef, BoundedPayload, CancellationProbe, ExecutionId, IdempotencyKey, InvocationLimits,
+    Principal, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
-use mainframe_env_host_api::{HostRequest, MqHandleSharing, MqHconn, MqOperation, MqRequest};
+use mainframe_env_host_api::{HostRequest, MqHandleSharing, MqHconn, MqMqiHostRequest};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -86,26 +86,57 @@ fn mutation() -> Mutation {
     }
 }
 
-fn effect(value: &Invocation, mutation: &Mutation) -> EffectRequest {
-    // Only the existing occurrence metadata is projected here. This legacy
-    // payload is never dispatched or accepted as a typed MQI payload.
+fn effect(
+    value: &Invocation,
+    mutation: &Mutation,
+    envelope: &MqMqiRequestEnvelope,
+) -> EffectRequest {
     EffectRequest {
         run_unit: value.run_unit_id.clone(),
         sequence: mutation.sequence,
         deadline_tick: 90,
         idempotency_key: Some(mutation.idempotency_key.clone()),
-        request: HostRequest::Mq(MqRequest {
-            operation: MqOperation::Open,
-            queue: None,
-            handle: None,
-            message: Vec::new(),
-            message_id: None,
-            correlation_id: None,
-            options: 0,
-            wait_ticks: 0,
-            max_message_bytes: 1024,
-            mutation: Some(mutation.clone()),
+        request: HostRequest::MqMqi(MqMqiHostRequest {
+            envelope: envelope.clone(),
+            mutation: mutation.clone(),
         }),
+    }
+}
+
+fn scope<'a>(
+    invocation: &'a Invocation,
+    owner: MqHandleOwner,
+    effect: &'a EffectRequest,
+    provider: &'a CapabilityDescriptor,
+) -> Result<MqMqiServiceScope<'a>, HostProblem> {
+    let original = effect
+        .mq_mqi_occurrence(HostLimits::default())?
+        .ok_or(HostProblem::Malformed)?;
+    Ok(MqMqiServiceScope::for_host_dispatch(
+        invocation,
+        owner,
+        original,
+        provider,
+        HostLimits::default(),
+    ))
+}
+
+fn attempt(
+    trusted: &Invocation,
+    invocation: &Invocation,
+    owner: MqHandleOwner,
+    original: &EffectRequest,
+    provider: &CapabilityDescriptor,
+    tick: u64,
+) -> Result<(), HostProblem> {
+    let scope = scope(trusted, owner, original, provider)?;
+    admit_mqi(&scope, invocation, tick).map(|_| ())
+}
+
+fn original_mut(effect: &mut EffectRequest) -> &mut MqMqiHostRequest {
+    match &mut effect.request {
+        HostRequest::MqMqi(value) => value,
+        _ => unreachable!(),
     }
 }
 
@@ -123,81 +154,52 @@ fn provider() -> CapabilityDescriptor {
 }
 
 #[test]
-fn forged_owner_and_occurrence_never_reach_state_or_provider() {
+fn malformed_original_owner_context_run_sequence_and_key_never_reach_state() {
     let inv = invocation();
-    let env = envelope();
     let m = mutation();
-    let e = effect(&inv, &m);
     let p = provider();
-    let scope = MqMqiServiceScope::for_host_dispatch(
-        &inv,
-        owner(),
-        &env,
-        &m,
-        MqMqiEffectOccurrence::from_effect(&e),
-        &p,
-    );
-    let calls = Cell::new(0);
-    for case in 0..9 {
-        let mut candidate_inv = inv.clone();
-        let mut candidate_env = env.clone();
-        let mut candidate_m = m.clone();
-        let mut candidate_e = e.clone();
+    let baseline = effect(&inv, &m, &envelope());
+    let protected = Cell::new(0);
+    for case in 0..10 {
+        let mut original = baseline.clone();
         match case {
-            0 => candidate_env.context.owner.task_id += 1,
-            1 => candidate_env.context.syncpoint_owner = MqSyncpointOwner::HostCoordinator,
-            2 => candidate_m.sequence += 1,
+            0 => original_mut(&mut original).envelope.context.owner.task_id += 1,
+            1 => {
+                original_mut(&mut original).envelope.context.syncpoint_owner =
+                    MqSyncpointOwner::HostCoordinator
+            }
+            2 => original_mut(&mut original).mutation.sequence += 1,
             3 => {
-                candidate_m.idempotency_key =
+                original_mut(&mut original).mutation.idempotency_key =
                     IdempotencyKey::new("forged-key", InvocationLimits::default()).unwrap()
             }
-            4 => {
-                candidate_inv.run_unit_id =
-                    RunUnitId::new("forged-run", InvocationLimits::default()).unwrap()
+            4 => original.sequence += 1,
+            5 => original.idempotency_key = None,
+            6 => {
+                original.run_unit =
+                    RunUnitId::new("foreign-run", InvocationLimits::default()).unwrap()
             }
-            5 => {
-                candidate_inv.execution_id =
-                    ExecutionId::new("forged-execution", InvocationLimits::default()).unwrap()
-            }
-            6 => candidate_e.sequence += 1,
-            7 => candidate_e.idempotency_key = None,
-            8 => {
-                candidate_e.run_unit =
-                    RunUnitId::new("forged-run", InvocationLimits::default()).unwrap()
-            }
+            7 => original.sequence = 0,
+            8 => original_mut(&mut original).mutation.transaction = Some(String::new()),
+            9 => original_mut(&mut original).envelope.context.owner.host_id = 0,
             _ => unreachable!(),
         }
-        let result = admit_mqi(
-            &scope,
-            &candidate_inv,
-            &candidate_env,
-            &candidate_m,
-            MqMqiEffectOccurrence::from_effect(&candidate_e),
-            1,
-        );
-        if matches!(result, Ok(MqMqiAdmission::ServiceValidation(_))) {
-            calls.set(calls.get() + 1);
+        let before = original.clone();
+        let result = attempt(&inv, &inv, owner(), &original, &p, 1);
+        if result.is_ok() {
+            protected.set(protected.get() + 1);
         }
-        assert!(result.is_err(), "forgery {case}");
+        assert!(result.is_err(), "original case {case}");
+        assert_eq!(original, before);
     }
-    assert_eq!(calls.get(), 0);
+    assert_eq!(protected.get(), 0);
 }
 
 #[test]
 fn live_controls_and_revoked_grants_fail_before_dispatch() {
     let inv = invocation().with_cancellation_probe(CancellationProbe::new());
-    let env = envelope();
-    let m = mutation();
-    let e = effect(&inv, &m);
+    let original = effect(&inv, &mutation(), &envelope());
     let p = provider();
-    let scope = MqMqiServiceScope::for_host_dispatch(
-        &inv,
-        owner(),
-        &env,
-        &m,
-        MqMqiEffectOccurrence::from_effect(&e),
-        &p,
-    );
     let mut revoked = inv.clone();
     revoked.principal = Principal::new(
         inv.principal.id().clone(),
@@ -206,57 +208,26 @@ fn live_controls_and_revoked_grants_fail_before_dispatch() {
     )
     .unwrap();
     assert_eq!(
-        admit_mqi(
-            &scope,
-            &revoked,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            1
-        )
-        .unwrap_err(),
-        HostProblem::Unauthorized
+        attempt(&inv, &revoked, owner(), &original, &p, 1),
+        Err(HostProblem::Unauthorized)
     );
     for deadline in [0, 1, u64::MAX] {
-        let mut candidate = e.clone();
-        candidate.deadline_tick = deadline;
-        assert!(
-            admit_mqi(
-                &scope,
-                &inv,
-                &env,
-                &m,
-                MqMqiEffectOccurrence::from_effect(&candidate),
-                1
-            )
-            .is_err()
-        );
+        let mut value = original.clone();
+        value.deadline_tick = deadline;
+        assert!(attempt(&inv, &inv, owner(), &value, &p, 1).is_err());
     }
-    assert!(
-        admit_mqi(
-            &scope,
-            &inv,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            90
-        )
-        .is_err()
+    assert_eq!(
+        attempt(&inv, &inv, owner(), &original, &p, 90),
+        Err(HostProblem::TimedOut)
     );
     inv.cancellation_probe.as_ref().unwrap().request();
     assert_eq!(
-        admit_mqi(
-            &scope,
-            &inv,
-            &env,
-            &m,
-            MqMqiEffectOccurrence::from_effect(&e),
-            1
-        )
-        .unwrap_err(),
-        HostProblem::Cancelled
+        attempt(&inv, &inv, owner(), &original, &p, 1),
+        Err(HostProblem::Cancelled)
     );
 }
 
 mod contexts;
 mod controls_and_bounds;
+mod original_binding;
+mod results;

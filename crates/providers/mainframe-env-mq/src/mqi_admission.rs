@@ -1,122 +1,83 @@
-//! Private pre-state admission for the next typed MQI service integration.
+//! Private pre-state admission bound to one original typed host effect.
 //!
-//! This is neither a dispatcher nor a participant permit. The service must
-//! supply its host-minted numeric owner and the admitted execution's original
-//! invocation, envelope, mutation and effect occurrence. In particular it must
-//! resolve execution/run/principal to that owner through its trusted lifecycle
-//! authority; this helper cannot attest an arbitrary `Invocation` or binding.
-//! No owner is derived from request assertions or hashed string identities.
+//! This is neither a dispatcher nor a participant permit. Scope construction
+//! requires the already-admitted host Invocation, the service lifecycle's
+//! independently minted owner, provider descriptor and HostLimits. It cannot
+//! attest arbitrary bindings or derive an owner from request assertions.
+//! The sole payload source is the validated host-api MQI occurrence. No separate
+//! envelope, mutation or metadata-only occurrence can replace its original.
 //!
-//! `ServiceValidation` permits only the next service validation phase: live
-//! handle/UOW checks, typed SAF/audit, supported execution and atomic fenced
-//! effect/provider-row persistence remain with their existing authorities.
-//! `PublicDispatch` review is not an execution permit. Explicit pending forms
-//! cannot reach that phase through this boundary.
-//! The retained request digest is the standalone MQI canonical domain, not the
-//! shared journal's `CanonicalHostV1` effect digest. The manager-owned route
-//! must encode the full original host effect through that existing authority.
+//! ServiceValidation permits only the next service validation phase: live
+//! registry/handle/UOW checks, typed SAF/audit and atomic fenced publication
+//! remain with their existing authorities. Result preflight is bounded shape
+//! and copied-capacity validation, never a returned-handle or mutation permit.
+//! PublicDispatch review and typed pending observations are not execution success.
+//! Full host request/result canonical identities use the shared journal codec;
+//! no standalone MQI digest, private journal or new outcome protocol is used.
 //!
-//! Source baseline: ibm-mq-9.4-mqi-2026-08-31, rows 0001/0002/0007,
-//! 0008/0009, 0004/0005/0011 (offline manifest-hash-verified review).
+//! Source baseline: ibm-mq-9.4-mqi-2026-08-31, rows 0001-0026,
+//! 26 identities/27 source positions (offline manifest-hash-verified review).
 
 use crate::host_context::decode_host_context;
 use crate::retention::{MqReplayOwnerKind, origin_for};
-use mainframe_env_execution_api::{
-    CapabilityId, IdempotencyKey, Invocation, InvocationLimits, PrincipalId, RunUnitId,
-};
+use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::mq_mqi::*;
 use mainframe_env_host_api::mq_object_route::MqRouteContextIntent;
 use mainframe_env_host_api::{
-    CapabilityDescriptor, EffectRequest, HostLimits, HostProblem, MqContextDisposition,
-    MqHandleOwner, MqHostEnvironment, MqSyncpointCall, MqSyncpointOwner, Mutation,
+    CapabilityDescriptor, EffectRequest, HostLimits, HostProblem, MAX_CANONICAL_EFFECT_BYTES,
+    MqContextDisposition, MqHandleOwner, MqHostEnvironment, MqMqiEffectOccurrence, MqSyncpointCall,
+    MqSyncpointOwner, Mutation, canonical_request_digest, canonical_request_size,
     mq_syncpoint_context_disposition,
 };
 
-/// Borrowed projection of the existing host-effect occurrence, not a second
-/// effect protocol. The future manager-owned route must extract the MQI envelope
-/// from this SAME original effect before constructing the service scope.
-/// Until that route exists, projecting metadata does not register any payload.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct MqMqiEffectOccurrence<'a> {
-    run_unit: &'a RunUnitId,
-    sequence: u64,
-    deadline_tick: u64,
-    idempotency_key: Option<&'a IdempotencyKey>,
-}
+mod result;
 
-impl<'a> MqMqiEffectOccurrence<'a> {
-    pub(crate) fn from_effect(effect: &'a EffectRequest) -> Self {
-        Self {
-            run_unit: &effect.run_unit,
-            sequence: effect.sequence,
-            deadline_tick: effect.deadline_tick,
-            idempotency_key: effect.idempotency_key.as_ref(),
-        }
-    }
-
-    pub(crate) const fn sequence(self) -> u64 {
-        self.sequence
-    }
-    pub(crate) const fn deadline_tick(self) -> u64 {
-        self.deadline_tick
-    }
-    pub(crate) const fn run_unit(self) -> &'a RunUnitId {
-        self.run_unit
-    }
-    pub(crate) const fn idempotency_key(self) -> Option<&'a IdempotencyKey> {
-        self.idempotency_key
-    }
-}
-
-/// Trusted service-owned reference scope, deliberately unavailable to callers
-/// outside this provider crate. Construction records a precondition, not proof
-/// that application-provided bindings were host-minted. The service must obtain
-/// every reference from its admitted dispatch/lifecycle authorities, never the
-/// incoming envelope's owner. Keep this scope within one synchronous dispatch.
+/// Trusted service-owned scope. Host admission/lifecycle provenance is an
+/// explicit construction precondition, not a claim that this helper attests it.
+/// Keep this scope within one dispatch; bindings never grant coordinator authority.
 pub(crate) struct MqMqiServiceScope<'a> {
     invocation: &'a Invocation,
     owner: MqHandleOwner,
-    envelope: &'a MqMqiRequestEnvelope,
-    mutation: &'a Mutation,
-    effect: MqMqiEffectOccurrence<'a>,
+    original: MqMqiEffectOccurrence<'a>,
     provider: &'a CapabilityDescriptor,
+    host_limits: HostLimits,
 }
 
 impl<'a> MqMqiServiceScope<'a> {
     pub(crate) fn for_host_dispatch(
         invocation: &'a Invocation,
         owner: MqHandleOwner,
-        envelope: &'a MqMqiRequestEnvelope,
-        mutation: &'a Mutation,
-        effect: MqMqiEffectOccurrence<'a>,
+        original: MqMqiEffectOccurrence<'a>,
         provider: &'a CapabilityDescriptor,
+        host_limits: HostLimits,
     ) -> Self {
         Self {
             invocation,
             owner,
-            envelope,
-            mutation,
-            effect,
+            original,
             provider,
+            host_limits,
         }
     }
 }
 
-/// Bounded borrowed identity binds the exact canonical intent to its existing
-/// effect and principal. There is no allocation of a request or state snapshot.
+/// Borrowed original identity; no request/state snapshot or replacement payload.
 #[derive(Debug)]
 pub(crate) struct MqMqiAdmitted<'a> {
     invocation: &'a Invocation,
+    trusted_invocation: &'a Invocation,
     pub(crate) envelope: &'a MqMqiRequestEnvelope,
     pub(crate) mutation: &'a Mutation,
     pub(crate) owner: MqHandleOwner,
-    pub(crate) request_digest: [u8; 32],
-    pub(crate) request_bytes: usize,
+    pub(crate) host_request_digest: [u8; 32],
+    pub(crate) host_request_bytes: usize,
     pub(crate) observed_tick: u64,
     pub(crate) origin: MqReplayOwnerKind,
     pub(crate) outer_effect_key: Option<String>,
     pub(crate) capability: CapabilityId,
-    effect: MqMqiEffectOccurrence<'a>,
+    effect: &'a EffectRequest,
+    provider: &'a CapabilityDescriptor,
+    host_limits: HostLimits,
 }
 
 impl MqMqiAdmitted<'_> {
@@ -126,17 +87,18 @@ impl MqMqiAdmitted<'_> {
     pub(crate) fn principal(&self) -> &PrincipalId {
         self.invocation.principal.id()
     }
-    pub(crate) fn effect(&self) -> MqMqiEffectOccurrence<'_> {
+    pub(crate) fn effect(&self) -> &EffectRequest {
         self.effect
     }
 
-    /// Recheck immediately before SAF/state/mutation and at subsequent owned
-    /// dispatch boundaries. A successful earlier check never freezes the probe.
+    /// Recheck immediately before SAF/state/mutation and subsequent owned
+    /// boundaries. A successful earlier check never freezes the live probe.
     pub(crate) fn recheck_controls(&self, now_tick: u64) -> Result<(), HostProblem> {
         if now_tick < self.observed_tick {
             return Err(HostProblem::Malformed);
         }
-        controls(self.invocation, self.effect, now_tick)
+        controls(self.invocation, self.effect, now_tick)?;
+        controls(self.trusted_invocation, self.effect, now_tick)
     }
 }
 
@@ -154,7 +116,7 @@ pub(crate) enum MqMqiAdmission<'a> {
 
 fn controls(
     invocation: &Invocation,
-    effect: MqMqiEffectOccurrence<'_>,
+    effect: &EffectRequest,
     now_tick: u64,
 ) -> Result<(), HostProblem> {
     if invocation.cancellation_requested() {
@@ -191,13 +153,31 @@ fn bounded_invocation(value: &Invocation) -> Result<(), HostProblem> {
         })
         || value
             .provider_generations
-            .values()
-            .any(|generation| generation.is_empty() || generation.len() > limits.max_identity_bytes)
+            .iter()
+            .any(|(capability, generation)| {
+                capability.as_str().len() > limits.max_identity_bytes
+                    || generation.is_empty()
+                    || generation.len() > limits.max_identity_bytes
+            })
+        || value
+            .principal
+            .grants()
+            .iter()
+            .any(|grant| grant.as_str().len() > limits.max_identity_bytes)
+        || value
+            .parent_execution_id
+            .as_ref()
+            .is_some_and(|id| id.as_str().len() > limits.max_identity_bytes)
         || [
+            value.request_id.as_str(),
             value.execution_id.as_str(),
             value.run_unit_id.as_str(),
+            value.selector.as_str(),
+            value.artifact.as_str(),
             value.principal.id().as_str(),
+            value.trace_id.as_str(),
             value.idempotency_key.as_str(),
+            &value.audit_correlation,
         ]
         .iter()
         .any(|text| text.len() > limits.max_identity_bytes)
@@ -207,76 +187,39 @@ fn bounded_invocation(value: &Invocation) -> Result<(), HostProblem> {
     Ok(())
 }
 
-/// Validate the occurrence exactly as the existing effect/mutation contract,
-/// plus the service's immutable admitted occurrence. An effect key is not the
-/// invocation key: nested/ordinary effects legitimately have their own key.
-fn occurrence(
-    invocation: &Invocation,
-    mutation: &Mutation,
-    effect: MqMqiEffectOccurrence<'_>,
-) -> Result<(), HostProblem> {
-    mutation.validate(HostLimits::default())?;
-    let key = effect
-        .idempotency_key
-        .ok_or(HostProblem::MissingIdempotency)?;
-    if effect.run_unit != &invocation.run_unit_id {
-        return Err(HostProblem::Malformed);
-    }
-    if effect.sequence != mutation.sequence || key != &mutation.idempotency_key {
-        return Err(HostProblem::IdempotencyConflict);
-    }
-    if effect.sequence > invocation.limits.max_effects
-        || key.as_str().len() > InvocationLimits::default().max_identity_bytes
-    {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    Ok(())
-}
-
 pub(crate) fn admit_mqi<'a>(
-    scope: &MqMqiServiceScope<'_>,
+    scope: &'a MqMqiServiceScope<'a>,
     invocation: &'a Invocation,
-    envelope: &'a MqMqiRequestEnvelope,
-    mutation: &'a Mutation,
-    effect: MqMqiEffectOccurrence<'a>,
     now_tick: u64,
 ) -> Result<MqMqiAdmission<'a>, HostProblem> {
+    let effect = scope.original.effect();
+    let envelope = scope.original.envelope();
+    let mutation = scope.original.mutation();
     controls(invocation, effect, now_tick)?;
-    controls(scope.invocation, scope.effect, now_tick)?;
+    controls(scope.invocation, effect, now_tick)?;
     bounded_invocation(invocation)?;
     bounded_invocation(scope.invocation)?;
-    occurrence(invocation, mutation, effect)?;
-    occurrence(scope.invocation, scope.mutation, scope.effect)?;
-    if invocation.execution_id != scope.invocation.execution_id
-        || invocation.run_unit_id != scope.invocation.run_unit_id
-        || invocation.principal.id() != scope.invocation.principal.id()
-        || invocation.idempotency_key != scope.invocation.idempotency_key
-        || invocation.attempt != scope.invocation.attempt
-        || invocation.limits != scope.invocation.limits
-        || invocation.cancellation_probe != scope.invocation.cancellation_probe
-        || invocation.bindings != scope.invocation.bindings
-        || invocation.provider_generations != scope.invocation.provider_generations
-        || invocation.deadline_tick > scope.invocation.deadline_tick
-        || effect.deadline_tick > scope.effect.deadline_tick
-        || mutation != scope.mutation
-        || effect.run_unit != scope.effect.run_unit
-        || effect.sequence != scope.effect.sequence
-        || effect.idempotency_key != scope.effect.idempotency_key
-    {
-        return Err(HostProblem::IdempotencyConflict);
+    let capability = effect
+        .request
+        .required_capability(InvocationLimits::default());
+    if capability.as_str() != "host.mq.write" {
+        return Err(HostProblem::Malformed);
     }
-    // Keep the current MQ host route's capability authority. No new public
-    // read/write classification or handler registration is inferred here.
-    let capability = CapabilityId::new("host.mq.write", InvocationLimits::default())
-        .expect("existing static MQ routing grant");
     if !invocation.principal.has_grant(&capability)
         || !scope.invocation.principal.has_grant(&capability)
-        || !invocation
-            .principal
-            .grants()
-            .is_subset(scope.invocation.principal.grants())
     {
         return Err(HostProblem::Unauthorized);
+    }
+    // Complete equality also preserves request/parent/artifact/trace/audit,
+    // service class, cancellation identity, grants and every generation binding.
+    if invocation != scope.invocation {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    if effect.run_unit != invocation.run_unit_id {
+        return Err(HostProblem::Malformed);
+    }
+    if effect.sequence > invocation.limits.max_effects {
+        return Err(HostProblem::ResourceExhausted);
     }
     let provider = scope.provider;
     provider
@@ -292,18 +235,17 @@ pub(crate) fn admit_mqi<'a>(
     {
         return Err(HostProblem::ProviderFailure);
     }
-    let request_bytes = mq_mqi_request_size(envelope).map_err(contract_problem)?;
-    if request_bytes > provider.max_request_bytes {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let request_digest = mq_mqi_request_digest(envelope).map_err(contract_problem)?;
-    let original_bytes = mq_mqi_request_size(scope.envelope).map_err(contract_problem)?;
-    if original_bytes > provider.max_request_bytes {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    if request_digest != mq_mqi_request_digest(scope.envelope).map_err(contract_problem)? {
-        return Err(HostProblem::IdempotencyConflict);
-    }
+    // The actual host preimage includes the original Mutation and envelope.
+    // Preflight provider/product/hard budgets before any field-cloning validator.
+    let host_request_bytes = canonical_request_size(
+        &effect.request,
+        provider
+            .max_request_bytes
+            .min(envelope.limits.canonical_bytes)
+            .min(MAX_CANONICAL_EFFECT_BYTES),
+    )?;
+    effect.validate(scope.host_limits)?;
+    let host_request_digest = canonical_request_digest(&effect.request)?;
     let context = decode_host_context(invocation)?.ok_or(HostProblem::Malformed)?;
     if envelope.context.owner != scope.owner
         || scope.owner.environment != context.environment
@@ -311,16 +253,13 @@ pub(crate) fn admit_mqi<'a>(
     {
         return Err(HostProblem::Malformed);
     }
-    // Reuse exact existing nested/outer/run/sequence/key validation. A valid
-    // origin is provenance, NEVER authority to select an internal coordinator.
+    // Reuse full nested/outer/run/sequence/key validation; origin is provenance,
+    // never authority to select an internal coordinator for application calls.
     let (origin, outer_effect_key) = origin_for(
         invocation,
         mutation.idempotency_key.as_str(),
         mutation.sequence,
     )?;
-    if matches!(envelope.request, MqMqiRequest::CallbackFunction { .. }) {
-        return Err(HostProblem::Unsupported);
-    }
     let call = match envelope.request {
         MqMqiRequest::Back { .. } => Some(MqSyncpointCall::Back),
         MqMqiRequest::Begin { .. } => Some(MqSyncpointCall::Begin),
@@ -344,33 +283,24 @@ pub(crate) fn admit_mqi<'a>(
     }
     let identity = MqMqiAdmitted {
         invocation,
+        trusted_invocation: scope.invocation,
         envelope,
         mutation,
         owner: scope.owner,
-        request_digest,
-        request_bytes,
+        host_request_digest,
+        host_request_bytes,
         observed_tick: now_tick,
         origin,
         outer_effect_key,
         capability,
         effect,
+        provider,
+        host_limits: scope.host_limits,
     };
     identity.recheck_controls(now_tick)?;
     match pending_form(&envelope.request, context.environment, context.owner) {
         Some(reason) => Ok(MqMqiAdmission::Pending { identity, reason }),
         None => Ok(MqMqiAdmission::ServiceValidation(identity)),
-    }
-}
-
-fn contract_problem(problem: MqMqiProblem) -> HostProblem {
-    match problem {
-        MqMqiProblem::CanonicalLimit
-        | MqMqiProblem::Allocation
-        | MqMqiProblem::Limits
-        | MqMqiProblem::SelectorCount
-        | MqMqiProblem::AttributeCount
-        | MqMqiProblem::Buffer => HostProblem::ResourceExhausted,
-        _ => HostProblem::Malformed,
     }
 }
 

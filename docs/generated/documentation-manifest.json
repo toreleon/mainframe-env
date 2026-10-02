@@ -585,7 +585,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 1,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:0d10af3103d74f01afb91e4b67a78e996a68b3c6d2c8eeacd5e9cfc66e5db5f8",
+      "sha256": "sha256:79bdbc5f19c709961e7457faf7a6f114067e1b656f9ae27d60c81d6e9f6a5c4f",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0

@@ -48,6 +48,33 @@ and validation limits remain explicit. The future provider must compare the
 result with its original request, capacities, UOW and handle lifetimes before
 publication; standalone result validation does not attest that relationship.
 
+Private MQI admission consumes the host API's validated original occurrence,
+with no separate envelope, mutation or metadata-only effect argument. Its
+trusted scope requires the already-admitted host Invocation, independently
+minted lifecycle owner, provider descriptor and HostLimits; constructing that
+scope does not attest arbitrary bindings. Admission compares the complete
+Invocation and derives payload, mutation, run, sequence, key and deadline from
+the one original borrow. It retains the full shared canonical HostRequest
+digest and bounded byte count, explicitly distinct from standalone MQI shape
+digests. Existing context and nested/outer origin decoders remain authoritative;
+valid origin provenance never selects an application syncpoint coordinator.
+
+The private result preflight binds the existing EffectResult sequence, exact
+MQI call and original limits, then streams the complete host result budget and
+uses ordinary host/result validation, including call-specific reviewed statuses.
+Copied MQGET bodies, inquiry arrays, property name/value bytes and conversion
+buffers must fit the original requested capacities. The existing get-disposition
+validator preserves required lengths above capacity while checking actual copied
+bytes and original mode/truncation intent. Property/conversion required-length
+payload forms absent from the frozen vocabulary remain pending; reviewed
+size-reporting status identities do not justify fabricated payloads or wire
+equivalence. Pending, unknown and duplicate observations retain their identities,
+and explicit shared UnknownOutcome keeps its existing precedence over corrupt
+reply metadata. Preflight is not a returned-handle, context, UOW or state permit.
+The actual service must still apply registry/state authority, SAF and atomic
+publication, and translate post-dispatch uncertainty through the shared effect
+authority. Live controls remain rechecked at owned boundaries.
+
 This freezes a typed boundary, not a handler, executable route or accepted MQ
 transaction participant. Pending structures, selectors, contexts and status
 mapping retain their typed pending identities; validation does not turn pending
