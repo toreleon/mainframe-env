@@ -124,3 +124,15 @@ the existing resolved type with NOT NULL, exact decimal precision/scale and
 verified byte/line/column endpoints. Fixed errors distinguish invalid input
 from deferred exponent/special/comma/long-integer forms. It performs no numeric
 evaluation, conversion or expression binding, and does not lift lexer fences.
+
+The searched DELETE/UPDATE surfaces own qualified targets and optional common
+search conditions; UPDATE also owns unique single-column expression/DEFAULT/
+NULL assignments. Scalar/predicate structure is validated at every expression
+depth, decoded names and complete-source spans are retained, and statement-wide
+budgets remain enforced. Positioned/fullselect/physical extensions and known
+aggregate-family UPDATE calls are fenced pending their declared binding scope.
+The static-host OPEN/FETCH surface preserves cursor spelling, orientation
+defaults, host/indicator leaves and descriptor operands. Exact repeated FETCH
+targets fail while repeated OPEN inputs remain legal. Host aliases, SQLDA
+contents, cursor applicability, catalog privileges and all execution remain
+pending; no public API changes durable SQL dispatch or grants whole-row credit.

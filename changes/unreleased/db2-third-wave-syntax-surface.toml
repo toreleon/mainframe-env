@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose owned bounded searched DELETE/UPDATE and static-host OPEN/FETCH syntax APIs with public name, predicate, span, duplicate and aggregate-limit regressions; binding, cursor state and execution remain pending."

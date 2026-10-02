@@ -42,6 +42,14 @@ pub use create_view_syntax::{
     Db2CreateViewStatement, Db2ViewCheckMode, Db2ViewExpression, Db2ViewLocated, Db2ViewOrderKey,
     Db2ViewSelectCore, parse_db2_create_view_statement,
 };
+pub use cursor_operation_syntax::{
+    Db2CursorHostOperands, Db2CursorHostReference, Db2CursorOperationKind,
+    Db2CursorOperationStatement, Db2FetchOrientation, parse_db2_cursor_operation_statement,
+};
+pub use delete_syntax::{
+    Db2DeleteLocated, Db2DeleteSearchCondition, Db2SearchedDeleteStatement,
+    parse_db2_searched_delete,
+};
 pub use expression_parser::{Db2ParsedExpression, parse_db2_expression};
 pub use generated_statement_catalog::{
     DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
@@ -94,4 +102,8 @@ pub use type_system::{
     Db2ResolvedType, Db2ScalarType, Db2TimeZone, Db2TypeAttributes, Db2TypeError, Db2TypeErrorCode,
     classify_db2_assignment, classify_db2_comparison, resolve_db2_type,
     resolve_db2_type_with_attributes,
+};
+pub use update_syntax::{
+    Db2UpdateAssignment, Db2UpdateExpression, Db2UpdateStatement, Db2UpdateValue,
+    parse_db2_searched_update,
 };

@@ -4,7 +4,7 @@ Subsystem: **db2**
 Phase: **core**
 Target release: **0.12.0**
 
-Status: **In progress — second-wave pure surfaces sealed; third-wave syntax/type kernels declared**
+Status: **In progress — second/third-wave pure surfaces sealed; catalog/binder and execution pending**
 
 This recovery slice starts from `origin/main` commit `26437e2c`. This file is
 program control, not product conformance or licensed execution evidence.
@@ -213,6 +213,19 @@ and `db2z_datatypesintro.html` (22904 bytes,
 `a488006755eedd9ef58da3ba8ef9f304a3d79c3910cc39da637dda1f3c38f570`),
 under the same Db2 13 baseline. These language elements have no independent
 statement-catalog row. Licensed differential remains pending by user direction.
+
+The public syntax slice adds six integration regressions for searched DELETE,
+searched UPDATE and static-host OPEN/FETCH. It preserves owned decoded names,
+original complete-source spans, recursive scalar/predicate distinctions,
+orientation spelling/defaults, host/indicator/descriptor operands, duplicate
+effective assignment names, exact FETCH targets and aggregate resource budgets.
+No shared statement dispatcher, cursor state, SQLCA, catalog or durable route
+changes. Pinned Db2 13 catalog rows SQL0065, SQL0155, SQL0100 and SQL0078 bind
+the DELETE, UPDATE, OPEN and FETCH topic identities declared above. The missing
+scalar-function overview is reported by the UPDATE worker; ambiguous
+aggregate-family calls remain explicitly deferred pending function binding.
+Full-row recognition, common/deferred freeze, execution and licensed gates
+remain pending. These partial APIs cannot close DB2-1201 or DB2-1202.
 
 ## Dependency gate
 
