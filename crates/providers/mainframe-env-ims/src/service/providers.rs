@@ -22,8 +22,19 @@ impl HostProvider for ImsProvider {
                     &request.request,
                     resolution_tick,
                     Some(&request),
+                    None,
                 )
-                .map(HostResult::Ims),
+                .map(|result| HostResult::Ims(result.result)),
+            HostRequest::ImsGsam(request) => self
+                .service
+                .execute_operands_at(
+                    invocation,
+                    &request.request,
+                    resolution_tick,
+                    None,
+                    Some(&request),
+                )
+                .map(HostResult::ImsGsam),
             HostRequest::Ims(request) => self
                 .service
                 .execute_at(invocation, &request, resolution_tick)

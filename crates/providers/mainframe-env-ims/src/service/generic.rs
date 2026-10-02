@@ -6,6 +6,7 @@ use crate::database::{
 };
 use crate::{ImsDatabaseMetadata, ImsDatabasePcbMetadata, ImsPcbMetadata};
 
+pub(super) mod gsam;
 pub(super) mod integrity;
 pub(super) mod isolation;
 mod load_image;

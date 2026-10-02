@@ -49,6 +49,7 @@ impl HostRequest {
             Self::Ims(_) => "host.ims.read",
             Self::ImsRecovery(_) => "host.ims.write",
             Self::ImsNavigation(_) => "host.ims.write",
+            Self::ImsGsam(_) => "host.ims.write",
             Self::Mq(_) => "host.mq.write",
         };
         CapabilityId::new(name, limits).expect("built-in capability identities are valid")
@@ -110,6 +111,7 @@ impl HostRequest {
             || matches!(self, Self::Ims(request) if request.operation.is_mutating())
             || matches!(self, Self::ImsRecovery(_))
             || matches!(self, Self::ImsNavigation(_))
+            || matches!(self, Self::ImsGsam(_))
             || matches!(self, Self::Mq(request) if request.operation.is_mutating())
     }
 
@@ -164,6 +166,7 @@ impl HostRequest {
             Self::Ims(request) => request.mutation.as_ref(),
             Self::ImsRecovery(request) => Some(&request.mutation),
             Self::ImsNavigation(request) => request.request.mutation.as_ref(),
+            Self::ImsGsam(request) => request.request.mutation.as_ref(),
             Self::Mq(request) => request.mutation.as_ref(),
             _ => None,
         }
@@ -261,6 +264,7 @@ impl HostRequest {
                 Ok(())
             }
             Self::ImsNavigation(request) => request.validate(limits),
+            Self::ImsGsam(request) => request.validate(limits),
             Self::Ims(request) => {
                 if (request.operation == ImsOperation::System) != request.system.is_some()
                     || request.q_class.is_some_and(|class| !class.is_valid())

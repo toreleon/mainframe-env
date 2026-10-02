@@ -309,6 +309,9 @@ struct Record {
     data: Vec<u8>,
     children: Vec<RecordId>,
     version: u64,
+    /// Issued logical address identity. Absent in retained historical images.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    gsam_address: Option<[u8; 32]>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -349,6 +352,7 @@ pub struct DatabaseEngineImage {
 }
 
 mod definition;
+mod gsam;
 mod logical;
 mod navigation;
 mod secondary;
@@ -445,6 +449,7 @@ impl DatabaseEngine {
     /// Check a deserialized image before it is admitted from durable storage.
     pub fn validate_image(&self) -> Result<(), EngineProblem> {
         validate_definition(&self.definition, self.limits)?;
+        self.validate_gsam_addresses()?;
         if self.records.len() > self.limits.max_records
             || self.next_id == 0
             || self.records.keys().any(|id| id.0 >= self.next_id)

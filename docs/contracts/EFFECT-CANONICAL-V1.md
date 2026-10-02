@@ -76,6 +76,21 @@ authorization, and audit request bytes are unchanged. The security request
 principal-field helper is isolated from the large generated encoder without
 changing its wire domain or version.
 
+`HostRequest::ImsGsam` and `HostResult::ImsGsam` are additive tuple variants.
+`ImsGsamRequest` sorts fields as `context`, `request`, `save_address`, `search`;
+`ImsGsamResult` sorts `address`, `result`. The embedded historical IMS objects
+retain their exact encodings. `ImsGsamAddress` sorts `database`, `token`, with
+the 32-byte token encoded as raw bytes. `ImsGsamSearchArgument` is Beginning
+(zero fields) or Record (tuple field `0`). Independent binary goldens freeze
+the 829-byte request at
+`ccc805d540fca887179e009db58f91780ea84c29921729688a36919698c9b980`
+and 502-byte result at
+`ee1eea1457dcca61a8318540879282c91e93d54a9bf5022583754b0095801821`.
+These are owned logical addresses, not IBM RSA bytes. Existing IMS preimages
+remain fixed. Replay output and downgrade rules are in
+[ADR-0028](../decisions/0028-gsam-logical-address.md); retention hashes the
+additive result variant without relabeling historical receipts.
+
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
 schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
 `suppressed`. The entry therefore participates in the ordinary canonical result

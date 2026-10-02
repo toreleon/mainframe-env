@@ -24,11 +24,21 @@ impl ProductServer {
         })
     }
 
-    fn ims_execute_selected_with(
+    /// GSAM shares the selected package and metadata publication boundary.
+    pub fn ims_gsam_selected(
         &self,
         application: &str,
-        execute: impl FnOnce(&ImsService) -> Result<mainframe_env_host_api::ImsResult, HostProblem>,
-    ) -> Result<mainframe_env_host_api::ImsResult, HostProblem> {
+        invocation: &Invocation,
+        request: &mainframe_env_host_api::ImsGsamRequest,
+    ) -> Result<mainframe_env_host_api::ImsGsamResult, HostProblem> {
+        self.ims_execute_selected_with(application, |ims| ims.execute_gsam(invocation, request))
+    }
+
+    fn ims_execute_selected_with<T>(
+        &self,
+        application: &str,
+        execute: impl FnOnce(&ImsService) -> Result<T, HostProblem>,
+    ) -> Result<T, HostProblem> {
         let _publication = self
             .application_publication
             .lock()

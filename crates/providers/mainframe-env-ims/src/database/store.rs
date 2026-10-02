@@ -78,6 +78,7 @@ impl DatabaseEngine {
             data: request.data,
             children: Vec::new(),
             version: 1,
+            gsam_address: None,
         };
         self.records.insert(id, record);
         if let Some(parent) = request.parent {

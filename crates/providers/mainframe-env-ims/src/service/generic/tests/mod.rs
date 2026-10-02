@@ -22,6 +22,7 @@ static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
 
 mod basic_checkpoint_tests;
 mod closure_tests;
+mod gsam_tests;
 mod integrity_tests;
 mod isolation_tests;
 mod pcb_tests;

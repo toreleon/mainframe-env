@@ -43,8 +43,16 @@ def read(path: Path, *, production: bool = False) -> str:
     return source
 
 
-def require(path: Path, fragments: tuple[str, ...], *, production: bool = False) -> str:
+def require(
+    path: Path,
+    fragments: tuple[str, ...],
+    *,
+    production: bool = False,
+    companions: tuple[Path, ...] = (),
+) -> str:
     source = read(path, production=production)
+    for companion in companions:
+        source += "\n" + read(companion, production=production)
     missing = [fragment for fragment in fragments if fragment not in source]
     if missing:
         relative = path.relative_to(ROOT)
@@ -391,6 +399,8 @@ def check_provider_codecs(root: Path) -> None:
                 "HostProblem::UnknownOutcome",
             ),
             production=True,
+            companions=(root / "crates/providers/mainframe-env-ims/src/service/execution.rs",)
+            if provider == "ims" else (),
         )
 
     require(

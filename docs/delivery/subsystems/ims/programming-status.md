@@ -6,6 +6,230 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1403.gsam-record-addressability (bounded slice implemented)
+
+Parent: IMS-1403. Consumed clean base: `65d2904d47155a9c0cffc6c21948eb5c76feb68c`,
+preserving the sealed public SSA feature and manager per-PCB/UOW authority.
+Branch: `codex/v014-gsam-record-addressability-20261002`. Scope: additive owned
+GSAM GU/GN/ISRT request, logical record address output and lookup, bounded
+canonical encoding, public provider and selected-package adapters, engine
+address helpers and focused tests. Catalog context:
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0008`; checkpoint/restart
+`:0002/:0023/:0025` are consumed interfaces and followup, not owned recovery semantics.
+Review execution-context/GSAM-PCB/PROCOPT/RSA/no-SSA applicability against exact
+pinned local sources before semantic edits. Obligations: independent PCB position,
+generated-address roundtrip, wrong-database/stale-address rejection, EOF/status/
+position, insertion, SAF-before-observation/mutation, canonical replay/conflicts,
+atomic CAS/failure/unknown outcome, Memory and SQLite fresh reopen, historical
+canonical bytes and retained row readers. No physical RSA, full-function key or
+guessed record ordinal is admitted as a host address.
+
+Host contracts own new bounded operands/results/canonical modules; IMS owns
+the adapter and engine helpers. Shared storage, row CAS, replay, SAF, participant,
+per-PCB maps and local UOW remain authoritative. No dependency, store, coordinator,
+recovery engine, secondary-index/Q/typed-CHKP-XRST module is owned here. Minimal
+enum/export/provider/selected-package dispatch integration will be reported.
+Acceptance: fail-first public-route regression, focused passing host/provider/
+selected-package tests, strict scoped Clippy, fmt/deny/docs/changelog, affected
+catalog/assurance/schema/shared guards and exact allowlist feature seal/check.
+Receipts stay outside Git/targets under the named worker receipt directory.
+No official row credit, licensed campaign, network refresh, parent completion,
+push or PR is authorized or claimed. Manager owns existing aggregate lint/module
+guard repairs and final integration re-sealing.
+
+This declaration preceded semantic changes. The implemented additive
+`HostRequest::ImsGsam` / `HostResult::ImsGsam`, `ImsService::execute_gsam` and
+`ProductServer::ims_gsam_selected` connect GU/GN/ISRT through the existing
+provider factory and signed metadata/publication fences. Only standalone
+`DbBatch`, GSAM organization, fixed length metadata, G/GS retrieval and L/LS
+insertion are admitted. The generic metadata Database PCB denotes GSAM when
+its referenced organization is GSAM; applicability is validated as Gsam PCB.
+No hierarchical SSA, hold, Q, replace/delete or full-function key is accepted.
+`save_address` models the optional fourth GN/ISRT output; GU accepts a prior
+opaque token or Beginning. AH and AJ leave position/data unchanged; GB clears
+position and the following new GN starts at the beginning. Status/replay
+bookkeeping is published normally. Beginning clears position and returns no
+record; its raw IBM I/O-area behavior is unproved. Successful GU positions the
+selected input PCB at the addressed record. Invalid-address position retention
+is an explicit host contract, not an established IBM equivalence assertion.
+
+The address is the normalized database name plus 32 opaque bytes. Issuance
+binds a separate domain, canonical request, shared database row CAS version
+and engine image/occurrence identity. It is not a record ordinal or IBM physical
+RSA. Existing record identities survive append and reopen; rollback/load
+replacement invalidates removed identities even when bytes/occurrence recur.
+First saved-address GN on retained records materializes identity using the
+existing local UOW witness and atomic publication, which can conservatively
+acquire that database's fence. No-save GN does not materialize an identity.
+Insertion uses the same image/UOW authority. This host mutation/position
+contract does not establish physical I/O, record-lock, or operational parity.
+
+Compatibility: optional engine-record `gsam_address` and optional replay-output
+`gsam` fields retain absent historical readers/serialization; the existing
+object envelope/namespaces and all old canonical bytes stay fixed. Retention
+now validates/hashes the additive result variant for GSAM receipts only.
+Live identities are bounded by existing record limits and survive independent
+replay pruning; removed identities in retained replies cannot locate records.
+No SQL migration, new retention target or automatic history rewrite. Downgrade
+requires stopping new GSAM calls, draining active UOWs and preserving compatible
+image/replay/checkpoint backups: old writers can lose identity fields and old
+strict replay readers reject new GSAM receipts. See
+[ADR-0028](../../../decisions/0028-gsam-logical-address.md).
+
+Integration exceptions: exhaustive request/result enum and canonical arms,
+exports/module declarations, existing provider operand dispatch and replay
+output, retention's result-family hash choice, selected-package helper's generic
+return type, and two test module declarations. Per-PCB/UOW/Q/secondary-index/
+typed-recovery owners' modules remain unchanged. The sealed SSA implementation
+is preserved; its selected helper now accepts either result type behind the
+same selection fences.
+
+### Exact offline sources
+
+All fourteen selected registered topics and the relevant IMS TOC matched the
+committed pins. The retained root was checked first; exact bytes resolved from
+the sharded SHA archive and were parsed locally by `ibm_docs.py search/read`.
+No selected exact source was missing or mismatched, no topic was redownloaded,
+and no IBM body entered Git. The partial reader's unrelated missing topics do
+not represent a whole-cache audit or unavailable selected evidence.
+
+Database baseline `ibm-ims-15.6-database-contracts-2026-09-11`, topic-set digest
+`3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b`:
+
+| Topic under `SSEPH2_15.6.0/com.ibm.ims156.doc.apg/` | SHA-256 |
+|---|---|
+| `ims_retrieveinsertgsamdb.htm` | `8dcb020dc55ed37c1cdf304e3cc7f6c0a724edb2868c910f4055e81ce2bd2ae1` |
+| `ims_processinggsamdb.htm` | `709a5195deb5a7b505f5d70d456d9a004bcf19078994583390f7edd0640f80c5` |
+| `ims_gsamstatuscodes.htm` | `a8531909e5276c69924ffb11b89a1e09d148ac0ff1ab8c8fec6843e107422592` |
+| `ims_gsamrecordformats.htm` | `c6eb5c8d24469ed275cd153ab191ff89f9ccee98b6e3cb921bbb0d7943aa50d4` |
+
+Programming baseline `ibm-ims-15.6-programming-contracts-2026-09-11`, topic-set
+digest `a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594`:
+
+| Topic under `SSEPH2_15.6.0/com.ibm.ims156.doc.apg/` | SHA-256 |
+|---|---|
+| `ims_pcbmaskgsamdb.htm` | `033ee82b96d160db01409f168a44f9076429bd090e70a49d83585f774755dcd3` |
+| `ims_processingoptions.htm` | `bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4` |
+| `ims_currentpos.htm` | `07aafcddb9b30591eef1da5ad50bfe8bc3c1e9b9e9e51b56b27d39bf6adf5673` |
+
+The same scope's `apr/ims_gughucall.htm`
+(`0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9`)
+and `apr/ims_gnghncall.htm`
+(`063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4`)
+were also read. The GSAM-specific retrieve/insert topic supplies the exact ISRT
+and saved-RSA rules; no generic full-function insertion assumption is substituted.
+
+Recovery baseline `ibm-ims-15.6-recovery-utilities-2026-09-11`, topic-set digest
+`7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8`:
+
+| Topic under `SSEPH2_15.6.0/com.ibm.ims156.doc.apr/` | SHA-256 |
+|---|---|
+| `ims_basicchkpcall.htm` | `1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a` |
+| `ims_symbolicchkpcall.htm` | `87ede5820b177ea850473dda852c424a7b4a8f5a93dd06c68a0b95c11a4093b5` |
+| `ims_xrstcall.htm` | `aff46320869b8910ab9916011c8d722a5e044f9e33970d2996e0501204046cb6` |
+
+Also read from that scope's `apg/`: `ims_chckpntcallsintro.htm`
+(`c3aaf84e538be688d44af8fe9072e6cb00c47e4f9e46277f2ba22aa053be013d`)
+and `ims_restartingprogramandcheckforpos.htm`
+(`ac6ec41de956052fe05cb68efd58b59793af4c0903458cf447852b93b0211670`).
+The shared TOC hash is
+`aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618`.
+
+### Unsupported classes and recovery handoff
+
+Unsupported: BMP/JBP region binding, other contexts, RECFM V/U and LL/RDW,
+undefined-record PCB length, IBM 8/12-byte RBA/TTR/volume/displacement layouts,
+INIT RSA12, tape/DASD selection, data-set concatenation, OPEN/CLOSE/PURGE and
+physical I/O error conditions, raw PCB key-feedback bytes, symbolic GSAM
+checkpoint/restart, embedded DL/I/AIB adapters and licensed equivalence.
+The source requires symbolic CHKP/XRST for GSAM and rejects basic checkpoint
+support. Existing basic checkpoint code is consumed unchanged and grants no
+GSAM recovery credit. The typed CHKP/XRST owner must extend the existing
+`SavedPcbPosition` interface with a discriminated address/beginning/EOF form,
+capture it before symbolic CHKP, retain engine identities, and resolve GSAM
+positions with the existing `RecoverySession::xrst` resolver and selected PCB
+helpers in one atomic transition. Do not serialize a GSAM token as the current
+full-function `segment_key`. Prove statuses and process restart there. No second
+recovery engine or checkpoint DTO is created here.
+
+### Scoped verification and integration limits
+
+Fail-first public provider dispatch returned Malformed before the GSAM arm was
+connected. Final focused `cargo test -p mainframe-env-ims public_gsam` passed
+11 tests. The host/IMS package run passed host 108 unit + 9 integration and
+IMS 128 unit + 17 integration tests before the final limits/format/auth-failure
+regression was added; that added regression passed in the final focused run.
+`cargo test -p mainframe-env-server product::tests::ims_package_tests` passed
+all 10 signed-package tests, including preserved SSA selection. Earlier GSAM
+package fixture failures (missing alternate PCB and foreign execution replay)
+were corrected without changing runtime authority; foreign replay is now
+explicitly asserted to conflict.
+
+Passed: strict `cargo clippy -p mainframe-env-host-api -p mainframe-env-ims
+--all-targets --no-deps -- -D warnings`; `cargo fmt --all -- --check`;
+`cargo deny --offline check`; `cargo xtask ims-catalog`,
+`ims-assurance-matrix`, `schemas`, `spec`, `docs`, and `changelog`, each with
+`--check`. Documentation was regenerated normally after registering ADR-0028
+and supplying its required metadata. `python3 -B tools/supply_chain.py check`
+passed after correcting the initial CLI invocation. Shared Python execution
+route, effect encoding, provider rows, storage profile, enterprise authorization,
+retention lifecycle, typed semantic boundary and transaction participant guards
+passed; `generate_transaction_participant.py --check` also passed.
+
+Receipts and exact argv are outside Git/targets at
+`/Users/tore/Library/Caches/mainframe-env/worker-receipts/v014-completion-20261002/IMS-1403.gsam-record-addressability`.
+Every Cargo/generator verification sequence ended with this checkout's
+`cargo clean`. No skips receive conformance credit. An exact reviewed path
+allowlist supplies the scoped feature seal and committed `--check`; any manager
+integration changes require re-sealing the changed blobs.
+
+The inherited server strict Clippy 11 diagnostics, aggregate architecture/cache
+and module guard blockers were not repeated or repaired here. The new production
+modules are at most 172 lines. Minimal exhaustive integration changes increase
+already over-budget blobs: product 6240→6241, canonical arms 3076→3086, host
+request 2341→2350, IMS service 2157→2213. The manager owns their extraction and
+guard repair. This is no aggregate guard pass, full-parent acceptance, official
+row credit or release/promotion claim; IMS-1403 and symbolic GSAM recovery remain
+open at their respective boundaries.
+
+Manager integration consumes the sealed STAT/integrity/checkpoint/index/Q/SSA
+candidate at `b0b2ee94`, rather than overwriting its newer authorities with the
+worker base. GSAM's selected facade is folded into `product/ims.rs`; canonical
+arms remain in `canonical/dispatch.rs`, host request methods remain in
+`request/host_request.rs`, and the existing provider factory adds the GSAM arm.
+One common `service/execution.rs` owns database/SSA/GSAM request validation,
+authorization, digest/replay, fresh image/integrity fences and atomic publication.
+GSAM preparation runs after exact replay and fresh read validation. Image
+publication passes the current limits to the existing Q/UOW witness helper.
+There is no second facade, dispatcher, recovery engine or lock authority.
+
+The unchanged host result-validation implementation moves to
+`request/host_result.rs`; the shared execution and replay-migration methods move
+out of the IMS facade. The IMS facade is now below the 1,200-production-line
+limit and loses its oversized exemption. The host request exact ceiling lowers
+from 1,938 to 1,611. Source-based canonical replay, SAF ordering and retention
+guards read the named execution owner with their original required assertions;
+six focused Python tests include removal mutants for those controls. Initial
+missing-limits compilation and facade-only locator failures are retained as
+failures, not relabeled passing evidence. Worker-base evidence above retains its
+original identity; final manager receipts are recorded separately.
+
+Final manager verification: host 111 unit + 15 integration, IMS 191 unit + 41
+integration, and 14 selected signed-package tests pass on this integrated
+candidate. The `gsam` filter runs 12 tests (including the existing engine case);
+unmatched integration filters earn no credit. Strict scoped IMS/host/server
+Clippy, formatting, module boundaries, IMS catalog/assurance and schemas/spec
+checks pass. Shared row, execution-route, canonical effect, storage, enterprise
+SAF, retention, typed-boundary, participant and supply-chain guards pass after
+bounded locator repairs; the row guard keeps its forbidden whole-state checks
+and a removal/addition mutant regression on both IMS and MQ child owners.
+Manager receipts are `gsam-integration.log`, `gsam-integration-scoped.log` and
+`gsam-integration-policy.log` outside Git under the continuation receipt root.
+The single initial compile failure is `gsam-integration-initial.log`; the three
+locator failures are `gsam-policy-locator-initial-failure.md`. No older receipt
+is relabeled as this candidate. Licensed certification remains excluded by the
+user; official acceptance and parent completion remain unclaimed.
+
 ## IMS-1401.public-ssa-navigation (bounded slice implemented)
 
 Parent: IMS-1401. Candidate base: `4040bfef`, incorporating manager commits

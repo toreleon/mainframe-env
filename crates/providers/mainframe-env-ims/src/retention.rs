@@ -6,7 +6,7 @@ use crate::service::{
 use mainframe_env_execution_api::{
     ExecutionId, IdempotencyKey, Invocation, InvocationLimits, RunUnitId,
 };
-use mainframe_env_host_api::{HostLimits, HostProblem, HostResult};
+use mainframe_env_host_api::{HostLimits, HostProblem};
 use mainframe_env_store_api::{EffectDigestFormat, EffectRecord, EffectState, ProviderStateRecord};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -380,8 +380,8 @@ fn result_digest(
     recorded: &RecordedResult,
     limits: ImsLimits,
 ) -> Result<[u8; 32], ImsReplayRetentionError> {
-    let result = recorded.result();
-    HostResult::Ims(result.clone())
+    let result = recorded.host_result();
+    result
         .validate(HostLimits {
             max_name_bytes: 128,
             max_record_bytes: limits.max_segment_bytes,
@@ -391,7 +391,7 @@ fn result_digest(
             max_state_bytes: limits.max_state_bytes,
         })
         .map_err(|_| ImsReplayRetentionError::CorruptPayload)?;
-    mainframe_env_host_api::canonical_result_digest(&Ok(HostResult::Ims(result)))
+    mainframe_env_host_api::canonical_result_digest(&Ok(result))
         .map_err(|_| ImsReplayRetentionError::CorruptPayload)
 }
 
@@ -685,6 +685,7 @@ mod tests {
             checkpoint_id: None,
             affected_segments: 1,
             system: None,
+            gsam: None,
         }
     }
 

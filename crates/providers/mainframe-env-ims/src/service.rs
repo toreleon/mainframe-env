@@ -22,6 +22,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 mod application_recovery;
+mod execution;
 mod generic;
 mod legacy_load;
 use legacy_load::{load, unload};
@@ -30,6 +31,7 @@ pub use providers::ims_providers;
 mod rows;
 pub use application_recovery::ims_providers_with_recovery;
 use rows::*;
+mod gsam;
 mod system;
 mod utility_bridge;
 mod validation;
@@ -216,6 +218,8 @@ pub(crate) struct RecordedResult {
     pub(crate) affected_segments: u64,
     #[serde(default)]
     pub(crate) system: Option<mainframe_env_host_api::ImsSystemResult>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) gsam: Option<gsam::ReplayOutput>,
 }
 
 impl RecordedResult {
@@ -247,6 +251,7 @@ impl RecordedResult {
             checkpoint_id: result.checkpoint_id.clone(),
             affected_segments: result.affected_segments,
             system: result.system.clone(),
+            gsam: None,
         }
     }
 
@@ -432,267 +437,6 @@ impl ImsService {
         generic::install_metadata(self, metadata)
     }
 
-    pub fn execute(
-        &self,
-        invocation: &Invocation,
-        request: &ImsRequest,
-    ) -> Result<ImsResult, HostProblem> {
-        self.execute_at(invocation, request, invocation.deadline_tick)
-    }
-
-    pub fn execute_navigation(
-        &self,
-        invocation: &Invocation,
-        request: &mainframe_env_host_api::ImsNavigationRequest,
-    ) -> Result<ImsResult, HostProblem> {
-        self.execute_operands_at(
-            invocation,
-            &request.request,
-            invocation.deadline_tick,
-            Some(request),
-        )
-    }
-
-    fn execute_at(
-        &self,
-        invocation: &Invocation,
-        request: &ImsRequest,
-        resolution_lower_bound: u64,
-    ) -> Result<ImsResult, HostProblem> {
-        self.execute_operands_at(invocation, request, resolution_lower_bound, None)
-    }
-
-    fn execute_operands_at(
-        &self,
-        invocation: &Invocation,
-        request: &ImsRequest,
-        resolution_lower_bound: u64,
-        navigation: Option<&mainframe_env_host_api::ImsNavigationRequest>,
-    ) -> Result<ImsResult, HostProblem> {
-        if let Some(navigation) = navigation {
-            navigation.validate(mainframe_env_host_api::HostLimits::default())?;
-        }
-        if resolution_lower_bound == 0 {
-            return Err(HostProblem::Malformed);
-        }
-        let mut durable = self.lock()?;
-        refresh_replay(&*self.store, self.limits, &mut durable)?;
-        system::reservations::refresh(&*self.store, self.limits, &mut durable)?;
-        let integrity_read = generic::integrity::is_read(request.operation);
-        if integrity_read {
-            generic::integrity::refresh_sessions(&*self.store, self.limits, &mut durable)?;
-        } else if durable.state.metadata.is_some() {
-            generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
-        }
-        let system_resources = if request.operation == ImsOperation::System {
-            Some(system::resources(&durable.state, invocation, request)?)
-        } else {
-            None
-        };
-        if let Some(authorizer) = &self.authorizer {
-            for resource in if let Some(resources) = system_resources {
-                resources
-            } else {
-                ims_resources(&durable.state, invocation, request)?
-            } {
-                authorizer.authorize(invocation.principal.id(), &resource)?;
-            }
-        }
-        refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let request_sha256 = if let Some(navigation) = navigation {
-            mainframe_env_host_api::canonical_request_digest(&HostRequest::ImsNavigation(
-                navigation.clone(),
-            ))?
-        } else {
-            canonical_ims_request_digest(request)?
-        };
-        let replay_key = request
-            .mutation
-            .as_ref()
-            .map(|mutation| mutation.idempotency_key.as_str());
-        let sequence = request.mutation.as_ref().map(|mutation| mutation.sequence);
-        if let Some(key) = replay_key
-            && let Some(recorded) = durable.state.replay.get(key)
-        {
-            match recorded.request_digest_format {
-                ReplayDigestFormat::LegacyDebugV0 => return Err(HostProblem::UnknownOutcome),
-                ReplayDigestFormat::CanonicalHostV1
-                    if recorded.request_sha256 == request_sha256 =>
-                {
-                    let result = recorded.result();
-                    let pending = ims_pending_replay_matches(
-                        recorded,
-                        key,
-                        invocation,
-                        sequence.ok_or(HostProblem::MissingIdempotency)?,
-                    )?;
-                    if pending {
-                        self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
-                            .map_err(|_| HostProblem::UnknownOutcome)?;
-                    }
-                    return Ok(result);
-                }
-                ReplayDigestFormat::CanonicalHostV1 => {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            }
-        }
-        let run = invocation.run_unit_id.as_str();
-        if integrity_read {
-            if durable.state.metadata.is_some() {
-                generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
-            }
-            generic::integrity::refresh_legacy(&*self.store, self.limits, &mut durable)?;
-        }
-        let read_fence = generic::integrity::prepare(&durable.state, run, request)?;
-        let prepared = navigation
-            .map(|navigation| {
-                generic::ssa::prepare(&durable.state, invocation, navigation, self.limits)
-            })
-            .transpose()?;
-        let mut next = durable.state.scoped_snapshot();
-        let result = if let Some(prepared) = prepared {
-            generic::ssa::read(&mut next, run, request, &prepared, self.limits)?
-        } else if request.operation == ImsOperation::System {
-            system::apply_request(&mut next, run, request, self.limits)?
-        } else if generic::is_generic(&next, run, request) {
-            generic::apply_request(&mut next, run, request, self.limits)?
-        } else {
-            apply_request(&mut next, run, request, self.limits)?
-        };
-        system::reservations::ensure_legacy_changes(
-            &durable.state,
-            &mut next,
-            run,
-            request,
-            &result,
-        )?;
-        if request.operation != ImsOperation::System {
-            system::observe_database_call(&mut next, run, request, &result, self.limits)?;
-        }
-        if invocation.service_class == ServiceClass::Batch
-            && matches!(
-                request.operation,
-                ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
-            )
-        {
-            next.pending_undo.remove(run);
-            next.generic_pending_undo.remove(run);
-        }
-        let uow = request.operation == ImsOperation::Commit
-            || request.operation == ImsOperation::Rollback;
-        if uow
-            && next.definitions.is_none()
-            && next.metadata.is_none()
-            && !durable.state.pending_undo.contains_key(run)
-            && !durable.state.generic_pending_undo.contains_key(run)
-        {
-            return Ok(result);
-        }
-        if request.operation.is_mutating() {
-            let key = replay_key.ok_or(HostProblem::MissingIdempotency)?;
-            if next.replay.len() >= self.limits.max_replays {
-                return Err(HostProblem::ResourceExhausted);
-            }
-            let mut recorded = RecordedResult::from_result(request_sha256, &result);
-            prepare_ims_replay(
-                &mut recorded,
-                key,
-                invocation,
-                sequence.ok_or(HostProblem::MissingIdempotency)?,
-                self.limits,
-            )?;
-            next.replay.insert(key.into(), Arc::new(recorded));
-            validate_state(&next, self.limits)?;
-            generic::integrity::persist(self, &mut durable, next, &read_fence)?;
-            self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
-                .map_err(|_| HostProblem::UnknownOutcome)?;
-        }
-        Ok(result)
-    }
-
-    fn finalize_replay_metadata(
-        &self,
-        durable: &mut DurableState,
-        key: &str,
-        resolution_lower_bound: u64,
-    ) -> Result<(), HostProblem> {
-        let Some(clock) = &self.replay_clock else {
-            return Ok(());
-        };
-        let observed_tick = clock.now_tick()?;
-        if observed_tick == 0 {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let mut next = durable.state.scoped_snapshot();
-        let recorded = next
-            .replay
-            .get_mut(key)
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        resolve_ims_replay(
-            Arc::make_mut(recorded),
-            key,
-            observed_tick,
-            resolution_lower_bound,
-        )?;
-        validate_state(&next, self.limits)?;
-        self.persist(durable, next)
-    }
-
-    /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
-    ///
-    /// Legacy receipts are never replayed or redispatched implicitly. The caller
-    /// must attest the exact retained digest before this metadata-only migration.
-    pub fn reconcile_legacy_replay(
-        &self,
-        key: &IdempotencyKey,
-        expected_legacy_digest: [u8; 32],
-        request: &ImsRequest,
-    ) -> Result<(), HostProblem> {
-        if !request.operation.is_mutating()
-            || request
-                .mutation
-                .as_ref()
-                .map(|mutation| &mutation.idempotency_key)
-                != Some(key)
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let canonical = canonical_ims_request_digest(request)?;
-        let mut durable = self.lock()?;
-        refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let retained = durable
-            .state
-            .replay
-            .get(key.as_str())
-            .ok_or(HostProblem::NotFound)?;
-        match retained.request_digest_format {
-            ReplayDigestFormat::CanonicalHostV1 => {
-                return if retained.request_sha256 == canonical {
-                    Ok(())
-                } else {
-                    Err(HostProblem::IdempotencyConflict)
-                };
-            }
-            ReplayDigestFormat::LegacyDebugV0
-                if retained.request_sha256 != expected_legacy_digest =>
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            ReplayDigestFormat::LegacyDebugV0 => {}
-        }
-        let mut next = durable.state.scoped_snapshot();
-        let retained = next
-            .replay
-            .get_mut(key.as_str())
-            .ok_or(HostProblem::NotFound)?;
-        let retained = Arc::make_mut(retained);
-        retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
-        retained.request_sha256 = canonical;
-        validate_state(&next, self.limits)?;
-        self.persist(&mut durable, next)
-    }
-
     pub fn hierarchy(&self, database: &str) -> Result<Vec<ImsLoadRoot>, HostProblem> {
         let durable = self.lock()?;
         let database = durable
@@ -732,33 +476,6 @@ impl ImsService {
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
         generic::integrity::persist(self, durable, state, &Default::default())
     }
-}
-
-fn refresh_replay(
-    store: &dyn ProviderStateStore,
-    limits: ImsLimits,
-    durable: &mut DurableState,
-) -> Result<(), HostProblem> {
-    let mut replay_versions = RowVersions::new();
-    let replay: BTreeMap<String, Arc<RecordedResult>> = load_row_map(
-        store,
-        REPLAY_NAMESPACE,
-        limits.max_replays,
-        limits,
-        &mut replay_versions,
-    )?;
-    if replay
-        .iter()
-        .any(|(key, recorded)| validate_ims_recorded_result(key, recorded, limits).is_err())
-    {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    durable
-        .versions
-        .retain(|(namespace, _), _| namespace != REPLAY_NAMESPACE);
-    durable.versions.extend(replay_versions);
-    durable.state.replay = replay;
-    Ok(())
 }
 
 struct RowChange {

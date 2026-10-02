@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 224,
+    "markdown_documents": 225,
     "navigation_groups": 6,
-    "normative_documents": 58,
-    "xtask_commands": 231
+    "normative_documents": 59,
+    "xtask_commands": 232
   },
   "documents": [
     {
@@ -265,8 +265,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 2,
-      "sha256": "sha256:cf3c3f9b94a5bfb7e7fa7a20c0285bfe51a19314d7e44ea5dac22fd494150587",
+      "relative_links": 3,
+      "sha256": "sha256:bd9b16c5b7c6bc77ed70cea8949128a8a3929f59e64c1adb4380ed468867da92",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 114,
-      "sha256": "sha256:5418836a0e358de5dc83f6ecbdb00705e4fe6e0b17ed81a73f4d3db1da5637a5",
+      "relative_links": 115,
+      "sha256": "sha256:523d92f514fcd39726ec387468712f1daa13969b146897ec29ce23229914d99b",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -583,9 +583,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 1,
+      "relative_links": 2,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:897340e5ff831c34d1fe9ebbdf4bd828bc47c9b7c859ee59f8e27d9f599e0039",
+      "sha256": "sha256:be308d0095eb5dffa85881eab4cca69b37a96c255c44c904d216d08e1bd2166e",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -963,10 +963,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0028-gsam-logical-address.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.gsam-record-addressability",
+      "sha256": "sha256:8c6c50d2959c7a0acd1cea81677926831e4b643e96a8472d42b0f375a1ca205f",
+      "status": "Proposed within the human-authorized bounded IMS implementation",
+      "title": "ADR-0028: GSAM logical record addresses on the owned host route",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 27,
-      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
+      "relative_links": 28,
+      "sha256": "sha256:3bd936e1b4c4f38ab41d674a58ff163acb682ebf2261e68576a0497b9ccba2c8",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1401,10 +1413,10 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 7,
-      "sha256": "sha256:5fd4ef51902179225b508c20bc417862eadd6f818f3013a96977e9ea165a68fc",
+      "relative_links": 8,
+      "sha256": "sha256:4a30a643f3d6410fae196f83ca757fa4f2c3418c30908c44019ddaf78ecc5847",
       "title": "IMS — DB / TM programming surface progress",
-      "xtask_commands": 24
+      "xtask_commands": 25
     },
     {
       "normative": false,
@@ -2252,6 +2264,10 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Bounded GSAM logical record addresses",
+          "path": "docs/decisions/0028-gsam-logical-address.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2500,7 +2516,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:08240a952807eaf4035eece2e89762297490f259993d574750f8f0b3dd53f617",
+  "registry_sha256": "sha256:7deb61e47444fd9267d43f5494feb8656aeb3d0589a0acde9620c6cdd33dbb84",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

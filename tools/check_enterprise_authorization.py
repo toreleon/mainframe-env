@@ -35,7 +35,10 @@ def check(root: Path = ROOT) -> None:
 
     for family in ("db2", "ims", "mq"):
         source = (root / f"crates/providers/mainframe-env-{family}/src/service.rs").read_text()
-        body = execute_body(source)
+        execution = source
+        if family == "ims":
+            execution = (root / "crates/providers/mainframe-env-ims/src/service/execution.rs").read_text()
+        body = execute_body(execution)
         require("authorizer.authorize(" in body, f"{family} execute omits enterprise authorization")
         require(
             body.index("authorizer.authorize(") < body.index("apply_request("),
