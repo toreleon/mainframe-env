@@ -84,6 +84,146 @@ fn property() -> MqMessageProperty {
     }
 }
 
+fn pending_callback(kernel: &mut MqPubsubKernel, connection: MqHconn) {
+    let subscription = subscribe(kernel, connection, "D");
+    kernel
+        .register_callback(
+            owner(1),
+            connection,
+            subscription.hobj,
+            9,
+            MqPubsubAuthorization::Permit,
+        )
+        .unwrap();
+    kernel
+        .control(owner(1), connection, MqCallbackControl::Start)
+        .unwrap();
+    kernel
+        .publish(
+            &name("T"),
+            mainframe_env_host_api::MqMessage {
+                descriptor: mainframe_env_host_api::MqMessageDescriptor {
+                    identifiers: mainframe_env_host_api::MqMessageIdentifiers::default(),
+                    format: None,
+                    expiry: mainframe_env_host_api::MqExpiry::Unlimited,
+                    persistence: mainframe_env_host_api::MqPersistence::Persistent,
+                    priority: mainframe_env_host_api::MqPriority::QueueDefault,
+                    ordering: mainframe_env_host_api::MqMessageOrdering::default(),
+                },
+                body: vec![1],
+                properties: Vec::new(),
+            },
+            false,
+            None,
+            MqPubsubAuthorization::Permit,
+        )
+        .unwrap();
+}
+
+#[test]
+fn both_access_guards_reconcile_direct_retirement_before_dispatch() {
+    for through_registry in [false, true] {
+        let mut kernel = kernel(8);
+        let connection = connect(&mut kernel, 1);
+        pending_callback(&mut kernel, connection);
+        if through_registry {
+            kernel
+                .handles_mut()
+                .disconnect(owner(1), connection)
+                .unwrap();
+        } else {
+            kernel
+                .message_handles_mut()
+                .disconnect(owner(1), connection)
+                .unwrap();
+        }
+        assert_eq!(kernel.next_event(), Ok(None));
+        assert_eq!(kernel.callback_state(connection), MqCallbackState::Stopped);
+        assert_eq!(kernel.handles_mut().active_handles(), 0);
+        let replacement = connect(&mut kernel, 1);
+        kernel
+            .subscribe(
+                owner(1),
+                replacement,
+                &name("D"),
+                MqSubscriptionMode::Resume,
+                MqPubsubAuthorization::Permit,
+            )
+            .unwrap();
+    }
+}
+
+#[test]
+fn forgotten_guard_cannot_dispatch_retired_callback() {
+    let mut kernel = kernel(8);
+    let connection = connect(&mut kernel, 1);
+    pending_callback(&mut kernel, connection);
+    let mut access = kernel.handles_mut();
+    access.disconnect(owner(1), connection).unwrap();
+    std::mem::forget(access);
+    assert_eq!(kernel.next_event(), Ok(None));
+    assert_eq!(kernel.callback_state(connection), MqCallbackState::Stopped);
+}
+
+#[test]
+fn raw_disconnect_preserves_unassociated_properties_and_failed_in_use_state() {
+    let mut kernel = kernel(8);
+    let connection = connect(&mut kernel, 1);
+    let unassociated = kernel
+        .message_handles_mut()
+        .create(
+            owner(1),
+            MqHconn::Unassociated,
+            MqHandleKernelOption::Default,
+        )
+        .unwrap();
+    kernel
+        .message_handles_mut()
+        .set(
+            owner(1),
+            MqHconn::Unassociated,
+            unassociated.into(),
+            property(),
+            MqHandleKernelOption::Default,
+        )
+        .unwrap();
+    let associated = kernel
+        .message_handles_mut()
+        .create(owner(1), connection, MqHandleKernelOption::Default)
+        .unwrap();
+    kernel
+        .message_handles_mut()
+        .begin_io(owner(1), connection, associated)
+        .unwrap();
+    assert_eq!(
+        kernel.handles_mut().disconnect(owner(1), connection),
+        Err(MqHandleProblem::InUse)
+    );
+    kernel
+        .message_handles_mut()
+        .end_io(owner(1), connection, associated)
+        .unwrap();
+    kernel
+        .handles_mut()
+        .disconnect(owner(1), connection)
+        .unwrap();
+    connect(&mut kernel, 1);
+    assert_eq!(
+        kernel.message_handles_mut().inquire(
+            owner(1),
+            MqHconn::Unassociated,
+            unassociated.into(),
+            &MqPropertyQuery::Exact("p".into()),
+            None,
+            1,
+            MqHandleKernelOption::Default
+        ),
+        Ok(property())
+    );
+    kernel.handles_mut().end_processing_unit(owner(1)).unwrap();
+    assert_eq!(kernel.handles_mut().active_handles(), 0);
+}
+
 #[test]
 fn one_connection_supports_properties_subscription_and_callback() {
     let mut kernel = kernel(8);

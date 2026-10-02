@@ -66,6 +66,11 @@ pub struct MqHandleKernel {
 }
 
 impl MqHandleKernel {
+    pub(crate) fn reclaim_retired_properties(&mut self) {
+        self.properties
+            .retain(|entry| self.registry.is_live(entry.handle.into()));
+    }
+
     pub fn new(
         epoch: u64,
         max_slots: usize,
@@ -623,6 +628,30 @@ mod tests {
             kind: MqPropertyType::ByteString,
             value: value.into(),
         }
+    }
+
+    #[test]
+    fn reclaim_uses_lifetime_not_connection_or_in_use_permission() {
+        let mut kernel = MqHandleKernel::new(1, 8, MqMessageLimits::default()).unwrap();
+        let who = owner(3);
+        let conn = kernel.connect(who, MqHandleSharing::NonShared).unwrap();
+        let associated = kernel
+            .create(who, conn, MqHandleKernelOption::Default)
+            .unwrap();
+        let unassociated = kernel
+            .create(who, MqHconn::Unassociated, MqHandleKernelOption::Default)
+            .unwrap();
+        kernel.begin_io(who, conn, associated).unwrap();
+        kernel.reclaim_retired_properties();
+        assert_eq!(kernel.properties.len(), 2);
+        kernel.end_io(who, conn, associated).unwrap();
+        kernel.registry.disconnect(who, conn).unwrap();
+        kernel.reclaim_retired_properties();
+        assert_eq!(kernel.properties.len(), 1);
+        assert_eq!(kernel.properties[0].handle, unassociated);
+        kernel.registry.advance_epoch(2).unwrap();
+        kernel.reclaim_retired_properties();
+        assert!(kernel.properties.is_empty());
     }
 
     #[test]

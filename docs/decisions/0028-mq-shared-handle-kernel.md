@@ -17,8 +17,15 @@ methods, reclaiming properties, retired subscription bindings and callbacks.
 Durable subscriptions survive handle retirement; non-durable definitions with
 no remaining binding are removed. Epoch retirement does not decide staged
 transactions: the existing UOW owner must explicitly commit or back out.
-The low-level registry accessor remains for compatibility, not a new product
-dispatch route. Message properties have no durable snapshot or wire claim.
+The low-level registry accessor retains method-level compatibility through a
+scoped dereference guard, not a naked mutable reference or product dispatch
+route. Both access guards reconcile registry-retired property rows, bindings and
+callbacks on release. Reconciliation also runs before a new access and event
+dispatch because Rust does not guarantee destructors run. A lifetime-only
+registry observation is not caller authorization; live unassociated or in-use
+properties must not be discarded merely because an operation cannot access
+them. Explicit callers requiring `&mut MqHandleRegistry` must borrow their guard
+instead. Message properties have no durable snapshot or wire claim.
 
 ## Sources and compatibility
 

@@ -246,6 +246,21 @@ impl MqHandleRegistry {
         self.active
     }
 
+    /// Lifetime-only observation for reclaiming provider data after retirement.
+    /// This does not check caller ownership, connection applicability or in-use
+    /// state and must never substitute for operation authorization/validation.
+    #[must_use]
+    pub fn is_live(&self, handle: MqHandle) -> bool {
+        self.entry(handle.id()).is_ok_and(|entry| {
+            matches!(
+                (entry.kind, handle.kind()),
+                (EntryKind::Object, MqHandleKind::Object)
+                    | (EntryKind::Subscription, MqHandleKind::Subscription)
+                    | (EntryKind::Message, MqHandleKind::Message)
+            )
+        })
+    }
+
     /// A new runtime epoch invalidates every old token, including default and
     /// unassociated handles. Epochs must increase; wraparound fails closed.
     pub fn advance_epoch(&mut self, next: u64) -> Result<(), MqHandleProblem> {
@@ -773,6 +788,33 @@ mod tests {
 
     fn registry(max: usize) -> MqHandleRegistry {
         MqHandleRegistry::new(7, max).unwrap()
+    }
+
+    #[test]
+    fn lifetime_observation_is_not_operation_permission() {
+        let mut registry = registry(8);
+        let who = owner(MqHostEnvironment::ZosBatch);
+        let conn = registry.connect(who, MqHandleSharing::NonShared).unwrap();
+        let associated = registry.create_message(who, conn).unwrap();
+        let unassociated = registry.create_message(who, MqHconn::Unassociated).unwrap();
+        registry.begin_message_io(who, conn, associated).unwrap();
+        assert!(registry.is_live(associated.into()));
+        assert_eq!(
+            registry.validate_message_property(who, conn, associated.into()),
+            Err(MqHandleProblem::InUse)
+        );
+        registry.end_message_io(who, conn, associated).unwrap();
+        registry.disconnect(who, conn).unwrap();
+        assert!(!registry.is_live(associated.into()));
+        assert!(registry.is_live(unassociated.into()));
+        assert_eq!(
+            registry.validate_message_property(who, MqHconn::Unassociated, unassociated.into()),
+            Err(MqHandleProblem::MissingConnection)
+        );
+        let other = MqHandleRegistry::new(7, 8).unwrap();
+        assert!(!other.is_live(unassociated.into()));
+        registry.advance_epoch(8).unwrap();
+        assert!(!registry.is_live(unassociated.into()));
     }
 
     #[test]

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reconciled low-level MQ handle retirement through scoped access guards and pre-dispatch cleanup, preserving live unassociated and in-use properties while removing stale callback bindings."

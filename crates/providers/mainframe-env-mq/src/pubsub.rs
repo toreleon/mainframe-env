@@ -3,6 +3,7 @@
 mod codec;
 mod lifecycle;
 use lifecycle::handle_kernel_problem;
+pub use lifecycle::{MqMessageHandleAccess, MqRegistryAccess};
 
 use crate::{
     MqHandleKernel, MqHandleKernelProblem, MqObjectCapability, MqObjectCatalog, MqObjectDefinition,
@@ -273,13 +274,6 @@ impl MqPubsubKernel {
             controls: Vec::new(),
             staged: Vec::new(),
         })
-    }
-
-    /// Low-level compatibility access to the single frozen handle registry.
-    /// Use this kernel's lifecycle methods and `message_handles_mut` for message
-    /// creation/retirement so property and subscription state is reclaimed too.
-    pub fn handles_mut(&mut self) -> &mut MqHandleRegistry {
-        &mut self.handles.registry
     }
 
     pub fn describe_publish(
@@ -810,6 +804,9 @@ impl MqPubsubKernel {
     /// Returns the earliest ready event and marks it unknown until an explicit settlement.
     /// The caller must never infer that an unacknowledged dispatch did not occur.
     pub fn next_event(&mut self) -> Result<Option<MqPubsubEvent>, MqPubsubError> {
+        // Drop is not guaranteed (e.g. a caller may forget an access guard).
+        // Never dispatch a callback whose registry lifetime has ended.
+        self.reclaim_retired_handles();
         enum Ready {
             Trigger(MqObjectName, MqObjectName),
             Publication(MqObjectName, u64),

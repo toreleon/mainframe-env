@@ -1,6 +1,48 @@
 //! Shared volatile handle-family ownership; no store or dispatcher is introduced.
 
 use super::*;
+use std::ops::{Deref, DerefMut};
+
+/// Scoped access to the composed message kernel. Retirement is reconciled when
+/// the borrow ends, including early-return/error paths.
+pub struct MqMessageHandleAccess<'a>(&'a mut MqPubsubKernel);
+
+impl Deref for MqMessageHandleAccess<'_> {
+    type Target = MqHandleKernel;
+    fn deref(&self) -> &Self::Target {
+        &self.0.handles
+    }
+}
+impl DerefMut for MqMessageHandleAccess<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.handles
+    }
+}
+impl Drop for MqMessageHandleAccess<'_> {
+    fn drop(&mut self) {
+        self.0.reclaim_retired_handles();
+    }
+}
+
+/// Compatibility registry access with the same bounded retirement cleanup.
+pub struct MqRegistryAccess<'a>(&'a mut MqPubsubKernel);
+
+impl Deref for MqRegistryAccess<'_> {
+    type Target = MqHandleRegistry;
+    fn deref(&self) -> &Self::Target {
+        &self.0.handles.registry
+    }
+}
+impl DerefMut for MqRegistryAccess<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.handles.registry
+    }
+}
+impl Drop for MqRegistryAccess<'_> {
+    fn drop(&mut self) {
+        self.0.reclaim_retired_handles();
+    }
+}
 
 pub(super) fn handle_kernel_problem(problem: MqHandleKernelProblem) -> MqPubsubError {
     match problem {
@@ -12,9 +54,20 @@ pub(super) fn handle_kernel_problem(problem: MqHandleKernelProblem) -> MqPubsubE
 
 impl MqPubsubKernel {
     /// Property operations use the same connections and slot budget as subscriptions.
-    /// Lifecycle retirement must use the enclosing pub/sub kernel's methods.
-    pub fn message_handles_mut(&mut self) -> &mut MqHandleKernel {
-        &mut self.handles
+    /// A scoped guard reconciles any direct lifetime mutation on release.
+    pub fn message_handles_mut(&mut self) -> MqMessageHandleAccess<'_> {
+        self.reclaim_retired_handles();
+        MqMessageHandleAccess(self)
+    }
+
+    pub fn handles_mut(&mut self) -> MqRegistryAccess<'_> {
+        self.reclaim_retired_handles();
+        MqRegistryAccess(self)
+    }
+
+    pub(super) fn reclaim_retired_handles(&mut self) {
+        self.handles.reclaim_retired_properties();
+        self.reclaim_retired_bindings();
     }
 
     /// Retire a connection and its associated properties and subscription bindings.

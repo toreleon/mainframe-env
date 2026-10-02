@@ -969,7 +969,7 @@
       "path": "docs/decisions/0028-mq-shared-handle-kernel.md",
       "relative_links": 0,
       "scope": "private v0.15 MQ kernel composition, not public route acceptance",
-      "sha256": "sha256:547d87150de0e82def6780792317ed1472f3bdda5226022acc545ac205cc1d05",
+      "sha256": "sha256:7f84e5e85307fde1a45f1a1b7ce32b6a618fd2499ae4a66df101ab6a295f8173",
       "status": "Proposed",
       "title": "Shared MQ handle-family kernel",
       "xtask_commands": 0

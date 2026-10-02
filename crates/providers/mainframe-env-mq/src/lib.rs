@@ -33,9 +33,9 @@ pub use object::{
 };
 
 pub use pubsub::{
-    MQ_PUBSUB_SNAPSHOT_SCHEMA, MqCallbackControl, MqCallbackState, MqPubsubAuthorization,
-    MqPubsubError, MqPubsubEvent, MqPubsubKernel, MqPubsubLimits, MqPubsubResource,
-    MqSubscriptionHandles, MqSubscriptionMode,
+    MQ_PUBSUB_SNAPSHOT_SCHEMA, MqCallbackControl, MqCallbackState, MqMessageHandleAccess,
+    MqPubsubAuthorization, MqPubsubError, MqPubsubEvent, MqPubsubKernel, MqPubsubLimits,
+    MqPubsubResource, MqRegistryAccess, MqSubscriptionHandles, MqSubscriptionMode,
 };
 
 pub use retention::{
