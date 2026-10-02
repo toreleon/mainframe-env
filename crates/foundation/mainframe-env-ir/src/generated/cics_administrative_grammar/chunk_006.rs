@@ -858,6 +858,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationCvdaDomain { option: "REASON", values: &["BACKUPNONBWO", "COMMITFAIL", "DATASETFULL", "DEADLOCK", "DELEXITERROR", "FAILEDBKOUT", "INDEXRECFULL", "INDOUBT", "IOERROR", "LCKSTRUCFULL", "NOTAPPLIC", "OPENERROR", "RLSGONE", "RRCOMMITFAIL", "RRINDOUBT"] },
         ],
         cvda_numeric_domains: &[
+            CicsApplicationCvdaNumericDomain { option: "REASON", source_baseline: "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23", source_topic: "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html", source_sha256: "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381", values: &[CicsApplicationCvdaNumericValue { symbol: "BACKUPNONBWO", number: 800 }, CicsApplicationCvdaNumericValue { symbol: "COMMITFAIL", number: 792 }, CicsApplicationCvdaNumericValue { symbol: "DATASETFULL", number: 793 }, CicsApplicationCvdaNumericValue { symbol: "DEADLOCK", number: 794 }, CicsApplicationCvdaNumericValue { symbol: "DELEXITERROR", number: 795 }, CicsApplicationCvdaNumericValue { symbol: "FAILEDBKOUT", number: 357 }, CicsApplicationCvdaNumericValue { symbol: "INDEXRECFULL", number: 796 }, CicsApplicationCvdaNumericValue { symbol: "INDOUBT", number: 620 }, CicsApplicationCvdaNumericValue { symbol: "IOERROR", number: 797 }, CicsApplicationCvdaNumericValue { symbol: "LCKSTRUCFULL", number: 832 }, CicsApplicationCvdaNumericValue { symbol: "NOTAPPLIC", number: 1 }, CicsApplicationCvdaNumericValue { symbol: "OPENERROR", number: 798 }, CicsApplicationCvdaNumericValue { symbol: "RLSGONE", number: 799 }, CicsApplicationCvdaNumericValue { symbol: "RRCOMMITFAIL", number: 830 }, CicsApplicationCvdaNumericValue { symbol: "RRINDOUBT", number: 831 }] },
         ],
         required_options: &[],
         alternative_groups: &[
@@ -904,6 +905,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationCvdaDomain { option: "TYPE", values: &["DATASET", "EXECENQ", "EXECENQADDR", "FILE", "TDQUEUE", "TSQUEUE"] },
         ],
         cvda_numeric_domains: &[
+            CicsApplicationCvdaNumericDomain { option: "TYPE", source_baseline: "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23", source_topic: "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html", source_sha256: "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381", values: &[CicsApplicationCvdaNumericValue { symbol: "DATASET", number: 756 }, CicsApplicationCvdaNumericValue { symbol: "EXECENQ", number: 751 }, CicsApplicationCvdaNumericValue { symbol: "EXECENQADDR", number: 752 }, CicsApplicationCvdaNumericValue { symbol: "FILE", number: 238 }, CicsApplicationCvdaNumericValue { symbol: "TDQUEUE", number: 767 }, CicsApplicationCvdaNumericValue { symbol: "TSQUEUE", number: 768 }] },
         ],
         required_options: &[],
         alternative_groups: &[

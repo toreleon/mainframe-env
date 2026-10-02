@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Bind pinned reference numeric values to private REGION inquiry CVDA metadata while preserving symbolic domains and pending runtime acceptance."

@@ -12787,7 +12787,140 @@
               171,
               180,
               186
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "BACKUPNONBWO",
+                  "number": 800,
+                  "source_lines": [
+                    144,
+                    145
+                  ]
+                },
+                {
+                  "symbol": "COMMITFAIL",
+                  "number": 792,
+                  "source_lines": [
+                    302,
+                    303
+                  ]
+                },
+                {
+                  "symbol": "DATASETFULL",
+                  "number": 793,
+                  "source_lines": [
+                    394,
+                    395
+                  ]
+                },
+                {
+                  "symbol": "DEADLOCK",
+                  "number": 794,
+                  "source_lines": [
+                    404,
+                    405
+                  ]
+                },
+                {
+                  "symbol": "DELEXITERROR",
+                  "number": 795,
+                  "source_lines": [
+                    432,
+                    433
+                  ]
+                },
+                {
+                  "symbol": "FAILEDBKOUT",
+                  "number": 357,
+                  "source_lines": [
+                    594,
+                    595
+                  ]
+                },
+                {
+                  "symbol": "INDEXRECFULL",
+                  "number": 796,
+                  "source_lines": [
+                    744,
+                    745
+                  ]
+                },
+                {
+                  "symbol": "INDOUBT",
+                  "number": 620,
+                  "source_lines": [
+                    748,
+                    749
+                  ]
+                },
+                {
+                  "symbol": "IOERROR",
+                  "number": 797,
+                  "source_lines": [
+                    780,
+                    781
+                  ]
+                },
+                {
+                  "symbol": "LCKSTRUCFULL",
+                  "number": 832,
+                  "source_lines": [
+                    836,
+                    837
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "OPENERROR",
+                  "number": 798,
+                  "source_lines": [
+                    1322,
+                    1323
+                  ]
+                },
+                {
+                  "symbol": "RLSGONE",
+                  "number": 799,
+                  "source_lines": [
+                    1606,
+                    1607
+                  ]
+                },
+                {
+                  "symbol": "RRCOMMITFAIL",
+                  "number": 830,
+                  "source_lines": [
+                    1622,
+                    1623
+                  ]
+                },
+                {
+                  "symbol": "RRINDOUBT",
+                  "number": 831,
+                  "source_lines": [
+                    1628,
+                    1629
+                  ]
+                }
+              ]
+            }
           }
         ]
       },
@@ -13509,7 +13642,68 @@
               209,
               216,
               227
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "DATASET",
+                  "number": 756,
+                  "source_lines": [
+                    392,
+                    393
+                  ]
+                },
+                {
+                  "symbol": "EXECENQ",
+                  "number": 751,
+                  "source_lines": [
+                    566,
+                    567
+                  ]
+                },
+                {
+                  "symbol": "EXECENQADDR",
+                  "number": 752,
+                  "source_lines": [
+                    568,
+                    569
+                  ]
+                },
+                {
+                  "symbol": "FILE",
+                  "number": 238,
+                  "source_lines": [
+                    604,
+                    605
+                  ]
+                },
+                {
+                  "symbol": "TDQUEUE",
+                  "number": 767,
+                  "source_lines": [
+                    1872,
+                    1873
+                  ]
+                },
+                {
+                  "symbol": "TSQUEUE",
+                  "number": 768,
+                  "source_lines": [
+                    1934,
+                    1935
+                  ]
+                }
+              ]
+            }
           }
         ]
       },
