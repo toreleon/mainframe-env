@@ -2055,3 +2055,48 @@ CSD source integration passes 28 generator regressions, eight IR regressions
 and both actual Draft202012 family instance gates. Private source projection
 now has 74 command rows, 1569 operands and 1877 case candidates. All runtime,
 application, selected-route, recovery and licensed gates remain pending.
+
+### Serialized FEPI session and data source-contract integration
+
+SPI-1001.fepi-session-source-contracts integrates the declared session/data
+family after complete repair and independent changed-fact review. Baseline
+SSJL4D_6.x FEPI command bodies and context candidates, the official FEPI catalog
+rows retained per command, dfhp748/749/74b/734/74f/74g/74i/73d, and
+dfhp74l/74m/7k4/7kq bound the reviewed forms, data formats and state obligations.
+The argument/CVDA common contexts remain hash-verified reference authority.
+
+All 19 rows, 222 union operands, 380 response clauses and 779 case identities
+remain private source contracts. Eight finding groups are repaired through 82
+property actions, accounting for 678 recursive property changes. Reversing the
+complete action set restores the frozen original; 41 cases change and 738 cases
+are identical. Five INQUIRE CONNECTION forms distinguish named inputs, START,
+NEXTNODE/NEXTTARGET receivers and END in the existing common grammar vocabulary.
+
+Temporary POOL selection is separate from allocated CONVID ownership; RECEIVE
+uses inbound presentation rules. Requested outputs have explicit caller storage.
+Exact one-byte SEND data is concrete, while 4096/4097-byte fixture representation
+and null-AID/ESCAPE/final-attention error precedence remain precise pending
+obligations. All 21 syntax negatives retain their identities: 18 isolate their
+structural constraint and three explicitly retain coupled constraints. No
+undefined byte domain, numeric alias, omitted output or remote completion is
+asserted as executed. Source, runtime, security, recovery, selected-route and
+licensed acceptance remain pending; no public handler or route is enabled.
+
+Independent full reviews of the terminal and network candidate artifacts were
+declared externally before dispatch into distinct exact-base worktrees. The
+retained terminal author now reviews network and the retained network author
+now reviews terminal. Each review owns only external reports and accounts for
+all selected source bodies and cases; neither candidate is yet integrated.
+
+The first manager generator attempt correctly rejected the five FEPI INQUIRE
+forms' unsorted IDs. Its failed receipt is preserved and target cleanup passed.
+Manager repair orders the array by existing form ID, as the common generator
+and xtask validator require. Every complete form object is byte-fact-identical
+and reversing that sole order change restores the reviewed family bytes.
+No selector, operand, direction, constraint, source citation or case changes.
+
+FEPI session source integration passes 28 generator regressions, eight IR
+regressions and the actual Draft202012 family instance gate. Private source
+projection now has 93 command rows, 1791 operands and 2656 case candidates.
+All runtime, application, selected-route, recovery and licensed gates remain
+pending.
