@@ -625,6 +625,37 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0004",
+        family: "spi-region-lifecycle",
+        label: "CREATE BUNDLE",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createbundle.html",
+        source_sha256: "sha256:21ee8555b9e3a3b7a5b863c69051dd05039b04f45fd00b62e1bb3009631550fb",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
+            CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
+            CicsApplicationOptionDescriptor { name: "BUNDLE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+        ],
+        cvda_domains: &[
+        ],
+        required_options: &["ATTRIBUTES", "BUNDLE"],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0012",
         family: "spi-file",
         label: "CREATE FILE",

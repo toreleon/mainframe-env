@@ -2100,3 +2100,42 @@ regressions and the actual Draft202012 family instance gate. Private source
 projection now has 93 command rows, 1791 operands and 2656 case candidates.
 All runtime, application, selected-route, recovery and licensed gates remain
 pending.
+
+### Serialized region lifecycle source-contract integration
+
+SPI-1001.spi-region-source-contracts integrates the declared region lifecycle
+family after complete thirteen-finding repair and independent review. Baseline
+SSJL4D_6.x SPI command bodies, original catalog identities and exact source pins
+remain attached to every row. The reviewed dfha8_createbundle,
+dfha8_inquireassociation/task/uowdsnfail/uowenq and
+dfha8_setbundle/dispatcher/system/task topics, dfha817 diagnostics and common
+argument/CVDA contexts bound the changes. No source was repinned or refreshed.
+
+All 25 command rows, 509 union operands, 156 response clauses and 868 case
+identities remain source contracts with private unregistered runtime binding.
+Forty-one property actions account for all 165 atomic changes and reverse to
+the complete frozen original. Seventeen cases change and 851 are identical;
+sixteen whole commands are unchanged. TYPE and REASON finite symbolic domains
+exclude table headings and retain the source-qualified non-RLS DEADLOCK value.
+
+START UOWENQ fixtures no longer request NEXT receivers, SCANDELAY range failures
+are isolated from TIME comparison, and named INQUIRE TASK requires TASK.
+PHTASKID is explicitly requested packed-decimal storage; association layouts,
+origins, previous hops, parent identifiers and output defaults remain distinct.
+LOGDEFER halfword encoding, END-before-START authority, CREATE BUNDLE failure
+phase/500-versus-612, PURGE-only KILL outcome, CLIENTLOC socket bit meanings and
+actual injected bundle enable/availability failures remain precise pending
+obligations. No numeric alias, completion, rollback or execution credit is
+assigned by these source corrections. Admission, runtime mutation, selected
+route, authorization, recovery and licensed acceptance remain pending.
+
+Web repair is now independently reviewed in a distinct exact-base worktree.
+The full queue review's twelve P2 semantic/fixture findings and one P3 shared
+contract citation finding are assigned to a single retained CLI repair author.
+Both tasks were declared externally before dispatch, own exact frozen inputs
+and preserve all previously declared identity and pending-gate obligations.
+
+Region source integration passes 28 generator regressions, eight IR regressions
+and the actual Draft202012 family instance gate. Private source projection now
+has 118 command rows, 2300 operands and 3524 case candidates. All runtime,
+application, selected-route, recovery and licensed gates remain pending.

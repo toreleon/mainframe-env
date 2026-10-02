@@ -885,6 +885,32 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },
     CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0065",
+        family: "spi-region-lifecycle",
+        label: "DISCARD BUNDLE",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_discardbundle.html",
+        source_sha256: "sha256:ff5766a76bc5c7d5a6b660d50a97b987bc032610446b09178c482033f077bc2c",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "BUNDLE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+        ],
+        cvda_domains: &[
+        ],
+        required_options: &["BUNDLE"],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0072",
         family: "spi-file",
         label: "DISCARD FILE",
