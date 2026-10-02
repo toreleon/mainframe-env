@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add private source-backed web resource contracts for 25 SPI identities with reviewed required actions, redirect isolation, diagnostic predicates and source citations; all runtime and acceptance gates remain pending."

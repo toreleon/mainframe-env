@@ -2139,3 +2139,75 @@ Region source integration passes 28 generator regressions, eight IR regressions
 and the actual Draft202012 family instance gate. Private source projection now
 has 118 command rows, 2300 operands and 3524 case candidates. All runtime,
 application, selected-route, recovery and licensed gates remain pending.
+
+### Pre-dispatch independent review enrollment on the 52-commit candidate
+
+The manager declares these four bounded reviews before launching their CLI
+processes. All producers have verified terminal exit zero; each reviewer uses a
+different retained thread and a new isolated worktree at `12fca1ca26155df445b9ae7e5ef8d24e3790931b`.
+Repository write ownership is empty. Each owns only its named external report
+root under the retained v010-20261002 worker-run directory.
+
+- `SPI-1001.spi-queue-storage-repair-review`: 30 exact rows, all 903 cases; changed source/fact review. Frozen SHA-256 `05496d90cdca6b16cf52e5fdeacf85961a57a63f4adee65e15b0f65e1e32dc7c`. IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0011`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0014`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0017`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0029`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0033`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0071`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0074`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0075`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0086`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0090`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0107`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0117`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0118`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0132`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0133`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0134`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0162`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0170`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0171`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0179`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0180`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0181`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0182`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0219`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0228`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0229`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0250`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0251`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0259`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0260`.
+- `SPI-1001.spi-event-policy-contract-review`: 19 exact rows, all 705 cases; full source/fact review. Frozen SHA-256 `21383295d4773ced14a9a8626b2df03d1effc9b8f27530b57856a20442bfb131`. IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0103`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0104`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0105`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0106`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0119`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0120`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0121`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0122`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0123`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0126`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0151`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0152`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0158`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0200`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0220`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0221`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0222`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0223`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0242`.
+- `SPI-1001.spi-database-messaging-contract-review`: 21 exact rows, all 550 cases; full source/fact review. Frozen SHA-256 `13e14bc09070ba4424a5e942b898b2e08168f7e6b9ec041c05e6f368bd6b8849`. IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0006`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0007`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0008`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0019`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0020`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0067`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0068`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0069`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0078`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0079`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0109`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0110`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0111`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0140`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0141`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0142`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0211`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0212`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0213`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0235`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0236`.
+- `SPI-1001.spi-platform-programs-contract-review`: 19 exact rows, all 562 cases; full source/fact review. Frozen SHA-256 `205459653198416048ba4175150eac58a5b9825b58ab5f59327194c449a3ab55`. IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0015`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0016`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0062`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0076`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0077`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0093`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0094`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0125`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0135`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0136`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0137`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0143`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0145`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0146`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0147`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0197`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0230`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0231`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0232`.
+
+Dependencies: frozen producer bytes and current source/schema authorities.
+QUEUE reuses the complete original review only after exact byte/pin/receipt
+verification, then independently reviews all 59 actions, 80 properties and 17
+changed cases and proves all 886 other cases identical. The other three reviews
+cover every command, option, condition, form, CVDA member, obligation and case;
+no sampling. Search/read of relevant matching pinned sources is mandatory;
+unknown linked contexts and disputed semantics remain precise pending gaps.
+
+The manager alone owns schema, generator, registry/facade, IR, state/security
+authorities, status, actual family-instance and mandatory integration gates,
+sealing and serial reconciliation. Review gates require complete accounting,
+source-linked findings and compatibility/preservation proof. Review completion
+earns zero runtime, selected-route, recovery or licensed credit. No public
+admission or route is authorized by these reviews. All 269 SPI and 39 FEPI
+identities and applicable mandatory obligations remain pending.
+
+Earlier review follow-ups were recorded externally before dispatch and copied
+into this status afterward; that chronology is preserved as a process deviation.
+These new declarations precede dispatch in this document.
+
+### Serialized web resource source-contract integration
+
+SPI-1001.spi-web-source-contracts integrates the already declared 25-row WEB
+family after complete repair and independent changed-fact review. Baseline
+SSJL4D_6.x SPI command bodies, ibm-cics-ts-6x-spi-command-bodies-2026-09-12,
+original catalog rows and exact per-command topic hashes remain authoritative.
+The reviewed dfha8_createatomservice/createdoctemplate/createpipeline/createurimap/
+createwebservice, dfha8_setdoctemplate/seturimap, dfha8_inquireurimap,
+dfha8_performpipeline/setwebservice/setxmltransform and dfha817 topics, plus
+common API format and CVDA contexts, bound the repaired facts. No refresh.
+
+All 25 rows, 336 union operands, 134 response identities and six named forms
+remain private unregistered source contracts. All 95 property changes replay
+to the complete final bytes and reverse to the entire original. All 549
+original case identities remain: 28 change and 521 are identical. Exactly one
+selector-only SET DOCTEMPLATE missing-action candidate is added, giving 550
+cases. Independent review found no actionable defect in the bounded repairs.
+
+SET DOCTEMPLATE requires COPY/NEWCOPY in its source grammar. URIMAP redirection
+candidates use an enabled, available SERVER definition and virtual host without
+a concurrent disable; simultaneous disable precedence remains pending. The
+ATOMSERVICE 628 diagnostic isolates the CICS execution principal's authorization
+for an existing valid file from issuing-task NOTAUTH and missing/invalid files.
+The URIMAP table omits a DESCRIPTION keyword number; no sibling-resource number
+is imported. Generic low-halfword diagnostic candidates remain conditional on
+complete attributes and failure isolation. All 33 syntax/syncpoint citation
+arrays are corrected; five LOG geometry observations retain unresolved omission
+and default meaning. Finite numeric encodings, conditional fixture applicability,
+unknown linked contexts and full security/UOW/recovery bindings remain pending.
+
+No public handler, compiler admission, resource mutation or selected route is
+enabled. Application dependency, all runtime/authorization/recovery/selected-route
+and licensed acceptance, and parent SPI-1001 remain pending with zero credit.
+
+Web source integration passes 28 generator regressions, eight IR regressions
+and the actual Draft202012 family instance gate. Private source projection now
+has 143 command rows, 2636 operands and 4074 case candidates. All runtime,
+application, selected-route, recovery and licensed gates remain pending.
