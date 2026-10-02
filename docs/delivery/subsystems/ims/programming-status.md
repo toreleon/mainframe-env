@@ -749,3 +749,113 @@ authorization, retention, and durable-storage guards but stopped at an
 unrelated CICS source freshness check: retained
 `SSJL4D_6.x/applications/designing/dfhp37p.html` is missing. No refresh was
 requested or performed; that broad gate is not claimed as a pass.
+
+## IMS-1406.carddemo-corpus-package-route (implemented local slice)
+
+Parent: IMS-1406. Candidate base: `213ed878`; this checkout consumes the
+accepted host ABI, SAF and shared store/UOW owners recorded in the COBOL 0.4,
+RACF 0.5 and dataset 0.6 progress/evidence authorities. This local integration
+profile does not promote those dependencies or claim licensed evidence.
+The exact clean CardDemo input is commit
+`59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, tree
+`a1253e31c839f78d1f185b01771ba956da63b005`. All eight IMS definition assets,
+the reached DBD/PSB projections, controller program sources and actual
+LOADPADB/UNLDPADB JCL are bound into a signed v2 package. Selection,
+publication and rollback remain owned by `mainframe-env-application` and
+`ProductServer`; metadata, database images, positions and replay by
+`ImsService`; SAF by RACF; effects/UOW and persistence by the existing host,
+coordinator and `ProviderStateStore`. Tooling owns independent expectations.
+
+Selected routes: public z/OSMF job submission with signed batch controllers,
+`ProductServer::ims_execute_selected`, and the existing scoped `ims_providers`
+host route. Backends: Memory and file-backed SQLite, including dropping and
+reopening the SQLite store. Obligations for this integration profile are exact
+segment/status/parent bytes, ordered load/unload and mutations, no mutation on
+denial/malformed/replay conflict, package signature/selection/replay/rollback,
+and retained data/checkpoint/replay on reopen. Official catalog context is
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families` rows
+0002 (CHKP), 0004 (DLET), 0005 (GU/GN/GNP), 0006 (hold), 0008/0009
+(ISRT/LOAD), 0015 (REPL), and 0024 (TERM). These are supplemental profile
+regressions, with no official obligation verdict or row credit: **0/25 pending**.
+Licensed certification is excluded by the user; mixed-resource closure stays
+in v0.16 and release promotion is outside this slice.
+
+Source review: offline `ibm_docs.py search/read` used IMS 15.6 programming,
+database and metadata manifests. Relevant topics are `ims_gughucall.htm`
+(`0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9`),
+`ims_replacecall.htm`
+(`55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a`),
+`ims_fieldstmt.htm`
+(`94455fbdc9d5f7404c89c0fd73a813fee237fb851fc0d2348a96ba1ce9d36fcb`),
+and `ims_psbgensensegstmt.htm`
+(`baf8ed5e7ad87faf1ba02801da3479385ba5b4b5fc74474ca051d32d3014ebf4`).
+The retained path root lacks these bodies; their SHA archive copies match
+manifest hashes and byte lengths and the reader TOC verifies. No network
+refresh occurred. This is source review, with zero execution credit.
+
+Boundary decision: reuse signed packages and generic database execution, with
+no added dependency or runtime. The existing batch load controller emits the
+public two-level `ImsLoadImage`, whereas the generic route accepts explicit
+record images. A bounded provider adapter is necessary to resolve that image
+from the installed metadata, rejecting ambiguous hierarchies; no application
+identity selects behavior. This is the declared exception to tooling-only
+ownership. Acceptance: focused corpus/profile regressions, carddemo-ims,
+format, docs, changelog and dependency policy. The scoped implementation and local verification are complete; seal this
+slice only, then hand it to the integration manager.
+
+The first runtime attempt exposed an unchanged batch parser restriction:
+UNLDPADB's exact 14-field `DLI,...,N` launch was rejected before controller
+dispatch. The bounded batch launch adapter now shares control validation and
+selection, accepting omitted controls and the local disabled-DBRC form only;
+enabled or unknown supplied options remain unsupported. This requires the
+batch facade, program validator, service delegate and a bounded launch module.
+The reviewed source scopes lack the exact DFSRRC00 operational-parameter topic;
+offline search reported no matching verified topic. The local profile does
+not claim DBRC operational equivalence. The load topic
+`ibm-ims-15.6-recovery-utilities-2026-09-11:ims_loaddb.htm`
+(`15abf89b0d2e0f9c13e9adf225f08ab5e6552bbfb05e9b64456fd6e5e4d920d1`)
+was read offline. Extracting the two tooling/batch functions requires lowering
+their exact module-budget inventory counts; no ceiling is increased and the
+assurance matrix/checker is unchanged.
+
+The migrated gate installs no legacy IMS definition and no empty Db2 package.
+Signed package selection supplies the reached two DBDs, three PSBs and three
+PCBs. The package also retains all eight definition sources, all eight IMS
+COBOL sources, both actual JCL assets, both source-bound controller entries and
+four compiled EXEC DLI artifacts. Existing public JES load/unload controllers
+operate on the generic image. Independent expectations compare every ordered
+root/child/parent byte, exact GN/GNP/GU results, Get Hold before update, mutation,
+compiled typed-DLI output, and the existing hierarchy and spool golden hashes.
+Invalid segment insertion now expects the existing generic route's exact `AT`
+status and zero mutation rather than the legacy harness's infrastructure error.
+The pinned programming database-status table permits AT for ISRT:
+`ims_dlistatuscodestables_databasecalls.htm`
+(`2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f`).
+This source-backed status membership is not licensed differential evidence.
+
+Memory and independent file-backed SQLite adapter reopen pass exact package
+selection, database/checkpoint preservation and replay checks. Malformed
+bulk images and conflicting insert/load identities preserve committed bytes;
+interactive UOW rollback and exact retry preserve the image. A separate
+subprocess seed/reopen regression verifies metadata/package identity, exact
+hierarchy, both index lookups, checkpoint and non-redispatched insert/load
+receipts after the seed process exits. This process boundary avoids relying on
+retained host-runtime references from an in-process shutdown. Package signature
+rejection, publication replay, second-generation publication and retained
+first-generation rollback pass on both backends.
+
+Focused verification passes the corpus gate, three load-adapter tests, generic
+IMS regressions, batch IMS tests, signed IMS package tests, the process-exit
+regression, warnings-denied IMS/batch Clippy, IMS catalog, changelog, format and
+dependency policy. Receipts are outside Git and Cargo targets. Broad conformance
+Clippy stops at the unchanged `licensed_harness.rs:slot_ids` double-must-use
+lint. The broad module guard stops at the unchanged server `product.rs` count
+(6,291 versus its recorded 6,008); this slice only lowers its two touched
+oversized counts and keeps every new module below 1,200 production lines.
+The touched generic provider's unchanged inline tests are moved to its existing
+test directory so its production module also stays below the limit. This is
+an additional provider scope exception for the module contract, with no runtime
+change. Neither unrelated finding is represented as a passing gate. The docs
+manifest is regenerated for this appended section. The manager owns integration;
+licensed certification remains excluded and **0/25 pending**, mixed-resource
+closure stays in v0.16, and no release promotion is claimed.
