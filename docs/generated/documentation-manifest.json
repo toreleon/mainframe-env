@@ -978,7 +978,7 @@
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 28,
-      "sha256": "sha256:5373a652b624f8912d59c6ba8999c201adf804575aab06252f64de0370d230ed",
+      "sha256": "sha256:245c3772246658bf0ffc5039909d712b83fd5656c9f68f35b6848c2bfc38a082",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2516,7 +2516,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:2c6d6d5b860b3ed92fea6153eac4d625647ca3c95e2d8764befad58e0d3d9abd",
+  "registry_sha256": "sha256:c9ccb736e55ad58a7500d3007727c195e0243c0c066eecead52a71a58c0205ca",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
