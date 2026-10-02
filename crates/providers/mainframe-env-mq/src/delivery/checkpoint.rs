@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::io::{self, Write};
 
+pub(crate) mod rows;
+
 impl MqDeliveryKernel {
     pub const LIVE_CHECKPOINT_SCHEMA: &str = "mainframe-env.mq-delivery-live@1";
 
@@ -20,10 +22,14 @@ impl MqDeliveryKernel {
     /// never resume an older checkpoint after a newer fenced publication.
     /// For cold restart's persistent-only backout policy use `encode`/`decode`.
     pub fn encode_live_checkpoint(&self) -> Result<Vec<u8>, MqDeliveryError> {
+        encode_projection(&self.live_projection()?, self.limits.snapshot_bytes)
+    }
+
+    fn live_projection(&self) -> Result<Checkpoint, MqDeliveryError> {
         let mut candidate = self.clone();
         candidate.advance_tick(self.tick)?;
         candidate.check_bounds()?;
-        let snapshot = Checkpoint {
+        Ok(Checkpoint {
             schema_version: Self::LIVE_CHECKPOINT_SCHEMA.into(),
             manager: candidate.manager.clone(),
             default_persistent: candidate.default_persistence == MqPersistence::Persistent,
@@ -87,20 +93,7 @@ impl MqDeliveryKernel {
                     entry_id: cursor.entry_id,
                 })
                 .collect(),
-        };
-        let mut writer = BoundedWriter {
-            bytes: Vec::new(),
-            limit: self.limits.snapshot_bytes,
-            full: false,
-        };
-        if serde_json::to_writer(&mut writer, &snapshot).is_err() {
-            return Err(if writer.full {
-                MqDeliveryError::ResourceExhausted
-            } else {
-                MqDeliveryError::CorruptSnapshot
-            });
-        }
-        Ok(writer.bytes)
+        })
     }
 
     /// Strict candidate-only restore: no current authority is mutated on error.
@@ -115,12 +108,18 @@ impl MqDeliveryKernel {
         message_limits: MqMessageLimits,
         default_persistence: MqPersistence,
     ) -> Result<Self, MqDeliveryError> {
-        let mut kernel = Self::new(catalog, limits, message_limits, default_persistence)?;
+        let kernel = Self::new(catalog, limits, message_limits, default_persistence)?;
         if bytes.len() > limits.snapshot_bytes {
             return Err(MqDeliveryError::ResourceExhausted);
         }
         let snapshot: Checkpoint =
             serde_json::from_slice(bytes).map_err(|_| MqDeliveryError::CorruptSnapshot)?;
+        Self::restore_projection(snapshot, kernel)
+    }
+
+    fn restore_projection(snapshot: Checkpoint, mut kernel: Self) -> Result<Self, MqDeliveryError> {
+        let limits = kernel.limits;
+        let default_persistence = kernel.default_persistence;
         if snapshot.schema_version != Self::LIVE_CHECKPOINT_SCHEMA {
             return Err(MqDeliveryError::UnsupportedSchema);
         }
@@ -260,6 +259,22 @@ impl MqDeliveryKernel {
         *self = candidate;
         Ok(())
     }
+}
+
+fn encode_projection(snapshot: &Checkpoint, limit: usize) -> Result<Vec<u8>, MqDeliveryError> {
+    let mut writer = BoundedWriter {
+        bytes: Vec::new(),
+        limit,
+        full: false,
+    };
+    if serde_json::to_writer(&mut writer, snapshot).is_err() {
+        return Err(if writer.full {
+            MqDeliveryError::ResourceExhausted
+        } else {
+            MqDeliveryError::CorruptSnapshot
+        });
+    }
+    Ok(writer.bytes)
 }
 
 fn restore_entry(
