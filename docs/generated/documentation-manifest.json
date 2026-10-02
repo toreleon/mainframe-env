@@ -585,7 +585,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 1,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:39c55bdde6e2a748dba95e5e436c83eba4a6344b87ad98f529ec1d7cbe698451",
+      "sha256": "sha256:d638b9ccecca7b1997f1ce7e536692768e1e05500c9fc4b72f789b4af0ac09e2",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1266,7 +1266,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:49cf19285bc87835d54cc1f4fbb1d538c65932ddcf15f3f5ad4519427ae85e2b",
+      "sha256": "sha256:764e93d047594a84bc02a2465ed3d9e571be619bca16db9f10386ecb36ff1ea8",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },

@@ -25,6 +25,77 @@ shared gates and application dependency pending; 0.10.0 remains Proposed**
 
 ## 2026-10-02 continuation: prerequisite review
 
+The user explicitly requested resolution and continuation after the blocked
+handoff. The resumed audit starts afresh. A targeted retained-cache locator
+search found both previously missing sources-a bodies in
+`/Users/tore/Library/Caches/mainframe-env/ibm-docs-pinned-0.9`; their committed
+hashes/byte counts match and the shared importer restored them to the task
+cache without network access. The prior absence finding concerned the two
+original retained roots; it is superseded by this matching additional cache.
+
+The resumed bounded slices are:
+
+| Slice | Exact scope / dependency | Exclusive ownership | Acceptance |
+|---|---|---|---|
+| `SPI-1001.source-cache-recovery` | The two committed sources-a connection/ASSIGN context bodies; exact retained pins | Manager-owned external task cache, this status and derived docs | Shared import, scoped search/read and repaired source gate; no repin or licensed credit |
+| `SPI-1001.qualified-identity-resolution` | SPI rows 0201, 0203, 0204; frozen EIBFN identities, three pinned candidate command bodies, relevant registered CICS reference links and retained TOC ancestors | Existing isolated SPI CLI worker; external `resumed-spi-identity/` only | Independent exact source-identity disposition; distinguish row identity from acceptance of a shorter grammar form; preserve any unproved mapping; no network, repository edits or semantics |
+| `SPI-1006.module-prerequisite-repair` | Restore the inherited batch service module below its existing 7,402-line ceiling; unchanged behavior | New isolated module CLI worker; `crates/apps/mainframe-env-batch/src/service.rs` and one narrowly extracted internal helper under `service/` only | Behavior-preserving structure, focused existing regressions, formatting and module gate; no ceiling refresh, CICS/v0.9 semantics or public contract change |
+
+Workers use `gpt-6.1-sol`, high reasoning and fast mode off, with no nested
+workers. The manager retains serialized shared schemas/generators, status,
+changelog, source registration and integration. The user subsequently requested
+"Bypass license CICS": licensed CICS runs are omitted for this goal's
+implementation/PR handoff, with `differential=pending` and zero licensed credit.
+This is not a repository release certification or a fabricated oracle pass.
+Local application, semantic, security, concurrency and recovery gates remain
+required; the user waiver does not itself accept incomplete v0.9 behavior.
+
+The batch extraction is checkpointed at `7ab58ce982a3e629df04a9634a0cf5afe662341b`.
+Its three focused existing regressions pass in the worker checkout; integrated
+candidate verification remains pending. A single scoped module inventory found
+ten additional inherited overages. The following disjoint structural prerequisite
+slices start from that exact checkpoint; they grant no subsystem behavior credit.
+
+| Slice | Exact affected modules / ceilings | Exclusive ownership | Acceptance |
+|---|---|---|---|
+| `SPI-1006.module-host-kernel` | Host API canonical/generated.rs 3070/3046 and request.rs 2336/2300; application/package_v2.rs 1498/1314; interpreter/machine.rs 11942/11940 | Isolated CLI worker; those four modules and cohesive private helper children only | Unchanged wire bytes and execution/package behavior; focused existing positive/negative regressions, formatting, independent moved-body review; all extracted modules <=1200 |
+| `SPI-1006.module-server-conformance` | Server/product.rs 6291/6008 and conformance/carddemo.rs 13621/13617 | Isolated CLI worker; those two modules and cohesive private helper children only | Existing selected product-route and affected report regressions; no new CICS routing, receipts or CardDemo campaign; unchanged behavior and formatting |
+| `SPI-1006.module-ims-mq` | IMS/service/generic.rs 2186/1200, service.rs 2113/1959, tm/service.rs 1264/1200; MQ/service.rs 1477/1331 | Isolated CLI worker; those four modules and cohesive private helper children only | Existing affected provider success/negative/recovery regressions, unchanged subsystem semantics and formatting; every new/non-exempt module <=1200 |
+
+Manager-only integration will lower exact inventory counts after reviewed
+extractions, never increase ceilings or create exemptions to hide growth.
+Workers cannot edit inventories, schemas, generators, registries, facades outside
+their listed modules, changelog or this status. Pure module relocation needs no
+unrelated IBM lookup; any semantic change is forbidden. Global module and required
+integration gates run after these inputs are repaired. The five separately pinned
+source supplements now match in the explicitly authorized existing Chrome session;
+their external-cache export/import is still being completed.
+
+The authorized five-topic Chrome retrieval/import is now complete: all 292,725
+bytes match the existing pins; shared supplement heading/date checks pass.
+No identities or target-product authority changed. The qualified identity
+worker's first continuation inspected only 27/224 sources-c topics because the
+cache restoration overlapped its search. The manager subsequently restored all
+224 exact pins. A further same-session, read-only continuation may repeat the
+three bounded sources-c identity searches against that materially repaired input;
+if unresolved it may run at most three similarly bounded searches in sources-a/b.
+Its rows, ownership and acceptance remain unchanged. New results stay separate
+from the partial-cache receipt and still confer no executable grammar credit.
+
+The subsequently authorized CICS TX TRACE supplement also matches its existing
+20,495-byte pin (`28e56eef7556509f9a473ae573f6295a56c170ae9a1dd79041c18b15fafd9c83`).
+All three repaired application source-review gates now pass. These are source
+freshness reviews, not acceptance of application behavior. The structural
+prerequisites are checkpointed at `8094971d` after serial review/integration:
+batch 3, host/kernel 35, server/conformance 11 and IMS/MQ 79 focused existing
+worker tests passed (128 total; zero ignored). Moved bodies and unchanged
+expectations were independently compared in integration. Exact module counts
+were lowered after reviewed extraction; the package and MQ oversized exemptions
+were removed after dropping below 1,200. Combined candidate policy, architecture,
+module, format/schema/docs gates and focused integration regressions are pending.
+No feature package, application prerequisite or parent is sealed by these
+structural checkpoints, and no public SPI/FEPI route is enabled.
+
 The manager integration checkout is
 `/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002`,
 branch `codex/v010-spi-fepi-completion-20261002`, based on fetched
