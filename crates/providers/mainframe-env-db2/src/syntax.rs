@@ -133,6 +133,7 @@ pub enum Db2StringKind {
     Graphic,
     Hex,
     UnicodeHex,
+    Binary,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -616,6 +617,7 @@ impl Lexer<'_> {
             }
             let kind = match upper.as_str() {
                 "X" => Db2StringKind::Hex,
+                "BX" => Db2StringKind::Binary,
                 "UX" => Db2StringKind::UnicodeHex,
                 "G" => Db2StringKind::Graphic,
                 "N" => Db2StringKind::National,
@@ -628,7 +630,10 @@ impl Lexer<'_> {
                 }
             };
             let value = self.quoted('\'', Db2SyntaxDiagnosticCode::UnterminatedString)?;
-            if matches!(kind, Db2StringKind::Hex | Db2StringKind::UnicodeHex) {
+            if matches!(
+                kind,
+                Db2StringKind::Hex | Db2StringKind::UnicodeHex | Db2StringKind::Binary
+            ) {
                 let modulus = if kind == Db2StringKind::UnicodeHex {
                     4
                 } else {
@@ -903,6 +908,138 @@ mod tests {
                 "Db2 float and decfloat constants are source-pending on #350"
             );
         }
+    }
+
+    #[test]
+    fn binary_string_tokens_preserve_original_hex_and_spans() {
+        for source in ["BX''", "bx'00'", "Bx'fF00c1'", "bX'c3A9'"] {
+            let owned = {
+                let input = source.to_owned();
+                lex(&input).unwrap()
+            };
+            let [token] = owned.tokens() else {
+                panic!("one binary token expected")
+            };
+            assert_eq!(
+                token.kind,
+                Db2TokenKind::String {
+                    kind: Db2StringKind::Binary,
+                    value: source[3..source.len() - 1].into(),
+                }
+            );
+            assert_eq!(
+                token.span,
+                Db2SourceSpan {
+                    start_byte: 0,
+                    end_byte: source.len(),
+                    start: Db2SourceLocation::START,
+                    end: Db2SourceLocation {
+                        line: 1,
+                        column: source.len() as u32 + 1
+                    },
+                }
+            );
+        }
+        let source = "-- é\r\n/* β */ bx'00fF' \r\n";
+        let statement = lex(source).unwrap();
+        let token = &statement.tokens()[0];
+        assert_eq!(
+            token.span,
+            Db2SourceSpan {
+                start_byte: 16,
+                end_byte: 24,
+                start: Db2SourceLocation { line: 2, column: 9 },
+                end: Db2SourceLocation {
+                    line: 2,
+                    column: 17
+                },
+            }
+        );
+        assert!(matches!(
+            lex("X'ff'").unwrap().tokens()[0].kind,
+            Db2TokenKind::String {
+                kind: Db2StringKind::Hex,
+                ..
+            }
+        ));
+        assert!(matches!(
+            lex("UX'0041'").unwrap().tokens()[0].kind,
+            Db2TokenKind::String {
+                kind: Db2StringKind::UnicodeHex,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn binary_string_tokens_reject_bad_hex_and_malformed_quotes() {
+        for source in ["BX'F'", "bx'0g'", "BX'0 0'", "BX'00''00'", "BX'β'"] {
+            assert_eq!(
+                lex(source).unwrap_err().code,
+                Db2SyntaxDiagnosticCode::InvalidHex,
+                "{source}"
+            );
+        }
+        for source in ["BX'", "bx'00", "BX'00''"] {
+            assert_eq!(
+                lex(source).unwrap_err().code,
+                Db2SyntaxDiagnosticCode::UnterminatedString,
+                "{source}"
+            );
+        }
+        assert_eq!(lex("BX\"00\"").unwrap().tokens().len(), 2);
+        assert_eq!(lex("BX '00'").unwrap().tokens().len(), 2);
+    }
+
+    #[test]
+    fn binary_string_tokens_obey_existing_source_token_and_count_limits() {
+        let exact = Db2SyntaxLimits {
+            max_statement_bytes: 6,
+            max_tokens: 1,
+            max_token_bytes: 6,
+            max_nesting: 1,
+        };
+        assert_eq!(lex_db2("BX'00'", exact).unwrap().tokens().len(), 1);
+        assert_eq!(
+            lex_db2(" BX'00'", exact).unwrap_err().code,
+            Db2SyntaxDiagnosticCode::StatementTooLarge
+        );
+        assert_eq!(
+            lex_db2(
+                "BX'00'",
+                Db2SyntaxLimits {
+                    max_token_bytes: 5,
+                    ..exact
+                }
+            )
+            .unwrap_err()
+            .code,
+            Db2SyntaxDiagnosticCode::TokenTooLarge
+        );
+        assert_eq!(
+            lex_db2(
+                "BX'' BX''",
+                Db2SyntaxLimits {
+                    max_statement_bytes: 9,
+                    ..exact
+                }
+            )
+            .unwrap_err()
+            .code,
+            Db2SyntaxDiagnosticCode::TooManyTokens
+        );
+        assert_eq!(
+            lex_db2(
+                "BX''",
+                Db2SyntaxLimits {
+                    max_tokens: 0,
+                    ..exact
+                }
+            )
+            .unwrap_err()
+            .code,
+            Db2SyntaxDiagnosticCode::InvalidLimits
+        );
     }
 
     #[test]

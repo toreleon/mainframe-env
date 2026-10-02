@@ -7,6 +7,8 @@
 use crate::ast::{Db2BuiltInDataType, Db2BuiltInType, Db2DataType};
 use std::fmt;
 
+pub mod string_constants;
+
 const MAX_DECIMAL_PRECISION: u32 = 31;
 const MAX_FLOAT_PRECISION: u32 = 53;
 const MAX_CHARACTER_LENGTH: u32 = 255;
