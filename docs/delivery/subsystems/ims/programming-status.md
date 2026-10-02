@@ -1099,3 +1099,113 @@ CHKP and participant changes, run the selected public CHKP regression there,
 and resolve aggregate baseline gates in their owners. No official IMS row
 credit, licensed differential, CardDemo certification, mixed-resource closure
 or v0.14 release completion is asserted.
+
+## IMS-1405.application-recovery-dispatch (bounded LOG slice)
+
+Parent: IMS-1405; remains Proposed. Starting candidate is `a130d1ac`, including
+manager repair `d5fef29b`. The audit at external
+`worker-receipts/v014-completion-20261002/acceptance-audit/audit-report.md`
+identifies nine recovery families with no application call adapter. This slice
+implements only typed LOG dispatch for a selected, installed generic PSB/database
+in DB batch, through the public host provider and existing canonical intent,
+RecoverySession and database utility bridge. It does not admit the pending IMS
+participant into a shared UOW. The existing recovery row is the log authority;
+the live database/session/undo rows must remain unchanged by LOG.
+
+Exact catalog scope: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0010`.
+Mandatory local obligations: owned bounded LOG code/text validation (A0–FF,
+including empty/binary text); selected-generation/PSB/database binding; DB-batch
+CALL context and Batch invocation validation; mandatory typed SAF before
+observation/mutation; exact canonical intent ownership/sequence/digest and
+no active recovery lease; ordered persistent log append; exact replay without
+duplicate append; rejection/no mutation for invalid/unsupported/unauthorized
+requests and missing/conflicting intents; atomic failure/CAS; unchanged database,
+PCB position and undo; log survival across local rollback, selected-generation
+rollback, and SQLite child-process restart; explicit lost-ack UnknownOutcome.
+Expectations are handwritten and invoke the owned public host route on Memory
+and SQLite. These obligations are supplemental until the manager binds shared
+Conformance IR; no official row passes or licensed credit are claimed.
+
+Owners: additive host-api recovery DTO, HostRequest/HostResult validation and
+canonical encoders/exports; additive IMS application recovery adapter and minimal
+registration; selected server host composition; focused host/provider route tests.
+Reuse the shared ProviderStateStore/IdempotencyStore and existing utility bridge;
+no new store, coordinator, dependency, resource-position row, or timestamp index.
+DB/DC, DBCTL, DCCTL, TM batch, command syntax and raw language LL/ZZ/AIB framing
+remain unsupported in this slice, although LOG is source-applicable there.
+PSB work-area and physical log block-size parity remain pending. Provider limits
+are bounded local operational limits, not evidence of those IBM physical sizes.
+
+Source: verified offline `ibm_docs.py search/read`, IMS 15.6 baseline
+`ibm-ims-15.6-recovery-utilities-2026-09-11`,
+`SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_logcall.htm`,
+`sha256:5106e045b54bca8564d5fc91065ca0dff7b58da4f25d8e09fd11b07d2aada5ca`.
+The 20-topic recovery reader cache and TOC verify; no refresh is requested.
+LOG writes caller information to the log using an I/O PCB; it neither commits
+database work nor repositions a database PCB. The typed projection carries code
+and text, excluding raw language framing rather than silently discarding it.
+
+Required local checks: fail-first selected public-route tests, focused host/IMS
+tests and server composition compile/tests, strict scoped Clippy, fmt, IMS
+catalog, shared spec integrity, affected architecture/security/effect/row/durable
+guards, docs/changelog and dependency policy, followed by an exact-path slice
+seal/check and one local completion commit. Receipts stay outside Git/target.
+
+Remaining recovery obligations: typed application basic/symbolic CHKP with atomic
+real UOW commit and position loss; XRST normal/named/LAST/timestamp selectors and
+real qualified-GU attempts on actual session position maps; SETS/SETU and
+ROLS/ROLL/ROLB over fenced real database and actual TM rows, express-message
+scope and termination/status; all other applicable contexts, raw framing,
+participant admission/fencing/audit/retention/backup-restore and shared official
+IR bindings. The manager's repaired basic CHKP route is preserved, not relabeled
+as this adapter. IMS official credit remains absent; licensed remains 0/25;
+mixed-resource closure and parent/release completion remain pending.
+
+The consumed host/SAF/storage ancestry includes `b0258ebb` (accepted integrated
+COBOL candidate) and `b4f8fc70` (security/dataset authorities), both verified
+ancestors of this candidate. Approval and licensed-pending dispositions remain
+in the COBOL execution, RACF security and dataset data status records and
+`conformance/0.6/evidence/dataset-certification.json`; this worker does not
+rerun or relabel those historical receipts. The current pending IMS participant
+preparation at `a130d1ac` remains pending, with no descriptor change.
+
+The I/O PCB success/status basis is additionally
+`ibm-ims-15.6-programming-contracts-2026-09-11`,
+`SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_specifyingiopcb.htm`,
+`sha256:d85982dd9c913de3bd6e387717c5e830e24c795b4dad51347f251a898ff18ced`.
+The recovery reader lacks that programming body and the retained topic-path file
+is absent. Its exact raw-archive body was hash-verified and parsed offline by
+the repository's `ibm_docs.plain_text`; the publication is available, not guessed.
+No source body, network refresh or whole-cache audit is part of this change.
+
+The implementation uses separate owned logical LOG DTOs and a separate I/O
+status result. Both server host compositions register the additive adapter;
+the old `ims_providers` constructor still supports its original request surface.
+The database/session/undo snapshots and real GN after GU remain unchanged by
+LOG. Recovery rows stay `mainframe-env.ims-recovery-session@1`; new run addresses
+bind selection/run/principal and effect addresses bind execution/key/sequence.
+Provider-row quotas and recovery limits bound retained state. This slice adds
+no automatic recovery-log pruning or physical IMS log format claim.
+
+There is no SQL or existing row-schema migration. New and prior canonical
+variants have independent golden compatibility tests. Older binaries can read
+the unchanged v1 recovery rows but cannot dispatch the new host variants; stop
+admission and drain/reconcile new effects before binary rollback. Preserve
+recovery rows, selected metadata, canonical journals and audits together during
+backup. Coherent backup/restore, retention expiry, concurrent recovery-lease
+mutation fencing and participant admission remain unclosed obligations. Checking
+an already claimed effect is an admission rejection, not that concurrent fence.
+
+Focused host/IMS and selected signed-package/coordinator tests pass, including
+Memory/SQLite failure, CAS, corruption, real position, rollback, replay and
+separate SQLite processes. The independent canonical goldens cover new forms
+and prior IMS request/result bytes. Strict IMS Clippy passes. Host/server Clippy
+diagnostic review finds no warning or error on changed lines, without lint
+allowances; whole-package strict commands remain blocked by unchanged MQ
+validation and server COBOL/CICS/retention test lints, recorded in the external
+handoff. No unrelated lint repair belongs to this slice. The scoped execution,
+effect, provider-row, storage, authorization, retention and pending-participant
+guards, IMS catalog, spec integrity, formatting and dependency policy pass.
+The spec check is integrity evidence only; no new official IMS binding exists.
+The final docs/changelog and exact-path seal/check remain the packaging steps;
+the external handoff records their executed results and the completion commit.

@@ -24,6 +24,15 @@ segment, field, index, relationship and sensitivity DTOs plus their bounded
 cross-reference validator and domain-separated digest. Packages and providers
 consume this one authority rather than translating between private schemas.
 
+`ImsRecoveryRequest` and `ImsRecoveryResult` are additive owned host forms for
+logical LOG code/text in DB-batch CALL context. They use `host.ims.write`, carry
+the selected application/package/PSB/database binding and canonical mutation,
+and return a separate I/O PCB status and durable sequence. Unsupported contexts,
+command syntax and external transaction operands reject explicitly. Raw LL/ZZ
+and AIB framing, other recovery calls and physical log sizing are not admitted.
+The explicit canonical encoder freezes the new named variants without changing
+prior IMS request/result bytes. No provider type enters this contract.
+
 Invariants: every request/result is bounded; mutations carry effect sequence
 and idempotency identity; capability resolution is deterministic; official and
 custom semantic namespaces cannot overlap; and no generated identity installs a

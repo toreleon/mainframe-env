@@ -23,7 +23,9 @@ use crate::retention::{
 };
 use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 
+mod application_recovery;
 mod generic;
+pub use application_recovery::ims_providers_with_recovery;
 mod system;
 mod utility_bridge;
 pub use generic::{ImsGenericLoadImage, ImsGenericLoadRecord};

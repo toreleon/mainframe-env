@@ -952,6 +952,8 @@ pub enum HostRequest {
     Cics(CicsRequest),
     Db2(Db2Request),
     Ims(ImsRequest),
+    /// Additive owned application recovery call, separate from database operands.
+    ImsRecovery(crate::ImsRecoveryRequest),
     Mq(MqRequest),
 }
 
@@ -1001,6 +1003,7 @@ impl HostRequest {
             Self::Db2(_) => "host.db2.read",
             Self::Ims(request) if request.operation.is_mutating() => "host.ims.write",
             Self::Ims(_) => "host.ims.read",
+            Self::ImsRecovery(_) => "host.ims.write",
             Self::Mq(_) => "host.mq.write",
         };
         CapabilityId::new(name, limits).expect("built-in capability identities are valid")
@@ -1060,6 +1063,7 @@ impl HostRequest {
         ) || matches!(self, Self::Cics(request) if request.is_mutating())
             || matches!(self, Self::Db2(request) if request.operation.is_mutating())
             || matches!(self, Self::Ims(request) if request.operation.is_mutating())
+            || matches!(self, Self::ImsRecovery(_))
             || matches!(self, Self::Mq(request) if request.operation.is_mutating())
     }
 
@@ -1112,6 +1116,7 @@ impl HostRequest {
             Self::Cics(request) => request.mutation.as_ref(),
             Self::Db2(request) => request.mutation.as_ref(),
             Self::Ims(request) => request.mutation.as_ref(),
+            Self::ImsRecovery(request) => Some(&request.mutation),
             Self::Mq(request) => request.mutation.as_ref(),
             _ => None,
         }
@@ -1119,6 +1124,7 @@ impl HostRequest {
 
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
+            Self::ImsRecovery(request) => request.validate(limits),
             Self::Dataset(request) => validate_dataset(request, limits),
             Self::Program(ProgramRequest::Call {
                 service: Some(service),
@@ -1308,12 +1314,15 @@ pub enum HostResult {
     Cics(CicsResponse),
     Db2(Db2Result),
     Ims(ImsResult),
+    /// Separate I/O PCB recovery response; it does not update a database PCB.
+    ImsRecovery(crate::ImsRecoveryResult),
     Mq(MqResult),
 }
 
 impl HostResult {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
+            Self::ImsRecovery(result) => result.validate(),
             Self::Dataset(DatasetResult::Description(description)) => {
                 description.definition.validate(
                     limits,

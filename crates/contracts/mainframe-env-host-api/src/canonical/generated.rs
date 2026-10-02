@@ -2907,6 +2907,11 @@ impl Canonical for HostRequest {
                 v0.encode(out)?;
                 Ok(())
             }
+            Self::ImsRecovery(v0) => {
+                out.variant("HostRequest", "ImsRecovery", 1)?;
+                out.text("0")?;
+                v0.encode(out)
+            }
             Self::Mq(v0) => {
                 out.variant("HostRequest", "Mq", 1)?;
                 out.text("0")?;
@@ -2981,6 +2986,11 @@ impl Canonical for HostResult {
                 out.text("0")?;
                 v0.encode(out)?;
                 Ok(())
+            }
+            Self::ImsRecovery(v0) => {
+                out.variant("HostResult", "ImsRecovery", 1)?;
+                out.text("0")?;
+                v0.encode(out)
             }
             Self::Mq(v0) => {
                 out.variant("HostResult", "Mq", 1)?;

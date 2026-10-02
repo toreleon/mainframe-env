@@ -53,7 +53,8 @@ use mainframe_env_host_api::{
 };
 use mainframe_env_ims::{
     ImsReplayClock, ImsService, TmCall, TmCallResult, TmCancelReceipt, TmEnqueueReceipt,
-    TmInputMessage, TmLimits, TmPackageBinding, TmScheduleReceipt, TmService, ims_providers,
+    TmInputMessage, TmLimits, TmPackageBinding, TmScheduleReceipt, TmService,
+    ims_providers_with_recovery,
 };
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
@@ -745,7 +746,11 @@ impl ProductServer {
             enterprise_replay_clock.clone(),
         )?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
-        enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(ims_providers_with_recovery(
+            ims.clone(),
+            store.clone(),
+            InvocationLimits::default(),
+        ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         let inner_program: Arc<dyn HostProvider> = program.clone();
         let inner = scoped_host(
@@ -769,7 +774,11 @@ impl ProductServer {
         let auth = cics_security::RacfCicsSecurityAuthority::new(racf_security, secrets.clone());
         cics.bind_security_authority(Arc::new(auth))?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
-        enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
+        enterprise_providers.extend(ims_providers_with_recovery(
+            ims.clone(),
+            store.clone(),
+            InvocationLimits::default(),
+        ));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
         enterprise_providers.extend(spool_providers(spool.clone(), InvocationLimits::default()));
         let host = scoped_host(

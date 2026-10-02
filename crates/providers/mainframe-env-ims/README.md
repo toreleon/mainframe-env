@@ -31,7 +31,17 @@ state.
 ## Public surface
 
 `ImsService` installs validated application definitions and exposes typed host
-providers through `ims_providers`. Public definition and limit types describe
+providers through `ims_providers`. `ims_providers_with_recovery` adds logical
+LOG dispatch using the canonical journal from the same shared store authority.
+The selected DB-batch CALL adapter requires typed PSB/database SAF and an exact
+canonical effect intent before loading the existing RecoverySession. It publishes
+the log and selection fence through the existing utility bridge, preserves live
+database/PCB/undo rows, and refuses unresolved effects. Recovery session keys bind
+the selected application, package, PSB/database, run and principal; they are
+addresses in the existing version-one recovery namespace, not a new authority.
+Other recovery families and contexts, raw language framing, physical log sizing,
+participant admission and concurrent recovery-lease fencing remain pending.
+Public definition and limit types describe
 the bounded installation and execution contract. `TmDefinitionSet`,
 `TmInputMessage`, and `TmCall` define the TM contract. `TmService` persists
 bounded catalog, message, session, conversation, outbound, and replay rows

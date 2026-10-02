@@ -18,6 +18,7 @@ mod ims;
 mod ims_applicability;
 mod ims_metadata;
 mod ims_pcb;
+mod ims_recovery;
 mod ims_status;
 mod ims_system;
 mod ims_tm;
@@ -82,6 +83,7 @@ pub use ims_pcb::{
     ImsPcbFieldWidth, ImsPcbKind, ImsPcbLayout, ImsPcbLimits, ImsPcbMaskDescriptor, ImsPcbProblem,
     ImsPcbSemanticValue, ims_pcb_layout, ims_pcb_mask, ims_pcb_masks,
 };
+pub use ims_recovery::{ImsRecoveryCall, ImsRecoveryRequest, ImsRecoveryResult};
 pub use ims_status::{
     IMS_STATUS_CONTEXT_MEMBERSHIPS, IMS_STATUS_CONTEXTS, IMS_STATUS_DISTINCT_CODE_COUNT,
     ImsStatusCategory, ImsStatusCode, ImsStatusContext, ImsStatusContextDescriptor,
