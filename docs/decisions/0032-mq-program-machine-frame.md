@@ -63,6 +63,46 @@ and historical-handle adoption support remains pending.
 
 ## Sources and acceptance boundary
 
+### Private same-task child ownership
+
+`MQ-1505.selected-batch-child-ownership` adds a checked provider-private
+`prepare_selected_batch_child(parent_frame, parent, child, relationship)` path.
+The existing opaque parent lease and exact frozen parent Invocation are required.
+The trusted, already-admitted host must independently supply the ordinary SAME
+TASK CALL relationship; the private selector is not an attestation capability.
+Equal bindings, parent IDs or run/principal alone cannot establish that relation.
+Separate subtasks, clients, CICS and IMS cannot inherit this batch processing unit.
+Root minting/binding still refuses every `parentSome` Invocation.
+
+The directory checks the actual child linkage, distinct execution, exact
+run/principal/grants/generations/attempt, shared physical cancellation probe,
+live controls and non-widening deadline/resource limits before bounded frame
+insertion. Each root batch frame retains a small frozen logical origin; only a
+checked same-task child copies it. Surviving frame references retain that origin
+without reconstructing it from a CONNECT receipt. Origin bytes count against the
+existing directory budget. No lease or origin has a public/Serde constructor.
+
+The selected service obtains that proof afresh under its sole authority mutex.
+It validates access to the original connection's retained logical owner rather
+than reassigning `UnitOwner@1` to the child. Existing owner schema and root bytes
+remain exact. Child GET/PUT and explicit batch CMIT/BACK/DISC retain the actual
+child's immutable effect, core intent, SAF principal, audit and occurrence
+receipt. Physical publication still composes current control/UOW dependencies,
+catalog/marker/delivery CAS and insert-only receipt with audit in the same store
+transaction; adoption follows the entire commit. Nested/outer intents cannot
+replace the child's original intent. Reply uncertainty fences this service and
+leaves reconciliation with the existing recovery authority.
+
+Explicit preparation abort removes only a newly created child frame. Ordinary
+CALL return removes a nonfinal child reference without retiring parent handles
+or deciding pending work; no Drop cleanup is installed. Final task end, raw
+abnormal/unknown host outcomes and child-only CONNECT/return policy need separate
+owned integration. Cold restart restores retained UOW/receipt bytes, never opaque
+lineage or tokens; durable incarnation advancement remains mandatory. This
+private composition awaits the real installed host producer/session and deliberate
+cross-crate authority design. It does not register a ready public provider or
+accept a shared participant.
+
 IBM MQ 9.4 baseline `ibm-mq-9.4-mqi-2026-08-31`, row `0008` MQCONN,
 `SSFKSJ_9.4.0/refdev/q101760_.html`, SHA-256
 `fa0cdd2c5e19326dfb91e5ad0b921fd47a1a3a918682e13c4ff5e36c2ba40347`,

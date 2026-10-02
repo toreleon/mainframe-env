@@ -4,6 +4,8 @@ use mainframe_env_host_api::mq_object_route::*;
 use mainframe_env_host_api::*;
 use mainframe_env_store::{MemoryStore, SqliteStateStore};
 use mainframe_env_store_api::*;
+#[path = "tests/batch_child.rs"]
+mod batch_child;
 #[path = "tests/bounds.rs"]
 mod bounds;
 #[path = "tests/failures.rs"]

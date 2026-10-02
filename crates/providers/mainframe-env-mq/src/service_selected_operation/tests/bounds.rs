@@ -1,6 +1,6 @@
 use super::*;
 
-fn fill_audits(f: &Fixture) {
+pub(super) fn fill_audits(f: &Fixture) {
     let e = f.effect(
         200,
         MqMqiRequest::Connect(MqMqiConnect {

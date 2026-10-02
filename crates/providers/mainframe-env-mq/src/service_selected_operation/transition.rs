@@ -59,6 +59,7 @@ pub(super) fn prepare(
     state: &rich_state::RichStoredState,
     runtime: &mut SelectedRuntime,
     invocation: &Invocation,
+    logical: &LogicalBatchOwner,
     owner: MqHandleOwner,
     request: &MqMqiRequest,
     key: &str,
@@ -66,6 +67,9 @@ pub(super) fn prepare(
     authorizer: &dyn EnterpriseAuthorizer,
     limits: MqLimits,
 ) -> Result<Candidate, HostProblem> {
+    if logical.owner() != owner {
+        return Err(HostProblem::Unauthorized);
+    }
     let mut next = Candidate {
         delivery: state.delivery.clone(),
         control: runtime.control.clone(),
@@ -97,13 +101,18 @@ pub(super) fn prepare(
         next.units
             .get(&binding.unit)
             .ok_or(HostProblem::Malformed)?
-            .require_owner(invocation, &binding.key, &next.control, binding.unit)?;
+            .require_owner(logical, &binding.key, &next.control, binding.unit)?;
         next.unit_dependencies.push(binding.unit);
     }
     // Actual clock expiry changes only the candidate, never the current queues.
     next.delivery.advance_tick(now).map_err(delivery_error)?;
     match request {
         MqMqiRequest::Connect(connect) | MqMqiRequest::ConnectExtended(connect) => {
+            // Child-only connection creation/return cleanup needs a separate
+            // policy. Existing parent connections use the checked logical origin.
+            if logical.is_child() {
+                return Err(HostProblem::Unsupported);
+            }
             if connect.options != MqMqiOptions::ContractDefault
                 || connect.sharing != MqHandleSharing::NonShared
             {
@@ -140,7 +149,7 @@ pub(super) fn prepare(
             if next.units.len() >= limits.max_pending_units {
                 return Err(HostProblem::ResourceExhausted);
             }
-            let unit = next.control.allocate(invocation, key)?;
+            let unit = next.control.allocate(logical, key)?;
             let connection = runtime
                 .handles
                 .handles_mut()
@@ -222,7 +231,7 @@ pub(super) fn prepare(
             authorize_path(authorizer, invocation, &binding.path, AccessIntent::Update)?;
             put_message(
                 &mut next,
-                invocation,
+                logical,
                 *connection,
                 put,
                 &binding.queue,
@@ -242,14 +251,7 @@ pub(super) fn prepare(
             }
             let (queue, path) = resolve(&state.catalog, lookup, crate::MqObjectCapability::Output)?;
             authorize_path(authorizer, invocation, &path, AccessIntent::Update)?;
-            put_message(
-                &mut next,
-                invocation,
-                *connection,
-                put,
-                &queue,
-                &state.catalog,
-            )?;
+            put_message(&mut next, logical, *connection, put, &queue, &state.catalog)?;
         }
         MqMqiRequest::Get(get) => {
             if get.message_handle.is_some()
@@ -267,7 +269,7 @@ pub(super) fn prepare(
             };
             let binding = require_object(runtime, owner, get.connection, get.object, access)?;
             authorize_path(authorizer, invocation, &binding.path, AccessIntent::Read)?;
-            let unit = resolve_unit(&next, invocation, get.connection, get.unit)?;
+            let unit = resolve_unit(&next, logical, get.connection, get.unit)?;
             let got = next
                 .delivery
                 .get(&state.catalog, &binding.queue, &get.get, unit)
@@ -292,7 +294,7 @@ pub(super) fn prepare(
             require_connection(runtime, owner, *connection)?;
             resolve_unit(
                 &next,
-                invocation,
+                logical,
                 *connection,
                 MqMqiUnitOfWork::Local { unit: *unit },
             )?;
@@ -336,7 +338,7 @@ pub(super) fn prepare(
                 .iter_mut()
                 .find(|b| b.connection == *connection)
                 .ok_or(HostProblem::Malformed)?;
-            let fresh = next.control.allocate(invocation, &binding.key)?;
+            let fresh = next.control.allocate(logical, &binding.key)?;
             binding.unit = fresh.unit;
             next.units.insert(fresh.unit, fresh);
             next.output = MqMqiOutput::UnitOfWork { unit: *unit };
@@ -383,7 +385,7 @@ pub(super) fn prepare(
                 .units
                 .get(&binding.unit)
                 .ok_or(HostProblem::Malformed)?;
-            unit.require_owner(invocation, &binding.key, &next.control, binding.unit)?;
+            unit.require_owner(logical, &binding.key, &next.control, binding.unit)?;
             // Source-pinned ordinary batch MQDISC commits the local connection
             // UOW. Its exact owner and all affected resources remain mandatory.
             let mut resources = vec![resource(
@@ -497,7 +499,7 @@ fn resolve(
 }
 fn resolve_unit(
     candidate: &Candidate,
-    invocation: &Invocation,
+    logical: &LogicalBatchOwner,
     connection: MqHconn,
     unit: MqMqiUnitOfWork,
 ) -> Result<Option<u64>, HostProblem> {
@@ -517,14 +519,14 @@ fn resolve_unit(
                 .units
                 .get(&unit)
                 .ok_or(HostProblem::Malformed)?
-                .require_owner(invocation, &binding.key, &candidate.control, unit)?;
+                .require_owner(logical, &binding.key, &candidate.control, unit)?;
             Ok(Some(unit))
         }
     }
 }
 fn put_message(
     candidate: &mut Candidate,
-    invocation: &Invocation,
+    logical: &LogicalBatchOwner,
     connection: MqHconn,
     put: &MqMqiPut,
     queue: &crate::MqObjectName,
@@ -543,7 +545,7 @@ fn put_message(
         // the input as a supposedly generated descriptor would lose output.
         return Err(HostProblem::Unsupported);
     }
-    let unit = resolve_unit(candidate, invocation, connection, put.unit)?;
+    let unit = resolve_unit(candidate, logical, connection, put.unit)?;
     let outcome = candidate
         .delivery
         .put_one(catalog, queue, put.message.clone(), unit)

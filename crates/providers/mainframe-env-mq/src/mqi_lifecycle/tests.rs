@@ -3,7 +3,7 @@ use mainframe_env_execution_api::*;
 use mainframe_env_host_api::{MqHandleProblem, MqHandleSharing, MqHconn};
 use std::collections::BTreeSet;
 
-fn invocation(name: &str, context: &[u8]) -> Invocation {
+pub(super) fn invocation(name: &str, context: &[u8]) -> Invocation {
     let limits = InvocationLimits::default();
     let mut bindings = BTreeMap::from([(
         "mq.host-context".into(),
@@ -45,13 +45,13 @@ fn invocation(name: &str, context: &[u8]) -> Invocation {
     )
     .unwrap()
 }
-fn directory() -> MqLifecycleDirectory {
+pub(super) fn directory() -> MqLifecycleDirectory {
     MqLifecycleDirectory::new(Default::default()).unwrap()
 }
-fn registry() -> MqHandleRegistry {
+pub(super) fn registry() -> MqHandleRegistry {
     MqHandleRegistry::new(1, 64).unwrap()
 }
-fn child(parent: &Invocation, name: &str) -> Invocation {
+pub(super) fn child(parent: &Invocation, name: &str) -> Invocation {
     let mut child = invocation(name, b"zos-cics|host-coordinator");
     child.parent_execution_id = Some(parent.execution_id.clone());
     child.run_unit_id = parent.run_unit_id.clone();

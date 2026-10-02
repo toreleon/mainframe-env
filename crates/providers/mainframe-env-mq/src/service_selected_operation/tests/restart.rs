@@ -1,9 +1,9 @@
 use super::*;
 
 static NEXT_FILE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-struct Database(std::path::PathBuf);
+pub(super) struct Database(std::path::PathBuf);
 impl Database {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
             "mq-selected-operation-{}-{}.sqlite",
             std::process::id(),
@@ -12,7 +12,7 @@ impl Database {
         assert!(!path.exists());
         Self(path)
     }
-    fn open(&self) -> Arc<dyn PlatformStore> {
+    pub(super) fn open(&self) -> Arc<dyn PlatformStore> {
         Arc::new(
             SqliteStateStore::open(
                 &format!("sqlite://{}?mode=rwc", self.0.display()),

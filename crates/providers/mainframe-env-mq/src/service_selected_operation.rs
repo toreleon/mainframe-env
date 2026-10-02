@@ -7,6 +7,7 @@
 use super::super::*;
 use crate::host_context::decode_host_context;
 use crate::mqi_admission::{MqMqiAdmission, MqMqiServiceScope, admit_mqi};
+use crate::mqi_lifecycle::LogicalBatchOwner;
 use crate::mqi_lifecycle::{FrameLease, LifecycleLimits, MqLifecycleDirectory, ProcessLease};
 use crate::service_mqi_intent::{MqIntentProblem, bind_core_intent};
 use mainframe_env_execution_api::{AuditDecision, AuditRecord};
@@ -22,6 +23,8 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectState};
 
 #[path = "service_selected_operation/authorization.rs"]
 mod authorization;
+#[path = "service_selected_operation/batch_child.rs"]
+mod batch_child;
 #[path = "service_selected_operation/ownership.rs"]
 mod ownership;
 #[path = "service_selected_operation/receipt.rs"]
@@ -102,6 +105,9 @@ impl MqService {
             .ok_or(HostProblem::Unsupported)?
             .now_tick()?;
         let owner = runtime.directory.owner_for(frame, invocation, now)?;
+        let logical = runtime
+            .directory
+            .logical_batch_owner(frame, invocation, now)?;
         runtime
             .handles
             .handles_mut()
@@ -117,7 +123,7 @@ impl MqService {
             .units
             .get(&binding.unit)
             .ok_or(HostProblem::Malformed)?
-            .require_owner(invocation, &binding.key, &runtime.control, binding.unit)?;
+            .require_owner(&logical, &binding.key, &runtime.control, binding.unit)?;
         Ok(MqMqiUnitOfWork::Local { unit: binding.unit })
     }
 
@@ -151,6 +157,9 @@ impl MqService {
                 return Err(HostProblem::UnknownOutcome);
             }
             let owner = runtime.directory.owner_for(frame, invocation, now)?;
+            let logical = runtime
+                .directory
+                .logical_batch_owner(frame, invocation, now)?;
             let scope = MqMqiServiceScope::for_host_dispatch(
                 invocation,
                 owner,
@@ -305,6 +314,7 @@ impl MqService {
                 state,
                 &mut runtime,
                 invocation,
+                &logical,
                 owner,
                 &admitted.envelope.request,
                 key,

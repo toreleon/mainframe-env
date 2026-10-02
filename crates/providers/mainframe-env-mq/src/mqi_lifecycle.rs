@@ -21,6 +21,9 @@ use mainframe_env_host_api::{HostProblem, MqHandleOwner, MqHandleRegistry, MqHos
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod batch_child;
+pub(crate) use batch_child::{BatchChildBinding, InstalledBatchRelationship, LogicalBatchOwner};
+
 static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
 const MAX_PROCESSES: usize = 256;
 const MAX_FRAMES: usize = 4096;
@@ -63,6 +66,7 @@ struct Frame {
     invocation: Invocation,
     owner: MqHandleOwner,
     bytes: usize,
+    batch_origin: Option<batch_child::BatchOrigin>,
 }
 
 pub(crate) struct MqLifecycleDirectory {
@@ -369,6 +373,27 @@ impl MqLifecycleDirectory {
         owner: MqHandleOwner,
         bytes: usize,
     ) -> Result<FrameLease, HostProblem> {
+        let origin = if invocation.parent_execution_id.is_none()
+            && owner.environment == MqHostEnvironment::ZosBatch
+        {
+            Some(batch_child::BatchOrigin::root(invocation))
+        } else {
+            None
+        };
+        self.insert_with_origin(process, invocation, owner, bytes, origin)
+    }
+
+    fn insert_with_origin(
+        &mut self,
+        process: ProcessLease,
+        invocation: &Invocation,
+        owner: MqHandleOwner,
+        bytes: usize,
+        batch_origin: Option<batch_child::BatchOrigin>,
+    ) -> Result<FrameLease, HostProblem> {
+        let bytes = bytes
+            .checked_add(batch_origin.as_ref().map_or(0, |origin| origin.bytes()))
+            .ok_or(HostProblem::ResourceExhausted)?;
         let retained = self
             .retained_bytes
             .checked_add(bytes)
@@ -388,6 +413,7 @@ impl MqLifecycleDirectory {
                 invocation: invocation.clone(),
                 owner,
                 bytes,
+                batch_origin,
             },
         );
         self.next_frame = next;

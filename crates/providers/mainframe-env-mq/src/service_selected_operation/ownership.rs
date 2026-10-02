@@ -4,9 +4,8 @@
 //! caller's Local.unit is only an assertion against the issued connection's
 //! current retained unit. This does not grant shared-participant capability.
 
-use mainframe_env_execution_api::{
-    ExecutionId, Invocation, InvocationLimits, PrincipalId, RunUnitId,
-};
+use crate::mqi_lifecycle::LogicalBatchOwner;
+use mainframe_env_execution_api::{ExecutionId, InvocationLimits, PrincipalId, RunUnitId};
 use mainframe_env_host_api::HostProblem;
 use serde::{Deserialize, Serialize};
 
@@ -117,7 +116,7 @@ impl Control {
 
     pub(super) fn allocate(
         &mut self,
-        invocation: &Invocation,
+        logical: &LogicalBatchOwner,
         connection_key: &str,
     ) -> Result<UnitOwner, HostProblem> {
         let next = self
@@ -130,9 +129,9 @@ impl Control {
             coordinator: "queue-manager-local".into(),
             unit: self.next_unit,
             connection_key: connection_key.into(),
-            execution: invocation.execution_id.as_str().into(),
-            run: invocation.run_unit_id.as_str().into(),
-            principal: invocation.principal.id().as_str().into(),
+            execution: logical.execution().into(),
+            run: logical.run().into(),
+            principal: logical.principal().into(),
             generation: self.generation,
             fence: self.fence,
             registry_epoch: self.registry_epoch,
@@ -179,15 +178,15 @@ impl UnitOwner {
 
     pub(super) fn require_owner(
         &self,
-        invocation: &Invocation,
+        logical: &LogicalBatchOwner,
         connection_key: &str,
         control: &Control,
         asserted_unit: u64,
     ) -> Result<(), HostProblem> {
         self.validate(control)?;
-        if self.execution != invocation.execution_id.as_str()
-            || self.run != invocation.run_unit_id.as_str()
-            || self.principal != invocation.principal.id().as_str()
+        if self.execution != logical.execution()
+            || self.run != logical.run()
+            || self.principal != logical.principal()
             || self.connection_key != connection_key
             || self.unit != asserted_unit
             || self.registry_epoch != control.registry_epoch

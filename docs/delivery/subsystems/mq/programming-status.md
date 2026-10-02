@@ -6,6 +6,17 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+Private same-task batch-child ownership now consumes an opaque admitted parent
+lease and explicit host-supplied SAME TASK relationship. It retains the frozen
+logical processing-unit origin across child references and validates existing
+durable UOW ownership against that proof without changing `UnitOwner@1` bytes.
+Child effects, retained core intent, SAF, audit and receipts keep the actual
+child actor; return/abort retire only the appropriate volatile frame. Same
+physical control/CAS, audited transaction and incarnation fences remain required.
+Fixture provider tests are not an installed/public host producer. Child-first
+CONNECT, final task end, abnormal/Unknown recovery, checkpoints, participant and
+full 26-call acceptance remain separate obligations.
+
 The additive `mq-point-layout-sources` scope now registers twelve hash-verified
 retained MQ 9.4 layout/scalar/encoding topics independently of the frozen
 80-topic programming supplements and original 27 call positions. Its baseline
