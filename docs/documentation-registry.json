@@ -61,6 +61,8 @@
     "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
+    "docs/decisions/0028-db2-typed-catalog-evolution.md",
+    "docs/decisions/0029-db2-core-participant-evolution.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -287,6 +289,14 @@
         {
           "label": "ADR-0027: CICS task ownership across logical program frames",
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
+        },
+        {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
           "label": "Decision index and template",

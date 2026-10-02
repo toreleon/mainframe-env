@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 224,
+    "markdown_documents": 227,
     "navigation_groups": 6,
-    "normative_documents": 58,
+    "normative_documents": 60,
     "xtask_commands": 211
   },
   "documents": [
@@ -258,7 +258,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
       "relative_links": 1,
-      "sha256": "sha256:165035f2e30394e5ba6245b7dc3051125e877ac99e74a08ccc857e5ecd30fa5c",
+      "sha256": "sha256:f8eef7e76d23ad4b8c74c102b4640c7e8a759019ded8c6b28d8bd3fc24f3f1a9",
       "title": "mainframe-env-db2",
       "xtask_commands": 2
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 114,
-      "sha256": "sha256:5418836a0e358de5dc83f6ecbdb00705e4fe6e0b17ed81a73f4d3db1da5637a5",
+      "relative_links": 116,
+      "sha256": "sha256:e2a8a762aa0619575d985eafa19f8e48a209635c37b6d11b0542a63461ea254b",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -963,10 +963,34 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.12.0 development; integration remains pending",
+      "normative": true,
+      "owner": "Db2, application-package and store-contract maintainers",
+      "path": "docs/decisions/0028-db2-typed-catalog-evolution.md",
+      "relative_links": 0,
+      "scope": "0.12 catalog/binder preparation and versioned integration",
+      "sha256": "sha256:eb401fc5e817bc7350f1929d82933e59428aec0d8f00e2ad52bab8f059f5de7d",
+      "status": "Proposed — implementation boundary, not owner acceptance",
+      "title": "ADR-0028: Db2 typed catalog evolution through existing authorities",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.12.0 development; implementation remains pending",
+      "normative": true,
+      "owner": "execution-contract, coordinator and Db2 maintainers",
+      "path": "docs/decisions/0029-db2-core-participant-evolution.md",
+      "relative_links": 0,
+      "scope": "0.12 local Db2 core and early INT-1601 participant integration",
+      "sha256": "sha256:690b3db46a8eaece1f5d770b86d9e190bea48987625e88cd060fc44de67ebb2b",
+      "status": "Proposed — prerequisite direction, not capability acceptance",
+      "title": "ADR-0029: Versioned Db2 core participant binding before mutating integration",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 27,
-      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
+      "relative_links": 29,
+      "sha256": "sha256:58e7d2a6400430cd5419b977aef77c26925c058372910efb580d92762b10ced2",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1014,7 +1038,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 21,
-      "sha256": "sha256:e970c51f90d7be2cea82d6d1f46c5fba8ffc7aab2667264af84466cb03b21fd9",
+      "sha256": "sha256:7f36ec6320efcb817b7dad29e076049e34daeda3a339d99064747e5ef673f4d0",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1369,9 +1393,17 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:d1144bb7293d89f5ac9232f3b7542841b244207c6bbde0b46c6cf9abd24a5cfc",
+      "relative_links": 3,
+      "sha256": "sha256:bbf66d9e902d06d7de4297dfaeff1908128080235b24a97deae54ce276a4b17d",
       "title": "Db2 — Engine and common SQL progress",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/db2/decfloat-primitive-decision.md",
+      "relative_links": 1,
+      "sha256": "sha256:db4aee97b473239b509d94bc69d243fb3c5286aad56e8f00c6a5b2aff1869d9e",
+      "title": "Finite DECFLOAT assignment primitive",
       "xtask_commands": 0
     },
     {
@@ -2252,6 +2284,14 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2500,7 +2540,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:08240a952807eaf4035eece2e89762297490f259993d574750f8f0b3dd53f617",
+  "registry_sha256": "sha256:5c23db19d6abc2c53c2aca392b3865fd386cd4bca1cd93f7494ef50e8f26e8ad",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

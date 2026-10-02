@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add bounded owned Db2 RENAME TABLE and INDEX syntax with explicit source qualification, unqualified destinations and original spans; binding, execution and whole-row recognition remain pending."

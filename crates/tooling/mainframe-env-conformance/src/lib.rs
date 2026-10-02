@@ -28,6 +28,8 @@ mod cobol_runtime;
 mod cobol_statements;
 mod dataset;
 mod dataset_reference;
+mod db2_syntax;
+mod db2_syntax_fixtures;
 mod decimal_adapter;
 mod framework;
 mod jcl;
@@ -37,6 +39,7 @@ mod racf;
 mod racf_oracle;
 mod racf_reference;
 
+pub use db2_syntax::{Db2SyntaxRuntime, db2_syntax_runtime};
 pub use decimal_adapter::{DecimalAdapterReceipt, LEDGER_FORMULA_CONTRACT, verify_decimal_adapter};
 pub use framework::*;
 pub use licensed_harness::{

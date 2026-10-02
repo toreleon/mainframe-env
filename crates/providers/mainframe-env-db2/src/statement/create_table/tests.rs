@@ -4,6 +4,78 @@ fn parse(source: &str) -> Result<Db2CreateTableStatement, Db2SyntaxDiagnostic> {
     parse_db2_create_table_statement(source, Db2SyntaxLimits::default(), Db2AstLimits::default())
 }
 
+#[test]
+fn operandless_defaults_are_present_clauses() {
+    for source in [
+        "CREATE TABLE t (a INT DEFAULT)",
+        "CREATE TABLE t (a INT WITH DEFAULT NOT NULL)",
+    ] {
+        let statement = parse(source).unwrap();
+        assert!(statement.columns()[0].default().is_some());
+        assert_eq!(statement.columns()[0].default().unwrap().value(), None);
+    }
+}
+
+#[test]
+fn default_operand_locations_retain_original_trivia() {
+    let statement = parse("CREATE TABLE t (a INT DEFAULT - /*é*/\r\n 12)").unwrap();
+    let default = statement.columns()[0].default().unwrap();
+    assert_eq!(default.value(), Some(&Db2Literal::Number("-12".into())));
+    assert_eq!(
+        default.span(),
+        Db2SourceSpan {
+            start_byte: 22,
+            end_byte: 43,
+            start: Db2SourceLocation {
+                line: 1,
+                column: 23
+            },
+            end: Db2SourceLocation { line: 2, column: 4 },
+        }
+    );
+    assert_eq!(default.value_span().unwrap().start_byte, 30);
+    assert_eq!(default.value_span().unwrap().end_byte, 43);
+    assert_eq!(
+        default.numeric_sign_span(),
+        Some(Db2SourceSpan {
+            start_byte: 30,
+            end_byte: 31,
+            start: Db2SourceLocation {
+                line: 1,
+                column: 31
+            },
+            end: Db2SourceLocation {
+                line: 1,
+                column: 32
+            },
+        })
+    );
+    assert_eq!(
+        default.numeric_token_span(),
+        Some(Db2SourceSpan {
+            start_byte: 41,
+            end_byte: 43,
+            start: Db2SourceLocation { line: 2, column: 2 },
+            end: Db2SourceLocation { line: 2, column: 4 },
+        })
+    );
+}
+
+#[test]
+fn default_intents_do_not_invent_nulls_or_type_values() {
+    let statement = parse("CREATE TABLE t (a INT, b INT DEFAULT, c INT DEFAULT NULL)").unwrap();
+    assert!(statement.columns()[0].default().is_none());
+    let type_default = statement.columns()[1].default().unwrap();
+    assert_eq!(type_default.value(), None);
+    assert_eq!(type_default.value_span(), None);
+    assert_eq!(type_default.numeric_sign_span(), None);
+    assert_eq!(type_default.numeric_token_span(), None);
+    assert_eq!(
+        statement.columns()[2].default().unwrap().value(),
+        Some(&Db2Literal::Null)
+    );
+}
+
 fn foreign(constraint: &Db2CreateTableConstraint) -> &Db2ForeignKeyConstraint {
     let Db2TableConstraintKind::ForeignKey(foreign) = constraint.kind() else {
         panic!("expected FOREIGN KEY")
@@ -32,7 +104,7 @@ fn create_table_builds_an_owned_bounded_ast() {
     assert_eq!(decimal.arguments(), &[9, 2]);
     assert_eq!(
         statement.columns()[1].default().unwrap().value(),
-        &Db2Literal::Number("-12.5".into())
+        Some(&Db2Literal::Number("-12.5".into()))
     );
     assert_eq!(
         statement.columns()[1].default().unwrap().spelling(),
@@ -48,7 +120,7 @@ fn create_table_builds_an_owned_bounded_ast() {
     );
     assert_eq!(
         statement.columns()[3].default().unwrap().value(),
-        &Db2Literal::Null
+        Some(&Db2Literal::Null)
     );
     assert!(statement.constraints().is_empty());
 }
@@ -224,8 +296,8 @@ fn malformed_and_missing_operands_fail_closed() {
         "CREATE TABLE t (a INT,)",
         "CREATE TABLE t (a)",
         "CREATE TABLE t (a INT b INT)",
-        "CREATE TABLE t (a INT DEFAULT)",
-        "CREATE TABLE t (a INT WITH DEFAULT)",
+        "CREATE TABLE t (a INT DEFAULT",
+        "CREATE TABLE t (a INT WITH DEFAULT",
         "CREATE TABLE t (a INT DEFAULT CURRENT_DATE)",
         "CREATE TABLE t (a INT, CONSTRAINT c)",
         "CREATE TABLE t (a INT, PRIMARY (a))",
@@ -254,7 +326,7 @@ fn column_options_are_an_unordered_repeat_group() {
         assert!(column.is_not_null(), "{source}");
         assert_eq!(
             column.default().unwrap().value(),
-            &Db2Literal::Number("1".into()),
+            Some(&Db2Literal::Number("1".into())),
             "{source}"
         );
     }
