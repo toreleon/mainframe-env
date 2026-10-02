@@ -1014,7 +1014,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 21,
-      "sha256": "sha256:b3ac586c977c8b7ad699fd62dd7707b5a66ab8b2563b6c9507042b5e265f0c5c",
+      "sha256": "sha256:d8634079ecd5f7d12dda16b2ebfb262f3dc67433467e66cd419502228eb34c44",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1370,7 +1370,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
       "relative_links": 1,
-      "sha256": "sha256:39606d409f6fcc3f4883d8ccdd7217f983d7ed3b719f2caa41a24b0414c59ccc",
+      "sha256": "sha256:e06c52db03e47202799ce104fc8308d4663892f29bb616af39c1d81f15ac612e",
       "title": "Db2 — Engine and common SQL progress",
       "xtask_commands": 0
     },

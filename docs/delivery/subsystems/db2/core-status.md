@@ -4,7 +4,7 @@ Subsystem: **db2**
 Phase: **core**
 Target release: **0.12.0**
 
-Status: **In progress — resumed original lane on current main for the declared second wave**
+Status: **In progress — second-wave pure surfaces sealed; third-wave syntax/type kernels declared**
 
 This recovery slice starts from `origin/main` commit `26437e2c`. This file is
 program control, not product conformance or licensed execution evidence.
@@ -125,6 +125,52 @@ blocked by the unrelated unavailable CICS topic
 `SSJL4D_6.x/applications/designing/dfhp37p.html` and the batch service's
 7,404-production-line count exceeding its 7,402-line legacy ceiling; these are
 not retried as Db2 tests.
+
+### Third-wave declarations
+
+The second-wave public syntax integration is sealed in `f400452c`; its affected
+package sequence passed 173 unit and 18 integration tests, Rust 1.95 check,
+formatting, statement-catalog, changelog and documentation gates. Those receipts
+belong to that tested feature input, not to the following unimplemented kernels.
+The unchanged dependency-policy inputs passed during the qualification-surface
+sequence. Full-catalog recognition, common/deferred freeze and execution credit
+remain pending.
+
+The next four isolated CLI workers retain `gpt-6.1-sol`, high reasoning, goal
+mode, bypass, fast mode disabled and default service tier. Each owns exactly its
+named private Rust module and unique changelog fragment; shared exports,
+dispatchers, status, catalog obligations and derived docs remain manager-owned.
+
+| Slice | Exact source-backed bounded obligations | Owned module / fragment |
+|---|---|---|
+| `DB2-1201.searched-delete-syntax` | SQL 0065: DELETE FROM qualified target with optional existing-expression search condition; preserve names and all original-source spans; reject bare-value WHERE, invalid predicate compositions, positioned CURRENT OF, correlation/period/INCLUDE/SET/fullselect/fetch/isolation/SKIP LOCKED/QUERYNO forms and extra statements. Binding, target kind, privileges, constraints and deletion remain pending. | `delete_syntax.rs`; `db2-searched-delete-syntax.toml` |
+| `DB2-1201.searched-update-syntax` | SQL 0155: qualified target, nonempty unique unqualified single-column SET assignments using common expression/DEFAULT/NULL, optional search condition; preserve assignment boundaries, names and relocated spans; enforce aggregate limits and structural predicates; reject positioned, tuple/row-fullselect/UNPACK, correlation/period/INCLUDE/isolation/SKIP LOCKED/QUERYNO forms and aggregate assignment functions. Catalog-dependent function distinctions and all mutation/type/default/nullability semantics remain pending. | `update_syntax.rs`; `db2-searched-update-syntax.toml` |
+| `DB2-1201.open-fetch-host-syntax` | SQL 0100 / 0078: OPEN unqualified cursor with optional bounded static-host USING list or SQLDA descriptor; single-row FETCH with omitted/NEXT/PRIOR/FIRST/LAST/CURRENT orientation, optional FROM and optional static-host INTO list or SQLDA descriptor. Preserve omitted spelling, host case, indicators, decoded cursor identity and spans; reject SQL PL globals/arrays, structures, rowsets, sensitivity, WITH CONTINUE, BEFORE/AFTER, ABSOLUTE/RELATIVE and undeclared forms. Cursor state, scrollability, parameter/target counts, host binding and SQLCA remain pending. | `cursor_operation_syntax.rs`; `db2-open-fetch-host-syntax.toml` |
+| `DB2-1202.integer-decimal-constant-types` | Language-element kernel, no statement-row claim: classify bounded signed/unsigned integer spellings of at most 19 digits by INTEGER/BIGINT range and out-of-BIGINT DECIMAL; classify decimal-point forms and unpointed out-of-BIGINT forms up to 31 digits with exact precision/scale including leading/trailing zeros. Return existing owned resolved type with NOT NULL, not an evaluator. Longer unpointed in-range spellings, exponent/DECFLOAT/special forms, comma decimal conventions and malformed inputs fail explicitly as outside this initial subset. No lexer-fence lifting, conversions or expression binding. | `numeric_constant_types.rs`; `db2-integer-decimal-constant-types.toml` |
+
+Pinned topics were verified in the supplied archive and read with the shared
+plain-text parser after ordinary search/read reported the unverified TOC:
+DELETE (`0e8760f121bb0e982541d6442ed565adbd291678dfbab44d6d2fe2dc4d176317`,
+225829 bytes), UPDATE
+(`0ddb9b81001292f17d7b2fe9d20db41274bb921a85ca11a8fab3ec2c0931c4ab`,
+252756 bytes), OPEN
+(`b0b06e74f611c2840d7cb81d8c64a151ea7dbb02404aa911c367defd5cc8eeee`,
+44706 bytes), FETCH
+(`b8109d9f6389937ae432fa9ff1abd49df237598fa81216032b752c31b413e57d`,
+211364 bytes), and constants introduction
+(`bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8`,
+17915 bytes). Topic names are `db2z_sql_{delete,update,open,fetch}.html` and
+`db2z_constantsintro.html` under the same pinned Db2 13 SQL-reference path.
+Identifier, expression/search-condition and data-type context topics must also
+be consulted before their rules change.
+
+All four are pure library kernels with no host route, store/catalog mutation,
+SAF decision, transaction binding, SQLCA mapping or official row credit. Their
+applicable acceptance is positive/negative/boundary/located diagnostic matrices,
+affected package tests/check, Rust 1.95 compatibility, formatting, catalog and
+changelog gates plus exact-path seals. A new module must stay below 1200
+production lines. Unchanged global architecture/source blockers are reported,
+not retried without new evidence. Public integration follows separate seals.
 
 ## Dependency gate
 

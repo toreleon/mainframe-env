@@ -19,7 +19,7 @@ Published releases do not imply licensed differential completion.
 | CICS | Application API | [Implementation in progress; application API acceptance and licensed differential remain incomplete](subsystems/cics/application-api-status.md) | 0.9.0 |
 | CICS | SPI and FEPI | [SPI-1001 identity foundation sealed; semantic source dependency blocked; SPI-1001 and 0.10.0 remain Proposed](subsystems/cics/system-api-status.md) | 0.10.0 |
 | z/OSMF | REST portfolio | [ZMF-1101 operation-normalization foundation complete; no new routes advertised](subsystems/zosmf/rest-status.md) | 0.11.0 |
-| Db2 | Engine and common SQL | [In progress — resumed original lane on current main for the declared second wave](subsystems/db2/core-status.md) | 0.12.0 |
+| Db2 | Engine and common SQL | [In progress — second-wave pure surfaces sealed; third-wave syntax/type kernels declared](subsystems/db2/core-status.md) | 0.12.0 |
 | Db2 | Complete programming surface | [No progress record](subsystems/db2/programming-plan.md) | 0.13.0 |
 | IMS | DB / TM programming surface | [Proposed](subsystems/ims/programming-status.md) | 0.14.0 |
 | IBM MQ | MQI programming surface | [Implementation active](subsystems/mq/programming-status.md) | 0.15.0 |

@@ -7,15 +7,19 @@ mod ast;
 mod catalog;
 mod create_index_syntax;
 mod create_view_syntax;
+mod cursor_operation_syntax;
+mod delete_syntax;
 mod expression_parser;
 mod generated_statement_catalog;
 mod insert_syntax;
 mod name_resolution;
+mod numeric_constant_types;
 mod retention;
 mod service;
 mod statement;
 mod syntax;
 mod type_system;
+mod update_syntax;
 
 pub use abi::db2_abi_library;
 pub use ast::{
