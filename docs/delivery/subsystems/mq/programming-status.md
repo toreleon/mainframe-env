@@ -391,3 +391,71 @@ modules must be reduced within their registered ceilings, not granted new
 exemptions. No provider advertisement, accepted participant or official
 execution credit is introduced. Public service composition remains separately
 required with trusted identity, SAF/audit and durable backend proof.
+
+### Integrated service-boundary prerequisites
+
+| Slice | Integrated feature | Bounded outcome |
+|---|---|---|
+| `MQ-1502.sqlite-fixture-isolation` | `2ed0dca6` | Exclusive fixture allocation remains unique at one clock tick; existing directories are never removed to claim ownership. |
+| `MQ-1505.row-envelope-reuse` | `aabc91fc` | One existing object-row codec is reusable within the crate, with unchanged bytes. |
+| `MQ-1505.service-row-codec-module` | `23c62001` | Mechanical helper extraction reduces service production lines to 1,092, below its unchanged 1,331 ceiling; linked-row guard mutants preserve the atomic/serialization checks. |
+| M: `MQ-1501.mqi-effect-admission` | `a979b828` | Borrowed invocation/effect identity, trusted-owner comparison and live controls precede service validation; origin decoding does not select a coordinator. |
+| O: `MQ-1501.completion-reason-catalog` | `cfde0373` | All 26 calls/27 source positions retain 1,020 source-consistent pairs and ten pending declarations; callback notification has no ordinary return table. |
+| N: `MQ-1505.delivery-provider-rows` | `157f84a9` | Queue/UOW/decision/cursor rows, finite metadata and exact catalog/generation/fence identities use one existing checkpoint validator and object-row codec. |
+
+Verification on the actual integration identities is separate: `a979b828`
+passed all 130 MQ tests (98 unit, ten CICS scope, four object lifecycle, seven
+object service and eleven shared handle); `cfde0373` passed 127 host-API unit
+and nine integration tests, tooling mutants and the compiled status schema;
+`157f84a9` passed all 34 affected delivery tests, including real Memory/SQLite
+atomic failure and reopen. Each feature's HEAD seal, formatting, changelog and
+documentation freshness passed. Provider-row and canonical-effect guards
+passed; unchanged dependency-policy results are retained rather than repeated.
+Each sequence cleaned its intended Cargo target and kept receipts outside Git.
+
+The status table reproduces the pinned offline return sections, not execution
+outcomes or independently licensed observations. Conflicting decimal/hex,
+missing numbers, conflicting symbol numbers and malformed source spelling
+remain pending. Numeric completion-code mapping remains pending because these
+call pages name completion classes without declaring their numeric values.
+No publication body is committed, no network refresh occurred, and no official
+row or licensed numerator is increased by these contract/kernel proofs.
+
+### Next isolated service-composition lanes
+
+The manager delegates the declared `MQ-1501.host-effect-contract` to retained
+lane M. Lanes N and O receive the following disjoint next slices, keeping three
+CLI workers plus manager, `gpt-6.1-sol`, high effort, goal mode/bypass and fast off.
+
+`MQ-1505.audited-provider-publication` (lane O) owns a minimal additive shared
+store boundary, Memory/SQLite implementations and focused tests, linked child
+modules/extraction hooks, ADR 0029, relevant provider-row/storage contract
+documentation and one fragment. It must assert the exact existing live canonical
+coordinator intent inside the same physical transaction as provider object,
+UOW/replay-result rows and their typed audit. It must use existing audit/effect
+codecs and touched-row rollback, never a private MQ audit/journal or whole-store
+clone. Core result/lifecycle/outbox completion remains coordinator-owned. All
+CAS, stale/recovered intent, audit capacity/identity and payload/row failures
+must roll back the whole publication. PostgreSQL execution remains pending if
+no disposable environment is configured; no new participant is accepted here.
+This is infrastructure for the same source-bound MQ mutations, not new IBM
+language semantics or a reason to review unrelated publications.
+
+`MQ-1505.legacy-delivery-import` (lane N) owns a private linked legacy import
+planner, minimal service hook and manifest-CAS dependency, focused Memory/SQLite
+tests, narrow row-compatibility documentation and one fragment. Source rows
+`0001`, `0007`, `0015`, `0020`, `0021` retain their pinned MQ baseline. The first
+bounded import accepts only validated quiescent legacy state; live handles/UOWs
+are rejected unchanged, never discarded or implicitly backed out. It must
+preserve exact queue order/body/IDs, catalog/trigger identity and retained replay
+bytes/versions/references through the existing delivery/checkpoint authority.
+The composable batch CAS-fences the legacy manifest/catalog/queue identities,
+initializes the existing rich row family and retires the legacy queue authority
+with an explicit versioned marker. Every old writer must CAS the small manifest
+dependency so a concurrent new pending-row insertion cannot evade migration's
+fence. Both race orderings must have one winner with no partial state/audit.
+This plan is not automatically applied during open and does not advertise a
+public upgrade before the manager supplies the v2 reader and single service
+selection. Non-quiescent conversion remains explicit pending work. The manager
+retains status/ADR coordination, trusted owner/UOW minting, service selection,
+SAF/audit composition, participant acceptance and public route proof.
