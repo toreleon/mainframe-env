@@ -413,6 +413,8 @@
       "crates/providers/mainframe-env-cics/src/handlers/program_abend.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/release.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/transfer_selection.rs",

@@ -19,6 +19,7 @@ const APPLICATION_ENTRY_NAMESPACE: &str = "cics-application-entry-v1";
 const PROGRAM_MAGIC: &[u8; 7] = b"MECPGD1";
 const APPLICATION_MAGIC: &[u8; 7] = b"MECAED1";
 
+mod administrative_status;
 mod invoke_application;
 mod load;
 mod release;

@@ -1522,3 +1522,28 @@ synthetic cohorts), 19 current generator tests and seven unchanged IR contract
 checks, with no ignores. Current two inputs pass exact linkage; absent future
 inputs remain pending. Identity/grammar output bytes do not change until a
 reviewed input is added. Mandatory gates precede this infrastructure seal.
+
+PROGRAM observation worker completed its two owned implementation/test files.
+Manager independently reviewed the entire 46-line primitive and 535-line tests
+and preserved their exact handoff hashes. It returns an owned whole highest
+generation definition under one State mutex; validates every selected-name
+generation key/name; distinguishes legacy membership and catalog-only absence;
+and performs no host/store/load/UOW call. Nine new primitive regressions and two
+existing LOAD compatibility checks passed in the worker. Same retained MemoryStore
+reconstruction and same-owner thread coherence are limited primitive proofs,
+not physical restart, selected-route or public namespace acceptance.
+
+Worker module inventory reported its exact nested test path as unknown; manager
+adds that path through the existing inventory owner, with no ceiling/guard waiver.
+Worker offline dependency check stopped at a read-only advisory lock and normal
+Git staging at its shared index sandbox boundary. These failure receipts remain
+external; integrated mandatory module/dependency/Git gates must pass afresh on
+the manager candidate. The frozen parent module registration is the only facade
+change. Current command/source pins, immutable codec and all Pending coverage
+remain unchanged. No command handler, CVDA/output mapping, authorization grant,
+resource namespace, mutation, public route or v0.9 acceptance is introduced.
+
+Integrated primitive gates pass nine new observation tests plus two exact LOAD
+compatibility regressions, no failures/ignores. Actual module inventory and offline
+dependency policy now pass in the manager checkout. All command and licensed
+gates remain Pending; these checks earn zero administrative execution credit.
