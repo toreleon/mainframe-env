@@ -23,6 +23,8 @@ class MqMqiRegistryTests(unittest.TestCase):
             mq_registry.TOPIC_MANIFEST_PATH,
             mq_registry.OUTPUT_PATH,
             mq_registry.CONTRACT_OUTPUT_PATH,
+            mq_registry.wire.MANIFEST,
+            mq_registry.wire.OUTPUT,
         ]:
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -55,7 +57,7 @@ class MqMqiRegistryTests(unittest.TestCase):
             _, contract = self.contract(root)
             mutate(contract)
             self.write_contract(root, contract)
-            with self.assertRaisesRegex(ValueError, "stale generated MQ MQI registry"):
+            with self.assertRaisesRegex(ValueError, "stale generated MQ MQI registry|historical MQ catalog"):
                 mq_registry.check(root)
 
     def test_repository_registry_is_fresh_and_exact(self):

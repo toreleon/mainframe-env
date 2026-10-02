@@ -17,10 +17,11 @@
     "identity_authority",
     "behavioral_coverage_credit",
     "licensed_execution_credit",
-    "calls"
+    "calls",
+    "wire_options"
   ],
   "properties": {
-    "schema_version": {"const": "mainframe-env.mq-structure-status-catalog@1"},
+    "schema_version": {"const": "mainframe-env.mq-structure-status-catalog@2"},
     "target_version": {"const": "0.15.0"},
     "work_package": {"const": "MQ-1501.structure-status-catalog"},
     "baseline_id": {"const": "ibm-mq-9.4-mqi-2026-08-31"},
@@ -32,6 +33,7 @@
     "identity_authority": {"const": true},
     "behavioral_coverage_credit": {"const": 0},
     "licensed_execution_credit": {"const": 0},
+    "wire_options": {"$ref": "#/$defs/wire-options"},
     "calls": {
       "type": "array",
       "minItems": 26,
@@ -40,6 +42,45 @@
     }
   },
   "$defs": {
+    "wire-options": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseline_id", "scope_id", "topic_manifest", "historical_catalog_sha256", "semantic_execution_credit", "facts", "corroboration"],
+      "properties": {
+        "baseline_id": {"const": "ibm-mq-9.4-programming-supplements-2026-09-12"},
+        "scope_id": {"const": "mq-programming-supplements"},
+        "topic_manifest": {"$ref": "#/$defs/file-binding"},
+        "historical_catalog_sha256": {"const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"},
+        "semantic_execution_credit": {"const": 0},
+        "facts": {"type": "array", "minItems": 102, "maxItems": 102, "uniqueItems": true, "items": {"$ref": "#/$defs/wire-fact"}},
+        "corroboration": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"$ref": "#/$defs/wire-locator"}}
+      }
+    },
+    "wire-locator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["topic_path", "topic_sha256", "first_line", "last_line", "fragment_sha256"],
+      "properties": {
+        "topic_path": {"type": "string", "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"},
+        "topic_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "first_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "last_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "fragment_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "wire-fact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["symbol", "decimal", "hexadecimal", "kind", "topic_path", "topic_sha256", "first_line", "last_line", "fragment_sha256"],
+      "properties": {
+        "symbol": {"type": "string", "pattern": "^MQ(?:OO|CO|GMO|PMO|MD|OD)_[A-Z0-9_]+$"},
+        "decimal": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "hexadecimal": {"type": ["string", "null"], "pattern": "^[0-9A-Fa-f]{8}$"},
+        "kind": {"enum": ["version", "option", "cpp-only"]},
+        "topic_path": {"type": "string", "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"},
+        "topic_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "first_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "last_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "fragment_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
     "file-binding": {
       "type": "object",
       "additionalProperties": false,

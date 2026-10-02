@@ -877,3 +877,36 @@ its earlier service receipts keep their actual pre-integration identity. Fresh
 composed service publication/replay checks are required before sealing that lane.
 All 26-call, security, persistence, recovery, participant and CardDemo gates stay
 active; the sole licensed oracle skip remains zero-credit.
+
+## Checked point-to-point numeric options
+
+`MQ-1501.point-to-point-wire-options` integrates sealed worker `736e5cda`.
+Checked signed MQLONG options and reviewed MQOD1/GMO1/PMO1 plus ungrouped MQMD1/2
+construct existing OPEN/CLOSE/GET/PUT/PUT1 requests without granting registry,
+SAF, cursor or UOW authority. Unknown bits and illegal combinations fail;
+recognized unrepresented versions, context, property and asynchronous modes
+remain pending. Trusted bindings must attest queue defaults even for CLOSE zero,
+supply independently admitted UOW/cursor state and explicitly convert finite
+milliseconds to clock ticks. GET defaults follow the queue-manager platform.
+PUT1 retains its actual opaque HCONN. This pure adapter is not service execution.
+
+The existing normative structure/status catalog adds a private version-two
+wire-options projection (102 facts, ten corroborating locators), retaining the
+exact reconstructed version-one hash and all original call/status canonical
+identities. Reviewed sources are original rows `0006/0015/0019/0020/0021` and
+the pinned programming-supplements baseline's MQOO/MQCO/MQGMO/MQPMO, MQOD/MQMD
+and field-detail topics; exact pins are recorded in the architecture and worker
+handoff. Missing unpinned MQOD/MQMO constant tables are not guessed or refreshed.
+Raw structure layouts, further descriptor fields and all-26 option coverage
+remain required.
+
+The composed candidate passes 114 Rust MQ host tests and 33 tooling tests with
+no failures/ignored. The manager discovered its shell previously selected
+system Python 3.9.6; fresh tooling, source reproduction, canonical/provider-row
+guards, four row tests, schemas and registry checks now run with the pinned
+Python 3.12.13. Documentation generation/checks and changelog validation use the
+same corrected PATH. Older Python receipts retain their actual interpreter and
+candidate identities; they are not relabeled. Rust 1.98 results are unchanged.
+Dependency policy reuse verifies the original receipt and all 32 unchanged
+inputs. The unrelated batch module overage remains unwaived. Only the licensed
+oracle is skipped with zero credit; full v0.15 acceptance remains incomplete.

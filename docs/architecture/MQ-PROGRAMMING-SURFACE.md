@@ -31,7 +31,8 @@ The MQBUFMH spelling anomaly is recorded in the catalog, while `MQHMSG` is
 the sole published handle identity. The registry supplies identity data only.
 The additive validator now checks source-bound ordered signatures, structure
 identities and versions, option families and documented combinations without
-registering a handler; numeric wire legality and execution remain pending.
+registering a handler. The bounded numeric adapter below admits its reviewed
+point-to-point subset; other numeric forms and execution remain pending.
 
 ## Authority boundary
 
@@ -179,6 +180,59 @@ failed payloads, conversion-dependent lengths and absent property size-reporting
 forms fail closed; status-only or explicit pending observations remain available.
 No reason name authorizes mutation, and no numeric alias bypasses reviewed
 symbol admission. All 1,030 declarations and ten pending reasons are unchanged.
+
+## Checked point-to-point numeric intent
+
+The private unreleased structure catalog uses additive schema
+`mainframe-env.mq-structure-status-catalog@2`. Its `wire_options` projection
+contains 102 reviewed numeric identities with exact topic/fragment hashes and
+bounded line locators under `ibm-mq-9.4-programming-supplements-2026-09-12`.
+MQOO `q092100_`, MQCO `q091070_`, MQGMO `q091510_`, MQPMO `q092190_`,
+MQMD `q091870_` and MQOD `q098100_` supply constants and version facts.
+MQGMO `q096715_`, MQPMO `q098655_` and MQOD `q098105_` supply field context.
+Original call rows `0006`, `0015`, `0019`, `0020`, `0021` remain bound to
+`q101740_`, `q101830_`, `q101870_`, `q101880_`, `q101890_` respectively.
+MQOD1 is the only numerically established MQOD version in this selected scope;
+higher version numbers and MQMO constants are not inferred from symbol names.
+
+`mq_wire_options` accepts signed numeric inputs, checks signed 32-bit MQLONG
+range, and produces existing typed OPEN/CLOSE/GET/PUT/PUT1 intents only for
+local queues, MQOD1/GMO1/PMO1 and basic ungrouped MQMD1/2. It preserves the
+three input modes, browse versus removal, finite wait conversion, truncation,
+identifier selection and independently admitted local syncpoint. PUT1 retains
+actual HCONN. NEW_MSG_ID clears only the requested ID to select the existing
+generator intent; NEW_CORREL_ID remains pending. No ID or outcome is generated.
+The returned structures are not wire layouts and do not reconstruct opaque handles.
+
+The integration-owned `MqWireBindings` port supplies queue-manager platform,
+already admitted unit/cursor, clock conversion and independently checked queue
+defaults. Zero option words require confirmation that cluster/read-ahead,
+property and put response defaults are represented. Missing configuration,
+unit or cursor fails closed. Queue-manager z/OS defaults select local syncpoint;
+distributed defaults select no syncpoint, while browse stays outside syncpoint.
+External coordination remains pending. This port grants no SAF or mutation permit.
+Service/coordinator and live registry checks remain mandatory after conversion.
+
+Unknown/sign/overflow values and supported illegal combinations are rejected.
+Recognized unrepresented context, properties, message handles, async response,
+distribution and higher structure versions stay explicitly pending. Nonempty
+selection under cursor remains pending because the current kernel applies
+selection there, unlike the reviewed source. Nonzero unused wait fields and
+unbounded waits are outside the strict subset. Unsupported defaults cannot
+silently become `ContractDefault`; that value is emitted only after conversion.
+
+The generator reconstructs and verifies the exact historical `@1` catalog hash
+`3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448`.
+Existing signature descriptors, status bindings, all 1,030 reason declarations,
+ten pending reasons and canonical request/result bytes retain their identities.
+Only the new projection has a new digest. Older strict catalog readers must
+explicitly support `@2`; no retained effect migration or automatic replay occurs.
+Cache-backed checks reproduce the selected facts through the shared offline
+reader; cache-free checks bind their artifact closure. The supplemental archive
+remains in-progress without independent browser reproduction, predates the MQINQ
+re-pin, and establishes no freshness or same-snapshot claim. The adapter is not
+a public handler or execution/participant/licensed acceptance claim. Remaining
+all-26 structure/option/ABI/service integration stays required.
 
 ## Coverage boundary
 

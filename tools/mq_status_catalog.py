@@ -149,7 +149,9 @@ def load(root: Path = ROOT) -> dict:
     for key, path in [("topic_manifest", registry.TOPIC_MANIFEST_PATH),
                       ("source_call_list", registry.SOURCE_LIST_PATH),
                       ("structure_status_catalog", registry.CONTRACT_CATALOG_PATH)]:
-        if catalog[key] != {"path": path.as_posix(), "sha256": registry._sha256(root / path)}:
+        bound_sha = (registry.wire.historical_sha(root / path) if key == "structure_status_catalog"
+                     else registry._sha256(root / path))
+        if catalog[key] != {"path": path.as_posix(), "sha256": bound_sha}:
             raise ValueError(f"MQ status {key} binding differs")
     identities = registry.load(root)
     registry.load_contract(root)

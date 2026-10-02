@@ -30,6 +30,7 @@ pub mod mq_mqi;
 pub mod mq_object_route;
 pub mod mq_status;
 mod mq_validation;
+pub mod mq_wire_options;
 mod names;
 mod registry;
 mod request;
