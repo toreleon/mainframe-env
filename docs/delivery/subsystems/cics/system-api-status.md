@@ -782,6 +782,25 @@ focused format/module checks and cleanup. These are diagnostics and grant no
 runtime, parent, recovered or licensed credit. The manager owns any resulting
 instance-scope and normal-return eligibility contract.
 
+The two calling-context identities are sealed at
+`c12ee5032ebf5ba8c9f3216dd60412f30d49beb3`; source reader/schema/corpus/architecture/
+format/docs/changelog/dependency checks pass and target is removed. The declared
+LINK storage diagnostics have started in a fresh checkout of that exact candidate.
+
+`SPI-1001.fepi-retained-context-pins` is a manager-only identity slice for the
+three independently reproduced retained candidates: begin-session handler,
+sysplex workload routing and application programming reference. Own only
+`conformance/0.10/manifests/cics-fepi-retained-context-topics.json`, its existing
+registry entry, a bounded metadata-only verification receipt, this status,
+unique fragment and derived documentation. Verify the 17,582-byte three-topic
+proposal against actual metadata/body/TOC/H1, register and read locally through
+the pinned reader. The existing three reused diagnostics/security pins and
+all 39 FEPI rows stay unchanged. Keep the prior six absent fragments and all
+23 literal edges explicit; do not substitute anchors or claim whole/prescriptive
+source closure. Acceptance is exact pin/schema/reader and required metadata/docs/
+policy gates with cleanup. This source-only slice earns zero behavioral/licensed
+credit and does not accept the private source map, v0.9 dependency or parent SPI.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001

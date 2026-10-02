@@ -1,0 +1,39 @@
+{
+  "baseline_id": "ibm-cics-ts-6x-fepi-retained-context-additions-2026-09-12",
+  "book_href": "SSJL4D_6.x/reference-applications/reference-programming.html",
+  "book_label": "CICS TS 6.x bounded retained FEPI context additions",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSJL4D_6.x",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-12",
+  "subsystem": "cics",
+  "target_version": "0.10.0",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "topic_count": 3,
+  "topic_manifest_digest": "449705790944425162c33d8a4056b061b376d01cd582c15e3779218c99838397",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 3613,
+      "last_modified": "2026-01-16",
+      "sha256": "9353521527eacefbb685804db34fa6c9c2002622e0ae8b464a213c4f7a9dfd37",
+      "topic_path": "SSJL4D_6.x/applications/developing/fepi/dfhp73r.html"
+    },
+    {
+      "bytes": 2922,
+      "last_modified": "2026-01-16",
+      "sha256": "4ab05629fe0d097f7a4dcba0a7b6c951bf30d521413ada3242a9d21aadd3341c",
+      "topic_path": "SSJL4D_6.x/configuring/fepi/dfhp76q.html"
+    },
+    {
+      "bytes": 11047,
+      "last_modified": "2026-07-23",
+      "sha256": "5f25bcdf66b2c84ad7c11bc36e5025b04f35907fcd32b014f60175d5b8ead90c",
+      "topic_path": "SSJL4D_6.x/reference-applications/reference-programming.html"
+    }
+  ],
+  "total_bytes": 17582
+}
