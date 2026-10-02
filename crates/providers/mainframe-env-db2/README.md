@@ -143,6 +143,16 @@ a verified type/value pair. All classifier limits and deferred-form errors
 remain intact. This value surface is not assignment/default conversion, numeric
 expression evaluation, typed cell persistence or a catalog canonical preimage.
 
+The located numeric-operand surface additionally accepts an original optional
+sign and unsigned number token separated by bounded SQL trivia. Combined/sign/
+number byte and line/column endpoints must match the original source; the lexer
+reads only the selected operand. It reuses the same classification and exact
+coefficient authorities, not normalized source or parser-inserted sign text.
+Both full-source budgets, combined literal bytes and token/count/nesting limits
+apply before materialization. Adjacent APIs still reject embedded trivia, and
+the located path retains the actual lexer's trailing-point and floating fences.
+These proofs prepare numeric default binding but do not establish its legality.
+
 The exact numeric assignment surface converts only opaque materialized literal
 proofs into validated SMALLINT/INTEGER/BIGINT/DECIMAL targets. Results own the
 matching target type/value and original span. Whole-part bounds precede decimal

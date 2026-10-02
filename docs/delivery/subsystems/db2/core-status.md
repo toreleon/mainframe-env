@@ -728,6 +728,28 @@ pass before this public feature commit. Defaults, other encodings/ordinary
 families, typed durable cells/catalog, executor and licensed differentials remain
 pending; source review and local proofs grant no official row/gate credit.
 
+The manager declares `DB2-1202.located-numeric-surface` for the separately sealed
+numeric-operand prerequisite. Exact ownership is root `lib.rs` exports, new
+`tests/located_numeric_operands.rs`, README, this status, unique
+`changes/unreleased/db2-located-numeric-surface.toml` and derived documentation
+manifest. Independent public tests establish signed natural type boundaries,
+spelling-derived decimal precision/scale and exact coefficient, original UTF-8/
+CRLF ownership, existing exact target assignment, forged component/trivia errors,
+both original-source budgets and token/literal/count limits. Parser DEFAULT
+locations supplement fixed expected vectors without proving default legality.
+The original adjacent APIs and the lexer's trailing-point/floating fences stay
+unchanged. Root exports must discharge both private reachability warnings;
+focused/package/MSRV, strict scoped Clippy and applicable policy/docs/exact-path
+checks precede the public feature commit. No row/gate or licensed credit is added.
+
+Constants/token/datatype pins above supply numeric rules; SQL comments additionally
+uses `SSEPEK_13.0.0/sqlref/src/tpc/db2z_sqlcomments.html`, 6508 bytes,
+`c8e3c16d1152a165b0c2c7b71ddfad4ca8032f910f2c92f0eca5484ce5b68ca2`.
+Main verified/read all 43 archive lines after retained-path checks; generic SQL
+trivia support is not host-language/tool-specific comment applicability. Actual
+NULL/type-default/constant-default admission, ordinary value closure, typed
+catalogs and licensed evidence remain subsequent required implementation.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
