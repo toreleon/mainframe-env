@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Define bounded source-reviewed SPI and FEPI family contracts for private grammar and lifecycle implementation over the existing CICS authority."

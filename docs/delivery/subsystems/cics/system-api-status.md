@@ -1288,3 +1288,39 @@ Integrated LINK call provenance checks pass: 45 focused tests, zero failures
 and zero ignored. Manual loans, changed requests/sources, cold or exited loans,
 cancellation, expiry and nested top-loan ownership are covered. Mandatory gates
 precede the bounded seal; no runtime writer or parent acceptance is enabled.
+
+## User priority change: begin v0.10 now
+
+On 2026-10-02 the user instructed: “3 unready typed v0.9 có thể skip, nhanh
+chóng bắt đầu hoàn thiện v0.10 đi”. This supersedes the earlier finish-v0.9-first
+implementation priority, including the retained internal CICSMESSAGE requirement
+as a current task prerequisite. Application rows 0027 CICSMESSAGE, 0093 GETNEXT
+TIMER and 0114 ISSUE COPY remain unready and pending; they are deferred from this
+implementation run, without removing their catalog identities or claiming passes.
+The existing 260 typed registrations are the development compatibility baseline.
+Application acceptance is not declared. Remaining scoped-return and atomic-guard
+review handoffs are preserved; no additional v0.9 frame work is the next lane.
+Licensed differentials remain pending with zero credit under the earlier waiver.
+
+Manager declares these dependency-safe SPI-1001 contracts before CLI dispatch:
+
+| Slice | Exact catalog rows | Exclusive ownership | Dependencies and acceptance |
+|---|---|---|---|
+| `SPI-1001.spi-program-contract` | SPI 0026 CREATE PROGRAM, 0084 DISCARD PROGRAM, 0155 INQUIRE PROGRAM, 0241 SET PROGRAM | `conformance/0.10/cics/families/spi-program.json` and external worker handoff only | Exact four mapped command-body pins; frozen shared family schema. Source-reviewed options, constraints, response/condition, lifecycle/security/effect/recovery facts and independent case expectations; schema validation. No handler/runtime/coverage claim. |
+| `SPI-1001.fepi-pool-contract` | FEPI 0001 ADD POOL, 0007 DELETE POOL, 0009 DISCARD POOL, 0018 INQUIRE POOL, 0021 INSTALL POOL, 0034 SET POOL | `conformance/0.10/cics/families/fepi-pool.json` and external worker handoff only | Exact six mapped command-body pins and necessary retained context; frozen shared family schema. Source-reviewed options, constraints, response/condition, lifecycle/security/effect/recovery facts and independent case expectations; schema validation. No handler/runtime/coverage claim. |
+
+Manager exclusively owns `SPI-1001.family-contract-schema`, existing catalog/
+contract generators, all shared facades, IR/HIR/MIR, host ABI, command/resource/
+condition/SAF/effect/UOW/retention authorities, route registration, status, ADRs,
+fragments and derived docs. Workers do not alter these owners, spawn workers or
+refresh sources. Private source-ready cohorts may proceed under the user's new
+priority; unresolved SPI source equivalences 0201/0203/0204 and FEPI context gaps
+remain explicit and cannot be inferred from names or EIBFN. No public capability
+is advertised before its selected-route and compatibility gates pass.
+
+The family contract is a bounded private product catalog with source-review
+case candidates, not an executable Conformance IR or verdict ledger. Cases
+will bind through the existing shared IR owner; product generators consume
+semantic contract facts rather than test outcomes. No runtime or official
+coverage is claimed. The pinned Python lacks jsonschema; the repository's
+existing Rust Draft 2020-12 schema checker owns validation instead.
