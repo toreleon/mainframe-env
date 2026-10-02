@@ -305,15 +305,20 @@ pub(super) fn resources(
                     .ok_or(HostProblem::NotFound)?,
             );
         }
-        ImsOperation::Commit | ImsOperation::Rollback => {
+        ImsOperation::Commit | ImsOperation::Rollback | ImsOperation::Checkpoint => {
             if let Some(pending) = state.generic_pending_undo.get(run) {
                 databases.extend(pending.keys().cloned());
             }
             if let Some(pending) = state.pending_undo.get(run) {
                 databases.extend(pending.keys().cloned());
             }
+            if request.operation == ImsOperation::Checkpoint
+                && let Ok(name) = session_database(state, run)
+            {
+                databases.insert(name);
+            }
         }
-        ImsOperation::Terminate | ImsOperation::Checkpoint => {
+        ImsOperation::Terminate => {
             if let Ok(name) = session_database(state, run) {
                 databases.insert(name);
             }
@@ -770,12 +775,13 @@ fn checkpoint(
     if state.checkpoints.len() >= limits.max_checkpoints && !state.checkpoints.contains_key(&id) {
         return Err(HostProblem::ResourceExhausted);
     }
-    let session = state
-        .sessions
-        .get(run)
-        .cloned()
-        .ok_or(HostProblem::NotFound)?;
-    state.checkpoints.insert(id.clone(), session);
+    let session = state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?;
+    // CHKP commits the run's database work and loses database position. Save
+    // only that post-checkpoint state; replay must not commit later work again.
+    Arc::make_mut(session).position = PcbPosition::default();
+    state.checkpoints.insert(id.clone(), session.clone());
+    state.pending_undo.remove(run);
+    state.generic_pending_undo.remove(run);
     Ok(ImsResult {
         status: "  ".into(),
         segments: Vec::new(),
@@ -970,6 +976,7 @@ pub(crate) mod tests {
 
     static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
 
+    mod basic_checkpoint_tests;
     mod closure_tests;
 
     pub(crate) fn catalog() -> ImsMetadataCatalog {

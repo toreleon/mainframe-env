@@ -6,6 +6,44 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1405.basic-checkpoint-boundary (implemented repair slice)
+
+Parent: IMS-1405. Candidate base: `213ed878ec138bdb2914330db6613559bffc5a86`
+on `codex/v014-nonlicensed-completion-20261002`. This slice repairs the existing
+metadata-selected `ImsService::execute` checkpoint boundary, not a new store,
+coordinator, raw DL/I operand parser, or mixed-resource syncpoint. The accepted
+host, SAF, provider-row CAS, replay, and durable storage authorities remain
+unchanged. Relevant catalog context is
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002` (basic CHKP).
+Local obligations are commit-before-new-undo, loss of current/parent/hold
+position, exact replay without a second commit, checkpoint-capacity rejection
+without mutation, and authorization of every database whose undo is committed.
+Memory and SQLite close/reopen are the affected backends. These regressions
+grant no official Conformance IR or licensed credit; raw I/O PCB and implicit
+message-delivery obligations remain separate unfinished integration work.
+
+Offline `ibm_docs.py search` and `read` passed against the retained verified
+`ims-1405-topic-cache` for baseline
+`ibm-ims-15.6-recovery-utilities-2026-09-11`, topic
+`SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_basicchkpcall.htm`,
+`sha256:1029208c47f44b8a0144472c8127767b18140c57be70850fdfa00da83ef1743a`
+(11,733 bytes). The source states that basic CHKP commits database changes
+and loses database position. The current generic handler instead retains undo
+and position; focused fail-first regressions reproduced that discrepancy.
+The user's 2026-10-02 exclusion of licensed certification does not convert
+source review or local handler coverage into official row passes.
+
+The repaired generic checkpoint clears the current, parent and held position,
+commits both existing undo maps for its run, and stores the post-checkpoint
+session with the normal replay result in the shared atomic row publication.
+Authorization covers every pending database, not only the scheduled PCB's
+database. Exact replay returns the recorded checkpoint without committing a
+later unit of work. Four focused regressions pass, including denial/capacity
+no-mutation and a fresh SQLite connection. Scoped strict IMS Clippy,
+formatting and diff checks pass. No schema migration is needed; old checkpoint
+and session rows remain readable. A prior binary retains its old CHKP behavior,
+so rollback of the binary does not retain this corrected semantic guarantee.
+
 ## IMS-1403.organization-logical-closure (implementation candidate)
 
 Parent: IMS-1403. Candidate: `codex/v014-organization-closure`; accepted
