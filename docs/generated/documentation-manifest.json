@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 236,
+    "markdown_documents": 237,
     "navigation_groups": 6,
-    "normative_documents": 67,
+    "normative_documents": 68,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 123,
-      "sha256": "sha256:8590966024ce1cb4e82175f5c8caf28b2ead0490f6eabc9670292547cf768199",
+      "relative_links": 124,
+      "sha256": "sha256:9748a33613fddd3fd500803b772188ceb8610648d67a3a314b0c6b81e39f279f",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -619,9 +619,9 @@
       "normative": true,
       "owner": "store-contract, provider, and core-server maintainers",
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
-      "relative_links": 3,
+      "relative_links": 4,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:a795c945fa0701858febe260c98b150b86b102802b462695d3644af84c2e473c",
+      "sha256": "sha256:3d84c39f07834b79772a50d18dcde7d20ea698854c57e62a6d11a313bd5f5fa3",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -1068,6 +1068,18 @@
       "sha256": "sha256:5cdf97fa10bb05233b73da47a99b3507ade37ca1011e250f22f206564b3e377a",
       "status": "Proposed within the user-authorized bounded IMS leaf",
       "title": "ADR-0036: Literal null SSA command slots",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider and core-server retention maintainers",
+      "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md",
+      "relative_links": 0,
+      "scope": "IMS-1405.private-recovery-retention-fence, existing unowned core dependency fence",
+      "sha256": "sha256:929712574fdf4097ba0711ca6bf41cc162562ca8bd932ac85ae2d32e65e6b508",
+      "status": "Proposed",
+      "title": "ADR-0037: Private IMS recovery retention fence",
       "xtask_commands": 0
     },
     {
@@ -1526,7 +1538,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 18,
-      "sha256": "sha256:88323a8c5112c3757046c8bff6061a79b6d1fdaa09851714feb2e695a05cd197",
+      "sha256": "sha256:8becaee5830931331d7e33b61d9ba2e89f0e6a139b01fa5fbc440507f3526198",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2396,6 +2408,10 @@
           "path": "docs/decisions/0035-selected-pcb-feedback.md"
         },
         {
+          "label": "ADR-0037: Private IMS recovery retention fence",
+          "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
@@ -2668,7 +2684,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:9c4d46aad995045f1bc7b325cc453de6eabbc7d85edbef12a3abf1436ede8b19",
+  "registry_sha256": "sha256:83c4c3540774b2d6292e6bbe106c5742109fdfeb6a3be62d3473e4019c3bb2e7",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

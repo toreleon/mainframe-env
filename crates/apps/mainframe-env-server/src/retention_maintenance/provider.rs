@@ -26,6 +26,7 @@ use mainframe_env_execution_api::{ExecutionId, IdempotencyKey, InvocationLimits,
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_ims::{
     ImsLimits, ImsReplayDependency, ImsReplayRetentionState, describe_ims_replay_row,
+    ims_private_recovery_retention_required,
 };
 use mainframe_env_mq::{
     MqLimits, MqReplayDependency, MqReplayRetentionState, describe_mq_replay_row,
@@ -990,3 +991,6 @@ mod safety_tests;
 
 #[cfg(test)]
 mod container_tests;
+
+#[cfg(test)]
+mod ims_recovery_tests;

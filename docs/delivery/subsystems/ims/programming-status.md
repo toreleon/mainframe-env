@@ -4331,3 +4331,160 @@ gap packet, not the pending mixed evaluation, any official gate, maintainer
 approval, licensed differential, parent IMS-1401 or v0.14 completion. Next step:
 authorize and review exact pins for the four missing topics, then implement and
 prove independently derived mixed outcomes through the same existing authority.
+## IMS-1405.private-recovery-retention-fence — bounded implementation declaration
+
+Base: `a8deb3d8a97be2660cfa0d38327ff246a194a910`. Disposition: **Complete**
+for this user-authorized bounded fence and its declared local proof; parent
+IMS-1405 and v0.14 remain incomplete. ADR-0037 stays Proposed; it is the
+authorized leaf decision, not an external approval claim.
+This leaf preserves canonical recovery references by OR-ing conservative presence
+of reserved `ims-recovery-v1-` rows into the existing unowned core fence under
+the existing provider epoch. It adds no expiry, attribution, graph decoder,
+target, coordinator, store, lease, participant, raw CALL or TM authority.
+
+Applicability: existing Memory and file SQLite maintenance; configured isolated
+PostgreSQL gate when available. Required local proof starts with an actual
+failing planner/signed selected LOG regression, then empty/present/malformed/
+unknown prefix cases, real forecast and maintenance, store failure, real stale
+epoch insertion, ordinary replay pruning with canonical private replay intact,
+and separate SQLite process plus coherent signed-package backup/restore.
+Reopen alone is not process evidence. PostgreSQL 18 bounded gate is unconfigured
+on this host and remains pending; local completion grants no PostgreSQL parity.
+
+Owners: IMS retention helper/export, existing server dependency inventory and
+existing test owners below. Shared retention/store APIs remain unchanged.
+Catalog `ibm-ims-15.6-dli-2026-08-31/dli-call-families` :0010 LOG,
+:0023 symbolic CHKP and :0016/:0025 XRST motivate reference preservation;
+no official row, denominator, licensed, participant or acceptance credit changes.
+Required gates: focused new proofs and affected replay/checkpoint/epoch contracts,
+strict IMS/server all-target Clippy, fmt, offline deny, docs, changelog, coverage
+policy, IMS catalog/assurance, schemas/spec, affected execution/effect/provider/
+storage/SAF/retention/participant/typed-boundary/module/public-API guards,
+participant generator, supply-chain and license policy. Receipts remain external.
+
+Exact revised allowlist (13 paths):
+
+```
+crates/providers/mainframe-env-ims/src/retention.rs
+crates/providers/mainframe-env-ims/src/lib.rs
+crates/apps/mainframe-env-server/src/retention_maintenance/provider.rs
+crates/apps/mainframe-env-server/src/retention_maintenance/provider/dependencies.rs
+crates/apps/mainframe-env-server/src/retention_maintenance/provider/ims_recovery_tests.rs
+crates/apps/mainframe-env-server/src/product/tests/ims_application_recovery_tests.rs
+docs/delivery/subsystems/ims/programming-status.md
+changes/unreleased/ims-private-recovery-retention-fence.toml
+docs/generated/documentation-manifest.json
+docs/decisions/0037-private-ims-recovery-retention-fence.md
+docs/contracts/RETENTION-LIFECYCLE-V1.md
+docs/documentation-registry.json
+docs/README.md
+```
+
+The last two paths revise the authorized eleven-path declaration solely because
+xtask/docs.rs requires every numbered ADR in normative_documents and navigation;
+normal docs generation updates the portal. No baseline, policy, dependency,
+catalog, ledger/evidence schema or adjacent ADR-0036/0038 owner changes are admitted.
+All four dependency-sensitive core families may remain globally protected
+indefinitely while any private row exists. Audit/outbox and excluded legacy
+session/checkpoint/undo families gain no new protection from this leaf. Private
+expiry and complete mixed backup/restore remain external owner/parent obligations.
+
+Local outcome: the fail-first signed selected LOG tests reported two eligible
+canonical effects on both Memory and file SQLite after actual ordinary replay
+pruning while a private LOG row remained. The implemented IMS-owned max-one
+prefix predicate now makes the existing core inventory unowned. It does not
+alter ordinary replay planning, source CAS, store APIs, payloads, target order,
+watermarks or idempotency lifetimes. Provider insertion after empty inventory
+rejects stale archive epoch; insertion before the closing inventory epoch check
+rejects the scan. Failed prefix/store reads cannot certify absence.
+
+Two IMS helper tests and eight server proofs pass. The server parent executes
+three substantive independent SQLite processes (seed, backup, restore); its
+ignored worker alone earns no credit. The restore uses existing integrity and
+VACUUM INTO APIs at fresh paths, exact IMS/journal/epoch/clock snapshot equality,
+canonical LOG replay, authoritative symbolic-checkpoint observation and all six
+signed-package blobs copied with file metadata and verified through
+LocalArtifactStore. The combined checkpoint fixture contains inherited direct
+receipts whose ordinary retention planner scan fails closed; this composition
+keeps them intact. Ordinary replay pruning and subsequent canonical private
+replay preservation are separately proved by the two signed LOG tests. The
+bounded composition does not certify arbitrary signed recovery graphs, full
+GSAM/secondary/backout backup matrices, v0.16 mixed restore or PostgreSQL.
+
+Affected regressions pass 69 provider application-recovery cases (six idle
+process helpers excluded), eight store retention/watermark/archive saturation/
+concurrency cases, and seven existing server planner cases. Three PostgreSQL
+cases across these selections remain ignored/unconfigured, not parity evidence.
+Strict IMS/server all-target Clippy --no-deps -D warnings, fmt, offline deny,
+public API documentation, source guards, participant generation, supply-chain,
+license notices, IMS catalog/assurance, schemas, spec, changelog, coverage policy
+and docs generation/check pass. Spec also runs 134 Python cases. Coverage policy
+and assurance inventory are not a new instrumented coverage campaign. No
+baseline module/API ratchet, dependency, catalog denominator or accepted IR rule
+changes. Source review and earlier audit paragraphs remain reference facts;
+only current executed logs provide proof.
+
+Receipts and input hashes are external under
+worker-receipts/v014-completion-20261002/private-retention-implementation.
+Every Cargo/build/test/lint/generator sequence ends with this checkout's cargo
+clean, including failed attempts. Final docs refresh, exact thirteen-path
+generated Complete seal, one commit and committed --check are packaging gates;
+the external handoff records their actual outcome. No push, PR action, browser,
+download, cache campaign, full CardDemo or licensed/certification work occurs.
+Canonical/audit/journal saturation and pending participant contracts keep their
+existing owners; this read-only inventory predicate introduces no atomic audit
+or admission extension. Drain older maintenance clients before retaining private
+graphs; rollback must disable maintenance or retain a compatible fence. Private
+expiry needs accepted attribution/age/horizon and archive-before-CAS authority.
+
+### Root composition declaration for private retention
+
+Root integrates worker `5a4588bf0c28f1822322cfa5cfe21af9edb9a84f` onto
+`339b653bf3204a4a0eea9b28e5a62e1eec401803`, preserving the original worker
+receipts and thirteen-path allowlist above. Review confirms the production
+predicate is in the core inventory, not the ordinary nested replay planner;
+only the existing four-family unowned fence changes. The normal documentation
+registry merge keeps ADR-0036 and ADR-0037, and the manifest is regenerated
+through its owner rather than resolving generated hashes manually.
+
+Before verification, the manager adds exact child-count and phase-completion
+assertions to the existing three-process parent. A successful zero-test selector
+must not become durable evidence. This affects only the already-declared server
+test file. Root focused helper/planner/signed LOG/backup composition checks,
+strict affected lint, relevant boundary/policy gates and normal docs/seal checks
+will bind to this composed candidate; their results remain pending until actually
+executed. No old runtime receipt is relabeled as root candidate or CI evidence.
+Full PostgreSQL acceptance, private expiry, official/HUMAN rows and the full
+minor remain open.
+
+Root additionally found the already installed exact PostgreSQL 18.6 tools.
+The repository's read-only parity prerequisite check passes, including pinned
+runtime policy and support files. Before any backend claim, the manager will
+start one disposable loopback-only cluster in a fresh task-specific temporary
+directory, using no existing server, database or data directory. Only the
+declared private-retention planner/epoch case and existing PostgreSQL retention
+contract are selected, with a fresh owned database between them. No install,
+full CardDemo, whole-backend campaign or licensed work is authorized by this
+local attempt. Its execution outcome remains pending; worker PostgreSQL skips
+retain their original identities and cannot be relabeled as passes.
+
+Root outcome: two IMS helper cases and eight server cases pass on the composed
+candidate, plus the parent actually executes three independent SQLite children
+(seed 38100, backup 38110, restore 38111). Each now proves one passing exact
+child test and its phase-completion marker. Strict IMS/server all-target and
+all-feature Clippy passes; this sequence cleans 6.5 GiB of Cargo output.
+
+The separate focused PostgreSQL attempt passes against verified installed
+18.6 (server_version_num 180006): one private-retention planner/presence/epoch
+case and one existing core retention contract, each explicitly selected with
+--ignored --exact on separate fresh owned databases. No zero-test selection
+is credited. The disposable loopback cluster is stopped, its log retained
+externally, and only that resolved generated task directory is removed. Cargo
+clean ends the PostgreSQL sequence. These two root receipts do not alter the
+worker's original skips or establish signed LOG/backup parity on PostgreSQL.
+The historical attempt declaration above remains as provenance. Composed
+execution/effect/row/storage/SAF/retention/participant/typed/module guards,
+participant generation, offline runtime/dependency/license policy, normal docs,
+changelog, catalog/assurance/schema/spec/coverage and exact existing API ratchets
+pass. Final packaging regenerates documentation and the exact thirteen-path
+feature seal/check; it does not rerun unchanged runtime suites for this prose.

@@ -24,7 +24,7 @@ pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, ImsReplayDependency,
     ImsReplayOwnerKind, ImsReplayRetentionDescriptor, ImsReplayRetentionError,
-    ImsReplayRetentionState, describe_ims_replay_row,
+    ImsReplayRetentionState, describe_ims_replay_row, ims_private_recovery_retention_required,
 };
 
 pub use service::{
