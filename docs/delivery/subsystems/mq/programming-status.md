@@ -6,6 +6,16 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The continuation's module-budget composition repair passes the global module
+guard after unchanged validation, input-projection and conversation helpers are
+split from the inherited server/application/IMS/CardDemo modules. IMS generic
+tests move into the existing test-only directory; the MQ status generator's
+comment header now matches the generator-owned-header policy. All inventory
+changes lower exact counts or remove a no-longer-oversized MQ exemption; no
+ceiling increases or new exemptions are introduced. The focused composed
+regressions pass 53 tests with zero ignored. This is policy-gate repair, not
+additional MQ call, participant, CardDemo-full or licensed execution credit.
+
 Current user-directed acceptance exception (2026-10-02): the user explicitly
 requested skipping the licensed IBM MQ differential gate after the missing
 authorized oracle environment/receipt was reported. Do not request or run that

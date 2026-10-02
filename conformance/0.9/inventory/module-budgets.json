@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6008,
+      "max_production_lines": 5999,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -48,19 +48,19 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 3046,
+      "max_production_lines": 2989,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2300,
+      "max_production_lines": 2268,
       "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
       "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
     },
     {
       "path": "crates/kernel/mainframe-env-application/src/package_v2.rs",
-      "max_production_lines": 1314,
+      "max_production_lines": 1289,
       "responsibility": "Application package v2 validation, identity, signatures, generations, and installation transitions are co-located.",
       "split_boundary": "Separate manifest validation and identity/signature verification from generation-selection and install-state transitions."
     },
@@ -102,7 +102,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11940,
+      "max_production_lines": 11814,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -126,15 +126,9 @@
     },
     {
       "path": "crates/providers/mainframe-env-ims/src/service.rs",
-      "max_production_lines": 1959,
+      "max_production_lines": 1912,
       "responsibility": "IMS session, PSB/database resolution, DL/I operations, unit-of-work state, and replay share one service module.",
       "split_boundary": "Separate session/PSB binding, database operation handlers, and unit-of-work persistence/replay."
-    },
-    {
-      "path": "crates/providers/mainframe-env-mq/src/service.rs",
-      "max_production_lines": 1331,
-      "responsibility": "MQ queue semantics, unit-of-work transitions, durable object rows, replay identity, and retention-clock finalization share one service authority; host-context validation and canonical message identity are extracted.",
-      "split_boundary": "Continue extracting replay envelopes and clock finalization from queue operations and durable object-row persistence behind the existing MQ service."
     },
     {
       "path": "crates/providers/mainframe-env-racf/src/authority.rs",
@@ -174,7 +168,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3393,
+      "max_production_lines": 3311,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -186,13 +180,13 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 1783,
+      "max_production_lines": 1675,
       "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
       "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 13617,
+      "max_production_lines": 13614,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
