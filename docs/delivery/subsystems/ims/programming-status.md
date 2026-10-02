@@ -6,6 +6,27 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root Q/DEQ source integration — 2026-10-03
+
+Root composes source-only worker `f0e72434235675dccf63904a8cce15d9d4ae9a7c`
+onto `dd0328ec6e8659487f34a44d71ebb1eec2bc6cd1` with the same exact five
+declared paths below. Manager independently verifies all four source identities,
+their retained-first/archive fallback and TOC leaves, fourteen preserved registry
+rows/manifests, 193 old receipts, 72 packet files, 23 source-reader tests and
+fourteen source-only gates. Main executes the registered Q search and complete
+259-line bounded reads of all four topics. No IBM body enters Git.
+
+Status composition preserves every complete root and worker declaration; only
+normal docs generation recomputes the manifest. Source manifest, additive registry
+and fragment remain worker-byte-exact. Root checks changed docs/check, changelog,
+coverage, formatting and exact five-path generated/committed seal, then cleans
+this checkout's Cargo target. Unchanged runtime, PostgreSQL, whole-cache and
+known infrastructure exploration is not repeated for this source integration.
+The four-topic registration earns zero runtime/IR/official/HUMAN/licensed or
+participant credit. Q/DEQ runtime, shared ADR0031/0033, raw CALL and parent v0.14
+remain incomplete; all 25 mandatory rows and official/HUMAN0/25 remain unchanged.
+Licensed certification stays excluded; mandatory OSS license policy remains.
+
 ## Root prior-commit source integration — 2026-10-03
 
 Root composes source-only worker `b5f6c48a49a2c1024bc261257f03a726847cc8d1`
@@ -81,6 +102,78 @@ runtime, PostgreSQL or known CICS source-prerequisite exploration is repeated.
 This finite fixed-layout fence does not complete the remaining organization,
 U/V, shared TM/raw CALL, official/HUMAN or parent v0.14 obligations. Licensed IBM
 certification remains excluded; OSS dependency/license policy remains required.
+
+## IMS-1401.q-deq-source-registration (source-only declaration, 2026-10-03)
+
+Target **0.14.0**, exact clean base `b5f6c48a49a2c1024bc261257f03a726847cc8d1`,
+branch `codex/v014-q-deq-source-registration-20261003`. Register only the four
+previously retained Q/DEQ reference topics as scope `ims-q-deq-contracts`,
+baseline `ibm-ims-15.6-q-deq-contracts-2026-09-11`. Exact archive metadata binds
+all four IMS 15.6 topic paths/hashes/bytes to successful fetches on 2026-09-11;
+the run created that day binds the existing committed IMS 15.6 TOC SHA-256
+`aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618`.
+Each selected topic has exactly one matching TOC leaf. All four retained-path
+files are absent; immutable archive fallbacks match their exact identities.
+Snapshot date describes the retained archive baseline, not a new fetch or a
+complete corpus: the run remains in-progress. HTTP Last-Modified is unrecorded.
+
+Exact maximum allowlist declared before registration:
+
+- `conformance/0.14/manifests/ims-q-deq-contract-topics.json`
+- `conformance/0.14/manifests/index.json`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-q-deq-sources-20261003.toml`
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+Existing source manifest/schema/registry and offline reader remain owners.
+Preserve all fourteen existing registry entries and manifest bytes, prior status
+lanes and external Q/TM/source/design receipts. Catalog context is unchanged:
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0003` (DEQ), `0005/0006`
+(Get/Get Hold), `0004/0015` (DLET/REPL), `0008/0009` (insert/load) and `0002`
+(checkpoint). This closes only the Q-reservation leaf's missing registered
+reference gap; it changes no runtime behavior, accepted expectation or row.
+
+Planned checks: selected four-topic import/status/search/full bounded reads,
+source-reader regressions, schema/spec, IMS catalog/assurance, coverage/inventory,
+normal docs generation/check, changelog, fmt and mandatory offline dependency,
+license and supply-chain policy, then exact five-path generated Complete seal and
+committed check. External packet: `q-deq-source-registration/` under the shared
+worker receipt root; each sequence ends with checkout-local cargo clean and
+target absent. No runtime/Cargo semantic tests, PG, crash/backup, whole-cache,
+CardDemo, fuzz, unrelated CICS retry or licensed certification campaign.
+Source/runtime/IR/official/HUMAN/participant/licensed credit is zero; denominator
+25 and official/HUMAN0/25 remain unchanged. ADR0031/0033, HUMAN shared-prerequisite
+permission, raw CALL/TM and participant admission remain unapproved. Parent
+v0.14 stays active/incomplete. Prior source/runtime/design seals are preserved.
+
+Source-only results: importer reports four topics plus one TOC; status verifies
+all five. Four searches match nonzero topics (Q 4, DEQ 4, reserving 3, locking 2).
+Four bounded reads reach EOF: reserving 24, DEQ 81, Q 137, locking 17 plain lines,
+259 total, with zero new setup/read failures. The computed sorted-path/hash-lines
+topic digest is `c9347102caea79a553387ea26b65ecd1a97b03ac0fd8d6874c442df110a0a5f4`.
+
+Reference locators: reserving 7–19 separates MSDB/secondary-index restrictions,
+resource lock integrity/GO and Q protection after moving position; Q 13–39
+separates data-sharing batch, MAXQ and full-function/Fast Path class validation;
+Q 73–117 and DEQ 30–71 separate PCB/class and modified/current-position/reclass
+exceptions from Fast Path buffer/FW rules; Q 118–130 separates root-record access
+and dependent ordinary Gets, shared block scope and conversation boundaries;
+locking 3–15 describes shared Q/test-lock/root-hold protocols. Fast Path's stated
+Q-alone versus two-byte validation wording is not resolved into a guessed raw
+ABI or changed SSA expectation. DEQ's table/Batch labels do not authorize generic
+context equivalence. Full lock-manager, MAXQ, shared-holder, root-entry, block/CI,
+Fast Path and participant obligations remain with their existing owners.
+
+All 23 source-reader unit tests passed, zero failures/skips; schema/spec, IMS
+catalog/assurance, coverage/inventory, changelog, offline deny, license-notice and
+offline supply-chain checks passed. Source and policy sequences ended in cargo
+clean with target absent. Normal docs generation/check, fmt and the full exact
+five-path generated seal/committed check are recorded with final Git identities
+in external `q-deq-source-registration/handoff.md` and `callback.json`. The prior
+fourteen manifest/registry identities, complete earlier status bytes and 193
+selected original receipt hashes are preserved. Historical unregistered reader
+gaps retain their old candidate identity; new registration earns no runtime or
+acceptance credit and does not complete the Q runtime or parent IMS milestones.
 
 ## IMS-1404.tm-prior-commit-source-registration (source-only declaration, 2026-10-03)
 

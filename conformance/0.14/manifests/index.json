@@ -157,6 +157,17 @@
       "topic_manifest_sha256": "sha256:b58649136d3fcb9d8a426eafd588f28ca2a4996974a229dba05b08f4964ed857",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-q-deq-contracts",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-q-deq-contracts-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-q-deq-contract-topics.json",
+      "manifest_sha256": "sha256:4549429186320cd85a830315e8109785d5e1675af7a03aa02c02b5dafd41eb5b",
+      "topic_count": 4,
+      "topic_manifest_sha256": "sha256:c9347102caea79a553387ea26b65ecd1a97b03ac0fd8d6874c442df110a0a5f4",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
