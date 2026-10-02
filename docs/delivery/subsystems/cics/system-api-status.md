@@ -598,6 +598,19 @@ CALL receipt, instance lease or automatic redispatch. Its exact allowlist and
 source-backed durable CALL/instance contract are reviewed separately before
 runtime wiring; workers may submit read-only designs only for those shared owners.
 
+`CIC-902.program-task.frames.transfer-state-authority` continues the same isolated
+frame worker session as a read-only prerequisite review for rows 0138/0263 and
+source program lifecycle state. Its exact obligation is to identify target-pinned
+COBOL/CICS authority for ordinary last-used state and INITIAL disposal after XCTL,
+and propose the smallest pure transfer snapshot contract without asserting normal
+GOBACK/EXIT PROGRAM. It owns external metadata/design receipts only; all runtime,
+coordinator, original CALL/instance schemas, registries, generators and status are
+manager-owned. Review at most twelve relevant retained topics through pinned
+search/read and verified HTML fallback; no network refresh or broader audit.
+Acceptance is explicit baseline/topic/row citations, preserved prior patch bytes,
+applicable static state fields/resource exclusions and precise unresolved authority.
+Source review earns zero execution/licensed credit and reserves no codec/API.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001

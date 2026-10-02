@@ -22,6 +22,8 @@ use std::sync::Arc;
 const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
 const LIFECYCLE_OUTBOX_DOMAIN: &[u8] = b"mainframe-env.execution-lifecycle@1\0";
 
+mod handoff;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CoordinatorLimits {
     pub quantum: Quantum,

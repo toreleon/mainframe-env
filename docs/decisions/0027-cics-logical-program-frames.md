@@ -447,6 +447,27 @@ cross-authority handoff proof before this helper can be connected to execution.
 No durable codec number, new namespace, coordinator, routing or full-frame
 acceptance is introduced by this volatile prerequisite.
 
+### Exact-version source core terminalization prerequisite
+
+`complete_suspended_handoff_at_version` uses the existing execution record,
+lifecycle journal and atomic core CAS. Before mutation it requires the exact
+positive, successor-compatible source version; execution/run/principal identity,
+selector, immutable artifact and attempt; Suspended state without terminal age;
+and the matching final Suspended event. The supplied positive terminal tick must
+be monotonic and fit the existing durable integer domain. It never opens generic
+resumable admission, which would create a missing source or relax suspended
+selector/artifact identity. Races or disappearance are rejected by the existing
+CAS; no second coordinator or namespace is introduced.
+
+The Completed/HandoffCompleted step and its event/outbox are atomic through the
+existing owner. Checkpoint deletion remains subsequent cleanup and can fail after
+the terminal step committed. An error does not prove non-execution or authorize a
+retry; the embedding must separately observe the exact terminal record/event.
+This helper grants no provider disposition, target instance lease, CALL reply,
+volatile task loan or redispatch. The existing generic handoff remains unchanged.
+Source snapshot semantics and the original CALL/instance proof chain are separate
+prerequisites before any runtime use.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline
