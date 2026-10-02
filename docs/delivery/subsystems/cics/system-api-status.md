@@ -1789,3 +1789,49 @@ synthetic cohorts), 23 current generator tests and seven unchanged IR contract
 checks, with no ignores. Current present inputs pass exact linkage; absent future
 inputs remain pending. Identity/grammar output bytes do not change until a
 reviewed input is added. Mandatory gates precede this infrastructure seal.
+
+SPI-1001.fepi-resource-contracts manager integration consumes the independently
+reviewed and repaired final resources/list inputs, fourteen distinct FEPI rows
+0008/0010/0011/0017/0019/0020/0022/0023/0024/0032/0033/0035/0036/0037.
+These retain178 union operand facts,210 condition records and229 source case
+candidates (213 originals plus16 reviewed journaling/device candidates). Exact
+original fields, all2048 fixed-array entries and all POOLLIST bytes are preserved
+except the five independently reviewed lifecycle fields and sixteen new cases.
+FORMAT refers to outbound/inbound character attributes; MSGJRNL has its four
+direction-specific meanings, and DEVICE retains twelve sourced mode/model/line
+mappings. INSTALL stores policy for later data, not installation-time data
+journaling. Baseline ibm-cics-ts-6x-fepi-command-bodies-2026-09-12, catalog
+ibm-cics-ts-6x-2026-08-31:fepi-commands and exact dfhp737/dfhp73b command pins;
+formatted context dfhp74l uses ibm-cics-ts-6x-fepi-context-candidates-2026-09-12.
+All other primary/context pins and the reviewed combined-page variant identities
+are unchanged. SET NODE/NODELIST OPEN ACB174 versus reference-index176 remains
+unresolved with both pins; no runtime mapping is selected. CSZX/EXCEPTIONQ
+event/loss and product-audit distinctions remain. Grammar unions are partial;
+named/NEXT directions, CVDA compatibility, source contexts, precise SAF, async
+admission/attainment, UOW/lock/restart/concurrency and product-route/licensed
+obligations stay pending. The sole generator projects options only, never
+fixture-driven execution, lifecycle prose or verdicts. All308 command identities
+and260 advertised application typed registrations are preserved; runtime credit0.
+
+Before dispatch manager declares bounded read-only SPI-1001.spi-file-repair-review
+for final repaired FILE rows0012/0072/0127/0224. It depends on terminal producer
+repair and freezes its exact final hash/change inventory before launch. Review
+all changed fields/case relationships (currently104 fields across29 cases) and
+verify exact preservation of the137 unaffected cases, all139 operands,91
+conditions and source/security/gap records against the original fully reviewed
+input. Reuse unchanged earlier review coverage; do not repeat whole unchanged
+source campaigns. Consult pinned source authority for changed CVDA fixtures,
+file-kind/state/boundary isolation, unresolved EMPTYREQ competing outcomes and
+raw-syntax default CSDL logging. Its only write ownership is external review
+receipts in an isolated clean checkout; no tracked repair/shared authority or
+acceptance seal is delegated. Manager serially fixes residual findings and
+integrates with actual schema/projection/policy gates. No execution or licensed
+credit; the retained independent reviewer differs from FILE's producer.
+
+FEPI resource/list integration passes23 current generator tests, seven IR
+regressions over every generated fact, and the actual Rust Draft202012 instance
+checks for both files. The integrated private source projection now has24 rows
+(4 SPI and20 FEPI),352 union operand facts and468 source case candidates.
+These remain partial source contracts with Pending constraints and no handlers,
+application/selected-route/recovery/license acceptance or execution credit.
+Mandatory current-candidate gates precede this bounded source slice seal.
