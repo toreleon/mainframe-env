@@ -68,6 +68,7 @@
     "docs/decisions/0028-db2-typed-catalog-evolution.md",
     "docs/decisions/0029-db2-core-participant-evolution.md",
     "docs/decisions/0030-gsam-application-record-formats.md",
+    "docs/decisions/0032-selected-secondary-checkpoint-position.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -322,6 +323,10 @@
         {
           "label": "ADR-0030: GSAM application record formats and owned length",
           "path": "docs/decisions/0030-gsam-application-record-formats.md"
+        },
+        {
+          "label": "ADR-0032: Selected secondary checkpoint positions",
+          "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md"
         },
         {
           "label": "Decision index and template",

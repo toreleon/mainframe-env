@@ -256,7 +256,7 @@ pub(in crate::service) fn publish_backout_image(
     state: &mut State,
     run: &str,
     name: &str,
-    image: DatabaseEngineImage,
+    mut image: DatabaseEngineImage,
     limits: ImsLimits,
 ) -> Result<(), HostProblem> {
     ensure_writer(state, run, name)?;
@@ -273,9 +273,21 @@ pub(in crate::service) fn publish_backout_image(
     {
         return Err(HostProblem::UnknownOutcome);
     }
+    image.reconcile_secondary_backout(
+        state
+            .generic_databases
+            .get(name)
+            .ok_or(HostProblem::UnknownOutcome)?,
+    );
+    let digest = image_digest(&image)?;
     // A savepoint backout is not a commit. Keep the original local undo and
     // ownership until the existing common local settlement removes it.
-    Arc::make_mut(undo).post_images.insert(name.into(), digest);
+    let undo = Arc::make_mut(undo);
+    undo.post_images.insert(name.into(), digest);
+    undo.owned_images
+        .entry(name.into())
+        .or_default()
+        .insert(digest);
     state.generic_databases.insert(name.into(), Arc::new(image));
     Ok(())
 }

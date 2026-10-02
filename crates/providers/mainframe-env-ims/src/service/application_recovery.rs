@@ -10,6 +10,7 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore}
 
 mod checkpoint;
 pub(in crate::service) mod gsam_checkpoint;
+mod secondary_checkpoint;
 pub(super) use checkpoint::refresh_system;
 
 /// Defaulted fields preserve reads of prior v1 Session rows. Never supplied by callers.

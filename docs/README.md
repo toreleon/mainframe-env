@@ -100,6 +100,7 @@ explicitly names that authority as superseded.
 - [ADR-0028: Db2 typed catalog evolution](decisions/0028-db2-typed-catalog-evolution.md)
 - [ADR-0029: Db2 core participant evolution](decisions/0029-db2-core-participant-evolution.md)
 - [ADR-0030: GSAM application record formats and owned length](decisions/0030-gsam-application-record-formats.md)
+- [ADR-0032: Selected secondary checkpoint positions](decisions/0032-selected-secondary-checkpoint-position.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

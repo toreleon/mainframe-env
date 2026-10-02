@@ -443,12 +443,13 @@ pub(super) fn apply_request(
                     state.databases.insert(name.clone(), image.clone());
                 }
             }
-            if let Some(pending) = state.generic_pending_undo.remove(run) {
+            if let Some(pending) = state.generic_pending_undo.get(run).cloned() {
                 for (name, image) in pending.iter() {
-                    state.generic_databases.insert(name.clone(), image.clone());
+                    isolation::publish_backout_image(state, run, name, (**image).clone(), limits)?;
                     reset_positions(state, name, None);
                 }
             }
+            state.generic_pending_undo.remove(run);
             if let Some(session) = state.sessions.get_mut(run) {
                 pcb::clear_positions(Arc::make_mut(session));
             }

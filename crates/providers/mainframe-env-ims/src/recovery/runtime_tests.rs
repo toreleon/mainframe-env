@@ -427,6 +427,7 @@ fn xrst_attempts_positions_once_per_generation_and_preserves_reported_status() {
         database: "ACCOUNTS".into(),
         segment_key: b"K001".to_vec(),
         gsam: None,
+        secondary: None,
     });
     session
         .checkpoint("checkpoint", checkpoint, [4; 32])

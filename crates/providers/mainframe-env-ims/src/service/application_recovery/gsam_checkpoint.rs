@@ -83,6 +83,7 @@ pub(super) fn save(
         database: pcb.database.clone(),
         segment_key: vec![],
         gsam: Some(saved),
+        secondary: None,
     })
 }
 

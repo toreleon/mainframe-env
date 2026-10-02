@@ -84,6 +84,198 @@ drain/reconcile and coherent backup obligations remain those of the manager base
 no backup/restore or subprocess restart acceptance is claimed. Shared CALL-frame,
 IMS entry/metadata and feedback owners must admit a coherent class before raw
 status/cursor/hold/update/undo/replay/copyout acceptance or parent closure.
+## IMS-1405.secondary-index-checkpoint-restart (bounded integrated leaf)
+
+Historical worker clean entry `531f39c137ab5dad00d8db72f28b083aea2b19d3` and its branch are
+preserved. This lane starts directly from manager seal
+`06ed341181151c5e9b526989f7c2ee5f2fb6b9db`, without the old TM gap branch.
+Parent IMS-1405 and target 0.14.0 remain incomplete. Catalog identities are
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002/:0023/:0025`, with
+`:0005/:0008` and hold/update consumers. Execution is signed selected DB-batch
+CALL metadata and existing full-function root-target secondary navigation.
+Physical source/current paths must have unique sequence keys. Nonroot inverted
+hierarchies, aliases, DEDB, optional fields, NULLVAL, physical RSA and timestamps,
+HDAM missing-key resume, and licensed tie-order equivalence remain unsupported.
+
+Owners: additive SavedPcbPosition identity/validation, one selected-secondary
+checkpoint helper and minimum engine/checkpoint hooks, focused provider and
+signed-package tests, unique fragment and boundary ADR. Preserve existing GSAM
+identity/future fields, primary historical bytes/digests, selected_index_field,
+ordinary PCB/Q/holds, generic integrity/UOW/publication and recovery replay.
+The original worker changes no GSAM formats, mixed SSA evaluator, PCB feedback,
+TM or backout algorithms. Integration below composes the root's generic Batch
+undo and epoch/incarnation; its already-removed GSAM settlement helper stays absent.
+
+Mandatory obligations: fail-first public CHKP/XRST; same-PCB GU/GN/GNP/hold;
+independent PCBs and mixed primary/GSAM/secondary PSB; binary/composite search
+and distinct source/target; deleted/moved/replaced identities GE without revival;
+SAF/malformed/context/limits without mutation; replay after later work; actual
+row CAS, missing-image, lost-ack/UnknownOutcome and read-only reconciliation;
+Memory/file SQLite reopen and real process phases; signed canonical coordinator.
+Run focused tests, strict scoped all-targets/no-deps Clippy, and mandatory
+execution/effect/provider-row/storage/participant/security/retention/typed/module/
+supply-chain/deny/catalog/assurance/schema/spec/fmt/docs/changelog gates.
+Exact allowlist seal, feature commit and committed --check follow verification.
+Receipts stay outside Git/targets under worker-receipts/v014-completion-20261002/
+ims-secondary-index-restart. No official, human, licensed, parent or release
+credit, network refresh, delegation, push or PR is authorized.
+
+Before semantics, eleven selected topics matched committed hashes and byte
+counts after checking the retained topic-path root, then the SHA archive and
+explicit ims-1405/ims-1403 caches. ibm_docs.py search/read and its plain_text
+parser were used offline. Baselines: ims-recovery-utilities-contracts
+`7418508fe1db54bbc8374fc1b8ea4cfd45a3e9aceff75f9734b75cb0afd4bde8`,
+ims-database-contracts
+`3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b`,
+ims-programming-contracts
+`119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182`.
+Relevant topics: apr/ims_xrstcall.htm, ims_symbolicchkpcall.htm;
+apg/ims_restartingprogramandcheckforpos.htm, ims_ssassecondaryindex.htm,
+ims_secondaryindexlogicalrelationships.htm, ims_currentpos.htm,
+ims_imsdbdbpcbmask.htm; dag/ims_howseindexmaint.htm,
+ims_howhierrstruc_fullfunction.htm; apr/ims_gughucall.htm, ims_gnghncall.htm.
+Full SSEPH2_15.6.0 paths, exact SHA/bytes and resolutions are in external
+sources.json. No selected source is unavailable or mismatched; unselected cache
+entries were not audited. No publication bodies enter Git.
+
+### Implemented selected secondary restart projection
+
+SavedPcbPosition's optional `secondary` variant is exclusive with GSAM and the
+historical hierarchy key. It binds selected PSB/PCB/database metadata, index,
+binary/composite search key, distinct source/target/current occurrence witnesses
+and unique physical paths. Witnesses are issued on existing engine records in
+the existing CHKP proposal. The engine's secondary GU has one exact-source
+filter; existing pointer ordering, SSA parser/shared selected_index_field and
+parentage/hold authority remain unchanged. XRST clears holds and establishes GU
+parentage. Data-only REPL preserves witnesses; changed index keys invalidate
+them even after changing back. Deletion/reinsertion and reload cannot revive an
+old witness. GE continuation uses actual selected GN in keyed-root order.
+
+The historical worker candidate passes 207 IMS unit tests and the 44-test public
+application recovery dispatch suite, two historical GSAM and two new secondary
+retained contract tests, plus existing participant/TM consumer tests. Standalone
+process-worker entries and empty doc-test/filter binaries earn no scenario
+credit. Substantive parents execute three real SQLite checkpoint/restart/
+continuation processes and assert outcomes. A later focused additional test
+proves two saved source pointers returning the same target resume independently
+on Memory and SQLite. Final focused secondary dispatch passes 12 entries, including
+11 substantive cases plus the environment-only process worker; real three-phase
+child execution is asserted by its parent. Actual missing database images reject
+XRST without mutation, and nonunique physical source paths reject CHKP without
+mutation. These receipts are separate from the prior 44-test suite.
+The signed public package/canonical coordinator suite passes all 22 tests,
+including two new Memory/SQLite secondary CHKP/XRST/reopen cases. Strict IMS
+and server Clippy passes with all-targets/no-deps and warnings denied; the later
+test-only addition passes strict IMS Clippy separately. No inherited warning is
+waived in the selected crates. Dependency warnings outside no-deps scope remain
+distinct. Real backend database CAS conflicts, capacity, CHKP/XRST lost-ack,
+read-only observation, missing receipts, replay after later work, auth/context/
+malformed/limits, corrupt images, binary composite values, child field collision,
+independent PCBs, holds/GNP/changed-key parentage and mixed FF/GSAM/secondary
+proposals are exercised. Initial expected and fixture failures remain retained.
+
+Historical worker receipt groups are `final-code.json`, `final-secondary.json`, `policy.json`,
+`sources.json` and `pinned-source-reader.json` under the external leaf receipt
+directory above. All eleven selected topic bodies, exact SHA/bytes and scoped
+reads pass under Python 3.12.13. The programming-cache search reports one
+unselected missing entry; this partial scope is not a whole-cache completeness
+claim or a missing selected source. Shared TOC verification succeeds. The
+documentation registry in that worker registered a colliding ADR-0029. The
+integrated leaf registers [ADR-0032](../../../decisions/0032-selected-secondary-checkpoint-position.md)
+and preserves existing GSAM ADR-0028 and PCB-feedback ADR-0029.
+
+The original worker adds no SQL migration, namespace, request/result canonical domain, retention lifetime,
+coordinator, address registry, lock service or backout algorithm changes.
+Absent fields preserve old serialized positions/images and checkpoint digests;
+GSAM formats/identities remain intact. Rust saved-position literals require
+`secondary: None`. Older writers/readers must be drained before new retained
+secondary rows are admitted. Stop admission, settle UOWs/holds/Q and unknown
+effects, and retain a coherent database/session/recovery/selected-metadata/
+journal/audit backup before upgrade or downgrade. Coherent backup restoration
+and retention expiry are not certified by reopen tests.
+
+Original worker handoff obligation: retain the exact-source GU hook, additive record witness
+and changed-index-key invalidation when integrating generic Batch retained undo
+and epoch/incarnation. Restoring an old raw undo image can otherwise revive an
+invalidated witness; integrate the manager's authority rather than adding a
+second generation registry here. The GSAM batch settlement helper is unchanged
+except its saved-position literal and must be removed by the manager as planned.
+Primary/GSAM fresh behavior, ordinary Q/release/commit and foreign integrity-read
+fences remain owned by their existing modules. Unsupported physical/nonunique
+path applicability, nonroot inversion/aliases/DEDB, HDAM missing-boundary resume,
+accepted participant/lease composition, backup/retention exercise, official rule
+acceptance and licensed differentials remain parent obligations. This bounded
+leaf never marks IMS-1405 or v0.14 complete.
+
+The historical worker's required execution/effect/provider-row/storage/participant/generated-participant/
+security/retention/typed/module, offline supply-chain/dependency/license, IMS
+catalog/assurance, shared assurance inventory, schema/spec, fmt/changelog and
+docs generation/check gates pass. New production owners are 220 engine, 79
+retained contract and 154 adapter lines; the existing checkpoint owner is 798,
+database module 638 and frozen owners do not grow beyond their ratchets.
+Command exits and nonzero test outcomes are retained in the external receipt
+directory. All Cargo build targets are cleaned after each verification sequence.
+
+The historical worker's extra global public API-doc ratchet was blocked by contract
+owners: execution-api 305 missing-doc items against 176, host-api 2,100 against
+1,128. Neither package nor its ratchet changed in this leaf. The isolated
+`acceptance-final-10.log` records this failure; it is not reported as a passing
+required docs check. The initial API-doc build also raced cleanup when incorrectly
+run alongside Cargo; that infrastructure failure is retained separately, and the
+serialized retry diagnoses the actual inherited documentation debt. No warning
+allowance or other-lane documentation rewrite was introduced. Manager owns that
+repair and integrated candidate resealing; licensed/official credit stays zero.
+
+### Secondary checkpoint integration with application backout (2026-10-02)
+
+The integration branch starts at manager commit
+`0634ffc221aa977c66a063ba792ab22b379a248d` and consumes only the exact
+26-path delta of sealed `89bf004e332bde150541e106976328feaacb0673` from
+`06ed341181151c5e9b526989f7c2ee5f2fb6b9db`. Its prior sealed worker branch
+and the unconsumed TM gap `531f39c137ab5dad00d8db72f28b083aea2b19d3`
+remain unchanged. Other newer unsealed worker branches are excluded.
+
+Witness issuance binds the root's existing UOW incarnation/epoch in addition
+to canonical request, actual database CAS version and engine image. The existing
+generic backout publication reconciles restored occurrence witnesses against
+the current actual image after validating the original owned-image digest.
+Data-only replacement retains identity; changed index keys and deletion cannot
+revive an older identity through named ROLS, ROLB, terminal ROLL or generic
+Rollback. The reconciled image remains owned by the same retained UOW, including
+a subsequent full rollback after named ROLS. CHKP advances the existing epoch;
+rescheduling changes incarnation. Old named tokens are rejected across both.
+Retained checkpoint references can still reposition live occurrences after a
+legitimate new schedule. No additional generation store or dispatcher is created.
+
+Root pristine integrity read-source, dependency CAS/Q guards, rich SSA field
+resolver, feedback projection, GSAM output restart and common execution pipeline
+are preserved. The older worker's removed GSAM Batch settlement helper is not
+reintroduced. Only its saved-position literal gains `secondary: None`.
+Normal documentation generation incorporates ADR-0032 registry metadata and
+links; the feature's unique existing change fragment is retained.
+
+Offline source review verifies sixteen selected IMS 15.6 pinned HTML identities
+and reads. The eleven historical selected topics above plus SETS/SETU, ROLS,
+ROLB, ROLL and intermediate-backout topics inform the integration. Catalog
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0017/:0018/:0020/:0021`
+supplements the unchanged checkpoint/navigation rows. The programming search's
+one unselected missing cache topic is reported without a cache-completeness
+claim. All selected retained-path checks resolve matching archive bodies; no
+selected source is missing or mismatched. External actual command logs and
+candidate identities live under worker-receipts/v014-completion-20261002/
+ims-secondary-manager. Old worker receipts retain their historical identities.
+
+Focused public recovery, signed selected-secondary package/coordinator tests,
+both backends and independent SQLite checkpoint/restart/continuation child
+phases are the integration acceptance scope. The composition regression adds
+named/full/terminal/generic backout, data-only versus changed-key/deleted-source
+witnesses, lost selection, epoch invalidation and incarnation isolation.
+Mandatory policy and unchanged exact API-documentation checking apply to the
+manager base; historical worker API-doc failures are not this candidate's result.
+Nonunique physical paths, optional fields/aliases/nonroot inversion/DEDB remain
+Unsupported. No acceptance rules, pins, thresholds or denominator change;
+official/human/licensed credit stays zero. Parent IMS-1405, participant/lease,
+coherent backup/retention, root composition and v0.14 acceptance remain open.
 
 ## IMS-1403.gsam-record-addressability (bounded slice implemented)
 
@@ -3726,3 +3918,32 @@ shared TOC were read locally without a refresh. Catalog context remains
 grants zero execution credit. Parent IMS-1403/1405, selected-secondary integration,
 root current-main composition, participant/official/human acceptance, licensed
 evidence, full-v0.14 and release promotion remain open.
+
+### Root secondary/GSAM/current-main composition — 2026-10-02
+
+Root consumes `d90b35ea39280e8d1667aa5033bab7a94ea18b5b` on GSAM-format
+seal `88f88f23` after the current-main merge. The retained position validator
+combines both leaves: hierarchy keys, GSAM positions and selected-secondary
+identities are mutually exclusive; a format identity belongs only to GSAM.
+Historical omitted fields still round-trip byte-for-byte. The new secondary
+adapter explicitly supplies no GSAM format, and the older mixed-position fixture
+explicitly supplies no U length. Root keeps the pristine XRST integrity read,
+output-suffix witness, epoch/incarnation and one backout publication owner.
+Proposed ADR-0032 links the renumbered IMS decisions 0034/0035, preserving main's
+Db2 decisions 0028/0029 and their code/dependency identities.
+
+The integrated recovery harness initially passed 72 existing entries and failed
+the new joint fixture: it incorrectly declared a U record minimum of two rather
+than twelve bytes. Two earlier compile errors were fixture composition issues,
+not passing evidence. After fixing the fixture, the joint parent passes four
+Memory/file-SQLite format/backend combinations. One checkpoint contains a primary
+position, two distinct selected-secondary positions and GSAM input/output positions;
+reopen restores all five, preserves V/U areas and U length, continues each PCB,
+and rejects an address from the truncated output suffix. The four binary retained
+contract tests pass, including the new secondary-with-GSAM-format rejection.
+Strict IMS all-target Clippy, formatting, module, docs and changelog checks pass.
+Idle subprocess helper entries are not independent scenario credit. Receipts
+remain external under `v014-completion-20261002/secondary-root-*`; prior worker
+receipts retain their actual base. Final signed-route/mixed-SSA and aggregate
+policy composition is a separate candidate sequence, not retroactive credit.
+This completes only the bounded secondary restart leaf, not IMS-1405 or v0.14.

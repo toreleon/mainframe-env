@@ -233,6 +233,18 @@ impl DatabaseEngine {
         request: &ReadRequest,
         matches: impl Fn(RecordId, &[u8]) -> bool,
     ) -> Result<RecordView, EngineProblem> {
+        self.read_secondary_occurrence(name, position, request, None, matches)
+    }
+
+    /// Checkpoint GU binds one proven pointer rather than choosing a tie anew.
+    pub(super) fn read_secondary_occurrence(
+        &self,
+        name: &str,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        source_occurrence: Option<RecordId>,
+        matches: impl Fn(RecordId, &[u8]) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
         self.validate_secondary_navigation(name)?;
         self.validate_read(request)?;
         let mut next = position.clone();
@@ -261,6 +273,9 @@ impl DatabaseEngine {
             let mut sources = sources.iter().copied().collect::<Vec<_>>();
             sources.sort_by_key(|source| ranks[source]);
             for source in &sources {
+                if source_occurrence.is_some_and(|expected| expected != *source) {
+                    continue;
+                }
                 if request.kind == ReadKind::NextInParent
                     && next
                         .secondary

@@ -606,10 +606,11 @@ fn save_positions(
         let Some(id) = generic::pcb::position(session, number).current() else {
             continue;
         };
-        // Physical key paths do not retain the selected index's source pointer.
-        // Never publish a primary-order substitute for a secondary resume point.
         if pcb.secondary_index.is_some() {
-            return Err(HostProblem::Unsupported);
+            saved.push(secondary_checkpoint::save(
+                state, versions, run, number, pcb, digest, limits,
+            )?);
+            continue;
         }
         let engine = generic::restored(state, &pcb.database, limits)?;
         let path = match record_key(&engine, id) {
@@ -625,6 +626,7 @@ fn save_positions(
             database: pcb.database.clone(),
             segment_key,
             gsam: None,
+            secondary: None,
         });
     }
     saved.sort_by_key(|saved| saved.pcb.parse::<u16>().unwrap_or(0));
@@ -651,15 +653,18 @@ fn restore_position(
     if pcb.database != saved.database {
         return Err(HostProblem::IdempotencyConflict);
     }
-    if pcb.secondary_index.is_some() {
-        return Err(HostProblem::Unsupported);
-    }
     // XRST's provider-owned GU is still a database read. The common bridge
     // already CAS-fences every selected database at publication.
     let mut observation = checkpoint_observation();
     observation.operation = ImsOperation::GetUnique;
     observation.pcb = number;
     generic::integrity::prepare(read_source, run, &observation)?;
+    if pcb.secondary_index.is_some() {
+        return secondary_checkpoint::restore(state, psb, number, &pcb, saved, limits);
+    }
+    if saved.secondary.is_some() {
+        return Err(HostProblem::IdempotencyConflict);
+    }
     if gsam_checkpoint::is_gsam(state, &saved.database) {
         return gsam_checkpoint::restore(state, run, number, &pcb, saved, limits);
     }

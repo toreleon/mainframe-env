@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 233,
+    "markdown_documents": 234,
     "navigation_groups": 6,
-    "normative_documents": 65,
+    "normative_documents": 66,
     "xtask_commands": 233
   },
   "documents": [
@@ -265,8 +265,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 6,
-      "sha256": "sha256:2830373fa6763ab6c5ff1877ab0f0b30a66de7a86d573a9068740f89b0c160dc",
+      "relative_links": 7,
+      "sha256": "sha256:93e482fcd6ff03cae681539bfff715fe10522473804131b4f34008815af590c8",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 121,
-      "sha256": "sha256:052253a7d58385109614a83b3a38867ee574d102d2708a65be670a2c042b9e65",
+      "relative_links": 122,
+      "sha256": "sha256:9cf5e7a741417bb794ab58db389dad66759e7bc7a4da60a68e4e81c382e128b4",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1013,6 +1013,18 @@
     {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
+      "owner": "IMS recovery and database maintainers",
+      "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md",
+      "relative_links": 5,
+      "scope": "IMS-1405.secondary-index-checkpoint-restart, target 0.14.0",
+      "sha256": "sha256:22045a053293f721efa119f3b5f05e964f3c99a95a65b851411fd9e18a9b3295",
+      "status": "Proposed within the user-authorized bounded IMS leaf",
+      "title": "ADR-0032: Selected secondary checkpoint positions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
       "owner": "compiler, interpreter, host-contract and IMS maintainers",
       "path": "docs/decisions/0033-cobol-dli-call-boundary.md",
       "relative_links": 0,
@@ -1049,8 +1061,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 34,
-      "sha256": "sha256:a27ac62d2bd2b95269b78b1db860a765f08e3a5b01e32bf9f91d1e9aee876f73",
+      "relative_links": 35,
+      "sha256": "sha256:0f3ca59b8e0f4a1faf35b85c3dd1a9775dba1d1924f6011dffe1ab27b7ff6c24",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1493,8 +1505,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 15,
-      "sha256": "sha256:5201777b977bf6992a0476a8dce9037411276508fc9cbf02ae0b5293e0fb5d2d",
+      "relative_links": 16,
+      "sha256": "sha256:94b07e39b904182d46a76fa8c91c2dd67d459106330a4d2d88cb284c35d04be0",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2380,6 +2392,10 @@
           "path": "docs/decisions/0030-gsam-application-record-formats.md"
         },
         {
+          "label": "ADR-0032: Selected secondary checkpoint positions",
+          "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2628,7 +2644,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:447ce80643b53708a030e3304375eb300cfd1cead9ac9661f0c891daf58166f5",
+  "registry_sha256": "sha256:bd3c9addaca1c9e082810e76bcd63c6fc88b4e49a5ae391b9867653370ef3314",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

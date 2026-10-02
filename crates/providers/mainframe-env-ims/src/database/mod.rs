@@ -315,6 +315,8 @@ struct Record {
     /// Issued logical address identity. Absent in retained historical images.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     gsam_address: Option<[u8; 32]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    secondary_checkpoint_identity: Option<[u8; 32]>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -361,6 +363,7 @@ pub(crate) mod gsam_format;
 mod logical;
 mod navigation;
 mod secondary;
+mod secondary_checkpoint;
 mod ssa;
 mod store;
 
@@ -455,6 +458,7 @@ impl DatabaseEngine {
     pub fn validate_image(&self) -> Result<(), EngineProblem> {
         validate_definition(&self.definition, self.limits)?;
         self.validate_gsam_addresses()?;
+        self.validate_secondary_checkpoint_identities()?;
         if self.records.len() > self.limits.max_records
             || self.next_id == 0
             || self.records.keys().any(|id| id.0 >= self.next_id)

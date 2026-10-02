@@ -73,7 +73,7 @@ pub enum CheckpointKind {
     Symbolic,
 }
 
-/// A PCB's retained hierarchy key or discriminated GSAM logical position.
+/// A PCB's retained hierarchy key, GSAM position, or selected secondary identity.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SavedPcbPosition {
@@ -86,6 +86,9 @@ pub struct SavedPcbPosition {
     /// GSAM has no hierarchy key. Absent preserves historical digest bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gsam: Option<SavedGsamPosition>,
+    /// Selected pointer identity is distinct from hierarchy keys and GSAM RSA.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary: Option<super::SavedSecondaryPosition>,
 }
 
 /// Provider-derived logical positions, never physical IBM RSA layouts.
@@ -106,7 +109,8 @@ impl SavedPcbPosition {
     fn validate(&self, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
         if !valid_name(&self.pcb, limits.max_database_name_bytes)
             || !valid_name(&self.database, limits.max_database_name_bytes)
-            || (self.segment_key.is_empty() != self.gsam.is_some())
+            || (self.segment_key.is_empty() != (self.gsam.is_some() || self.secondary.is_some()))
+            || (self.gsam.is_some() && self.secondary.is_some())
             || self.gsam_format.is_some() && self.gsam.is_none()
             || self.gsam_format == Some([0; 32])
         {
@@ -114,6 +118,9 @@ impl SavedPcbPosition {
         }
         if self.segment_key.len() > limits.max_position_key_bytes {
             return Err(RecoveryProblem::LimitExceeded);
+        }
+        if let Some(position) = &self.secondary {
+            position.validate(limits)?;
         }
         if let Some(position) = &self.gsam {
             match position {
@@ -173,7 +180,9 @@ impl CheckpointRequest {
         let mut names = BTreeSet::new();
         for position in &self.positions {
             position.validate(limits)?;
-            if self.kind == CheckpointKind::Basic && position.gsam.is_some() {
+            if self.kind == CheckpointKind::Basic
+                && (position.gsam.is_some() || position.secondary.is_some())
+            {
                 return Err(RecoveryProblem::Unsupported);
             }
             if !names.insert(position.pcb.as_str()) {

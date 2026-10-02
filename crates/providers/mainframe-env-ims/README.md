@@ -48,6 +48,16 @@ the log and selection fence through the existing utility bridge. CHKP atomically
 releases actual undo, all PCB positions/holds and Q reservations with its recovery
 receipt; symbolic CHKP saves seven bounded areas and provider-derived key paths.
 XRST observes those paths through real qualified GU and retains real GN position.
+Selected full-function root-target secondary PCBs retain a separate pointer
+identity bound to selected metadata and live source/target/current occurrences.
+XRST uses the same secondary engine GU authority and restores independent GN/GNP
+position without a hold; deleted, reloaded or changed-key pointers report GE.
+Historical primary and GSAM identities remain distinct. Uniquely keyed physical
+paths are required; nonroot inversion, aliases, DEDB and physical tie-order parity
+remain unsupported. [ADR-0032](../../../docs/decisions/0032-selected-secondary-checkpoint-position.md)
+describes drain/backup boundaries and composition with existing application
+epoch/incarnation and retained local backout; old undo cannot revive an
+invalidated secondary witness.
 The Session enforces once-per-execution-attempt XRST and checkpoint-kind order.
 Read-only recovery observation lets a fenced coordinator resolver distinguish
 published results from ambiguous outcomes without redispatch. Recovery session keys bind

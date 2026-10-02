@@ -30,6 +30,7 @@ fn gsam_retained_position_preserves_historical_bytes_and_rejects_ambiguous_shape
                 database: "DB".into(),
                 segment_key: vec![],
                 gsam: Some(gsam),
+                secondary: None,
             }],
         };
         let image =
@@ -78,6 +79,7 @@ fn gsam_retained_position_bounds_and_database_identity_are_checked_before_sealin
             pcb: "1".into(),
             database: "DB".into(),
             segment_key: vec![],
+            secondary: None,
             gsam: Some(SavedGsamPosition::Record(ImsGsamAddress {
                 database: "OTHER".into(),
                 token: [3; 32],

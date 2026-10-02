@@ -79,6 +79,7 @@ impl DatabaseEngine {
             children: Vec::new(),
             version: 1,
             gsam_address: None,
+            secondary_checkpoint_identity: None,
         };
         self.records.insert(id, record);
         if let Some(parent) = request.parent {
@@ -151,6 +152,9 @@ impl DatabaseEngine {
             .ok_or(EngineProblem::StaleHold)?;
         updated.data = data.to_vec();
         updated.version = version;
+        if old_values != new_values {
+            updated.secondary_checkpoint_identity = None;
+        }
         self.indexes = indexes;
         self.revision = revision;
         position.held = Some(HeldRecord {
