@@ -138,7 +138,10 @@ fn both_access_guards_reconcile_direct_retirement_before_dispatch() {
                 .unwrap();
         }
         assert_eq!(kernel.next_event(), Ok(None));
-        assert_eq!(kernel.callback_state(connection), MqCallbackState::Stopped);
+        assert_eq!(
+            kernel.callback_state(owner(1), connection),
+            Err(MqPubsubError::Handle(MqHandleProblem::Stale))
+        );
         assert_eq!(kernel.handles_mut().active_handles(), 0);
         let replacement = connect(&mut kernel, 1);
         kernel
@@ -162,7 +165,10 @@ fn forgotten_guard_cannot_dispatch_retired_callback() {
     access.disconnect(owner(1), connection).unwrap();
     std::mem::forget(access);
     assert_eq!(kernel.next_event(), Ok(None));
-    assert_eq!(kernel.callback_state(connection), MqCallbackState::Stopped);
+    assert_eq!(
+        kernel.callback_state(owner(1), connection),
+        Err(MqPubsubError::Handle(MqHandleProblem::Stale))
+    );
 }
 
 #[test]
@@ -319,7 +325,10 @@ fn disconnect_retires_all_associated_families_and_allows_nondurable_recreate() {
         .unwrap();
     kernel.disconnect(owner(1), connection).unwrap();
     assert_eq!(kernel.handles_mut().active_handles(), 0);
-    assert_eq!(kernel.callback_state(connection), MqCallbackState::Stopped);
+    assert_eq!(
+        kernel.callback_state(owner(1), connection),
+        Err(MqPubsubError::Handle(MqHandleProblem::Stale))
+    );
     assert_eq!(
         kernel.close_subscription(owner(1), connection, subscription.hsub),
         Err(MqPubsubError::Handle(MqHandleProblem::Stale))
@@ -512,7 +521,10 @@ fn cics_default_disconnect_is_a_noop_across_both_families() {
         .unwrap();
     kernel.disconnect(cics, connection).unwrap();
     assert_eq!(kernel.handles_mut().active_handles(), 4);
-    assert_eq!(kernel.callback_state(connection), MqCallbackState::Started);
+    assert_eq!(
+        kernel.callback_state(cics, connection),
+        Ok(MqCallbackState::Started)
+    );
     kernel
         .message_handles_mut()
         .set(
@@ -525,5 +537,8 @@ fn cics_default_disconnect_is_a_noop_across_both_families() {
         .unwrap();
     kernel.end_processing_unit(cics).unwrap();
     assert_eq!(kernel.handles_mut().active_handles(), 0);
-    assert_eq!(kernel.callback_state(connection), MqCallbackState::Stopped);
+    assert_eq!(
+        kernel.callback_state(cics, connection),
+        Err(MqPubsubError::Handle(MqHandleProblem::MissingConnection))
+    );
 }

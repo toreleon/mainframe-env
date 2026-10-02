@@ -226,6 +226,21 @@ struct ConnectionControl {
     state: MqCallbackState,
 }
 
+impl ConnectionControl {
+    /// Callers validate the connection through the registry before matching.
+    /// Default resolves by the frozen CICS processing unit (host/process/task),
+    /// ignoring thread and syncpoint epoch. Issued tokens already identify one
+    /// connection, including when the registry permits sharing across threads.
+    fn matches(&self, owner: MqHandleOwner, hconn: MqHconn) -> bool {
+        self.hconn == hconn
+            && (hconn != MqHconn::Default
+                || (self.owner.environment == owner.environment
+                    && self.owner.host_id == owner.host_id
+                    && self.owner.process_id == owner.process_id
+                    && self.owner.task_id == owner.task_id))
+    }
+}
+
 #[derive(Clone, Debug)]
 enum Mutation {
     Publish {
@@ -552,15 +567,22 @@ impl MqPubsubKernel {
         operation: MqCallbackControl,
     ) -> Result<MqCallbackState, MqPubsubError> {
         self.handles.registry.validate_connection(owner, hconn)?;
-        let index = self.controls.iter().position(|item| item.hconn == hconn);
+        let index = self
+            .controls
+            .iter()
+            .position(|item| item.matches(owner, hconn));
         let old = index.map_or(MqCallbackState::Stopped, |i| self.controls[i].state);
         let next = match operation {
             MqCallbackControl::Start if old == MqCallbackState::Stopped => {
-                if !self
-                    .callbacks
-                    .iter()
-                    .any(|item| item.hconn == hconn && !item.suspended)
-                {
+                if !self.callbacks.iter().any(|item| {
+                    item.hconn == hconn
+                        && !item.suspended
+                        && self
+                            .handles
+                            .registry
+                            .validate(owner, hconn, item.hobj.into(), MqHandleKind::Object)
+                            .is_ok()
+                }) {
                     return Err(MqPubsubError::NoCallbacksActive);
                 }
                 MqCallbackState::Started
@@ -601,12 +623,18 @@ impl MqPubsubKernel {
         Ok(next)
     }
 
-    #[must_use]
-    pub fn callback_state(&self, hconn: MqHconn) -> MqCallbackState {
-        self.controls
+    /// Observe private callback control under the registry's connection scope.
+    pub fn callback_state(
+        &self,
+        owner: MqHandleOwner,
+        hconn: MqHconn,
+    ) -> Result<MqCallbackState, MqPubsubError> {
+        self.handles.registry.validate_connection(owner, hconn)?;
+        Ok(self
+            .controls
             .iter()
-            .find(|item| item.hconn == hconn)
-            .map_or(MqCallbackState::Stopped, |item| item.state)
+            .find(|item| item.matches(owner, hconn))
+            .map_or(MqCallbackState::Stopped, |item| item.state))
     }
 
     /// Stage by caller-owned UOW id, or apply now. Staging remains invisible until commit.
@@ -836,7 +864,8 @@ impl MqPubsubKernel {
                             callback.hconn == binding.hconn
                                 && callback.hobj == binding.handles.hobj
                                 && !callback.suspended
-                                && self.callback_state(callback.hconn) == MqCallbackState::Started
+                                && self.callback_state(binding.owner, callback.hconn)
+                                    == Ok(MqCallbackState::Started)
                         })
                     })
                 else {
