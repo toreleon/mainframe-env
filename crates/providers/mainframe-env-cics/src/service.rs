@@ -3912,6 +3912,7 @@ mod tests {
     struct SyncpointOriginProvider {
         descriptor: CapabilityDescriptor,
         seen: Arc<Mutex<Vec<(String, String, String)>>>,
+        mq_context: Vec<u8>,
     }
 
     #[allow(dead_code)]
@@ -4310,6 +4311,14 @@ mod tests {
         }
 
         fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            if self.descriptor.capability.as_str() == "host.mq.write" {
+                let context = invocation
+                    .bindings
+                    .get("cics.execution-context")
+                    .expect("trusted MQ dispatch materializes the validated CICS context");
+                assert_eq!(context.schema(), "mainframe-env.cics.execution-context@1");
+                assert_eq!(context.bytes(), self.mq_context);
+            }
             let nested = invocation
                 .bindings
                 .get(CICS_NESTED_EFFECT_ORIGIN_BINDING)
@@ -4746,6 +4755,7 @@ mod tests {
 
     fn syncpoint_origin_authorities(
         seen: Arc<Mutex<Vec<(String, String, String)>>>,
+        mq_context: &[u8],
     ) -> Arc<ScopedHostService> {
         let mut providers = [
             "host.security.authorize",
@@ -4765,6 +4775,7 @@ mod tests {
             providers.push(Arc::new(SyncpointOriginProvider {
                 descriptor: descriptor(capability),
                 seen: seen.clone(),
+                mq_context: mq_context.to_vec(),
             }));
         }
         Arc::new(ScopedHostService::new(
@@ -40364,7 +40375,7 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open(
-            syncpoint_origin_authorities(seen.clone()),
+            syncpoint_origin_authorities(seen.clone(), b"local"),
             store,
             CicsLimits::default(),
         )
@@ -40408,6 +40419,138 @@ mod tests {
             seen[3..]
                 .iter()
                 .all(|(_, nested, outer)| nested.starts_with("cics:run:") && outer == "outer-94")
+        );
+    }
+
+    #[test]
+    fn syncpoint_mq_context_capacity_is_checked_before_any_participant_mutation() {
+        let limits = InvocationLimits::default();
+        for (case, context, binding_count, expected) in [
+            ("implicit-fit", None, limits.max_bindings - 3, Ok(())),
+            (
+                "implicit-over",
+                None,
+                limits.max_bindings - 2,
+                Err(HostProblem::ResourceExhausted),
+            ),
+            (
+                "explicit-fit",
+                Some(b"local".as_slice()),
+                limits.max_bindings - 2,
+                Ok(()),
+            ),
+            (
+                "explicit-over",
+                Some(b"local".as_slice()),
+                limits.max_bindings - 1,
+                Err(HostProblem::ResourceExhausted),
+            ),
+            (
+                "dpl-fit",
+                Some(b"dpl-synconreturn".as_slice()),
+                limits.max_bindings - 2,
+                Ok(()),
+            ),
+        ] {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = CicsService::open(
+                syncpoint_origin_authorities(seen.clone(), context.unwrap_or(b"local")),
+                store.clone(),
+                CicsLimits::default(),
+            )
+            .unwrap();
+            let mut bindings = BTreeMap::new();
+            if let Some(context) = context {
+                bindings.insert(
+                    "cics.execution-context".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.execution-context@1",
+                        context.to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                );
+            }
+            for index in bindings.len()..binding_count {
+                bindings.insert(
+                    format!("binding-{index}"),
+                    BoundedPayload::new("test@1", Vec::new(), limits).unwrap(),
+                );
+            }
+            let invocation = invocation_for(case, bindings);
+            let session = SessionId::new(case, 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            for (sequence, rollback) in [(95, false), (96, true)] {
+                let arguments = if rollback {
+                    BTreeMap::from([("OPTION.ROLLBACK".into(), bounded(Vec::new()).unwrap())])
+                } else {
+                    BTreeMap::new()
+                };
+                let request = request(CicsOperation::Syncpoint, arguments, sequence);
+                let result = service.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                );
+                assert_eq!(
+                    result.as_ref().map(|_| ()).map_err(Clone::clone),
+                    expected,
+                    "{case}"
+                );
+                if expected.is_ok() {
+                    assert_eq!(
+                        result.unwrap().unit_of_work,
+                        Some(if rollback {
+                            CicsUnitOfWorkOutcome::RolledBack
+                        } else {
+                            CicsUnitOfWorkOutcome::Committed
+                        })
+                    );
+                } else {
+                    assert!(seen.lock().unwrap().is_empty());
+                    assert!(
+                        store
+                            .get_provider_state("cics-uow", &format!("outer-{sequence}"))
+                            .unwrap()
+                            .is_none()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn syncpoint_without_mq_does_not_reserve_an_unused_context_binding() {
+        let limits = InvocationLimits::default();
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let bindings = (0..limits.max_bindings)
+            .map(|index| {
+                (
+                    format!("binding-{index}"),
+                    BoundedPayload::new("test@1", Vec::new(), limits).unwrap(),
+                )
+            })
+            .collect();
+        let invocation = invocation_for("without-mq", bindings);
+        let session = SessionId::new("without-mq", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let request = request(CicsOperation::Syncpoint, BTreeMap::new(), 97);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 97),
+                    request
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
         );
     }
 
