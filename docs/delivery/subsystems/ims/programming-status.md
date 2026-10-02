@@ -3149,3 +3149,79 @@ exact resealing accompany the manager feature commit. Human source/expectation/
 applicability acceptance, complete applicable classes, participant/lease closure,
 coherent restore/retention and full v0.14 acceptance remain pending. Licensed
 certification is user-excluded, not counted passing. No parent/release credit.
+## IMS-1405.tm-application-backout (bounded contract gap delivery, 2026-10-02)
+
+Parent: IMS-1405, still in progress. Clean entry:
+`bf0dc41c798ea344a195e5c2b3d47bfed7908277`; branch:
+`codex/v014-tm-application-backout-20261002`. The user authorizes a precise
+source/contract gap packet where genuine shared-owner authority is required.
+This slice declares that delivery before implementation: proposed
+[ADR-0031](../../../decisions/0031-ims-tm-recovery-publication.md), focused
+signed scheduled-TM rejection and shared-store interleaving witnesses, this
+status, a unique fragment, and normal generated documentation. No runtime,
+public ABI, durable schema, participant capability, or algorithm is changed.
+
+Catalog context is `ibm-ims-15.6-dli-2026-08-31:dli-call-families`
+`:0017/:0018/:0020/:0021`, with `:0002/:0023` checkpoint and
+`:0005/:0008/:0024` message-I/O dependencies. Required obligations are one
+RecoverySession/DB UOW/TM publication authority, actual signed transaction
+selection and claimed input, work lease/incarnation and core recovery fencing,
+ordinary/unpurged/express-PURGed output distinction, point/commit interval
+ownership, conversation/input resumption, suspend versus reschedule/terminal
+disposition, canonical replay, live controls/SAF/bounds, and retained read-only
+observation plus fenced settlement resolution. Memory and file SQLite are
+the bounded investigation matrix; PostgreSQL and all implementation acceptance
+phases remain pending until an owned contract extension exists.
+
+The existing `ProviderStateStore` can publish TM and DB rows together but
+cannot predicate that publication on a typed WorkStore lease or effect
+recovery fence. The Memory work map is separate from provider rows; SQLite's
+private `durable-work` encoding is not a portable provider authority. A
+read-only lease check or `has_session` absence check cannot fence publication
+against concurrent lease replacement/admission. TM release/completion remains
+a second operation with retained replay-work data, without an authoritative
+settlement outcome tied to the exact scheduling incarnation. The proposal
+names the shared store/coordinator, host and IMS owner decisions required;
+no private queue/work table/lock service or raw core-row mutation substitutes
+for them. No dormant staged helper is shipped before those decisions.
+
+Actual TM application backout remains Unsupported, including attempts to
+label an existing TM session DB-batch. The preceding DB-only SETS/SETU/ROLS/
+ROLL/ROLB and generic Batch undo/epoch/incarnation behavior is preserved.
+The older base lacks the manager's extracted `product/ims.rs` owner; the only
+product seam here is test registration in the existing recovery test owner.
+Official, licensed, maintainer, parent and release credit remain zero; mixed
+resource closure remains v0.16. ADR-0031 supplies source identities, the exact
+missing guarantees, proposed compatibility/failure rules, and future acceptance
+matrix. Current-candidate receipts and the sealed commit identity belong in
+the external handoff, never a new committed execution ledger.
+
+### Manager TM contract-gap integration — 2026-10-02
+
+The manager consumes exactly `531f39c137ab5dad00d8db72f28b083aea2b19d3`
+after sealed application backout and candidate-IR preparation. Its proposed
+decision is renumbered ADR-0031 to avoid the independently allocated GSAM
+ADR-0028; source content and Proposed status are preserved. Both documentation
+navigation entries survive integration. No accepted ADR, store/execution API,
+provider behavior, work codec, migration or participant capability changes.
+
+The negative witnesses run real signed scheduled input and provider mutations,
+plus Memory/file SQLite stale-lease and provider-CAS interleavings. They show
+an unavailable guarantee: a provider-row transaction can succeed before a
+separate work completion rejects its replaced lease. This is not successful
+TM backout or a source-excluded fake execution. The required owner decision is
+an additive shared conditional publication and authoritative work settlement,
+with default fail-closed behavior for old implementations and genuine backend
+failure/replay/crash proof. No provider-private work table can substitute.
+
+Current manager verification receipts and exact gap-packet seal remain external.
+Two signed scheduled-TM rejection cases and four shared-store test entries pass;
+the no-environment process helper earns no scenario credit, while its substantive
+parent asserts three real SQLite child phases. Strict changed-store-test and
+server all-targets Clippy, module/architecture, dependency, IMS catalog/assurance/
+schema/spec, formatting, docs and changelog checks pass in the manager checkout.
+The older worker's inherited server-lint/module blockers are not waived; the
+manager verifies its extracted owners directly. Human/official/participant/TM
+execution/parent/release acceptance stays open. Licensed certification remains
+excluded, with no execution credit. Actual TM recovery needs the proposed
+shared-owner decision; read-only absence or lease observations are insufficient.

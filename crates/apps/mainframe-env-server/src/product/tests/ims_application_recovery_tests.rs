@@ -7,6 +7,8 @@ use mainframe_env_host_api::{
 
 #[path = "ims_application_backout_tests.rs"]
 mod application_backout;
+#[path = "ims_tm_backout_gap_tests.rs"]
+mod tm_backout_gap;
 
 struct LogMachine {
     effect: Option<EffectRequest>,

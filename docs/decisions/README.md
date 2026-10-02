@@ -32,6 +32,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 | [0027](0027-cics-logical-program-frames.md) | shared CICS task ownership and bounded logical program frames | Proposed |
 | [0028](0028-gsam-logical-address.md) | bounded public GSAM logical addresses using existing engine, PCB and row authorities | Proposed |
+| [0031](0031-ims-tm-recovery-publication.md) | shared work/effect-fenced IMS TM recovery publication and settlement | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

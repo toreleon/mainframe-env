@@ -94,6 +94,7 @@ explicitly names that authority as superseded.
 - [ADR-0026: CardDemo run bundle](decisions/0026-run-bundle.md)
 - [ADR-0027: CICS task ownership across logical program frames](decisions/0027-cics-logical-program-frames.md)
 - [ADR-0028: Bounded GSAM logical record addresses](decisions/0028-gsam-logical-address.md)
+- [ADR-0031: IMS TM recovery publication and work settlement](decisions/0031-ims-tm-recovery-publication.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 225,
+    "markdown_documents": 226,
     "navigation_groups": 6,
-    "normative_documents": 59,
+    "normative_documents": 60,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 115,
-      "sha256": "sha256:523d92f514fcd39726ec387468712f1daa13969b146897ec29ce23229914d99b",
+      "relative_links": 116,
+      "sha256": "sha256:41290bf41bcd049e365a066ba23db5732832cdea897f651c57b281e39aca1f8c",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -975,10 +975,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 investigation; implementation pending owner decision",
+      "normative": true,
+      "owner": "store/execution contracts and coordinator maintainers, with host and IMS owners",
+      "path": "docs/decisions/0031-ims-tm-recovery-publication.md",
+      "relative_links": 0,
+      "scope": "proposed shared publication/settlement boundary; no actual TM recovery admission",
+      "sha256": "sha256:c4d8476ef89497c096ee28a79dd316b3c75d08c80a8292601f7ad340244ad9da",
+      "status": "Proposed; shared contract-owner decision required",
+      "title": "ADR-0031: IMS TM recovery publication and work settlement",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 28,
-      "sha256": "sha256:3bd936e1b4c4f38ab41d674a58ff163acb682ebf2261e68576a0497b9ccba2c8",
+      "relative_links": 29,
+      "sha256": "sha256:14bbe6939fa267b4698942b38af59090011759303e4abd478dfcb51c954ca704",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1413,8 +1425,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 8,
-      "sha256": "sha256:964dc8b1c352c9a998205f3e9908629bbb89d4998861f30770126564db463831",
+      "relative_links": 9,
+      "sha256": "sha256:8cca75f216616b9db72f5e57ba2ff48fb1f52087ff3c4be14f3d18695ccfd223",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2268,6 +2280,10 @@
           "path": "docs/decisions/0028-gsam-logical-address.md"
         },
         {
+          "label": "ADR-0031: IMS TM recovery publication and work settlement",
+          "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2516,7 +2532,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:7deb61e47444fd9267d43f5494feb8656aeb3d0589a0acde9620c6cdd33dbb84",
+  "registry_sha256": "sha256:4c8b53cccff80f1f0e3154cbe7da6624a2af1ca83837edd16f9b0ba0fa3a183a",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
