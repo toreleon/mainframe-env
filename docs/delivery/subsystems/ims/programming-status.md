@@ -6,6 +6,61 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## 2026-10-02 nonlicensed continuation
+
+The user explicitly excluded licensed certification for this continuation.
+This is an implementation-work scope decision, not a licensed pass, a release
+promotion, or a reduction of the official 25-row denominator. Differential
+credit remains **0/25**. The resumed manager candidate starts from
+`213ed878ec138bdb2914330db6613559bffc5a86` on
+`codex/v014-nonlicensed-completion-20261002` and uses isolated CLI feature
+lanes with at most four workers. Each lane uses `gpt-6.1-sol`, high effort,
+fast mode off, offline pinned source review and feature completion seals.
+
+The read-only acceptance audit found zero IMS rows/cases in the shared
+Conformance IR. The earlier **25/25 local handler mappings are not official
+nonlicensed gate passes**. Several historical pending paragraphs were already
+superseded by later implementations; they are retained as their original slice
+record, not the current remaining-work authority.
+
+Current work and sequencing:
+
+- `IMS-1405.basic-checkpoint-boundary` is sealed at `d5fef29b`; the generic
+  checkpoint commits undo and clears position, with four focused regressions.
+- `IMS-1406.participant-binding` is integrated at `a130d1ac` as **preparation
+  only**, retaining pending/null accepted capabilities. Public-provider and
+  four-process SQLite restart tests do not replace the missing coordinator
+  fencing, live controls, audit, retention and compatibility obligations.
+- `IMS-1406.carddemo-corpus-package-route` migrates the actual clean corpus at
+  pinned commit `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, not merely synthetic
+  CardDemo-shaped definitions. It must prove signed selected metadata, exact
+  load/unload outputs, replay/rollback and Memory/SQLite reopen.
+- `IMS-1403.local-uow-isolation` fences competing same-database writers and
+  makes whole-image backout fail closed when retained safety cannot be proved.
+- `IMS-1403.pcb-sensitivity` repairs request-PCB selection, independent
+  positions and targetless GN/GNP sensitivity without protected-data leakage.
+- `IMS-1405.application-recovery-dispatch` connects the existing recovery
+  authority to bounded public typed calls; real PCB reposition and actual TM
+  backout remain required where applicable, not synthetic-row substitutes.
+
+Subsequent owned closure still includes public SSA/command-code/GSAM RSA and
+embedded call routing, reviewed secondary access paths and STAT observations,
+accepted early IMS participation, independently specified shared IR
+obligations/driver/verdicts, and the applicable restart/compatibility/scale
+matrix. The manager must integrate feature commits before running the complete
+affected-subsystem exit checks on one unchanged candidate. Final mixed-resource
+syncpoint closure stays in 0.16; licensed certification is excluded from this
+run and remains pending rather than silently passed.
+
+Offline cache resolution found the former CICS `dfhp37p.html` blocker at its
+exact retained pin and assembled 509 verified reader entries. The aggregate
+architecture gate still requires eight absent pinned CICS bodies (two batch-A
+topics and six supplements). No refresh was authorized or performed. These
+source-cache findings carry zero semantic credit, and the unchanged aggregate
+failure is not repeatedly rerun. Focused architecture/security/effect/storage/
+retention guards and dependency policy passed on the audited base; their old
+receipts are not relabeled as new-candidate acceptance.
+
 ## IMS-1405.basic-checkpoint-boundary (implemented repair slice)
 
 Parent: IMS-1405. Candidate base: `213ed878ec138bdb2914330db6613559bffc5a86`
