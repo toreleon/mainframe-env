@@ -354,3 +354,40 @@ below its existing ceiling, without raising exemptions or changing schemas.
 The same slice updates `tools/check_provider_rows.py` and focused guard mutants
 to inspect the linked MQ row child as well as the service, preserving both
 required atomic-write checks and whole-state-serialization rejection.
+
+### Consumed dependency identities
+
+The accepted COBOL execution integration is merged PR #6, merge
+`c7a07a93d0980173338cb26b85224e65d26e945e`, accepted candidate
+`ba0694b12409b190acfae62fc50c01b289b7cdbc`, tree
+`a0d6d6334db66f3392db44c3bb2e82ce0c590e66`. The accepted RACF/SAF integration is
+merged PR #4, merge `b4f8fc70d320c52576667a7887312c16f9b22e68`, accepted candidate
+`aa6debaf4952f31c15d83668c7b210834caa847d`, tree
+`6b5975fdc7920d1664ec28674b5f66a7d6bb6f72`. Both merged authorities are ancestors
+of this continuation; each accepted candidate has the same tree as its merge.
+The scoped approvals recorded in COBOL execution status (2026-09-02, licensed
+0/153 pending) and RACF security status (2026-09-01, licensed 0/48 pending)
+remain historical dependency dispositions, not an MQ licensed waiver.
+
+On clean continuation candidate `23c6200144c7416ee05e091409dd058d9f31ddf3`, the
+consumed contracts passed `cargo xtask cobol-exit --check`,
+`cargo xtask racf-catalog --check`, and focused RACF/SAF local conformance:
+48/48 for each recognized, validated, executed, conditioned and recovered gate.
+The COBOL exit checks structural closure and owned malformed/limit/recovery and
+prior-artifact compatibility; it is not a fresh licensed execution campaign.
+Receipts retain their actual candidate outside Git, and the target was cleaned.
+
+### Next shared effect boundary
+
+The manager declares `MQ-1501.host-effect-contract`: additive typed MQI
+`HostRequest`/`HostResult` framing through the existing canonical streaming
+authority, exact mutation/effect occurrence binding and bounded validation.
+It covers existing catalog rows `0001`–`0026` as a non-executable contract only,
+preserving callback notification's non-application-call role and every existing
+legacy golden byte. Owned paths are host request/MQ child records, canonical MQ
+child/framing, facade, focused host contract/golden tests, the canonical contract
+document and one unique fragment. Existing oversized request and canonical
+modules must be reduced within their registered ceilings, not granted new
+exemptions. No provider advertisement, accepted participant or official
+execution credit is introduced. Public service composition remains separately
+required with trusted identity, SAF/audit and durable backend proof.

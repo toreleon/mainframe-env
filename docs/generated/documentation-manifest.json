@@ -3,7 +3,7 @@
     "markdown_documents": 225,
     "navigation_groups": 6,
     "normative_documents": 59,
-    "xtask_commands": 211
+    "xtask_commands": 213
   },
   "documents": [
     {
@@ -1486,9 +1486,9 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:31ff0aaeb486f2adcd2066107f26c8788d69b59547cbad30561935f656f1639b",
+      "sha256": "sha256:93526a5b86936df1b57c5dac367fbd93e01edd3cd8d7815adad59517ed5f55d9",
       "title": "IBM MQ — MQI programming surface progress",
-      "xtask_commands": 0
+      "xtask_commands": 2
     },
     {
       "normative": false,
