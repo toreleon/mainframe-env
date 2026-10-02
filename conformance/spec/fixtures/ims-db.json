@@ -1,0 +1,2956 @@
+{
+  "schema_version": "mainframe-env.ims-db-fixtures@1",
+  "metadata": {
+    "schema_version": "mainframe-env.ims-metadata@1",
+    "databases": [
+      {
+        "name": "IRDB",
+        "version": 1,
+        "organization": "HIDAM",
+        "segments": [
+          {
+            "name": "ROOT",
+            "parent": null,
+            "min_length": 3,
+            "max_length": 3,
+            "fields": [
+              {
+                "name": "ROOTKEY",
+                "offset": 0,
+                "length": 2,
+                "sequence": true,
+                "unique": true
+              }
+            ]
+          },
+          {
+            "name": "CHILD",
+            "parent": "ROOT",
+            "min_length": 3,
+            "max_length": 3,
+            "fields": [
+              {
+                "name": "CHILDKEY",
+                "offset": 0,
+                "length": 2,
+                "sequence": true,
+                "unique": true
+              }
+            ]
+          }
+        ],
+        "secondary_indexes": [],
+        "logical_relationships": []
+      }
+    ],
+    "psbs": [
+      {
+        "name": "IRPSB",
+        "database_level": "current",
+        "pcbs": [
+          {
+            "kind": "database",
+            "name": "IRPCB",
+            "database": "IRDB",
+            "database_version": 1,
+            "processing_options": "AP",
+            "sensitive_segments": [
+              {
+                "name": "ROOT",
+                "parent": null,
+                "processing_options": null
+              },
+              {
+                "name": "CHILD",
+                "parent": "ROOT",
+                "processing_options": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "seed": {
+    "database": "IRDB",
+    "records": [
+      {
+        "segment": "ROOT",
+        "parent": null,
+        "data": [
+          65,
+          49,
+          120
+        ]
+      },
+      {
+        "segment": "CHILD",
+        "parent": 0,
+        "data": [
+          99,
+          49,
+          117
+        ]
+      },
+      {
+        "segment": "CHILD",
+        "parent": 0,
+        "data": [
+          99,
+          50,
+          118
+        ]
+      },
+      {
+        "segment": "ROOT",
+        "parent": null,
+        "data": [
+          66,
+          50,
+          121
+        ]
+      },
+      {
+        "segment": "CHILD",
+        "parent": 3,
+        "data": [
+          100,
+          49,
+          119
+        ]
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "id": "ims.db.unique_repeated.memory",
+      "backend": "memory",
+      "trial": "unique_repeated",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.unique_repeated.sqlite",
+      "backend": "sqlite",
+      "trial": "unique_repeated",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.sequential_boundary.memory",
+      "backend": "memory",
+      "trial": "sequential_boundary",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  66,
+                  50,
+                  121
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "GB",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              66,
+              50,
+              121
+            ]
+          ]
+        }
+      },
+      "seed_scope": "roots_only"
+    },
+    {
+      "id": "ims.db.sequential_boundary.sqlite",
+      "backend": "sqlite",
+      "trial": "sequential_boundary",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  66,
+                  50,
+                  121
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "GB",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              66,
+              50,
+              121
+            ]
+          ]
+        }
+      },
+      "seed_scope": "roots_only"
+    },
+    {
+      "id": "ims.db.parent_sequence.memory",
+      "backend": "memory",
+      "trial": "parent_sequence",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  49,
+                  117
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  50,
+                  118
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            99,
+            50,
+            118
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.parent_sequence.sqlite",
+      "backend": "sqlite",
+      "trial": "parent_sequence",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  49,
+                  117
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  50,
+                  118
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            99,
+            50,
+            118
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.parent_required.memory",
+      "backend": "memory",
+      "trial": "parent_required",
+      "expected": {
+        "calls": [
+          {
+            "status": "GP",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.parent_required.sqlite",
+      "backend": "sqlite",
+      "trial": "parent_required",
+      "expected": {
+        "calls": [
+          {
+            "status": "GP",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.parent_mismatch.memory",
+      "backend": "memory",
+      "trial": "parent_mismatch",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "GE",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.parent_mismatch.sqlite",
+      "backend": "sqlite",
+      "trial": "parent_mismatch",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "GE",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.hold_unique_replace.memory",
+      "backend": "memory",
+      "trial": "hold_unique_replace",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            122
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              122
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.hold_unique_replace.sqlite",
+      "backend": "sqlite",
+      "trial": "hold_unique_replace",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            122
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              122
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.hold_next_replace.memory",
+      "backend": "memory",
+      "trial": "hold_next_replace",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            122
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              122
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.hold_next_replace.sqlite",
+      "backend": "sqlite",
+      "trial": "hold_next_replace",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            122
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              122
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.hold_parent_replace.memory",
+      "backend": "memory",
+      "trial": "hold_parent_replace",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  49,
+                  117
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            99,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              122
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.hold_parent_replace.sqlite",
+      "backend": "sqlite",
+      "trial": "hold_parent_replace",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  49,
+                  117
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            99,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              122
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_without_hold.memory",
+      "backend": "memory",
+      "trial": "replace_without_hold",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DJ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_without_hold.sqlite",
+      "backend": "sqlite",
+      "trial": "replace_without_hold",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DJ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.delete_without_hold.memory",
+      "backend": "memory",
+      "trial": "delete_without_hold",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DJ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.delete_without_hold.sqlite",
+      "backend": "sqlite",
+      "trial": "delete_without_hold",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DJ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_key_forbidden.memory",
+      "backend": "memory",
+      "trial": "replace_key_forbidden",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DA",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_key_forbidden.sqlite",
+      "backend": "sqlite",
+      "trial": "replace_key_forbidden",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DA",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.delete_subtree.memory",
+      "backend": "memory",
+      "trial": "delete_subtree",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 3
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.delete_subtree.sqlite",
+      "backend": "sqlite",
+      "trial": "delete_subtree",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 3
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.malformed_ssa.memory",
+      "backend": "memory",
+      "trial": "malformed_ssa",
+      "expected": {
+        "calls": [
+          {
+            "status": null,
+            "problem": "Malformed",
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.malformed_ssa.sqlite",
+      "backend": "sqlite",
+      "trial": "malformed_ssa",
+      "expected": {
+        "calls": [
+          {
+            "status": null,
+            "problem": "Malformed",
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.ssa_limit.memory",
+      "backend": "memory",
+      "trial": "ssa_limit",
+      "expected": {
+        "calls": [
+          {
+            "status": null,
+            "problem": "ResourceExhausted",
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.ssa_limit.sqlite",
+      "backend": "sqlite",
+      "trial": "ssa_limit",
+      "expected": {
+        "calls": [
+          {
+            "status": null,
+            "problem": "ResourceExhausted",
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.denied.memory",
+      "backend": "memory",
+      "trial": "denied",
+      "expected": {
+        "calls": [
+          {
+            "status": null,
+            "problem": "Unauthorized",
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.denied.sqlite",
+      "backend": "sqlite",
+      "trial": "denied",
+      "expected": {
+        "calls": [
+          {
+            "status": null,
+            "problem": "Unauthorized",
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replayed_next.memory",
+      "backend": "memory",
+      "trial": "replayed_next",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replayed_next.sqlite",
+      "backend": "sqlite",
+      "trial": "replayed_next",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            120
+          ],
+          "parentage": [
+            65,
+            49,
+            120
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_rollback.memory",
+      "backend": "memory",
+      "trial": "replace_rollback",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_rollback.sqlite",
+      "backend": "sqlite",
+      "trial": "replace_rollback",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_restart_replay.memory",
+      "backend": "memory",
+      "trial": "replace_restart_replay",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            122
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              122
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.replace_restart_replay.sqlite",
+      "backend": "sqlite",
+      "trial": "replace_restart_replay",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 1
+          }
+        ],
+        "state": {
+          "current": [
+            65,
+            49,
+            122
+          ],
+          "parentage": [
+            65,
+            49,
+            122
+          ],
+          "held": true,
+          "database": [
+            [
+              65,
+              49,
+              122
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.delete_restart_replay.memory",
+      "backend": "memory",
+      "trial": "delete_restart_replay",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 3
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 3
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.delete_restart_replay.sqlite",
+      "backend": "sqlite",
+      "trial": "delete_restart_replay",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 3
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [],
+            "affected": 3
+          }
+        ],
+        "state": {
+          "current": null,
+          "parentage": null,
+          "held": false,
+          "database": [
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.intervening_get.memory",
+      "backend": "memory",
+      "trial": "intervening_get",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  49,
+                  117
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DJ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            99,
+            49,
+            117
+          ],
+          "parentage": [
+            99,
+            49,
+            117
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    },
+    {
+      "id": "ims.db.intervening_get.sqlite",
+      "backend": "sqlite",
+      "trial": "intervening_get",
+      "expected": {
+        "calls": [
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "ROOT",
+                "data": [
+                  65,
+                  49,
+                  120
+                ],
+                "parent_key": null
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "  ",
+            "problem": null,
+            "segments": [
+              {
+                "name": "CHILD",
+                "data": [
+                  99,
+                  49,
+                  117
+                ],
+                "parent_key": [
+                  65,
+                  49
+                ]
+              }
+            ],
+            "affected": 0
+          },
+          {
+            "status": "DJ",
+            "problem": null,
+            "segments": [],
+            "affected": 0
+          }
+        ],
+        "state": {
+          "current": [
+            99,
+            49,
+            117
+          ],
+          "parentage": [
+            99,
+            49,
+            117
+          ],
+          "held": false,
+          "database": [
+            [
+              65,
+              49,
+              120
+            ],
+            [
+              99,
+              49,
+              117
+            ],
+            [
+              99,
+              50,
+              118
+            ],
+            [
+              66,
+              50,
+              121
+            ],
+            [
+              100,
+              49,
+              119
+            ]
+          ]
+        }
+      },
+      "seed_scope": "hierarchy"
+    }
+  ]
+}

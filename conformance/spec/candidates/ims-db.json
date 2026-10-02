@@ -1,0 +1,2128 @@
+{
+  "schema_version": "mainframe-env.conformance-candidate@1",
+  "review_status": "pending-maintainer",
+  "coverage_credit": 0,
+  "spec": {
+    "schema_version": "mainframe-env.conformance-spec@1",
+    "spec_version": "mainframe-env.conformance-ir@1",
+    "catalog_digest": "sha256:f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
+    "shard_count": 1,
+    "registries": {
+      "operations": [
+        "ims.db.get",
+        "ims.db.hold",
+        "ims.db.replace",
+        "ims.db.delete"
+      ],
+      "input_shapes": [
+        "ims.db.fixture"
+      ],
+      "predicates": [],
+      "transitions": [
+        "ims.db.public-transition"
+      ],
+      "observations": [
+        "observe.ims.db.unique_repeated.memory",
+        "observe.ims.db.unique_repeated.sqlite",
+        "observe.ims.db.sequential_boundary.memory",
+        "observe.ims.db.sequential_boundary.sqlite",
+        "observe.ims.db.parent_sequence.memory",
+        "observe.ims.db.parent_sequence.sqlite",
+        "observe.ims.db.parent_required.memory",
+        "observe.ims.db.parent_required.sqlite",
+        "observe.ims.db.parent_mismatch.memory",
+        "observe.ims.db.parent_mismatch.sqlite",
+        "observe.ims.db.hold_unique_replace.memory",
+        "observe.ims.db.hold_unique_replace.sqlite",
+        "observe.ims.db.hold_next_replace.memory",
+        "observe.ims.db.hold_next_replace.sqlite",
+        "observe.ims.db.hold_parent_replace.memory",
+        "observe.ims.db.hold_parent_replace.sqlite",
+        "observe.ims.db.replace_without_hold.memory",
+        "observe.ims.db.replace_without_hold.sqlite",
+        "observe.ims.db.delete_without_hold.memory",
+        "observe.ims.db.delete_without_hold.sqlite",
+        "observe.ims.db.replace_key_forbidden.memory",
+        "observe.ims.db.replace_key_forbidden.sqlite",
+        "observe.ims.db.delete_subtree.memory",
+        "observe.ims.db.delete_subtree.sqlite",
+        "observe.ims.db.malformed_ssa.memory",
+        "observe.ims.db.malformed_ssa.sqlite",
+        "observe.ims.db.ssa_limit.memory",
+        "observe.ims.db.ssa_limit.sqlite",
+        "observe.ims.db.denied.memory",
+        "observe.ims.db.denied.sqlite",
+        "observe.ims.db.replayed_next.memory",
+        "observe.ims.db.replayed_next.sqlite",
+        "observe.ims.db.replace_rollback.memory",
+        "observe.ims.db.replace_rollback.sqlite",
+        "observe.ims.db.replace_restart_replay.memory",
+        "observe.ims.db.replace_restart_replay.sqlite",
+        "observe.ims.db.delete_restart_replay.memory",
+        "observe.ims.db.delete_restart_replay.sqlite",
+        "observe.ims.db.intervening_get.memory",
+        "observe.ims.db.intervening_get.sqlite"
+      ],
+      "conditions": [
+        "ims.db.status-or-host-error"
+      ],
+      "recoveries": [
+        "ims.db.local-replay-reopen-rollback"
+      ],
+      "oracles": [],
+      "drivers": [
+        "ims.db.public-host"
+      ],
+      "fixtures": [
+        {
+          "id": "ims.db.unique_repeated.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.unique_repeated.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.sequential_boundary.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.sequential_boundary.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.parent_sequence.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.parent_sequence.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.parent_required.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.parent_required.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.parent_mismatch.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.parent_mismatch.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.hold_unique_replace.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.hold_unique_replace.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.hold_next_replace.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.hold_next_replace.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.hold_parent_replace.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.hold_parent_replace.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_without_hold.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_without_hold.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.delete_without_hold.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.delete_without_hold.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_key_forbidden.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_key_forbidden.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.delete_subtree.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.delete_subtree.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.malformed_ssa.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.malformed_ssa.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.ssa_limit.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.ssa_limit.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.denied.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.denied.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replayed_next.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replayed_next.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_rollback.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_rollback.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_restart_replay.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.replace_restart_replay.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.delete_restart_replay.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.delete_restart_replay.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.intervening_get.memory",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        },
+        {
+          "id": "ims.db.intervening_get.sqlite",
+          "digest": "sha256:9476b8b7c1c368c00198778cd8c2a15a01ae8f7cda39a94cde16fbfcb3078d51"
+        }
+      ],
+      "scenario_steps": [],
+      "failure_points": [],
+      "reviewed_rules": []
+    },
+    "rows": [
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "operation": "ims.db.delete",
+        "input": "ims.db.fixture",
+        "preconditions": [],
+        "transition": "ims.db.public-transition",
+        "postconditions": [
+          "observe.ims.db.delete_without_hold.memory",
+          "observe.ims.db.delete_without_hold.sqlite",
+          "observe.ims.db.delete_subtree.memory",
+          "observe.ims.db.delete_subtree.sqlite",
+          "observe.ims.db.delete_restart_replay.memory",
+          "observe.ims.db.delete_restart_replay.sqlite"
+        ],
+        "conditions": [
+          "ims.db.status-or-host-error"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "applicable_gates": [
+          "recognized",
+          "validated",
+          "executed",
+          "conditioned",
+          "recovered",
+          "differential"
+        ],
+        "obligations": [
+          "delete_without_hold.memory",
+          "delete_without_hold.sqlite",
+          "delete_subtree.memory",
+          "delete_subtree.sqlite",
+          "delete_restart_replay.memory",
+          "delete_restart_replay.sqlite"
+        ],
+        "reviewed_rules": []
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "operation": "ims.db.get",
+        "input": "ims.db.fixture",
+        "preconditions": [],
+        "transition": "ims.db.public-transition",
+        "postconditions": [
+          "observe.ims.db.unique_repeated.memory",
+          "observe.ims.db.unique_repeated.sqlite",
+          "observe.ims.db.sequential_boundary.memory",
+          "observe.ims.db.sequential_boundary.sqlite",
+          "observe.ims.db.parent_sequence.memory",
+          "observe.ims.db.parent_sequence.sqlite",
+          "observe.ims.db.parent_required.memory",
+          "observe.ims.db.parent_required.sqlite",
+          "observe.ims.db.parent_mismatch.memory",
+          "observe.ims.db.parent_mismatch.sqlite",
+          "observe.ims.db.malformed_ssa.memory",
+          "observe.ims.db.malformed_ssa.sqlite",
+          "observe.ims.db.ssa_limit.memory",
+          "observe.ims.db.ssa_limit.sqlite",
+          "observe.ims.db.replayed_next.memory",
+          "observe.ims.db.replayed_next.sqlite"
+        ],
+        "conditions": [
+          "ims.db.status-or-host-error"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "applicable_gates": [
+          "recognized",
+          "validated",
+          "executed",
+          "conditioned",
+          "recovered",
+          "differential"
+        ],
+        "obligations": [
+          "unique_repeated.memory",
+          "unique_repeated.sqlite",
+          "sequential_boundary.memory",
+          "sequential_boundary.sqlite",
+          "parent_sequence.memory",
+          "parent_sequence.sqlite",
+          "parent_required.memory",
+          "parent_required.sqlite",
+          "parent_mismatch.memory",
+          "parent_mismatch.sqlite",
+          "malformed_ssa.memory",
+          "malformed_ssa.sqlite",
+          "ssa_limit.memory",
+          "ssa_limit.sqlite",
+          "replayed_next.memory",
+          "replayed_next.sqlite"
+        ],
+        "reviewed_rules": []
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "operation": "ims.db.hold",
+        "input": "ims.db.fixture",
+        "preconditions": [],
+        "transition": "ims.db.public-transition",
+        "postconditions": [
+          "observe.ims.db.hold_unique_replace.memory",
+          "observe.ims.db.hold_unique_replace.sqlite",
+          "observe.ims.db.hold_next_replace.memory",
+          "observe.ims.db.hold_next_replace.sqlite",
+          "observe.ims.db.hold_parent_replace.memory",
+          "observe.ims.db.hold_parent_replace.sqlite",
+          "observe.ims.db.denied.memory",
+          "observe.ims.db.denied.sqlite",
+          "observe.ims.db.intervening_get.memory",
+          "observe.ims.db.intervening_get.sqlite"
+        ],
+        "conditions": [
+          "ims.db.status-or-host-error"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "applicable_gates": [
+          "recognized",
+          "validated",
+          "executed",
+          "conditioned",
+          "recovered",
+          "differential"
+        ],
+        "obligations": [
+          "hold_unique_replace.memory",
+          "hold_unique_replace.sqlite",
+          "hold_next_replace.memory",
+          "hold_next_replace.sqlite",
+          "hold_parent_replace.memory",
+          "hold_parent_replace.sqlite",
+          "denied.memory",
+          "denied.sqlite",
+          "intervening_get.memory",
+          "intervening_get.sqlite"
+        ],
+        "reviewed_rules": []
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "operation": "ims.db.replace",
+        "input": "ims.db.fixture",
+        "preconditions": [],
+        "transition": "ims.db.public-transition",
+        "postconditions": [
+          "observe.ims.db.replace_without_hold.memory",
+          "observe.ims.db.replace_without_hold.sqlite",
+          "observe.ims.db.replace_key_forbidden.memory",
+          "observe.ims.db.replace_key_forbidden.sqlite",
+          "observe.ims.db.replace_rollback.memory",
+          "observe.ims.db.replace_rollback.sqlite",
+          "observe.ims.db.replace_restart_replay.memory",
+          "observe.ims.db.replace_restart_replay.sqlite",
+          "observe.ims.db.hold_unique_replace.memory",
+          "observe.ims.db.hold_unique_replace.sqlite"
+        ],
+        "conditions": [
+          "ims.db.status-or-host-error"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "applicable_gates": [
+          "recognized",
+          "validated",
+          "executed",
+          "conditioned",
+          "recovered",
+          "differential"
+        ],
+        "obligations": [
+          "replace_without_hold.memory",
+          "replace_without_hold.sqlite",
+          "replace_key_forbidden.memory",
+          "replace_key_forbidden.sqlite",
+          "replace_rollback.memory",
+          "replace_rollback.sqlite",
+          "replace_restart_replay.memory",
+          "replace_restart_replay.sqlite",
+          "replace_nonkey.memory",
+          "replace_nonkey.sqlite"
+        ],
+        "reviewed_rules": []
+      }
+    ],
+    "obligations": [
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "unique_repeated.memory",
+        "applicable_gates": [
+          "recognized"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "unique_repeated.sqlite",
+        "applicable_gates": [
+          "recognized"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "sequential_boundary.memory",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "sequential_boundary.sqlite",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_sequence.memory",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_sequence.sqlite",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_required.memory",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_required.sqlite",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_mismatch.memory",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_mismatch.sqlite",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_unique_replace.memory",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_unique_replace.sqlite",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_next_replace.memory",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_next_replace.sqlite",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_parent_replace.memory",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_parent_replace.sqlite",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_without_hold.memory",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_without_hold.sqlite",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_without_hold.memory",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_without_hold.sqlite",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_key_forbidden.memory",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_key_forbidden.sqlite",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_subtree.memory",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_subtree.sqlite",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "malformed_ssa.memory",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "malformed_ssa.sqlite",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "ssa_limit.memory",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "ssa_limit.sqlite",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "denied.memory",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "denied.sqlite",
+        "applicable_gates": [
+          "validated"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "replayed_next.memory",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "replayed_next.sqlite",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_rollback.memory",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_rollback.sqlite",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_restart_replay.memory",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_restart_replay.sqlite",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_restart_replay.memory",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_restart_replay.sqlite",
+        "applicable_gates": [
+          "recovered"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "intervening_get.memory",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "intervening_get.sqlite",
+        "applicable_gates": [
+          "conditioned"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_nonkey.memory",
+        "applicable_gates": [
+          "executed"
+        ]
+      },
+      {
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_nonkey.sqlite",
+        "applicable_gates": [
+          "executed"
+        ]
+      }
+    ],
+    "cases": [
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "unique_repeated.memory",
+        "gate": "recognized",
+        "test_id": "ims.db.unique_repeated.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.unique_repeated.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.unique_repeated.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "unique_repeated.sqlite",
+        "gate": "recognized",
+        "test_id": "ims.db.unique_repeated.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.unique_repeated.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.unique_repeated.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "sequential_boundary.memory",
+        "gate": "conditioned",
+        "test_id": "ims.db.sequential_boundary.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.sequential_boundary.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.sequential_boundary.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "sequential_boundary.sqlite",
+        "gate": "conditioned",
+        "test_id": "ims.db.sequential_boundary.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.sequential_boundary.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.sequential_boundary.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_sequence.memory",
+        "gate": "executed",
+        "test_id": "ims.db.parent_sequence.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.parent_sequence.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.parent_sequence.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_sequence.sqlite",
+        "gate": "executed",
+        "test_id": "ims.db.parent_sequence.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.parent_sequence.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.parent_sequence.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_required.memory",
+        "gate": "conditioned",
+        "test_id": "ims.db.parent_required.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.parent_required.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.parent_required.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_required.sqlite",
+        "gate": "conditioned",
+        "test_id": "ims.db.parent_required.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.parent_required.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.parent_required.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_mismatch.memory",
+        "gate": "conditioned",
+        "test_id": "ims.db.parent_mismatch.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.parent_mismatch.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.parent_mismatch.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "parent_mismatch.sqlite",
+        "gate": "conditioned",
+        "test_id": "ims.db.parent_mismatch.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.parent_mismatch.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.parent_mismatch.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_unique_replace.memory",
+        "gate": "executed",
+        "test_id": "ims.db.hold_unique_replace.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_unique_replace.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_unique_replace.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_unique_replace.sqlite",
+        "gate": "executed",
+        "test_id": "ims.db.hold_unique_replace.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_unique_replace.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_unique_replace.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_next_replace.memory",
+        "gate": "executed",
+        "test_id": "ims.db.hold_next_replace.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_next_replace.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_next_replace.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_next_replace.sqlite",
+        "gate": "executed",
+        "test_id": "ims.db.hold_next_replace.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_next_replace.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_next_replace.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_parent_replace.memory",
+        "gate": "executed",
+        "test_id": "ims.db.hold_parent_replace.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_parent_replace.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_parent_replace.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "hold_parent_replace.sqlite",
+        "gate": "executed",
+        "test_id": "ims.db.hold_parent_replace.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_parent_replace.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_parent_replace.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_without_hold.memory",
+        "gate": "conditioned",
+        "test_id": "ims.db.replace_without_hold.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_without_hold.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_without_hold.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_without_hold.sqlite",
+        "gate": "conditioned",
+        "test_id": "ims.db.replace_without_hold.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_without_hold.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_without_hold.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_without_hold.memory",
+        "gate": "conditioned",
+        "test_id": "ims.db.delete_without_hold.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.delete_without_hold.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.delete_without_hold.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_without_hold.sqlite",
+        "gate": "conditioned",
+        "test_id": "ims.db.delete_without_hold.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.delete_without_hold.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.delete_without_hold.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_key_forbidden.memory",
+        "gate": "validated",
+        "test_id": "ims.db.replace_key_forbidden.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_key_forbidden.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_key_forbidden.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_key_forbidden.sqlite",
+        "gate": "validated",
+        "test_id": "ims.db.replace_key_forbidden.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_key_forbidden.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_key_forbidden.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_subtree.memory",
+        "gate": "executed",
+        "test_id": "ims.db.delete_subtree.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.delete_subtree.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.delete_subtree.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_subtree.sqlite",
+        "gate": "executed",
+        "test_id": "ims.db.delete_subtree.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.delete_subtree.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.delete_subtree.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "malformed_ssa.memory",
+        "gate": "validated",
+        "test_id": "ims.db.malformed_ssa.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.malformed_ssa.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.malformed_ssa.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "malformed_ssa.sqlite",
+        "gate": "validated",
+        "test_id": "ims.db.malformed_ssa.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.malformed_ssa.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.malformed_ssa.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "ssa_limit.memory",
+        "gate": "validated",
+        "test_id": "ims.db.ssa_limit.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.ssa_limit.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.ssa_limit.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "ssa_limit.sqlite",
+        "gate": "validated",
+        "test_id": "ims.db.ssa_limit.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.ssa_limit.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.ssa_limit.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "denied.memory",
+        "gate": "validated",
+        "test_id": "ims.db.denied.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.denied.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.denied.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "denied.sqlite",
+        "gate": "validated",
+        "test_id": "ims.db.denied.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.denied.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.denied.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "replayed_next.memory",
+        "gate": "recovered",
+        "test_id": "ims.db.replayed_next.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replayed_next.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replayed_next.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+        "obligation_id": "replayed_next.sqlite",
+        "gate": "recovered",
+        "test_id": "ims.db.replayed_next.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replayed_next.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replayed_next.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_rollback.memory",
+        "gate": "recovered",
+        "test_id": "ims.db.replace_rollback.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_rollback.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_rollback.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_rollback.sqlite",
+        "gate": "recovered",
+        "test_id": "ims.db.replace_rollback.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_rollback.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_rollback.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_restart_replay.memory",
+        "gate": "recovered",
+        "test_id": "ims.db.replace_restart_replay.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_restart_replay.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_restart_replay.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_restart_replay.sqlite",
+        "gate": "recovered",
+        "test_id": "ims.db.replace_restart_replay.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.replace_restart_replay.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.replace_restart_replay.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_restart_replay.memory",
+        "gate": "recovered",
+        "test_id": "ims.db.delete_restart_replay.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.delete_restart_replay.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.delete_restart_replay.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+        "obligation_id": "delete_restart_replay.sqlite",
+        "gate": "recovered",
+        "test_id": "ims.db.delete_restart_replay.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.delete_restart_replay.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.delete_restart_replay.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "intervening_get.memory",
+        "gate": "conditioned",
+        "test_id": "ims.db.intervening_get.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.intervening_get.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.intervening_get.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+        "obligation_id": "intervening_get.sqlite",
+        "gate": "conditioned",
+        "test_id": "ims.db.intervening_get.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.intervening_get.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.intervening_get.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_nonkey.memory",
+        "gate": "executed",
+        "test_id": "ims.db.replace_nonkey.memory",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_unique_replace.memory",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_unique_replace.memory"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      },
+      {
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+        "obligation_id": "replace_nonkey.sqlite",
+        "gate": "executed",
+        "test_id": "ims.db.replace_nonkey.sqlite",
+        "driver": "ims.db.public-host",
+        "input": "ims.db.hold_unique_replace.sqlite",
+        "preconditions": [],
+        "expected": [
+          "observe.ims.db.hold_unique_replace.sqlite"
+        ],
+        "recovery": "ims.db.local-replay-reopen-rollback",
+        "oracle": null,
+        "reviewed_rules": [],
+        "scenario": null
+      }
+    ],
+    "scenarios": []
+  },
+  "rules": [
+    {
+      "id": "ims.db.candidate.unique_repeated",
+      "rationale": "Independent unique repeated fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:90-124;Usage:Get Unique"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "unique_repeated.memory",
+          "gate": "recognized"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "unique_repeated.sqlite",
+          "gate": "recognized"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.sequential_boundary",
+      "rationale": "Independent sequential boundary fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. The GN recipe uses unqualified calls against the declared roots-only seed: A1, B2, GB, A1. Cross-type/level GA/GK status proposals are excluded pending separate source review.",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
+          "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
+          "anchor": "plain_text:107-148;unqualified GN order, GB and first occurrence after GB"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "sequential_boundary.memory",
+          "gate": "conditioned"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "sequential_boundary.sqlite",
+          "gate": "conditioned"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.parent_sequence",
+      "rationale": "Independent parent sequence fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
+          "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
+          "anchor": "plain_text:74-114;Usage:Get Next in Parent"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "parent_sequence.memory",
+          "gate": "executed"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "parent_sequence.sqlite",
+          "gate": "executed"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.parent_required",
+      "rationale": "Independent parent required fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
+          "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
+          "anchor": "plain_text:97-114,161-166;Parentage and GP"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "parent_required.memory",
+          "gate": "conditioned"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "parent_required.sqlite",
+          "gate": "conditioned"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.parent_mismatch",
+      "rationale": "Independent parent mismatch fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
+          "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
+          "anchor": "plain_text:161-164;GE and unchanged position"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssacodingrules.htm",
+          "sha256": "cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5",
+          "anchor": "plain_text:5-32,64-68;fixed-width names and relational operands"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "parent_mismatch.memory",
+          "gate": "conditioned"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "parent_mismatch.sqlite",
+          "gate": "conditioned"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.hold_unique_replace",
+      "rationale": "Independent hold unique replace fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:143-167;Usage:Get Hold Unique"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "hold_unique_replace.memory",
+          "gate": "executed"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "hold_unique_replace.sqlite",
+          "gate": "executed"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.hold_next_replace",
+      "rationale": "Independent hold next replace fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
+          "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
+          "anchor": "plain_text:182-198;Usage:Get Hold Next"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "hold_next_replace.memory",
+          "gate": "executed"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "hold_next_replace.sqlite",
+          "gate": "executed"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.hold_parent_replace",
+      "rationale": "Independent hold parent replace fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
+          "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
+          "anchor": "plain_text:173-175;Usage:Get Hold Next in Parent"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:143-167;hold/update"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "hold_parent_replace.memory",
+          "gate": "executed"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "hold_parent_replace.sqlite",
+          "gate": "executed"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replace_without_hold",
+      "rationale": "Independent replace without hold fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. The exact DA/DJ explanation is now separately hash-pinned and reviewed offline; applicability and expected outcome remain pending human maintainer acceptance.",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:143-167;hold required"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
+          "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
+          "anchor": "Table 1 and Table 2;DJ/REPL membership"
+        },
+        {
+          "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
+          "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
+          "anchor": "plain_text:4-8;REPL requires current Get Hold"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_without_hold.memory",
+          "gate": "conditioned"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_without_hold.sqlite",
+          "gate": "conditioned"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.delete_without_hold",
+      "rationale": "Independent delete without hold fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. The exact DA/DJ explanation is now separately hash-pinned and reviewed offline; applicability and expected outcome remain pending human maintainer acceptance.",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:143-167;hold required"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
+          "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
+          "anchor": "Table 1 and Table 2;DJ/DLET membership"
+        },
+        {
+          "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
+          "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
+          "anchor": "plain_text:4-12;DLET requires current hold and cannot repeat after deletion"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "obligation_id": "delete_without_hold.memory",
+          "gate": "conditioned"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "obligation_id": "delete_without_hold.sqlite",
+          "gate": "conditioned"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replace_key_forbidden",
+      "rationale": "Independent replace key forbidden fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. The exact DA/DJ explanation is now separately hash-pinned and reviewed offline; applicability and expected outcome remain pending human maintainer acceptance.",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:149-151;key excluded"
+        },
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
+          "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
+          "anchor": "plain_text:8-13;error changes no data"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
+          "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
+          "anchor": "Table 1 and Table 2;DA/REPL membership"
+        },
+        {
+          "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/da.htm",
+          "sha256": "2cdd75d8c8b15e6ca28deecbc28b458fe57cb7bedaf72ac48b24cf5ba825201d",
+          "anchor": "plain_text:4-8;REPL cannot modify segment key"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_key_forbidden.memory",
+          "gate": "validated"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_key_forbidden.sqlite",
+          "gate": "validated"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.delete_subtree",
+      "rationale": "Independent delete subtree fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_issuedeletecall.htm",
+          "sha256": "f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23",
+          "anchor": "plain_text:11-21;physical deletion and dependents"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
+          "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
+          "anchor": "plain_text:119-122;deleted parent"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "obligation_id": "delete_subtree.memory",
+          "gate": "executed"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "obligation_id": "delete_subtree.sqlite",
+          "gate": "executed"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.malformed_ssa",
+      "rationale": "Independent malformed ssa fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_formattingssa.htm",
+          "sha256": "6d8409b99f914fd6f602666a7120756433726fc7315d3f320c6fa380857dedbe",
+          "anchor": "plain_text:3-8;coding authority"
+        },
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssacodingrules.htm",
+          "sha256": "cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5",
+          "anchor": "plain_text:5-32,64-68;fixed-width names and relational operands"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "malformed_ssa.memory",
+          "gate": "validated"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "malformed_ssa.sqlite",
+          "gate": "validated"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.ssa_limit",
+      "rationale": "Independent ssa limit fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:78-83;15 SSA bound"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "ssa_limit.memory",
+          "gate": "validated"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "ssa_limit.sqlite",
+          "gate": "validated"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.denied",
+      "rationale": "Independent denied fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_processingoptions.htm",
+          "sha256": "bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4",
+          "anchor": "plain_text:20-23;data security;local SAF denial is host-contract preparation"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "denied.memory",
+          "gate": "validated"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "denied.sqlite",
+          "gate": "validated"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replayed_next",
+      "rationale": "Independent replayed next fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
+          "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
+          "anchor": "plain_text:89-114;GN advancement;retry is local canonical host contract"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "replayed_next.memory",
+          "gate": "recovered"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+          "obligation_id": "replayed_next.sqlite",
+          "gate": "recovered"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replace_rollback",
+      "rationale": "Independent replace rollback fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
+          "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
+          "anchor": "plain_text:8-13;mutation atomicity;rollback is local host UOW contract"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_rollback.memory",
+          "gate": "recovered"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_rollback.sqlite",
+          "gate": "recovered"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replace_restart_replay",
+      "rationale": "Independent replace restart replay fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
+          "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
+          "anchor": "plain_text:8-13;mutation atomicity;reopen/retry is local durable host contract"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_restart_replay.memory",
+          "gate": "recovered"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_restart_replay.sqlite",
+          "gate": "recovered"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.delete_restart_replay",
+      "rationale": "Independent delete restart replay fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_issuedeletecall.htm",
+          "sha256": "f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23",
+          "anchor": "plain_text:11-21;deletion;reopen/retry is local durable host contract"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "obligation_id": "delete_restart_replay.memory",
+          "gate": "recovered"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+          "obligation_id": "delete_restart_replay.sqlite",
+          "gate": "recovered"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.intervening_get",
+      "rationale": "Independent intervening get fixture for physical two-level HIDAM. Exact output bytes, affected count, logical current/parent occurrence data, hold and retained database are authored in fixtures/ims-db.json. Host errors, canonical retry, fresh-connection reopen and local rollback are local-contract checks; they do not establish raw IBM framing, XRST, ROLL, process death or licensed equivalence. ",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:160-167;intervening call cancels hold"
+        },
+        {
+          "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
+          "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
+          "anchor": "plain_text:4-8;current hold is required"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "intervening_get.memory",
+          "gate": "conditioned"
+        },
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+          "obligation_id": "intervening_get.sqlite",
+          "gate": "conditioned"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replace_nonkey.memory",
+      "rationale": "Nonkey replacement changes A1x to A1z after GHU; all other occurrences remain byte-exact. Physical segment data is an independent golden candidate, with no expectation calculated by a handler.",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:143-167;hold permits nonkey replacement"
+        },
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
+          "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
+          "anchor": "plain_text:8-13;atomic replacement"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_nonkey.memory",
+          "gate": "executed"
+        }
+      ]
+    },
+    {
+      "id": "ims.db.candidate.replace_nonkey.sqlite",
+      "rationale": "Nonkey replacement changes A1x to A1z after GHU; all other occurrences remain byte-exact. Physical segment data is an independent golden candidate, with no expectation calculated by a handler.",
+      "sources": [
+        {
+          "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
+          "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
+          "anchor": "plain_text:143-167;hold permits nonkey replacement"
+        },
+        {
+          "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
+          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
+          "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
+          "anchor": "plain_text:8-13;atomic replacement"
+        }
+      ],
+      "bindings": [
+        {
+          "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+          "obligation_id": "replace_nonkey.sqlite",
+          "gate": "executed"
+        }
+      ]
+    }
+  ],
+  "missing_classes": [
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004",
+      "classes": [
+        "Human conformance maintainer acceptance and digest-bound accepted rules are absent; no candidate may be promoted by the agent.",
+        "Other applicable execution contexts/organizations, language PCB/AIB framing, raw update operands, path/command/Boolean combinations, logical relationships and secondary access require separate mandatory obligations.",
+        "Status table membership alone does not establish every condition. Verified DA/DJ explanations are pinned for these proposed cases; exact applicability, warning statuses including GA/GK, and successful/failed-call position classes still require human maintainer review.",
+        "Multi-PCB sensitivity, Q/integrity, concurrent holds/locking, variable segments, deadlines, cancellation, failure/CAS/corruption and complete limit classes are not established by this initial physical-HIDAM fixture.",
+        "Reopen is a fresh reader/SQLite connection, not child-process death or IBM XRST. Full checkpoint/backout, retained compatibility, retention expiry, coherent backup/restore and PostgreSQL remain missing where applicable.",
+        "Licensed IMS 15.6 differential is user-excluded and remains pending. Local SAF/replay/rollback contracts do not substitute for IBM environment or oracle acceptance."
+      ]
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005",
+      "classes": [
+        "Human conformance maintainer acceptance and digest-bound accepted rules are absent; no candidate may be promoted by the agent.",
+        "Other applicable execution contexts/organizations, language PCB/AIB framing, raw update operands, path/command/Boolean combinations, logical relationships and secondary access require separate mandatory obligations.",
+        "Status table membership alone does not establish every condition. Verified DA/DJ explanations are pinned for these proposed cases; exact applicability, warning statuses including GA/GK, and successful/failed-call position classes still require human maintainer review.",
+        "Multi-PCB sensitivity, Q/integrity, concurrent holds/locking, variable segments, deadlines, cancellation, failure/CAS/corruption and complete limit classes are not established by this initial physical-HIDAM fixture.",
+        "Reopen is a fresh reader/SQLite connection, not child-process death or IBM XRST. Full checkpoint/backout, retained compatibility, retention expiry, coherent backup/restore and PostgreSQL remain missing where applicable.",
+        "Licensed IMS 15.6 differential is user-excluded and remains pending. Local SAF/replay/rollback contracts do not substitute for IBM environment or oracle acceptance."
+      ]
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0006",
+      "classes": [
+        "Human conformance maintainer acceptance and digest-bound accepted rules are absent; no candidate may be promoted by the agent.",
+        "Other applicable execution contexts/organizations, language PCB/AIB framing, raw update operands, path/command/Boolean combinations, logical relationships and secondary access require separate mandatory obligations.",
+        "Status table membership alone does not establish every condition. Verified DA/DJ explanations are pinned for these proposed cases; exact applicability, warning statuses including GA/GK, and successful/failed-call position classes still require human maintainer review.",
+        "Multi-PCB sensitivity, Q/integrity, concurrent holds/locking, variable segments, deadlines, cancellation, failure/CAS/corruption and complete limit classes are not established by this initial physical-HIDAM fixture.",
+        "Reopen is a fresh reader/SQLite connection, not child-process death or IBM XRST. Full checkpoint/backout, retained compatibility, retention expiry, coherent backup/restore and PostgreSQL remain missing where applicable.",
+        "Licensed IMS 15.6 differential is user-excluded and remains pending. Local SAF/replay/rollback contracts do not substitute for IBM environment or oracle acceptance."
+      ]
+    },
+    {
+      "row_id": "ibm-ims-15.6-dli-2026-08-31:dli-call-families:0015",
+      "classes": [
+        "Human conformance maintainer acceptance and digest-bound accepted rules are absent; no candidate may be promoted by the agent.",
+        "Other applicable execution contexts/organizations, language PCB/AIB framing, raw update operands, path/command/Boolean combinations, logical relationships and secondary access require separate mandatory obligations.",
+        "Status table membership alone does not establish every condition. Verified DA/DJ explanations are pinned for these proposed cases; exact applicability, warning statuses including GA/GK, and successful/failed-call position classes still require human maintainer review.",
+        "Multi-PCB sensitivity, Q/integrity, concurrent holds/locking, variable segments, deadlines, cancellation, failure/CAS/corruption and complete limit classes are not established by this initial physical-HIDAM fixture.",
+        "Reopen is a fresh reader/SQLite connection, not child-process death or IBM XRST. Full checkpoint/backout, retained compatibility, retention expiry, coherent backup/restore and PostgreSQL remain missing where applicable.",
+        "Licensed IMS 15.6 differential is user-excluded and remains pending. Local SAF/replay/rollback contracts do not substitute for IBM environment or oracle acceptance."
+      ]
+    }
+  ]
+}

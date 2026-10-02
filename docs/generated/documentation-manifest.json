@@ -3,7 +3,7 @@
     "markdown_documents": 225,
     "navigation_groups": 6,
     "normative_documents": 59,
-    "xtask_commands": 232
+    "xtask_commands": 233
   },
   "documents": [
     {
@@ -98,9 +98,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:30e5824717f946cf358039655fb4d10b738fdd73a64db769716a15c737dcc6d0",
+      "sha256": "sha256:0edccc95419c94af0caeeab6776bb89c765b719abb3c37dd7a5e148489dfea73",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -1414,7 +1414,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 8,
-      "sha256": "sha256:928f9983b28142a92ed8973b483c8c10da9a91179080ba88fa04d3107926305b",
+      "sha256": "sha256:964dc8b1c352c9a998205f3e9908629bbb89d4998861f30770126564db463831",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },

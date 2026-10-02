@@ -7,11 +7,13 @@ mod carddemo_readacct;
 mod carddemo_v09_host;
 mod changelog;
 mod cobol_differential;
+mod conformance_catalog;
 mod db2_statement_catalog;
 mod docs;
 mod evidence_seal;
 mod ims_assurance_matrix;
 mod ims_catalog;
+mod ims_conformance;
 mod jcl_catalog;
 mod jcl_conformance;
 mod profile_intake;
@@ -23,6 +25,9 @@ mod work_package_seal;
 mod zosmf_contracts;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
+#[cfg(test)]
+use conformance_catalog::indexed_catalog_closure;
+use conformance_catalog::official_catalog_rows;
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
     CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
@@ -139,6 +144,11 @@ struct ConformanceArgs {
     shard: Option<u16>,
     #[arg(long)]
     replay: Option<String>,
+    #[arg(
+        long,
+        help = "Run noncredit candidate preparation; never emit official verdicts"
+    )]
+    prepare_candidates: bool,
     #[arg(long)]
     check: bool,
 }
@@ -811,7 +821,9 @@ fn check_spec(root: &Path) -> TaskResult {
                 "cobol-statement-phrase-runtime-fixtures.schema.json",
                 "cobol-statement-runtime-fixtures.schema.json",
                 "conformance-inventory.schema.json",
+                "conformance-candidate.schema.json",
                 "conformance-spec.schema.json",
+                "ims-db-fixtures.schema.json",
                 "derived-ledger.schema.json",
                 "verdict-event.schema.json",
             ]),
@@ -1001,6 +1013,7 @@ fn check_spec(root: &Path) -> TaskResult {
     check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
     check_cics_pilot_inputs(root, &spec)?;
+    ims_conformance::check(root, &spec)?;
     check_cobol_move_pilot_inputs(root, &spec)?;
     check_cobol_arithmetic_pilot_inputs(root, &spec)?;
     if let Ok(receipt_path) = env::var("MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT") {
@@ -5287,65 +5300,6 @@ fn augment_cobol_arithmetic_pilot_spec(root: &Path, spec: &mut Value) -> TaskRes
     Ok(())
 }
 
-fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
-    let index = json(&index_path)?;
-    let catalogs = indexed_catalog_closure(root, &index, &index_path)?;
-    let mut rows = Vec::new();
-    for (subsystem, catalog_path) in catalogs {
-        let catalog = json(&catalog_path)?;
-        for unit in array(&catalog, "units", &catalog_path)? {
-            let family = text(unit, "id", &catalog_path)?;
-            for row in array(unit, "rows", &catalog_path)? {
-                rows.push(
-                    OfficialCatalogRow::new(
-                        text(row, "id", &catalog_path)?,
-                        &subsystem,
-                        family,
-                        text(row, "source_locator", &catalog_path)?,
-                        CoverageGate::ALL,
-                        ConformanceLimits::default(),
-                    )
-                    .map_err(|problem| problem.to_string())?,
-                );
-            }
-        }
-    }
-    require(
-        rows.len() == 1_506,
-        "shared spec compiler did not load the frozen 1,506-row catalog",
-    )?;
-    Ok(rows)
-}
-
-fn indexed_catalog_closure(
-    root: &Path,
-    index: &Value,
-    index_path: &Path,
-) -> TaskResult<Vec<(String, PathBuf)>> {
-    let mut catalogs = Vec::new();
-    for baseline in array(index, "baselines", index_path)? {
-        let subsystem = text(baseline, "subsystem", index_path)?.to_string();
-        let catalog_relative = text(baseline, "catalog", index_path)?;
-        require(
-            catalog_relative.starts_with("conformance/0.2/catalogs/")
-                && catalog_relative.ends_with(".json")
-                && !catalog_relative.contains(".."),
-            &format!("indexed catalog path is unsafe: {catalog_relative}"),
-        )?;
-        let catalog_path = root.join(catalog_relative);
-        let expected = text(baseline, "catalog_sha256", index_path)?;
-        validate_sha256_identity(expected, "indexed catalog digest")?;
-        let actual = format!("sha256:{}", file_digest(&catalog_path)?);
-        require(
-            actual == expected,
-            &format!("indexed catalog digest drifted: {catalog_relative}"),
-        )?;
-        catalogs.push((subsystem, catalog_path));
-    }
-    Ok(catalogs)
-}
-
 fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> TaskResult {
     require(
         args.replay.is_none() || args.subsystem.is_none(),
@@ -5358,6 +5312,18 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
     require(
         args.replay.is_none() || (args.gate.is_none() && args.shard.is_none()),
         "--replay cannot be combined with --gate or --shard",
+    )?;
+    if args.subsystem.as_deref() == Some("ims")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|id| id.starts_with("ims."))
+    {
+        return ims_conformance::run(root, args);
+    }
+    require(
+        !args.prepare_candidates,
+        "candidate preparation is not installed for this selector",
     )?;
     let dataset_racf_or_jcl_selected = matches!(
         args.subsystem.as_deref(),

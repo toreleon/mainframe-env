@@ -3009,3 +3009,143 @@ concurrent admission. Raw contexts/framing, protected retention/coherent restore
 participant admission and human accepted-rule execution remain open. No
 official, human-maintainer, parent or release credit is promoted. Licensed
 certification remains excluded by the user's request, not treated as passing.
+
+## IMS-1406.official-ir-candidate (preparation leaf, declared 2026-10-02)
+
+Parent: IMS-1406; parent and release remain open. Base:
+`21e51c8be1546ace252a50a3b10bc3021ac29042`. The clean sealed STAT HEAD
+`14db41c20ddb053da85f8e8c19477cb621d2d01c` remains on its original branch.
+This branch owns only shared candidate-reference preparation, a thin tooling
+IMS driver/helper, independent fixtures and proposed rules in `conformance/spec`,
+focused compiler/driver/mutant checks, bounded xtask registration, this append,
+a unique fragment and regenerated documentation manifest. It does not own IMS
+product semantics, Q/integrity, GSAM, STAT, checkpoint/backout algorithms,
+other in-flight feature integration, dependency promotion or release counters.
+
+Exact initial catalog scope: IMS 15.6 `ibm-ims-15.6-dli-2026-08-31`,
+`dli-call-families:0004` (DLET), `:0005` (GU/GN/GNP), `:0006`
+(GHU/GHN/GHNP), `:0015` (REPL). Applicability: call-level full-function
+two-level physical HIDAM, DB PCB with AP/G processing options, DB-batch
+navigation operands and interactive local UOW settlement. The public host
+provider, metadata parser, SAF, row CAS/replay and Memory/SQLite authorities
+remain product-owned. Tooling inspects bounded actual output and retained
+position/hold/database rows; expected data is independently authored from pins.
+Positive, boundary, condition, forbidden mutation, malformed/SAF, retry,
+fresh-reader restart and local rollback preparation are mandatory. Fresh-reader
+reopen is not process-death, XRST or full checkpoint/recovery credit.
+
+Minimal cross-owner integration: shared coverage gets a candidate wrapper
+around existing IR/compiler/runner references; it cannot expose official
+verdicts/ledger or convert a candidate into accepted rules. Xtask checks the
+candidate during spec validation and explicitly reports maintainer-pending IMS
+preparation at its existing focused selector. Frozen facades must shrink or
+remain within their existing ceilings; no new evidence/ledger/runner authority,
+general DSL or product dispatch by row/obligation identity is permitted.
+
+All publication rules remain **pending HUMAN conformance maintainer acceptance**.
+No approval identity is supplied by this agent and no accepted-rule registry is
+edited. Official IMS rows and all six gate numerators remain **0/25**; the local
+25-row assurance map remains zero-credit. Licensed execution, network/browser
+refresh, delegation, push and PR are user-excluded. Exact proposed bindings,
+source anchors, expected observations, missing classes and reviewer action will
+be retained in the bounded shared candidate artifact. Acceptance here completes
+preparation only, never official-row, parent or release acceptance.
+
+The preparation artifacts are `conformance/spec/candidates/ims-db.json` (22
+proposed rules, 42 ordinary IR bindings, four catalog rows) and
+`conformance/spec/fixtures/ims-db.json` (40 independent Memory/SQLite fixtures).
+The GN boundary uses an explicitly declared roots-only seed with unqualified
+calls: A1, B2, GB, A1. This excludes unresolved GA/GK cross-type/level proposals.
+The other recipes retain the two-level physical hierarchy. Shared coverage
+gate identities and immutable catalog loading were extracted unchanged into
+small modules; the coverage facade ceiling was ratcheted from 571 to 533
+production lines. No ceiling was raised and no product dispatch uses row IDs.
+
+Offline review verified 13 selected retained HTML identities against committed
+manifests and read them with `ibm_docs.py` in the explicit programming,
+database and recovery scopes. Rule anchors retain the exact baseline, topic,
+manifest and SHA-256. GU/GHU `0a9b433d…`, GN/GHN `063ff108…`, GNP/GHNP
+`6daaf592…`, REPL `55778b03…`, DLET `f40ecf69…`, SSA coding `cfb772b7…`
+and the database status table `2b41e141…` are central anchors. The original
+catalog comparison topic is `ce4a179e…`. Full hashes and all proposed obligations
+are in the candidate artifact and the external handoff. No publication body,
+network refresh or licensed execution evidence was added to Git.
+
+Focused checks passed 19 shared coverage tests, five IMS candidate compiler/
+runner tests and three tooling driver/fixture tests. Preparation executes 42
+bindings with zero mismatches and rejects seven observation perturbations;
+the driver test rejects eight representative mutants through the shared
+runner. Exact replay executes one nonzero binding. Ordinary official IMS
+selection fails with the HUMAN acceptance blocker. Strict coverage/tooling
+Clippy, formatting, spec, IMS catalog, IMS assurance, schema, dependency/license,
+execution/effect/security/storage/retention/transaction guards and the module
+ratchet are checked independently of source review. These are local preparation
+results and grant no official or licensed credit.
+
+Two inherited manager-base checks remain blocked without any waiver or
+out-of-scope repair: the provider-row guard reads only MQ `service.rs` although
+its required row functions moved to `service/rows.rs`; strict xtask Clippy
+reports `collapsible_if` at unchanged `xtask/src/docs.rs:183`. The external
+receipts preserve both failures and byte-for-byte base comparisons. They
+remain integration blockers; the allowlist digest seal is not a claim that
+these gates passed.
+
+Reviewer action: a HUMAN conformance maintainer must accept or reject every
+proposed anchor and expected observation, review the separately pinned DA/DJ
+explanatory rules, and settle the recorded applicability and missing classes
+before creating an accepted reviewed-rule artifact. In particular, injected
+SAF denial is not full RACF-profile evidence, fresh SQLite connection reopen
+is not process death/XRST, and local rollback is not full ROLL/CHKP recovery.
+Other contexts/organizations, path/command/logical/secondary variants, warning
+positions, multi-PCB/Q/integrity, concurrency/failure/migration/retention and
+licensed differential remain pending. Manager owns later Q/checkpoint/GSAM/
+STAT integration and the remaining parent/release acceptance. This leaf
+delivers candidate preparation only; human approval cannot be simulated.
+
+### Manager candidate-IR integration and source-gap repair — 2026-10-02
+
+The manager consumed exactly `6f1bd076a2d0fee70ed34c7946fc6917416ada79`
+after sealed GSAM restart and application backout. The shared IR compiler,
+runtime registry and runner remain authoritative; the candidate wrapper exports
+diagnostics only and discards draft events/ledger. The accepted v1 spec remains
+byte-identical, with no official IMS registration, reviewed-rule approval or
+licensed differential. The packet still proposes 22 rules, 42 bindings and four
+rows against 40 independent Memory/SQLite fixtures.
+
+The previously unavailable DA/DJ explanations were found in the retained archive
+metadata and verified offline. They are now registered in a separate zero-credit
+`ims-status-explanations` scope, baseline
+`ibm-ims-15.6-status-explanations-2026-09-11`, without repinning older baselines:
+
+| Topic | SHA-256 | Bytes |
+|---|---|---|
+| `SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/da.htm` | `2cdd75d8c8b15e6ca28deecbc28b458fe57cb7bedaf72ac48b24cf5ba825201d` | 1804 |
+| `SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm` | `61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82` | 3085 |
+
+Pinned `ibm_docs.py` search/read and the repository parser read both full topics;
+the retained topic-path files were absent but the raw archive hashes/bytes match.
+The existing pinned IMS TOC is unchanged. No download, browser refresh, whole-
+cache audit or publication body in Git occurred. Proposed no-hold, changed-key
+and intervening-Get cases now carry these exact anchors. Topic/hash/baseline
+mutation tests reject mismatches. Availability resolves a source-location gap,
+not human acceptance or the unproved explanatory/context classes.
+
+Current checks pass 19 coverage tests, six IMS xtask tests, eight docs tests and
+three tooling-driver tests. The shared preparation run executes 42 checks with
+zero mismatches and rejects seven observation perturbations; a selected replay
+executes one check. Ordinary IMS conformance deliberately refuses pending HUMAN
+maintainer acceptance. These are diagnostics, not 42 official passes. Strict
+coverage/conformance/xtask all-targets Clippy passes after the behavior-preserving
+docs navigation let-chain repair. The prior MQ provider-row locator blocker is
+already repaired by the manager. Formatting/module checks pass; new public draft
+contracts are documented without new API authority or raised policy thresholds.
+Runtime receipts precede the Rustdoc-only additions; their original tested-input
+identities are retained, with an independent unchanged-code-token comparison.
+
+Receipts: `ir-candidate-integration.log`, `ir-candidate-official-refusal.log` and
+the bounded `ims-status-explanations-cache` under the completion receipt root.
+Mandatory source-reader/policy/schema/spec/dependency/docs/changelog checks and
+exact resealing accompany the manager feature commit. Human source/expectation/
+applicability acceptance, complete applicable classes, participant/lease closure,
+coherent restore/retention and full v0.14 acceptance remain pending. Licensed
+certification is user-excluded, not counted passing. No parent/release credit.

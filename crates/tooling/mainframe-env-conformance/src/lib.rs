@@ -30,6 +30,7 @@ mod dataset;
 mod dataset_reference;
 mod decimal_adapter;
 mod framework;
+mod ims_candidate;
 mod jcl;
 mod licensed_harness;
 pub mod profile_intake;
@@ -39,6 +40,7 @@ mod racf_reference;
 
 pub use decimal_adapter::{DecimalAdapterReceipt, LEDGER_FORMULA_CONTRACT, verify_decimal_adapter};
 pub use framework::*;
+pub use ims_candidate::{ImsCandidateRuntime, ims_candidate_runtime};
 pub use licensed_harness::{
     OracleCandidateExpectation, OracleHarnessRegistry, OracleHarnessValidation,
     OracleHarnessValidationKind, validate_oracle_harness_receipt, validate_oracle_harness_registry,

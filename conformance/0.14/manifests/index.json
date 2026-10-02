@@ -69,6 +69,17 @@
       "topic_manifest_sha256": "sha256:5957b8e2a868c0fc8db7d379630af868b048fe9a3dd86fd8466c4de664bd2353",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "ims-status-explanations",
+      "subsystem": "ims",
+      "baseline_id": "ibm-ims-15.6-status-explanations-2026-09-11",
+      "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+      "manifest_sha256": "sha256:87406c0d9ba6147e1578ed9357267bc5b52706060516f830f717a1d0ef09bd3c",
+      "topic_count": 2,
+      "topic_manifest_sha256": "sha256:7d4d6f9d5431bae8a438e9fa40c32f371325cd0956c282df7a4920514ee9c509",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }
