@@ -15,11 +15,12 @@
 //! their opaque proofs to resolved exact numeric targets, with no expression
 //! evaluation, default legality, wire format, catalog
 //! identity, cell persistence, backend, execution or coverage claim. The sole
-//! spelling/span/type authority remains `classify_db2_numeric_constant`, including
+//! spelling/span/type authority remains the existing numeric classifier, including
 //! its deferred exponent, special, comma, long unpointed in-range and >31-digit
 //! forms. Long unpointed spellings are outside this subset, not universally
 //! invalid IBM constants. No shared lexer or expression fence is lifted.
 
+use crate::numeric_constant_types::classify_db2_located_numeric_operand;
 use crate::{
     Db2NumericConstantError, Db2NumericConstantErrorCode, Db2NumericConstantLimits,
     Db2NumericConstantType, Db2ResolvedType, Db2ScalarType, Db2SourceSpan,
@@ -126,7 +127,6 @@ pub fn materialize_db2_numeric_constant(
     span: Db2SourceSpan,
     limits: Db2NumericConstantLimits,
 ) -> Result<Db2MaterializedNumericConstant, Db2NumericConstantValueError> {
-    use Db2NumericConstantValueErrorCode as Code;
     let constant_type = classify_db2_numeric_constant(source, span, limits)?;
     // Classification already verified these UTF-8 boundaries and endpoints.
     let spelling = &source[span.start_byte..span.end_byte];
@@ -135,6 +135,46 @@ pub fn materialize_db2_numeric_constant(
         Some(b'+') => (false, &spelling[1..]),
         _ => (false, spelling),
     };
+    materialize_parts(constant_type, unsigned, negative)
+}
+
+/// Materialize an original located sign/number operand, permitting only the
+/// existing lexer's intervening trivia. The classifier verifies the complete
+/// source envelope, limits, component endpoints, ordering and actual tokens
+/// before coefficient accumulation. Output owns its natural type/value and the
+/// original combined operand span; it does not establish default legality.
+pub fn materialize_db2_located_numeric_operand(
+    source: &str,
+    operand: Db2SourceSpan,
+    sign: Option<Db2SourceSpan>,
+    number: Db2SourceSpan,
+    numeric_limits: Db2NumericConstantLimits,
+    syntax_limits: crate::Db2SyntaxLimits,
+) -> Result<Db2MaterializedNumericConstant, Db2NumericConstantValueError> {
+    let constant_type = classify_db2_located_numeric_operand(
+        source,
+        operand,
+        sign,
+        number,
+        numeric_limits,
+        syntax_limits,
+    )?;
+    // The classifier proved both components against the same original source.
+    let negative = sign.is_some_and(|span| source.as_bytes()[span.start_byte] == b'-');
+    materialize_parts(
+        constant_type,
+        &source[number.start_byte..number.end_byte],
+        negative,
+    )
+}
+
+fn materialize_parts(
+    constant_type: Db2NumericConstantType,
+    unsigned: &str,
+    negative: bool,
+) -> Result<Db2MaterializedNumericConstant, Db2NumericConstantValueError> {
+    use Db2NumericConstantValueErrorCode as Code;
+    let span = constant_type.span();
     let coefficient = accumulate_coefficient(unsigned, negative, span)?;
     let out_of_range = || {
         Db2NumericConstantValueError::new(
@@ -1688,6 +1728,650 @@ mod tests {
             assert_eq!(error.span, span);
             assert_eq!(error.code, Db2NumericAssignmentErrorCode::ValueOutOfRange);
             assert!(error.to_string().contains(&format!("{line}:{column}")));
+        }
+    }
+
+    mod located_operand_tests {
+        use super::*;
+        use crate::{Db2SourceLocation, Db2SyntaxDiagnosticCode, Db2SyntaxLimits};
+
+        fn span(start: usize, end: usize, from: (u32, u32), to: (u32, u32)) -> Db2SourceSpan {
+            Db2SourceSpan {
+                start_byte: start,
+                end_byte: end,
+                start: Db2SourceLocation {
+                    line: from.0,
+                    column: from.1,
+                },
+                end: Db2SourceLocation {
+                    line: to.0,
+                    column: to.1,
+                },
+            }
+        }
+
+        fn line_span(start: usize, end: usize) -> Db2SourceSpan {
+            span(
+                start,
+                end,
+                (1, (start as u32).saturating_add(1)),
+                (1, (end as u32).saturating_add(1)),
+            )
+        }
+
+        fn selected(
+            text: &str,
+            sign: bool,
+            number_start: usize,
+        ) -> Result<Db2MaterializedNumericConstant, Db2NumericConstantValueError> {
+            materialize_db2_located_numeric_operand(
+                text,
+                line_span(0, text.len()),
+                sign.then(|| line_span(0, 1)),
+                line_span(number_start, text.len()),
+                Db2NumericConstantLimits::default(),
+                Db2SyntaxLimits::default(),
+            )
+        }
+
+        #[test]
+        fn located_fixed_natural_types_and_coefficients() {
+            for (text, start, scalar, value) in [
+                (
+                    "- /*c*/ 2147483648",
+                    8,
+                    Db2ScalarType::Integer,
+                    Db2NumericConstantValue::Integer(-2_147_483_648),
+                ),
+                (
+                    "- /*c*/ 9223372036854775808",
+                    8,
+                    Db2ScalarType::BigInt,
+                    Db2NumericConstantValue::BigInt(-9_223_372_036_854_775_808),
+                ),
+                (
+                    "+ /*c*/ 2147483648",
+                    8,
+                    Db2ScalarType::BigInt,
+                    Db2NumericConstantValue::BigInt(2_147_483_648),
+                ),
+                (
+                    "- /*c*/ 9223372036854775809",
+                    8,
+                    Db2ScalarType::Decimal {
+                        precision: 19,
+                        scale: 0,
+                    },
+                    Db2NumericConstantValue::Decimal(
+                        DecimalValue::new(-9_223_372_036_854_775_809, 0).unwrap(),
+                    ),
+                ),
+                (
+                    "- /*c*/ 000.00100",
+                    8,
+                    Db2ScalarType::Decimal {
+                        precision: 8,
+                        scale: 5,
+                    },
+                    Db2NumericConstantValue::Decimal(DecimalValue::new(-100, 5).unwrap()),
+                ),
+                (
+                    "- /*c*/ 000.00",
+                    8,
+                    Db2ScalarType::Decimal {
+                        precision: 5,
+                        scale: 2,
+                    },
+                    Db2NumericConstantValue::Decimal(DecimalValue::new(0, 2).unwrap()),
+                ),
+                (
+                    "- /*c*/ .0000000000000000000000000000001",
+                    8,
+                    Db2ScalarType::Decimal {
+                        precision: 31,
+                        scale: 31,
+                    },
+                    Db2NumericConstantValue::Decimal(DecimalValue::new(-1, 31).unwrap()),
+                ),
+                (
+                    "- /*c*/ 000000000000000000000000000000.1",
+                    8,
+                    Db2ScalarType::Decimal {
+                        precision: 31,
+                        scale: 1,
+                    },
+                    Db2NumericConstantValue::Decimal(DecimalValue::new(-1, 1).unwrap()),
+                ),
+                (
+                    "000.00",
+                    0,
+                    Db2ScalarType::Decimal {
+                        precision: 5,
+                        scale: 2,
+                    },
+                    Db2NumericConstantValue::Decimal(DecimalValue::new(0, 2).unwrap()),
+                ),
+            ] {
+                let result = selected(text, start != 0, start).unwrap();
+                assert_eq!(result.resolved_type().scalar(), &scalar, "{text}");
+                assert_eq!(
+                    result.resolved_type().nullability(),
+                    crate::Db2Nullability::NotNull
+                );
+                assert_eq!(result.value(), &value, "{text}");
+                assert_eq!(result.span(), line_span(0, text.len()));
+            }
+        }
+
+        #[test]
+        fn located_trivia_sign_omission_and_adjacency() {
+            for (text, start) in [
+                ("-1", 1),
+                ("- 1", 2),
+                ("-\t\x0c1", 3),
+                ("-/*c*/1", 6),
+                ("- /*a /*b*/ c*/ 1", 16),
+            ] {
+                assert_eq!(
+                    selected(text, true, start).unwrap().value(),
+                    &Db2NumericConstantValue::Integer(-1)
+                );
+            }
+            for text in ["1", "2147483647"] {
+                assert!(selected(text, false, 0).is_ok());
+            }
+            assert_eq!(
+                selected("+1", true, 1).unwrap().value(),
+                &Db2NumericConstantValue::Integer(1)
+            );
+            for (text, start) in [("- 1", 2), ("-/*c*/1", 6)] {
+                let error = materialize_db2_numeric_constant(
+                    text,
+                    line_span(0, text.len()),
+                    Db2NumericConstantLimits::default(),
+                )
+                .unwrap_err();
+                assert_eq!(
+                    error.code,
+                    Db2NumericConstantValueErrorCode::Classification(
+                        Db2NumericConstantErrorCode::InvalidSpelling
+                    )
+                );
+                assert!(selected(text, true, start).is_ok());
+            }
+        }
+
+        #[test]
+        fn located_fixed_utf8_crlf_provenance_and_lifetime_without_surrounding_lexing() {
+            let operand = span(8, 34, (2, 1), (3, 13));
+            let sign = span(8, 9, (2, 1), (2, 2));
+            let number = span(24, 34, (3, 3), (3, 13));
+            let result = {
+                // Neither surrounding invalid SQL nor the suffix NUL is selected.
+                let source = String::from("α😀\r\n- /*α*/ --b\r\n  2147483648\0???");
+                materialize_db2_located_numeric_operand(
+                    &source,
+                    operand,
+                    Some(sign),
+                    number,
+                    Db2NumericConstantLimits::default(),
+                    Db2SyntaxLimits::default(),
+                )
+                .unwrap()
+            };
+            assert_eq!(result.span(), operand);
+            assert_eq!(result.resolved_type().scalar(), &Db2ScalarType::Integer);
+            assert_eq!(
+                result.value(),
+                &Db2NumericConstantValue::Integer(-2_147_483_648)
+            );
+            assert_eq!(result.clone(), result);
+            for (text, end_line) in [("- --c\n1", 2), ("- --c\r1", 2), ("- --c\r\n1", 2)] {
+                let end = text.len();
+                let result = materialize_db2_located_numeric_operand(
+                    text,
+                    span(0, end, (1, 1), (end_line, 2)),
+                    Some(line_span(0, 1)),
+                    span(end - 1, end, (end_line, 1), (end_line, 2)),
+                    Db2NumericConstantLimits::default(),
+                    Db2SyntaxLimits::default(),
+                )
+                .unwrap();
+                assert_eq!(result.value(), &Db2NumericConstantValue::Integer(-1));
+            }
+        }
+
+        #[test]
+        fn located_rejects_nontrivia_extra_tokens_and_malformed_comments() {
+            for (text, start) in [
+                ("- +1", 3),
+                ("- x 1", 4),
+                ("- 1 2", 4),
+                ("- (1)", 3),
+                ("- /** 1", 6),
+                ("- /*c* / 1", 9),
+                ("--comment 1", 10),
+                ("- --comment 1", 12),
+                ("-\0 1", 3),
+            ] {
+                // Number span excludes the trailing ')' only in that negative case.
+                let number_end = if text == "- (1)" { 4 } else { text.len() };
+                assert!(
+                    materialize_db2_located_numeric_operand(
+                        text,
+                        line_span(0, text.len()),
+                        Some(line_span(0, 1)),
+                        line_span(start, number_end),
+                        Db2NumericConstantLimits::default(),
+                        Db2SyntaxLimits::default()
+                    )
+                    .is_err(),
+                    "{text:?}"
+                );
+            }
+            for (text, start, code) in [
+                (
+                    "- /*c*/ 1E0",
+                    8,
+                    Db2NumericConstantErrorCode::UnsupportedExponent,
+                ),
+                (
+                    "- /*c*/ NAN",
+                    8,
+                    Db2NumericConstantErrorCode::UnsupportedSpecialValue,
+                ),
+                (
+                    "- /*c*/ 1,2",
+                    8,
+                    Db2NumericConstantErrorCode::UnsupportedCommaDecimal,
+                ),
+                (
+                    "- /*c*/ 00000000000000000001",
+                    8,
+                    Db2NumericConstantErrorCode::UnsupportedLongInteger,
+                ),
+                (
+                    "- /*c*/ .00000000000000000000000000000001",
+                    8,
+                    Db2NumericConstantErrorCode::TooManyDigits,
+                ),
+                (
+                    "- /*c*/ +1",
+                    8,
+                    Db2NumericConstantErrorCode::InvalidSpelling,
+                ),
+                (
+                    "- /*c*/ -1",
+                    8,
+                    Db2NumericConstantErrorCode::InvalidSpelling,
+                ),
+            ] {
+                let error = selected(text, true, start).unwrap_err();
+                assert_eq!(
+                    error.code,
+                    Db2NumericConstantValueErrorCode::Classification(code)
+                );
+                assert_eq!(error.span, line_span(0, text.len()));
+            }
+            // A classifier-valid trailing point is not one actual lexer Number token.
+            assert!(selected("- /*c*/ 5.", true, 8).is_err());
+            assert!(selected("-1", false, 0).is_err());
+        }
+
+        #[test]
+        fn located_component_spans_cannot_be_forged() {
+            let text = "- /*c*/ 12";
+            let operand = line_span(0, 10);
+            let sign = line_span(0, 1);
+            let number = line_span(8, 10);
+            let mut cases = vec![
+                (operand, None, number),
+                (number, Some(sign), number),
+                (operand, Some(number), sign),
+                (operand, Some(line_span(0, 9)), number),
+                (operand, Some(line_span(0, 0)), number),
+                (operand, Some(sign), line_span(10, 8)),
+                (operand, Some(sign), line_span(8, 9)),
+                (operand, Some(sign), line_span(8, usize::MAX)),
+                (line_span(0, 11), Some(sign), number),
+            ];
+            for component in 0..3 {
+                for endpoint in 0..2 {
+                    let (mut a, mut b, mut c) = (operand, sign, number);
+                    let altered = match component {
+                        0 => &mut a,
+                        1 => &mut b,
+                        _ => &mut c,
+                    };
+                    if endpoint == 0 {
+                        altered.start.column += 1;
+                    } else {
+                        altered.end.line += 1;
+                    }
+                    cases.push((a, Some(b), c));
+                }
+            }
+            for (operand, sign, number) in cases {
+                let error = materialize_db2_located_numeric_operand(
+                    text,
+                    operand,
+                    sign,
+                    number,
+                    Db2NumericConstantLimits::default(),
+                    Db2SyntaxLimits::default(),
+                )
+                .unwrap_err();
+                assert_eq!(
+                    error.code,
+                    Db2NumericConstantValueErrorCode::Classification(
+                        Db2NumericConstantErrorCode::InvalidSourceSpan
+                    )
+                );
+                assert_eq!(error.span, operand);
+            }
+            let text = "α- 1";
+            let operand = span(2, 5, (1, 2), (1, 5));
+            let number = span(4, 5, (1, 4), (1, 5));
+            for (operand, sign, number) in [
+                (
+                    Db2SourceSpan {
+                        start_byte: 1,
+                        ..operand
+                    },
+                    Some(span(2, 3, (1, 2), (1, 3))),
+                    number,
+                ),
+                (operand, Some(span(1, 2, (1, 1), (1, 2))), number),
+                (
+                    operand,
+                    Some(span(2, 3, (1, 2), (1, 3))),
+                    Db2SourceSpan {
+                        start_byte: 1,
+                        ..number
+                    },
+                ),
+            ] {
+                assert!(
+                    materialize_db2_located_numeric_operand(
+                        text,
+                        operand,
+                        sign,
+                        number,
+                        Db2NumericConstantLimits::default(),
+                        Db2SyntaxLimits::default()
+                    )
+                    .is_err()
+                );
+            }
+            // Valid coordinates selecting an actual nonsign cannot establish a sign.
+            assert!(selected("x 1", true, 2).is_err());
+        }
+
+        #[test]
+        fn located_default_parser_spans_supplement_fixed_vectors() {
+            let source = "CREATE TABLE T (A INTEGER DEFAULT - /*c*/ 2147483648, B DECIMAL(5,2) WITH DEFAULT + --c\r\n000.00)";
+            let table = crate::parse_db2_create_table_statement(
+                source,
+                Db2SyntaxLimits::default(),
+                crate::Db2AstLimits::default(),
+            )
+            .unwrap();
+            for (column, expected) in table.columns().iter().zip([
+                Db2NumericConstantValue::Integer(-2_147_483_648),
+                Db2NumericConstantValue::Decimal(DecimalValue::new(0, 2).unwrap()),
+            ]) {
+                let default = column.default().unwrap();
+                let operand = default.value_span().unwrap();
+                let result = materialize_db2_located_numeric_operand(
+                    source,
+                    operand,
+                    default.numeric_sign_span(),
+                    default.numeric_token_span().unwrap(),
+                    Db2NumericConstantLimits::default(),
+                    Db2SyntaxLimits::default(),
+                )
+                .unwrap();
+                assert_eq!(result.value(), &expected);
+                assert_eq!(result.span(), operand);
+            }
+        }
+
+        #[test]
+        fn located_exact_and_one_beyond_source_operand_token_count_and_type_argument_bounds() {
+            let source = "- /*c*/ 1.0";
+            let operand = line_span(0, 11);
+            let sign = Some(line_span(0, 1));
+            let number = line_span(8, 11);
+            let numeric = Db2NumericConstantLimits {
+                max_source_bytes: 11,
+                ast: crate::Db2AstLimits {
+                    max_literal_bytes: 11,
+                    max_list_items: 2,
+                    ..crate::Db2AstLimits::default()
+                },
+            };
+            let syntax = Db2SyntaxLimits {
+                max_statement_bytes: 11,
+                max_token_bytes: 3,
+                max_tokens: 2,
+                max_nesting: 1,
+            };
+            let run = |source: &str, numeric, syntax| {
+                materialize_db2_located_numeric_operand(
+                    source, operand, sign, number, numeric, syntax,
+                )
+            };
+            assert!(run(source, numeric, syntax).is_ok());
+            for (numeric, syntax, code) in [
+                (
+                    Db2NumericConstantLimits {
+                        max_source_bytes: 10,
+                        ..numeric
+                    },
+                    syntax,
+                    Db2NumericConstantErrorCode::SourceTooLarge,
+                ),
+                (
+                    numeric,
+                    Db2SyntaxLimits {
+                        max_statement_bytes: 10,
+                        ..syntax
+                    },
+                    Db2NumericConstantErrorCode::SourceTooLarge,
+                ),
+                (
+                    Db2NumericConstantLimits {
+                        ast: crate::Db2AstLimits {
+                            max_literal_bytes: 10,
+                            ..numeric.ast
+                        },
+                        ..numeric
+                    },
+                    syntax,
+                    Db2NumericConstantErrorCode::ConstantTooLarge,
+                ),
+                (
+                    numeric,
+                    Db2SyntaxLimits {
+                        max_token_bytes: 2,
+                        ..syntax
+                    },
+                    Db2NumericConstantErrorCode::Syntax(Db2SyntaxDiagnosticCode::TokenTooLarge),
+                ),
+                (
+                    numeric,
+                    Db2SyntaxLimits {
+                        max_tokens: 1,
+                        ..syntax
+                    },
+                    Db2NumericConstantErrorCode::Syntax(Db2SyntaxDiagnosticCode::TooManyTokens),
+                ),
+                (
+                    Db2NumericConstantLimits {
+                        ast: crate::Db2AstLimits {
+                            max_list_items: 1,
+                            ..numeric.ast
+                        },
+                        ..numeric
+                    },
+                    syntax,
+                    Db2NumericConstantErrorCode::TypeArgumentsLimit,
+                ),
+            ] {
+                assert_eq!(
+                    run(source, numeric, syntax).unwrap_err().code,
+                    Db2NumericConstantValueErrorCode::Classification(code)
+                );
+            }
+            // Unselected suffix still consumes both full-source budgets.
+            assert_eq!(
+                run("- /*c*/ 1.0x", numeric, syntax).unwrap_err().code,
+                Db2NumericConstantValueErrorCode::Classification(
+                    Db2NumericConstantErrorCode::SourceTooLarge
+                )
+            );
+            let text = "1";
+            assert!(
+                materialize_db2_located_numeric_operand(
+                    text,
+                    line_span(0, 1),
+                    None,
+                    line_span(0, 1),
+                    Db2NumericConstantLimits::default(),
+                    Db2SyntaxLimits {
+                        max_tokens: 1,
+                        max_token_bytes: 1,
+                        ..syntax
+                    }
+                )
+                .is_ok()
+            );
+            let text = "- /*a /*b*/ c*/ 1";
+            let error = materialize_db2_located_numeric_operand(
+                text,
+                line_span(0, 17),
+                Some(line_span(0, 1)),
+                line_span(16, 17),
+                Db2NumericConstantLimits::default(),
+                Db2SyntaxLimits {
+                    max_nesting: 1,
+                    ..Db2SyntaxLimits::default()
+                },
+            )
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                Db2NumericConstantValueErrorCode::Classification(
+                    Db2NumericConstantErrorCode::Syntax(
+                        Db2SyntaxDiagnosticCode::UnbalancedDelimiter
+                    )
+                )
+            );
+        }
+
+        #[test]
+        fn located_all_compiled_budget_ceilings_and_invalid_limits_precede_spans() {
+            let numeric = Db2NumericConstantLimits {
+                max_source_bytes: 8 * 1024 * 1024,
+                ast: crate::Db2AstLimits {
+                    max_identifier_bytes: 1024,
+                    max_name_parts: 16,
+                    max_literal_bytes: 8 * 1024 * 1024,
+                    max_expression_nodes: 262_144,
+                    max_list_items: 65_536,
+                    max_expression_depth: 1024,
+                },
+            };
+            let syntax = Db2SyntaxLimits {
+                max_statement_bytes: 8 * 1024 * 1024,
+                max_tokens: 262_144,
+                max_token_bytes: 1024 * 1024,
+                max_nesting: 1024,
+            };
+            let run = |numeric, syntax| {
+                materialize_db2_located_numeric_operand(
+                    "1",
+                    line_span(0, 1),
+                    None,
+                    line_span(0, 1),
+                    numeric,
+                    syntax,
+                )
+            };
+            assert!(run(numeric, syntax).is_ok());
+            let mut invalid = Vec::new();
+            for field in 0..11 {
+                for beyond in [false, true] {
+                    let (mut n, mut s) = (numeric, syntax);
+                    let value = match field {
+                        0 => &mut n.max_source_bytes,
+                        1 => &mut n.ast.max_identifier_bytes,
+                        2 => &mut n.ast.max_name_parts,
+                        3 => &mut n.ast.max_literal_bytes,
+                        4 => &mut n.ast.max_expression_nodes,
+                        5 => &mut n.ast.max_list_items,
+                        6 => &mut n.ast.max_expression_depth,
+                        7 => &mut s.max_statement_bytes,
+                        8 => &mut s.max_tokens,
+                        9 => &mut s.max_token_bytes,
+                        _ => &mut s.max_nesting,
+                    };
+                    *value = if beyond { *value + 1 } else { 0 };
+                    invalid.push((n, s));
+                }
+            }
+            for (n, s) in invalid {
+                let error = materialize_db2_located_numeric_operand(
+                    "1",
+                    line_span(0, usize::MAX),
+                    Some(line_span(0, usize::MAX)),
+                    line_span(0, usize::MAX),
+                    n,
+                    s,
+                )
+                .unwrap_err();
+                assert_eq!(
+                    error.code,
+                    Db2NumericConstantValueErrorCode::Classification(
+                        Db2NumericConstantErrorCode::InvalidLimits
+                    )
+                );
+                assert_eq!(error.span, line_span(0, 0));
+            }
+            // Exact compiled source and combined-operand envelopes, with bounded
+            // selected tokens. The eight-megabyte trivia is never normalized/copied.
+            let mut source = String::from("-");
+            source.push_str(&" ".repeat(numeric.max_source_bytes - 2));
+            source.push('1');
+            let operand = line_span(0, source.len());
+            let number = line_span(source.len() - 1, source.len());
+            let result = materialize_db2_located_numeric_operand(
+                &source,
+                operand,
+                Some(line_span(0, 1)),
+                number,
+                numeric,
+                syntax,
+            )
+            .unwrap();
+            assert_eq!(result.value(), &Db2NumericConstantValue::Integer(-1));
+            source.push('x');
+            let error = materialize_db2_located_numeric_operand(
+                &source,
+                operand,
+                Some(line_span(0, 1)),
+                number,
+                numeric,
+                syntax,
+            )
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                Db2NumericConstantValueErrorCode::Classification(
+                    Db2NumericConstantErrorCode::SourceTooLarge
+                )
+            );
+            assert_eq!(error.span, line_span(0, 0));
         }
     }
 }

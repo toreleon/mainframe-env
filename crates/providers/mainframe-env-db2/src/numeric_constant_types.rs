@@ -5,17 +5,22 @@
 //!   bf0cb79eac0636348209b6919c4f4ee680f1c3d2ada9cab186dddfdd39a13fa8;
 //! - db2z_datatypesintro.html, 22904 bytes,
 //!   a488006755eedd9ef58da3ba8ef9f304a3d79c3910cc39da637dda1f3c38f570.
+//! - db2z_characterstokens.html, 14271 bytes,
+//!   ed63dd289fc68abe18ec5863756239f79d93941cd525968ba48f962d1299d4ae;
+//! - db2z_sqlcomments.html, 6508 bytes,
+//!   c8e3c16d1152a165b0c2c7b71ddfad4ca8032f910f2c92f0eca5484ce5b68ca2.
 //!
 //! These are language elements, with no standalone statement-catalog row or
-//! execution/coverage claim. This kernel neither invokes nor changes the lexer,
-//! AST/expression parsers, conversions, or binding. Longer unpointed spellings
+//! execution/coverage claim. Located operands reuse the lexer without changing
+//! it, AST/expression parsers, conversions, or binding. Longer unpointed spellings
 //! whose value fits BIGINT are outside this initial subset, not universally
 //! invalid IBM constants. Exponents, special values, comma decimal conventions,
 //! and more than 31 digits require later declared constant families.
 
 use crate::{
     Db2AstLimits, Db2BuiltInDataType, Db2BuiltInType, Db2DataType, Db2Nullability, Db2ResolvedType,
-    Db2SourceLocation, Db2SourceSpan, resolve_db2_type,
+    Db2SourceLocation, Db2SourceSpan, Db2Symbol, Db2SyntaxDiagnosticCode, Db2SyntaxLimits,
+    Db2TokenKind, lex_db2, resolve_db2_type,
 };
 use std::fmt;
 
@@ -56,6 +61,8 @@ pub enum Db2NumericConstantErrorCode {
     UnsupportedLongInteger,
     TypeArgumentsLimit,
     InvalidResolvedType,
+    InvalidOperandTokens,
+    Syntax(Db2SyntaxDiagnosticCode),
 }
 
 /// Fixed-size diagnostic: no source text or unbounded error string is retained.
@@ -174,6 +181,194 @@ pub fn classify_db2_numeric_constant(
         Some(b'+') => (false, &spelling[1..]),
         _ => (false, spelling),
     };
+    classify_parts(unsigned, negative, span, limits.ast)
+}
+
+/// Classify one original operand consisting of an optional sign and one unsigned
+/// number token, with lexer-admitted trivia between them. All three spans must
+/// describe the same original source, including line/column endpoints. The
+/// combined span begins at the sign (or number) and ends at the number, without
+/// leading/trailing trivia. Only this operand is lexed; unrelated SQL is untouched.
+///
+/// Both source byte limits cover the full original source. The AST literal limit
+/// covers the combined operand including trivia; syntax token/count/nesting
+/// budgets cover its selected tokens/comments. All limits are validated even
+/// when their expression/name fields are unused. No expression/list backend or
+/// host-language comment applicability is established by this generic SQL proof.
+pub fn classify_db2_located_numeric_operand(
+    source: &str,
+    operand: Db2SourceSpan,
+    sign: Option<Db2SourceSpan>,
+    number: Db2SourceSpan,
+    numeric_limits: Db2NumericConstantLimits,
+    syntax_limits: Db2SyntaxLimits,
+) -> Result<Db2NumericConstantType, Db2NumericConstantError> {
+    use Db2NumericConstantErrorCode as Code;
+    let origin = Db2SourceSpan {
+        start_byte: 0,
+        end_byte: 0,
+        start: Db2SourceLocation::START,
+        end: Db2SourceLocation::START,
+    };
+    // Reuse the syntax owner's limit validator through an empty lexical probe;
+    // no selected payload or unrelated SQL is scanned/allocated by this probe.
+    if numeric_limits.max_source_bytes == 0
+        || numeric_limits.max_source_bytes > MAX_SOURCE_BYTES_CEILING
+        || numeric_limits.ast.validate().is_err()
+        || !matches!(lex_db2("", syntax_limits),
+            Err(error) if error.code == Db2SyntaxDiagnosticCode::EmptyStatement)
+    {
+        return Err(Db2NumericConstantError::new(
+            Code::InvalidLimits,
+            origin,
+            "numeric or syntax limits are invalid",
+        ));
+    }
+    if source.len() > numeric_limits.max_source_bytes
+        || source.len() > syntax_limits.max_statement_bytes
+    {
+        return Err(Db2NumericConstantError::new(
+            Code::SourceTooLarge,
+            origin,
+            "original source exceeds a configured byte limit",
+        ));
+    }
+    let invalid_span = || {
+        Db2NumericConstantError::new(
+            Code::InvalidSourceSpan,
+            operand,
+            "operand components do not match the original source",
+        )
+    };
+    // Check every byte boundary and ordering before subtraction, slices or
+    // coordinate walks. The operand envelope also bounds all lexer allocation.
+    for span in [Some(operand), Some(number), sign].into_iter().flatten() {
+        if span.start_byte >= span.end_byte
+            || span.end_byte > source.len()
+            || !source.is_char_boundary(span.start_byte)
+            || !source.is_char_boundary(span.end_byte)
+        {
+            return Err(invalid_span());
+        }
+    }
+    if number.end_byte != operand.end_byte || number.end != operand.end {
+        return Err(invalid_span());
+    }
+    if let Some(sign) = sign {
+        if sign.start_byte != operand.start_byte
+            || sign.start != operand.start
+            || sign.end_byte > number.start_byte
+            || sign.end_byte - sign.start_byte != 1
+        {
+            return Err(invalid_span());
+        }
+    } else if number != operand {
+        return Err(invalid_span());
+    }
+    if operand.end_byte - operand.start_byte > numeric_limits.ast.max_literal_bytes {
+        return Err(Db2NumericConstantError::new(
+            Code::ConstantTooLarge,
+            operand,
+            "combined operand exceeds the AST literal byte limit",
+        ));
+    }
+    if number.end_byte - number.start_byte > syntax_limits.max_token_bytes {
+        return Err(Db2NumericConstantError::new(
+            Code::Syntax(Db2SyntaxDiagnosticCode::TokenTooLarge),
+            operand,
+            "number token exceeds the syntax token byte limit",
+        ));
+    }
+    if 1 + usize::from(sign.is_some()) > syntax_limits.max_tokens {
+        return Err(Db2NumericConstantError::new(
+            Code::Syntax(Db2SyntaxDiagnosticCode::TooManyTokens),
+            operand,
+            "selected sign and number exceed the aggregate token budget",
+        ));
+    }
+    for span in [Some(operand), Some(number), sign].into_iter().flatten() {
+        if location_at(source, span.start_byte) != span.start
+            || location_at(source, span.end_byte) != span.end
+        {
+            return Err(invalid_span());
+        }
+    }
+    let negative = match sign.map(|span| &source[span.start_byte..span.end_byte]) {
+        Some("-") => true,
+        Some("+") | None => false,
+        _ => {
+            return Err(Db2NumericConstantError::new(
+                Code::InvalidOperandTokens,
+                operand,
+                "sign span must select an actual plus or minus",
+            ));
+        }
+    };
+    // One numeric rule authority, using the original unsigned slice and sign.
+    // It retains all existing numeric fences; no normalized SQL is constructed.
+    let constant_type = classify_parts(
+        &source[number.start_byte..number.end_byte],
+        negative,
+        operand,
+        numeric_limits.ast,
+    )?;
+    let selected = &source[operand.start_byte..operand.end_byte];
+    let lexed = lex_db2(selected, syntax_limits).map_err(|error| {
+        Db2NumericConstantError::new(
+            Code::Syntax(error.code),
+            operand,
+            "selected operand failed bounded SQL lexing",
+        )
+    })?;
+    let tokens = lexed.tokens();
+    // Original endpoints were verified above. Translate those coordinates to
+    // the selected operand's origin, never to a rewritten or normalized source.
+    let relative_location = |location: Db2SourceLocation| Db2SourceLocation {
+        line: location.line - operand.start.line + 1,
+        column: if location.line == operand.start.line {
+            location.column - operand.start.column + 1
+        } else {
+            location.column
+        },
+    };
+    let matching_span = |actual: Db2SourceSpan, expected: Db2SourceSpan| {
+        actual.start_byte == expected.start_byte - operand.start_byte
+            && actual.end_byte == expected.end_byte - operand.start_byte
+            && actual.start == relative_location(expected.start)
+            && actual.end == relative_location(expected.end)
+    };
+    let matches = match (sign, tokens) {
+        (None, [token]) => {
+            matches!(token.kind, Db2TokenKind::Number(_)) && matching_span(token.span, number)
+        }
+        (Some(sign), [sign_token, number_token]) => {
+            matches!(
+                sign_token.kind,
+                Db2TokenKind::Symbol(Db2Symbol::Plus | Db2Symbol::Minus)
+            ) && matching_span(sign_token.span, sign)
+                && matches!(number_token.kind, Db2TokenKind::Number(_))
+                && matching_span(number_token.span, number)
+        }
+        _ => false,
+    };
+    if !matches {
+        return Err(Db2NumericConstantError::new(
+            Code::InvalidOperandTokens,
+            operand,
+            "operand must contain exactly the selected sign and unsigned number tokens",
+        ));
+    }
+    Ok(constant_type)
+}
+
+// Original-owner classification shared by adjacent and segmented source proofs.
+fn classify_parts(
+    unsigned: &str,
+    negative: bool,
+    span: Db2SourceSpan,
+    ast_limits: Db2AstLimits,
+) -> Result<Db2NumericConstantType, Db2NumericConstantError> {
+    use Db2NumericConstantErrorCode as Code;
     if ["INF", "INFINITY", "NAN", "SNAN"]
         .iter()
         .any(|special| unsigned.eq_ignore_ascii_case(special))
@@ -263,7 +458,7 @@ pub fn classify_db2_numeric_constant(
             (Db2BuiltInType::Decimal, vec![precision, 0])
         }
     };
-    let syntax = Db2BuiltInDataType::new(kind, arguments, false, limits.ast).map_err(|_| {
+    let syntax = Db2BuiltInDataType::new(kind, arguments, false, ast_limits).map_err(|_| {
         Db2NumericConstantError::new(
             Code::TypeArgumentsLimit,
             span,
@@ -822,6 +1017,37 @@ mod tests {
                 Db2AstLimits::default()
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn located_operand_uses_original_sign_and_unsigned_range() {
+        let source = "- /*c*/ 2147483648";
+        let operand = full_span(source);
+        let sign = full_span("-");
+        let number = Db2SourceSpan {
+            start_byte: 8,
+            end_byte: 18,
+            start: Db2SourceLocation { line: 1, column: 9 },
+            end: Db2SourceLocation {
+                line: 1,
+                column: 19,
+            },
+        };
+        let result = classify_db2_located_numeric_operand(
+            source,
+            operand,
+            Some(sign),
+            number,
+            Db2NumericConstantLimits::default(),
+            Db2SyntaxLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(result.resolved_type().scalar(), &Db2ScalarType::Integer);
+        assert_eq!(result.span(), operand);
+        assert_eq!(
+            classify(source).unwrap_err().code,
+            Db2NumericConstantErrorCode::InvalidSpelling
         );
     }
 }
