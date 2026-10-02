@@ -1,5 +1,5 @@
 {
-  "schema_version": "mainframe-env.mq-completion-reason-catalog@1",
+  "schema_version": "mainframe-env.mq-completion-reason-catalog@2",
   "target_version": "0.15.0",
   "work_package": "MQ-1501.completion-reason-catalog",
   "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
@@ -28,7 +28,77 @@
     "MQCC_WARNING",
     "MQCC_FAILED"
   ],
-  "completion_numeric_mapping": "pending-not-in-call-pages",
+  "completion_numeric_mapping": "reviewed-supplemental",
+  "completion_wire_mapping": {
+    "review": "reviewed-supplemental",
+    "review_work_package": "MQ-1501.completion-wire-mapping",
+    "scope_id": "mq-programming-supplements",
+    "baseline_id": "ibm-mq-9.4-programming-supplements-2026-09-12",
+    "topic_manifest": {
+      "path": "conformance/0.15/manifests/mq-programming-supplements-topics.json",
+      "sha256": "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a",
+      "topic_manifest_digest": "d069fab04063e46679f542bc9b14f93f039ab4d623f18f3cba9447d524928f0b"
+    },
+    "canonical_call_return_sha256": "02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa",
+    "topic_path": "SSFKSJ_9.4.0/refdev/q090560_.html",
+    "topic_sha256": "87fb6467cf1e1c1715146fea70957e82970fcf4019ce15d44a750eae443d33ca",
+    "classes": [
+      {
+        "symbol": "MQCC_OK",
+        "decimal": 0,
+        "hexadecimal": "00000000",
+        "first_line": 10,
+        "last_line": 12,
+        "fragment_sha256": "5c4ad943cf0d35b2739646627a3a8ffae9a8db976074af02eb45feb553f0dbd6"
+      },
+      {
+        "symbol": "MQCC_WARNING",
+        "decimal": 1,
+        "hexadecimal": "00000001",
+        "first_line": 13,
+        "last_line": 15,
+        "fragment_sha256": "5b9f535857a51d648543a52042036ef8bc9a7ebf132ca78b1d3283c50512e450"
+      },
+      {
+        "symbol": "MQCC_FAILED",
+        "decimal": 2,
+        "hexadecimal": "00000002",
+        "first_line": 16,
+        "last_line": 18,
+        "fragment_sha256": "5b177a7dfa85bec03d6485f52cd1b8d8b9572896dcf6f4857cfe269d3f196167"
+      }
+    ],
+    "excluded_unknown": {
+      "symbol": "MQCC_UNKNOWN",
+      "decimal": -1,
+      "hexadecimal": "FFFFFFFF",
+      "disposition": "not-an-admitted-call-return",
+      "first_line": 19,
+      "last_line": 21,
+      "fragment_sha256": "6433c895f30112e97ed4e5659fd6652722d9e0939ba4659f2675186d2b6b1ac3"
+    },
+    "corroboration": [
+      {
+        "kind": "call-return-mqlong-output",
+        "official_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007",
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101750_.html",
+        "topic_sha256": "590f32c213d129d6937c253f048ccdb9c5cbd963ca2d3310cf5672dcf68c42f4",
+        "first_line": 13,
+        "last_line": 21,
+        "fragment_sha256": "a39a040a1bdf4c788e26b119ada3402de654e00d3bbc49b599ef5acf928bbbd9"
+      },
+      {
+        "kind": "callback-context-input-not-call-return",
+        "official_row": null,
+        "topic_path": "SSFKSJ_9.4.0/refdev/q094335_.html",
+        "topic_sha256": "f59d8d0055f9a46cb8d0c277ebb775d1e58eceb2355c61e19edab4994d6ae62b",
+        "first_line": 140,
+        "last_line": 150,
+        "fragment_sha256": "cebb4614407fd3a484c4a2662ab1c0831adc6fcf15ab98133359902992cc3f10"
+      }
+    ],
+    "projection_sha256": "1b67e82e0c85139fd0bf2ce58bb851f4eca5184bebb081ed7b1ccadee71da5cd"
+  },
   "behavioral_coverage_credit": 0,
   "licensed_execution_credit": 0,
   "calls": [

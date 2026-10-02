@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 
 import generate_mq_mqi_registry as registry
 
@@ -14,6 +15,10 @@ CATALOG = Path("conformance/0.15/mq/completion-reason-catalog.json")
 SCHEMA = Path("conformance/0.15/schemas/mq-completion-reason-catalog.schema.json")
 OUTPUT = Path("crates/contracts/mainframe-env-host-api/src/mq_status/generated")
 COMPLETIONS = {"MQCC_OK": "Ok", "MQCC_WARNING": "Warning", "MQCC_FAILED": "Failed"}
+# Reviewed immutable source-projection fixtures, not another numeric authority.
+WIRE_PROJECTION_SHA256 = "1b67e82e0c85139fd0bf2ce58bb851f4eca5184bebb081ed7b1ccadee71da5cd"
+CALL_RETURN_SHA256 = "02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa"
+SUPPLEMENT_MANIFEST = Path("conformance/0.15/manifests/mq-programming-supplements-topics.json")
 ISSUES = {"admitted", "pending-number", "pending-numeric-conflict", "pending-symbol-conflict", "pending-symbol-spelling"}
 CALL_VARIANTS = (
     "Back", "Begin", "BufferToHandle", "Callback", "CallbackFunction", "Close",
@@ -53,24 +58,94 @@ def projection(call: dict) -> dict:
     return {key: call[key] for key in ("return_kind", "reason_section", "context_notes", "pairs")}
 
 
+def load_wire(catalog: dict, root: Path) -> None:
+    wire = catalog["completion_wire_mapping"]
+    fields(wire, {"review", "review_work_package", "scope_id", "baseline_id", "topic_manifest",
+        "canonical_call_return_sha256", "topic_path", "topic_sha256", "classes", "excluded_unknown",
+        "corroboration", "projection_sha256"}, "completion wire projection")
+    projected = {key: value for key, value in wire.items() if key != "projection_sha256"}
+    if wire["projection_sha256"] != digest(projected) or digest(projected) != WIRE_PROJECTION_SHA256:
+        raise ValueError("MQ reviewed completion wire projection differs")
+    # Reconstruct the unchanged @1 source artifact. Its digest is already part
+    # of canonical status bytes; supplemental review must not reframe it.
+    original = {key: value for key, value in catalog.items() if key != "completion_wire_mapping"}
+    original["schema_version"] = "mainframe-env.mq-completion-reason-catalog@1"
+    original["completion_numeric_mapping"] = "pending-not-in-call-pages"
+    legacy = hashlib.sha256((json.dumps(original, indent=2) + "\n").encode()).hexdigest()
+    if legacy != CALL_RETURN_SHA256 or wire["canonical_call_return_sha256"] != legacy:
+        raise ValueError("MQ immutable call-return catalog identity differs")
+    sys.path.insert(0, str(ROOT / "conformance/tools"))
+    import ibm_docs
+    manifest = read_json(root / SUPPLEMENT_MANIFEST)
+    if wire["topic_manifest"] != {"path": SUPPLEMENT_MANIFEST.as_posix(),
+            "sha256": registry._sha256(root / SUPPLEMENT_MANIFEST),
+            "topic_manifest_digest": manifest["topic_manifest_digest"]}:
+        raise ValueError("MQ supplemental manifest binding differs")
+    topics, _, _ = ibm_docs.validate_manifest(manifest, root / SUPPLEMENT_MANIFEST,
+        target_version="0.15.0", baseline=wire["baseline_id"], subsystem="mq")
+    index = read_json(root / SUPPLEMENT_MANIFEST.parent / "index.json")
+    entries = [entry for entry in index["manifests"] if entry["scope_id"] == wire["scope_id"]]
+    expected = {"scope_id": wire["scope_id"], "subsystem": "mq", "baseline_id": wire["baseline_id"],
+        "manifest": SUPPLEMENT_MANIFEST.as_posix(), "manifest_sha256": "sha256:" + wire["topic_manifest"]["sha256"],
+        "topic_count": len(topics), "topic_manifest_sha256": "sha256:" + manifest["topic_manifest_digest"],
+        "semantic_authority": False, "coverage_credit": 0}
+    if (index["schema_version"] != "mainframe-env.topic-manifest-registry@1"
+            or index["target_version"] != "0.15.0" or index["semantic_authority"] is not False
+            or type(index["coverage_credit"]) is not int or index["coverage_credit"] != 0
+            or entries != [expected] or entries[0]["semantic_authority"] is not False
+            or type(entries[0]["coverage_credit"]) is not int):
+        raise ValueError("MQ supplemental registry binding differs")
+    by_topic = {topic["topic_path"]: topic for topic in topics}
+    for source in [wire, wire["corroboration"][1]]:
+        if by_topic[source["topic_path"]]["sha256"] != source["topic_sha256"]:
+            raise ValueError("MQ supplemental topic binding differs")
+    call = next(call for call in catalog["calls"] if call["official_row"] == wire["corroboration"][0]["official_row"])
+    if any(call[key] != wire["corroboration"][0][key] for key in ("topic_path", "topic_sha256")):
+        raise ValueError("MQ completion call context binding differs")
+
+
+def wire_source_lines(catalog: dict, supplemental_cache: Path, call_cache: Path) -> dict[str, list[str]]:
+    """Read only the selected wire topic/context pins through shared infrastructure."""
+    sys.path.insert(0, str(ROOT / "conformance/tools"))
+    import ibm_docs
+    result = {}
+    for scope, cache, sources in [
+        (catalog["completion_wire_mapping"]["scope_id"], supplemental_cache,
+         [catalog["completion_wire_mapping"], catalog["completion_wire_mapping"]["corroboration"][1]]),
+        (registry.BASELINE, call_cache, [catalog["completion_wire_mapping"]["corroboration"][0]])]:
+        pins, tocs = ibm_docs.select(*ibm_docs.load_pins(), scope, None)
+        by_topic = {pin.topic: pin for pin in pins}
+        for toc in tocs:
+            if hashlib.sha256(ibm_docs.read_bounded(cache / toc.key)).hexdigest() != toc.sha256:
+                raise ValueError("MQ wire source TOC mismatch")
+        for source in sources:
+            pin = by_topic[source["topic_path"]]
+            raw = ibm_docs.read_bounded(cache / pin.key)
+            if hashlib.sha256(raw).hexdigest() != source["topic_sha256"] or len(raw) != pin.size:
+                raise ValueError("MQ wire source hash/size mismatch")
+            result[pin.topic] = ibm_docs.plain_text(raw)
+    return result
+
+
 def load(root: Path = ROOT) -> dict:
     catalog = read_json(root / CATALOG)
     fields(catalog, {"schema_version", "target_version", "work_package", "baseline_id",
         "topic_manifest", "source_call_list", "structure_status_catalog", "unique_call_count",
         "source_position_count", "call_return_count", "callback_notification_count", "pair_count",
         "source_occurrence_count", "admitted_pair_count", "pending_pair_count", "completion_symbols",
-        "completion_numeric_mapping", "behavioral_coverage_credit", "licensed_execution_credit", "calls"}, "catalog")
-    constants = {"schema_version": "mainframe-env.mq-completion-reason-catalog@1",
+        "completion_numeric_mapping", "completion_wire_mapping", "behavioral_coverage_credit", "licensed_execution_credit", "calls"}, "catalog")
+    constants = {"schema_version": "mainframe-env.mq-completion-reason-catalog@2",
         "target_version": "0.15.0", "work_package": "MQ-1501.completion-reason-catalog",
         "baseline_id": registry.BASELINE, "unique_call_count": 26, "source_position_count": 27,
         "call_return_count": 25, "callback_notification_count": 1,
         "pair_count": 1030, "source_occurrence_count": 1031,
         "admitted_pair_count": 1020, "pending_pair_count": 10,
-        "completion_symbols": list(COMPLETIONS), "completion_numeric_mapping": "pending-not-in-call-pages",
+        "completion_symbols": list(COMPLETIONS), "completion_numeric_mapping": "reviewed-supplemental",
         "behavioral_coverage_credit": 0, "licensed_execution_credit": 0}
     for key, value in constants.items():
         if catalog[key] != value or (isinstance(value, int) and type(catalog[key]) is not int):
             raise ValueError(f"MQ status {key} differs")
+    load_wire(catalog, root)
     for key, path in [("topic_manifest", registry.TOPIC_MANIFEST_PATH),
                       ("source_call_list", registry.SOURCE_LIST_PATH),
                       ("structure_status_catalog", registry.CONTRACT_CATALOG_PATH)]:

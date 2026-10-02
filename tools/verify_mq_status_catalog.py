@@ -12,6 +12,45 @@ import sys
 import mq_status_catalog as authority
 
 
+def project_completions(lines: list[str]) -> list[tuple[str, int, str]]:
+    """Only the selected constants table, including its excluded UNKNOWN row."""
+    if len(lines) != 23 or lines[:3] != ["MQCC_* (completion codes)", "Last Updated: 2026-05-18", "Table 1. Values of constants"]:
+        raise ValueError("MQ completion table boundary differs")
+    if lines[3:9] != ["Name", "|", "Decimal value", "|", "Hexadecimal value", "|"]:
+        raise ValueError("MQ completion table columns differ")
+    result = []
+    for start in range(9, 21, 3):
+        symbol = re.fullmatch(r"(MQCC_[A-Z]+) \|", lines[start])
+        decimal = re.fullmatch(r"(-?[0-9]+) \|", lines[start+1])
+        hexadecimal = re.fullmatch(r"X'([0-9A-F]{8})' \|", lines[start+2])
+        if not symbol or not decimal or not hexadecimal:
+            raise ValueError("MQ completion numeric row differs")
+        number = int(decimal[1])
+        if not -(2**31) <= number < 2**31 or number & 0xFFFFFFFF != int(hexadecimal[1], 16):
+            raise ValueError("MQ completion signed numeric identity differs")
+        if any(row[0] == symbol[1] for row in result):
+            raise ValueError("duplicate MQ completion symbol")
+        result.append((symbol[1], number, hexadecimal[1]))
+    return result
+
+
+def reproduce_wire(catalog: dict, supplemental_cache: Path, call_cache: Path) -> None:
+    sources = authority.wire_source_lines(catalog, supplemental_cache, call_cache)
+    wire = catalog["completion_wire_mapping"]
+    facts = [*wire["classes"], wire["excluded_unknown"]]
+    actual = project_completions(sources[wire["topic_path"]])
+    if actual != [(fact["symbol"], fact["decimal"], fact["hexadecimal"]) for fact in facts]:
+        raise ValueError("MQ reviewed completion table differs from source")
+    for fact in facts:
+        fragment = "\n".join(sources[wire["topic_path"]][fact["first_line"]-1:fact["last_line"]])
+        if hashlib.sha256(fragment.encode()).hexdigest() != fact["fragment_sha256"]:
+            raise ValueError("MQ completion fact locator differs")
+    for note in wire["corroboration"]:
+        fragment = "\n".join(sources[note["topic_path"]][note["first_line"]-1:note["last_line"]])
+        if hashlib.sha256(fragment.encode()).hexdigest() != note["fragment_sha256"]:
+            raise ValueError("MQ completion corroboration locator differs")
+
+
 def project_pairs(lines: list[str], first: int, last: int) -> list[dict]:
     """Only Reason's explicit CompCode groups, never page-wide MQRC matches."""
     if lines[first-1] != "Reason" or not lines[last].startswith(("For detailed information", "For more information about these codes")):
@@ -76,7 +115,7 @@ def apply_symbol_conflicts(calls: list[dict]) -> None:
 def reproduce(root: Path, cache: Path, catalog: dict) -> None:
     sys.path.insert(0, str(root / "conformance/tools"))
     import ibm_docs
-    pins, tocs = ibm_docs.select(*ibm_docs.load_pins(), None, "mq")
+    pins, tocs = ibm_docs.select(*ibm_docs.load_pins(), authority.registry.BASELINE, None)
     by_topic = {pin.topic: pin for pin in pins}
     for toc in tocs:
         data = ibm_docs.read_bounded(cache / toc.key)
@@ -113,11 +152,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--source-cache", type=Path)
+    parser.add_argument("--supplemental-cache", type=Path)
     args = parser.parse_args()
+    if bool(args.source_cache) != bool(args.supplemental_cache):
+        parser.error("source reproduction requires original call and supplemental caches")
     catalog = authority.load()
     if args.source_cache:
         reproduce(authority.ROOT, args.source_cache, catalog)
-    print(f"MQ status: calls=26 positions=27 admitted={catalog['admitted_pair_count']} pending={catalog['pending_pair_count']} callback-not-applicable=1 credit=0")
+    if args.supplemental_cache:
+        reproduce_wire(catalog, args.supplemental_cache, args.source_cache)
+    source = "call-and-wire-source-reproduced" if args.source_cache else "offline-artifact-closure"
+    print(f"MQ status: calls=26 positions=27 admitted={catalog['admitted_pair_count']} pending={catalog['pending_pair_count']} callback-not-applicable=1 completion-wire=reviewed source={source} credit=0")
 
 
 if __name__ == "__main__":

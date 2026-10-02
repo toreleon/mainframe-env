@@ -5,7 +5,8 @@
 //! context locators here record review provenance, not dispatch permission.
 //! Callback notification has no ordinary call-return pair. Contradictory or
 //! unnumbered declarations remain visible as pending and cannot be constructed.
-//! Completion classes are symbolic: these call pages do not number MQCC values.
+//! Three completion wire numbers are explicitly reviewed from the separately
+//! pinned MQCC supplement. The existing symbolic canonical identity is unchanged.
 
 use crate::mq_mqi::MqMqiCall;
 
@@ -14,7 +15,10 @@ mod generated;
 #[cfg(test)]
 mod tests;
 
-pub use generated::{MQ_STATUS_CATALOG_SHA256, MQ_STATUS_PAIR_COUNT, MQ_STATUS_PENDING_COUNT};
+pub use generated::{
+    MQ_COMPLETION_WIRE_PROJECTION_SHA256, MQ_COMPLETION_WIRE_TOPIC_SHA256,
+    MQ_STATUS_CATALOG_SHA256, MQ_STATUS_PAIR_COUNT, MQ_STATUS_PENDING_COUNT,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqCompletion {
@@ -34,6 +38,17 @@ impl MqCompletion {
 
     pub fn symbol(self) -> &'static str {
         generated::completion_symbol(self)
+    }
+
+    /// Reviewed MQCC identity only; does not calculate an operation outcome.
+    pub fn wire_number(self) -> i32 {
+        generated::completion_wire_number(self)
+    }
+
+    /// Wide adapter input prevents narrowing/wrapping an unknown wire value.
+    pub fn from_wire_number(number: i64) -> Result<Self, MqStatusProblem> {
+        let number = i32::try_from(number).map_err(|_| MqStatusProblem::NumericOutOfRange)?;
+        generated::completion_from_wire(number).ok_or(MqStatusProblem::UnknownCompletionNumber)
     }
 }
 
@@ -101,6 +116,8 @@ pub fn mq_status_call(call: MqMqiCall) -> &'static MqStatusCallDescriptor {
 pub enum MqStatusProblem {
     NoCallReturn,
     UnknownCompletionSymbol,
+    UnknownCompletionNumber,
+    NumericOutOfRange,
     UnknownPair,
     PendingSource(MqStatusReview),
     NumericMismatch,
@@ -116,6 +133,24 @@ pub struct MqReviewedStatus {
 }
 
 impl MqReviewedStatus {
+    /// Numeric reason aliases and pending declarations retain existing rejection.
+    pub fn from_wire_pair(
+        call: MqMqiCall,
+        completion: i64,
+        reason: i64,
+    ) -> Result<Self, MqStatusProblem> {
+        if !mq_status_call(call).has_call_return {
+            return Err(MqStatusProblem::NoCallReturn);
+        }
+        let completion = MqCompletion::from_wire_number(completion)?;
+        let reason = i32::try_from(reason).map_err(|_| MqStatusProblem::NumericOutOfRange)?;
+        Self::from_reason_number(call, completion, reason)
+    }
+
+    pub fn wire_pair(self) -> (i32, i32) {
+        (self.completion().wire_number(), self.reason_decimal())
+    }
+
     pub fn from_symbols(
         call: MqMqiCall,
         completion: &str,

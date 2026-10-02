@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -15,6 +16,24 @@ REVIEWS = {"admitted": "Admitted", "pending-number": "PendingNumber",
     "pending-numeric-conflict": "PendingNumericConflict", "pending-symbol-conflict": "PendingSymbolConflict",
     "pending-symbol-spelling": "PendingSymbolSpelling"}
 BLOCK_SIZE = 48
+
+
+def reproduce_wire(catalog: dict, supplemental_cache: Path, call_cache: Path) -> None:
+    sources = authority.wire_source_lines(catalog, supplemental_cache, call_cache)
+    wire = catalog["completion_wire_mapping"]
+    for fact in [*wire["classes"], wire["excluded_unknown"]]:
+        fragment = sources[wire["topic_path"]][fact["first_line"]-1:fact["last_line"]]
+        if (hashlib.sha256("\n".join(fragment).encode()).hexdigest() != fact["fragment_sha256"]
+                or len(fragment) != 3):
+            raise ValueError("MQ generator completion fragment differs")
+        symbol, decimal, hexadecimal = [line.removesuffix(" |").strip() for line in fragment]
+        if (symbol != fact["symbol"] or int(decimal) != fact["decimal"]
+                or hexadecimal != "X'" + fact["hexadecimal"] + "'"):
+            raise ValueError("MQ generator completion numeric identity differs")
+    for source in wire["corroboration"]:
+        fragment = sources[source["topic_path"]][source["first_line"]-1:source["last_line"]]
+        if hashlib.sha256("\n".join(fragment).encode()).hexdigest() != source["fragment_sha256"]:
+            raise ValueError("MQ generator completion context differs")
 
 
 def optional(value) -> str:
@@ -62,14 +81,21 @@ def render(root: Path = authority.ROOT) -> dict[Path, str]:
             f"pair_blocks: &[{','.join(blocks)}] " + "},\n")
     main = [HEADER, "use super::*;\n"]
     main += [f"mod {name};\n" for name in modules]
-    main += [f'pub const MQ_STATUS_CATALOG_SHA256: &str = "sha256:{authority.registry._sha256(root / authority.CATALOG)}";\n',
+    wire = catalog["completion_wire_mapping"]
+    main += [f'pub const MQ_STATUS_CATALOG_SHA256: &str = "sha256:{wire["canonical_call_return_sha256"]}";\n',
+        f'pub const MQ_COMPLETION_WIRE_PROJECTION_SHA256: &str = "sha256:{wire["projection_sha256"]}";\n',
+        f'pub const MQ_COMPLETION_WIRE_TOPIC_SHA256: &str = "{wire["topic_sha256"]}";\n',
         f"pub const MQ_STATUS_PAIR_COUNT: usize = {catalog['pair_count']};\n",
         f"pub const MQ_STATUS_PENDING_COUNT: usize = {catalog['pending_pair_count']};\n",
         "pub(super) const COMPLETIONS: &[(MqCompletion, &str)] = &[\n"]
     main += [f"(MqCompletion::{variant}, {json.dumps(symbol)}),\n" for symbol,variant in authority.COMPLETIONS.items()]
     main += ["];\npub(super) fn completion_symbol(completion: MqCompletion) -> &'static str { match completion {\n"]
     main += [f"MqCompletion::{variant} => {json.dumps(symbol)},\n" for symbol,variant in authority.COMPLETIONS.items()]
-    main += ["} }\npub(super) static CALLS: [MqStatusCallDescriptor; 26] = [\n", *descriptors,
+    main += ["} }\npub(super) fn completion_wire_number(completion: MqCompletion) -> i32 { match completion {\n"]
+    main += [f"MqCompletion::{authority.COMPLETIONS[fact['symbol']]} => {fact['decimal']},\n" for fact in wire["classes"]]
+    main += ["} }\npub(super) fn completion_from_wire(number: i32) -> Option<MqCompletion> { match number {\n"]
+    main += [f"{fact['decimal']} => Some(MqCompletion::{authority.COMPLETIONS[fact['symbol']]}),\n" for fact in wire["classes"]]
+    main += ["_ => None, } }\npub(super) static CALLS: [MqStatusCallDescriptor; 26] = [\n", *descriptors,
         "];\npub(super) fn descriptor(call: MqMqiCall) -> &'static MqStatusCallDescriptor { &CALLS[match call {\n"]
     main += [f"MqMqiCall::{variant} => {index},\n" for index,variant in enumerate(authority.CALL_VARIANTS)]
     main.append("}] }\n")
@@ -111,7 +137,13 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--patch", action="store_true", help="emit edits for apply_patch")
+    parser.add_argument("--supplemental-cache", type=Path)
+    parser.add_argument("--source-cache", type=Path)
     args = parser.parse_args()
+    if bool(args.supplemental_cache) != bool(args.source_cache):
+        parser.error("wire reproduction requires supplemental and original call caches")
+    if args.supplemental_cache:
+        reproduce_wire(authority.load(), args.supplemental_cache, args.source_cache)
     if args.check:
         check()
         print("MQ status descriptors fresh; execution credit 0")

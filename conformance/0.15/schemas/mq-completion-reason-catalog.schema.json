@@ -19,6 +19,7 @@
     "pending_pair_count",
     "completion_symbols",
     "completion_numeric_mapping",
+    "completion_wire_mapping",
     "behavioral_coverage_credit",
     "licensed_execution_credit",
     "topic_manifest",
@@ -28,7 +29,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "mainframe-env.mq-completion-reason-catalog@1"
+      "const": "mainframe-env.mq-completion-reason-catalog@2"
     },
     "target_version": {
       "const": "0.15.0"
@@ -71,7 +72,230 @@
       ]
     },
     "completion_numeric_mapping": {
-      "const": "pending-not-in-call-pages"
+      "const": "reviewed-supplemental"
+    },
+    "completion_wire_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review",
+        "review_work_package",
+        "scope_id",
+        "baseline_id",
+        "topic_manifest",
+        "canonical_call_return_sha256",
+        "topic_path",
+        "topic_sha256",
+        "classes",
+        "excluded_unknown",
+        "corroboration",
+        "projection_sha256"
+      ],
+      "properties": {
+        "review": {
+          "const": "reviewed-supplemental"
+        },
+        "review_work_package": {
+          "const": "MQ-1501.completion-wire-mapping"
+        },
+        "scope_id": {
+          "const": "mq-programming-supplements"
+        },
+        "baseline_id": {
+          "const": "ibm-mq-9.4-programming-supplements-2026-09-12"
+        },
+        "topic_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "topic_manifest_digest"
+          ],
+          "properties": {
+            "path": {
+              "const": "conformance/0.15/manifests/mq-programming-supplements-topics.json"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "topic_manifest_digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "canonical_call_return_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "topic_path": {
+          "const": "SSFKSJ_9.4.0/refdev/q090560_.html"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "classes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "decimal",
+              "hexadecimal",
+              "first_line",
+              "last_line",
+              "fragment_sha256"
+            ],
+            "properties": {
+              "symbol": {
+                "enum": [
+                  "MQCC_OK",
+                  "MQCC_WARNING",
+                  "MQCC_FAILED"
+                ]
+              },
+              "decimal": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "hexadecimal": {
+                "type": "string",
+                "pattern": "^[0-9A-F]{8}$"
+              },
+              "first_line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "last_line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "fragment_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "excluded_unknown": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "symbol",
+            "decimal",
+            "hexadecimal",
+            "disposition",
+            "first_line",
+            "last_line",
+            "fragment_sha256"
+          ],
+          "properties": {
+            "symbol": {
+              "const": "MQCC_UNKNOWN"
+            },
+            "decimal": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": -1
+            },
+            "hexadecimal": {
+              "type": "string",
+              "pattern": "^[0-9A-F]{8}$"
+            },
+            "disposition": {
+              "const": "not-an-admitted-call-return"
+            },
+            "first_line": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
+            },
+            "last_line": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
+            },
+            "fragment_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "corroboration": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "official_row",
+              "topic_path",
+              "topic_sha256",
+              "first_line",
+              "last_line",
+              "fragment_sha256"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "call-return-mqlong-output",
+                  "callback-context-input-not-call-return"
+                ]
+              },
+              "official_row": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^ibm-mq-9\\.4-mqi-2026-08-31:mqi-calls-unique:[0-9]{4}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "topic_path": {
+                "type": "string",
+                "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]{6}_\\.html$"
+              },
+              "topic_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "first_line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "last_line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "fragment_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "projection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
     },
     "behavioral_coverage_credit": {
       "const": 0

@@ -42,7 +42,7 @@ mod tests {
         let schema = json(&root.join(SCHEMA)).unwrap();
         let catalog = json(&path).unwrap();
         validate_schema_instance(&schema, &catalog, &path).unwrap();
-        for mutation in 0..7 {
+        for mutation in 0..12 {
             let mut value = catalog.clone();
             match mutation {
                 0 => value["calls"][0]["pairs"][0]["declared_decimal"] = serde_json::json!(-1),
@@ -58,6 +58,26 @@ mod tests {
                         serde_json::json!(2001)
                 }
                 6 => value["licensed_execution_credit"] = serde_json::json!(1),
+                7 => {
+                    value["completion_wire_mapping"]["classes"][0]["decimal"] =
+                        serde_json::json!(-1)
+                }
+                8 => {
+                    value["completion_wire_mapping"]["classes"][0]["decimal"] =
+                        serde_json::json!(2147483648_i64)
+                }
+                9 => {
+                    value["completion_wire_mapping"]["classes"][0]["symbol"] =
+                        serde_json::json!("MQCC_UNKNOWN")
+                }
+                10 => {
+                    value["completion_numeric_mapping"] =
+                        serde_json::json!("pending-not-in-call-pages")
+                }
+                11 => {
+                    value["schema_version"] =
+                        serde_json::json!("mainframe-env.mq-completion-reason-catalog@1")
+                }
                 _ => unreachable!(),
             }
             assert!(
@@ -65,5 +85,11 @@ mod tests {
                 "mutation {mutation}"
             );
         }
+    }
+
+    #[test]
+    fn reviewed_status_gate_checks_schema_and_freshness_without_external_html() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        check(root).unwrap();
     }
 }

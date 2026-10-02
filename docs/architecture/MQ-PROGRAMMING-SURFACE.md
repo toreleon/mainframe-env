@@ -108,6 +108,38 @@ explicit duplicate or unknown states. These are non-executable contracts:
 unsupported forms and pending provider authorities stay explicit, and their
 presence grants no behavioral or licensed coverage.
 
+## Reviewed completion wire identities
+
+The existing completion/reason catalog now uses private source-projection schema
+`mainframe-env.mq-completion-reason-catalog@2`. Its additive wire projection
+reviews `MQCC_OK=0`, `MQCC_WARNING=1` and `MQCC_FAILED=2` from
+`SSFKSJ_9.4.0/refdev/q090560_.html` in the separately pinned
+`ibm-mq-9.4-programming-supplements-2026-09-12` scope. Decimal and eight-digit
+hexadecimal identities agree and fit the API's signed 32-bit MQCC and signed SQL
+integer representation; no SQL storage or general structure layout changes.
+`MQCC_UNKNOWN=-1` is recorded as excluded from ordinary reviewed call returns.
+MQCMIT catalog row `0007` corroborates the MQLONG output role; MQCBC field
+context remains callback input and never creates a return pair for MQCB_FUNCTION.
+
+`MqCompletion::wire_number` and `from_wire_number` map these three identities.
+`MqReviewedStatus::wire_pair` emits their MQCC with the already admitted reason;
+`from_wire_pair` applies the existing call-specific reason admission. Unknown,
+negative or out-of-range completion values, reason aliases needing explicit
+symbols, pending collisions and callback notifications fail closed. All ten
+reason declarations remain pending and all 1,030 pairs retain their source pins.
+
+The generator validates the unchanged original `@1` call-return artifact digest
+by reconstructing its exact JSON representation. `MQ_STATUS_CATALOG_SHA256`
+continues to bind that identity in existing canonical status bytes; the additive
+completion projection has its own source digest. Canonical encoders, outcome
+forms and old golden bytes are unchanged. Offline checks validate artifact
+closure; cache-backed generator/verifier checks independently reproduce the
+selected constants and corroborating fragments before comparison. This maps
+identities only and does not calculate runtime results or register an ABI.
+The archive provenance remains in-progress, without independent browser
+reproduction and predating the MQINQ re-pin; no freshness, same-snapshot,
+behavioral, licensed or execution claim follows from this review.
+
 ## Coverage boundary
 
 The MQ-1506 licensed adapter at

@@ -664,6 +664,21 @@ Earlier unpublished 27698b56 was superseded by the summary-substitution repair.
 Nested CICS composition, actual SAF/queue/UOW validation and receipt deduplication
 remain pending. No fabricated intent or replacement store can enter the binding.
 
+O's sealed `6f28c25a` completion wire mapping is integrated separately. The
+supplemental `q090560_` table binds MQCC_OK/WARNING/FAILED to 0/1/2; UNKNOWN -1
+is not an ordinary call return. The original call catalog is reconstructed
+exactly so its canonical status digest and all golden bytes stay unchanged.
+Fourteen tooling tests, the host API suite and two schema/freshness checks are
+fresh integration gates; selected source reproduction uses only the reviewed
+MQCC/context fragments. The worker's independent full call/source reproduction
+retains its actual candidate. All ten reason declarations remain pending.
+
+O next performs read-only independent selected/publication/intent composition
+review, excluding its own status/pin work. It binds committed path identities and
+locates actual production host/coordinator call sites for the executable critical
+path; no unchanged suite is rerun merely for a review. The next implementation
+units must compose the existing service rather than mint parallel queue authority.
+
 The manager owns actual selected service/ABI/host admission, separately durable
 UOW ownership, SAF/security context and audit/replay composition, participant
 minimum acceptance and public capability proof. All 26-call gates, CardDemo and

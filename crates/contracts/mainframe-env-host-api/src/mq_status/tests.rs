@@ -8,6 +8,115 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 #[test]
+fn reviewed_completion_wire_constants_reject_unknown_and_wide_inputs() {
+    for (completion, number, symbol) in [
+        (MqCompletion::Ok, 0, "MQCC_OK"),
+        (MqCompletion::Warning, 1, "MQCC_WARNING"),
+        (MqCompletion::Failed, 2, "MQCC_FAILED"),
+    ] {
+        assert_eq!(completion.wire_number(), number);
+        assert_eq!(completion.symbol(), symbol);
+        assert_eq!(
+            MqCompletion::from_wire_number(i64::from(number)),
+            Ok(completion)
+        );
+    }
+    for number in [-1, -2, i64::from(i32::MIN), 3, i64::from(i32::MAX)] {
+        assert_eq!(
+            MqCompletion::from_wire_number(number),
+            Err(MqStatusProblem::UnknownCompletionNumber)
+        );
+    }
+    for number in [
+        i64::MIN,
+        i64::from(i32::MIN) - 1,
+        i64::from(i32::MAX) + 1,
+        i64::MAX,
+    ] {
+        assert_eq!(
+            MqCompletion::from_wire_number(number),
+            Err(MqStatusProblem::NumericOutOfRange)
+        );
+    }
+    assert_eq!(
+        MQ_COMPLETION_WIRE_TOPIC_SHA256,
+        "87fb6467cf1e1c1715146fea70957e82970fcf4019ce15d44a750eae443d33ca"
+    );
+}
+
+#[test]
+fn wire_status_admission_preserves_call_membership_pending_and_alias_rejection() {
+    for (call, completion, reason, symbol) in [
+        (MqMqiCall::Put, 0, 0, "MQRC_NONE"),
+        (MqMqiCall::Get, 1, 2079, "MQRC_TRUNCATED_MSG_ACCEPTED"),
+        (MqMqiCall::Get, 2, 2033, "MQRC_NO_MSG_AVAILABLE"),
+        (MqMqiCall::Commit, 1, 2003, "MQRC_BACKED_OUT"),
+    ] {
+        let status = MqReviewedStatus::from_wire_pair(call, completion, reason).unwrap();
+        assert_eq!(status.reason_symbol(), symbol);
+        assert_eq!(status.wire_pair(), (completion as i32, reason as i32));
+    }
+    for (call, completion, reason, error) in [
+        (
+            MqMqiCall::CallbackFunction,
+            0,
+            0,
+            MqStatusProblem::NoCallReturn,
+        ),
+        (
+            MqMqiCall::CallbackFunction,
+            -1,
+            i64::MAX,
+            MqStatusProblem::NoCallReturn,
+        ),
+        (
+            MqMqiCall::Get,
+            -1,
+            2033,
+            MqStatusProblem::UnknownCompletionNumber,
+        ),
+        (MqMqiCall::Get, 0, 2033, MqStatusProblem::UnknownPair),
+        (MqMqiCall::Begin, 2, 2033, MqStatusProblem::UnknownPair),
+        (MqMqiCall::Get, 2, -1, MqStatusProblem::UnknownPair),
+        (
+            MqMqiCall::Get,
+            2,
+            i64::MAX,
+            MqStatusProblem::NumericOutOfRange,
+        ),
+        (
+            MqMqiCall::Put,
+            2,
+            2192,
+            MqStatusProblem::AmbiguousReasonIdentity,
+        ),
+        (
+            MqMqiCall::CreateMessageHandle,
+            2,
+            2273,
+            MqStatusProblem::PendingSource(MqStatusReview::PendingNumericConflict),
+        ),
+        (
+            MqMqiCall::CreateMessageHandle,
+            2,
+            2009,
+            MqStatusProblem::PendingSource(MqStatusReview::PendingNumericConflict),
+        ),
+    ] {
+        assert_eq!(
+            MqReviewedStatus::from_wire_pair(call, completion, reason),
+            Err(error)
+        );
+    }
+    for symbol in ["MQRC_PAGESET_FULL", "MQRC_STORAGE_MEDIUM_FULL"] {
+        let status =
+            MqReviewedStatus::from_identity(MqMqiCall::Put, "MQCC_FAILED", symbol, 2192, 0x890)
+                .unwrap();
+        assert_eq!(status.wire_pair(), (2, 2192));
+    }
+}
+
+#[test]
 fn every_call_membership_and_source_identity_admits_only_reviewed_pairs() {
     let expected = [
         17, 15, 16, 69, 0, 34, 20, 42, 61, 13, 67, 23, 12, 15, 96, 37, 28, 18, 76, 127, 137, 42,

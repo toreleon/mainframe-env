@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added explicitly reviewed MQCC wire identities and call-specific status conversions from the pinned MQ 9.4 supplement, preserving canonical status bytes and all ten pending reason declarations; runtime and licensed acceptance remain pending."

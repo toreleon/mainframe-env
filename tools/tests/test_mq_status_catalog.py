@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import mq_status_catalog as authority
@@ -19,6 +20,10 @@ class MqStatusCatalogTests(unittest.TestCase):
         for path in (authority.CATALOG, authority.registry.SOURCE_LIST_PATH,
                      authority.registry.CONTRACT_CATALOG_PATH, authority.registry.OFFICIAL_CATALOG_PATH,
                      authority.registry.TOPIC_MANIFEST_PATH, Path("rustfmt.toml")):
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(authority.ROOT / path, target)
+        for path in [authority.SUPPLEMENT_MANIFEST, authority.SUPPLEMENT_MANIFEST.parent / "index.json"]:
             target = root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(authority.ROOT / path, target)
@@ -52,7 +57,93 @@ class MqStatusCatalogTests(unittest.TestCase):
         self.assertEqual(callback["return_kind"], "callback-notification-no-call-return")
         self.assertIsNone(callback["reason_section"])
         self.assertEqual(callback["pairs"], [])
-        self.assertEqual(catalog["completion_numeric_mapping"], "pending-not-in-call-pages")
+        self.assertEqual(catalog["completion_numeric_mapping"], "reviewed-supplemental")
+
+    def test_reviewed_completion_facts_and_original_canonical_identity_are_fixed(self):
+        catalog = authority.load()
+        wire = catalog["completion_wire_mapping"]
+        # Independently reviewed MQCC constants, not generated Rust expectations.
+        self.assertEqual([(f["symbol"], f["decimal"], f["hexadecimal"]) for f in wire["classes"]],
+                         [("MQCC_OK", 0, "00000000"), ("MQCC_WARNING", 1, "00000001"),
+                          ("MQCC_FAILED", 2, "00000002")])
+        self.assertEqual(wire["excluded_unknown"]["decimal"], -1)
+        self.assertEqual(wire["canonical_call_return_sha256"],
+                         "02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa")
+        rendered = generator.render()[authority.OUTPUT / "mod.rs"]
+        self.assertIn('"sha256:02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa"', rendered)
+
+    def test_completion_projection_mutants_fail_even_with_recomputed_digest(self):
+        mutations = [
+            lambda w: w["classes"][0].__setitem__("decimal", 9),
+            lambda w: w["classes"][0].__setitem__("decimal", True),
+            lambda w: w["classes"][0].__setitem__("decimal", 2**31),
+            lambda w: w["classes"][1].__setitem__("symbol", "MQCC_OK"),
+            lambda w: w["classes"][2].__setitem__("symbol", "MQCC_UNKNOWN"),
+            lambda w: w["classes"].pop(),
+            lambda w: w.__setitem__("topic_sha256", "0"*64),
+            lambda w: w["topic_manifest"].__setitem__("sha256", "0"*64),
+            lambda w: w["topic_manifest"].__setitem__("topic_manifest_digest", "0"*64),
+            lambda w: w["classes"][0].__setitem__("first_line", 19),
+            lambda w: w["classes"][0].__setitem__("fragment_sha256", "0"*64),
+            lambda w: w.__setitem__("review", "pending"),
+            lambda w: w.__setitem__("canonical_call_return_sha256", "0"*64),
+            lambda w: w["excluded_unknown"].__setitem__("disposition", "admitted"),
+            lambda w: w["corroboration"][0].__setitem__("official_row", "foreign"),
+        ]
+        for mutation in mutations:
+            def mutate(catalog):
+                wire = catalog["completion_wire_mapping"]
+                mutation(wire)
+                wire["projection_sha256"] = authority.digest({k:v for k,v in wire.items() if k != "projection_sha256"})
+            with self.subTest(mutation=mutation):
+                self.reject(mutate)
+
+    def test_supplement_registry_and_manifest_tampering_fail_without_html(self):
+        for relative, mutate in [
+            (authority.SUPPLEMENT_MANIFEST, lambda d: d["topics"][0].__setitem__("sha256", "0"*64)),
+            (authority.SUPPLEMENT_MANIFEST.parent / "index.json", lambda d: d.__setitem__("semantic_authority", True)),
+            (authority.SUPPLEMENT_MANIFEST.parent / "index.json", lambda d: d["manifests"][0].__setitem__("manifest_sha256", "sha256:"+"0"*64)),
+            (authority.SUPPLEMENT_MANIFEST.parent / "index.json", lambda d: d["manifests"].append(copy.deepcopy(d["manifests"][0]))),
+        ]:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.fixture(root)
+                document = json.loads((root / relative).read_text())
+                mutate(document)
+                (root / relative).write_text(json.dumps(document))
+                with self.assertRaises(ValueError):
+                    authority.load(root)
+
+    def test_pending_reviews_and_coherent_reason_alias_changes_are_immutable(self):
+        def promote(catalog):
+            pair = next(p for c in catalog["calls"] for p in c["pairs"] if p["review"] == "pending-symbol-conflict")
+            pair["review"] = "admitted"
+        self.reject(promote, refresh=True)
+        def alias(catalog):
+            pair = catalog["calls"][0]["pairs"][0]
+            pair["declared_decimal"] = 2192
+            pair["declared_hex"] = "890"
+        self.reject(alias, refresh=True)
+
+    def test_independent_completion_table_parser_rejects_numeric_aliases_and_overflow(self):
+        lines = ["MQCC_* (completion codes)", "Last Updated: 2026-05-18", "Table 1. Values of constants",
+                 "Name", "|", "Decimal value", "|", "Hexadecimal value", "|",
+                 "MQCC_OK |", "0 |", "X'00000000' |", "MQCC_WARNING |", "1 |", "X'00000001' |",
+                 "MQCC_FAILED |", "2 |", "X'00000002' |", "MQCC_UNKNOWN |", "-1 |", "X'FFFFFFFF' |",
+                 "Parent topic:", "fixture-parent"]
+        self.assertEqual(verifier.project_completions(lines), [("MQCC_OK",0,"00000000"),
+                         ("MQCC_WARNING",1,"00000001"), ("MQCC_FAILED",2,"00000002"),
+                         ("MQCC_UNKNOWN",-1,"FFFFFFFF")])
+        for index, value in [(10,"1 |"), (12,"MQCC_OK |"), (16,"2147483648 |"),
+                             (17,"X'FFFFFFFF' |"), (9,"MQRC_CONTEXT |")]:
+            changed = lines.copy();changed[index] = value
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                verifier.project_completions(changed)
+        catalog = authority.load()
+        for tool in [generator, verifier]:
+            with patch.object(authority, "wire_source_lines", return_value={catalog["completion_wire_mapping"]["topic_path"]:lines}):
+                with self.assertRaises((ValueError, KeyError)):
+                    tool.reproduce_wire(catalog, Path("unused"), Path("unused"))
 
     def test_pending_and_duplicate_source_occurrences_are_not_silently_corrected(self):
         catalog = authority.load()

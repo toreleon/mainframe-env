@@ -36,6 +36,10 @@ mod row_0025_0;
 mod row_0026_0;
 pub const MQ_STATUS_CATALOG_SHA256: &str =
     "sha256:02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa";
+pub const MQ_COMPLETION_WIRE_PROJECTION_SHA256: &str =
+    "sha256:1b67e82e0c85139fd0bf2ce58bb851f4eca5184bebb081ed7b1ccadee71da5cd";
+pub const MQ_COMPLETION_WIRE_TOPIC_SHA256: &str =
+    "87fb6467cf1e1c1715146fea70957e82970fcf4019ce15d44a750eae443d33ca";
 pub const MQ_STATUS_PAIR_COUNT: usize = 1030;
 pub const MQ_STATUS_PENDING_COUNT: usize = 10;
 pub(super) const COMPLETIONS: &[(MqCompletion, &str)] = &[
@@ -48,6 +52,21 @@ pub(super) fn completion_symbol(completion: MqCompletion) -> &'static str {
         MqCompletion::Ok => "MQCC_OK",
         MqCompletion::Warning => "MQCC_WARNING",
         MqCompletion::Failed => "MQCC_FAILED",
+    }
+}
+pub(super) fn completion_wire_number(completion: MqCompletion) -> i32 {
+    match completion {
+        MqCompletion::Ok => 0,
+        MqCompletion::Warning => 1,
+        MqCompletion::Failed => 2,
+    }
+}
+pub(super) fn completion_from_wire(number: i32) -> Option<MqCompletion> {
+    match number {
+        0 => Some(MqCompletion::Ok),
+        1 => Some(MqCompletion::Warning),
+        2 => Some(MqCompletion::Failed),
+        _ => None,
     }
 }
 pub(super) static CALLS: [MqStatusCallDescriptor; 26] = [
