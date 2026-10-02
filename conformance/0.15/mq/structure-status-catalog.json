@@ -1694,6 +1694,14 @@
           "path": "conformance/0.15/manifests/mq-point-layout-sources-topics.json",
           "sha256": "128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa"
         }
+      },
+      {
+        "scope_id": "ibm-mq-9.4-mqi-2026-08-31",
+        "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
+        "topic_manifest": {
+          "path": "conformance/0.2/manifests/mq-topics.json",
+          "sha256": "f5d2fbc4d05cfc8b461b94e72048fffe34d04bafffbd1e711ca2fb8175d65562"
+        }
       }
     ],
     "elementary": {
@@ -3796,6 +3804,98 @@
             }
           }
         ]
+      },
+      {
+        "kind": "Cno1",
+        "family": "MQCNO",
+        "version": 1,
+        "identifier": "CNO ",
+        "prefix_bytes": 12,
+        "c_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+          "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+          "first_line": 135,
+          "last_line": 138,
+          "fragment_sha256": "f9588bae1b0d08875ef9349ac4036c59be265acb2eb6ec72d58cf465d87fb981"
+        },
+        "cobol_declaration": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+          "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+          "first_line": 165,
+          "last_line": 169,
+          "fragment_sha256": "2c8f4b4c804b7528fc1221f34e82c48f8f709da8a2f17c09d4ef066bc080211f"
+        },
+        "fields": [
+          {
+            "name": "StrucId",
+            "kind": "characters",
+            "width": 4,
+            "offset": 0,
+            "c_line": 135,
+            "cobol_line": 165,
+            "initial": {
+              "kind": "identifier",
+              "value": null,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+                "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+                "first_line": 35,
+                "last_line": 37,
+                "fragment_sha256": "6564f31a1b87f9dd299924b57d570e7a6468707a417e0f5c79081bc06ca2b1b5"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Version",
+            "kind": "long",
+            "width": 4,
+            "offset": 4,
+            "c_line": 136,
+            "cobol_line": 167,
+            "initial": {
+              "kind": "long",
+              "value": 1,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+                "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+                "first_line": 38,
+                "last_line": 40,
+                "fragment_sha256": "07be4a3f9f7d574bca01c9ec8531c59681e9097f8035f2f53c18ddc3e158a7a1"
+              }
+            },
+            "writeback": "input",
+            "writeback_source": null
+          },
+          {
+            "name": "Options",
+            "kind": "long",
+            "width": 4,
+            "offset": 8,
+            "c_line": 137,
+            "cobol_line": 169,
+            "initial": {
+              "kind": "long",
+              "value": 0,
+              "source": {
+                "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+                "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+                "first_line": 41,
+                "last_line": 44,
+                "fragment_sha256": "5a4e86355f98e2acc8cddb30a0e4e3da08ecdf9b60cada6333a0a0e49ef6090d"
+              }
+            },
+            "writeback": "pending-output",
+            "writeback_source": {
+              "topic_path": "SSFKSJ_9.4.0/refdev/q095415_.html",
+              "topic_sha256": "2c4bfc1a502dd1a745c758ad9a6b7cb5a0aa4f8954c8adc8575ada0f296fb225",
+              "first_line": 63,
+              "last_line": 76,
+              "fragment_sha256": "78eb6bd0974eebf3c185cb3ab40fb1633f3beb66304f932b65127b1ed1175056"
+            }
+          }
+        ]
       }
     ],
     "identifier_sources": [
@@ -3826,6 +3926,13 @@
         "first_line": 8,
         "last_line": 12,
         "fragment_sha256": "5723ed82e5a261f1fc81a644e62d0a5fb9b2ee8d428c5f0cb26819419ea3f698"
+      },
+      {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+        "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+        "first_line": 9,
+        "last_line": 13,
+        "fragment_sha256": "4c1f0e4a2047bba118a81aa1e54da55a5e29d16f40e2948d08cedc139d012cfc"
       }
     ],
     "signal_policy": {
@@ -3859,6 +3966,398 @@
       "first_line": 3,
       "last_line": 5,
       "fragment_sha256": "2d1a9d1da26c226706e6f02a1771dcadb353e3c69d10492740cf41e47b548a70"
+    },
+    "previous_projection_sha256": "5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0",
+    "connx_input": {
+      "origin_row": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009",
+      "origin": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101770_.html",
+        "topic_sha256": "41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633",
+        "first_line": 3,
+        "last_line": 42,
+        "fragment_sha256": "9d36bd5a9dfad8ef9659be85c3f26faaef8c3aceebd21b681da00c186423ee8a"
+      },
+      "origin_host_scope": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101770_.html",
+        "topic_sha256": "41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633",
+        "first_line": 48,
+        "last_line": 66,
+        "fragment_sha256": "2a640d76946fc9356336391c7095af65e2de787a58afc0ae8f35fbb5aa6f5671"
+      },
+      "prefix_input_fields": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095415_.html",
+        "topic_sha256": "2c4bfc1a502dd1a745c758ad9a6b7cb5a0aa4f8954c8adc8575ada0f296fb225",
+        "first_line": 5,
+        "last_line": 18,
+        "fragment_sha256": "b49584a22f47efb0410a1244351b2bbf64d4872ee22d09c729a66da5325038e4"
+      },
+      "options_input": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095415_.html",
+        "topic_sha256": "2c4bfc1a502dd1a745c758ad9a6b7cb5a0aa4f8954c8adc8575ada0f296fb225",
+        "first_line": 37,
+        "last_line": 38,
+        "fragment_sha256": "784086bd6ffd3eeefcc28a07511c47263346831aabf49139bb3e74faf041f100"
+      },
+      "binding": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095415_.html",
+        "topic_sha256": "2c4bfc1a502dd1a745c758ad9a6b7cb5a0aa4f8954c8adc8575ada0f296fb225",
+        "first_line": 63,
+        "last_line": 106,
+        "fragment_sha256": "25fea884232f124b9bb08f2bcf7345c2a07bea4b67b811274a606022c98df573"
+      },
+      "sharing": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095415_.html",
+        "topic_sha256": "2c4bfc1a502dd1a745c758ad9a6b7cb5a0aa4f8954c8adc8575ada0f296fb225",
+        "first_line": 235,
+        "last_line": 270,
+        "fragment_sha256": "0f5487e14397e1280314f55954eeede4112cb96ef0ea10ec9c9f89de91b0fbf1"
+      },
+      "default": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095415_.html",
+        "topic_sha256": "2c4bfc1a502dd1a745c758ad9a6b7cb5a0aa4f8954c8adc8575ada0f296fb225",
+        "first_line": 340,
+        "last_line": 345,
+        "fragment_sha256": "ad214d456d9ae30d48a263d73fd984e4847f498e36748b621095a1affd1fa9b3"
+      },
+      "version_boundary": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+        "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+        "first_line": 35,
+        "last_line": 46,
+        "fragment_sha256": "a296a2bb26ee2aab73af4b97a5bfe3fa9e8e25505f0b3bbe77e9e32c15e69e5f"
+      },
+      "structure_applicability": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q095410_.html",
+        "topic_sha256": "c04d62f35840b44b02e3ebbf10506078b4284ac27231c1819d24bcf532d33e7c",
+        "first_line": 8,
+        "last_line": 25,
+        "fragment_sha256": "e667bc79573c83bde0f84d045a387a79aa9f038d8e982eaa49ed89b12f73e8af"
+      },
+      "facts": [
+        {
+          "symbol": "MQCNO_ACCOUNTING_MQI_DISABLED",
+          "decimal": 8192,
+          "hexadecimal": "00002000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 89,
+          "last_line": 91,
+          "fragment_sha256": "71f9e598678a868e33a58ded8bcc0ba441f77c0fdf8572c2b993242d9d5386c9"
+        },
+        {
+          "symbol": "MQCNO_ACCOUNTING_MQI_ENABLED",
+          "decimal": 4096,
+          "hexadecimal": "00001000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 86,
+          "last_line": 88,
+          "fragment_sha256": "030f5e9051b7c1e5d0d49702e4f5922420f05323e8696d242a53ce7a0b82bc92"
+        },
+        {
+          "symbol": "MQCNO_ACCOUNTING_Q_DISABLED",
+          "decimal": 32768,
+          "hexadecimal": "00008000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 95,
+          "last_line": 97,
+          "fragment_sha256": "b85e3a8205f3d6de7ec9603a853014fb42280c4afce1074423e9965db6f754c4"
+        },
+        {
+          "symbol": "MQCNO_ACCOUNTING_Q_ENABLED",
+          "decimal": 16384,
+          "hexadecimal": "00004000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 92,
+          "last_line": 94,
+          "fragment_sha256": "5162625a25ff512fe7671b38d33f9d094517ddd65d40a7adfeb98cd684121a4d"
+        },
+        {
+          "symbol": "MQCNO_ACTIVITY_TRACE_DISABLED",
+          "decimal": 268435456,
+          "hexadecimal": "10000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 125,
+          "last_line": 127,
+          "fragment_sha256": "b59ca7399dace806d1b36c7b517d4811bb957fac1d72755740d3f422f358f2a5"
+        },
+        {
+          "symbol": "MQCNO_ACTIVITY_TRACE_ENABLED",
+          "decimal": 134217728,
+          "hexadecimal": "08000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 122,
+          "last_line": 124,
+          "fragment_sha256": "f65d63a92baad4b7a4b61bc02f422651c68a4951f86fde2197232f325670c334"
+        },
+        {
+          "symbol": "MQCNO_ALL_CONVS_SHARE",
+          "decimal": 262144,
+          "hexadecimal": "00040000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 101,
+          "last_line": 103,
+          "fragment_sha256": "2565569fba4aed7e1f71e1feb0008468fc3d417952bbeaa70b39d26f63d89138"
+        },
+        {
+          "symbol": "MQCNO_CD_FOR_OUTPUT_ONLY",
+          "decimal": 524288,
+          "hexadecimal": "00080000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 104,
+          "last_line": 106,
+          "fragment_sha256": "3a41679c9506b5c43674b8c30d1f2871bf4d7d11ebf817ae1719b7d37ef9df6c"
+        },
+        {
+          "symbol": "MQCNO_CLIENT_BINDING",
+          "decimal": 2048,
+          "hexadecimal": "00000800",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 83,
+          "last_line": 85,
+          "fragment_sha256": "3c248c1e1c7e3bc94c73ba0b4489f1301cef095c01323932bb6d6edb333dec80"
+        },
+        {
+          "symbol": "MQCNO_FASTPATH_BINDING",
+          "decimal": 1,
+          "hexadecimal": "00000001",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 50,
+          "last_line": 52,
+          "fragment_sha256": "4a73b5e51697caaf3ea3ac119525c66ae4460f8f59ced3b0625abcaf8a5b5b73"
+        },
+        {
+          "symbol": "MQCNO_HANDLE_SHARE_BLOCK",
+          "decimal": 64,
+          "hexadecimal": "00000040",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 68,
+          "last_line": 70,
+          "fragment_sha256": "7743fd0bd3a15b6dc61868b7bfc24452d6162ea4320be1c692df42bb9d3cbdda"
+        },
+        {
+          "symbol": "MQCNO_HANDLE_SHARE_NONE",
+          "decimal": 32,
+          "hexadecimal": "00000020",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 65,
+          "last_line": 67,
+          "fragment_sha256": "fb53d4d0896dfbcf3832bb5393ee951c5ea5c0efada78bd7ad60b5711620b7f5"
+        },
+        {
+          "symbol": "MQCNO_HANDLE_SHARE_NO_BLOCK",
+          "decimal": 128,
+          "hexadecimal": "00000080",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 71,
+          "last_line": 73,
+          "fragment_sha256": "89dc2043cbd77b729a22150d5ff4b769365464c568f3071774a9e8505666172b"
+        },
+        {
+          "symbol": "MQCNO_ISOLATED_BINDING",
+          "decimal": 512,
+          "hexadecimal": "00000200",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 77,
+          "last_line": 79,
+          "fragment_sha256": "3d6287daaff3dcae63b41baacdd7dd2ff1f754ce12f1bd92056d3c30a79e32a9"
+        },
+        {
+          "symbol": "MQCNO_LOCAL_BINDING",
+          "decimal": 1024,
+          "hexadecimal": "00000400",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 80,
+          "last_line": 82,
+          "fragment_sha256": "519bbcca86bc9d6731c60fabcf9f38651269f1021cf0ffd67bc9dd1298954438"
+        },
+        {
+          "symbol": "MQCNO_NONE",
+          "decimal": 0,
+          "hexadecimal": "00000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 128,
+          "last_line": 130,
+          "fragment_sha256": "776e8981a2cd06c10353a2c7666d81ca06bb7da97bf7ca43d65305a4cc3c5b9d"
+        },
+        {
+          "symbol": "MQCNO_NO_CONV_SHARING",
+          "decimal": 65536,
+          "hexadecimal": "00010000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 98,
+          "last_line": 100,
+          "fragment_sha256": "7a2a7c27680bb7e1dadfa9d350693e652a5f0ad93f93072f6965400f502e1dd4"
+        },
+        {
+          "symbol": "MQCNO_RECONNECT",
+          "decimal": 16777216,
+          "hexadecimal": "01000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 110,
+          "last_line": 112,
+          "fragment_sha256": "370eb4e96dd87731940e5cbf21cc0f2988ba34f8463c2d10cca37d4965e5e050"
+        },
+        {
+          "symbol": "MQCNO_RECONNECT_AS_DEF",
+          "decimal": 0,
+          "hexadecimal": "00000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 113,
+          "last_line": 115,
+          "fragment_sha256": "a414bbacb0344ac4fb16871832c8504ad1d0a3e614433fc7528ff4b2234851a1"
+        },
+        {
+          "symbol": "MQCNO_RECONNECT_DISABLED",
+          "decimal": 33554432,
+          "hexadecimal": "02000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 116,
+          "last_line": 118,
+          "fragment_sha256": "5a17015441c95c2884b80271a81800bf3334a6d3309e67d0c5927596a10f3623"
+        },
+        {
+          "symbol": "MQCNO_RECONNECT_Q_MGR",
+          "decimal": 67108864,
+          "hexadecimal": "04000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 119,
+          "last_line": 121,
+          "fragment_sha256": "fce35722ad23e8fffbc29f28bc4686044896b6be2247b4ad04b765a8698930bd"
+        },
+        {
+          "symbol": "MQCNO_RESTRICT_CONN_TAG_QSG",
+          "decimal": 16,
+          "hexadecimal": "00000010",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 62,
+          "last_line": 64,
+          "fragment_sha256": "ad225a052fe6a345d25a55a98bc03bfe325bdbff2ca9b753b47a3ddbfd53edff"
+        },
+        {
+          "symbol": "MQCNO_RESTRICT_CONN_TAG_Q_MGR",
+          "decimal": 8,
+          "hexadecimal": "00000008",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 59,
+          "last_line": 61,
+          "fragment_sha256": "024c465ba5af005f8e6fe96798f8c81cdae65d0174e421886d34f1af2413018c"
+        },
+        {
+          "symbol": "MQCNO_SERIALIZE_CONN_TAG_QSG",
+          "decimal": 4,
+          "hexadecimal": "00000004",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 56,
+          "last_line": 58,
+          "fragment_sha256": "81bfd88ead8e49f417376f5f0bae2e827f4677f07a54877ff77fda92ff8859b3"
+        },
+        {
+          "symbol": "MQCNO_SERIALIZE_CONN_TAG_Q_MGR",
+          "decimal": 2,
+          "hexadecimal": "00000002",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 53,
+          "last_line": 55,
+          "fragment_sha256": "3a40579d8e3dec946eb606d428ab81a4d52ec72a8cb7b92d2b21d9f1d895702b"
+        },
+        {
+          "symbol": "MQCNO_SHARED_BINDING",
+          "decimal": 256,
+          "hexadecimal": "00000100",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 74,
+          "last_line": 76,
+          "fragment_sha256": "6a6cbb6c6645c49c033701847c5fdd97098cd3914f290bb8a5cafd425eed2003"
+        },
+        {
+          "symbol": "MQCNO_STANDARD_BINDING",
+          "decimal": 0,
+          "hexadecimal": "00000000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 47,
+          "last_line": 49,
+          "fragment_sha256": "874e58da231d19b3fe81691a0879838f57a22d2adce5c5443c4a1908256d1bb1"
+        },
+        {
+          "symbol": "MQCNO_USE_CD_SELECTION",
+          "decimal": 1048576,
+          "hexadecimal": "00100000",
+          "kind": "option",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 107,
+          "last_line": 109,
+          "fragment_sha256": "c9b40a50ac128725b8af6466a64967f43dccbc80facb0cef36b88eef937fbecb"
+        },
+        {
+          "symbol": "MQCNO_VERSION_1",
+          "decimal": 1,
+          "hexadecimal": "00000001",
+          "kind": "version",
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091060_.html",
+          "topic_sha256": "9e527a17ef7f9c6861dcce708c6dea460ffb1199809f61a09492a66a6243851d",
+          "first_line": 21,
+          "last_line": 23,
+          "fragment_sha256": "20453305a54cb55ec517b8cd479962f5d875db4fc86b0400e719805dbb010bb3"
+        }
+      ],
+      "admitted_options_symbols": [
+        "MQCNO_NONE",
+        "MQCNO_HANDLE_SHARE_NONE"
+      ]
     }
   }
 }

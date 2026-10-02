@@ -168,7 +168,8 @@
             "get-put",
             "dynamic-open",
             "put-count-other",
-            "single-queue-put"
+            "single-queue-put",
+            "pending-output"
           ]
         },
         "writeback_source": {
@@ -203,7 +204,8 @@
             "Md1",
             "Md2",
             "Gmo1",
-            "Pmo1"
+            "Pmo1",
+            "Cno1"
           ]
         },
         "family": {
@@ -211,7 +213,8 @@
             "MQOD",
             "MQMD",
             "MQGMO",
-            "MQPMO"
+            "MQPMO",
+            "MQCNO"
           ]
         },
         "version": {
@@ -237,13 +240,51 @@
         },
         "fields": {
           "type": "array",
-          "minItems": 7,
+          "minItems": 3,
           "maxItems": 29,
           "items": {
             "$ref": "#/$defs/raw-field"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "Cno1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "family": {
+                "const": "MQCNO"
+              },
+              "version": {
+                "const": 1
+              },
+              "identifier": {
+                "const": "CNO "
+              },
+              "prefix_bytes": {
+                "const": 12
+              },
+              "fields": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "fields": {
+                "minItems": 7
+              }
+            }
+          }
+        }
+      ]
     },
     "raw-layout": {
       "type": "object",
@@ -263,7 +304,9 @@
         "body_encoding_policy",
         "character_policy",
         "owned_character_table",
-        "descriptor_output_policy"
+        "descriptor_output_policy",
+        "previous_projection_sha256",
+        "connx_input"
       ],
       "properties": {
         "schema_version": {
@@ -280,8 +323,8 @@
         },
         "sources": {
           "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
+          "minItems": 3,
+          "maxItems": 3,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -294,7 +337,8 @@
               "scope_id": {
                 "enum": [
                   "mq-programming-supplements",
-                  "mq-point-layout-sources"
+                  "mq-point-layout-sources",
+                  "ibm-mq-9.4-mqi-2026-08-31"
                 ]
               },
               "baseline_id": {
@@ -339,16 +383,16 @@
         },
         "layouts": {
           "type": "array",
-          "minItems": 5,
-          "maxItems": 5,
+          "minItems": 6,
+          "maxItems": 6,
           "items": {
             "$ref": "#/$defs/raw-layout-descriptor"
           }
         },
         "identifier_sources": {
           "type": "array",
-          "minItems": 4,
-          "maxItems": 4,
+          "minItems": 5,
+          "maxItems": 5,
           "items": {
             "$ref": "#/$defs/raw-locator"
           }
@@ -367,10 +411,138 @@
         },
         "descriptor_output_policy": {
           "$ref": "#/$defs/raw-locator"
+        },
+        "previous_projection_sha256": {
+          "const": "5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0"
+        },
+        "connx_input": {
+          "$ref": "#/$defs/connx-input"
         }
       }
-    }
-,
+    },
+    "connx-fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "decimal",
+        "hexadecimal",
+        "kind",
+        "topic_path",
+        "topic_sha256",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "symbol": {
+          "type": "string",
+          "pattern": "^MQCNO_[A-Z0-9_]+$"
+        },
+        "decimal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "hexadecimal": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{8}$"
+        },
+        "kind": {
+          "enum": [
+            "version",
+            "option"
+          ]
+        },
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "connx-input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin_row",
+        "origin",
+        "origin_host_scope",
+        "prefix_input_fields",
+        "options_input",
+        "binding",
+        "sharing",
+        "default",
+        "version_boundary",
+        "structure_applicability",
+        "facts",
+        "admitted_options_symbols"
+      ],
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "origin_host_scope": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "prefix_input_fields": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "options_input": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "binding": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "sharing": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "default": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "version_boundary": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "structure_applicability": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "origin_row": {
+          "const": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009"
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 29,
+          "maxItems": 29,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/connx-fact"
+          }
+        },
+        "admitted_options_symbols": {
+          "const": [
+            "MQCNO_NONE",
+            "MQCNO_HANDLE_SHARE_NONE"
+          ]
+        }
+      }
+    },
     "wire-options": {
       "type": "object", "additionalProperties": false,
       "required": ["baseline_id", "scope_id", "topic_manifest", "historical_catalog_sha256", "semantic_execution_credit", "facts", "corroboration"],

@@ -6,6 +6,17 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The checked raw-layout contract now includes MQCNO version 1's twelve-byte
+StrucId/Version/Options prefix. Exact options zero or 32 decode only with a
+separately supplied ordinary owned nonshared profile; options cannot select
+host, sharing, security or binding authority. Conditional IBM Options output
+remains pending, and writeback preserves omitted, undefined and suffix bytes.
+The additive raw projection preserves the prior five-layout identity and all
+original canonical/status/call identities. Original row `0009` and supplemental
+`q091060_/q095410_/q095415_` under the pinned MQ 9.4 baselines define this
+bounded source review. This is not executable CONNX or licensed call credit.
+Installed memory/profile/alias routing and broader CNO versions remain required.
+
 The installed server now supplies a private-constructor, non-Clone/non-Serde
 admission observation only after validated artifact/catalog selection and winning
 the original durable CALL reservation. It preserves the actual parent and

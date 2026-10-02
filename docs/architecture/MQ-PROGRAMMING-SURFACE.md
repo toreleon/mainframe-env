@@ -45,7 +45,7 @@ reviewed initial observation. Initial observations are reference facts, never
 missing-input defaults or scalar legality permits.
 
 `mainframe-env-host-api::mq_raw_layout` captures complete MQOD1 (168 bytes),
-MQMD1 (324), MQMD2 (364), GMO1 (72) and PMO1 (128) prefixes. Lengths derive from
+MQMD1 (324), MQMD2 (364), GMO1 (72), PMO1 (128) and MQCNO1 (12) prefixes. Lengths derive from
 the COBOL declarations and joined C byte/character types, not platform-dependent
 CURRENT_LENGTH macros. Version, identifier and complete capacity are checked;
 opaque identifiers and all other input fields remain exact. The embedding must
@@ -85,6 +85,32 @@ q093580_, q093600_, q093630_, q103960_. Exact source pins and fragment locators
 remain in the single catalog. Offline checks validate artifact closure; optional
 cache-backed generation reproduces the selected facts. Reference review provides
 zero execution/licensed credit and no refresh or same-browser capture claim.
+
+MQCNO1 is an additive private raw projection revision in that same catalog. Its
+new frozen digest reconstructs and verifies the exact previous five-layout
+projection; historical call/status/wire-option identities and canonical DTOs
+remain unchanged. The generated prefix contains only StrucId, Version and
+Options. Later offsets/pointers are outside VERSION1 and are never read or zeroed.
+`decode_connx_default` admits numeric MQCNO_NONE (0) or HANDLE_SHARE_NONE (32)
+only with an independently selected ordinary owned nonshared profile. It returns
+the existing checked optional manager name, NonShared and ContractDefault.
+Application options cannot select host topology, connection scope or authority.
+MTS sharing defaults, client/fallback, implicit CICS and binding/security profiles
+remain pending. Other recognized flags are unsupported and unknown bits reject;
+platform-ignored flags are not silently ignored. Zero-valued aliases cannot
+establish binding or reconnect configuration.
+
+StrucId and Version are always input. Options has conditional binding output
+semantics, which this input-only adapter explicitly leaves pending: observed
+updates reject atomically and unchanged/undefined observations retain exact bytes.
+No successful output, status or HCONN is fabricated. The manager still owns the
+trusted producer profile, live alias registry and actual service/COBOL bridge.
+Source context is original row0009 q101770_ and supplemental q091060_ (numeric
+identities), q095410_ (C/COBOL declaration) and q095415_ (field/platform semantics),
+under the baselines above. Exact pins and bounded fragment locators are in the
+catalog. Conflicting CURRENT_VERSION declarations remain unresolved; this adapter
+uses only independently corroborated VERSION1. This decoder earns no MQCONNX
+execution or licensed credit and does not broaden the accepted replay schema.
 
 ## Authority boundary
 

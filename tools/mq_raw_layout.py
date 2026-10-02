@@ -9,12 +9,26 @@ import sys
 import mq_wire_options as wire
 
 OUTPUT = Path('crates/contracts/mainframe-env-host-api/src/mq_raw_layout/generated.rs')
-PROJECTION_SHA = '5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0'
-SCOPES = ('mq-programming-supplements', 'mq-point-layout-sources')
+PROJECTION_SHA = '2f6d7c679543891ccc768f099963813d981871d2abd35fa7b49aa4e70732ae6a'
+PREVIOUS_PROJECTION_SHA = '5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0'
+SCOPES = ('mq-programming-supplements', 'mq-point-layout-sources', 'ibm-mq-9.4-mqi-2026-08-31')
 
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def previous_projection(value):
+    """Reconstruct exact reviewed five-layout artifact, never relabel its identity."""
+    previous = json.loads(json.dumps(value))
+    del previous['previous_projection_sha256']
+    del previous['connx_input']
+    previous['sources'].pop()
+    previous['layouts'].pop()
+    previous['identifier_sources'].pop()
+    if digest(previous) != PREVIOUS_PROJECTION_SHA:
+        raise ValueError('previous MQ raw layout projection differs')
+    return previous
 
 
 def locators(value):
@@ -34,6 +48,7 @@ def load(root):
     value = wire.read_json(root / wire.CATALOG)['raw_layout']
     if digest(value) != PROJECTION_SHA:
         raise ValueError('reviewed MQ raw layout projection differs')
+    previous_projection(value)
     if (value['schema_version'] != 'mainframe-env.mq-raw-layout-projection@1'
             or value['semantic_execution_credit'] != 0
             or value['historical_catalog_sha256'] != wire.HISTORICAL_SHA
@@ -67,6 +82,13 @@ def load(root):
     owned = value['owned_character_table']
     if hashlib.sha256((root / owned['path']).read_bytes()).hexdigest() != owned['sha256']:
         raise ValueError('owned embedding character profile differs')
+    facts = value['connx_input']['facts']
+    if len(facts) != 29 or [f['symbol'] for f in facts] != sorted({f['symbol'] for f in facts}):
+        raise ValueError('MQCNO numeric fact count/order differs')
+    for fact in facts:
+        if (type(fact['decimal']) is not int or not 0 <= fact['decimal'] <= 2147483647
+                or int(fact['hexadecimal'], 16) != fact['decimal']):
+            raise ValueError('MQCNO numeric identity differs')
     return value
 
 
@@ -91,6 +113,10 @@ def verify_source(root, caches):
         fragment = contents[source['topic_path']][source['first_line']-1:source['last_line']]
         if hashlib.sha256('\n'.join(fragment).encode()).hexdigest() != source['fragment_sha256']:
             raise ValueError('MQ raw layout source fragment differs')
+        if 'symbol' in source:
+            expected = [source['symbol'], str(source['decimal']), "X'" + source['hexadecimal'] + "'"]
+            if [line.removesuffix(' |') for line in fragment] != expected:
+                raise ValueError('MQCNO source numeric fact differs')
     for layout in value['layouts']:
         lines = contents[layout['c_declaration']['topic_path']]
         declaration = layout['c_declaration']
@@ -139,7 +165,8 @@ def render(root):
            f"pub(super) const COBOL_LONG_MAX: i32 = {value['elementary']['cobol_long_max']};\n"]
     kinds = {'long': 'Long', 'alias': 'Alias', 'signal-slot': 'SignalSlot', 'bytes': 'Bytes', 'characters': 'Characters'}
     policies = {'input': 'Input', 'get': 'Get', 'get-put': 'GetPut', 'dynamic-open': 'DynamicOpen',
-                'put-count-other': 'PutCountOther', 'single-queue-put': 'SingleQueuePut'}
+                'put-count-other': 'PutCountOther', 'single-queue-put': 'SingleQueuePut',
+                'pending-output': 'PendingOutput'}
     for layout in value['layouts']:
         out.append(f"const {layout['kind'].upper()}_FIELDS: &[MqRawFieldDescriptor] = &[\n")
         for field in layout['fields']:
@@ -159,5 +186,14 @@ def render(root):
                     f"        version: {layout['version']},\n",f"        prefix_bytes: {layout['prefix_bytes']},\n",
                     f'        ascii_identifier: *b"{ident}",\n',f"        cp037_identifier: {cp},\n",
                     f"        fields: {layout['kind'].upper()}_FIELDS,\n",'    },\n'])
+    out.append('];\n')
+    for fact in value['connx_input']['facts']:
+        out.append(f"pub(super) const {fact['symbol']}: i32 = {fact['decimal']};\n")
+    names = [f['symbol'] for f in value['connx_input']['facts'] if f['kind'] == 'option']
+    out.append('pub(super) const MQCNO_KNOWN: i32 = ' + '\n    | '.join(names) + ';\n')
+    out.append('pub(super) const MQCNO_ADMITTED: &[i32] = &[' + ', '.join(value['connx_input']['admitted_options_symbols']) + '];\n')
+    out.append('pub(super) const MQCNO_NUMERIC_IDENTITIES: &[(&str, i32)] = &[\n')
+    for fact in value['connx_input']['facts']:
+        symbol = fact['symbol'];out.append(f'    ("{symbol}", {symbol}),\n')
     out.append('];\n')
     return ''.join(out)

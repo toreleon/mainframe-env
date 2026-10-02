@@ -7,6 +7,9 @@
 
 use crate::mq_mqi::MqMqiCall;
 
+mod connx;
+pub use connx::{MqConnxProblem, MqConnxProfile, mq_connx_numeric_identities};
+
 mod generated {
     use super::*;
     include!("mq_raw_layout/generated.rs");
@@ -23,6 +26,7 @@ pub enum MqRawLayoutKind {
     Md2,
     Gmo1,
     Pmo1,
+    Cno1,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,6 +75,7 @@ pub enum MqRawInitialValue {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WritebackPolicy {
     Input,
+    PendingOutput,
     Get,
     GetPut,
     DynamicOpen,
@@ -273,7 +278,7 @@ impl MqRawCapture {
                 continue;
             };
             let permitted = match field.writeback {
-                WritebackPolicy::Input => false,
+                WritebackPolicy::Input | WritebackPolicy::PendingOutput => false,
                 WritebackPolicy::Get => context.call == MqMqiCall::Get,
                 WritebackPolicy::GetPut => matches!(
                     context.call,
@@ -357,6 +362,7 @@ fn call_matches(kind: MqRawLayoutKind, call: MqMqiCall) -> bool {
         }
         MqRawLayoutKind::Gmo1 => call == MqMqiCall::Get,
         MqRawLayoutKind::Pmo1 => matches!(call, MqMqiCall::Put | MqMqiCall::PutOne),
+        MqRawLayoutKind::Cno1 => call == MqMqiCall::ConnectExtended,
     }
 }
 

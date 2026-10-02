@@ -17,7 +17,7 @@ import generate_mq_mqi_registry as registry
 class MqRawLayoutTests(unittest.TestCase):
     def fixture(self, root):
         value = raw.load(registry.ROOT)
-        for path in [wire.CATALOG, wire.MANIFEST, Path(value['sources'][1]['topic_manifest']['path']), Path(value['owned_character_table']['path'])]:
+        for path in [wire.CATALOG, *[Path(s['topic_manifest']['path']) for s in value['sources']], Path(value['owned_character_table']['path'])]:
             target = root / path; target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(registry.ROOT / path, target)
 
@@ -25,7 +25,7 @@ class MqRawLayoutTests(unittest.TestCase):
         value = raw.load(registry.ROOT)
         layouts = {l['kind']: l for l in value['layouts']}
         self.assertEqual([(l['kind'], l['prefix_bytes']) for l in value['layouts']],
-                         [('Od1',168),('Md1',324),('Md2',364),('Gmo1',72),('Pmo1',128)])
+                         [('Od1',168),('Md1',324),('Md2',364),('Gmo1',72),('Pmo1',128),('Cno1',12)])
         fields = {f['name']: f for f in layouts['Md2']['fields']}
         for name,offset,width,kind in [('MsgId',48,24,'bytes'),('CorrelId',72,24,'bytes'),
                                       ('AccountingToken',208,32,'bytes'),('GroupId',324,24,'bytes'),
@@ -45,6 +45,22 @@ class MqRawLayoutTests(unittest.TestCase):
                          'sha256:8452faa699ae5ed8431605958196aabf52fc4d550cca7b3d485b26c0beb0c965')
         self.assertEqual(registry.render_contract(),(registry.ROOT/registry.CONTRACT_OUTPUT_PATH).read_text())
         self.assertEqual(wire.render(registry.ROOT),(registry.ROOT/wire.OUTPUT).read_text())
+        self.assertEqual(raw.digest(raw.previous_projection(raw.load(registry.ROOT))),
+                         '5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0')
+
+    def test_fixed_connx_facts_and_input_output_boundary(self):
+        value = raw.load(registry.ROOT)
+        cno = value['layouts'][-1]
+        self.assertEqual((cno['kind'],cno['version'],cno['identifier'],cno['prefix_bytes']),('Cno1',1,'CNO ',12))
+        self.assertEqual([(f['name'],f['offset'],f['width'],f['writeback']) for f in cno['fields']],
+                         [('StrucId',0,4,'input'),('Version',4,4,'input'),('Options',8,4,'pending-output')])
+        facts = {f['symbol']: f['decimal'] for f in value['connx_input']['facts']}
+        for symbol,number in [('MQCNO_VERSION_1',1),('MQCNO_NONE',0),('MQCNO_STANDARD_BINDING',0),
+                              ('MQCNO_RECONNECT_AS_DEF',0),('MQCNO_HANDLE_SHARE_NONE',32),
+                              ('MQCNO_HANDLE_SHARE_BLOCK',64),('MQCNO_HANDLE_SHARE_NO_BLOCK',128),
+                              ('MQCNO_CLIENT_BINDING',2048),('MQCNO_LOCAL_BINDING',1024)]:
+            self.assertEqual(facts[symbol],number)
+        self.assertEqual(value['connx_input']['admitted_options_symbols'],['MQCNO_NONE','MQCNO_HANDLE_SHARE_NONE'])
 
     def test_exact_layout_pin_type_width_offset_output_and_credit_mutants_reject(self):
         mutations = [
@@ -67,6 +83,17 @@ class MqRawLayoutTests(unittest.TestCase):
             lambda v: v.__setitem__('semantic_execution_credit',1),
             lambda v: v['elementary'].__setitem__('long_bytes',8),
             lambda v: v.__setitem__('unknown',True),
+            lambda v: v['layouts'][-1]['fields'][2].__setitem__('offset',4),
+            lambda v: v['layouts'][-1]['fields'][2].__setitem__('writeback','get'),
+            lambda v: v['layouts'][-1].__setitem__('prefix_bytes',20),
+            lambda v: v['connx_input']['facts'][0].__setitem__('decimal',1),
+            lambda v: v['connx_input']['facts'][0].__setitem__('hexadecimal','FFFFFFFF'),
+            lambda v: v['connx_input']['facts'].append(copy.deepcopy(v['connx_input']['facts'][0])),
+            lambda v: v['connx_input']['facts'][0].__setitem__('symbol',v['connx_input']['facts'][1]['symbol']),
+            lambda v: v['connx_input']['admitted_options_symbols'].append('MQCNO_HANDLE_SHARE_BLOCK'),
+            lambda v: v['connx_input']['origin'].__setitem__('topic_sha256','0'*64),
+            lambda v: v['sources'][2]['topic_manifest'].__setitem__('sha256','0'*64),
+            lambda v: v.__setitem__('previous_projection_sha256','0'*64),
         ]
         for mutation in mutations:
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
