@@ -280,6 +280,21 @@ No shared dispatcher, binder, typed catalog, evaluator or durable route changes.
 Language elements have no standalone statement row; full-row recognition,
 common/deferred freeze and licensed differential remain pending.
 
+The reviewed public numeric-expression boundary now owns arithmetic contexts,
+constant provenance, fixed diagnostics and runtime obligations, plus ordered
+result-combination inputs, contexts, owned outputs and conversion traces. Six
+public regressions exercise these boundaries without claiming parser, binder,
+value conversion or execution support. A rustfmt-only reflow in the arithmetic
+unit test accompanies integration; its production semantics are unchanged.
+COALESCE context additionally uses `db2z_bif_coalesce.html` (12698 bytes,
+`6f6c80fad7a56d48a50b66fee4c33b6d1ea5d29f4d24ed11fb314a36528941a4`)
+under the same pinned Db2 13 baseline. Mixed decimal/binary-float arithmetic with
+DECFLOAT remains unresolved: neither the result-combination table (which excludes
+arithmetic) nor a scalar conversion-function default establishes its temporary
+precision. FLOAT(n) aliases, character/graphic CCSID/collation and datetime-string
+combination still require source-backed binding/context. No statement-catalog
+numerator, durable route, shared signature preimage or parent milestone changes.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

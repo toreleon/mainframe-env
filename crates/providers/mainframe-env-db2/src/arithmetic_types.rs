@@ -1007,14 +1007,9 @@ mod tests {
         }
         // A nonzero-independent metadata result keeps zero checks pending.
         let zero = constant("-0");
-        let result = resolve_db2_binary_arithmetic(
-            Divide,
-            &zero,
-            &zero,
-            context(Dec15, 0),
-            zero.span(),
-        )
-        .unwrap();
+        let result =
+            resolve_db2_binary_arithmetic(Divide, &zero, &zero, context(Dec15, 0), zero.span())
+                .unwrap();
         assert_eq!(
             result.obligations().zero,
             Db2ArithmeticZeroCheck::DivisorMustBeNonzero

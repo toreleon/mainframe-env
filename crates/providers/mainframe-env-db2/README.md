@@ -136,3 +136,19 @@ defaults, host/indicator leaves and descriptor operands. Exact repeated FETCH
 targets fail while repeated OPEN inputs remain legal. Host aliases, SQLDA
 contents, cursor applicability, catalog privileges and all execution remain
 pending; no public API changes durable SQL dispatch or grants whole-row credit.
+
+Pure arithmetic metadata exposes unary/binary numeric result types under explicit
+DEC15/DEC31 and minimum-divide-scale context. Constant digit provenance is
+constructed from verified original source rather than caller-supplied counts;
+binder-supplied operands retain only structural span validation. Results own
+their types and retain runtime range, divisor, truncation and SQLWARN7 obligations,
+not evaluated values. Mixed decimal/binary-float arithmetic with DECFLOAT remains
+explicitly unresolved pending its temporary-conversion precision rule.
+
+Ordered result-type combination exposes numeric, binary and same-family datetime
+shapes with verified original UTF-8 locations, aggregate operand bounds, explicit
+untyped NULL and CASE/COALESCE application context. Precision caps retain whole-part
+preservation and conversion obligations, including each ordered candidate step.
+Character/graphic CCSID/collation, datetime strings and FLOAT(n) alias binding
+remain pending. Neither surface parses expressions, resolves function overloads,
+changes the durable SQL route or grants licensed or statement-row credit.

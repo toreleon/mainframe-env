@@ -24,6 +24,13 @@ mod type_system;
 mod update_syntax;
 
 pub use abi::db2_abi_library;
+pub use arithmetic_types::{
+    Db2ArithmeticConstantError, Db2ArithmeticConstantLimits, Db2ArithmeticContext,
+    Db2ArithmeticError, Db2ArithmeticErrorCode, Db2ArithmeticObligations, Db2ArithmeticOperand,
+    Db2ArithmeticRangeCheck, Db2ArithmeticResult, Db2ArithmeticSide, Db2ArithmeticSignRule,
+    Db2ArithmeticZeroCheck, Db2DecimalArithmetic, Db2DecimalMultiplyCheck, Db2DecimalTruncation,
+    classify_db2_arithmetic_constants, resolve_db2_binary_arithmetic, resolve_db2_unary_arithmetic,
+};
 pub use ast::{
     Db2AstError, Db2AstErrorCode, Db2AstLimits, Db2BinaryOperator, Db2BuiltInDataType,
     Db2BuiltInType, Db2DataType, Db2Expression, Db2ExpressionArena, Db2ExpressionId,
@@ -70,6 +77,12 @@ pub use name_resolution::{
 pub use numeric_constant_types::{
     Db2NumericConstantError, Db2NumericConstantErrorCode, Db2NumericConstantLimits,
     Db2NumericConstantType, classify_db2_numeric_constant,
+};
+pub use result_combination_types::{
+    Db2CaseElse, Db2CombinedResultOperand, Db2CombinedResultType, Db2ResultCombinationContext,
+    Db2ResultCombinationError, Db2ResultCombinationErrorCode, Db2ResultCombinationLimits,
+    Db2ResultCombinationStep, Db2ResultConversionObligation, Db2ResultTypeOperand,
+    combine_db2_result_types,
 };
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
