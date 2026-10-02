@@ -56,6 +56,23 @@ impl ScopedHostService {
         Self { registry, limits }
     }
 
+    /// Observe whether the ready provider selected by this frozen registry is
+    /// the same physical `Arc` allocation retained by a trusted embedding.
+    /// Equal descriptors, generation strings or stores are not object identity.
+    /// Missing/not-ready selection preserves the registry's ordinary refusal.
+    /// This read-only check performs no dispatch and grants no invocation,
+    /// capability, lifecycle, SAF, effect or transaction authority; `invoke`
+    /// still enforces its complete independent admission protocol.
+    pub fn selects_same_provider(
+        &self,
+        capability: &CapabilityId,
+        expected: &Arc<dyn crate::HostProvider>,
+    ) -> Result<bool, HostProblem> {
+        self.registry
+            .select(capability)
+            .map(|selected| Arc::ptr_eq(&selected, expected))
+    }
+
     /// Preflight exact provider-generation requirements before restoring any
     /// state or dispatching the first effect.
     pub fn validate_provider_generations(
@@ -344,6 +361,77 @@ mod tests {
                 .invoke(&invocation, 1, false, request(&invocation.run_unit_id))
                 .effect()
                 .outcome,
+            Err(HostProblem::Unsupported)
+        );
+    }
+
+    fn identity_provider(ready: bool) -> Arc<dyn HostProvider> {
+        Arc::new(PanicProvider {
+            descriptor: CapabilityDescriptor {
+                capability: CapabilityId::new("host.state.read", InvocationLimits::default())
+                    .unwrap(),
+                provider_id: "identity".into(),
+                generation: "same-generation".into(),
+                request_schema: "request@1".into(),
+                result_schema: "result@1".into(),
+                max_request_bytes: 1024,
+                max_result_bytes: 1024,
+                ready,
+            },
+        })
+    }
+    fn identity_service(provider: Arc<dyn HostProvider>) -> ScopedHostService {
+        ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+            ),
+            HostLimits::default(),
+        )
+    }
+
+    #[test]
+    fn physical_provider_observation_accepts_only_the_same_allocation_without_dispatch() {
+        let expected = identity_provider(true);
+        let other = identity_provider(true);
+        assert_eq!(expected.descriptor(), other.descriptor());
+        let host = identity_service(expected.clone());
+        let capability = expected.descriptor().capability.clone();
+        assert_eq!(
+            host.selects_same_provider(&capability, &expected.clone()),
+            Ok(true)
+        );
+        assert_eq!(host.selects_same_provider(&capability, &other), Ok(false));
+        // PanicProvider::invoke would panic. The identity check above cannot
+        // dispatch, and even a true observation cannot bypass principal grants.
+        let denied = invocation(false);
+        assert_eq!(
+            host.invoke(&denied, 1, false, request(&denied.run_unit_id))
+                .effect()
+                .outcome,
+            Err(HostProblem::Unauthorized)
+        );
+    }
+
+    #[test]
+    fn physical_provider_observation_preserves_missing_and_not_ready_refusals() {
+        let expected = identity_provider(false);
+        let capability = expected.descriptor().capability.clone();
+        let host = identity_service(expected.clone());
+        assert_eq!(
+            host.selects_same_provider(&capability, &expected),
+            Err(HostProblem::ProviderFailure)
+        );
+        let absent = CapabilityId::new("host.mq.write", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            host.selects_same_provider(&absent, &expected),
+            Err(HostProblem::Unsupported)
+        );
+        let empty = ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, vec![], InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        );
+        assert_eq!(
+            empty.selects_same_provider(&capability, &expected),
             Err(HostProblem::Unsupported)
         );
     }
