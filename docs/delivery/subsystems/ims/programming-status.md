@@ -6,6 +6,28 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root SHISAM fixed-layout integration — 2026-10-03
+
+Root composes worker `5a7118d94d889de5d670fca953080d712a0a057c` onto
+`7cb46bc8f8e25f999bdae5d9d555facbf54c307a` with the same exact nine-path
+SHISAM allowlist below. Manager reviewed the complete source-backed handoff,
+both existing production predicates, every added public/signed/engine test and
+all fifteen actual retained-reader executions. Exact committed inputs, original
+artifacts, four retained binaries, command logs and stopped/removed task clusters
+independently verify. All six Rust inputs remain byte-exact to the worker's
+passing strict lint; the intervening TM commit changed none of those inputs.
+Worker runtime/PostgreSQL receipts keep their original candidate identities.
+
+The expected status insertion and generated manifest conflicts preserve both
+complete TM and SHISAM sections. Only normal documentation generation may
+recompute the manifest; no generated hash is authored. Changed root docs/check,
+changelog/check, coverage/check, formatting and the exact nine-path generated
+seal/committed check are required, followed by root Cargo cleanup. No unchanged
+runtime, PostgreSQL or known CICS source-prerequisite exploration is repeated.
+This finite fixed-layout fence does not complete the remaining organization,
+U/V, shared TM/raw CALL, official/HUMAN or parent v0.14 obligations. Licensed IBM
+certification remains excluded; OSS dependency/license policy remains required.
+
 ## IMS-1404.tm-output-identity-local-order (finite runtime declaration, 2026-10-03)
 
 Target **0.14.0**, composed base `86bf917e5a20d581a3b5d56b89de86db94ccadf4`.
@@ -102,6 +124,171 @@ The first normal docs generation rejects the newly registered ADR because its
 navigation entry was omitted. Repair only that authorized registry entry; preserve
 the exit-1 packaging receipt/cleanup and rerun changed docs generation/check.
 No runtime, lint or policy result is relabeled or repeated for this docs repair.
+
+## IMS-1403.shisam-fixed-layout-admission — runtime leaf declaration, 2026-10-03
+
+Entry `86bf917e5a20d581a3b5d56b89de86db94ccadf4`, branch
+`codex/v014-shisam-fixed-layout-admission-20261003`; target **0.14.0**.
+Manager reviewed the completed test-only phase and approves only two production
+changes: SHISAM min/max equality after shared metadata numeric bounds, returning
+existing IncompatibleReference; and extending the existing engine fixed-root
+SHSAM guard to SHSAM or SHISAM, returning InvalidDefinition. This typed equal-
+bounds constraint changes no DTO, bytes/schema/identity, root count, logical/
+index/key/PROCOPT/context or storage/navigation authority. No new ADR is needed.
+
+Exact nine-path allowlist declared before repair:
+
+- `crates/contracts/mainframe-env-host-api/src/ims_metadata.rs`
+- `crates/providers/mainframe-env-ims/src/database/definition.rs`
+- `crates/providers/mainframe-env-ims/src/database/tests.rs`
+- `crates/providers/mainframe-env-ims/tests/shisam_fixed_admission.rs`
+- `crates/apps/mainframe-env-server/src/product.rs` (test declaration only)
+- `crates/apps/mainframe-env-server/src/product/tests/shisam_fixed_admission_tests.rs`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-shisam-fixed-layout-admission-20261003.toml`
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+Rows remain 0008 ISRT, 0005 retrieval, 0006 holds and 0019 scheduling controls
+under `ibm-ims-15.6-dli-2026-08-31:dli-call-families`; all25 mandatory, accepted
+official/HUMAN0/25. Existing typed Batch invocation public registry/provider and
+signed selected package routes remain the proof consumers; no all-context claim.
+Reverify selected metadata-contracts DBD205–234/SEGM300–354 offline before the
+predicate edits. Preserve original v2 red/v3 controls and all reviewed bytes/
+artifacts externally. Capture actual good base-created engine/public/signed
+state and existing reader binaries outside target before repair, then prove
+new readers against exact old good and invalid bytes, distinct provider/image/
+package/selected-generation fail-closed mappings without retained mutation, and
+actual old read-only compatibility with new good state. Local backend matrix is
+Memory, file SQLite and mandatory scoped PostgreSQL18.6 public/signed parity.
+
+Gates: all six original rejections green with no partial rows/generation changes;
+six positive controls; affected host metadata/engine organization/image/install/
+signed and historical-reader tests; strict host-api/IMS/server all-target/all-
+feature no-deps Clippy -D warnings; fmt, offline deny/license/supply-chain; normal
+docs/changelog/catalog/assurance/schema/spec/coverage and relevant execution/
+effect/rows/storage/SAF/retention/participant/typed/module/API guards. Each build/
+test/lint/generator sequence cleans only this checkout target. Fresh receipts
+are external under `shisam-fixed-layout-runtime/`. Task PG is isolated loopback
+only, stopped on pass/failure with logs retained before its resolved data cleanup.
+Seal the exact leaf only after all declared gates pass; no push/PR.
+
+Legacy invalid layouts stay parseable but new runtime validation fails closed;
+deployment availability may require separately reviewed operator recovery. No
+coercion, automatic migration or re-signing. HISAM/HIDAM ranges remain intact;
+shared single-root and HSAM/SHSAM equality gaps stay separately mandatory. This
+does not certify literal DBDGEN minbytes presence/compression/physical VSAM,
+process restart/backup, participant or parent v0.14 completion. Raw CALL/TM
+ADR0031/0033 remain unanswered; licensed certification is excluded.
+
+Local runtime leaf results: **Complete** for this finite typed equality fence.
+Fresh `focused-v1` executes host metadata9, engine/database12, public Memory/
+SQLite4 and signed Memory/SQLite4 passing tests, zero failures. All six original
+literal rejections are green with no partial rows/generation/publication; six
+distinct fixed-layout controls retain keyed ISRT/GU/GHU/GN, replay and reopen.
+Seven ordinary external-reader/PG ignores get no credit; required resource-bound
+selectors execute explicitly with `--ignored --exact`, never empty filters.
+Strict current host-api/IMS/server all-target/all-feature no-deps Clippy with
+`-D warnings`, fmt and 17 additional/current install/organization/package/signed
+regression executions pass. Original v2 red/v3 controls remain their own inputs.
+
+Base-created good state and explicitly resolved old test readers were captured
+before repair. Three read-only sequences execute five tests each: old readers
+on old good/invalid bytes, new readers on exact old good/invalid bytes, and old
+readers on new good bytes. Four good fixed organization images roundtrip byte-
+exact old/new. Invalid engine restore returns InvalidDefinition; public service
+open and selected-generation decode return InfrastructureFailure; retained
+signed package-registry restore returns Malformed. Full SQLite file hashes and
+all provider payload/version digests are unchanged before/after each corrected
+reader. The first whole-server old reader advanced retention_lock and was
+correctly uncredited for read-only byte preservation; logs/binary remain intact.
+The corrected test uses existing registry/selection readers, not new authority.
+
+Scoped PostgreSQL18.6 actually passes public variable rejection/fixed keyed
+programming-replay-reopen and signed rejection/fixed selected programming-replay-
+reopen, one exact executed test per history in four separate task databases.
+Public v2 identities remain unchanged; signed v3 fixes only the test setup's
+existing required secret-reference prefix. Initial socket-path startup and signed
+setup failures remain uncredited. Loopback-only task clusters are stopped and
+their exact resolved data directories removed after external log preservation.
+No process-restart, backup, physical VSAM or all-context claim follows reopen.
+
+All 22 declared policy/generated/contract gate commands pass: offline deny,
+both-target license notices, offline supply-chain, normal docs/check, changelog,
+coverage inventory, schemas/spec, IMS catalog/assurance and execution/effect/rows/
+storage/SAF/retention/participant/generator/typed/module/API guards. No ratchet,
+schema, source pin, dependency or authority changed; all build/test/lint/generator
+sequences clean this checkout target, including failures. Fresh command/input/
+source/binary/artifact identities, counts/skips and the exact generated local
+seal/check are retained externally under `shisam-fixed-layout-runtime/`.
+Final status prose requires only normal docs regeneration/check before seal;
+passing runtime/PG explorations are not rerun or relabeled for prose/commit.
+Old invalid layouts remain readable to old validators, not equivalent safe
+downgrade. Affected deployment availability/operator recovery limits and separate
+shared SHISAM single-root/HSAM/SHSAM layout obligations remain as declared above.
+Parent IMS/full v0.14, all25 and official/HUMAN0/25 remain unchanged/incomplete.
+
+## IMS-1403.shisam-fixed-layout-failfirst — test-only phase, 2026-10-03
+
+Entry `86bf917e5a20d581a3b5d56b89de86db94ccadf4` on
+`codex/v014-shisam-fixed-layout-failfirst-20261003`; target **0.14.0**.
+This phase adds independent rejection expectations for a unique named root-only
+SHISAM descriptor changed only from lengths 3/3 to 3/4. Existing shared metadata,
+engine definition, actual public installation and signed installation/publication
+are the admission owners. No production repair is authorized in this phase.
+
+Exact six-path test-only allowlist, declared before test edits:
+
+- `crates/contracts/mainframe-env-host-api/src/ims_metadata.rs` (cfg(test) only)
+- `crates/providers/mainframe-env-ims/src/database/tests.rs` (tests only)
+- `crates/providers/mainframe-env-ims/tests/shisam_fixed_admission.rs` (new)
+- `crates/apps/mainframe-env-server/src/product.rs` (existing cfg(test) module declaration only)
+- `crates/apps/mainframe-env-server/src/product/tests/shisam_fixed_admission_tests.rs` (new)
+- `docs/delivery/subsystems/ims/programming-status.md`
+
+Proof requires six actual assertion failures (host, engine, public Memory/SQLite,
+signed Memory/SQLite), logging accepted results before normative rejection.
+Fixed SHISAM keyed programming/replay and retained-image controls execute on
+Memory and file SQLite. Selected pinned DBD/SEGM and call/status sources are
+reference data with zero execution credit. Focused tests, formatting and strict
+affected test lint retain exact commands/input identities externally under
+`shisam-fixed-layout-failfirst/`; each Cargo sequence ends with this checkout's
+default target cleanup. A minimal later predicate repair and legacy-invalid
+readability consequences require manager review before production edits.
+
+U/V production owners and HISAM test paths are untouched. All 25 catalog rows
+remain mandatory; accepted official/HUMAN counts remain 0/25. SHSAM/HSAM variable
+layout obligations, physical/operational parity, raw CALL/TM ADR0031/0033 and
+parent IMS/full v0.14 remain incomplete; no commit or feature seal is authorized.
+
+Test-only results: `failfirst-v1` is compiler/setup failure with zero behavior
+credit. `failfirst-v2` executes all six normative rejection tests: shared host
+and engine each accept 3/4 SHISAM; public Memory/SQLite each install metadata
+with two new IMS rows; signed Memory/SQLite each stage and publish generation 1.
+Every normative assertion fails against literal rejection, preserving actual
+results before assertion. Public calls also retain 3-byte `A1X` and 4-byte
+`B2YZ`; current readers reopen that invalid layout without changing existing
+rows. Those artifacts remain external and are not accepted compatibility rules.
+
+The same v2 execution has five additional uncredited control-fixture failures:
+reused GU/GHU idempotency identities on four store/route controls and a wrong
+SHSAM sequential-order expectation. `controls-v3` repairs only those histories
+and executes five passing controls: engine good-image roundtrips for fixed
+SHISAM/HISAM/SHSAM/HIDAM, signed Memory/SQLite and public Memory/SQLite keyed
+ISRT/GU/GHU/GN, exact replay and reopen. The unchanged host fixed/other-organization
+control passed at its original v2 identity. No rejected expectation is weakened
+or relabeled as current-candidate execution. Total distinct tests: six normative
+red proofs and six passing controls, with no ignored tests or empty selectors.
+
+Current affected all-target/all-feature no-deps Clippy with `-D warnings`, fmt,
+offline deny, offline supply-chain and both-target license-notice checks pass.
+Each of four Cargo sequences cleaned only this checkout; target is absent.
+No production repair, generator output, commit or seal was made. Seven selected
+source reads verify matching archive bytes after retained-path absence; general
+programming searches return partial results because the previously unavailable,
+unselected STAT cache entry is absent. The finite source requirement is available.
+The external handoff proposes only SHISAM equality checks in existing shared
+metadata and engine definition owners, and identifies fail-closed consequences
+for retained invalid images/generations. That runtime phase awaits manager review.
 
 ## Root HISAM integration declaration — 2026-10-03
 

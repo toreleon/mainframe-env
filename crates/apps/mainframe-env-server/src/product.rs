@@ -5995,6 +5995,8 @@ mod tests {
     use super::*;
     #[path = "ims_package_tests.rs"]
     mod ims_package_tests;
+    #[path = "shisam_fixed_admission_tests.rs"]
+    mod shisam_fixed_admission_tests;
     use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};

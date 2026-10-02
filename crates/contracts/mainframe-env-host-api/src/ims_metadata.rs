@@ -500,6 +500,11 @@ fn validate_database(
         {
             return Err(ImsMetadataProblem::LimitExceeded);
         }
+        if database.organization == ImsDatabaseOrganization::Shisam
+            && segment.min_length != segment.max_length
+        {
+            return Err(ImsMetadataProblem::IncompatibleReference);
+        }
         if let Some(parent) = &segment.parent
             && (!segments.contains_key(&normalize(parent))
                 || normalize(parent) == normalize(&segment.name))
@@ -883,6 +888,62 @@ fn normalize(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn shisam_fixed_catalog(organization: ImsDatabaseOrganization) -> ImsMetadataCatalog {
+        let mut value = catalog();
+        let db = &mut value.databases[0];
+        db.organization = organization;
+        db.segments.truncate(1);
+        db.segments[0].min_length = 3;
+        db.segments[0].max_length = 3;
+        db.segments[0].fields[0].length = 2;
+        db.secondary_indexes.clear();
+        db.logical_relationships.clear();
+        let ImsPcbMetadata::Database(pcb) = &mut value.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.sensitive_segments.truncate(1);
+        value
+    }
+
+    #[test]
+    fn shisam_fixed_layout_host_rejects_variable_root() {
+        let good = shisam_fixed_catalog(ImsDatabaseOrganization::Shisam);
+        validate_ims_metadata(&good, ImsMetadataLimits::default()).unwrap();
+        let mut invalid = good;
+        invalid.databases[0].segments[0].max_length = 4;
+        let actual = validate_ims_metadata(&invalid, ImsMetadataLimits::default());
+        eprintln!("SHISAM_HOST_VARIABLE_ACTUAL={actual:?}");
+        assert_eq!(actual, Err(ImsMetadataProblem::IncompatibleReference));
+    }
+
+    #[test]
+    fn shisam_fixed_layout_host_fixed_and_other_organization_controls() {
+        for organization in [
+            ImsDatabaseOrganization::Shisam,
+            ImsDatabaseOrganization::Hisam,
+            ImsDatabaseOrganization::Shsam,
+            ImsDatabaseOrganization::Hidam,
+        ] {
+            let good = shisam_fixed_catalog(organization);
+            let bytes = serde_json::to_vec(&good).unwrap();
+            let identity = validate_ims_metadata(&good, ImsMetadataLimits::default()).unwrap();
+            let decoded = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(serde_json::to_vec(&decoded).unwrap(), bytes);
+            assert_eq!(
+                validate_ims_metadata(&decoded, ImsMetadataLimits::default()),
+                Ok(identity)
+            );
+        }
+        for organization in [
+            ImsDatabaseOrganization::Hisam,
+            ImsDatabaseOrganization::Hidam,
+        ] {
+            let mut ranged = shisam_fixed_catalog(organization);
+            ranged.databases[0].segments[0].max_length = 4;
+            assert!(validate_ims_metadata(&ranged, ImsMetadataLimits::default()).is_ok());
+        }
+    }
 
     #[test]
     fn gsam_absent_format_keeps_historical_metadata_bytes_and_explicit_format_binds_identity() {

@@ -164,7 +164,7 @@ pub(super) fn validate_definition(
         {
             Err(EngineProblem::InvalidDefinition)
         }
-        DatabaseOrganization::Shsam
+        DatabaseOrganization::Shsam | DatabaseOrganization::Shisam
             if definition.segments[0].min_length != definition.segments[0].max_length =>
         {
             Err(EngineProblem::InvalidDefinition)

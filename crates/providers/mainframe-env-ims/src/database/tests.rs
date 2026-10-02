@@ -1,5 +1,146 @@
 use super::*;
 
+fn shisam_fixed_definition(organization: DatabaseOrganization) -> DatabaseDefinition {
+    let mut value = definition(organization);
+    value.segments.truncate(1);
+    value.segments[0].max_length = 3;
+    value.secondary_indexes.clear();
+    value
+}
+
+#[test]
+fn shisam_fixed_layout_engine_rejects_variable_root() {
+    let good = shisam_fixed_definition(DatabaseOrganization::Shisam);
+    DatabaseEngine::new(good.clone(), EngineLimits::default()).unwrap();
+    let mut invalid = good;
+    invalid.segments[0].max_length = 4;
+    let actual = DatabaseEngine::new(invalid, EngineLimits::default());
+    eprintln!("SHISAM_ENGINE_VARIABLE_ACTUAL={actual:?}");
+    if let Ok(mut accepted) = actual.clone() {
+        insert(&mut accepted, "ROOT", None, b"A1X");
+        insert(&mut accepted, "ROOT", None, b"B2YZ");
+        let bytes = serde_json::to_vec(&accepted.image()).unwrap();
+        let restored = DatabaseEngine::restore(
+            serde_json::from_slice(&bytes).unwrap(),
+            EngineLimits::default(),
+        )
+        .unwrap();
+        eprintln!(
+            "SHISAM_ENGINE_LEGACY_IMAGE={}",
+            String::from_utf8(bytes.clone()).unwrap()
+        );
+        eprintln!(
+            "SHISAM_ENGINE_LEGACY_RESTORED_EXACT={}",
+            serde_json::to_vec(&restored.image()).unwrap() == bytes
+        );
+    }
+    assert_eq!(actual, Err(EngineProblem::InvalidDefinition));
+}
+
+#[test]
+fn shisam_fixed_layout_engine_fixed_images_and_other_organization_controls() {
+    for organization in [
+        DatabaseOrganization::Shisam,
+        DatabaseOrganization::Hisam,
+        DatabaseOrganization::Shsam,
+        DatabaseOrganization::Hidam,
+    ] {
+        let mut engine = DatabaseEngine::new(
+            shisam_fixed_definition(organization),
+            EngineLimits::default(),
+        )
+        .unwrap();
+        insert(&mut engine, "ROOT", None, b"A1X");
+        insert(&mut engine, "ROOT", None, b"B2Y");
+        let bytes = serde_json::to_vec(&engine.image()).unwrap();
+        if let Some(directory) = std::env::var_os("SHISAM_CAPTURE_GOOD_DIR") {
+            let path =
+                std::path::PathBuf::from(directory).join(format!("good-{organization:?}.json"));
+            std::fs::write(path, &bytes).unwrap();
+        }
+        let restored = DatabaseEngine::restore(
+            serde_json::from_slice(&bytes).unwrap(),
+            EngineLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(serde_json::to_vec(&restored.image()).unwrap(), bytes);
+        let mut position = PcbPosition::default();
+        assert_eq!(
+            read(
+                &restored,
+                &mut position,
+                ReadKind::Unique,
+                Some("ROOT"),
+                vec![equal("ROOT", "ROOTKEY", b"A1")],
+                true
+            )
+            .unwrap()
+            .data,
+            b"A1X"
+        );
+        assert!(position.is_held());
+        assert_eq!(
+            read(
+                &restored,
+                &mut position,
+                ReadKind::Next,
+                None,
+                vec![],
+                false
+            )
+            .unwrap()
+            .data,
+            b"B2Y"
+        );
+    }
+    for organization in [DatabaseOrganization::Hisam, DatabaseOrganization::Hidam] {
+        let mut ranged = shisam_fixed_definition(organization);
+        ranged.segments[0].max_length = 4;
+        DatabaseEngine::new(ranged, EngineLimits::default()).unwrap();
+    }
+    let mut shsam = shisam_fixed_definition(DatabaseOrganization::Shsam);
+    shsam.segments[0].max_length = 4;
+    assert_eq!(
+        DatabaseEngine::new(shsam, EngineLimits::default()),
+        Err(EngineProblem::InvalidDefinition)
+    );
+}
+
+#[test]
+#[ignore = "requires exact externally retained old/new engine images"]
+fn shisam_fixed_layout_engine_historical_reader() {
+    let directory = std::path::PathBuf::from(std::env::var_os("SHISAM_IMAGE_DIR").unwrap());
+    for organization in [
+        DatabaseOrganization::Shisam,
+        DatabaseOrganization::Hisam,
+        DatabaseOrganization::Shsam,
+        DatabaseOrganization::Hidam,
+    ] {
+        let path = directory.join(format!("good-{organization:?}.json"));
+        let bytes = std::fs::read(&path).unwrap();
+        let engine = DatabaseEngine::restore(
+            serde_json::from_slice(&bytes).unwrap(),
+            EngineLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(serde_json::to_vec(&engine.image()).unwrap(), bytes);
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+    }
+    let path = std::path::PathBuf::from(std::env::var_os("SHISAM_INVALID_IMAGE").unwrap());
+    let bytes = std::fs::read(&path).unwrap();
+    let result = DatabaseEngine::restore(
+        serde_json::from_slice(&bytes).unwrap(),
+        EngineLimits::default(),
+    );
+    match std::env::var("SHISAM_READER_EXPECTATION").unwrap().as_str() {
+        "old" => assert_eq!(serde_json::to_vec(&result.unwrap().image()).unwrap(), bytes),
+        "new" => assert_eq!(result, Err(EngineProblem::InvalidDefinition)),
+        other => panic!("Invalid independently selected reader expectation: {other}"),
+    }
+    assert_eq!(std::fs::read(path).unwrap(), bytes);
+    eprintln!("SHISAM_ENGINE_HISTORICAL_READER_PASS");
+}
+
 #[test]
 fn hisam_nonunique_private_last_preserves_historical_insert_and_image() {
     let mut descriptor = definition(DatabaseOrganization::Hisam);
@@ -624,7 +765,7 @@ fn all_pinned_organizations_have_bounded_engine_or_index_only_behavior() {
         if matches!(organization, Gsam | Index | Msdb | Psindex | Shisam | Shsam) {
             descriptor.segments.truncate(1);
         }
-        if organization == Shsam {
+        if matches!(organization, Shsam | Shisam) {
             descriptor.segments[0].max_length = descriptor.segments[0].min_length;
         }
         let mut engine = DatabaseEngine::new(descriptor, EngineLimits::default()).unwrap();

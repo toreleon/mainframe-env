@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reject variable-length SHISAM layouts through existing shared metadata and engine definition validation; preserve fixed-layout programming and retained formats, and fail closed on previously admitted invalid images or package generations without rewriting stored bytes."
