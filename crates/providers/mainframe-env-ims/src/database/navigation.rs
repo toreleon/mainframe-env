@@ -18,6 +18,18 @@ impl PcbPosition {
                     && self.current.is_some()
                     && !self.after_end
             })
+            && self.secondary_restart.as_ref().is_none_or(|saved| {
+                saved
+                    .validate(crate::recovery::RecoveryLimits::default())
+                    .is_ok()
+                    && self.parentage.is_none()
+                    && self.held.is_none()
+                    && !self.after_end
+                    && self
+                        .secondary
+                        .as_ref()
+                        .is_none_or(|p| p.index == saved.index)
+            })
     }
 }
 

@@ -74,6 +74,7 @@ impl DatabaseEngine {
             }),
             after_end: false,
             secondary: None,
+            secondary_restart: None,
         };
         self.delete(&mut position)
     }

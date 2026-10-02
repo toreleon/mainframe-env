@@ -38,7 +38,7 @@ pub struct SavedSecondaryPosition {
 }
 
 impl SavedSecondaryPosition {
-    pub(super) fn validate(&self, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
+    pub(crate) fn validate(&self, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
         let valid_name = |name: &str| {
             !name.is_empty()
                 && name.len() <= limits.max_database_name_bytes

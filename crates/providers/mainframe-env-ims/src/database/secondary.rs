@@ -82,12 +82,35 @@ impl DatabaseEngine {
         &self,
         position: &PcbPosition,
     ) -> Result<(), EngineProblem> {
-        let Some(selected) = &position.secondary else {
-            return Ok(());
-        };
         if !position.valid_retained_shape() {
             return Err(EngineProblem::InvalidData);
         }
+        if let Some(saved) = &position.secondary_restart {
+            self.validate_secondary_navigation(&saved.index)?;
+            let index = self
+                .definition
+                .secondary_indexes
+                .iter()
+                .find(|index| index.name == saved.index)
+                .ok_or(EngineProblem::InvalidData)?;
+            if saved
+                .source_path
+                .last()
+                .is_none_or(|(name, _)| name != &index.source_segment)
+                || saved.source_path.first() != saved.current_path.first()
+                || saved
+                    .current_path
+                    .first()
+                    .is_none_or(|(name, _)| name != index.target_segment())
+            {
+                return Err(EngineProblem::InvalidData);
+            }
+            self.checkpoint_order(&saved.source_path)?;
+            self.checkpoint_order(&saved.current_path)?;
+        }
+        let Some(selected) = &position.secondary else {
+            return Ok(());
+        };
         let target = self.index_target(&selected.index, selected.source)?;
         let record = &self.records[&selected.source];
         if !self
@@ -157,6 +180,7 @@ impl DatabaseEngine {
         position.current = Some(inserted);
         position.held = None;
         position.after_end = false;
+        position.secondary_restart = None;
         position.secondary = Some(SecondaryPosition {
             index: name.into(),
             source,
@@ -245,8 +269,56 @@ impl DatabaseEngine {
         source_occurrence: Option<RecordId>,
         matches: impl Fn(RecordId, &[u8]) -> bool,
     ) -> Result<RecordView, EngineProblem> {
+        self.read_secondary_filtered(name, position, request, source_occurrence, None, matches)
+    }
+
+    /// Disjoint independent equality groups scan in SSA order, once per target
+    /// per group. The same source-occurrence cursor and publication remain owned
+    /// here; ordinary dependent/OR calls retain the full pointer sequence.
+    pub(super) fn read_secondary_ordered_matching(
+        &self,
+        name: &str,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        independent_keys: Option<&[&[u8]]>,
+        matches: impl Fn(RecordId, &[u8]) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
+        self.read_secondary_filtered(name, position, request, None, independent_keys, matches)
+    }
+
+    /// Both adapters constrain this one traversal; neither owns a second cursor.
+    fn read_secondary_filtered(
+        &self,
+        name: &str,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        source_occurrence: Option<RecordId>,
+        independent_keys: Option<&[&[u8]]>,
+        matches: impl Fn(RecordId, &[u8]) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
         self.validate_secondary_navigation(name)?;
         self.validate_read(request)?;
+        let restart = position
+            .secondary_restart
+            .as_deref()
+            .filter(|_| independent_keys.is_some() && request.kind != ReadKind::Unique);
+        if let (Some(saved), Some(keys)) = (restart, independent_keys)
+            && !keys.contains(&saved.search_key.as_slice())
+        {
+            return Err(EngineProblem::Unsupported);
+        }
+        if let Some(keys) = independent_keys
+            && request.kind != ReadKind::Unique
+            && position.current.is_some()
+            && restart.is_none()
+            && !self
+                .selected_secondary_key(name, position)
+                .is_ok_and(|key| keys.contains(&key))
+        {
+            // No group cursor is encoded for a prior pointer outside these
+            // disjoint groups. Do not guess a new independent scan position.
+            return Err(EngineProblem::Unsupported);
+        }
         let mut next = position.clone();
         next.held = None;
         let parent = if request.kind == ReadKind::NextInParent {
@@ -266,10 +338,21 @@ impl DatabaseEngine {
             .indexes
             .get(name)
             .ok_or(EngineProblem::InvalidRequest)?;
-        let mut started =
-            request.kind == ReadKind::Unique || next.after_end || next.current.is_none();
+        let mut started = restart.is_some()
+            || request.kind == ReadKind::Unique
+            || next.after_end
+            || next.current.is_none();
         let mut found = None;
+        let entries = independent_keys.map_or_else(
+            || entries.iter().collect::<Vec<_>>(),
+            |keys| {
+                keys.iter()
+                    .filter_map(|key| entries.get_key_value(*key))
+                    .collect()
+            },
+        );
         'entries: for (key, sources) in entries {
+            let mut targets = BTreeSet::new();
             let mut sources = sources.iter().copied().collect::<Vec<_>>();
             sources.sort_by_key(|source| ranks[source]);
             for source in &sources {
@@ -285,11 +368,17 @@ impl DatabaseEngine {
                     continue;
                 }
                 let target = self.index_target(name, *source)?;
+                let first_pointer = independent_keys.is_none() || targets.insert(target);
                 for id in order
                     .iter()
                     .copied()
                     .filter(|id| *id == target || self.is_descendant(*id, target))
                 {
+                    if let (Some(saved), Some(keys)) = (restart, independent_keys)
+                        && !self.follows_secondary_restart(saved, keys, key, *source, id)?
+                    {
+                        continue;
+                    }
                     if !started {
                         if next.current == Some(id)
                             && next.secondary.as_ref().is_some_and(|selected| {
@@ -303,7 +392,7 @@ impl DatabaseEngine {
                     if parent.is_some_and(|parent| !self.is_descendant(id, parent)) {
                         continue;
                     }
-                    if matches(id, key) {
+                    if first_pointer && matches(id, key) {
                         found = Some((id, *source));
                         break 'entries;
                     }
@@ -334,6 +423,7 @@ impl DatabaseEngine {
             );
         };
         next.current = Some(id);
+        next.secondary_restart = None;
         next.secondary = Some(SecondaryPosition {
             index: name.into(),
             source,

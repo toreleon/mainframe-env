@@ -225,6 +225,9 @@ pub struct PcbPosition {
     after_end: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     secondary: Option<SecondaryPosition>,
+    /// Original missing-occurrence boundary, not the ordinary-order predecessor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    secondary_restart: Option<Box<crate::recovery::SavedSecondaryPosition>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -237,6 +240,7 @@ struct SecondaryPosition {
 impl PcbPosition {
     pub fn set_current(&mut self, id: RecordId) {
         self.secondary = None;
+        self.secondary_restart = None;
         self.current = Some(id);
         self.parentage = Some(id);
         self.held = None;
@@ -256,9 +260,18 @@ impl PcbPosition {
     }
 
     pub(crate) fn secondary_index(&self) -> Option<&str> {
-        self.secondary
+        self.secondary_restart
             .as_ref()
-            .map(|selected| selected.index.as_str())
+            .map(|saved| saved.index.as_str())
+            .or_else(|| {
+                self.secondary
+                    .as_ref()
+                    .map(|selected| selected.index.as_str())
+            })
+    }
+
+    pub(crate) fn has_secondary_restart_boundary(&self) -> bool {
+        self.secondary_restart.is_some()
     }
 }
 

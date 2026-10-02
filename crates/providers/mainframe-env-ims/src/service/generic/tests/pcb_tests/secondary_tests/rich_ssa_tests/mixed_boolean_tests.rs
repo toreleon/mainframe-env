@@ -1,4 +1,4 @@
-//! Local fail-closed acceptance, not an IBM mixed-expression evaluation oracle.
+//! Historical guard packet, narrowed to source-derived unsupported classes.
 use super::*;
 
 fn installed_mixed(store: Arc<dyn ProviderStateStore>, run: &str) -> Arc<ImsService> {
@@ -76,18 +76,14 @@ fn reject_mixed(service: Arc<ImsService>, run: &str, selected: u16) {
     let position = pcb::position(&service.lock().unwrap().state.sessions[run], selected);
     assert!(position.is_held());
 
-    // All three predicates are true. Flattening the two AND identities used to
-    // return success and publish a new session/replay row. Neither mixed AND nor
-    // OR/AND precedence is established by the registered body pins.
-    for (first, second) in [
-        ('&', '#'),
-        ('#', '*'),
-        ('&', '|'),
-        ('+', '*'),
-        ('#', '|'),
-        ('+', '#'),
-    ] {
-        let raw = format!("ROOT    (ROOTKEY GEA1{first}ROOTKEY LEB2{second}KIND    NE?)");
+    // Primary # is forbidden. Pure indexed mixed independent groups remain
+    // outside the disjoint equality-group implementation.
+    for (first, second) in [('&', '#'), ('#', '*'), ('#', '|'), ('+', '#')] {
+        let raw = if selected == 1 {
+            format!("ROOT    (ROOTKEY GEA1{first}ROOTKEY LEB2{second}KIND    NE?)")
+        } else {
+            format!("ROOT    (BYCHILD GEAZ{first}BYCHILD LEZA{second}BYCHILD NE??)")
+        };
         for operation in [
             ImsOperation::GetUnique,
             ImsOperation::GetHoldNext,
@@ -105,9 +101,8 @@ fn reject_mixed(service: Arc<ImsService>, run: &str, selected: u16) {
             assert_eq!(snapshot(&service), before);
         }
     }
-    // Multiple alternating groups and binary values must not be scanned as
-    // connectors or coerced into a uniform expression.
-    let mut raw = b"ROOT    *O(00030001LT".to_vec();
+    // Unsupported command/context remains fenced even with mixed binary sets.
+    let mut raw = b"ROOT    *QO(00030001LT".to_vec();
     raw.extend([255]);
     raw.extend(b"&00040001NE");
     raw.extend([0]);
@@ -188,6 +183,25 @@ fn mixed_boolean_gap_preserves_uniform_encoding_aliases_and_saf_order() {
                 b"ROOT    (ROOTKEY GEA1#ROOTKEY LEB2#KIND    NE?)".as_slice(),
             ),
         ] {
+            if selected == 1 && seq == 12 {
+                let before = snapshot(&service);
+                assert_eq!(
+                    public(
+                        service.clone(),
+                        run,
+                        nav(
+                            run,
+                            seq + 10 * u64::from(selected),
+                            ImsOperation::GetHoldUnique,
+                            selected,
+                            &[raw]
+                        )
+                    ),
+                    Err(HostProblem::Unsupported)
+                );
+                assert_eq!(snapshot(&service), before);
+                continue;
+            }
             let found = public(
                 service.clone(),
                 run,

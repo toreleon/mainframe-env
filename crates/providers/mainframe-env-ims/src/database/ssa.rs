@@ -32,12 +32,12 @@ pub(crate) struct SsaFields<'a> {
     secondary: Option<&'a str>,
 }
 
-impl SsaFields<'_> {
+impl<'a> SsaFields<'a> {
     fn selected_index_field(
         &self,
         segment: &str,
         field: &str,
-    ) -> Option<&SecondaryIndexDefinition> {
+    ) -> Option<&'a SecondaryIndexDefinition> {
         let index = self.secondary.and_then(|name| {
             self.engine
                 .definition
@@ -114,9 +114,24 @@ impl DatabaseEngine {
                 })
         };
         let view = if let Some(name) = secondary {
-            self.read_secondary_matching(name, position, request, |id, key| {
-                matches(id, Some((name, key)))
-            })
+            // Distinct equality groups have disjoint keys, so the existing
+            // source cursor also identifies their left-to-right scan position.
+            let keys = ssas
+                .iter()
+                .find(|ssa| self.independent_index(ssa, secondary).is_some())
+                .map(|ssa| {
+                    ssa.predicates
+                        .iter()
+                        .map(|p| p.value.as_slice())
+                        .collect::<Vec<_>>()
+                });
+            self.read_secondary_ordered_matching(
+                name,
+                position,
+                request,
+                keys.as_deref(),
+                |id, key| matches(id, Some((name, key))),
+            )
         } else {
             self.read_matching(position, request, |id| matches(id, None))
         }?;
@@ -172,21 +187,67 @@ impl DatabaseEngine {
                     return Err(EngineProblem::InvalidRequest);
                 }
             }
-            // Pins establish the encodings, but the linked multiple-qualification
-            // bodies are unpinned. Do not flatten distinct AND identities or infer
-            // mixed precedence. This is a local admission fence, not an IBM status.
-            if ssa
-                .connectors
-                .first()
-                .is_some_and(|first| ssa.connectors.iter().any(|c| c != first))
+            // The supplemental HDAM/DEDB source requires randomizer anchors and
+            // search termination, which this metadata cannot represent.
+            if secondary.is_none()
+                && definition.parent.is_none()
+                && !ssa.connectors.is_empty()
+                && matches!(
+                    self.definition.organization,
+                    DatabaseOrganization::Hdam | DatabaseOrganization::Dedb
+                )
             {
                 return Err(EngineProblem::Unsupported);
+            }
+            if ssa.connectors.contains(&ImsSsaBoolean::IndependentAnd) {
+                if secondary.is_none() {
+                    return Err(EngineProblem::Unsupported);
+                }
+                if self.independent_index(ssa, secondary).is_some() {
+                    // Overlapping ranges, repeated equality groups and mixed
+                    // independent sets need additional group/search semantics.
+                    // Admit only disjoint equality groups; never flatten them.
+                    let mut keys = BTreeSet::new();
+                    if ssa
+                        .connectors
+                        .iter()
+                        .any(|c| *c != ImsSsaBoolean::IndependentAnd)
+                        || ssa.predicates.iter().any(|p| {
+                            p.relation != ImsSsaRelation::Equal || !keys.insert(p.value.as_slice())
+                        })
+                    {
+                        return Err(EngineProblem::Unsupported);
+                    }
+                }
             }
         }
         if count > self.limits.max_predicates {
             return Err(EngineProblem::LimitExceeded);
         }
         Ok(())
+    }
+
+    fn independent_index<'a>(
+        &'a self,
+        ssa: &ImsSsa,
+        secondary: Option<&'a str>,
+    ) -> Option<&'a SecondaryIndexDefinition> {
+        if !ssa.connectors.contains(&ImsSsaBoolean::IndependentAnd) {
+            return None;
+        }
+        let ImsSsaField::Named(name) = &ssa.predicates.first()?.field else {
+            return None;
+        };
+        let fields = self.ssa_fields(secondary);
+        let index = fields.selected_index_field(&ssa.segment, name)?;
+        if !ssa
+            .predicates
+            .iter()
+            .all(|p| matches!(&p.field, ImsSsaField::Named(name) if name == &index.name))
+        {
+            return None;
+        }
+        Some(index)
     }
 
     fn matches_ssa(&self, id: RecordId, ssa: &ImsSsa, indexed: Option<(&str, &[u8])>) -> bool {
@@ -215,6 +276,19 @@ impl DatabaseEngine {
         let Ok(definition) = self.segment(&record.segment) else {
             return false;
         };
+        if let Some(index) = self.independent_index(ssa, indexed.map(|(name, _)| name)) {
+            return indexed.is_some_and(|(_, key)| ssa.predicates.iter().any(|p| p.value == key))
+                && ssa.predicates.iter().all(|p| {
+                    self.indexes[&index.name]
+                        .get(&p.value)
+                        .is_some_and(|sources| {
+                            sources.iter().any(|source| {
+                                self.index_target(&index.name, *source)
+                                    .is_ok_and(|target| target == id)
+                            })
+                        })
+                });
+        }
         let evaluate = |p: &mainframe_env_host_api::ImsSsaPredicate| {
             let actual = match &p.field {
                 ImsSsaField::Named(name)
@@ -244,10 +318,18 @@ impl DatabaseEngine {
                 ImsSsaRelation::GreaterOrEqual => actual >= p.value.as_slice(),
             })
         };
-        if ssa.connectors.contains(&ImsSsaBoolean::LogicalOr) {
-            ssa.predicates.iter().any(evaluate)
-        } else {
-            ssa.predicates.iter().all(evaluate)
+        // Each OR starts another AND set. Preserve the AST connector identities;
+        // secondary # with a physical field has source-defined dependent behavior.
+        let mut set = true;
+        for (i, predicate) in ssa.predicates.iter().enumerate() {
+            if i > 0 && ssa.connectors[i - 1] == ImsSsaBoolean::LogicalOr {
+                if set {
+                    return true;
+                }
+                set = true;
+            }
+            set &= evaluate(predicate);
         }
+        set
     }
 }

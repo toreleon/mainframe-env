@@ -373,3 +373,178 @@ fn one_checkpoint_restores_primary_secondary_and_formatted_gsam_positions() {
         });
     }
 }
+
+#[test]
+fn independent_secondary_groups_continue_after_exact_checkpoint_reposition() {
+    for qualification in [
+        b"ROOT    (BYCOMP  EQ\0\xff#BYCOMP  EQ\xff\0)".as_slice(),
+        b"ROOT    (BYCOMP  EQ\xff\0#BYCOMP  EQ\0\xff)".as_slice(),
+    ] {
+        backends("independent-secondary-restart", |store| {
+            let service = open_catalog(store.clone(), indexed_catalog());
+            let first = invocation();
+            setup(&service, &store, &first);
+            // ROOT 02 has two same-key pointers plus a pointer in the other group.
+            // The independent groups must correlate to this one target, not ROOT 01.
+            child(&service, &first, 30, b"02", b"B3\xff\0");
+            service
+                .execute(&first, &database_request(ImsOperation::Commit, 31, b""))
+                .unwrap();
+            assert_eq!(
+                nav(
+                    &service,
+                    &first,
+                    2,
+                    ImsOperation::GetUnique,
+                    &[qualification]
+                )
+                .segments[0]
+                    .data,
+                b"02B"
+            );
+            invoke_call(&service, &store, &first, 2, symbolic());
+            drop(service);
+            let fresh =
+                ImsService::open_authorized(store.clone(), Default::default(), Arc::new(Allow))
+                    .unwrap();
+            let next = next_execution(&first, "independent-restart");
+            assert!(
+                matches!(invoke_call(&fresh, &store, &next, 3, restart()), ImsRecoveryResult::Restarted { pcb_statuses, .. } if pcb_statuses.contains(&(2, "  ".into())))
+            );
+            // No extra group cursor is invented: the retained pointer's disjoint
+            // search key identifies the first group after the provider-owned GU.
+            assert_eq!(
+                nav(&fresh, &next, 2, ImsOperation::GetNext, &[qualification]).segments[0].data,
+                b"02B"
+            );
+            assert_eq!(
+                nav(&fresh, &next, 2, ImsOperation::GetNext, &[qualification]).status,
+                "GE"
+            );
+        });
+    }
+}
+
+#[test]
+fn deleted_checkpoint_target_resumes_reversed_independent_groups_without_skipping() {
+    backends("deleted-independent-restart", |store| {
+        let qualification = b"ROOT    (BYCOMP  EQ\xff\0#BYCOMP  EQ\0\xff)";
+        let service = open_catalog(store.clone(), indexed_catalog());
+        let first = invocation();
+        setup(&service, &store, &first);
+        nav(
+            &service,
+            &first,
+            1,
+            ImsOperation::GetHoldUnique,
+            &[b"ROOT    (KEY     EQ03)"],
+        );
+        service
+            .execute(&first, &database_request(ImsOperation::Delete, 35, b""))
+            .unwrap();
+        service
+            .execute(&first, &database_request(ImsOperation::Commit, 36, b""))
+            .unwrap();
+        child(&service, &first, 30, b"01", b"A2\0\xff");
+        child(&service, &first, 31, b"02", b"B3\xff\0");
+        service
+            .execute(&first, &database_request(ImsOperation::Commit, 32, b""))
+            .unwrap();
+        assert_eq!(
+            nav(
+                &service,
+                &first,
+                2,
+                ImsOperation::GetUnique,
+                &[qualification]
+            )
+            .segments[0]
+                .data,
+            b"01A"
+        );
+        invoke_call(&service, &store, &first, 2, symbolic());
+        nav(
+            &service,
+            &first,
+            1,
+            ImsOperation::GetHoldUnique,
+            &[b"ROOT    (KEY     EQ01)"],
+        );
+        assert_eq!(
+            service
+                .execute(&first, &database_request(ImsOperation::Delete, 33, b""))
+                .unwrap()
+                .status,
+            "  "
+        );
+        service
+            .execute(&first, &database_request(ImsOperation::Commit, 34, b""))
+            .unwrap();
+        drop(service);
+        let fresh = ImsService::open_authorized(store.clone(), Default::default(), Arc::new(Allow))
+            .unwrap();
+        let next = next_execution(&first, "deleted-independent-restart");
+        assert!(
+            matches!(invoke_call(&fresh, &store, &next, 3, restart()), ImsRecoveryResult::Restarted { pcb_statuses, .. } if pcb_statuses.contains(&(2, "GE".into())))
+        );
+        let capture = call(4, symbolic());
+        intent(&*store, &next, &capture);
+        let before = snapshot(&*store);
+        assert_eq!(
+            dispatch(fresh.clone(), store.clone(), &next, &capture),
+            Err(HostProblem::Unsupported)
+        );
+        assert_eq!(snapshot(&*store), before);
+        // Reopen once more: continuation provenance is retained, not a local cache.
+        drop(fresh);
+        let mut original = store
+            .get_provider_state("ims-v1-session-index", "log-run")
+            .unwrap()
+            .unwrap();
+        let original_value: serde_json::Value = serde_json::from_slice(&original.payload).unwrap();
+        assert!(original_value["value"]["pcb_positions"]["2"]["secondary_restart"].is_object());
+        for corruption in ["digest", "reversed", "endpoint", "width", "target"] {
+            let mut corrupt = original.clone();
+            let mut corrupt_value = original_value.clone();
+            let boundary = &mut corrupt_value["value"]["pcb_positions"]["2"]["secondary_restart"];
+            match corruption {
+                "digest" => boundary["metadata_digest"] = serde_json::json!(vec![0; 32]),
+                "reversed" => boundary["source_path"].as_array_mut().unwrap().reverse(),
+                "endpoint" => {
+                    boundary["source_path"].as_array_mut().unwrap().pop();
+                }
+                "width" => boundary["source_path"][0][1] = serde_json::json!([48, 48, 49]),
+                _ => boundary["current_path"][0][1] = serde_json::json!([48, 50]),
+            }
+            corrupt.version += 1;
+            corrupt.payload = serde_json::to_vec(&corrupt_value).unwrap();
+            store
+                .put_provider_state(corrupt.clone(), Some(original.version))
+                .unwrap();
+            assert!(
+                matches!(
+                    ImsService::open_authorized(store.clone(), Default::default(), Arc::new(Allow)),
+                    Err(HostProblem::InfrastructureFailure)
+                ),
+                "accepted {corruption} provenance"
+            );
+            let mut repaired = original;
+            repaired.version = corrupt.version + 1;
+            store
+                .put_provider_state(repaired.clone(), Some(corrupt.version))
+                .unwrap();
+            original = repaired;
+        }
+        let fresh = ImsService::open_authorized(store.clone(), Default::default(), Arc::new(Allow))
+            .unwrap();
+        for _ in 0..2 {
+            let found = nav(&fresh, &next, 2, ImsOperation::GetNext, &[qualification]);
+            assert_eq!(found.status, "  ");
+            assert_eq!(found.segments[0].data, b"02B");
+        }
+        assert_eq!(
+            nav(&fresh, &next, 2, ImsOperation::GetNext, &[qualification]).status,
+            "GE"
+        );
+    });
+}

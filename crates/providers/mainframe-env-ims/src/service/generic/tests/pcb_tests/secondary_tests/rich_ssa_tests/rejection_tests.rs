@@ -28,7 +28,7 @@ fn secondary_ssa_malformed_commands_context_and_saf_preserve_all_rows() {
         (b"ROOT    *Q ".as_slice(), HostProblem::Unsupported),
         (b"ROOT    *L ".as_slice(), HostProblem::Unsupported),
         (
-            b"ROOT    (BYCHILD EQZA|KIND    EQA#ROOTKEY EQB2)".as_slice(),
+            b"ROOT    (BYCHILD EQZA|BYCHILD EQAZ#BYCHILD EQ??)".as_slice(),
             HostProblem::Unsupported,
         ),
         (b"ROOT    *P".as_slice(), HostProblem::Malformed),

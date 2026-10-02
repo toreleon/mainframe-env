@@ -217,13 +217,48 @@ impl DatabaseEngine {
         }
         position.held = None;
         position.parentage = None;
+        position.secondary_restart = Some(Box::new(saved.clone()));
         Ok((position, false))
     }
 
-    fn checkpoint_order(
+    /// Interpret a missing occurrence in this call's disjoint qualification order.
+    pub(super) fn follows_secondary_restart(
+        &self,
+        saved: &SavedSecondaryPosition,
+        keys: &[&[u8]],
+        key: &[u8],
+        source: RecordId,
+        current: RecordId,
+    ) -> Result<bool, EngineProblem> {
+        let group = keys
+            .iter()
+            .position(|candidate| *candidate == key)
+            .ok_or(EngineProblem::InvalidData)?;
+        let saved_group = keys
+            .iter()
+            .position(|candidate| *candidate == saved.search_key)
+            .ok_or(EngineProblem::Unsupported)?;
+        match group.cmp(&saved_group) {
+            std::cmp::Ordering::Less => Ok(false),
+            std::cmp::Ordering::Greater => Ok(true),
+            std::cmp::Ordering::Equal => Ok((
+                self.checkpoint_order(&self.checkpoint_key_path(source)?)?,
+                self.checkpoint_order(&self.checkpoint_key_path(current)?)?,
+            ) > (
+                self.checkpoint_order(&saved.source_path)?,
+                self.checkpoint_order(&saved.current_path)?,
+            )),
+        }
+    }
+
+    pub(super) fn checkpoint_order(
         &self,
         path: &[(String, Vec<u8>)],
     ) -> Result<Vec<(usize, Vec<u8>)>, EngineProblem> {
+        if path.is_empty() {
+            return Err(EngineProblem::InvalidData);
+        }
+        let mut parent = None;
         path.iter()
             .map(|(name, key)| {
                 let ordinal = self
@@ -232,6 +267,16 @@ impl DatabaseEngine {
                     .iter()
                     .position(|s| &s.name == name)
                     .ok_or(EngineProblem::InvalidData)?;
+                let segment = &self.definition.segments[ordinal];
+                let field = segment
+                    .fields
+                    .iter()
+                    .find(|field| Some(field.name.as_str()) == segment.key_field.as_deref())
+                    .ok_or(EngineProblem::InvalidData)?;
+                if segment.parent.as_deref() != parent || key.len() != field.length {
+                    return Err(EngineProblem::InvalidData);
+                }
+                parent = Some(segment.name.as_str());
                 Ok((ordinal, key.clone()))
             })
             .collect()

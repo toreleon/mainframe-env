@@ -603,7 +603,12 @@ fn save_positions(
             continue;
         }
         let session = state.sessions.get(run).ok_or(HostProblem::NotFound)?;
-        let Some(id) = generic::pcb::position(session, number).current() else {
+        let position = generic::pcb::position(session, number);
+        if position.has_secondary_restart_boundary() {
+            // A missing-occurrence fallback is not a newly proven checkpoint GU.
+            return Err(HostProblem::Unsupported);
+        }
+        let Some(id) = position.current() else {
             continue;
         };
         if pcb.secondary_index.is_some() {

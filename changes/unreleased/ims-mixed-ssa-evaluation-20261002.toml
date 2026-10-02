@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Evaluate source-derived OR-separated AND SSA sets and bounded secondary Independent AND correlation through the existing matcher and pointer cursor; register four offline IMS source pins in a separate zero-credit supplement and preserve target-only virtual field resolution."

@@ -205,7 +205,6 @@ fn public_ssa_binary_relations_and_boolean_classes() {
     for (i, raw) in [
         b"ROOT    (ROOTKEY GEA1&ROOTKEY LEB2)".as_slice(),
         b"ROOT    (ROOTKEY GEA1*ROOTKEY LEB2)".as_slice(),
-        b"ROOT    (ROOTKEY GEA1#ROOTKEY LEB2)".as_slice(),
         b"ROOT    (ROOTKEY EQZ9|KIND    EQX)".as_slice(),
         b"ROOT    (ROOTKEY EQZ9+KIND    EQX)".as_slice(),
         b"ROOT    *(ROOTKEY EQA1)".as_slice(),
@@ -224,6 +223,21 @@ fn public_ssa_binary_relations_and_boolean_classes() {
             ("  ", b"A1X".as_slice())
         );
     }
+    let before = snapshot(&service);
+    assert_eq!(
+        public(
+            service.clone(),
+            run,
+            navigation(
+                run,
+                39,
+                ImsOperation::GetUnique,
+                &[b"ROOT    (ROOTKEY GEA1#ROOTKEY LEB2)"]
+            )
+        ),
+        Err(HostProblem::Unsupported)
+    );
+    assert_eq!(snapshot(&service), before);
     let mut raw = b"ROOT    *O(00030001LT".to_vec();
     raw.extend([0xff, b')']);
     assert_eq!(

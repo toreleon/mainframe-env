@@ -276,6 +276,68 @@ Nonunique physical paths, optional fields/aliases/nonroot inversion/DEDB remain
 Unsupported. No acceptance rules, pins, thresholds or denominator change;
 official/human/licensed credit stays zero. Parent IMS-1405, participant/lease,
 coherent backup/retention, root composition and v0.14 acceptance remain open.
+## IMS-1401.mixed-ssa-evaluation manager integration (2026-10-02)
+
+The integration branch consumes only manager base
+`0634ffc221aa977c66a063ba792ab22b379a248d`, the separately sealed guard
+`f1efa47f167ae426b9ce3c3356e4c14f87093697` from bdbca36, and the evaluation
+delta from `dad91c4a5e4fbb39b7b42bcd65917381abd050eb`. Probe repair 5ed2e0c1
+remains separately owned by the root manager. Historical leaf receipts retain
+their original candidates; integration receipts are external in
+worker-receipts/v014-completion-20261002/ims-mixed-manager.
+
+Before semantic changes, all four exact pins in
+`ibm-ims-15.6-mixed-ssa-supplement-2026-09-11` were searched and read offline
+with ibm_docs.py after retained-path checks and SHA/size verification. Catalog
+context is `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`, with
+inherited :0004/:0008/:0015 maintenance interactions. The supplement registers
+only four reference bodies; existing manager manifests and registry rows remain
+byte-exact. Source presence grants zero semantic or execution credit.
+
+The same matcher now evaluates OR-separated AND sets. Pure selected-XDFLD
+Independent AND admits distinct EQ groups correlated through the existing
+index_target authority to the same target, in qualification order, once per
+target per group. Physical-field qualifications use dependent behavior.
+Independent ranges, repeated keys, mixed independent groups, primary Independent
+AND, unrepresentable continuation contexts and primary HDAM/DEDB root multiple
+qualifications remain Unsupported. Canonical/DTO/AST/row/SQL schemas are unchanged.
+
+The manager's target-only selected_index_field resolver body and existing
+physical-child/root-virtual collision regression are retained. Its return
+lifetime is made explicit for the new correlated-index helper; the duplicate
+leaf collision test is omitted. There is one matcher and secondary pointer
+traversal. Manager service/execution.rs and shared generic/tests/session_cas.rs
+retain authority, with the existing nested CAS re-export used by the new tests.
+Feedback, backout, GSAM, authorization and read-integrity owners are unchanged.
+
+Focused integration verification covers mixed logical sets, binary boundaries,
+same-target correlation, disjoint-group order/duplicates, signed selection and
+the real durable coordinator, malformed/denied requests, replay/conflict,
+Memory/file SQLite reopen, actual CAS refusal/lost acknowledgement and three
+independent SQLite child phases. Mandatory policies and the unchanged public
+API documentation ratchet are required. The older base's three AMS probe
+citations are not repaired or bypassed here; an unchanged failure is recorded
+once for root composition. Content seals grant no official, human, licensed,
+participant, parent IMS-1401 or v0.14 acceptance.
+
+Integration runtime receipts record 66 passing parent tests: eight new provider
+cases, three signed/coordinator cases and 55 affected regressions, including the
+retained manager collision case. The process parents require real configured
+SQLite children; unconfigured helpers receive no parent credit. The initial
+two CAS/lost-ack failures were fixture assumptions about the existing UOW CAS
+envelope. The repaired fixtures retain full-row stability on refusal and replay,
+assert one publication version advance and unchanged database image bytes, and
+use the unchanged shared CAS helper. No production owner was altered to fit them.
+
+Strict scoped Clippy, fmt, deny, supply-chain/license notices, catalog/assurance,
+schemas/spec, execution/effect/row/storage/SAF/retention/participant/module guards,
+participant generation, changelog and the unchanged API documentation ratchet
+passed. Mandatory coverage policy failed once on the unchanged three AMS probe
+citations (6202/6080/3050 versus actual 6194/6072/3052); later aggregate coverage
+subchecks were not reached. No retry or out-of-allowlist repair occurred. Root
+must compose its separately sealed probe repair and verify the affected gate on
+that actual candidate. Final docs generation and exact feature sealing are
+packaging checks, with receipts bound to the actual tested inputs and candidates.
 
 ## IMS-1403.gsam-record-addressability (bounded slice implemented)
 
@@ -3947,6 +4009,70 @@ remain external under `v014-completion-20261002/secondary-root-*`; prior worker
 receipts retain their actual base. Final signed-route/mixed-SSA and aggregate
 policy composition is a separate candidate sequence, not retroactive credit.
 This completes only the bounded secondary restart leaf, not IMS-1405 or v0.14.
+
+### Root mixed-SSA composition and continuation repair — 2026-10-02
+
+Root retains the guard as separate seal `0cbb08a0` and consumes evaluation
+`5242de84feb32751815ef6b4bad8ddb668a73654` after secondary/GSAM/current-main.
+Exact-occurrence GU and disjoint independent-group scans are thin adapters over
+one traversal loop; root retains both filters and the selected-field collision
+resolver. Both raw-CALL and mixed-SSA supplements remain registered without
+repinning any existing publication. The separately sealed AMS locator repair
+is present. Initial composed runtime evidence passes 244 IMS unit entries,
+74 recovery entries, four retained recovery contracts, 26 selected host unit
+entries, two binary SSA recognition tests and 37 selected server entries, plus
+strict affected all-feature Clippy. Unconfigured process helpers earn zero credit.
+All mandatory offline policy/schema/spec/catalog/assurance/coverage and exact
+public-API-ratchet checks pass on their actual recorded inputs.
+
+A read-only Codex CLI review at gpt-6.1-sol/high/default service tier, fast mode
+disabled, found one concrete P2 continuation defect. The review retains its
+original HEAD/file hashes and is static, not test evidence. Root's first fixture
+hit an outside-group Unsupported guard because it included an extra unmatched
+third root; the corrected two-target fixture reproduces the actual silent skip:
+GE is returned before the surviving correlated target in reversed groups.
+
+The repair retains the original bounded checkpoint witness in the existing PCB
+position when exact GU cannot find it. The same traversal compares this boundary
+in qualification order, not the ordinary byte-order predecessor. Actual selection
+consumes the provenance; CHKP cannot promote an unresolved predecessor into a new
+witness. Default omission preserves historical bytes, strict validation protects
+retained shape and old readers must reject the new field. The regression restores
+GE, reopens, then returns the remaining target once in each independent group
+before final GE. Repaired IMS unit/recovery and strict IMS lint checks pass;
+the final signed-route/corruption/coverage checks are recorded separately after
+this changed input. No original failed or pre-repair receipt is relabeled.
+Source bindings are the pinned XRST deletion/unique-path rules and independent
+AND group rules, rows :0005/:0023/:0025 with :0004 maintenance. Raw/TM shared
+owner decisions, human rule approval, full applicability and release acceptance
+remain open; licensed certification remains excluded with zero credit.
+
+The follow-up static review confirms the valid-state repair but finds a retained
+shape defect: merely existing segment names admitted a reversed historical path.
+Root's corruption regression reproduces that acceptance before the repair.
+Definition-bound validation now checks ordered parents, exact sequence-key widths,
+the index source endpoint and a shared root target, without requiring deleted
+occurrences to be live. The focused regression includes zero digest, reversed
+path, wrong endpoint, wrong key width and mismatched root-target corruptions.
+Review reports and failed attempts remain separately bound to their original
+bytes. No shared CALL/store or host request/result contract, pin, threshold or
+acceptance rule is changed; the retained position field requires compatible readers.
+
+Final definition-bound repair checks pass 244 IMS unit and 75 recovery harness
+entries, four retained recovery contract tests, the negative/reopen regression
+and both signed secondary checkpoint routes. Six unconfigured recovery helpers
+and two unconfigured IMS unit helpers receive zero scenario credit. A mistaken
+`ims_secondary` server filter selected zero tests and is explicitly uncredited;
+the corrected `secondary_ssa` selector is recorded separately. Earlier 37 selected
+server entries include 35 IMS-package entries and two incidental reclaim tests;
+the latter are not IMS execution evidence. Strict affected all-feature Clippy,
+module/typed guards, docs/changelog and mandatory coverage policy pass after the
+repair. Original dependency/schema/spec/catalog/assurance/API-ratchet and other
+policy results retain their input identities; their relevant unchanged inputs
+are not relabeled as committed-head CI. Root verification receipts and Rust
+identities are external under `boundary-path-*` and `mixed-evaluation-root-*`.
+The initial mixed worker's stale AMS failure is resolved by composing the root's
+probe repair; no acceptance gate was waived. The PR stays draft and v0.14 open.
 ## Historical prerequisite packet imported from bdbca36 (2026-10-02)
 
 The following packet retains its original source and verification disposition.

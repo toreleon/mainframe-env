@@ -1,4 +1,4 @@
-//! Signed selected-route guard for the explicit mixed-Boolean source gap.
+//! Signed selected-route guard for remaining unsupported independent classes.
 use super::*;
 
 fn reject_mixed(server: &ProductServer) {
@@ -16,23 +16,22 @@ fn reject_mixed(server: &ProductServer) {
             .unwrap()
     });
     for selected in [1, 3] {
-        for (first, second) in [
-            ('&', '#'),
-            ('#', '*'),
-            ('&', '|'),
-            ('+', '*'),
-            ('#', '|'),
-            ('+', '#'),
-        ] {
+        for (first, second) in [('&', '#'), ('#', '*'), ('#', '|'), ('+', '#')] {
             let mut request = carddemo_request(ImsOperation::GetHoldNext, 20, vec![]);
             request.pcb = selected;
             request.segments.clear();
-            let mut raw = b"PAUTSUM0*O(00070001LT".to_vec();
-            raw.push(255);
-            raw.extend(format!("{first}00070001GE").bytes());
-            raw.push(0);
-            raw.extend(format!("{second}00070001NE").bytes());
-            raw.extend([255, b')']);
+            let raw = if selected == 1 {
+                let mut raw = b"PAUTSUM0*O(00070001LT".to_vec();
+                raw.push(255);
+                raw.extend(format!("{first}00070001GE").bytes());
+                raw.push(0);
+                raw.extend(format!("{second}00070001NE").bytes());
+                raw.extend([255, b')']);
+                raw
+            } else {
+                format!("PAUTSUM0(BYVALUE GEAZ{first}BYVALUE LEZA{second}BYVALUE NE??)")
+                    .into_bytes()
+            };
             let nav = ImsNavigationRequest {
                 request,
                 context: ImsExecutionContext::DbBatch,

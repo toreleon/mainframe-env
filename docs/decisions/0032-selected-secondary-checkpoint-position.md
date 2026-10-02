@@ -54,6 +54,19 @@ cross CHKP or rescheduling. A retained checkpoint can legitimately reposition
 the same live database occurrence in a new scheduled application incarnation.
 Coordinator leases and participant admission remain unchanged.
 
+When a saved occurrence is missing, the existing PCB position retains the original
+bounded `SavedSecondaryPosition` as continuation provenance, separate from its
+ordinary index-order predecessor. Independent equality groups compare the original
+search key and physical source/current boundary in qualification order; they never
+interpret a byte-sorted predecessor as an independent-group cursor. A successful
+real read consumes this provenance. Until then CHKP refuses to turn the guessed
+predecessor into a new proven position. The field is omitted on historical rows,
+validated with the existing recovery bounds, retained across reopen, and rejected
+by incompatible strict readers. It adds no store, second cursor or dispatcher.
+Reopen also checks root-to-child order, exact sequence-key widths, the index's
+source endpoint and shared root target against the retained database definition;
+these checks do not require a deleted occurrence to remain live.
+
 Historical absent fields still deserialize and serialize without new fields;
 their checkpoint digests and host canonical bytes stay fixed. GSAM identities,
 format fields and namespaces are preserved. New secondary rows need a compatible

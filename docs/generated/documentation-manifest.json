@@ -1017,7 +1017,7 @@
       "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md",
       "relative_links": 5,
       "scope": "IMS-1405.secondary-index-checkpoint-restart, target 0.14.0",
-      "sha256": "sha256:22045a053293f721efa119f3b5f05e964f3c99a95a65b851411fd9e18a9b3295",
+      "sha256": "sha256:bb31c1ff6872c27282e10b6a3812c84112639da4aa2b826226ad3772befd5bb9",
       "status": "Proposed within the user-authorized bounded IMS leaf",
       "title": "ADR-0032: Selected secondary checkpoint positions",
       "xtask_commands": 0
@@ -1498,7 +1498,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/mixed-boolean-ssa-gap.md",
       "relative_links": 0,
-      "sha256": "sha256:284db17f9eb765b15dc6520e51e05a674775f53c5e576cb890f3ff3b67353e5e",
+      "sha256": "sha256:0c7363ab0f7a38e2e823f48336a6353073b76c7b04dd5e7d1e89b736e7a17c16",
       "title": "IMS mixed Boolean SSA acceptance gap",
       "xtask_commands": 0
     },
@@ -1514,7 +1514,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 17,
-      "sha256": "sha256:197b01c6d8c9aa7cca3491cd5ac64b0e8f83f38d999518325ae905d9eadff13c",
+      "sha256": "sha256:fabd4615464b4ed648b79fb52f4bf2059f894f37a6a7f4dcaf24bc4731b70145",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },

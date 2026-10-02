@@ -103,3 +103,75 @@ claims, using retained matching bytes where available. Any network/browser
 refresh needs a separate user request. Then replace the guard through the same
 parser/AST/matcher, author independent outcomes and execute this matrix; do not
 create another parser, cursor or evaluation engine.
+
+## Offline resolution: IMS-1401.mixed-ssa-evaluation
+
+The four exact archive metadata records and encoded IBM content URLs match the
+requested IMS 15.6 identities. Their retained topic-path files are absent, but
+the matching raw HTML bodies verify by SHA-256 and byte count and were read with
+the repository plain_text parser. The earlier claim that expected SHA/byte
+counts were unavailable is corrected: they existed in archive metadata outside
+the registered scopes. No prior body review or execution is retrospectively
+claimed. One new scope `ims-mixed-ssa-supplement`, baseline
+`ibm-ims-15.6-mixed-ssa-supplement-2026-09-11`, registers only these locators:
+
+| APG topic under `SSEPH2_15.6.0/com.ibm.ims156.doc.apg/` | SHA-256 | Bytes |
+| --- | --- | ---: |
+| `ims_multiqualificationstmts.htm` | `29e43be1e8fe4ad761cd68de1fcd498d54c59517faa17040b2b9302b8bfdcf21` | 8962 |
+| `ims_examplmultiqualificationstmts.htm` | `d8cb14d5d26e439c2bd6dcb4e80ed80323e0404d679a3bb10ae4f3ebc6eebaaa` | 3397 |
+| `ims_multqualificationstmtshdam_phdam_dedb.htm` | `81612af040f57982980bff1cbf230d19193af0ad7b2a07dc4be5ba4403ebae93` | 4859 |
+| `ims_multqualificationstatementssecondaryindex.htm` | `9b966ac7bcbad17af038b4da29be83590b3e5184c146bec4d731b9b9ae787492` | 8102 |
+
+The shared IMS TOC remains
+`aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618`.
+All existing manager-base manifests remain byte-exact. The older leaf's
+26-body programming identity is historical; this integration preserves the
+manager's existing programming manifest and registry identity. Explicit pinned new-scope search and full reads
+verify four bodies/one TOC. Archive HTTP provenance is reference only; no Chrome
+corpus-completeness, accepted semantic projection, execution or human approval
+claim follows. Semantic-authority fields remain false and coverage credit zero.
+
+The overview and worked example establish OR-separated sets of dependent AND
+qualifications, evaluated left-to-right. This replaces the uniform-identity
+guard through the existing parser/AST/matcher; binary values consume exact
+metadata lengths and all connector identities remain distinct. The secondary
+body restricts Independent AND to secondary indexing. If any qualification
+uses a physical field, it behaves as dependent AND. Pure selected-XDFLD
+Independent AND correlates distinct equality-key groups through the existing
+pointer-to-target authority. Scan order follows qualification order; GN can
+return the same target once per group with a different retained source cursor.
+Duplicate sources for one target/key do not add another independent-group result.
+Ordinary dependent/OR scans still retain every source occurrence.
+
+Independent ranges, repeated equality groups, all-index mixed `#`/AND/OR groups,
+and unrepresentable independent cursor contexts stay Unsupported. Primary `#`
+is rejected, including the prior uniform-AND test assumption. Primary HDAM/DEDB
+root multiple qualifications stay Unsupported because admitted metadata has no
+randomizer anchors/search termination. This is a local bounded exclusion, not
+an IBM claim that these valid source forms are forbidden. Existing raw framing,
+nonroot inversion/aliases, optional index fields, NULLVAL/exits/SUBSEQ, Fast Path,
+commands/context exclusions and pending key-feedback semantics remain unchanged.
+
+The selected virtual field applies only to its target. Both field-length and
+value resolution share selected_index_field; a child's same-name physical field
+reads child bytes. This factor and its independent public regression are minimal
+manager integration seams. There is no additional evaluator, cursor, coordinator,
+schema, store, index-maintenance, recovery, lock or participant authority.
+
+Upgrade permits newly supported mixed requests under their existing canonical
+encoding and rejects primary Independent AND before replay. Retain/drain/reconcile
+older results, including historical flattened mixed-AND results; never redispatch
+an unknown effect under a new key. Downgrade restores the sealed local guard and
+requires stopping new mixed/independent calls while preserving their receipts.
+No row/SQL/host/AST migration or replay rewrite is introduced. Existing extended
+index and recovery backup/downgrade restrictions remain applicable. The new leaf
+can seal bounded implementation and local regressions only; official review,
+licensed differentials, remaining classes, parent IMS-1401 and v0.14 stay open.
+
+Integrated local regressions and independent policy/contract gates pass, but the
+mandatory coverage check stops at three stale AMS line citations in unchanged
+base publication-probe prose. This leaf records that concrete blocker without
+editing unrelated sources, retrying unchanged inputs or awarding acceptance.
+See programming-status.md and the external current-input receipts for the exact
+commands, actual fixture failures, repaired CAS-envelope assertions and remaining
+gates. Historical fail-first receipts keep their original candidate identities.
