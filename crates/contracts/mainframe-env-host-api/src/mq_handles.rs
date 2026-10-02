@@ -52,6 +52,21 @@ pub struct MqHsub(HandleId);
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqHmsg(HandleId);
 
+macro_rules! canonical_identity {
+    ($($token:ident),+ $(,)?) => {$(
+        impl $token {
+            /// Read-only host canonical identity: registry, slot, generation,
+            /// epoch. These are not MQ wire values. No reconstruction API is
+            /// exposed; lifetime validation remains registry-owned.
+            pub(crate) const fn canonical_parts(self) -> (u64, u32, u64, u64) {
+                let HandleId { registry, slot, generation, epoch } = self.0;
+                (registry, slot, generation, epoch)
+            }
+        }
+    )+};
+}
+canonical_identity!(MqConnectionId, MqHobj, MqHsub, MqHmsg);
+
 /// Runtime handle tag for an MQI parameter whose expected role is catalogued.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqHandle {
