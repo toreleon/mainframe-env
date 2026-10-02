@@ -463,6 +463,41 @@ route, missing/duplicate output and bounds mutants. Rejection of a legal deferre
 form records a product limitation, never official recognition evidence. Existing
 six-gate applicability, 174 rows and licensed-pending disposition stay unchanged.
 
+The manager declares `DB2-1201.located-column-default-intents` before typed
+catalog/default binding. The current CREATE TABLE parser cannot represent the
+valid operand-less DEFAULT form and discards individual operand locations.
+Worker ownership is exactly `statement/create_table/mod.rs`, `columns.rs`,
+`tests.rs`, `tests/create_table_defaults.rs` and
+`changes/unreleased/db2-located-column-default-intents.toml`. Preserve the
+existing column/default types, with explicit absence versus present type-default
+versus literal/NULL intent. `Db2ColumnDefault::value()` changes to
+`Option<&Db2Literal>`: `None` means a present operand-less default clause, not
+an omitted clause or implicit NULL. This is an intentional development source-API
+adjustment; migrate existing direct consumers rather than inventing a literal
+or panicking for the new form. Do not change accepted durable/wire contracts.
+
+Retain complete original clause and operand spans; numeric defaults additionally
+retain sign and number-token spans so trivia between them cannot be replaced by
+a fabricated contiguous source span. Preserve DEFAULT/WITH DEFAULT spelling
+and inherited literal escape text. Recognize valid operand-less clauses before
+an element boundary or the next admitted column clause, enforce duplicate and
+NOT NULL/explicit NULL conflicts, and reject malformed or still-unsupported
+default expressions/registers. Do not invent a zero, current timestamp, implicit
+NULL, typed value, conversion result or catalog identity in the parser.
+Focused/public regressions cover all three intents, signed/trivia operands,
+quoted/UTF-8/CRLF locations, ownership, clause order, negative forms and exact
+resource bounds; package/MSRV, required policy/docs/seal checks precede its commit.
+
+Source SQL0050 `db2z_sql_createtable.html`, 874327 bytes,
+`104cc7fd0f43e804819da99c18887de60983cad8fa78b7d550ffaf63dfd299d6`,
+defines operand-less type defaults, assignment-compatible constants, nullable
+implicit DEFAULT NULL and NOT NULL without a default. The corresponding original
+description/table and diagram are source authority; syntax alone does not prove
+their semantic values or insertion effects. The retained file is absent; matching
+archive HTML was read offline under the Db2 13 baseline, with normal reader
+TOC-blocked. The typed catalog, default resolver and all ordinary value families
+remain required implementation, not narrowed to these initial numeric slices.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
