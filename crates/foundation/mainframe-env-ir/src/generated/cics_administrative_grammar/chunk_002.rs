@@ -344,6 +344,7 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+            CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"] },
         ],
         cvda_numeric_domains: &[
         ],
@@ -934,66 +935,6 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
         forms: &[
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0029",
-        family: "spi-queue-storage",
-        label: "CREATE TDQUEUE",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createtdqueue.html",
-        source_sha256: "sha256:1f43175ddc013b70e1c435b136fdb31b64cb0ca750de2952ee626f3281ecb16b",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
-            CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
-            CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "TDQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-        ],
-        cvda_domains: &[
-        ],
-        cvda_numeric_domains: &[
-        ],
-        required_options: &["ATTRIBUTES", "TDQUEUE"],
-        alternative_groups: &[
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-        forms: &[
-            CicsAdministrativeGrammarForm {
-                id: "named-tdqueue",
-                selector_options: &["TDQUEUE"],
-                options: &[
-                    CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
-                    CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
-                    CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-                    CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-                    CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-                    CicsApplicationOptionDescriptor { name: "TDQUEUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-                ],
-                cvda_domains: &[
-                ],
-                cvda_numeric_domains: &[
-                ],
-                required_options: &["ATTRIBUTES", "TDQUEUE"],
-                alternative_groups: &[
-                ],
-                dependencies: &[
-                    CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-                ],
-                mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-                constraint_status: CicsApplicationConstraintStatus::Pending,
-            },
         ],
         constraint_status: CicsApplicationConstraintStatus::Pending,
     },

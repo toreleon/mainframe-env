@@ -167,6 +167,23 @@
               "RESP"
             ]
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "LOGMESSAGE",
+            "values": [
+              "LOG",
+              "NOLOG"
+            ],
+            "source_lines": [
+              61,
+              62,
+              63,
+              64,
+              65,
+              66
+            ]
+          }
         ]
       },
       "responses": [
@@ -773,7 +790,8 @@
         "CREATE diagnostic authority: ibm-cics-ts-6x-spi-command-bodies-2026-09-12, SSJL4D_6.x/reference-system-programming/commands-spi/dfha817.html, sha256:d73b2bb43afc1b3b616befbe0351e4c7022fae07f66dc057a8f0a9de2ac8e3b4, parser lines 4-12,22-128,175-234,1113-1201.",
         "Required CREATE contexts dfha808.html, dfha8lr.html and FILE resource dfha4_summary.html have no registered committed pin in the current manifests. Expected pin cannot be resolved; host topic-path copies are absent. Manager-owned retained-candidate registration is pending; no refresh or semantics from unverified archive bytes.",
         "The @1 shape cannot structure nested ATTRIBUTES grammar/defaults/ranges, encoded RESP2 high/low halfwords or stage-conditional syncpoint. Facts below are bounded normative prose; full grammar remains Pending. Generic CREATE/CSD errors for unrelated resource types are not FILE conditions.",
-        "RESP numeric authority independently reviewed: ibm-cics-ts-6x-application-api-sources-b-2026-09-10, SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html, sha256:a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7, parser lines827-882: NOTAUTH70, FILENOTFOUND12, END83, INVREQ16, IOERR17, ILLOGIC21, LENGERR22. Numeric identities agree with the existing shared condition-name authority."
+        "RESP numeric authority independently reviewed: ibm-cics-ts-6x-application-api-sources-b-2026-09-10, SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html, sha256:a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7, parser lines827-882: NOTAUTH70, FILENOTFOUND12, END83, INVREQ16, IOERR17, ILLOGIC21, LENGERR22. Numeric identities agree with the existing shared condition-name authority.",
+        "LOGMESSAGE finite sender membership is only LOG/NOLOG from primary lines61-66. Raw syntax at line15 places LOG above the logging-choice mainline, NOLOG below and LOGMESSAGE(cvda) on another lower branch; this retained geometry does not pin notation/default authority. Omitted logging behavior, translation/ABI and actual CSDL observation remain Pending; no numeric/default facet or lifecycle change is introduced."
       ]
     },
     {
@@ -1867,6 +1885,599 @@
               "RESP"
             ]
           }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ACCESSMETHOD",
+            "values": [
+              "BDAM",
+              "REMOTE",
+              "VSAM"
+            ],
+            "source_lines": [
+              77,
+              78,
+              79,
+              80,
+              81,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89
+            ]
+          },
+          {
+            "option": "ADD",
+            "values": [
+              "ADDABLE",
+              "NOTADDABLE",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              90,
+              92,
+              93,
+              94,
+              96,
+              98,
+              99,
+              100
+            ]
+          },
+          {
+            "option": "BLOCKFORMAT",
+            "values": [
+              "BLOCKED",
+              "NOTAPPLIC",
+              "UNBLOCKED"
+            ],
+            "source_lines": [
+              122,
+              124,
+              125,
+              126,
+              127,
+              128,
+              130,
+              131,
+              132
+            ]
+          },
+          {
+            "option": "BROWSE",
+            "values": [
+              "BROWSABLE",
+              "NOTAPPLIC",
+              "NOTBROWSABLE"
+            ],
+            "source_lines": [
+              142,
+              144,
+              145,
+              146,
+              148,
+              150,
+              151,
+              152
+            ]
+          },
+          {
+            "option": "CHANGEAGENT",
+            "values": [
+              "CREATESPI",
+              "CSDAPI",
+              "CSDBATCH",
+              "DREPAPI",
+              "OVERRIDE",
+              "SYSTEM",
+              "TABLE"
+            ],
+            "source_lines": [
+              158,
+              159,
+              160,
+              161,
+              163,
+              165,
+              167,
+              169,
+              171,
+              173,
+              174
+            ]
+          },
+          {
+            "option": "DELETE",
+            "values": [
+              "DELETABLE",
+              "NOTAPPLIC",
+              "NOTDELETABLE"
+            ],
+            "source_lines": [
+              191,
+              193,
+              194,
+              195,
+              197,
+              199,
+              200,
+              201
+            ]
+          },
+          {
+            "option": "DISPOSITION",
+            "values": [
+              "NOTAPPLIC",
+              "OLD",
+              "SHARE"
+            ],
+            "source_lines": [
+              202,
+              204,
+              205,
+              206,
+              207,
+              209,
+              211,
+              212,
+              213
+            ]
+          },
+          {
+            "option": "EMPTYSTATUS",
+            "values": [
+              "EMPTYREQ",
+              "NOEMPTYREQ",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              224,
+              226,
+              227,
+              228,
+              229,
+              230,
+              231,
+              232,
+              234,
+              236,
+              237,
+              238
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "DISABLING",
+              "ENABLED",
+              "NOTAPPLIC",
+              "UNENABLED",
+              "UNENABLING"
+            ],
+            "source_lines": [
+              239,
+              240,
+              241,
+              242,
+              243,
+              248,
+              252,
+              254,
+              258,
+              262,
+              263,
+              264
+            ]
+          },
+          {
+            "option": "EXCLUSIVE",
+            "values": [
+              "EXCTL",
+              "NOEXCTL",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              265,
+              267,
+              268,
+              269,
+              270,
+              273,
+              276,
+              277,
+              278
+            ]
+          },
+          {
+            "option": "FWDRECSTATUS",
+            "values": [
+              "FWDRECOVABLE",
+              "NOTAPPLIC",
+              "NOTFWDRCVBLE"
+            ],
+            "source_lines": [
+              282,
+              284,
+              286,
+              288,
+              291,
+              294,
+              297,
+              298,
+              303,
+              305,
+              306,
+              307,
+              308
+            ]
+          },
+          {
+            "option": "INSTALLAGENT",
+            "values": [
+              "BUNDLE",
+              "CREATESPI",
+              "CSDAPI",
+              "GRPLIST",
+              "SYSTEM",
+              "TABLE"
+            ],
+            "source_lines": [
+              309,
+              310,
+              311,
+              312,
+              314,
+              316,
+              319,
+              321,
+              323,
+              324
+            ]
+          },
+          {
+            "option": "LOADTYPE",
+            "values": [
+              "LOAD",
+              "NOLOAD",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              373,
+              375,
+              376,
+              377,
+              380,
+              383,
+              384,
+              385,
+              386,
+              388,
+              389,
+              390,
+              391
+            ]
+          },
+          {
+            "option": "OBJECT",
+            "values": [
+              "BASE",
+              "NOTAPPLIC",
+              "PATH"
+            ],
+            "source_lines": [
+              431,
+              433,
+              434,
+              435,
+              436,
+              437,
+              441,
+              446,
+              448,
+              449,
+              450,
+              451,
+              452,
+              453
+            ]
+          },
+          {
+            "option": "OPENSTATUS",
+            "values": [
+              "CLOSED",
+              "CLOSEREQUEST",
+              "NOTAPPLIC",
+              "OPEN"
+            ],
+            "source_lines": [
+              454,
+              455,
+              456,
+              457,
+              458,
+              459,
+              460,
+              462,
+              464,
+              466,
+              467,
+              468,
+              469,
+              470,
+              471
+            ]
+          },
+          {
+            "option": "RBATYPE",
+            "values": [
+              "EXTENDED",
+              "NOTAPPLIC",
+              "NOTEXTENDED"
+            ],
+            "source_lines": [
+              472,
+              474,
+              475,
+              476,
+              479,
+              480,
+              481,
+              482,
+              483,
+              484,
+              486
+            ]
+          },
+          {
+            "option": "READ",
+            "values": [
+              "NOTAPPLIC",
+              "NOTREADABLE",
+              "READABLE"
+            ],
+            "source_lines": [
+              487,
+              489,
+              490,
+              491,
+              493,
+              495,
+              496,
+              497
+            ]
+          },
+          {
+            "option": "READINTEG",
+            "values": [
+              "CONSISTENT",
+              "NOTAPPLIC",
+              "REPEATABLE",
+              "UNCOMMITTED"
+            ],
+            "source_lines": [
+              498,
+              500,
+              501,
+              502,
+              503,
+              506,
+              509,
+              510,
+              511,
+              512,
+              513,
+              514,
+              516,
+              517,
+              520,
+              521
+            ]
+          },
+          {
+            "option": "RECORDFORMAT",
+            "values": [
+              "FIXED",
+              "NOTAPPLIC",
+              "UNDEFINED",
+              "VARIABLE"
+            ],
+            "source_lines": [
+              522,
+              524,
+              525,
+              526,
+              528,
+              529,
+              530,
+              531,
+              532,
+              533,
+              534,
+              535,
+              536,
+              537
+            ]
+          },
+          {
+            "option": "RECOVSTATUS",
+            "values": [
+              "NOTAPPLIC",
+              "NOTRECOVABLE",
+              "RECOVERABLE"
+            ],
+            "source_lines": [
+              554,
+              556,
+              558,
+              559,
+              561,
+              563,
+              564,
+              565,
+              566,
+              567,
+              568,
+              569,
+              571,
+              573,
+              574,
+              575
+            ]
+          },
+          {
+            "option": "RELTYPE",
+            "values": [
+              "BLK",
+              "DEC",
+              "HEX",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              576,
+              578,
+              579,
+              580,
+              581,
+              583,
+              585,
+              587,
+              588,
+              589
+            ]
+          },
+          {
+            "option": "REMOTETABLE",
+            "values": [
+              "NOTAPPLIC",
+              "REMTABLE"
+            ],
+            "source_lines": [
+              599,
+              600,
+              601,
+              602,
+              603,
+              604,
+              605,
+              606,
+              607
+            ]
+          },
+          {
+            "option": "RLSACCESS",
+            "values": [
+              "NOTAPPLIC",
+              "NOTRLS",
+              "RLS"
+            ],
+            "source_lines": [
+              608,
+              610,
+              611,
+              612,
+              613,
+              614,
+              615,
+              618,
+              619
+            ]
+          },
+          {
+            "option": "TABLE",
+            "values": [
+              "CFTABLE",
+              "CICSTABLE",
+              "NOTAPPLIC",
+              "NOTTABLE",
+              "USERTABLE"
+            ],
+            "source_lines": [
+              624,
+              626,
+              627,
+              628,
+              630,
+              632,
+              634,
+              636,
+              637,
+              638
+            ]
+          },
+          {
+            "option": "TYPE",
+            "values": [
+              "ESDS",
+              "KEYED",
+              "KSDS",
+              "NOTAPPLIC",
+              "NOTKEYED",
+              "RRDS",
+              "VRRDS"
+            ],
+            "source_lines": [
+              647,
+              649,
+              650,
+              651,
+              652,
+              654,
+              656,
+              659,
+              661,
+              663,
+              665,
+              666
+            ]
+          },
+          {
+            "option": "UPDATE",
+            "values": [
+              "NOTAPPLIC",
+              "NOTUPDATABLE",
+              "UPDATABLE"
+            ],
+            "source_lines": [
+              667,
+              669,
+              670,
+              671,
+              673,
+              675,
+              676,
+              677
+            ]
+          },
+          {
+            "option": "UPDATEMODEL",
+            "values": [
+              "CONTENTION",
+              "LOCKING",
+              "NOTAPPLIC"
+            ],
+            "source_lines": [
+              678,
+              680,
+              681,
+              682,
+              683,
+              686,
+              689,
+              690,
+              691,
+              692,
+              693,
+              694,
+              695,
+              697,
+              698,
+              699
+            ]
+          }
         ]
       },
       "responses": [
@@ -2421,7 +3032,12 @@
         "CVDA authority: ibm-cics-ts-6x-application-api-sources-b-2026-09-10, SSJL4D_6.x/system-programming/intro/dfha80x.html, sha256:81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25, parser lines 3-15,16-27: sender versus receiver follows Specifies versus Returns; CVDA representation is fullword; symbolic value names can stand for sender options.",
         "General browse dfha80w.html, null dfha80y.html, FILE-resource summary and resource-signature audit/summary bodies have no current registered committed pins; expected SHA unresolved, host topic paths absent. Missing closure does not prevent bounded primary field facts, but full grammar and signature-default semantics remain Pending.",
         "@1 cannot express named versus START/NEXT/END option availability or FILE conditional direction. Required FILE is prose for named inquiry only; grammar.required is empty to avoid invalidating browse forms. ABSTIME and CHANGEAGREL representations remain null where not stated by the selected body.",
-        "RESP numeric authority independently reviewed: ibm-cics-ts-6x-application-api-sources-b-2026-09-10, SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html, sha256:a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7, parser lines827-882: NOTAUTH70, FILENOTFOUND12, END83, INVREQ16, IOERR17, ILLOGIC21, LENGERR22. Numeric identities agree with the existing shared condition-name authority."
+        "RESP numeric authority independently reviewed: ibm-cics-ts-6x-application-api-sources-b-2026-09-10, SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html, sha256:a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7, parser lines827-882: NOTAUTH70, FILENOTFOUND12, END83, INVREQ16, IOERR17, ILLOGIC21, LENGERR22. Numeric identities agree with the existing shared condition-name authority.",
+        "Finite CVDA arrays enumerate primary-described inquiry outputs, not SET inputs or executable state-to-output rules. Primary lines39-65 qualify results by current/previous open, local/remote and object relevance, including ignored inapplicable parameters. Closed/remote default or null encodings need the still-unpinned null context; NOTAPPLIC is included only where explicitly listed, never promoted to zero/null or a universal remote result. Named versus resource-browse availability and concrete writable receiver/layout/observation binding remain Pending.",
+        "Primary ACCESSMETHOD lines77-89 reports VSAM for all data-table kinds, with data-table-service and load/source-data-set qualifications. BLOCKFORMAT has a BDAM-only heading at122 but BLOCKED explicitly includes VSAM at127; RELTYPE has a BDAM-only heading at576 but NOTAPPLIC includes VSAM/absolute addressing at587-589. Both heading and clauses are retained; complete applicability resolution remains Pending. TYPE lines647-666 requires the data set open, with NOTAPPLIC for not-open; RBATYPE lines472-486 separately lists BDAM/remote/not-open NOTAPPLIC, not a universal type rule.",
+        "Inquiry EMPTYSTATUS lines224-238 only empties eligible reusable non-RLS VSAM objects. READINTEG lines498-521 is a default for read requests without an override; non-RLS VSAM/remote/BDAM/CFDT return NOTAPPLIC, while a saved RLS integrity setting survives a switch and is returned on switching back. LOADTYPE lines373-391 and UPDATEMODEL lines678-699 can return a specified saved choice even on non-CFDT definitions; LOADTYPE has no significance for CICS/user shared tables. TABLE lines624-638 keeps VSAM/CFDT and explicit remote NOTAPPLIC qualifications. Complete conditional projections remain Pending; membership alone does not select an observation.",
+        "Inquiry FWDRECSTATUS lines282-308 and RECOVSTATUS lines554-575 depend on first-open-since-initial/cold-start versus last-open values, which may differ from definition through ICF catalog override; RECOVSTATUS ignores ICF values for user/CICS shared tables. NOTFWDRCVBLE is explicitly returned for CFDT/user-maintained tables. RECORDFORMAT lines522-537 limits UNDEFINED to BDAM and always returns VARIABLE for user-maintained shared tables. Runtime observation/recovery closure and unpinned resource/null details remain Pending; no CREATE attribute spelling or storage/numeric alias is introduced.",
+        "CHANGEAGENT lines158-174 and INSTALLAGENT lines309-324 retain separate last-change and install provenance sets; resource-signature/default mapping at71-75 and184-187 remains unpinned. ENABLESTATUS lines239-264 and OPENSTATUS lines454-471 retain their distinct transitional observations, including OPENSTATUS CLOSEREQUEST describing ENABLESTATUS DISABLING; completed VSAM load can temporarily show CLOSED/ENABLED at52-58. Full lifecycle/transition mapping remains Pending; these observed symbols do not add SET actions or forms."
       ]
     },
     {
@@ -3286,6 +3902,307 @@
               "FILE"
             ],
             "required": true
+          }
+        ],
+        "cvda_domains": [
+          {
+            "option": "ADD",
+            "values": [
+              "ADDABLE",
+              "NOTADDABLE"
+            ],
+            "source_lines": [
+              110,
+              111,
+              112,
+              113,
+              115
+            ]
+          },
+          {
+            "option": "BROWSE",
+            "values": [
+              "BROWSABLE",
+              "NOTBROWSABLE"
+            ],
+            "source_lines": [
+              117,
+              118,
+              119,
+              120,
+              122
+            ]
+          },
+          {
+            "option": "BUSY",
+            "values": [
+              "FORCE",
+              "NOWAIT",
+              "WAIT"
+            ],
+            "source_lines": [
+              124,
+              125,
+              126,
+              127,
+              128,
+              129,
+              130,
+              131,
+              132,
+              133,
+              134,
+              136,
+              137,
+              138,
+              139,
+              141
+            ]
+          },
+          {
+            "option": "DELETE",
+            "values": [
+              "DELETABLE",
+              "NOTDELETABLE"
+            ],
+            "source_lines": [
+              151,
+              152,
+              153,
+              154,
+              156
+            ]
+          },
+          {
+            "option": "DISPOSITION",
+            "values": [
+              "OLD",
+              "SHARE"
+            ],
+            "source_lines": [
+              158,
+              159,
+              160,
+              161,
+              162,
+              163,
+              164,
+              166
+            ]
+          },
+          {
+            "option": "EMPTYSTATUS",
+            "values": [
+              "EMPTYREQ",
+              "NOEMPTYREQ"
+            ],
+            "source_lines": [
+              205,
+              206,
+              207,
+              208,
+              209,
+              210,
+              214,
+              216,
+              219,
+              223,
+              226,
+              229,
+              230,
+              232,
+              582,
+              583
+            ]
+          },
+          {
+            "option": "ENABLESTATUS",
+            "values": [
+              "DISABLED",
+              "ENABLED"
+            ],
+            "source_lines": [
+              233,
+              234,
+              235,
+              236,
+              238
+            ]
+          },
+          {
+            "option": "EXCLUSIVE",
+            "values": [
+              "EXCTL",
+              "NOEXCTL"
+            ],
+            "source_lines": [
+              240,
+              241,
+              242,
+              243,
+              245
+            ]
+          },
+          {
+            "option": "LOADTYPE",
+            "values": [
+              "LOAD",
+              "NOLOAD"
+            ],
+            "source_lines": [
+              19,
+              258,
+              259,
+              260,
+              261,
+              262,
+              267,
+              271,
+              272,
+              273,
+              578
+            ]
+          },
+          {
+            "option": "OPENSTATUS",
+            "values": [
+              "CLOSED",
+              "OPEN"
+            ],
+            "source_lines": [
+              308,
+              309,
+              310,
+              311,
+              313,
+              315,
+              317,
+              318,
+              319,
+              320,
+              322,
+              330,
+              332,
+              339,
+              342,
+              344
+            ]
+          },
+          {
+            "option": "READ",
+            "values": [
+              "NOTREADABLE",
+              "READABLE"
+            ],
+            "source_lines": [
+              345,
+              346,
+              347,
+              348,
+              350
+            ]
+          },
+          {
+            "option": "READINTEG",
+            "values": [
+              "CONSISTENT",
+              "REPEATABLE",
+              "UNCOMMITTED"
+            ],
+            "source_lines": [
+              352,
+              353,
+              354,
+              355,
+              357,
+              359,
+              361,
+              362,
+              363,
+              364,
+              365,
+              514,
+              515
+            ]
+          },
+          {
+            "option": "RLSACCESS",
+            "values": [
+              "NOTRLS",
+              "RLS"
+            ],
+            "source_lines": [
+              374,
+              375,
+              376,
+              377,
+              378,
+              379,
+              380,
+              381,
+              382,
+              384,
+              386,
+              387
+            ]
+          },
+          {
+            "option": "TABLE",
+            "values": [
+              "CFTABLE",
+              "CICSTABLE",
+              "NOTTABLE",
+              "USERTABLE"
+            ],
+            "source_lines": [
+              391,
+              392,
+              393,
+              394,
+              396,
+              398,
+              400,
+              401
+            ]
+          },
+          {
+            "option": "UPDATE",
+            "values": [
+              "NOTUPDATABLE",
+              "UPDATABLE"
+            ],
+            "source_lines": [
+              410,
+              411,
+              412,
+              413,
+              415
+            ]
+          },
+          {
+            "option": "UPDATEMODEL",
+            "values": [
+              "CONTENTION",
+              "LOCKING"
+            ],
+            "source_lines": [
+              417,
+              418,
+              419,
+              420,
+              421,
+              422,
+              423,
+              424,
+              425,
+              426,
+              427,
+              428,
+              430,
+              616,
+              617,
+              618
+            ]
           }
         ]
       },
@@ -5903,7 +6820,11 @@
         "INVREQ/43 text describes discard although this is SET FILE; retain the documented response, but a concrete SET-only reproducer is unresolved. KEYLENGTH(0)/condition60 and LSRPOOLNUM(0)/condition11 precedence also require exact general FILE context.",
         "General FILE-resource and RLS-switching contexts lack registered committed pins at this base. Exact expected hashes unresolved, host topic paths absent. No inferred constraint closure, threadsafety claim, missing retained-byte claim or refresh.",
         "RESP numeric authority independently reviewed: ibm-cics-ts-6x-application-api-sources-b-2026-09-10, SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html, sha256:a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7, parser lines827-882: NOTAUTH70, FILENOTFOUND12, END83, INVREQ16, IOERR17, ILLOGIC21, LENGERR22. Numeric identities agree with the existing shared condition-name authority.",
-        "Conditions65 invalid CFDTPOOL,66 invalid TABLE name and69 invalid DSNAME are fully retained, but exact invalid-character/length acceptance policy is absent from registered FILE-resource context. Concrete byte-level negative case inputs are pending that authority; no guessed names or placeholder failing cases are emitted. Condition43 likewise lacks a SET-only reproducer."
+        "Conditions65 invalid CFDTPOOL,66 invalid TABLE name and69 invalid DSNAME are fully retained, but exact invalid-character/length acceptance policy is absent from registered FILE-resource context. Concrete byte-level negative case inputs are pending that authority; no guessed names or placeholder failing cases are emitted. Condition43 likewise lacks a SET-only reproducer.",
+        "SET finite CVDA membership comes only from SET option clauses; inquiry-only NOTAPPLIC, transitional enable/open states, and historical signature symbols are not accepted inputs. Primary lines54-78 retain CLOSED plus DISABLED/UNENABLED prerequisites, ignored irrelevant/closed-state attributes, next-open effects, retained-lock restrictions and ordered changes; lines79-108 retain bundle limitations. BUSY lines124-145 applies only to DISABLED/CLOSED requests and otherwise is ignored; FORCE integrity/backout hazards and the existing WAIT prose/example tension remain. Source-compatible invocation/state binding and complete value-dependent constraints remain Pending; membership is not successful mutation or rollback evidence.",
+        "LOADTYPE heading at primary258 says data-value, whereas raw syntax at19 explicitly uses LOADTYPE(cvda), its paragraph260-270 lists LOAD/NOLOAD CVDA values and condition578 calls invalid LOADTYPE a CVDA. The existing valued four-byte input is preserved and only the explicit symbolic membership is added. The heading inconsistency and complete representation/translation binding remain Pending; CFDT-only applicability and saved settings for later switches at271-273 are not generalized to other operations.",
+        "SET EMPTYSTATUS membership is EMPTYREQ/NOEMPTYREQ at205-232, not the separate compatibility EMPTY option at202-204. Reusable/non-RLS and subsequent-open qualifications remain; EMPTYREQ CFDT preloading/ignored NOLOAD/already-loaded clauses219-228 oppose INVREQ57 at581-584 prescribing NOEMPTYREQ for CFDT. Both pinned clauses are retained and concrete applicability/precedence remains Pending; no union rejection or definitive output/condition selection is added.",
+        "SET READINTEG lines352-365 supplies per-file defaults only without a per-read override and ignores CFDT settings, while CONSISTENT/REPEATABLE non-RLS has INVREQ40 at513-515; their complete conditional applicability/precedence remains Pending. RLSACCESS lines374-387 retains CLOSED/DISABLED-or-UNENABLED and LSR/NSR selection; TABLE lines391-401 retains file-kind constraints at489-512 and566-567. UPDATEMODEL lines417-430 can be saved for a later CFDT switch, but recoverable CFDT requires LOCKING and rejects CONTENTION at615-618. OPENSTATUS lines308-344 retains deferred close, next-open CFDT creation/load and prior recoverable-work commit requirements. Unpinned mode-switch/resource contexts and full invocation/storage/recovery binding remain Pending."
       ]
     }
   ]

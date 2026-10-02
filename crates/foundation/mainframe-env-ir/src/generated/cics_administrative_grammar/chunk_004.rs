@@ -4,6 +4,79 @@
 /// Partial source-reviewed grammar contracts, with Pending completeness and no routes.
 pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
     CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0052",
+        family: "spi-csd-browse",
+        label: "CSD INQUIRERSRCE",
+        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_csd_inquirersrce.html",
+        source_sha256: "sha256:cc17d7d67a56a2eaae759ae2e39e5fc075777734c8cd21e5ec099d686525f9bc",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "ATOMSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::BoundedAmbiguity, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "BUNDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "CONNECTION", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "CORBASERVER", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DB2CONN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DB2ENTRY", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DB2TRAN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DJAR", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DOCTEMPLATE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DUMPCODE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "ENQMODEL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "FILE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "GROUP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "IPCONN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "JOURNALMODEL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "JVMSERVER", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "LIBRARY", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "LSRPOOL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "MAPSET", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "MQCONN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "MQMONITOR", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PARTITIONSET", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PARTNER", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PIPELINE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PROCESSTYPE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PROFILE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PROGRAM", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "REQUESTMODEL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESID", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "RESTYPE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::BoundedAmbiguity, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "SESSIONS", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "SET", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TCPIPSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TDQUEUE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TERMINAL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TRANCLASS", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TRANSACTION", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TSMODEL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TYPETERM", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "URIMAP", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &["GROUP", "RESID"],
+        alternative_groups: &[
+            CicsApplicationOptionAlternative { members: &["ATOMSERVICE", "BUNDLE", "CONNECTION", "CORBASERVER", "DB2CONN", "DB2ENTRY", "DB2TRAN", "DJAR", "DOCTEMPLATE", "DUMPCODE", "ENQMODEL", "FILE", "IPCONN", "JOURNALMODEL", "JVMSERVER", "LIBRARY", "LSRPOOL", "MAPSET", "MQCONN", "MQMONITOR", "PARTITIONSET", "PARTNER", "PIPELINE", "PROCESSTYPE", "PROFILE", "PROGRAM", "REQUESTMODEL", "RESTYPE", "SESSIONS", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANSACTION", "TSMODEL", "TYPETERM", "URIMAP", "WEBSERVICE"], required: true },
+            CicsApplicationOptionAlternative { members: &["ATTRIBUTES", "SET"], required: true },
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+            CicsApplicationOptionDependency { option: "SET", requires: &["ATTRLEN"] },
+        ],
+        mutual_exclusion_groups: &[&["ATOMSERVICE", "BUNDLE", "CONNECTION", "CORBASERVER", "DB2CONN", "DB2ENTRY", "DB2TRAN", "DJAR", "DOCTEMPLATE", "DUMPCODE", "ENQMODEL", "FILE", "IPCONN", "JOURNALMODEL", "JVMSERVER", "LIBRARY", "LSRPOOL", "MAPSET", "MQCONN", "MQMONITOR", "PARTITIONSET", "PARTNER", "PIPELINE", "PROCESSTYPE", "PROFILE", "PROGRAM", "REQUESTMODEL", "RESTYPE", "SESSIONS", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANSACTION", "TSMODEL", "TYPETERM", "URIMAP", "WEBSERVICE"], &["ATTRIBUTES", "SET"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0053",
         family: "spi-csd-definition",
         label: "CSD INSTALL",
@@ -892,56 +965,6 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
                 cvda_numeric_domains: &[
                 ],
                 required_options: &["JOURNALMODEL"],
-                alternative_groups: &[
-                ],
-                dependencies: &[
-                    CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-                ],
-                mutual_exclusion_groups: &[],
-                constraint_status: CicsApplicationConstraintStatus::Pending,
-            },
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0075",
-        family: "spi-queue-storage",
-        label: "DISCARD JOURNALNAME",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_discardjournalname.html",
-        source_sha256: "sha256:c54c71a1ef356842046d380190edb6add54991f74b05048b420fb05d512e5c7a",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "JOURNALNAME", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-        ],
-        cvda_domains: &[
-        ],
-        cvda_numeric_domains: &[
-        ],
-        required_options: &["JOURNALNAME"],
-        alternative_groups: &[
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[],
-        forms: &[
-            CicsAdministrativeGrammarForm {
-                id: "named-journalname",
-                selector_options: &["JOURNALNAME"],
-                options: &[
-                    CicsApplicationOptionDescriptor { name: "JOURNALNAME", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-                    CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-                    CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-                ],
-                cvda_domains: &[
-                ],
-                cvda_numeric_domains: &[
-                ],
-                required_options: &["JOURNALNAME"],
                 alternative_groups: &[
                 ],
                 dependencies: &[

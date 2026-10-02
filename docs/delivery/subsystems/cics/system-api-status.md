@@ -2941,3 +2941,34 @@ PLATFORM integrated candidate passes 31 generator and nine IR regressions plus
 actual Draft202012 family instance validation. Private projection has 278 commands
 (239 SPI and 39 FEPI), 4577 head operands and 7814 case candidates. One of 18
 enrolled family inputs remains unintegrated; all-family and runtime gates pending.
+
+FILE integration child SPI-1001.spi-file-cvda-domains is manager-owned after
+independent review of all 13 additions. All four exact enrolled rows, 139 complete
+operands, 91 responses, 18 obligations, zero forms and 166 whole cases remain
+unchanged. Three parent-array additions contain 44 scoped domains/138 symbolic
+members; ten precise source gaps are added and all 51 original gaps retained.
+Manager read every actual domain/qualifying member and full added gap, verified
+whole-byte forward/reverse replay and 33 handoff artifact identities, and used
+four pinned topics/29 fresh search/read calls including 25 bounded primary pages.
+CREATE logging/default geometry, INQUIRE open history/local/remote/saved settings,
+first/last-open recovery/ICF and SET value-dependent closed-state/RLS/CFDT rules
+remain qualified. BUSY, FORCE, ignored attributes, deferred close and prior
+recoverable-work commit requirements do not imply rollback or universal success.
+LOADTYPE heading/raw-CVDA, BLOCKFORMAT/RELTYPE applicability, CFDT EMPTYREQ
+versus INVREQ57 and WAIT completion/example-start oppositions remain Pending.
+Baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12; exact rows/pins stay in
+spi-file.json. Common fullword/direction dfha80x uses
+ibm-cics-ts-6x-application-api-sources-b-2026-09-10. No numeric encoding, new
+operand/case/form, runtime route or duplicate shared authority is added. Manager
+solely owns schema/types/generator/IR facade/status and serial integration.
+Only this bounded source child seals after actual FILE instance, projection,
+focused and mandatory gates. All six per-command, parent/application/selected
+route/recovery/restart/licensed gates stay Pending, credit0. Historical report
+only FULLAPI coverage finding SPI-FILE-REPAIR-REVIEW-R1 remains explicit pending
+provenance; no acceptance or retrospective fixture claim is inferred.
+
+FILE domain integrated candidate passes 31 generator and nine IR regressions and
+actual Draft202012 FILE instance validation. Private 278-command projection
+(239 SPI and 39 FEPI), 4577 operands/7814 case candidates and all 62 numeric
+domains/217 numeric records are unchanged. One of 18 enrolled family inputs
+remains unintegrated; all-family/runtime/acceptance gates remain Pending.
