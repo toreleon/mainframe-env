@@ -230,6 +230,17 @@ The store accepts that inventory only at its exact provider-state epoch and
 rechecks it inside the core archive transaction; it never tries to reconstruct
 provider ownership from prefixes or partial payload fields.
 
+Selected MQ state additionally enters that same core dependency inventory through
+the owning complete captured-snapshot reader: marker, catalog, delivery rows,
+control, unit owners and lossless occurrence receipts are validated together.
+Every receipt execution/original effect key and every retained unit's logical
+execution/original CONNECT key remains blocked, including empty and finalized
+units. Unknown, orphaned, malformed or over-budget selected state sets the
+conservative unowned fence. This read-only protection neither opens a runtime
+nor establishes a terminal age. The pre-publication receipt tick is not an age;
+selected receipt/unit retirement and post-persistence age reconciliation remain
+separate owning protocols. No new target or selected archival permit is added.
+
 ## Legacy age observations
 
 Absence of a trustworthy intrinsic tick protects a structurally valid legacy

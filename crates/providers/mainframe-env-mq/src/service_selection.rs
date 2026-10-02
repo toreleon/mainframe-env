@@ -101,7 +101,7 @@ impl MqService {
     }
 }
 
-fn selection_error(error: rich_state::ReadError) -> HostProblem {
+pub(super) fn selection_error(error: rich_state::ReadError) -> HostProblem {
     match error {
         rich_state::ReadError::Bounds => HostProblem::ResourceExhausted,
         rich_state::ReadError::Identity => HostProblem::IdempotencyConflict,

@@ -47,7 +47,8 @@ pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, MqReplayDependency,
     MqReplayOwnerKind, MqReplayRetentionDescriptor, MqReplayRetentionError, MqReplayRetentionState,
-    describe_mq_replay_row,
+    MqSelectedRetentionDependencies, describe_mq_replay_row,
+    describe_mq_selected_retention_dependencies,
 };
 
 pub use service::{

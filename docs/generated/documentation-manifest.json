@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 234,
+    "markdown_documents": 235,
     "navigation_groups": 6,
     "normative_documents": 67,
     "xtask_commands": 213
@@ -132,6 +132,14 @@
       "relative_links": 0,
       "sha256": "sha256:073db7972b5da005e02cb52d40f8d0dc2c40b79810f907f3f351f16f8b5d6a22",
       "title": "mainframe-env-server",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "crates/apps/mainframe-env-server/src/retention_maintenance/provider/selected_mq_fixture.md",
+      "relative_links": 0,
+      "sha256": "sha256:238939f6c82bd1975c531f38d6954a4a6d52b6ca62a360623dd81f4551cdfd00",
+      "title": "Selected MQ retention fixture",
       "xtask_commands": 0
     },
     {
@@ -621,7 +629,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:a795c945fa0701858febe260c98b150b86b102802b462695d3644af84c2e473c",
+      "sha256": "sha256:6749650f4cb3c37b2948b4a4bb5210b1403fa35f584e410f034f43fea5a855a7",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -1590,7 +1598,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:a3bb8e163d97b1e5b8795ce7bbf89ecc7d253e58f7f2b07bc29d475c37d4f6af",
+      "sha256": "sha256:e0f9ba91b6c6913711c37f39b18902e68e76dfab3545f185a1bbcaf378fdd0fe",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

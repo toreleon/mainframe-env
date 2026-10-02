@@ -48,6 +48,10 @@ pub(crate) mod legacy_delivery_import;
 #[path = "service_rich_state.rs"]
 mod rich_state;
 
+#[path = "service_retention_selected.rs"]
+mod retention_selected;
+pub(crate) use retention_selected::selected_retention_dependencies;
+
 #[path = "service_selection.rs"]
 mod selection;
 use selection::LegacyAccess;

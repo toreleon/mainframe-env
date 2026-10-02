@@ -18,6 +18,12 @@ pub(in crate::service) fn is_ownership_namespace(namespace: &str) -> bool {
 }
 
 impl OwnershipRows {
+    /// Every allocated unit remains a dependency, including empty/final units.
+    /// No terminal-retirement protocol is inferred from its decision.
+    pub(in crate::service) fn retained_dependencies(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.units.values().map(UnitOwner::retained_dependency)
+    }
+
     pub(super) fn require_physical_control(
         &self,
         record: &ProviderStateRecord,

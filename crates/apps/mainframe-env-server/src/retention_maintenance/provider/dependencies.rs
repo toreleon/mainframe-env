@@ -238,6 +238,25 @@ impl RetentionPlanner {
         let mut effects = BTreeSet::new();
         let mut unowned = false;
         let mut observations = ObservationMap::new();
+        let mq_records = self.bounded_prefix("mq-")?;
+        // Presence detection is not attribution. Unknown selected namespaces
+        // must enter the owning full reader and fence core retention on failure.
+        // Legacy-only MQ continues through its unchanged descriptor path below.
+        if mq_records
+            .iter()
+            .any(|row| row.namespace.starts_with("mq-selected-"))
+        {
+            match mainframe_env_mq::describe_mq_selected_retention_dependencies(
+                mq_records,
+                Default::default(),
+            ) {
+                Ok(dependencies) => {
+                    executions.extend(dependencies.executions);
+                    effects.extend(dependencies.effect_keys);
+                }
+                Err(_) => unowned = true,
+            }
+        }
         let online_rows = self.bounded_namespace("online-exchange-v1")?;
         let online_sessions: BTreeSet<_> = online_rows.iter().map(|row| row.key.as_str()).collect();
         for row in &online_rows {

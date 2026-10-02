@@ -16,6 +16,8 @@ mod failures;
 mod historical;
 #[path = "tests/restart.rs"]
 mod restart;
+#[path = "tests/retention_dependencies.rs"]
+mod retention_dependencies;
 
 struct Clock(std::sync::atomic::AtomicU64);
 impl MqReplayClock for Clock {

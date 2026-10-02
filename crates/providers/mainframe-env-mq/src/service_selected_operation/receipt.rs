@@ -50,6 +50,12 @@ pub(in crate::service) struct OccurrenceReceipt {
 }
 
 impl OccurrenceReceipt {
+    /// Attribution for conservative retention protection after full restore.
+    /// This supplies neither an execution permit nor a terminal age.
+    pub(in crate::service) fn retained_dependency(&self) -> (&str, &str) {
+        (&self.execution, &self.key)
+    }
+
     pub(super) fn capture(
         admitted: &MqMqiAdmitted<'_>,
         reply: &EffectResult,

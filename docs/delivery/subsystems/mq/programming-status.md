@@ -6,6 +6,23 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1506.selected-retention-dependencies` now protects selected recovery graphs
+in the existing epoch-fenced core inventory. The owning full rich snapshot reader
+validates marker/catalog/delivery/control/unit/receipt together, delegating old
+and full storage outputs to the sole lossless result codec. Every retained
+receipt execution/effect and unit logical execution/original CONNECT key stays
+blocked, including empty/final units; malformed/unknown/orphaned state sets the
+conservative unowned fence. No runtime, age, archival permit or new target is
+created. Four provider and three server regressions plus 13 rich-reader, three
+existing safety and one coordinator retention regressions pass (24 total, zero
+ignored), with owned SQLite reopen, real core-row protection, stale epoch refusal
+and actual guards/four row mutants/module937/fmt/docs/changelog. Original failed
+compile/test receipts remain failed; their repaired inputs pass separately.
+Dependency policy reuses only original d8 and all 32 unchanged inputs; unchanged
+contract inputs retain the genuine global API-doc pass from `54bcfeae`, not a
+new gate run. Selected retirement/post-persistence age, root task end, recovery,
+actual full delivery, participant/IR/CardDemo/all26 still require implementation.
+
 `MQ-1506.host-api-doc-repair` composes sealed worker `d3c7b274` with the
 execution/store repair below. The genuine global API-documentation gate now
 passes at exact counts compiler 70, coverage 386, execution 0, host 931 and

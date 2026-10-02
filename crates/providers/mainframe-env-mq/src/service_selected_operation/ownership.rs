@@ -148,6 +148,11 @@ impl Control {
 }
 
 impl UnitOwner {
+    /// Retained logical owner and original CONNECT dependency, never a lease.
+    pub(super) fn retained_dependency(&self) -> (&str, &str) {
+        (&self.execution, &self.connection_key)
+    }
+
     pub(super) fn validate(&self, control: &Control) -> Result<(), HostProblem> {
         let limits = InvocationLimits::default();
         if self.schema_version != UOW_SCHEMA

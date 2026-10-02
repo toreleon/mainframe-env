@@ -990,3 +990,6 @@ mod safety_tests;
 
 #[cfg(test)]
 mod container_tests;
+
+#[cfg(test)]
+mod selected_mq_tests;
