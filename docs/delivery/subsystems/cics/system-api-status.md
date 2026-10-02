@@ -2878,3 +2878,30 @@ NETWORK integrated candidate passes 31 generator and nine IR regressions plus
 actual Draft202012 family instance validation. Private projection has 237 commands
 (198 SPI and 39 FEPI), 3936 head operands and 6503 case candidates. Three of 18
 enrolled family inputs remain unintegrated; all-family and runtime gates pending.
+
+TRANSACTION child SPI-1001.spi-transaction-resources-source-contracts is
+manager-owned and bounded to 22 enrolled transaction/process rows with 311
+operands, 148 conditions, five forms, 64 domains/178 members and 749 source cases.
+Final 8e7fb0b6f03af475db80d69abe7b6b6659a95c6bb32e4e17261f65fe4472ddd7
+passed independent full-family review and final one-property citation review.
+The sole final correction adds primary67-69 to SET PROCESSTYPE's existing
+already-disabled prerequisite; all 749 whole cases, every other fact and all
+249 precise gaps are preserved. Manager byte replay and current pinned
+search/read agree with the independent expectation; prior 275-action/223-group
+full repair review, 25 pins and 61 source-call identities remain immutable
+source-only provenance. Manager verified all 35 final handoff artifact refs.
+Primary baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12; command catalog
+rows and exact source pins stay enrolled in spi-transaction-resources.json.
+REQID raw/prose/pointer, threshold, tracing, purgeability, partial effects, SAF,
+ABI, caller UOW and recovery conflicts remain Pending. Source contracts stay
+private and non-routing. Manager exclusively owns shared schema/generator/IR
+facade/status and serial integration; no runtime/condition/resource/security/UOW
+authority is duplicated. Only this bounded source child may seal after actual
+family Draft202012, focused regressions and mandatory integration gates. All
+six command gates, application dependency, SPI-1001 parent, selected route,
+physical recovery/restart and licensed acceptance remain Pending, credit0.
+
+TRANSACTION integrated candidate passes 31 generator and nine IR regressions
+plus actual Draft202012 family validation. Private projection has 259 commands
+(220 SPI and 39 FEPI), 4247 head operands and 7252 case candidates. Two of 18
+enrolled family inputs remain unintegrated; all-family and runtime gates pending.
