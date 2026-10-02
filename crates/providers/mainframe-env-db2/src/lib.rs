@@ -107,6 +107,12 @@ pub use retention::{
 };
 pub use service::{Db2Limits, Db2ReplayClock, Db2Service, db2_providers};
 pub use statement::{
+    Db2BoundColumnDefault, Db2BoundColumnDefaultResult, Db2BoundCreateTableColumnDefaults,
+    Db2ColumnDefaultBindingError, Db2ColumnDefaultBindingErrorCode, Db2ColumnDefaultBindingLimits,
+    Db2ColumnDefaultStringContexts, Db2SystemDefaultProducer,
+    bind_db2_create_table_column_defaults,
+};
+pub use statement::{
     Db2ColumnDefault, Db2CommitStatement, Db2CreateTableColumn, Db2CreateTableConstraint,
     Db2CreateTableStatement, Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget,
     Db2CursorReturnability, Db2CursorRowsetPositioning, Db2CursorSensitivity,

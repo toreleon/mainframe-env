@@ -95,6 +95,18 @@ This intentional development API adjustment changes no accepted wire/durable
 contract. Quoted names decode escapes once. Default values/applicability and
 all binding or insertion effects remain unresolved by this syntax API.
 
+The column-default binding surface reparses one bounded original CREATE TABLE,
+then resolves only column types/defaults through the existing owners. It retains
+implicit NULL, missing-default obligations for NOT NULL, explicit NULL, system
+producer plans and exact assigned numeric/string proofs as distinct results.
+Character/X defaults enforce 1536 decoded UTF-8 bytes before trimming/padding;
+BX remains binary. System date/time/timestamp plans retain declared precision/
+zone for insertion/update/LOAD, without observing a CREATE-time host clock or
+fabricating literal proofs. WITH DEFAULT binding remains explicitly source-pending
+because its pinned prose is ambiguous. Per-family budgets apply when consumed.
+This is not table-name/constraint/privilege binding, installed catalog admission,
+runtime producer execution, typed cells or a complete SQL0050/ licensed gate.
+
 The proposed common type boundary resolves the owned AST's built-in type syntax
 to bounded numeric, character, graphic, binary, and datetime shapes. It exposes
 directional assignment and symmetric comparison classifications, preserving

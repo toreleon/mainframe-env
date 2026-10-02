@@ -258,7 +258,7 @@
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
       "relative_links": 1,
-      "sha256": "sha256:e96f03c32b9ec24421fb8aeb5416cb4059a17961a22572bdcdc560163cef0659",
+      "sha256": "sha256:0f5f96eb82a0a9d40a6dfcb742a0fa1f790fd180c6b926e73a988bd4d4234f01",
       "title": "mainframe-env-db2",
       "xtask_commands": 2
     },
@@ -1394,7 +1394,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
       "relative_links": 3,
-      "sha256": "sha256:e12ddb972d61b708e6c9928b8d333716899eae328f2958b23312377c533bb8ac",
+      "sha256": "sha256:dc6a2eef50426dabae9114f6034a85d741b34a78ef03a464060a1c8075a9b694",
       "title": "Db2 — Engine and common SQL progress",
       "xtask_commands": 0
     },

@@ -884,6 +884,32 @@ the private worker's actual policy receipt is reused without relabeling its
 execution identity. These local proofs add no official recognition/execution
 or licensed numerator, and no evaluator consumes the predicate domain yet.
 
+The manager declares `DB2-1202.column-default-binding-surface`, parent DB2-1202,
+for the separately sealed column-only binder. Exact ownership is existing
+`src/statement.rs` child facade and root `lib.rs` exports, new
+`tests/column_default_binding.rs`, provider README, this status, unique
+`changes/unreleased/db2-column-default-binding-surface.toml` and generated
+documentation manifest. Main read all 1254 module lines, the 195-line handoff,
+registration/fragment and verified the final source blob. Independent public
+vectors cover four clause intents, exact target values, UTF-8/CRLF signed
+provenance and owned lifetimes, character/binary assignment, pre-trim 1536/1537
+bytes, declared source/output budgets, producer precision/zone and explicit
+pending/type/NULL-conflict errors. Backend/catalog/constraint/name/privilege
+binding and runtime producers are not added; SQL0050 and licensed gates remain
+partial/pending. Acceptance requires focused/package/Rust/MSRV checks, strict
+scoped Clippy with all private reachability warnings discharged, formatting,
+applicable unchanged-input policy/catalog/changelog/docs, both private/public
+exact seals and cleanup. No mutable/durable/schema contract changes.
+
+The column-default public candidate passes six focused tests and 347 unit plus
+96 integration tests, with no failures/skips. Rust 1.98/1.95, strict scoped Clippy,
+formatting, catalog/changelog/docs and committed private-seal checks pass; the
+public exports discharge the private warnings. Unchanged dependency-policy
+inputs retain the private worker's actual passing receipt identity. Main's public
+tests do not use binder results to generate expected values or locations. The
+tested production bytes are unchanged by the final documentation reconciliation;
+generated hashes are checked again before the public feature seal and cleanup.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
