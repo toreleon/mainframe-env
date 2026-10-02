@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 
@@ -274,6 +275,48 @@ class AdministrativeGrammarTests(unittest.TestCase):
         return catalog_tool.project_family_grammar(
             self.family if family is None else family, self.mapping, self.manifest
         )
+
+    def test_chunked_projection_preserves_every_fact_order_and_digest_at_scale(self) -> None:
+        template = self.project()[-1]
+        facts = []
+        for index in range(305):
+            fact = copy.deepcopy(template)
+            fact["official_row"] = f"synthetic:{index:04}"
+            facts.append(fact)
+        outputs = catalog_tool.render_grammar_outputs(facts)
+        self.assertTrue(all(len(body.splitlines()) <= 1000 for body in outputs.values()))
+        chunks = [body.decode().splitlines()[5:-1] for path, body in outputs.items()
+                  if path != catalog_tool.GRAMMAR_OUTPUT_PATH]
+        monolithic = catalog_tool.render_grammar_facts(facts).decode().splitlines()
+        self.assertEqual([line for chunk in chunks for line in chunk], monolithic[8:-1])
+        facade = outputs[catalog_tool.GRAMMAR_OUTPUT_PATH].decode()
+        self.assertIn(monolithic[3].split(" = ", 1)[1], facade)
+        self.assertEqual(facade.count("::CONTRACTS["), 305)
+        self.assertEqual(outputs, catalog_tool.render_grammar_outputs(facts))
+
+    def test_missing_extra_or_modified_chunks_fail_freshness(self) -> None:
+        outputs = catalog_tool.render_grammar_outputs(self.project())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, body in outputs.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(body)
+            catalog_tool.check_grammar_outputs(root, outputs)
+            chunk = next(path for path in outputs if path != catalog_tool.GRAMMAR_OUTPUT_PATH)
+            original = (root / chunk).read_bytes()
+            (root / chunk).write_bytes(original + b"// changed\n")
+            with self.assertRaisesRegex(catalog_tool.CatalogError, "stale"):
+                catalog_tool.check_grammar_outputs(root, outputs)
+            (root / chunk).write_bytes(original)
+            extra = root / catalog_tool.GRAMMAR_CHUNK_PATH / "chunk_999.rs"
+            extra.write_bytes(original)
+            with self.assertRaisesRegex(catalog_tool.CatalogError, "inventory is stale"):
+                catalog_tool.check_grammar_outputs(root, outputs)
+            extra.unlink()
+            (root / chunk).unlink()
+            with self.assertRaisesRegex(catalog_tool.CatalogError, "inventory is stale"):
+                catalog_tool.check_grammar_outputs(root, outputs)
 
     def test_exact_program_cohort_uses_shared_operand_types_and_pending_status(self) -> None:
         facts = self.project()

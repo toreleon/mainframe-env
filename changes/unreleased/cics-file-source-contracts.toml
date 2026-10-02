@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Retain independently reviewed private FILE administrative source contracts with isolated boundary fixtures and explicit unresolved source conflicts."

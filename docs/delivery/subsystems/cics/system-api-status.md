@@ -1919,3 +1919,83 @@ regressions from41033cc apply to these unchanged generated/IR inputs and are
 not relabeled current execution evidence. Present private family instances pass
 exact source linkage; future absent inputs stay pending. Mandatory gates precede
 this bounded enrollment seal.
+
+Before dispatch manager declares SPI-1001.spi-csd-review-repair, exclusive to
+spi-csd-definition.json and spi-csd-browse.json in the original now-idle producer
+checkout,25 rows/475 original case identities. It repairs allnine CSD findings:
+INSTALL selector form, LIST ownership/lookup/locks, COPY duplicates, precise
+option citations, sourced fullword CVDA widths and explicitly pending unpinned
+character fixtures. SPI-1001.spi-region-review-repair owns only
+spi-region-lifecycle.json,25 rows/868 original case identities, repairing all13
+terminal findings: UOW CVDA domains/phase fixtures, isolated range/encoding,
+named TASK selector, actual ASSOCIATION outputs/layouts, bundle transition
+preconditions, exact citations and opposed duplicate/KILL source outcomes.
+Dependencies are completed independent reviews and frozen latest workfile hashes;
+all unaffected properties/cases/source pins/gates must be preserved. Existing
+CSD staged historical draft is untouched; working bytes are authoritative.
+Both use existing shared schema/form/CVDA types read-only and retained actual
+CLI sessions gpt-6.1-sol/high/default/fastOFF, with at most eight workers and no
+nested workers. Manager owns all shared schema/generator/IR/resource/security/
+status paths, separate changed-fact review, actual instance/policy gates and
+serial seals. Neither is runtime/route/application/recovery/license acceptance.
+
+SPI-1001.spi-file-contracts integrates four exact FILE rows0012/0072/0127/0224,
+139 union operands,91 source conditions,18 obligations and166 candidate cases.
+Independent original and changed-fact reviews preserve all137 unaffected cases
+and every source/grammar/response/authorization/gap record, with104 bounded
+field changes across29 cases. Fullword DFHVALUE(DPLSUBSET) wrong-domain inputs
+are independently sourced; only CREATE explicitly seeds FULLAPI. Sixteen SET
+fixtures isolate actual VSAM/BDAM/CFDT kind/state/prior values; BUSY requests
+CLOSED. Ten numeric boundaries distinguish definition storage from next OPEN
+validation and dataset/server-table effects. EMPTYREQ no-load/already-loaded
+ignore versus INVREQ16/57 stays explicitly unresolved with both source passages.
+CREATE raw SVG's LOG default is a bounded retained-source fact; explicit diagram
+notation promotion and CSDL delivery/payload remain pending, not product audit.
+Baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12, catalog
+ibm-cics-ts-6x-2026-08-31:spi-commands-unique, exact dfha8_createfile f1c4d6c,
+dfha8_setfile ec8a39c and unchanged DISCARD/INQUIRE pins are retained.
+CVDA dfha80x uses source-b baseline2026-09-10 pin81f101e. Manager corrects the
+low external handoff coverage overstatement in provenance-preserving copies;
+the reviewed normative JSON stays byte-identical. Grammar/form/numeric ABI,
+precise SAF, effects/UOW/locks, async completion, restart/concurrency and actual
+selected-route/application/license gates all remain pending. No handlers or
+public routing/admission are added; all308 identities and260 existing advertised
+application registrations remain unchanged. Current actual instance/projection
+and mandatory gates are required before this bounded private source slice seal.
+
+The first FILE integration attempt passed26 generator tests,7 IR regressions
+and the actual family instance check, then stopped at the mandatory module gate:
+the generated monolithic grammar reached1316 lines. Cleanup completed; no seal
+or successful-candidate receipt was issued. Manager extends this same bounded
+integration ownership to the sole generator/tests and generated grammar chunks,
+packing complete commands below1000 lines with one ordered facade and unchanged
+global product-fact digest. No exemption or module ceiling is increased. Scale
+and missing/extra/modified chunk regressions must verify no lost/reordered facts
+and exact freshness. Workers retain exclusive source-file ownership; this
+structural generator repair changes no source, readiness or runtime authority.
+
+Before dispatch manager declares three independent external-only review slices:
+SPI-1001.spi-program-cvda-review freezes the terminal four-row enrichment and
+reviews all eight added parent/form domain arrays, every finite symbol/direction/
+width/citation and exact restoration of97 union operands/47 responses/106 cases.
+SPI-1001.spi-monitoring-repair-review freezes the terminal21-row repair, reviews
+all73 property changes/29 affected cases for MON-R1..R5 and verifies739 unaffected
+cases plus source/grammar/response/authorization preservation. Reuse unchanged
+earlier full review, without repeating its source campaign. SPI-1001.spi-web-contract-review
+freezes the terminal25-row input and independently reviews every336 operand,
+134 condition, six named form and549 candidate input/expectation, lifecycle/
+authorization/audit/UOW/recovery/gap and primary source relation. Each depends
+on terminal producer handoff and exact frozen hashes, owns only external
+reports in a clean isolated checkout and consults pinned search/read before
+semantic evaluation. Reviewers differ from each input's producer. All shared
+schema/generator/IR/resource/security/status and serial integration gates remain
+manager-owned; no tracked edits or acceptance seals are delegated. At most
+eight actual retained CLI workers, gpt-6.1-sol/high/default/fastOFF; all execution/
+application/selected-route/recovery/license/parent gates remain pending.
+
+FILE integration passes28 current generator regressions, seven IR source
+regressions without ignores and the actual Draft202012 FILE instance gate.
+Current private source projection contains28 rows (8SPI/20FEPI),491 union
+operand facts and634 source case candidates. These are pending contracts,
+not accepted typed execution or actual selected-route/recovery evidence.
+Mandatory current-candidate gates precede the bounded source seal.
