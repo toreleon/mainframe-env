@@ -493,7 +493,7 @@
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
       "relative_links": 1,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:7b4b0f021f40a26206c7a0d23afc38f1cdb4c572b272a4228bbb9c2c54e924e1",
+      "sha256": "sha256:24805f672dfbeceb3d945458bf71107f4f38211667ed87113b5e3ea9edfa5477",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -583,9 +583,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 1,
+      "relative_links": 2,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:05ea49088a2b52aebf803b8aaf5f7b7e8e9aa1328d884d99791a314dd1341d54",
+      "sha256": "sha256:a26e442604a1a1b482ae3bfd221c244e37bf0ffff17a5c982f9796e581daff78",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -597,7 +597,7 @@
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
       "relative_links": 2,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:acbb6ca7aaf82345718d44ca240c3c08c0826789a638de0b0e8a322793d6e93a",
+      "sha256": "sha256:ddcd1717e0d52c752b775dca4aeffbd71008467ea4897569ffe8bdc0b7b0e952",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -1578,7 +1578,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:52ad61b1a86f4b895e251e1dc931225397391f5d948ccebf7982eb9b665aa9a7",
+      "sha256": "sha256:956a0dba0ef4381dc64ea8b05c8bd98fa0360046fa00da127e068fc35a7753c9",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

@@ -823,3 +823,31 @@ not M's service/UOW publication, O's numeric options or the manager's production
 host bridge. Actual parentSome topology, real artifact provenance, same-store
 admission, cancellation/probe, frame cleanup and durable recovery must compose;
 the review cannot turn binding parsing or a test provider into attestation.
+
+## Lossless reviewed output integration
+
+`MQ-1505.lossless-reviewed-output` integrates sealed worker `4b7f5582` and
+deliberately extends the existing strict codec, not a second result codec or
+status inventory. An additive canonical tag preserves reviewed completion/reason
+plus the exact output. GET OK/NONE, both reviewed truncation warnings and
+no-message/wait-expiry failure observations retain descriptors, copied bytes,
+required lengths and properties. Original request/mode/capacity must still pass
+provider preflight. Unrepresented conversion/property/per-destination and other
+status forms stay pending; the all-26 scope is not reduced.
+
+The composed candidate passes 155 host unit plus nine integration, 33 original
+admission/result, 23 codec, 11 typed-machine and five installed-batch tests
+(236 total, no failures/ignored). New codec regressions cover required fields,
+extra data, corrupted and coherent-invalid digests, warning/failure payloads,
+SQL cursor bounds and historical/special connection handling. The machine may
+copy validated reviewed OK/NONE connection/disconnection outputs, but cannot
+turn a historical token into a live alias. Full original result tags/digests
+remain unchanged in the core journal; local writeback is not receipt rewriting.
+Old canonical goldens and old storage bytes are preserved.
+
+Source review uses original baseline rows `0015/0020/0021` and supplemental
+MQGMO `SSFKSJ_9.4.0/refdev/q096715_.html` (pinned programming-supplements baseline),
+with exact four pins in the worker's source receipt and reviewed architecture.
+All offline source credit remains zero. Actual selected-service publication,
+host attestation, cold incarnation/checkpoint/retention, participant and CardDemo
+acceptance remain required; only the licensed oracle is human-skipped.

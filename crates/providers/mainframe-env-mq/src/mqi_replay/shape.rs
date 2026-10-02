@@ -357,11 +357,28 @@ impl Output {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum StoredOutcome {
-    Completed { status: Completion, output: Output },
-    StatusPending { output: Output },
-    ReviewedStatus { completion: String, reason: String },
-    CallbackReturned { context: Options },
-    Pending { reason: Pending },
+    Completed {
+        status: Completion,
+        output: Output,
+    },
+    StatusPending {
+        output: Output,
+    },
+    ReviewedStatus {
+        completion: String,
+        reason: String,
+    },
+    ReviewedOutput {
+        completion: String,
+        reason: String,
+        output: Output,
+    },
+    CallbackReturned {
+        context: Options,
+    },
+    Pending {
+        reason: Pending,
+    },
     UnknownOutcome {},
     DuplicatePossible {},
 }
@@ -378,6 +395,11 @@ impl StoredOutcome {
             MqMqiOutcome::ReviewedStatus { status } => Self::ReviewedStatus {
                 completion: status.completion().symbol().into(),
                 reason: status.reason_symbol().into(),
+            },
+            MqMqiOutcome::ReviewedOutput { status, output } => Self::ReviewedOutput {
+                completion: status.completion().symbol().into(),
+                reason: status.reason_symbol().into(),
+                output: Output::from_output(output)?,
             },
             MqMqiOutcome::CallbackReturned { context } => Self::CallbackReturned {
                 context: (*context).into(),
@@ -401,6 +423,15 @@ impl StoredOutcome {
             Self::ReviewedStatus { completion, reason } => MqMqiOutcome::ReviewedStatus {
                 status: MqReviewedStatus::from_symbols(call, &completion, &reason)
                     .map_err(ReplayError::Status)?,
+            },
+            Self::ReviewedOutput {
+                completion,
+                reason,
+                output,
+            } => MqMqiOutcome::ReviewedOutput {
+                status: MqReviewedStatus::from_symbols(call, &completion, &reason)
+                    .map_err(ReplayError::Status)?,
+                output: output.into_output()?,
             },
             Self::CallbackReturned { context } => MqMqiOutcome::CallbackReturned {
                 context: context.into(),

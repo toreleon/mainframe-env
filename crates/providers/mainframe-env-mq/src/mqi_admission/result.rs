@@ -49,6 +49,10 @@ impl MqMqiAdmitted<'_> {
         reply.validate(self.effect.sequence, self.host_limits)?;
         if let Some(value) = typed {
             copied_capacities(&self.envelope.request, &value.result.outcome)?;
+            value
+                .result
+                .validate_reviewed_output_for(&self.envelope.request)
+                .map_err(|_| HostProblem::Malformed)?;
         }
         self.recheck_controls(now_tick)?;
         Ok(MqMqiResultPreflight {
@@ -70,7 +74,9 @@ fn bound(copied: usize, capacity: usize) -> Result<(), HostProblem> {
 
 fn copied_capacities(request: &MqMqiRequest, outcome: &MqMqiOutcome) -> Result<(), HostProblem> {
     let output = match outcome {
-        MqMqiOutcome::Completed { output, .. } | MqMqiOutcome::StatusPending { output } => output,
+        MqMqiOutcome::Completed { output, .. }
+        | MqMqiOutcome::StatusPending { output }
+        | MqMqiOutcome::ReviewedOutput { output, .. } => output,
         MqMqiOutcome::ReviewedStatus { .. }
         | MqMqiOutcome::Pending(_)
         | MqMqiOutcome::UnknownOutcome
@@ -145,7 +151,7 @@ fn copied_capacities(request: &MqMqiRequest, outcome: &MqMqiOutcome) -> Result<(
                 MqMqiOutcome::Completed {
                     status: MqMqiStatus::FailedEnvironment,
                     ..
-                }
+                } | MqMqiOutcome::ReviewedOutput { .. }
             ) =>
         {
             Ok(())

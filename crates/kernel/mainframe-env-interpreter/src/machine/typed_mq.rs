@@ -243,7 +243,21 @@ impl ReferenceMachine {
         value
             .validate(HostLimits::default())
             .map_err(MachineProblem::Host)?;
-        let (completion, reason, connection, completed) = match value.result.outcome {
+        // Writeback may normalize a validated OK/NONE observation locally;
+        // the journal retains the full original result and its canonical tag.
+        let outcome = match value.result.outcome {
+            MqMqiOutcome::ReviewedOutput { status, output }
+                if status.completion() == mainframe_env_host_api::mq_status::MqCompletion::Ok
+                    && status.reason_symbol() == "MQRC_NONE" =>
+            {
+                MqMqiOutcome::Completed {
+                    status: MqMqiStatus::OkNone,
+                    output,
+                }
+            }
+            other => other,
+        };
+        let (completion, reason, connection, completed) = match outcome {
             MqMqiOutcome::Completed {
                 status: MqMqiStatus::OkNone,
                 output,

@@ -429,3 +429,66 @@ fn historical_connection_reply_cannot_install_a_live_abi_alias() {
         assert_eq!(machine.decimal(name).unwrap().coefficient, 0);
     }
 }
+
+#[test]
+fn reviewed_ok_output_installs_only_live_connection_and_disconnect_retires_it() {
+    for historical in [false, true] {
+        let (mut machine, _) = fixture();
+        let effect = connect(&mut machine);
+        let live = issued();
+        let connection = if historical {
+            mainframe_env_host_api::MqHandleObservation::capture_connection(live)
+                .unwrap()
+                .historical_connection()
+                .unwrap()
+        } else {
+            live
+        };
+        let status = mainframe_env_host_api::mq_status::MqReviewedStatus::from_symbols(
+            MqMqiCall::Connect,
+            "MQCC_OK",
+            "MQRC_NONE",
+        )
+        .unwrap();
+        let result = reply(
+            &mut machine,
+            &effect,
+            MqMqiOutcome::ReviewedOutput {
+                status,
+                output: MqMqiOutput::Connected(connection),
+            },
+        );
+        if historical {
+            assert_eq!(
+                result,
+                Err(MachineProblem::Host(HostProblem::UnknownOutcome))
+            );
+            assert!(machine.mqi.as_ref().unwrap().connections.is_empty());
+            assert_eq!(machine.decimal("HCONN").unwrap().coefficient, 0);
+            continue;
+        }
+        result.unwrap();
+        assert_eq!(
+            machine.mqi.as_ref().unwrap().connections.get(&1),
+            Some(&live)
+        );
+        let effect = call(&mut machine, &["MQDISC", "USING", "HCONN", "CC", "REASON"]).unwrap();
+        reply(
+            &mut machine,
+            &effect,
+            MqMqiOutcome::ReviewedOutput {
+                status: mainframe_env_host_api::mq_status::MqReviewedStatus::from_symbols(
+                    MqMqiCall::Disconnect,
+                    "MQCC_OK",
+                    "MQRC_NONE",
+                )
+                .unwrap(),
+                output: MqMqiOutput::NoOutput,
+            },
+        )
+        .unwrap();
+        assert!(machine.mqi.as_ref().unwrap().connections.is_empty());
+        assert_eq!(machine.decimal("CC").unwrap().coefficient, 0);
+        assert_eq!(machine.decimal("REASON").unwrap().coefficient, 0);
+    }
+}

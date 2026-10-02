@@ -12,6 +12,7 @@
 //! Unknown outcomes require fenced reconciliation, never automatic redispatch.
 
 mod encoding;
+mod reviewed_output;
 #[cfg(test)]
 mod tests;
 mod validation;
@@ -471,6 +472,12 @@ pub enum MqMqiOutput {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqMqiOutcome {
+    /// A reviewed call return with its bounded typed observations. This is not
+    /// state/handle authority; providers must also validate the original request.
+    ReviewedOutput {
+        status: crate::mq_status::MqReviewedStatus,
+        output: MqMqiOutput,
+    },
     /// A source-reviewed observed return identity. This carries no operation
     /// output and does not calculate or assert provider execution success.
     ReviewedStatus {

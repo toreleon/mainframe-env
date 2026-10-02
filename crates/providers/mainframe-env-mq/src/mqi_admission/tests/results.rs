@@ -154,6 +154,128 @@ fn observation(output: MqMqiOutput) -> MqMqiOutcome {
 }
 
 #[test]
+fn reviewed_get_warning_outputs_are_bound_to_actual_original_capacity_and_disposition() {
+    let f = Fixture::new();
+    let outcome = |reason, disposition, copied| MqMqiOutcome::ReviewedOutput {
+        status: MqReviewedStatus::from_wire_pair(MqMqiCall::Get, 1, reason).unwrap(),
+        output: MqMqiOutput::Got {
+            disposition: MqGetDisposition::Message(disposition),
+            message: Some(message(copied)),
+            cursor: None,
+        },
+    };
+    for (reason, mode, truncation, disposition) in [
+        (
+            2079,
+            MqGetMode::Remove,
+            MqTruncation::Accept,
+            MqTruncationDisposition::AcceptedRemoved {
+                required: 7,
+                copied: 2,
+            },
+        ),
+        (
+            2079,
+            MqGetMode::BrowseFirst,
+            MqTruncation::Accept,
+            MqTruncationDisposition::AcceptedBrowsed {
+                required: 7,
+                copied: 2,
+            },
+        ),
+        (
+            2080,
+            MqGetMode::Remove,
+            MqTruncation::Reject,
+            MqTruncationDisposition::RejectedRetained {
+                required: 7,
+                copied: 2,
+            },
+        ),
+    ] {
+        assert_eq!(
+            check(f.get(2, mode, truncation), outcome(reason, disposition, 2)),
+            Ok(())
+        );
+        assert_eq!(
+            check(f.get(1, mode, truncation), outcome(reason, disposition, 2)),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(
+            check(f.get(3, mode, truncation), outcome(reason, disposition, 2)),
+            Err(HostProblem::Malformed)
+        );
+    }
+    assert_eq!(
+        check(
+            f.get(2, MqGetMode::Remove, MqTruncation::Reject),
+            outcome(
+                2079,
+                MqTruncationDisposition::AcceptedRemoved {
+                    required: 7,
+                    copied: 2
+                },
+                2
+            )
+        ),
+        Err(HostProblem::Malformed)
+    );
+    assert_eq!(
+        check(
+            f.get(2, MqGetMode::BrowseFirst, MqTruncation::Accept),
+            outcome(
+                2079,
+                MqTruncationDisposition::AcceptedRemoved {
+                    required: 7,
+                    copied: 2
+                },
+                2
+            )
+        ),
+        Err(HostProblem::Malformed)
+    );
+    assert_eq!(
+        check(
+            f.get(0, MqGetMode::Remove, MqTruncation::Accept),
+            outcome(
+                2079,
+                MqTruncationDisposition::AcceptedRemoved {
+                    required: 7,
+                    copied: 0
+                },
+                0
+            )
+        ),
+        Ok(())
+    );
+    assert_eq!(f.registry.active_handles(), 3);
+}
+
+#[test]
+fn reviewed_get_failed_empty_observation_does_not_become_unknown_or_success() {
+    let f = Fixture::new();
+    let status = MqReviewedStatus::from_wire_pair(MqMqiCall::Get, 2, 2033).unwrap();
+    for disposition in [
+        MqGetDisposition::NoMessage,
+        MqGetDisposition::WaitExpired,
+        MqGetDisposition::UnknownOutcome,
+    ] {
+        let outcome = MqMqiOutcome::ReviewedOutput {
+            status,
+            output: MqMqiOutput::Got {
+                disposition,
+                message: None,
+                cursor: None,
+            },
+        };
+        assert_eq!(
+            check(f.get(0, MqGetMode::Remove, MqTruncation::Reject), outcome).is_ok(),
+            disposition == MqGetDisposition::NoMessage
+        );
+    }
+}
+
+#[test]
 fn result_call_limits_sequence_and_host_variant_are_bound_to_the_original() {
     let f = Fixture::new();
     let request = f.inquire(2, 2);
@@ -477,6 +599,70 @@ fn result_preflight_borrows_actual_reply_and_preserves_uncertainty_identities() 
         digests.insert(preflight.host_result_digest);
     }
     assert_eq!(digests.len(), 3);
+}
+
+#[test]
+fn reviewed_output_preflight_retains_full_host_result_and_unknown_precedence() {
+    let f = Fixture::new();
+    let inv = invocation().with_cancellation_probe(CancellationProbe::new());
+    let p = provider();
+    let mut env = envelope();
+    env.request = f.get(2, MqGetMode::Remove, MqTruncation::Reject);
+    let e = effect(&inv, &mutation(), &env);
+    let scope = scope(&inv, owner(), &e, &p).unwrap();
+    let MqMqiAdmission::ServiceValidation(identity) = admit_mqi(&scope, &inv, 1).unwrap() else {
+        panic!()
+    };
+    let mut reply = EffectResult {
+        sequence: e.sequence,
+        outcome: Ok(HostResult::MqMqi(MqMqiHostResult {
+            limits: env.limits,
+            result: MqMqiResult {
+                call: MqMqiCall::Get,
+                outcome: MqMqiOutcome::ReviewedOutput {
+                    status: MqReviewedStatus::from_wire_pair(MqMqiCall::Get, 1, 2080).unwrap(),
+                    output: MqMqiOutput::Got {
+                        disposition: MqGetDisposition::Message(
+                            MqTruncationDisposition::RejectedRetained {
+                                required: 7,
+                                copied: 2,
+                            },
+                        ),
+                        message: Some(message(2)),
+                        cursor: None,
+                    },
+                },
+            },
+        })),
+    };
+    let before = reply.clone();
+    let observed = identity.preflight_result(&reply, 2).unwrap();
+    assert!(std::ptr::eq(observed.reply, &reply));
+    assert_eq!(
+        observed.host_result_digest,
+        canonical_result_digest(&reply.outcome).unwrap()
+    );
+    assert_eq!(
+        observed.host_result_bytes,
+        canonical_result_size(&reply.outcome, p.max_result_bytes).unwrap()
+    );
+    assert_eq!(reply, before);
+    let standalone =
+        mainframe_env_host_api::mq_mqi::mq_mqi_result_digest(&typed(&mut reply).result, env.limits)
+            .unwrap();
+    assert_ne!(standalone, canonical_result_digest(&reply.outcome).unwrap());
+    inv.cancellation_probe.as_ref().unwrap().request();
+    assert_eq!(
+        identity.preflight_result(&reply, 2).unwrap_err(),
+        HostProblem::Cancelled
+    );
+    reply.sequence += 1;
+    reply.outcome = Err(HostProblem::UnknownOutcome);
+    assert_eq!(
+        identity.preflight_result(&reply, 2).unwrap_err(),
+        HostProblem::UnknownOutcome
+    );
+    assert_eq!(f.registry.active_handles(), 3);
 }
 
 #[test]

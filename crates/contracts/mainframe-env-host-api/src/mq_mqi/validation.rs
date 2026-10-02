@@ -316,6 +316,9 @@ impl MqMqiResult {
     pub fn validate(&self, limits: MqMqiLimits) -> Result<(), MqMqiProblem> {
         limits.validate()?;
         let (status, output) = match &self.outcome {
+            MqMqiOutcome::ReviewedOutput { status, output } => {
+                return super::reviewed_output::validate(self.call, *status, output, limits);
+            }
             MqMqiOutcome::ReviewedStatus { status } => {
                 return if status.call() == self.call {
                     Ok(())
@@ -330,141 +333,141 @@ impl MqMqiResult {
             }
             _ => return Ok(()),
         };
-        use MqMqiCall as C;
-        use MqMqiOutput as O;
-        if status == Some(MqMqiStatus::FailedEnvironment) {
-            if !matches!(self.call, C::Back | C::Begin | C::Commit)
-                || !matches!(output, O::NoOutput)
-            {
-                return Err(MqMqiProblem::StatusCallMismatch);
-            }
-            return Ok(());
+        validate_output(self.call, status, output, limits)
+    }
+}
+
+pub(super) fn validate_output(
+    call: MqMqiCall,
+    status: Option<MqMqiStatus>,
+    output: &MqMqiOutput,
+    limits: MqMqiLimits,
+) -> Result<(), MqMqiProblem> {
+    use MqMqiCall as C;
+    use MqMqiOutput as O;
+    if status == Some(MqMqiStatus::FailedEnvironment) {
+        if !matches!(call, C::Back | C::Begin | C::Commit) || !matches!(output, O::NoOutput) {
+            return Err(MqMqiProblem::StatusCallMismatch);
         }
-        let matched = match (self.call, output) {
-            (C::Connect | C::ConnectExtended, O::Connected(connection)) => {
-                *connection != MqHconn::Unassociated
-            }
-            (C::Open, O::Opened { object, dynamic }) => dynamic
-                .as_ref()
-                .is_none_or(|d| d.handle == *object && d.model != d.name),
-            (C::CreateMessageHandle, O::MessageHandle(_)) => true,
-            (C::Subscribe, O::Subscribed { .. }) => true,
-            (
-                C::Get,
-                O::Got {
-                    disposition,
-                    message,
-                    cursor,
-                },
-            ) => {
-                if let Some(message) = message {
-                    message
-                        .validate(limits.message)
-                        .map_err(MqMqiProblem::Message)?;
-                }
-                if *cursor == Some(0) {
-                    return Err(MqMqiProblem::Buffer);
-                }
-                match disposition {
-                    MqGetDisposition::Message(crate::MqTruncationDisposition::Complete {
-                        length,
-                    }) => message.as_ref().is_some_and(|m| m.body.len() == *length),
-                    MqGetDisposition::Message(truncation) if status.is_none() => {
-                        let (required, copied) = match truncation {
-                            crate::MqTruncationDisposition::RejectedRetained {
-                                required,
-                                copied,
-                            }
-                            | crate::MqTruncationDisposition::AcceptedRemoved {
-                                required,
-                                copied,
-                            }
-                            | crate::MqTruncationDisposition::AcceptedBrowsed {
-                                required,
-                                copied,
-                            } => (*required, *copied),
-                            crate::MqTruncationDisposition::Complete { .. } => unreachable!(),
-                        };
-                        required <= limits.message.body_bytes
-                            && copied < required
-                            && message.as_ref().is_some_and(|m| m.body.len() == copied)
-                    }
-                    MqGetDisposition::NoMessage
-                    | MqGetDisposition::WaitExpired
-                    | MqGetDisposition::UnknownOutcome => {
-                        status.is_none() && message.is_none() && cursor.is_none()
-                    }
-                    _ => false,
-                }
-            }
-            (
-                C::Put | C::PutOne,
-                O::Put {
-                    descriptor: value,
-                    outcome,
-                },
-            ) => {
-                descriptor(value, limits.message)?;
-                status.is_none()
-                    || matches!(
-                        outcome,
-                        MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
-                    )
-            }
-            (C::Put | C::PutOne, O::Distribution(value)) => {
-                value
+        return Ok(());
+    }
+    let matched = match (call, output) {
+        (C::Connect | C::ConnectExtended, O::Connected(connection)) => {
+            *connection != MqHconn::Unassociated
+        }
+        (C::Open, O::Opened { object, dynamic }) => dynamic
+            .as_ref()
+            .is_none_or(|d| d.handle == *object && d.model != d.name),
+        (C::CreateMessageHandle, O::MessageHandle(_)) => true,
+        (C::Subscribe, O::Subscribed { .. }) => true,
+        (
+            C::Get,
+            O::Got {
+                disposition,
+                message,
+                cursor,
+            },
+        ) => {
+            if let Some(message) = message {
+                message
                     .validate(limits.message)
                     .map_err(MqMqiProblem::Message)?;
-                status.is_none()
-                    || value.items.iter().all(|item| {
-                        matches!(
-                            item.outcome,
-                            MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
-                        )
-                    })
             }
-            (C::InquireProperty, O::Property(value)) => {
-                property(value, limits.message)?;
-                true
+            if *cursor == Some(0) {
+                return Err(MqMqiProblem::Buffer);
             }
-            (
-                C::BufferToHandle | C::HandleToBuffer,
-                O::Buffer {
-                    descriptor: value,
-                    bytes,
-                    data_length,
-                },
-            ) => {
-                descriptor(value, limits.message)?;
-                bytes.len() <= limits.buffer_bytes && *data_length == bytes.len()
+            match disposition {
+                MqGetDisposition::Message(crate::MqTruncationDisposition::Complete { length }) => {
+                    message.as_ref().is_some_and(|m| m.body.len() == *length)
+                }
+                MqGetDisposition::Message(truncation) if status.is_none() => {
+                    let (required, copied) = match truncation {
+                        crate::MqTruncationDisposition::RejectedRetained { required, copied }
+                        | crate::MqTruncationDisposition::AcceptedRemoved { required, copied }
+                        | crate::MqTruncationDisposition::AcceptedBrowsed { required, copied } => {
+                            (*required, *copied)
+                        }
+                        crate::MqTruncationDisposition::Complete { .. } => unreachable!(),
+                    };
+                    required <= limits.message.body_bytes
+                        && copied < required
+                        && message.as_ref().is_some_and(|m| m.body.len() == copied)
+                }
+                MqGetDisposition::NoMessage
+                | MqGetDisposition::WaitExpired
+                | MqGetDisposition::UnknownOutcome => {
+                    status.is_none() && message.is_none() && cursor.is_none()
+                }
+                _ => false,
             }
-            (
-                C::Inquire,
-                O::Attributes {
-                    integers,
-                    characters,
-                },
-            ) => integers.len() <= limits.selectors && characters.len() <= limits.attribute_bytes,
-            (C::Back | C::Begin | C::Commit, O::UnitOfWork { unit }) => *unit != 0,
-            (C::SubscriptionRequest, O::PublicationsRequested { count }) => {
-                *count <= limits.message.distribution_items
-            }
-            (
-                C::Callback
-                | C::Close
-                | C::Control
-                | C::Disconnect
-                | C::DeleteMessageHandle
-                | C::DeleteProperty
-                | C::Set
-                | C::SetProperty,
-                O::NoOutput,
-            ) => true,
-            _ => false,
-        };
-        if !matched {
-            return Err(MqMqiProblem::OutputCallMismatch);
         }
-        Ok(())
+        (
+            C::Put | C::PutOne,
+            O::Put {
+                descriptor: value,
+                outcome,
+            },
+        ) => {
+            descriptor(value, limits.message)?;
+            status.is_none()
+                || matches!(
+                    outcome,
+                    MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
+                )
+        }
+        (C::Put | C::PutOne, O::Distribution(value)) => {
+            value
+                .validate(limits.message)
+                .map_err(MqMqiProblem::Message)?;
+            status.is_none()
+                || value.items.iter().all(|item| {
+                    matches!(
+                        item.outcome,
+                        MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
+                    )
+                })
+        }
+        (C::InquireProperty, O::Property(value)) => {
+            property(value, limits.message)?;
+            true
+        }
+        (
+            C::BufferToHandle | C::HandleToBuffer,
+            O::Buffer {
+                descriptor: value,
+                bytes,
+                data_length,
+            },
+        ) => {
+            descriptor(value, limits.message)?;
+            bytes.len() <= limits.buffer_bytes && *data_length == bytes.len()
+        }
+        (
+            C::Inquire,
+            O::Attributes {
+                integers,
+                characters,
+            },
+        ) => integers.len() <= limits.selectors && characters.len() <= limits.attribute_bytes,
+        (C::Back | C::Begin | C::Commit, O::UnitOfWork { unit }) => *unit != 0,
+        (C::SubscriptionRequest, O::PublicationsRequested { count }) => {
+            *count <= limits.message.distribution_items
+        }
+        (
+            C::Callback
+            | C::Close
+            | C::Control
+            | C::Disconnect
+            | C::DeleteMessageHandle
+            | C::DeleteProperty
+            | C::Set
+            | C::SetProperty,
+            O::NoOutput,
+        ) => true,
+        _ => false,
+    };
+    if !matched {
+        return Err(MqMqiProblem::OutputCallMismatch);
     }
+    Ok(())
 }

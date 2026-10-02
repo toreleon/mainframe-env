@@ -86,6 +86,24 @@ callback parameters without an application entry point, so this command/reply
 boundary rejects it. Source review and unit tests grant zero licensed or
 conformance execution credit.
 
+`MqMqiOutcome::ReviewedOutput` is an additive named variant (tag `41`, type
+`MqMqiOutcome`, variant `ReviewedOutput`, two fields `output` then `status`).
+It retains the reviewed call return and its bounded typed observations in the
+complete `Ok(HostResult::MqMqi(...))` result preimage. Host limits inspect the
+output, and provider preflight checks its original request relationship before
+publication. Existing canonical domains, old outcome bytes, status catalog
+digest and retained receipts are unchanged. The
+[MQ programming boundary](../architecture/MQ-PROGRAMMING-SURFACE.md) defines
+the explicitly admitted shapes and their source locators.
+
+Older storage/replay codecs cannot consume this new variant without an explicit
+lossless extension. They must reject it rather than discard output, substitute
+status-only replies, mint fresh handles or re-execute an old effect. Historical
+results retain their original form and digest; there is no rewrite or automatic
+migration. This addition supplies neither a durable replay decoder nor registry
+authority for handle-bearing outputs. Manager integration must extend the strict
+typed non-handle replay codec and separately resolve historical handle authority.
+
 All lengths/counts are unsigned 64-bit little-endian numbers. Integers are fixed
 width little-endian with distinct signed/unsigned type tags; `usize` uses u64,
 not native pointer width. Text is UTF-8 with a byte length, without Unicode

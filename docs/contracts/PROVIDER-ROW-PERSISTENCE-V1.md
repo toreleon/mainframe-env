@@ -239,6 +239,17 @@ private notification value validated by the frozen standalone result validator;
 the unchanged public host validator still rejects callback notifications as
 application MQI effects. Canonical framing alone grants no public admissibility.
 
+The additive ReviewedOutput storage kind retains an admitted call-specific
+completion/reason pair together with its exact typed output. It uses the same
+strict output projection, full host digest and original finite limits, including
+SQL-compatible UOW/cursor bounds. Reviewed GET truncation buffers, descriptors,
+properties and required/copied lengths do not become status-only records. The
+existing result validator rejects mismatched status/output even with a coherent
+digest; provider admission must additionally validate the original request.
+Issued handle outputs decode only to historical observations, and symbolic
+Default/Unassociated reconstruction is still refused. Every older storage kind
+and byte representation stays unchanged; older readers reject this new kind.
+
 A delivery-owned facade shares the original strict message/property projection.
 It records persistence, expiry and priority explicitly and restores them exactly,
 including nonpersistent and abstract pending/default values. Its neutral inner

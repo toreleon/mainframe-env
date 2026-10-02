@@ -122,8 +122,9 @@ fn limits(host: HostLimits, mqi: MqMqiLimits, bytes: usize) -> Result<(), Replay
 }
 
 fn refuse_special_connections(value: &MqMqiResult) -> Result<(), ReplayError> {
-    if let MqMqiOutcome::Completed { output, .. } | MqMqiOutcome::StatusPending { output } =
-        &value.outcome
+    if let MqMqiOutcome::Completed { output, .. }
+    | MqMqiOutcome::StatusPending { output }
+    | MqMqiOutcome::ReviewedOutput { output, .. } = &value.outcome
         && matches!(
             output,
             MqMqiOutput::Connected(MqHconn::Default | MqHconn::Unassociated)
@@ -144,8 +145,9 @@ fn validate_and_digest(
     value.validate(mqi).map_err(ReplayError::Mqi)?;
     // Persisted local UOW/cursor identities cannot overflow SQL adapters. This
     // is storage representability, not new MQ numeric legality or ownership.
-    if let MqMqiOutcome::Completed { output, .. } | MqMqiOutcome::StatusPending { output } =
-        &value.outcome
+    if let MqMqiOutcome::Completed { output, .. }
+    | MqMqiOutcome::StatusPending { output }
+    | MqMqiOutcome::ReviewedOutput { output, .. } = &value.outcome
     {
         let id = match output {
             MqMqiOutput::UnitOfWork { unit } => Some(*unit),

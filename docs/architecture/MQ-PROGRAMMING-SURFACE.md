@@ -140,6 +140,46 @@ The archive provenance remains in-progress, without independent browser
 reproduction and predating the MQINQ re-pin; no freshness, same-snapshot,
 behavioral, licensed or execution claim follows from this review.
 
+## Reviewed status with typed output
+
+The additive `MqMqiOutcome::ReviewedOutput { status, output }` binds the existing
+call-specific `MqReviewedStatus` to the existing `MqMqiOutput`. Its distinct
+canonical name preserves every older variant's bytes; `ReviewedStatus` remains
+a status-only observation. This is a bounded output contract, not runtime
+calculation, queue mutation permission, SAF or returned-handle authority.
+
+MQGET catalog row `0015`, `SSFKSJ_9.4.0/refdev/q101830_.html` (SHA-256
+`290b8af3acbe4a87f007ab9e3b67d0a797f835066118c9c6150ff0570e430b62`),
+lines 21–48 requires descriptor, copied buffer and original DataLength even on
+truncation. Its lines 65–125 place both truncation reasons under MQCC_WARNING.
+The separately pinned programming-supplements topic
+`SSFKSJ_9.4.0/refdev/q096715_.html` (SHA-256
+`a1c3fa0544e420f8bc1ce1dfeffb891df435e85a64108c378ac59a48dbd14af3`),
+lines 674–686, distinguishes accepted removal/browse advance from rejected
+retention without browse advance. Both baselines retain their exact pins;
+supplement registration itself grants no semantics or execution credit.
+
+Reviewed GET output admits OK/NONE with a complete message,
+WARNING/TRUNCATED_MSG_ACCEPTED with accepted removed/browsed truncation,
+WARNING/TRUNCATED_MSG_FAILED with rejected retained truncation, and
+FAILED/NO_MSG_AVAILABLE with no-message/wait-expired observation. The constructor
+and provider preflight bind call, supported default options, mode, wait,
+truncation choice, capacity and exact copied length to the original request.
+Required length can exceed capacity within explicit limits. Rejected truncation
+reports no new cursor. The full descriptor, properties, expiry, identifiers and
+copied bytes are encoded; an empty message remains distinct from no message.
+
+Existing OK/NONE output classes remain shape-checked, with reviewed PUT/PUT1
+requiring an actual accepted observation rather than pending/unknown/duplicate.
+Those descriptor input/output roles are retained from rows `0020` and `0021`,
+`q101880_` and `q101890_`. Reviewed distribution output is unsupported because
+this payload lacks per-destination return pairs. The existing syncpoint-only
+FAILED/ENVIRONMENT_ERROR no-output shape remains applicable. Other warning or
+failed payloads, conversion-dependent lengths and absent property size-reporting
+forms fail closed; status-only or explicit pending observations remain available.
+No reason name authorizes mutation, and no numeric alias bypasses reviewed
+symbol admission. All 1,030 declarations and ten pending reasons are unchanged.
+
 ## Coverage boundary
 
 ### Historical handle observation

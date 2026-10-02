@@ -205,7 +205,9 @@ pub(super) fn result(value: &MqMqiResult, limits: HostLimits) -> Result<(), Host
     use MqMqiOutcome as R;
     use MqMqiOutput as O;
     let output = match &value.outcome {
-        R::Completed { output, .. } | R::StatusPending { output } => output,
+        R::Completed { output, .. }
+        | R::StatusPending { output }
+        | R::ReviewedOutput { output, .. } => output,
         R::CallbackReturned { .. } => return Err(HostProblem::Malformed),
         R::ReviewedStatus { .. } | R::Pending(_) | R::UnknownOutcome | R::DuplicatePossible => {
             return Ok(());
