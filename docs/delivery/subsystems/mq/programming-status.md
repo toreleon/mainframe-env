@@ -932,3 +932,40 @@ remain the reviewed source boundary; source review gives zero execution credit.
 Worker receipts retain their original candidate identity. The actual admitted
 parent/artifact/call proof, same-service host bridge, lifecycle disposition,
 selected SAF/UOW/replay composition and full typed recovery remain required.
+
+## Private selected operation and durable-owner composition
+
+`MQ-1505.selected-operation-publication` integrates sealed worker `55de3f87`.
+Ordinary batch CONNECT/OPEN/PUT/PUT1/GET/CMIT/BACK/CLOSE/DISC compose under the
+existing sole service mutex and same physical PlatformStore. Original core
+intent/running execution, live opaque frame, resolved SAF resources, durable
+current-owner/control CAS, delivery/catalog/marker state, insert-only exact
+occurrence receipt and typed audit publish atomically. Candidate adoption follows
+the entire transaction; late CAS/audit/quota failure preserves pending work.
+Unknown publication/reply fences the runtime. Core completion/outbox remains
+coordinator-owned, and shared transactions remain explicitly unsupported here.
+
+Durable UOW IDs are allocated from bounded retained control, not caller integers
+or volatile directory leases. Every empty/final owner is retained; the reader
+checks the complete finite allocated prefix. Cold activation advances durable
+incarnation before exposing any new connection. Replay rechecks the exact
+physical control record, original receipt/core identity, current frame and SAF
+before resolving an exact existing live entry; it never resurrects a handle.
+The repaired stale-runtime regression proves a newer incarnation fences old
+cached connection replay on both Memory and SQLite.
+
+NoWait GET preserves source-reviewed OK/NONE, warning 2079/2080 and failed 2033
+outputs through the existing lossless codec. True wait scheduling, generated PUT
+descriptor fields, broader options/versions and remaining calls stay pending.
+The composed candidate passes 25 selected-operation, 21 rich-state, six selection,
+33 admission, 23 codec and 15 core-binding regressions (123 total, no failures or
+ignored tests). Worker prior 277/52 receipts retain their own source candidates.
+Reviewed original rows are `0001/0006/0007/0008/0009/0012/0015/0019/0020/0021`,
+plus pinned supplemental MQGMO field details; source review earns zero credit.
+
+The private root-only host entry still rejects the actual installed parentSome
+child. A real admitted parent/artifact/call proof and same-service topology/session
+bridge must compose before public registration. Pending owners survive cold
+restart without reassignment; no retention deletion or participant protocol is
+invented. Full security/recovery/participant/CardDemo/all-26 acceptance remains
+required, with only the licensed oracle human-skipped at zero credit.

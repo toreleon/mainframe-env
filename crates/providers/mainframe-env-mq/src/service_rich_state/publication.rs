@@ -64,6 +64,40 @@ pub(in crate::service) struct RichPublicationPlan {
     next: RichStoredState,
 }
 impl RichPublicationPlan {
+    /// Compose only modeled selected owner rows, then run the SAME strict
+    /// prospective reader/budgets on the entire retained + delivery footprint.
+    /// No namespace wildcard, deletion of history or separate publication.
+    fn compose_selected_rows(
+        retained: &mut Vec<ProviderStateRecord>,
+        additions: Vec<ProviderStateMutation>,
+    ) -> Result<Vec<ProviderStateMutation>, PublicationError> {
+        for mutation in &additions {
+            let ProviderStateMutation::Put(write) = mutation else {
+                return Err(PublicationError::Source);
+            };
+            if !selection::operations::rows::is_ownership_namespace(&write.record.namespace)
+                && write.record.namespace != selection::operations::receipt::NAMESPACE
+            {
+                return Err(PublicationError::Source);
+            }
+            let old = retained
+                .iter_mut()
+                .find(|r| r.namespace == write.record.namespace && r.key == write.record.key);
+            match (old, write.expected_version) {
+                (Some(old), Some(expected))
+                    if old.version == expected
+                        && expected.checked_add(1) == Some(write.record.version)
+                        && write.record.namespace != selection::operations::receipt::NAMESPACE =>
+                {
+                    *old = write.record.clone();
+                }
+                (None, None) if write.record.version == 1 => retained.push(write.record.clone()),
+                _ => return Err(PublicationError::Version),
+            }
+        }
+        Ok(additions)
+    }
+
     pub(in crate::service) fn mutations(&self) -> &[ProviderStateMutation] {
         &self.mutations
     }
@@ -83,7 +117,18 @@ impl RichStoredState {
         candidate: &MqDeliveryKernel,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(candidate, false, limits)
+        self.plan(candidate, false, Vec::new(), limits)
+    }
+
+    /// Owner and receipt changes are validated with the delivery delta as one
+    /// prospective snapshot; no intermediate state is accepted or published.
+    pub(in crate::service) fn plan_selected_delivery(
+        &self,
+        candidate: &MqDeliveryKernel,
+        additions: Vec<ProviderStateMutation>,
+        limits: PublicationLimits,
+    ) -> Result<RichPublicationPlan, PublicationError> {
+        self.plan(candidate, false, additions, limits)
     }
 
     /// Explicit next persisted fence, same catalog/generation and live state.
@@ -92,13 +137,14 @@ impl RichStoredState {
         &self,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
-        self.plan(&self.delivery, true, limits)
+        self.plan(&self.delivery, true, Vec::new(), limits)
     }
 
     fn plan(
         &self,
         candidate: &MqDeliveryKernel,
         advance: bool,
+        additions: Vec<ProviderStateMutation>,
         limits: PublicationLimits,
     ) -> Result<RichPublicationPlan, PublicationError> {
         limits.validate()?;
@@ -180,6 +226,20 @@ impl RichStoredState {
                 expected_version: Some(expected),
             }));
         }
+        let additions = RichPublicationPlan::compose_selected_rows(&mut retained, additions)?;
+        if !additions.is_empty() {
+            let owners = selection::operations::rows::OwnershipRows::restore(
+                &retained,
+                generation,
+                fence,
+                self.limits.legacy,
+            )
+            .map_err(ReadError::from)?;
+            owners
+                .require_transition_from(&self.ownership, self.limits.legacy)
+                .map_err(ReadError::from)?;
+        }
+        mutations.extend(additions);
         let mut bytes = 0usize;
         if mutations.len() > limits.mutations {
             return Err(PublicationError::Bounds);

@@ -142,6 +142,9 @@ pub(super) struct RichStoredState {
     pub(super) retained_records: Vec<ProviderStateRecord>,
     /// Legacy replay values, never interpreted as issued opaque handle tokens.
     pub(super) replay: BTreeMap<String, RecordedResult>,
+    pub(super) ownership: selection::operations::rows::OwnershipRows,
+    pub(super) receipts: BTreeMap<String, selection::operations::receipt::OccurrenceReceipt>,
+    pub(super) runtime: Option<selection::operations::SelectedRuntime>,
     limits: ReaderLimits,
 }
 
@@ -172,7 +175,7 @@ pub(super) fn read(
 }
 
 /// Shared captured-record path. It has no store reference and cannot rescan.
-fn decode_records(
+pub(super) fn decode_records(
     records: Vec<ProviderStateRecord>,
     generation: u64,
     fence: u64,
@@ -206,6 +209,8 @@ fn decode_records(
                     | PENDING_NAMESPACE
                     | REPLAY_NAMESPACE
             ) && !record.namespace.starts_with(PREFIX)
+                && !selection::operations::rows::is_ownership_namespace(&record.namespace)
+                && record.namespace != selection::operations::receipt::NAMESPACE
         {
             return Err(ReadError::Corrupt);
         }
@@ -264,7 +269,11 @@ fn decode_records(
             if legacy_bytes > limits.legacy.max_state_bytes {
                 return Err(ReadError::Bounds);
             }
-            if records.iter().any(|r| r.namespace.starts_with(PREFIX)) {
+            if records.iter().any(|r| {
+                r.namespace.starts_with(PREFIX)
+                    || selection::operations::rows::is_ownership_namespace(&r.namespace)
+                    || r.namespace == selection::operations::receipt::NAMESPACE
+            }) {
                 return Err(ReadError::Corrupt);
             }
             let manifest = strict::manifest(&manifest.payload)?;
@@ -352,6 +361,17 @@ fn decode_records(
                 return Err(ReadError::Identity);
             }
             let replay = decode_replay(&records, limits)?;
+            let ownership = selection::operations::rows::OwnershipRows::restore(
+                &records,
+                generation,
+                fence,
+                limits.legacy,
+            )?;
+            let receipts = selection::operations::receipt::restore(
+                &records,
+                ownership.control.as_ref(),
+                limits.legacy,
+            )?;
             let (rich_records, retained_records) = records
                 .into_iter()
                 .partition(|r| r.namespace.starts_with(PREFIX));
@@ -364,6 +384,7 @@ fn decode_records(
                 limits.message,
                 limits.default_persistence,
             )?;
+            ownership.validate_delivery(&delivery, &rows)?;
             Ok(StoredAuthority::Rich(RichStoredState {
                 catalog,
                 delivery,
@@ -372,6 +393,9 @@ fn decode_records(
                 versions,
                 retained_records,
                 replay,
+                ownership,
+                receipts,
+                runtime: None,
                 limits,
             }))
         }

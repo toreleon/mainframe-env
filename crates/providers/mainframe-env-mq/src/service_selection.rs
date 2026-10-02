@@ -8,6 +8,9 @@ use super::*;
 use mainframe_env_store_api::PlatformStore;
 use std::ops::{Deref, DerefMut};
 
+#[path = "service_selected_operation.rs"]
+pub(super) mod operations;
+
 /// Checked access keeps all historical service paths on the legacy variant.
 /// The guard holds the sole authority lock; the variant cannot change while
 /// a borrowed legacy state is exposed. Selected instances never obtain it.
