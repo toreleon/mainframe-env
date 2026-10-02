@@ -364,6 +364,39 @@ UTF-8/CRLF locations, bounds and all existing classifier rejections, owned outpu
 package/MSRV, formatting, dependency policy, catalog/changelog/docs and exact
 path seals. No public route, backend or licensed credit changes.
 
+The manager declares `DB2-1201.fifth-wave-syntax-surface` after reviewing and
+integrating the sealed DROP and RENAME kernels. Exact ownership is `lib.rs`,
+`tests/fifth_wave_syntax.rs`, the provider README, this status, the unique
+`db2-fifth-wave-syntax-surface.toml` fragment and derived documentation manifest.
+Expose the existing owned APIs without changing their implementations or adding
+dispatch. Public regressions cover the four DROP object kinds, omitted versus
+explicit alias designators, both RENAME kinds, explicit source qualification,
+unqualified destination, effective identifiers, original UTF-8/CRLF spans,
+owned output, rejection fences and configured input/token/name boundaries.
+Binding, dependencies, privileges, mutation and full statement-row recognition
+remain pending. The new direct encoding dependency requires current-candidate
+dependency policy rather than reuse of pre-dependency receipts.
+
+The DROP and RENAME private kernels were sealed independently, then integrated
+without production edits. The manager's public surface passes six focused
+regressions and the combined Db2 package: 267 unit tests and 40 integration
+tests, zero failures or skips. Original source pins bind SQL0072 and SQL0105
+under `ibm-db2-for-zos-13-2026-08-13`; the normal reader is TOC-blocked and the
+matching raw archive remains the offline fallback. These observations do not
+complete either official row or any execution/licensed obligation.
+
+The read-only freeze report enumerates all 174 row IDs exactly once, with all
+labels and source paths checked against the unchanged catalog. Its proposed
+allocation is 87 rows with common portions (71 SQL and all 16 SQL PL), 84 wholly
+deferred and three source-pending. These are planning counts, not gate numerators.
+It is not an accepted exhaustive clause/context freeze: existing Conformance IR
+has no Db2 bindings, ordinary scalar closure remains to be enumerated, and SQL
+PL handler/atomic/context and singleton-assignment rules need explicit resolution.
+The missing ALTER SEQUENCE, CREATE STOGROUP and SET CURRENT APPLICATION ENCODING
+pins remain unavailable; no source refresh has been authorized. The user has
+confirmed no licensed Db2 13 environment and requested continued implementation
+with differential pending, without substituting local tests for oracle evidence.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

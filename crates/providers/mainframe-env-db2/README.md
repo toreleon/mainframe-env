@@ -152,3 +152,15 @@ preservation and conversion obligations, including each ordered candidate step.
 Character/graphic CCSID/collation, datetime strings and FLOAT(n) alias binding
 remain pending. Neither surface parses expressions, resolves function overloads,
 changes the durable SQL route or grants licensed or statement-row credit.
+
+Common DROP syntax exposes TABLE/VIEW/INDEX and non-PUBLIC ALIAS names, keeping
+an omitted alias designator distinct from explicit FOR TABLE. RENAME exposes
+TABLE/INDEX source names and an explicit unqualified destination. TABLE, VIEW
+and ALIAS names allow at most three components; INDEX names allow at most two.
+Effective identifiers decode quoted escapes once and preserve case, with
+insignificant trailing spaces removed. Both APIs own complete original-source
+byte/line/column spans, enforce configured lexer/AST resource limits, and reject
+unsupported object families, clauses and additional statements. They neither
+infer current-server applicability, resolve an alias or destination qualifier,
+nor prove object existence, privileges, dependency effects or mutation. These
+partial SQL0072/SQL0105 surfaces do not add a generic dispatcher or full-row credit.

@@ -62,6 +62,10 @@ pub use delete_syntax::{
     Db2DeleteLocated, Db2DeleteSearchCondition, Db2SearchedDeleteStatement,
     parse_db2_searched_delete,
 };
+pub use drop_syntax::{
+    Db2DropAliasDesignator, Db2DropObjectKind, Db2DropObjectName, Db2DropStatement,
+    parse_db2_drop_statement,
+};
 pub use expression_parser::{Db2ParsedExpression, parse_db2_expression};
 pub use generated_statement_catalog::{
     DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
@@ -81,6 +85,7 @@ pub use numeric_constant_types::{
     Db2NumericConstantError, Db2NumericConstantErrorCode, Db2NumericConstantLimits,
     Db2NumericConstantType, classify_db2_numeric_constant,
 };
+pub use rename_syntax::{Db2RenameObjectKind, Db2RenameStatement, parse_db2_rename_statement};
 pub use result_combination_types::{
     Db2CaseElse, Db2CombinedResultOperand, Db2CombinedResultType, Db2ResultCombinationContext,
     Db2ResultCombinationError, Db2ResultCombinationErrorCode, Db2ResultCombinationLimits,
