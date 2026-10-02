@@ -8,11 +8,18 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Construction bounds for owned identities, grants and payloads.
+/// Limits are byte/count ceilings, not authorization or runtime resource reservations.
 pub struct InvocationLimits {
+    /// Maximum UTF-8 bytes in identities and payload schema names.
     pub max_identity_bytes: usize,
+    /// Maximum distinct grants or pinned provider-generation entries.
     pub max_capabilities: usize,
+    /// Maximum raw bytes in each payload, including each invocation binding.
     pub max_payload_bytes: usize,
+    /// Maximum number of binding entries in an invocation.
     pub max_bindings: usize,
+    /// Maximum UTF-8 bytes in binding names and cancellation reason text.
     pub max_binding_bytes: usize,
 }
 
@@ -29,16 +36,25 @@ impl Default for InvocationLimits {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Positive invocation-wide budgets enforced by the execution owner.
+/// A per-drive [`crate::Quantum`] narrows work scheduling without replacing these budgets.
 pub struct ResourceLimits {
+    /// Total machine steps allowed for the invocation.
     pub max_steps: u64,
+    /// Maximum owned machine storage in bytes.
     pub max_storage_bytes: u64,
+    /// Maximum returned application output in bytes.
     pub max_output_bytes: u64,
+    /// Maximum active call-frame depth.
     pub max_frames: u32,
+    /// Maximum host-effect occurrences within the invocation.
     pub max_effects: u64,
+    /// Maximum lifecycle observations within the invocation.
     pub max_events: u64,
 }
 
 impl ResourceLimits {
+    /// Reject any zero budget; this does not reserve capacity or prove available headroom.
     pub fn validate(self) -> Result<Self, InvocationProblem> {
         if self.max_steps == 0
             || self.max_storage_bytes == 0
@@ -68,6 +84,10 @@ impl Default for ResourceLimits {
 }
 
 #[derive(Clone)]
+/// Schema-labelled bounded bytes, shared by clones and zeroized on final release.
+///
+/// The schema identifies interpretation; construction does not parse or validate
+/// the body against that schema. Secret-schema Debug output is redacted.
 pub struct BoundedPayload {
     schema: String,
     bytes: std::sync::Arc<zeroize::Zeroizing<Vec<u8>>>,
@@ -95,6 +115,8 @@ impl PartialEq for BoundedPayload {
 impl Eq for BoundedPayload {}
 
 impl BoundedPayload {
+    /// Take ownership of bytes after checking nonempty bounded schema and per-payload size.
+    /// The body may be empty; schema characters are not restricted to the identity alphabet.
     pub fn new(
         schema: impl Into<String>,
         bytes: Vec<u8>,
@@ -115,22 +137,27 @@ impl BoundedPayload {
     }
 
     #[must_use]
+    /// Borrow the exact interpretation label without normalization.
     pub fn schema(&self) -> &str {
         &self.schema
     }
     #[must_use]
+    /// Borrow the original bytes; callers still own schema-specific validation and secret handling.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Bounded principal identity and exact capability grants supplied by trusted admission.
+/// Constructing this value does not authenticate a caller or grant resource-specific SAF access.
 pub struct Principal {
     id: PrincipalId,
     grants: BTreeSet<CapabilityId>,
 }
 
 impl Principal {
+    /// Store a validated identity and deduplicated grants within the capability count ceiling.
     pub fn new(
         id: PrincipalId,
         grants: BTreeSet<CapabilityId>,
@@ -143,49 +170,79 @@ impl Principal {
     }
 
     #[must_use]
+    /// Borrow the identity used for effect and audit attribution.
     pub fn id(&self) -> &PrincipalId {
         &self.id
     }
     #[must_use]
+    /// Borrow the exact grants; there is no wildcard or prefix implication.
     pub fn grants(&self) -> &BTreeSet<CapabilityId> {
         &self.grants
     }
     #[must_use]
+    /// Check exact set membership, independently of resource authorization and provider readiness.
     pub fn has_grant(&self, capability: &CapabilityId) -> bool {
         self.grants.contains(capability)
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Scheduling classification, independent of capability and resource permission.
 pub enum ServiceClass {
+    /// Latency-sensitive interactive work.
     Interactive,
+    /// Queued application batch work.
     Batch,
+    /// Compilation work under its own scheduling policy.
     Compiler,
+    /// Work expected to block outside deterministic machine steps.
     Blocking,
+    /// Product infrastructure work, without implicit elevation of grants.
     System,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Retained cancellation observation; attaching it immediately marks an invocation cancelled.
 pub struct Cancellation {
+    /// Stable identity for the cancellation request.
     pub id: CancellationId,
+    /// Nonempty bounded explanation, not executable control text.
     pub reason: String,
+    /// Request observation in the caller's logical tick domain; construction permits zero.
     pub requested_at_tick: u64,
 }
 
 #[derive(Clone, Default)]
+/// One-way live cancellation flag shared by clones, with release/acquire visibility.
+///
+/// Equality compares shared flag identity, not its current Boolean value. The
+/// probe is process-local control and supplies no durable cancellation receipt.
+///
+/// ```
+/// use mainframe_env_execution_api::CancellationProbe;
+/// let probe = CancellationProbe::new();
+/// let child = probe.clone();
+/// assert_eq!(probe, child);
+/// assert_ne!(probe, CancellationProbe::new());
+/// child.request();
+/// assert!(probe.is_requested());
+/// ```
 pub struct CancellationProbe(Arc<AtomicBool>);
 
 impl CancellationProbe {
     #[must_use]
+    /// Allocate an independent, initially unrequested flag.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Set the shared flag permanently; repeated requests are harmless.
     pub fn request(&self) {
         self.0.store(true, Ordering::Release);
     }
 
     #[must_use]
+    /// Observe the current shared request with acquire ordering.
     pub fn is_requested(&self) -> bool {
         self.0.load(Ordering::Acquire)
     }
@@ -209,6 +266,7 @@ impl PartialEq for CancellationProbe {
 impl Eq for CancellationProbe {}
 
 impl Cancellation {
+    /// Check nonempty bounded reason text; the supplied logical tick is retained verbatim.
     pub fn new(
         id: CancellationId,
         reason: impl Into<String>,
@@ -228,29 +286,57 @@ impl Cancellation {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Owned admitted-call context, carrying attribution and finite execution controls.
+///
+/// Constructors check shape/bounds, not authentication, artifact availability,
+/// host topology or lifecycle ownership. Public fields can be changed by callers;
+/// trusted boundaries must validate/freeze the actual context they consume.
 pub struct Invocation {
+    /// Request correlation identity, distinct from durable execution identity.
     pub request_id: RequestId,
+    /// Durable execution actor used by journal, audit and recovery.
     pub execution_id: ExecutionId,
+    /// Runtime instance associated with this occurrence.
     pub run_unit_id: RunUnitId,
+    /// Original parent linkage; presence alone does not attest same-task topology.
     pub parent_execution_id: Option<ExecutionId>,
+    /// Logical program/service selector admitted for execution.
     pub selector: Selector,
+    /// Exact compiled artifact reference; resolution and compatibility remain external checks.
     pub artifact: ArtifactRef,
+    /// Admitted principal and exact grants; resource authorization is separate.
     pub principal: Principal,
+    /// Scheduling class, without permission implications.
     pub service_class: ServiceClass,
+    /// Scheduler priority in its owned ordering domain.
     pub priority: u8,
+    /// Positive absolute deadline in the embedding's logical tick domain, not wall-clock seconds.
     pub deadline_tick: u64,
+    /// End-to-end tracing identity, also the initial audit correlation.
     pub trace_id: TraceId,
+    /// Original invocation deduplication identity; effect keys have their own occurrence binding.
     pub idempotency_key: IdempotencyKey,
+    /// Positive execution attempt, preserved across host attribution.
     pub attempt: u32,
+    /// Invocation-wide positive runtime budgets.
     pub limits: ResourceLimits,
+    /// Bounded application/configuration payloads; equal binding bytes do not mint trusted authority.
     pub bindings: BTreeMap<String, BoundedPayload>,
+    /// Retained cancellation observation, if a request is already known.
     pub cancellation: Option<Cancellation>,
+    /// Shared live control observed in addition to the retained cancellation.
     pub cancellation_probe: Option<CancellationProbe>,
+    /// Exact generation pins for granted capabilities, selected independently of request bindings.
     pub provider_generations: BTreeMap<CapabilityId, String>,
+    /// Audit correlation text initially copied from `trace_id` by [`Self::new`].
     pub audit_correlation: String,
 }
 
 impl Invocation {
+    /// Check positive attempt/deadline, positive budgets and bounded bindings.
+    ///
+    /// Cancellation and generation pins start absent; audit correlation starts
+    /// at the trace identity. This does not check whether the deadline has elapsed.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         request_id: RequestId,
@@ -309,6 +395,8 @@ impl Invocation {
         })
     }
 
+    /// Replace pins after checking count, nonempty bounded generation names and exact grants.
+    /// Does not resolve a generation or attest that the selected provider is available.
     pub fn with_provider_generations(
         mut self,
         generations: BTreeMap<CapabilityId, String>,
@@ -328,18 +416,21 @@ impl Invocation {
     }
 
     #[must_use]
+    /// Attach a retained request; this marks cancellation regardless of its observation tick.
     pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
         self.cancellation = Some(cancellation);
         self
     }
 
     #[must_use]
+    /// Attach the exact shared live probe, without replacing any retained request.
     pub fn with_cancellation_probe(mut self, cancellation_probe: CancellationProbe) -> Self {
         self.cancellation_probe = Some(cancellation_probe);
         self
     }
 
     #[must_use]
+    /// Observe either retained cancellation or the live flag; deadline checks remain separate.
     pub fn cancellation_requested(&self) -> bool {
         self.cancellation.is_some()
             || self
@@ -350,15 +441,25 @@ impl Invocation {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Construction rejection for malformed or over-budget invocation data.
 pub enum InvocationProblem {
+    /// At least one runtime resource budget is zero.
     InvalidResourceLimits,
+    /// The interpretation label is empty or exceeds the identity-byte ceiling.
     InvalidPayloadSchema,
+    /// A raw payload exceeds its per-payload byte ceiling.
     PayloadLimitExceeded,
+    /// Distinct grants exceed the admitted capability count.
     CapabilityLimitExceeded,
+    /// Cancellation reason text is empty or exceeds its byte ceiling.
     InvalidCancellation,
+    /// Execution attempt is zero.
     InvalidAttempt,
+    /// Absolute logical deadline is zero.
     InvalidDeadline,
+    /// Binding count, names or individual payloads exceed their construction bounds.
     BindingLimitExceeded,
+    /// Generation pins exceed bounds, are empty, or refer to an ungranted capability.
     InvalidProviderGeneration,
 }
 

@@ -11,8 +11,17 @@ pub const MAX_AUDITED_PROVIDER_MUTATIONS: usize = MAX_RETENTION_BATCH;
 /// must compare it under the publication lock/transaction, not before acquiring it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditedProviderPublication {
+    /// Exact observed unresolved canonical coordinator record, including owner/attempt/epoch.
+    /// The backend compares the whole retained record inside the publication transaction;
+    /// recovery claims or result resolution invalidate this fence. It is never finalized here.
     pub intent: EffectRecord,
+    /// Actual attributed decision for the original execution/run/sequence and principal.
+    /// Capability, resource domain/digest, invocation key and observation tick must match
+    /// the intent. This record is neither a grant nor a substitute for authorization.
     pub audit: AuditRecord,
+    /// Positive finite logical tick, equal to the audit observation and before recovery eligibility.
+    /// Memory/SQLite also reject clock regression and expired execution leases; durable
+    /// SQL-compatible observations fit the positive signed 64-bit domain, not wall time.
     pub observed_tick: u64,
     /// Empty is the audit-only form. Core durable rows are never provider-owned.
     pub mutations: Vec<ProviderStateMutation>,
