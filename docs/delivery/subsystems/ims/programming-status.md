@@ -2824,3 +2824,188 @@ official or licensed credit. Exact resealing, dependency/docs/changelog gates
 and cleanup accompany the manager feature commit. Participant/lease admission,
 physical applicability, coherent backup/retention and human rule acceptance
 remain open. Licensed certification is excluded by the user, not certified.
+## IMS-1405.application-backout (declared bounded leaf, 2026-10-02)
+
+Parent IMS-1405 remains in progress. Clean entry HEAD:
+`a1a84c7926851e61d0249ba576ba688794b073f9`; branch
+`codex/v014-application-backout-20261002`. Scope is additive selected signed
+application DB-batch CALL SETS/SETU, intermediate and prior-commit ROLS,
+ROLL and ROLB over actual generic database images and witnessed local undo.
+Catalog: `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0017/:0018/:0020/:0021`;
+checkpoint ordering/commit context is :0002/:0023 and XRST :0016/:0025.
+Logical I/O PCB operands are typed; raw LL/ZZ/AIB/language adapters remain
+outside this leaf. Unsupported DEDB/MSDB/GSAM savepoint PSBs require exact SC
+disposition, not a successful partial-backout claim. Other allowed source
+execution contexts remain pending, not retrospectively inapplicable.
+
+Obligation classes: exact operands, statuses, checkpoint/savepoint ordering;
+real post-checkpoint database updates and witnessed undo; nested, replaced,
+cancelled and bounded points; shared per-PCB positions and SystemState Q
+authority; no mutation on malformed/denied/stale/conflicting requests;
+canonical replay before later UOW observation; atomic publication faults,
+lost acknowledgments, explicit unknown outcomes, CAS races and authoritative
+observation; Memory and file SQLite reopen including separate child processes;
+retained readers, capacity, retention and downgrade consequences. Independent
+public-provider and signed selected-package/coordinator tests supplement the
+shared accepted IR; they grant no official row credit or maintainer acceptance.
+Licensed differential stays 0/25. No parent completion, push or PR is owned.
+
+Owners: host ims_recovery and its canonical module; application_recovery and
+new bounded application_backout owners; existing RecoverySession and atomic
+bridge with only necessary runtime seams; focused host/provider/server tests,
+one unique change fragment and this appended status/docs manifest. Frozen
+facades must not grow; tiny integration seams are reported for the manager's
+already extracted owners. No SSA/GSAM/secondary/STAT/Q algorithm edits.
+
+The TM queue's real session/output rows share ProviderStateStore, but work
+release/completion uses separate WorkStore operations and durable replay-work
+repair. DB-only recovery must not claim TM suspension, express-message scope
+or work-lease settlement. A live TM-backed run must reject this DB-batch leaf.
+The TM/coordinator owner must stage actual queue/session/output/conversation
+mutations under its existing lease and join the DB publication, then reconcile
+the separate work disposition honestly. No cross-store atomicity is invented.
+
+Verification: fail-first/pass public host/provider and selected signed routes;
+strict scoped all-target Clippy --no-deps, fmt, affected effect/provider-row/
+storage/participant/security/retention/schema guards, dependency policy,
+IMS catalog/assurance and shared spec integrity, docs/changelog, exact-path
+seal/check with this leaf ID and target 0.14.0, then one feature commit.
+Receipts remain outside Git and disposable Cargo targets. Required failures
+remain explicit; no lint waiver, lowered acceptance or licensed run is allowed.
+
+### Implementation and local delivery evidence (not maintainer acceptance)
+
+The bounded selected DB-batch route now uses actual database engine images,
+the existing local UOW's baseline/postimage witnesses and RecoverySession's
+point/replay authority. Generic Batch updates retain undo until an explicit
+commit/checkpoint/backout boundary; the legacy definition route keeps its
+prior behavior. A point reserves supported images using the existing UOW owner,
+without a separate reservation map. Scheduling incarnation plus commit epoch
+prevents an expired point from restoring a later UOW, including a reused run
+identifier. Intermediate ROLS preserves the local UOW and Q reservations but
+loses all real per-PCB positions/holds and Q current-position flags. ROLB restores
+only current-interval undo and releases Q through the existing rollback observer.
+ROLL and tokenless ROLS additionally persist U0778/U3303 terminal disposition;
+the typed application machine consumes it as a coordinator Abend. New calls on
+that Session reject, while retained recovery/database/LOG results replay first.
+
+Four-byte tokens retain arbitrary bytes. Named points nest; replacing a token
+captures the current image and cancels later points; tokenless SETS/SETU cancels
+points without settling the UOW. Nine points are admitted; the tenth returns SB.
+Absent, cancelled or prior-interval tokens return RA. SETS rejects unsupported
+DEDB/MSDB/GSAM PSBs with SC; SETU's SC warning retains a point over supported
+images only and never undoes the unsupported image. RC distinguishes the missing
+point in that unsupported scope. Output-area size must exactly match saved data.
+Malformed operands, unauthorized databases, unrelated pending work, stale image
+witnesses, wrong selection, conflicting replay, cancellation, deadline and leased
+or unknown core effects fail before publication. Documented conditions persist
+only bounded receipts/CAS fences, not database or undo payload changes.
+
+The existing atomic bridge publishes actual images, Session, undo, Q state and
+recovery receipt with selected metadata/database CAS fences. Memory/file SQLite
+tests cover real simultaneous publications (one backend CAS winner), failures,
+lost acknowledgment and observation. Six separate SQLite child phases prove
+durable point capture, image restoration, later-work-safe replay, prior-commit
+backout, lost acknowledgment and unknown-outcome observation without redispatch.
+Public provider and signed package/coordinator tests exercise positive and
+negative paths, SAF, all-PCB holds, Q, mixed SETU, terminal outcomes, capacity,
+replaced/cancelled points, commit epochs, foreign UOWs and unrelated work. Old
+canonical LOG/CHKP/XRST and ordinary IMS vectors remain fixed; new backout vectors
+are independently framed. Historical RecoverySession points remain readable
+with their exact old digest, but lack application-epoch authority and cannot
+be used to restore a real selected application image.
+
+Pinned semantic baseline is `ibm-ims-15.6-recovery-utilities-2026-09-11`, selected
+through `ims-1405-topic-cache`, scope `ims-recovery-utilities-contracts`:
+
+| Topic (under `SSEPH2_15.6.0/`) | SHA-256 |
+|---|---|
+| `com.ibm.ims156.doc.apr/ims_setssetucall.htm` | `53b9a76d65aed978e2eca2d9c10a295bea6abf16e88cb5f6949e3effa5709336` |
+| `com.ibm.ims156.doc.apr/ims_rolscall.htm` | `b7e15d0c110d3296eac11d895326b3ef48ac913fd682b94b312aa6c59ad14af5` |
+| `com.ibm.ims156.doc.apr/ims_rollcall.htm` | `01a33e88387636985ef575bdd7bdb99e0d3ce6a794dcf227d2f1e75c843ec61f` |
+| `com.ibm.ims156.doc.apr/ims_rolbcall.htm` | `166bc5f6ac4b4a75be331419fd9a185d76867a3be2aa322316a8e385bca2158b` |
+| `com.ibm.ims156.doc.apg/ims_backingoutintermediate.htm` | `73e987b85ca10963e4bfc68e83c4612433689052b7baba385eaff735ae42f4f2` |
+
+Related pinned scopes are `ims-programming-contracts` (I/O PCB, processing
+options, C command code and system-service status table) and `ims-tm-contracts`
+(ISRT/PURG/message-I/O boundaries), using their 2026-09-11 baselines and
+ims-1403/1404 topic caches. CHKP/XRST ordering uses the pinned recovery topics
+already identified in the preceding leaf. Catalog rows are precisely
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0017` (ROLL/ROLB), `:0018` (ROLS),
+`:0020` (SETS), `:0021` (SETU); related `:0002/:0023/:0016/:0025` stay unchanged.
+All selected registered bodies matched SHA-256/byte counts. Retained topic-path
+HTML was absent; matching content-addressed raw HTML supplied local parser
+review. Nine additional hash-verified archive bodies linked by those pinned
+topics supplement prior-commit/Q/status review without repinning the catalog.
+Full exact identities and offline receipts are in the external handoff directory;
+no publication body is committed and availability earns no execution credit.
+
+Compatibility: no SQL migration or canonical-reader replacement. New Session
+markers and point epoch fields extend private JSON codecs; new readers preserve
+old rows, while older binaries reject new fields or cannot enforce these UOW
+boundaries. Downgrade requires drained/reconciled writers, effects and UOWs plus
+a coherent verified pre-feature backup (images, sessions, recovery/checkpoints,
+selected metadata, journals and audits), or a retained compatible reader. Never
+strip fields or rewrite digests to manufacture a downgrade. Recovery-session
+replay remains bounded and protected, outside the ordinary IMS replay retention
+target; private-row expiry, graph attribution and coherent restore remain pending.
+Unvalidated generic retention rejects; quota pressure cannot authorize deletion.
+
+Explicit integration blockers remain: the whole-server warnings-denied Clippy
+gate hits unchanged COBOL/CICS/product/test diagnostics; the aggregate module
+guard hits unchanged product.rs (6300 versus 6008), and the inherited IMS facade
+already exceeded its recorded inventory ceiling. This leaf shrinks service.rs
+from 2111 to 2105 production lines and introduces bounded 557/179-line owners;
+no exemptions are raised. Manager must fold the tiny service prepare/settle hooks,
+module/import visibility seams and test registration into its already extracted
+request/canonical/product/service owners, and repair inherited lint/budget debt.
+The shared participant contract and licensed-pending ancestry are preserved;
+IMS participant admission remains pending, with licensed credit 0/25.
+
+Remaining source-applicable obligations are TM queue/session/output/conversation
+backout joined with the DB proposal and existing work-lease repair (already
+PURGed express output survives; unpurged express buffers do not), authentic TM
+admission fencing, atomic core recovery-lease/publication fencing, other execution
+contexts, raw CALL/LLZZ/PCB/CMPAT/JCL/region-log/BKO authorities, complete unsupported
+database-family recovery, official IR acceptance and licensed differential.
+The real TM guard proves DB-only rejection preserves queued output/buffers and
+the WorkStore lease. It does not fence concurrent TM admission or claim full TM
+recovery. Other GSAM, STAT, secondary and integrity-read lanes remain manager-owned.
+The human's v0.14 parent and IMS-1405 remain in progress.
+
+### Manager application-backout integration — 2026-10-02
+
+The manager consumed exactly `bf0dc41c798ea344a195e5c2b3d47bfed7908277`
+after its sealed GSAM restart integration. The prepare/settle hooks live in the
+existing `service/execution.rs`; the old facade body was not restored. The
+common application-backout settlement owner now covers generic Batch, including
+GSAM, so the temporary XRST-specific GSAM settlement helper is removed.
+Both image publishers retain current limits and Q reservation checks. Checkpoint
+epoch/incarnation updates compose with the existing GSAM resolver, pristine
+integrity read-source snapshot and secondary-index restart rejection.
+
+Current integration verification passed 55 application-recovery dispatch tests,
+207 IMS unit tests and 22 signed IMS-package tests, including real Memory/file
+SQLite backout, GSAM restart, SSA/index, integrity, Q and process scenarios.
+Standalone empty child harnesses and filtered zero-test binaries earn no
+scenario credit. Strict IMS/server all-targets Clippy, formatting and exact
+module-boundary checks pass; the older worker's inherited lint/budget failures
+are not current manager failures. These checks are retained externally in
+`backout-integration-initial.log` under the completion receipt root.
+
+The participant preparation document now describes generic Batch explicit
+settlement and the retained legacy definition-route policy. Pending/null
+participant metadata and all blocked admission obligations remain unchanged.
+This is a material client migration: explicitly commit/checkpoint/back out
+generic Batch work instead of assuming each write commits. Current canonical,
+host/recovery and participant compatibility checks, mandatory policy/generator/
+dependency/docs/changelog gates and exact feature reseal accompany the commit.
+Earlier source baseline/topic/catalog identities above remain unchanged and
+were independently searched/read offline before manager semantic integration.
+
+Actual TM recovery still requires an owned shared work/effect-lease publication
+and settlement contract; a read-only TM-session absence check does not fence
+concurrent admission. Raw contexts/framing, protected retention/coherent restore,
+participant admission and human accepted-rule execution remain open. No
+official, human-maintainer, parent or release credit is promoted. Licensed
+certification remains excluded by the user's request, not treated as passing.

@@ -89,7 +89,7 @@ Db2 and MQ retain their pending/null declarations. Removing a blocker or
 promoting IMS without an owned reviewed extension fails validation.
 
 The IMS test invokes `ims_providers` over generic HIDAM metadata. It exercises
-local Interactive commit/rollback, Batch's immediate undo discard, canonical
+local Interactive and generic Batch explicit commit/rollback, canonical
 request conflicts and replay, authorization denial/failure before mutation,
 missing-idempotency rejection, and separate SQLite processes retaining commit,
 undo and a post-publication unknown result. A failed replay clock leaves the
@@ -97,12 +97,18 @@ insert durable while returning `UnknownOutcome`; an exact retry consults the
 retained receipt without applying that insert again. That is local replay
 evidence, not fenced coordinator reconciliation or licensed IMS equivalence.
 
+The application-backout integration changes generic Batch settlement: writes
+keep the same local undo until an explicit boundary. Clients relying on implicit
+per-write settlement must explicitly commit or checkpoint. The legacy definition
+route retains its prior Batch policy. Existing pending/null participant metadata
+is unchanged; neither this behavior nor a bounded leaf seal accepts INT-1601.
+
 The remaining acceptance gaps are concrete:
 
 | Obligation | IMS gap requiring owner work before admission |
 |---|---|
-| owner / modes | ServiceClass selects local undo behavior, not a validated IMS execution-context/syncpoint owner. Batch inserts/replaces/deletes discard undo immediately; arbitrary distributed or TM contexts have no accepted participant mapping. |
-| ordering / fencing | Atomic provider-row CAS exists, but the database host route carries no effect recovery-lease epoch, stale-owner rejection or shared resource-lock ownership. It must bind coordinator ownership and protect undo dependencies across competing run units. |
+| owner / modes | Generic database Batch writes retain witnessed undo until explicit commit/checkpoint/backout; legacy definition-route Batch writes retain immediate settlement. These are local projections, not an accepted IMS execution-context/syncpoint owner. Distributed and authentic TM participant contexts remain pending. |
+| ordering / fencing | Atomic provider-row CAS, local postimage witnesses and reservation fences protect database dependencies across run units. They do not atomically bind coordinator effect/recovery ownership or the WorkStore lease to publication, and do not establish accepted shared resource-lock/participant admission. |
 | deadline-cancellation | The route uses the deadline as a replay metadata lower bound; it has no trusted current-time deadline check or live cancellation probe. Coordinator pre-dispatch checks alone do not prove the full participant boundary. |
 | security-audit | The authorized constructor checks typed IMS PSB/database/UOW resources. The public service also has unauthorised constructors; no participant admission enforces composition. It does not itself publish denial/failure audit or atomically publish audit with mutation/replay. Principal-only authorizer calls do not establish delegation/decision propagation. |
 | retention | Clockless replay remains conservatively unresolved. Protected replay metadata is useful but does not prove a participant UOW/checkpoint/audit retention watermark and all idempotency lifecycle obligations. |

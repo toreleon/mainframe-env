@@ -44,31 +44,6 @@ pub(in crate::service) fn reject_basic(state: &State, psb: &str) -> Result<(), H
     Ok(())
 }
 
-/// GSAM symbolic programs keep writes until their next checkpoint. Preserve the
-/// preexisting batch settlement for other routes and for calls before XRST.
-pub(in crate::service) fn settles_batch_uow(
-    state: &State,
-    invocation: &Invocation,
-    gsam: bool,
-    operation: ImsOperation,
-) -> bool {
-    let retained = gsam
-        && state
-            .sessions
-            .get(invocation.run_unit_id.as_str())
-            .is_some_and(|s| {
-                s.recovery.xrst
-                    && s.recovery.execution == invocation.execution_id.as_str()
-                    && s.recovery.attempt == invocation.attempt
-            });
-    invocation.service_class == ServiceClass::Batch
-        && !retained
-        && matches!(
-            operation,
-            ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
-        )
-}
-
 pub(super) fn save(
     state: &mut State,
     versions: &RowVersions,

@@ -4,6 +4,27 @@ use super::*;
 impl Canonical for ImsRecoveryCall {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
+            Self::Sets { token, user_data } | Self::Setu { token, user_data } => {
+                let variant = if matches!(self, Self::Sets { .. }) {
+                    "Sets"
+                } else {
+                    "Setu"
+                };
+                out.variant("ImsRecoveryCall", variant, 2)?;
+                out.text("token")?;
+                token.encode(out)?;
+                out.text("user_data")?;
+                user_data.encode(out)
+            }
+            Self::Rols { token, area_length } => {
+                out.variant("ImsRecoveryCall", "Rols", 2)?;
+                out.text("area_length")?;
+                area_length.encode(out)?;
+                out.text("token")?;
+                token.encode(out)
+            }
+            Self::Rolb => out.variant("ImsRecoveryCall", "Rolb", 0),
+            Self::Roll => out.variant("ImsRecoveryCall", "Roll", 0),
             Self::Log { code, data } => {
                 out.variant("ImsRecoveryCall", "Log", 2)?;
                 out.text("code")?;
@@ -91,6 +112,23 @@ impl Canonical for ImsRecoveryRequest {
 impl Canonical for ImsRecoveryResult {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
+            Self::Savepoint { status } => {
+                out.variant("ImsRecoveryResult", "Savepoint", 1)?;
+                out.text("status")?;
+                status.encode(out)
+            }
+            Self::BackedOut { status, user_data } => {
+                out.variant("ImsRecoveryResult", "BackedOut", 2)?;
+                out.text("status")?;
+                status.encode(out)?;
+                out.text("user_data")?;
+                user_data.encode(out)
+            }
+            Self::Abended { code } => {
+                out.variant("ImsRecoveryResult", "Abended", 1)?;
+                out.text("code")?;
+                code.encode(out)
+            }
             Self::Logged { sequence, status } => {
                 out.variant("ImsRecoveryResult", "Logged", 2)?;
                 out.text("sequence")?;

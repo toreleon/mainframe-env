@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod application;
+mod application_backout;
 pub(crate) const APPLICATION_RESULT_DOMAIN: &[u8] = b"mainframe-env.ims-application-result@1\0";
 
 const ROW_NAMESPACE: &str = "ims-recovery-v1-session";
@@ -105,10 +106,21 @@ struct CapturedResource {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BackoutPoint {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    application_epoch: Option<ApplicationEpoch>,
     token: Option<[u8; 4]>,
     kind: BackoutPointKind,
     user_data: Vec<u8>,
     resources: Vec<CapturedResource>,
+}
+
+/// Both the real Session's scheduling incarnation and its commit interval must
+/// match. A reused run identifier cannot resurrect a prior Session's points.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApplicationEpoch {
+    pub(crate) incarnation: String,
+    pub(crate) sequence: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -698,6 +710,7 @@ impl RecoverySession {
         let captured = capture(store, &resources, self.limits)?;
         let mut next = self.state.clone();
         next.baseline = Some(BackoutPoint {
+            application_epoch: None,
             token: None,
             kind: BackoutPointKind::Sets,
             user_data: Vec::new(),
@@ -758,6 +771,7 @@ impl RecoverySession {
                     .map(|captured| captured.resource.clone())
                     .collect::<Vec<_>>();
                 let point = BackoutPoint {
+                    application_epoch: None,
                     token: Some(token),
                     kind,
                     user_data,

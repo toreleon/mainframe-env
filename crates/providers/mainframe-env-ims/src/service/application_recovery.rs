@@ -10,11 +10,18 @@ use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore}
 
 mod checkpoint;
 pub(in crate::service) mod gsam_checkpoint;
+pub(super) use checkpoint::refresh_system;
 
-/// Defaulted fields preserve prior v1 Session readers. Never supplied by callers.
+/// Defaulted fields preserve reads of prior v1 Session rows. Never supplied by callers.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ExecutionRecovery {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(super) uow_incarnation: String,
+    #[serde(default)]
+    pub(super) uow_epoch: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) terminated: Option<String>,
     execution: String,
     #[serde(default)]
     attempt: u32,
@@ -38,6 +45,10 @@ pub(super) fn validate_sessions(state: &State) -> Result<(), HostProblem> {
                 && !marker.xrst)
             || (marker.checkpoint_kind == Some(crate::recovery::CheckpointKind::Basic)
                 && marker.xrst)
+            || marker
+                .terminated
+                .as_ref()
+                .is_some_and(|code| !matches!(code.as_str(), "U0778" | "U3303"))
         {
             return Err(HostProblem::InfrastructureFailure);
         }
@@ -185,6 +196,11 @@ impl ImsService {
         let recovery = RecoverySession::load(&*self.store, &run, RecoveryLimits::default())
             .map_err(recovery_error)?;
         let effect_id = recovery_effect_address(invocation, request);
+        if super::application_backout::is_backout(&request.call) {
+            return self.application_backout(
+                invocation, request, effects, digest, &selected, recovery, &effect_id,
+            );
+        }
         let ImsRecoveryCall::Log { code, data } = &request.call else {
             return self.application_checkpoint(
                 invocation, request, effects, digest, &selected, recovery, &effect_id,
@@ -199,6 +215,14 @@ impl ImsService {
                 },
             )
             .map_err(recovery_error)?;
+        if !transition.replayed() {
+            let mut durable = self.lock()?;
+            generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
+            super::application_backout::ensure_active(
+                &durable.state,
+                invocation.run_unit_id.as_str(),
+            )?;
+        }
         let result = ImsRecoveryResult::Logged {
             status: "  ".into(),
             sequence: transition.sequence(),
@@ -218,7 +242,7 @@ impl ImsService {
     }
 }
 
-fn recovery_address(
+pub(super) fn recovery_address(
     invocation: &Invocation,
     request: &ImsRecoveryRequest,
     application: &str,

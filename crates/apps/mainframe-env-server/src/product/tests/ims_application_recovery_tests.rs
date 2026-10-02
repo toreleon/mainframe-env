@@ -5,6 +5,9 @@ use mainframe_env_host_api::{
     ImsCallSyntax, ImsExecutionContext, ImsRecoveryCall, ImsRecoveryRequest, ImsRecoveryResult,
 };
 
+#[path = "ims_application_backout_tests.rs"]
+mod application_backout;
+
 struct LogMachine {
     effect: Option<EffectRequest>,
     result: Option<EffectResult>,

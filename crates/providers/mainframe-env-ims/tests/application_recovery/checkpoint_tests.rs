@@ -40,6 +40,14 @@ fn seed(service: &ImsService, invocation: &Invocation) {
             "  "
         );
     }
+    if invocation.service_class == ServiceClass::Batch {
+        service
+            .execute(
+                invocation,
+                &database_request(ImsOperation::Commit, 9000, &[]),
+            )
+            .unwrap();
+    }
 }
 
 pub(super) fn snapshot(store: &dyn ProviderStateStore) -> Vec<Vec<ProviderStateRecord>> {
@@ -565,6 +573,14 @@ fn missing_saved_segment_reports_gu_ge_and_gn_continues_after_deleted_key() {
             .execute(
                 &invocation,
                 &database_request(ImsOperation::Delete, 22, &[]),
+            )
+            .unwrap();
+        // The deleted-key restart case concerns a committed deletion. Generic
+        // DB-batch updates now correctly retain actual undo until this boundary.
+        service
+            .execute(
+                &invocation,
+                &database_request(ImsOperation::Commit, 8000, &[]),
             )
             .unwrap();
         let restarted = next_execution(&invocation, "deleted-restart");

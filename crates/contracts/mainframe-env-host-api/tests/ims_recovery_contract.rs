@@ -299,3 +299,194 @@ fn checkpoint_restart_contract_rejects_malformed_ids_areas_and_result_shapes() {
         );
     }
 }
+
+#[test]
+fn backout_contract_preserves_exact_binary_tokens_optional_areas_and_status_shapes() {
+    let limits = HostLimits::default();
+    for call in [
+        ImsRecoveryCall::Sets {
+            token: Some([0, 255, 32, 10]),
+            user_data: Some(vec![]),
+        },
+        ImsRecoveryCall::Setu {
+            token: None,
+            user_data: None,
+        },
+        ImsRecoveryCall::Rols {
+            token: Some(*b"SAVE"),
+            area_length: Some(0),
+        },
+        ImsRecoveryCall::Rols {
+            token: None,
+            area_length: None,
+        },
+        ImsRecoveryCall::Roll,
+        ImsRecoveryCall::Rolb,
+    ] {
+        assert_eq!(
+            ImsRecoveryRequest { call, ..request() }.validate(limits),
+            Ok(())
+        );
+    }
+    for call in [
+        ImsRecoveryCall::Sets {
+            token: Some(*b"SAVE"),
+            user_data: None,
+        },
+        ImsRecoveryCall::Setu {
+            token: None,
+            user_data: Some(vec![]),
+        },
+        ImsRecoveryCall::Rols {
+            token: None,
+            area_length: Some(0),
+        },
+    ] {
+        assert_eq!(
+            ImsRecoveryRequest { call, ..request() }.validate(limits),
+            Err(HostProblem::Malformed)
+        );
+    }
+    for call in [
+        ImsRecoveryCall::Sets {
+            token: Some(*b"SAVE"),
+            user_data: Some(vec![0; 32 * 1024 + 1]),
+        },
+        ImsRecoveryCall::Rols {
+            token: Some(*b"SAVE"),
+            area_length: Some(32 * 1024 + 1),
+        },
+    ] {
+        assert_eq!(
+            ImsRecoveryRequest { call, ..request() }.validate(limits),
+            Err(HostProblem::ResourceExhausted)
+        );
+    }
+    for status in ["  ", "SA", "SB", "SC"] {
+        assert_eq!(
+            ImsRecoveryResult::Savepoint {
+                status: status.into()
+            }
+            .validate(),
+            Ok(())
+        );
+    }
+    for result in [
+        ImsRecoveryResult::Savepoint {
+            status: "RA".into(),
+        },
+        ImsRecoveryResult::BackedOut {
+            status: "RA".into(),
+            user_data: vec![1],
+        },
+        ImsRecoveryResult::Abended {
+            code: "U0000".into(),
+        },
+    ] {
+        assert_eq!(result.validate(), Err(HostProblem::Malformed));
+    }
+}
+
+#[test]
+fn backout_canonical_goldens_are_independently_framed_and_additive() {
+    // Independently framed from EFFECT-CANONICAL-V1, with the same recipe
+    // reproducing every old LOG/checkpoint/restart vector. Binary token arrays
+    // use the byte-sequence encoding; present empty areas differ from absence.
+    let token = Some([0, 255, 32, 10]);
+    let hex = |digest: [u8; 32]| {
+        digest
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    };
+    for (call, size, expected) in [
+        (
+            ImsRecoveryCall::Sets {
+                token,
+                user_data: Some(b"XY".to_vec()),
+            },
+            721,
+            "79201b5dba11adfc1110a3236ed06f5ede6c337b1618ee225a66e2c4a985559e",
+        ),
+        (
+            ImsRecoveryCall::Setu {
+                token,
+                user_data: Some(b"XY".to_vec()),
+            },
+            721,
+            "46c1917821d8df852f6a29261385e99c2eb89a48d466d0ec9b9b01e2f61dbd66",
+        ),
+        (
+            ImsRecoveryCall::Sets {
+                token: None,
+                user_data: None,
+            },
+            697,
+            "50892afa446863b22c8e7a8bccc8242d8c1c256043b17268258e666471bffefe",
+        ),
+        (
+            ImsRecoveryCall::Rols {
+                token,
+                area_length: Some(2),
+            },
+            721,
+            "a35e8188971af8533a7baf2afeb0ad59b4e1baa47f037f27695d9104fdc69f61",
+        ),
+        (
+            ImsRecoveryCall::Rols {
+                token: None,
+                area_length: None,
+            },
+            699,
+            "7559ab8dd4dbd04a89900a0c57b2bec4e5e80576343a907a7ec47cb902a286b4",
+        ),
+        (
+            ImsRecoveryCall::Roll,
+            663,
+            "f0cb80787594909ed4f9d456f824417cec89a0c23f5733584f4b2e06b2fbaeba",
+        ),
+        (
+            ImsRecoveryCall::Rolb,
+            663,
+            "b8c2e47d991f64289e382cb4c1e3e7b9d0a2b88aa9ceec26e89f2e789d42d536",
+        ),
+    ] {
+        let request = HostRequest::ImsRecovery(ImsRecoveryRequest { call, ..request() });
+        assert_eq!(
+            canonical_request_size(&request, MAX_CANONICAL_EFFECT_BYTES).unwrap(),
+            size
+        );
+        assert_eq!(hex(canonical_request_digest(&request).unwrap()), expected);
+    }
+    for (result, size, expected) in [
+        (
+            ImsRecoveryResult::Savepoint {
+                status: "SB".into(),
+            },
+            168,
+            "49464da31de6996917a89b5899167b687386b27958255b3a8255f5fa63548fec",
+        ),
+        (
+            ImsRecoveryResult::BackedOut {
+                status: "  ".into(),
+                user_data: b"XY".to_vec(),
+            },
+            197,
+            "4d6ba608a1b9941ac65b00b9326a5f28ef464e3deb925f8370412f9b43eeb109",
+        ),
+        (
+            ImsRecoveryResult::Abended {
+                code: "U0778".into(),
+            },
+            167,
+            "6db213053a0e37e240cbe1945c5f0fd13f3bdbbf8f3ae65cb92737ccff01be8d",
+        ),
+    ] {
+        let result = Ok(HostResult::ImsRecovery(result));
+        assert_eq!(
+            canonical_result_size(&result, MAX_CANONICAL_EFFECT_BYTES).unwrap(),
+            size
+        );
+        assert_eq!(hex(canonical_result_digest(&result).unwrap()), expected);
+    }
+}

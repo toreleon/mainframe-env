@@ -49,6 +49,9 @@ fn encode_result(result: &ImsRecoveryResult) -> Result<Vec<u8>, HostProblem> {
 }
 
 fn decode_result(bytes: &[u8]) -> Result<ImsRecoveryResult, HostProblem> {
+    if super::super::application_backout::is_receipt(bytes) {
+        return super::super::application_backout::decode_result(bytes);
+    }
     let value: ApplicationResult = serde_json::from_slice(
         bytes
             .strip_prefix(APPLICATION_RESULT_DOMAIN)
@@ -128,7 +131,11 @@ impl ImsService {
         if !selected.catalog.psbs.iter().find(|psb| psb.name == request.psb).ok_or(HostProblem::NotFound)?.pcbs.iter().any(|pcb| matches!(pcb, ImsPcbMetadata::Database(pcb) if pcb.database == request.database)) {
             return Err(HostProblem::Malformed);
         }
-        self.authorize_checkpoint_scope(invocation, &selected, &request.psb)?;
+        if super::super::application_backout::is_backout(&request.call) {
+            self.authorize_backout_scope(invocation, &selected, &request.psb)?;
+        } else {
+            self.authorize_checkpoint_scope(invocation, &selected, &request.psb)?;
+        }
         let recovery = RecoverySession::load(
             &*self.store,
             &recovery_address(invocation, request, &selected.application),
@@ -186,6 +193,8 @@ impl ImsService {
             return Err(HostProblem::IdempotencyConflict);
         }
         let run = invocation.run_unit_id.as_str();
+        super::super::application_backout::ensure_active(&durable.state, run)?;
+        super::super::application_backout::ensure_scope(&durable.state, run, &request.psb)?;
         let session = durable
             .state
             .sessions
@@ -204,6 +213,8 @@ impl ImsService {
             *marker = ExecutionRecovery {
                 execution: invocation.execution_id.to_string(),
                 attempt: invocation.attempt,
+                uow_epoch: marker.uow_epoch,
+                uow_incarnation: marker.uow_incarnation.clone(),
                 ..Default::default()
             };
         }
@@ -282,6 +293,11 @@ impl ImsService {
                     Arc::make_mut(next.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
                 generic::pcb::clear_positions(session);
                 session.recovery.checkpoint_kind = Some(kind);
+                session.recovery.uow_epoch = session
+                    .recovery
+                    .uow_epoch
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
                 // Reuse the existing Q release observer without changing its ordinary-write owner.
                 system::observe_database_call(
                     &mut next,
@@ -398,6 +414,7 @@ impl ImsService {
                 (plan.transition, result)
             }
             ImsRecoveryCall::Log { .. } => return Err(HostProblem::Malformed),
+            _ => return Err(HostProblem::Unsupported),
         };
         result.validate()?;
         let transition = recovery
@@ -463,7 +480,7 @@ impl ImsService {
     }
 }
 
-fn refresh_system(
+pub(in crate::service) fn refresh_system(
     store: &dyn ProviderStateStore,
     limits: ImsLimits,
     durable: &mut DurableState,

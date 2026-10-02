@@ -228,14 +228,7 @@ fn memory_local_commit_rollback_replay_and_batch_limit() {
         );
         assert_eq!(rows(store.as_ref()), before);
         success(&service, &invocation, ImsOperation::Rollback, 3, b"");
-        assert_eq!(
-            data(&service, &invocation),
-            if class == ServiceClass::Batch {
-                vec![b"R1A".to_vec()]
-            } else {
-                vec![]
-            }
-        );
+        assert!(data(&service, &invocation).is_empty());
         success(&service, &invocation, ImsOperation::Insert, 4, b"R3C");
         success(&service, &invocation, ImsOperation::Commit, 5, b"");
         success(&service, &invocation, ImsOperation::Rollback, 6, b"");

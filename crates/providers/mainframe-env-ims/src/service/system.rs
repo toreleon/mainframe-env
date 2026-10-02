@@ -48,6 +48,15 @@ pub(super) struct SystemState {
     reservations: BTreeMap<String, Reservation>,
 }
 
+impl SystemState {
+    /// Position loss does not release Q reservations at an intermediate point.
+    pub(super) fn lose_backout_position(&mut self, run: &str) {
+        for reservation in self.reservations.values_mut().filter(|r| r.owner == run) {
+            reservation.current = false;
+        }
+    }
+}
+
 fn system_state(state: &mut State) -> &mut SystemState {
     Arc::make_mut(state.system.entry(ROW_KEY.into()).or_default())
 }

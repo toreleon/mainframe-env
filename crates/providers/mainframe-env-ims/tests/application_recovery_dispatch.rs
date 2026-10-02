@@ -20,6 +20,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
+#[path = "application_recovery/backout_tests.rs"]
+mod backout_tests;
 #[path = "application_recovery/checkpoint_tests.rs"]
 mod checkpoint_tests;
 #[path = "application_recovery/gsam_checkpoint_tests.rs"]

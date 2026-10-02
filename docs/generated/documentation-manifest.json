@@ -633,7 +633,7 @@
       "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
       "relative_links": 0,
       "scope": "provider-neutral transaction participant capabilities and obligations",
-      "sha256": "sha256:5c8c63398e8ecd14343baf62c9cccf0d84b6a37bcb2b34af3b1b04a597ed79d9",
+      "sha256": "sha256:96efe95328cdfba430d16afce4788094c05815bfa26989e4a7a6e06ab041cf3b",
       "status": "Frozen early additive INT-1601 prerequisite",
       "title": "Transaction participant contract, version 1",
       "xtask_commands": 0
@@ -1414,7 +1414,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 8,
-      "sha256": "sha256:bb1991f5f9850bc42d33c790bb0cb0cbfabf386279c5e5dd52671f4f273af65b",
+      "sha256": "sha256:928f9983b28142a92ed8973b483c8c10da9a91179080ba88fa04d3107926305b",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },

@@ -137,6 +137,7 @@ impl ImsService {
             generic::gsam::prepare(&durable.state, invocation, gsam, self.limits)?;
         }
         let mut next = durable.state.scoped_snapshot();
+        application_backout::prepare_database_call(&next, run, request)?;
         let output = if let Some(gsam) = gsam {
             Some(generic::gsam::apply(
                 &mut next,
@@ -170,15 +171,7 @@ impl ImsService {
         if request.operation != ImsOperation::System {
             system::observe_database_call(&mut next, run, request, &result, self.limits)?;
         }
-        if application_recovery::gsam_checkpoint::settles_batch_uow(
-            &next,
-            invocation,
-            gsam.is_some(),
-            request.operation,
-        ) {
-            next.pending_undo.remove(run);
-            next.generic_pending_undo.remove(run);
-        }
+        application_backout::settle_database_call(&mut next, invocation, request, &result)?;
         let uow = request.operation == ImsOperation::Commit
             || request.operation == ImsOperation::Rollback;
         if uow
