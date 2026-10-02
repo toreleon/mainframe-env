@@ -439,18 +439,16 @@ fn check_special(
                 value: MqArgumentValue::Structure { options, .. },
                 ..
             }) = args.iter().find(|arg| arg.name == "GetMsgOpts")
-            {
-                if options.iter().any(|s| *s == "MQGMO_SET_SIGNAL")
+                && (options.contains(&"MQGMO_SET_SIGNAL")
                     || (has(options, "MQGMO_BROWSE_FIRST")
                         && has(options, "MQGMO_BROWSE_NEXT")
-                        && options.iter().any(|s| s.starts_with("MQGMO_MARK_")))
-                {
-                    return Err(error(
-                        call,
-                        Some("GetMsgOpts"),
-                        MqValidationProblem::InvalidCombination,
-                    ));
-                }
+                        && options.iter().any(|s| s.starts_with("MQGMO_MARK_"))))
+            {
+                return Err(error(
+                    call,
+                    Some("GetMsgOpts"),
+                    MqValidationProblem::InvalidCombination,
+                ));
             }
         }
         "MQSUBRQ" => {

@@ -87,6 +87,18 @@ route, SAF denial-before-observation/mutation, and shared provider-row / durable
 Memory and SQLite contracts. The current feature sections identify their exact
 candidate-specific checks; the final integrated exit run is still pending.
 
+## IMS-1406.verification-lint-repair (verification infrastructure slice)
+
+The continuation's IMS/host/conformance Clippy diagnostics found three
+unchanged baseline lint failures: nested MQ callback-option validation,
+manual membership checking, and a redundant must-use annotation on an already
+must-use iterator. This slice applies equivalent predicate/style repairs only;
+it changes no IBM semantic, validation outcome, oracle admission or licensed
+credit. No unrelated source lookup or licensed run is required. Acceptance is
+focused MQ validation and local harness tests, strict affected-package Clippy,
+format, changelog/docs and dependency policy. The manager owns the two existing
+source files, this section, a unique fragment and routine docs manifest.
+
 ## IMS-1405.basic-checkpoint-boundary (implemented repair slice)
 
 Parent: IMS-1405. Candidate base: `213ed878ec138bdb2914330db6613559bffc5a86`
