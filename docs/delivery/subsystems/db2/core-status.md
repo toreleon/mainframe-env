@@ -253,6 +253,17 @@ format/catalog/changelog/docs/dependency policy and exact-path seals are
 required for the two code slices. Global unchanged architecture blockers are
 not retried. These declarations grant no full-row or licensed execution credit.
 
+The read-only catalog review completed against `c53976ed` without checkout
+changes, builds or tests. It identified two additional integration obligations:
+legacy cells cannot establish NULL versus empty, and rollback to a selected
+package without `data/db2/catalog` currently skips Db2 publication. Neither is
+repaired or accepted by this review. The manager's proposed
+[typed catalog evolution boundary](../../../decisions/0028-db2-typed-catalog-evolution.md)
+retains one installed authority, requires versioned package/persistence/cell
+contracts and explicit migration, and preserves old signature preimages and
+legacy byte behavior. The proposal is not owner acceptance, schema freeze or
+runtime completion. It fixes the direction before catalog mutation.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 224,
+    "markdown_documents": 225,
     "navigation_groups": 6,
-    "normative_documents": 58,
+    "normative_documents": 59,
     "xtask_commands": 211
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 114,
-      "sha256": "sha256:5418836a0e358de5dc83f6ecbdb00705e4fe6e0b17ed81a73f4d3db1da5637a5",
+      "relative_links": 115,
+      "sha256": "sha256:5085c2c1dee8ded091a64ea5f4503483d1c67c691baf29fd8f7ad5949778801c",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -963,10 +963,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.12.0 development; integration remains pending",
+      "normative": true,
+      "owner": "Db2, application-package and store-contract maintainers",
+      "path": "docs/decisions/0028-db2-typed-catalog-evolution.md",
+      "relative_links": 0,
+      "scope": "0.12 catalog/binder preparation and versioned integration",
+      "sha256": "sha256:eb401fc5e817bc7350f1929d82933e59428aec0d8f00e2ad52bab8f059f5de7d",
+      "status": "Proposed — implementation boundary, not owner acceptance",
+      "title": "ADR-0028: Db2 typed catalog evolution through existing authorities",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 27,
-      "sha256": "sha256:f8beef048852974f66b44b08f077954fa3640271b562f73568816a5a8c6bab66",
+      "relative_links": 28,
+      "sha256": "sha256:fa15f479d559443d3a50801259e2699fb289c1c3d484fdcfe55b78b7dd43228c",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1369,8 +1381,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:b4900923bad75ee17f718a23b0a666fcc44cd30d191a4b8a5c2730e5cc3a9ffc",
+      "relative_links": 2,
+      "sha256": "sha256:0fe61289e4e6ed9240e9c39620a79cc5619460e6dd8e8fd3e9448c540c3ae712",
       "title": "Db2 — Engine and common SQL progress",
       "xtask_commands": 0
     },
@@ -2252,6 +2264,10 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2500,7 +2516,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:08240a952807eaf4035eece2e89762297490f259993d574750f8f0b3dd53f617",
+  "registry_sha256": "sha256:3d680132af6c585c734814875ae1ec16448d26abb850b7f42fd5df5c70c11318",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
