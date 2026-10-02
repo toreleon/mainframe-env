@@ -316,7 +316,7 @@ pub fn materialize_db2_string_constant(
         Db2StringConstantValue::Character(decoded)
     } else {
         let mut decoded = Vec::with_capacity(decoded_len);
-        for pair in value.as_bytes().chunks_exact(2) {
+        for pair in value.as_bytes().as_chunks::<2>().0 {
             decoded.push((hex_digit(pair[0]) << 4) | hex_digit(pair[1]));
         }
         if form == Db2StringKind::Binary {
@@ -443,7 +443,7 @@ fn preflight_body(
         }
         Ok(body.len() - escaped)
     } else {
-        if body.len() % 2 != 0 || !body.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        if !body.len().is_multiple_of(2) || !body.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err(error(
                 Code::InvalidHex,
                 span,
