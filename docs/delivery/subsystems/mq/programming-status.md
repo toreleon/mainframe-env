@@ -6,6 +6,15 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+Current user-directed acceptance exception (2026-10-02): the user explicitly
+requested skipping the licensed IBM MQ differential gate after the missing
+authorized oracle environment/receipt was reported. Do not request or run that
+external gate for this continuation. Licensed execution remains **skipped, 0/26**,
+not passed or certified. The original release contract and historical required
+gate descriptions below are retained as provenance; this exception does not
+waive owned execution, source, security, persistence, participant or CardDemo
+checks, and no other acceptance requirement is reduced.
+
 - Completion branch: `codex/mq-v015-continuation`
 - Continuation-wave base: `213ed878` (current main after PR #381 merged)
 - Subsequent base integration: `f0727cf8` (accepted Db2 PR #385); MQ production
@@ -686,8 +695,9 @@ units must compose the existing service rather than mint parallel queue authorit
 
 The manager owns actual selected service/ABI/host admission, separately durable
 UOW ownership, SAF/security context and audit/replay composition, participant
-minimum acceptance and public capability proof. All 26-call gates, CardDemo and
-licensed differentials remain required. The clean `eb9483bc` licensed gate
+minimum acceptance and public capability proof. All owned 26-call gates and
+CardDemo remain required. Licensed differentials are explicitly user-skipped
+for this continuation, with zero licensed credit. The clean `eb9483bc` licensed gate
 reported missing external receipt/pins and pending 0/26; that older candidate
 receipt is not relabeled as evidence for these newer commits. No release or
 parent work package is complete.
