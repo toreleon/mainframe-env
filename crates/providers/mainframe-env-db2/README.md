@@ -94,3 +94,12 @@ XML, explicit CCSID/collation, and context-sensitive datetime strings remain
 explicitly rejected or deferred. This pure boundary performs no conversion or
 execution. Float and decfloat *type shapes* use the pinned data-type topic;
 float, decfloat, and Boolean *constants* remain fenced on #350.
+
+The common schema-qualification surface returns owned candidates for alias,
+index, table and view names under explicit static or dynamic RUN/BIND/DEFINE/
+INVOKE context. Qualified names and original spans are preserved. Unqualified
+table/view/alias candidates explicitly retain the current-user synonym lookup
+dependency unless an external caller confirms absence; every candidate still
+needs catalog lookup. SQL-path objects, EXPLAIN output and catalog/authorization
+resolution fail explicitly. This surface never establishes object existence,
+privileges or execution and grants no statement-row or licensed credit.

@@ -105,6 +105,18 @@ than being marked passed. Focused public/package regressions, formatting, Rust
 feature seals apply. The user confirmed no licensed Db2 13 environment is
 available; implementation continues with differential explicitly pending.
 
+The second-wave `DB2-1201.create-index-common-syntax` and
+`DB2-1202.schema-qualification` worker kernels are integrated as separate sealed
+feature commits. Their source/body and bounded obligations above remain the
+acceptance boundary. The qualification surface exports the owned context,
+candidate and located error types plus `qualify_db2_name`; public integration
+tests preserve explicit and derived names and verify that caller-confirmed
+synonym absence never becomes object-existence or authorization evidence.
+INSERT and CREATE VIEW are still under manager review. No whole-row recognition
+or execution count changes. Repository-wide architecture validation remains
+blocked by the unrelated unavailable CICS topic
+`SSJL4D_6.x/applications/designing/dfhp37p.html`; it is not retried as a Db2 test.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.

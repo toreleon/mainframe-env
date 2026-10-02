@@ -35,6 +35,12 @@ pub use generated_statement_catalog::{
     DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
     Db2StatementId, Db2StatementUnit, db2_statement_descriptor, db2_statement_descriptor_by_row,
 };
+pub use name_resolution::{
+    Db2DynamicQualificationContext, Db2QualificationCandidate, Db2QualificationContext,
+    Db2QualificationError, Db2QualificationErrorCode, Db2QualificationObject,
+    Db2QualificationOrigin, Db2QualificationRequest, Db2QualificationStatus, Db2QualificationUse,
+    Db2SynonymCheck, qualify_db2_name,
+};
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, Db2ReplayDependency,
