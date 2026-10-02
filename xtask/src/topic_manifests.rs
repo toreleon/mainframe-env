@@ -479,6 +479,47 @@ mod tests {
     }
 
     #[test]
+    fn later_015_independent_second_scope_preserves_the_first_file_binding() {
+        let (fixture, mut second, mut registry, first_path, registry_path) = registry_015();
+        let first_bytes = fs::read(&first_path).unwrap();
+        let first_entry = registry["manifests"][0].clone();
+        second["baseline_id"] = json!("mq-layout-baseline");
+        second["topics"][0]["topic_path"] = json!("pp/layout-a.html");
+        second["topics"][1]["topic_path"] = json!("pp/layout-b.html");
+        let path = first_path.with_file_name("layout-topics.json");
+        second["topic_manifest_digest"] = json!(recompute(&second, &path).unwrap());
+        fs::write(&path, serde_json::to_vec_pretty(&second).unwrap()).unwrap();
+        let mut entry = first_entry.clone();
+        entry["scope_id"] = json!("mq-layout");
+        entry["baseline_id"] = json!("mq-layout-baseline");
+        entry["manifest"] = json!("conformance/0.15/manifests/layout-topics.json");
+        entry["manifest_sha256"] = json!(format!(
+            "sha256:{:x}",
+            Sha256::digest(fs::read(&path).unwrap())
+        ));
+        entry["topic_manifest_sha256"] = json!(format!(
+            "sha256:{}",
+            second["topic_manifest_digest"].as_str().unwrap()
+        ));
+        registry["manifests"].as_array_mut().unwrap().push(entry);
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        check_later_registry(&fixture.0, config_015()).expect("two independent scopes");
+        assert_eq!(fs::read(&first_path).unwrap(), first_bytes);
+        assert_eq!(registry["manifests"][0], first_entry);
+        registry["manifests"][1]["semantic_authority"] = json!(true);
+        fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&registry).unwrap(),
+        )
+        .unwrap();
+        assert!(check_later_registry(&fixture.0, config_015()).is_err());
+    }
+
+    #[test]
     fn later_015_registry_pin_identity_and_credit_mutants_are_rejected() {
         let (fixture, _, original, _, registry_path) = registry_015();
         for (field, value) in [

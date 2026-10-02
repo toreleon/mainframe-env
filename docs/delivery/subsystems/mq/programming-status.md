@@ -6,6 +6,15 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+The additive `mq-point-layout-sources` scope now registers twelve hash-verified
+retained MQ 9.4 layout/scalar/encoding topics independently of the frozen
+80-topic programming supplements and original 27 call positions. Its baseline
+is `ibm-mq-9.4-point-layout-sources-2026-09-12`; manifest SHA-256 is
+`128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa`.
+The shared reader and registry keep separate scope closure and zero credit.
+This supplies sources for subsequent reviewed layout projections, not numeric
+admission, wire execution, a new browser capture or licensed certification.
+
 The continuation's module-budget composition repair passes the global module
 guard after unchanged validation, input-projection and conversation helpers are
 split from the inherited server/application/IMS/CardDemo modules. IMS generic

@@ -236,6 +236,29 @@ all-26 structure/option/ABI/service integration stays required.
 
 ## Coverage boundary
 
+### Additive point-layout source scope
+
+`mq-point-layout-sources` separately registers twelve retained MQ 9.4 topics under
+`ibm-mq-9.4-point-layout-sources-2026-09-12`. Its topic-manifest@1 and the shared
+0.15 registry bind exact bytes, topic-set digest, product and zero-credit scope.
+MQOD and MQMO constants, CCSID, expiry, message type and priority constants,
+elementary data types, COBOL declarations, structure alignment, COBOL COPY
+conventions and binary/machine encoding references supply missing sources for
+subsequent point-to-point layout review.
+The existing 80-topic scope already pins MQOD/MQMD/MQGMO/MQPMO declarations and
+fields, encoding, format, object-type and persistence references; those pins are
+reused without duplication or re-hashing. Both scopes use the existing pinned TOC.
+
+Registration is not numeric or layout admission. Later projections must use the
+one structure/status catalog and explicit review; source presence cannot supply
+defaults, permit unsupported forms or change pending reasons. Original call
+rows `0006`, `0015`, `0019`, `0020`, `0021`, all 27 source positions, frozen
+80-topic bindings and existing semantic/canonical identities remain unchanged.
+No public ABI, handler, machine or service behavior is added. The archive run
+remains in-progress without independent browser reproduction and predates MQINQ
+issue337 re-pin; identity metadata supplies no freshness or same-snapshot claim.
+Source and execution credit remain zero, with all ten reason declarations pending.
+
 ### Historical handle observation
 
 The strict private typed-result storage codec can preserve issued handle outputs

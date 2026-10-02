@@ -14,6 +14,17 @@
       "topic_manifest_sha256": "sha256:d069fab04063e46679f542bc9b14f93f039ab4d623f18f3cba9447d524928f0b",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-point-layout-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-point-layout-sources-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-point-layout-sources-topics.json",
+      "manifest_sha256": "sha256:128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa",
+      "topic_count": 12,
+      "topic_manifest_sha256": "sha256:5f29e97b1930418d018bbdd7834c6cb164ee567dab1a447c4116bff6a993673e",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

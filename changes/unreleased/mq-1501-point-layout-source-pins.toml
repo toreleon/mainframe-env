@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Registered a separate twelve-topic zero-credit offline MQ point-to-point layout source scope, preserving frozen call and supplemental pins and testing independent shared-reader scope selection."

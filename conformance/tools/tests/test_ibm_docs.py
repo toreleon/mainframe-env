@@ -536,10 +536,19 @@ class CacheTests(unittest.TestCase):
         self.assertIn("ims-database-contracts", scopes)
         self.assertIn("ims-tm-contracts", scopes)
         self.assertIn("mq-programming-supplements", scopes)
+        self.assertIn("mq-point-layout-sources", scopes)
         supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
         self.assertEqual(len(supplemental), 80)
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
                             for pin in supplemental))
+        layouts, _ = ibm_docs.select(pins, tocs, "mq-point-layout-sources", None)
+        self.assertEqual(len(layouts), 12)
+        self.assertTrue(all(pin.baseline == "ibm-mq-9.4-point-layout-sources-2026-09-12"
+                            for pin in layouts))
+        self.assertFalse({pin.topic for pin in supplemental} & {pin.topic for pin in layouts})
+        self.assertEqual(docs_api.digest((docs_api.REPOSITORY /
+                         "conformance/0.15/manifests/mq-programming-supplements-topics.json").read_bytes()),
+                         "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a")
         self.assertTrue(pins)
         self.assertTrue(tocs)
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
@@ -577,6 +586,42 @@ class CacheTests(unittest.TestCase):
         self.assertTrue(any(scope.scope_id == "later-scope" and scope.target_version == "0.15.0"
                             for scope in selected[0].scopes))
         self.assertFalse(self.cache.exists())
+
+    def test_015_two_scopes_preserve_first_pin_and_import_only_selected_bodies(self):
+        root, index, registry, first_path, document, _ = self.registry_015()
+        first_bytes = first_path.read_bytes()
+        first_entry = deepcopy(document["manifests"][0])
+        second = self.manifest(b'<h1>Layout</h1>', "0.15.0", "layout-baseline",
+                               "mq", "PRODUCT/ref/layout.html")
+        relative = "conformance/0.15/manifests/layout-topics.json"
+        path = root / relative
+        path.write_text(json.dumps(second))
+        entry = deepcopy(first_entry)
+        entry.update(scope_id="layout-scope", baseline_id="layout-baseline", manifest=relative,
+                     manifest_sha256="sha256:" + docs_api.digest(path.read_bytes()),
+                     topic_manifest_sha256="sha256:" + second["topic_manifest_digest"])
+        document["manifests"].append(entry)
+        registry.write_text(json.dumps(document))
+        with patch.object(docs_api, "REPOSITORY", root):
+            pins, tocs = ibm_docs.load_pins(index, registry)
+            selected, selected_tocs = ibm_docs.select(pins, tocs, "layout-scope", None)
+            self.assertEqual(len(selected), 1)
+            counts = ibm_docs.import_cache(self.archive([
+                (selected[0].legacy_key, b'<h1>Layout</h1>', None),
+                (selected_tocs[0].legacy_key, self.toc_body, None),
+            ]), self.cache, selected, selected_tocs)
+            self.assertEqual(counts["imported"], 2)
+            self.assertEqual(counts["missing_expected"], 0)
+            self.assertEqual(ibm_docs.cached_body(self.cache, selected[0]), b'<h1>Layout</h1>')
+            first, _ = ibm_docs.select(pins, tocs, "later-scope", None)
+            with self.assertRaises(FileNotFoundError):
+                ibm_docs.cached_body(self.cache, first[0])
+            document["manifests"][1]["manifest_sha256"] = "sha256:" + "0" * 64
+            registry.write_text(json.dumps(document))
+            with self.assertRaisesRegex(ValueError, "registry entry disagrees"):
+                ibm_docs.load_pins(index, registry)
+        self.assertEqual(first_path.read_bytes(), first_bytes)
+        self.assertEqual(document["manifests"][0], first_entry)
 
     def test_015_registry_identity_pin_and_credit_mutants_fail_closed(self):
         root, _, registry, _, original, _ = self.registry_015()
