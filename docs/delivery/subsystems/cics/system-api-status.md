@@ -2803,3 +2803,52 @@ WEB finite-domain integrated candidate passes31generator and nineIR regressions
 and actual Draft202012 WEB instance validation. Private192command projection
 (153SPI39FEPI),3240operands5682case candidates unchanged;62numeric domains and
 217numeric records unchanged. Five of18inputs and all-family/runtime gates pending.
+
+### Pre-dispatch TRANSACTION final citation independent review
+
+SPI-1001.spi-transaction-resources-final-citation-review depends on terminal complete independent review and manager external one-property correction SHA-256 8e7fb0b6f03af475db80d69abe7b6b6659a95c6bb32e4e17261f65fe4472ddd7. Retained independent reviewer owns external reports only; no source writer session is live.
+Independent final exact-one-property citation review TXRR-01. Manager-owned
+external repair changes only /commands/16/lifecycle/mutations/0 embedded citation
+from primary55-64,73-75 to55-64,67-69,73-75, adding decisive enable prerequisite.
+All22rows311options148responses64domains178members5forms749wholecases and every
+other fact remain byte-identical. Fresh SET PROCESSTYPE search/read exact primary
+e535e7719eb0f39b8ae1f1c8267920f0d1376efefee4c8f867277c11e0e0262a, row0240,
+baselineibm-cics-ts-6x-spi-command-bodies-2026-09-12 lines55-78. Do not infer
+drain, termination, caller rollback, precedence or process recovery. Prior complete
+275operation223group117repaired+12adjacentcase25topic61call independent review
+reused only after exact f4714d96 preimage/source/report/receipt identities.
+Exact rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0010`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0024`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0031`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0032`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0082`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0088`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0089`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0115`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0153`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0156`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0167`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0176`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0178`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0188`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0192`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0217`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0240`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0247`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0256`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0258`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0264`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0268`.
+Manager exclusively owns shared schema/IR/generator/status/security/UOW/runtime, actual instance/projection/focused/mandatory integration and serial seal. All six and parent/application/route/recovery/licensed Pending credit0.
+
+### Pre-dispatch spi-file-cvda-domains-review
+
+SPI-1001.spi-file-cvda-domains-review depends on terminal source candidate and bounded existing source contracts. Different retained CLI task owns external reports only; repository paths remain manager-owned.
+Independent full changed-fact FILE review of exactly13additions:three parent domain arrays44domains138members plus10related gaps. Different reviewer from source author01a0fdea-71a3-7323-a602-468bea1dc88d. Originala153ca5bba7c4ab9212be8a8dfdaacab00be045f46b80150b0f7895fe55abd55; all4rows139operandobjects91responses18obligations166wholecases0forms51oldgaps and everyother lifecycle/security/UOW/recovery fact exact. CREATE FILE LOGMESSAGE1domain2members sender; DISCARD has no CVDA; INQUIRE27domains100members output; SET16domains36members input. Review each symbol against command-specific source clauses, existing declared4byte operand extent/direction and surrounding applicability/transition rules, not similarly named SET versus observed inquiry lists. ACCESSMETHOD data-table VSAM, ENABLESTATUS versus OPENSTATUS, READINTEG saved RLS/nonRLS NOTAPPLIC/per-read overrides, LOADTYPE/UPDATEMODEL saved nonCFDT outputs, FWDRECSTATUS/RECOVSTATUS first-versus-last-open/ICF, RECORDFORMAT BDAM UNDEFINED/usertableVARIABLE and distinct provenance sets must remain exact. SET BUSY onlyDISABLED/CLOSED, ignored irrelevant attributes, closed prerequisites/next-open effects, retained locks/bundles and UOW boundaries; READINTEG CFDT ignore/nonRLS, TABLE filekind, recoverableCFDT LOCKING retained. Precise10gap additions retain CREATE logging omitted-default unknown notation, SET LOADTYPE data-value heading versus raw cvda/list/invalidCVDA condition, BLOCKFORMAT BDAM heading versus VSAM BLOCKED, RELTYPE BDAM versus VSAM NOTAPPLIC, EMPTYREQ ignore versus INVREQ57, WAITcompletion versus example start, linkedunknownhashes. Inspect actual SVG where implicated, do not infer defaults/aliases or newnumeric facets/forms/cases. Fresh pinned relevant4primaries+common CVDA/APIformat searches AND boundedreads required; unchanged prior84receipt29pin campaign reused only after exact full identity. All raw bodies external reference credit0.
+Exact rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0012`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0072`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0127`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224`.
+Shared schema/IR/generator/status/security/UOW/runtime remain manager-owned. Independent source review and manager actual instance/projection/focused/mandatory checks required before serial child seal; all six and parent/application/route/recovery/licensed Pending credit0. Input hashes: {'conformance/0.10/cics/families/spi-file.json': '67f10293e2d47572302dc32a931c79e51d61b981429c748ef8c1233b28e5a957'}.
+
+DATABASE integration child SPI-1001.spi-database-messaging-source-contracts is
+manager-owned, bounded to 21 exact enrolled DB2/MQ rows and 84 obligations;
+364 head operands, 192 conditions, 14 forms, 99 scoped domains/325 members and
+550 source-derived cases remain private and non-routing. Final source
+bc66dddf5afca257819da8ce70372f394e142b79a76f4343d575c54d8c9cfcde
+passed independent full semantic review and manager review of every 164 repair
+operation and 37 amended whole cases, preserving 513 whole cases and 144 gaps.
+Manager verified the external report-only 16-to-14 citation erratum without
+changing candidate bytes. All 16 source topics and 60 pinned search/read receipts
+are source review with zero execution credit. Mandatory 42-output DB2CONN and
+16-output DB2ENTRY alternatives, bare selectors, seeded receiver fixtures and
+explicit CREATE implicit-syncpoint metadata retain precise pending conflicts.
+Baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12; topic pins/catalog rows
+are enrolled in spi-database-messaging.json. Manager exclusively owns generator,
+shared schema/IR facade/status and integration; source import adds no separate
+dispatcher, condition mapper, security, UOW, resource or persistence authority.
+Only this child may be sealed after focused current-candidate tests and mandatory
+policy/schema/docs/module gates. Parent SPI-1001, all six per-command gates,
+application dependency, selected-route, recovery and licensed acceptance remain
+Pending; official/execution/licensed credit stays zero.
+
+DATABASE integrated candidate passes 31 generator and nine IR regressions plus
+actual Draft202012 family instance validation. Private projection has 213 commands
+(174 SPI and 39 FEPI), 3604 head operands and 6232 case candidates. Four of 18
+enrolled family inputs remain unintegrated; all-family and runtime gates pending.

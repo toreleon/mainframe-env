@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add independently reviewed private CICS DB2 and MQ source contracts with mandatory inquiry output alternatives and bounded condition receiver candidates; runtime acceptance stays pending."
