@@ -20,13 +20,20 @@ impl ImsService {
             invocation.deadline_tick,
             None,
             Some(request),
+            None,
         )
+        .map(feedback::ExecutionOutput::gsam_result)
     }
 }
 
 impl RecordedResult {
     pub(crate) fn host_result(&self) -> HostResult {
-        if let Some(gsam) = &self.gsam {
+        if let Some(feedback) = &self.pcb_feedback_v1 {
+            HostResult::ImsPcbFeedbackV1(mainframe_env_host_api::ImsPcbFeedbackResultV1 {
+                result: self.result(),
+                feedback: feedback.clone(),
+            })
+        } else if let Some(gsam) = &self.gsam {
             HostResult::ImsGsam(ImsGsamResult {
                 result: self.result(),
                 address: gsam.address.clone(),

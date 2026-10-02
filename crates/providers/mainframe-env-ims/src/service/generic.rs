@@ -210,7 +210,7 @@ pub(in crate::service) fn scheduled_pcb<'a>(
     }
 }
 
-fn session_pcb<'a>(
+pub(in crate::service) fn session_pcb<'a>(
     state: &'a State,
     run: &str,
     number: u16,

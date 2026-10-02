@@ -15,6 +15,10 @@ impl HostProvider for ImsProvider {
         let sequence = effect.sequence;
         let resolution_tick = effect.deadline_tick.max(invocation.deadline_tick);
         let outcome = match effect.request {
+            HostRequest::ImsPcbFeedbackV1(request) => self
+                .service
+                .execute_feedback_at(invocation, &request, resolution_tick)
+                .map(HostResult::ImsPcbFeedbackV1),
             HostRequest::ImsNavigation(request) => self
                 .service
                 .execute_operands_at(
@@ -22,6 +26,7 @@ impl HostProvider for ImsProvider {
                     &request.request,
                     resolution_tick,
                     Some(&request),
+                    None,
                     None,
                 )
                 .map(|result| HostResult::Ims(result.result)),
@@ -33,8 +38,9 @@ impl HostProvider for ImsProvider {
                     resolution_tick,
                     None,
                     Some(&request),
+                    None,
                 )
-                .map(HostResult::ImsGsam),
+                .map(|result| HostResult::ImsGsam(result.gsam_result())),
             HostRequest::Ims(request) => self
                 .service
                 .execute_at(invocation, &request, resolution_tick)

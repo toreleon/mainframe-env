@@ -3225,3 +3225,115 @@ manager verifies its extracted owners directly. Human/official/participant/TM
 execution/parent/release acceptance stays open. Licensed certification remains
 excluded, with no execution credit. Actual TM recovery needs the proposed
 shared-owner decision; read-only absence or lease observations are insufficient.
+## IMS-1401.selected-pcb-feedback (bounded ownership declared)
+
+Parent: IMS-1401. Base: `a01659799de8bf2291511714ac224279619a8571`.
+Branch: `codex/v014-selected-pcb-feedback-20261002`. The sealed official-IR
+candidate `6f1bd076a2d0fee70ed34c7946fc6917416ada79` stays on its branch.
+Owned scope: additive explicitly versioned selected full-function database PCB
+feedback DTO/canonical leaf, provider projection from the existing navigation or
+mutation proposal, focused tests, minimal existing host/execution/provider/replay
+and signed selected-package seams, ADR, unique fragment and normal documentation.
+Historical canonical bytes and receipt authority remain fixed; replay must return
+the retained feedback, never observe later mutable state to reconstruct it.
+
+Acceptance classes: fail-first missing public owned response; source/metadata
+derived literal status, segment level, key validity/bytes and data length on
+successful/unsuccessful GU/GN/GNP and Get Hold; unequal keys/data, key-only/path,
+independent PCBs and admitted secondary target/source; REPL invalidation;
+authorization before observation, capacity/no mutation; exact replay after later
+work; conflict, actual CAS and unknown lost acknowledgement; Memory, file SQLite
+fresh reopen and relevant process boundary; signed package through the real
+coordinator. Catalog context is `ibm-ims-15.6-dli-2026-08-31`, database get/update
+families; exact source pins/rows and admitted classes follow offline review.
+Focused regressions plus mandatory catalog/assurance/schema/spec/guards,
+fmt/deny/docs/changelog and strict scoped Clippy are required. Exact path sealing
+and committed `--check` follow passing scoped acceptance; receipts stay outside
+Git and disposable targets. No official row, parent, maintainer, release or
+licensed acceptance is claimed.
+
+PCB state, key-only suppression, indexed virtual fields, parentage/lost hold,
+SSA/index/GSAM/recovery/STAT/TM/backout/participant algorithms retain their owners.
+No new cursor/parser/metadata/store/replay/lock/recovery authority, raised module
+ceiling, delegation, refresh, other-checkout edit, push or PR is authorized.
+Raw EBCDIC COBOL/C masks, physical GSAM RSA, unavailable feedback invalidation
+semantics and fields without metadata remain Unsupported/unproved. If a source
+or ABI prerequisite prevents honest implementation, retain Unsupported and
+deliver an exact bounded missing-class packet rather than assign false credit.
+
+The bounded additive host projection is implemented. `ImsPcbFeedbackV1`
+request/result variants, `ImsService::execute_pcb_feedback_v1` and
+`ProductServer::ims_pcb_feedback_selected_v1` share the existing provider and
+signed publication fences. Primary successful Gets and ISRT project exact
+metadata sequence bytes from the existing proposal path, with segment name,
+level and valid byte length. Status/data and transferred length use that same
+result. Capacity rejection discards the unpublished proposal. The optional
+feedback output is retained in the existing receipt and included in its
+canonical result/retention binding; exact replay returns it after later work,
+fresh file SQLite connections and separate process restart.
+
+Source review used the IMS 15.6 programming, database and metadata baselines
+dated 2026-09-11. All selected retained topic-path files were absent; the
+hash-addressed archive files matched and were read with the repository parser
+and pinned search/read commands. Exact topics, hashes, catalog rows, independently
+derived literals, shared integration seams and unproved classes are recorded in
+[the bounded class review](selected-pcb-feedback.md), with the additive boundary
+and downgrade procedure in [ADR-0029](../../../decisions/0029-selected-pcb-feedback.md).
+No failed-call last-satisfied witness, selected secondary key-layout recipe,
+primary REPL/DLET validity, missing sequence/logical recipe or physical ABI is
+invented. Successful secondary REPL alone has source-defined invalidity.
+
+Fail-first proved the public owned DTO/response absent. Focused and affected
+host, IMS and signed selected-package tests pass, including the actual
+coordinator, independent PCB/hold/path/key-only behavior, all six Get forms,
+mutation conditions, deny/failure before observation, no-publication capacity,
+conflict/actual CAS/lost acknowledgement and retained response equality.
+Strict scoped three-package no-deps Clippy, fmt, dependency policy, IMS
+catalog/schema/assurance, spec and affected architecture/module/participant
+guards pass. The additional public-API documentation ratchet diagnostic is
+blocked by the untouched execution API and existing host surface exceeding
+its policy; new DTO items are documented and no policy ceiling is raised.
+This is not a full-minor documentation/maintainer acceptance claim.
+
+Receipts remain outside Git/targets under the slice's existing worker receipt
+directory. The existing request module's HostResult declaration was moved
+mechanically behind the stable export and its inventory ceiling lowered from
+1611 to 1592; no frozen or new module ceiling increased. No navigation, index,
+GSAM, recovery, STAT, TM, backout or participant algorithm changed. Parent
+IMS-1401, complete-v0.14, official/maintainer/parent/release and licensed
+acceptance stay open. Next work is the exact owner prerequisites in the class
+review, then manager integration with the separate newer secondary SSA,
+GSAM-checkpoint and backout leaves; none is silently consumed here.
+
+### Manager composition of selected PCB feedback (2026-10-02)
+
+The manager consumes sealed `86a8774f6e3eae07d2f222d7fd174a000da1b266`
+after `284e769b` in its nonlicensed integration checkout. The common execution
+proposal retains the newer application-backout prepare/settle hooks, generic
+Batch undo retention, Q/image publication guards and GSAM checkpoint integrity
+read authority. The older worker's Batch autocommit block is not reinstated.
+HostResult moves mechanically beside its existing validation and stable
+re-export; the frozen facade count lowers from1611 to1592 without a raised
+ceiling. No feedback projection is used as a second cursor or lease authority.
+
+The pinned database PCB mask source remains
+`ibm-ims-15.6-programming-contracts-2026-09-11`,
+`apg/ims_imsdbdbpcbmask.htm`, SHA-256
+`699a551e0c2804db26725d0997be3b1f9fdc91379a69f490c8e509d76fcc61b3`;
+catalog rows `dli-call-families:0005/:0006/:0008/:0015/:0004` retain their
+existing denominator. Sensitive-type count follows explicit selected metadata;
+KEYLEN is not guessed caller-area capacity. No raw mask or failed-call witness
+is invented. The retained result-family corruption guard rejects a receipt
+containing both feedback and GSAM, even if the selected feedback digest matches.
+The added manager regression verifies this on Memory and file SQLite.
+
+Thirteen provider harness tests pass, with zero scenario credit for the idle
+process helper; the substantive parent verifies real independent SQLite child
+phases. Twenty-six signed IMS package parent tests and two independent binary
+feedback contract tests pass. Strict IMS/host/server all-target Clippy passes.
+These receipts describe this code candidate, not later prose/commit CI evidence.
+Mandatory policy/docs acceptance is recorded separately outside Git; manager
+command-selection failures are retained rather than counted as gate passes.
+The separate API-documentation repair is not folded into this feature seal.
+Unsupported secondary/failure/raw ABI classes, official/human/participant/parent
+and release acceptance remain open; licensed certification is excluded.

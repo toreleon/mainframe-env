@@ -2,6 +2,17 @@
 use super::*;
 
 impl ProductServer {
+    /// Owned feedback shares signed package selection and metadata publication fences.
+    pub fn ims_pcb_feedback_selected_v1(
+        &self,
+        application: &str,
+        invocation: &Invocation,
+        request: &mainframe_env_host_api::ImsPcbFeedbackRequestV1,
+    ) -> Result<mainframe_env_host_api::ImsPcbFeedbackResultV1, HostProblem> {
+        self.ims_execute_selected_with(application, |ims| {
+            ims.execute_pcb_feedback_v1(invocation, request)
+        })
+    }
     /// Execute with the catalog from the selected, published application package.
     pub fn ims_execute_selected(
         &self,

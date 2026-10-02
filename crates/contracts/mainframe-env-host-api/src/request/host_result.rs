@@ -1,6 +1,30 @@
 //! Host result validation retains the existing wire-contract authority.
 use super::*;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HostResult {
+    Dataset(DatasetResult),
+    Program(BoundedPayload),
+    Spool(SpoolResult),
+    Terminal(BoundedPayload),
+    Security(SecurityDecision),
+    Clock(String),
+    State {
+        value: Option<Vec<u8>>,
+        version: u64,
+    },
+    Cics(CicsResponse),
+    Db2(Db2Result),
+    Ims(ImsResult),
+    /// Separate I/O PCB recovery response; it does not update a database PCB.
+    ImsRecovery(crate::ImsRecoveryResult),
+    /// GSAM saved-address output alongside the unchanged IMS status/data result.
+    ImsGsam(crate::ImsGsamResult),
+    /// Versioned owned feedback from the selected database PCB's proposal.
+    ImsPcbFeedbackV1(crate::ImsPcbFeedbackResultV1),
+    Mq(MqResult),
+}
+
 impl HostResult {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
@@ -299,6 +323,7 @@ impl HostResult {
                 Err(HostProblem::ResourceExhausted)
             }
             Self::ImsGsam(result) => result.validate(limits),
+            Self::ImsPcbFeedbackV1(result) => result.validate(limits),
             Self::Ims(result)
                 if result
                     .system

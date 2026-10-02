@@ -353,6 +353,7 @@ mod browse;
 mod cics;
 mod dispatch;
 mod generated;
+mod ims_feedback;
 mod ims_gsam;
 mod ims_navigation;
 mod ims_recovery;

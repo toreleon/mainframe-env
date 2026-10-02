@@ -79,6 +79,11 @@ impl Canonical for HostRequest {
                 out.text("0")?;
                 v0.encode(out)
             }
+            Self::ImsPcbFeedbackV1(v0) => {
+                out.variant("HostRequest", "ImsPcbFeedbackV1", 1)?;
+                out.text("0")?;
+                v0.encode(out)
+            }
             Self::Mq(v0) => {
                 out.variant("HostRequest", "Mq", 1)?;
                 out.text("0")?;
@@ -161,6 +166,11 @@ impl Canonical for HostResult {
             }
             Self::ImsGsam(v0) => {
                 out.variant("HostResult", "ImsGsam", 1)?;
+                out.text("0")?;
+                v0.encode(out)
+            }
+            Self::ImsPcbFeedbackV1(v0) => {
+                out.variant("HostResult", "ImsPcbFeedbackV1", 1)?;
                 out.text("0")?;
                 v0.encode(out)
             }

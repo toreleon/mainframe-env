@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 226,
+    "markdown_documents": 228,
     "navigation_groups": 6,
-    "normative_documents": 60,
+    "normative_documents": 61,
     "xtask_commands": 233
   },
   "documents": [
@@ -265,8 +265,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 3,
-      "sha256": "sha256:935306c7db7f60629e4fb7fb8f97def07464a062a68919bdeb83e4205083e573",
+      "relative_links": 5,
+      "sha256": "sha256:9f9ec918e2c64b974c0a683cae7dc13c4a9f96ea56a02c3fe33d753d76c1263d",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 116,
-      "sha256": "sha256:41290bf41bcd049e365a066ba23db5732832cdea897f651c57b281e39aca1f8c",
+      "relative_links": 117,
+      "sha256": "sha256:7c814cbf4cf2578007ed5de982c5fcfa3c51d8b7cd7282a695802b4b13cf57c8",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -583,9 +583,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 2,
+      "relative_links": 4,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:be308d0095eb5dffa85881eab4cca69b37a96c255c44c904d216d08e1bd2166e",
+      "sha256": "sha256:177cfd81aa17801ba6506a56775998d662d25deaad301569e8963a3646bb975b",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -975,6 +975,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0029-selected-pcb-feedback.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.selected-pcb-feedback, owned host projection",
+      "sha256": "sha256:2d154e64e47f4264e60e52123ee3fa04e369a1d3eac702e6d7af15e5ff70490a",
+      "status": "Proposed",
+      "title": "ADR-0029: Versioned selected database PCB feedback",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 investigation; implementation pending owner decision",
       "normative": true,
       "owner": "store/execution contracts and coordinator maintainers, with host and IMS owners",
@@ -989,8 +1001,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 29,
-      "sha256": "sha256:14bbe6939fa267b4698942b38af59090011759303e4abd478dfcb51c954ca704",
+      "relative_links": 30,
+      "sha256": "sha256:3e1779d1b14d5ebfedc6e1a5fb53b55626b997876defe9a8c67ccf27bc49d9e3",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1425,10 +1437,18 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 9,
-      "sha256": "sha256:8cca75f216616b9db72f5e57ba2ff48fb1f52087ff3c4be14f3d18695ccfd223",
+      "relative_links": 11,
+      "sha256": "sha256:748736e31ba0f49c0588d996a555c81fee546c9b976e97bc55b80bb41c71955d",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/ims/selected-pcb-feedback.md",
+      "relative_links": 1,
+      "sha256": "sha256:d917edf4f1bd72feb3b315e631ff025f2acc022d993e977682981e857a1a0572",
+      "title": "Selected database PCB feedback: bounded contract and class review",
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -2284,6 +2304,10 @@
           "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
         },
         {
+          "label": "ADR-0029: Versioned selected database PCB feedback",
+          "path": "docs/decisions/0029-selected-pcb-feedback.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2532,7 +2556,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:4c8b53cccff80f1f0e3154cbe7da6624a2af1ca83837edd16f9b0ba0fa3a183a",
+  "registry_sha256": "sha256:75e8b6655beb2a7c0b64d01ac2556e2c3531b4c0be5d077a20dc2cd48f955c10",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

@@ -16,6 +16,7 @@ mod ims;
 pub use ims::*;
 mod host_request;
 mod host_result;
+pub use host_result::HostResult;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HostLimits {
@@ -892,29 +893,9 @@ pub enum HostRequest {
     ImsNavigation(crate::ImsNavigationRequest),
     /// Standalone-batch GSAM record calls with owned logical addresses.
     ImsGsam(crate::ImsGsamRequest),
+    /// Versioned owned selected-database-PCB feedback route.
+    ImsPcbFeedbackV1(crate::ImsPcbFeedbackRequestV1),
     Mq(MqRequest),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum HostResult {
-    Dataset(DatasetResult),
-    Program(BoundedPayload),
-    Spool(SpoolResult),
-    Terminal(BoundedPayload),
-    Security(SecurityDecision),
-    Clock(String),
-    State {
-        value: Option<Vec<u8>>,
-        version: u64,
-    },
-    Cics(CicsResponse),
-    Db2(Db2Result),
-    Ims(ImsResult),
-    /// Separate I/O PCB recovery response; it does not update a database PCB.
-    ImsRecovery(crate::ImsRecoveryResult),
-    /// GSAM saved-address output alongside the unchanged IMS status/data result.
-    ImsGsam(crate::ImsGsamResult),
-    Mq(MqResult),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

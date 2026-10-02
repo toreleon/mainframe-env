@@ -32,6 +32,7 @@ pub use providers::ims_providers;
 mod rows;
 pub use application_recovery::ims_providers_with_recovery;
 use rows::*;
+mod feedback;
 mod gsam;
 mod system;
 mod utility_bridge;
@@ -221,6 +222,8 @@ pub(crate) struct RecordedResult {
     pub(crate) system: Option<mainframe_env_host_api::ImsSystemResult>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) gsam: Option<gsam::ReplayOutput>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) pcb_feedback_v1: Option<mainframe_env_host_api::ImsPcbFeedbackV1>,
 }
 
 impl RecordedResult {
@@ -253,6 +256,7 @@ impl RecordedResult {
             affected_segments: result.affected_segments,
             system: result.system.clone(),
             gsam: None,
+            pcb_feedback_v1: None,
         }
     }
 

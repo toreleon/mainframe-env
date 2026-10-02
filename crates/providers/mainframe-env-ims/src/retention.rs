@@ -380,6 +380,9 @@ fn result_digest(
     recorded: &RecordedResult,
     limits: ImsLimits,
 ) -> Result<[u8; 32], ImsReplayRetentionError> {
+    if recorded.gsam.is_some() && recorded.pcb_feedback_v1.is_some() {
+        return Err(ImsReplayRetentionError::CorruptPayload);
+    }
     let result = recorded.host_result();
     result
         .validate(HostLimits {
@@ -686,6 +689,7 @@ mod tests {
             affected_segments: 1,
             system: None,
             gsam: None,
+            pcb_feedback_v1: None,
         }
     }
 

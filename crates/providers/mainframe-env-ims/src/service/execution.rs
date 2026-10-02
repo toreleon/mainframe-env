@@ -21,6 +21,7 @@ impl ImsService {
             invocation.deadline_tick,
             Some(request),
             None,
+            None,
         )
         .map(|result| result.result)
     }
@@ -31,8 +32,15 @@ impl ImsService {
         request: &ImsRequest,
         resolution_lower_bound: u64,
     ) -> Result<ImsResult, HostProblem> {
-        self.execute_operands_at(invocation, request, resolution_lower_bound, None, None)
-            .map(|result| result.result)
+        self.execute_operands_at(
+            invocation,
+            request,
+            resolution_lower_bound,
+            None,
+            None,
+            None,
+        )
+        .map(|result| result.result)
     }
 
     pub(in crate::service) fn execute_operands_at(
@@ -42,7 +50,11 @@ impl ImsService {
         resolution_lower_bound: u64,
         navigation: Option<&mainframe_env_host_api::ImsNavigationRequest>,
         gsam: Option<&mainframe_env_host_api::ImsGsamRequest>,
-    ) -> Result<mainframe_env_host_api::ImsGsamResult, HostProblem> {
+        feedback: Option<&mainframe_env_host_api::ImsPcbFeedbackRequestV1>,
+    ) -> Result<feedback::ExecutionOutput, HostProblem> {
+        if let Some(feedback) = feedback {
+            feedback.validate(mainframe_env_host_api::HostLimits::default())?;
+        }
         if let Some(navigation) = navigation {
             navigation.validate(mainframe_env_host_api::HostLimits::default())?;
         }
@@ -76,7 +88,11 @@ impl ImsService {
             }
         }
         refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let request_sha256 = if let Some(gsam) = gsam {
+        let request_sha256 = if let Some(feedback) = feedback {
+            mainframe_env_host_api::canonical_request_digest(&HostRequest::ImsPcbFeedbackV1(
+                feedback.clone(),
+            ))?
+        } else if let Some(gsam) = gsam {
             mainframe_env_host_api::canonical_request_digest(&HostRequest::ImsGsam(gsam.clone()))?
         } else if let Some(navigation) = navigation {
             mainframe_env_host_api::canonical_request_digest(&HostRequest::ImsNavigation(
@@ -98,7 +114,11 @@ impl ImsService {
                 ReplayDigestFormat::CanonicalHostV1
                     if recorded.request_sha256 == request_sha256 =>
                 {
+                    if feedback.is_some() != recorded.pcb_feedback_v1.is_some() {
+                        return Err(HostProblem::UnknownOutcome);
+                    }
                     let result = recorded.result();
+                    let feedback = recorded.pcb_feedback_v1.clone();
                     let address = recorded
                         .gsam
                         .as_ref()
@@ -113,7 +133,11 @@ impl ImsService {
                         self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
                             .map_err(|_| HostProblem::UnknownOutcome)?;
                     }
-                    return Ok(mainframe_env_host_api::ImsGsamResult { result, address });
+                    return Ok(feedback::ExecutionOutput {
+                        result,
+                        address,
+                        feedback,
+                    });
                 }
                 ReplayDigestFormat::CanonicalHostV1 => {
                     return Err(HostProblem::IdempotencyConflict);
@@ -121,6 +145,9 @@ impl ImsService {
             }
         }
         let run = invocation.run_unit_id.as_str();
+        if let Some(feedback) = feedback {
+            feedback::prepare(&durable.state, run, feedback)?;
+        }
         if integrity_read {
             if durable.state.metadata.is_some() {
                 generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
@@ -172,6 +199,16 @@ impl ImsService {
             system::observe_database_call(&mut next, run, request, &result, self.limits)?;
         }
         application_backout::settle_database_call(&mut next, invocation, request, &result)?;
+        let pcb_feedback = feedback
+            .map(|feedback| feedback::project(&next, run, feedback, &result, self.limits))
+            .transpose()?;
+        if let Some(feedback) = &pcb_feedback {
+            mainframe_env_host_api::ImsPcbFeedbackResultV1 {
+                result: result.clone(),
+                feedback: feedback.clone(),
+            }
+            .validate(mainframe_env_host_api::HostLimits::default())?;
+        }
         let uow = request.operation == ImsOperation::Commit
             || request.operation == ImsOperation::Rollback;
         if uow
@@ -180,9 +217,10 @@ impl ImsService {
             && !durable.state.pending_undo.contains_key(run)
             && !durable.state.generic_pending_undo.contains_key(run)
         {
-            return Ok(mainframe_env_host_api::ImsGsamResult {
+            return Ok(feedback::ExecutionOutput {
                 result,
                 address: None,
+                feedback: None,
             });
         }
         if request.operation.is_mutating() {
@@ -191,6 +229,7 @@ impl ImsService {
                 return Err(HostProblem::ResourceExhausted);
             }
             let mut recorded = RecordedResult::from_result(request_sha256, &result);
+            recorded.pcb_feedback_v1 = pcb_feedback.clone();
             if let Some(output) = &output {
                 recorded.gsam = Some(gsam::ReplayOutput {
                     address: output.address.clone(),
@@ -209,9 +248,10 @@ impl ImsService {
             self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
                 .map_err(|_| HostProblem::UnknownOutcome)?;
         }
-        Ok(mainframe_env_host_api::ImsGsamResult {
+        Ok(feedback::ExecutionOutput {
             result,
             address: output.and_then(|o| o.address),
+            feedback: pcb_feedback,
         })
     }
 

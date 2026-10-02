@@ -63,6 +63,7 @@
     "docs/decisions/0027-cics-logical-program-frames.md",
     "docs/decisions/0028-gsam-logical-address.md",
     "docs/decisions/0031-ims-tm-recovery-publication.md",
+    "docs/decisions/0029-selected-pcb-feedback.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -297,6 +298,10 @@
         {
           "label": "ADR-0031: IMS TM recovery publication and work settlement",
           "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
+        },
+        {
+          "label": "ADR-0029: Versioned selected database PCB feedback",
+          "path": "docs/decisions/0029-selected-pcb-feedback.md"
         },
         {
           "label": "Decision index and template",

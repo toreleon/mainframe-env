@@ -30,6 +30,14 @@ state.
 
 ## Public surface
 
+`ImsService::execute_pcb_feedback_v1` and `HostRequest::ImsPcbFeedbackV1`
+expose bounded owned selected database PCB feedback through the existing
+provider and atomic receipt pipeline. Primary successful retrieval/ISRT return
+concatenated keys, segment name/level, metadata fields and transferred data
+length. Failed-call witnesses, secondary key layouts and physical masks remain
+explicitly unproved. See the [class review](../../../docs/delivery/subsystems/ims/selected-pcb-feedback.md)
+and [ADR-0029](../../../docs/decisions/0029-selected-pcb-feedback.md).
+
 `ImsService` installs validated application definitions and exposes typed host
 providers through `ims_providers`. `ims_providers_with_recovery` adds logical
 LOG and basic/symbolic CHKP/XRST dispatch using the canonical journal from the

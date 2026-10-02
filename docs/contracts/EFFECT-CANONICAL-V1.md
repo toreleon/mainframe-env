@@ -99,6 +99,21 @@ responses that lack the entry remain readable and make no dump claim.
 
 ## Typed size budgets
 
+`HostRequest::ImsPcbFeedbackV1` and `HostResult::ImsPcbFeedbackV1` are additive
+tuple variants with separately named V1 objects. Request fields sort as
+`context`, `key_capacity`, `request`, `ssas`; result fields as `feedback`,
+`result`. Feedback fields sort as `database`, `key`, `pcb`,
+`processing_options`, `sensitive_segment_count`, `transferred_data_length`.
+Key `Valid` sorts `bytes`, `segment_level`, `segment_name`;
+`InvalidatedSecondaryReplace` has no fields and `Unsupported` has tuple field
+`0` naming a closed missing-authority variant. Existing embedded IMS objects
+keep their encodings. Independent vectors and exact availability classes are
+in the [class review](../delivery/subsystems/ims/selected-pcb-feedback.md).
+The optional retained output participates in the existing result hash and
+receipt authority; replay never reconstructs feedback from later cursor state.
+Downgrade requires a compatible receipt reader or coherent pre-feature restore
+as described in [ADR-0029](../decisions/0029-selected-pcb-feedback.md).
+
 `CapabilityDescriptor.max_request_bytes` and `.max_result_bytes` now count the
 canonical preimage, including domain prefix, tags, field identifiers and lengths.
 The result budget includes its Ok/Err discriminant. Existing per-field HostLimits

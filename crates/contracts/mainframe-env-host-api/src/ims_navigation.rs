@@ -11,36 +11,43 @@ pub struct ImsNavigationRequest {
 
 impl ImsNavigationRequest {
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
+        Self::validate_operands(&self.request, &self.ssas, limits)
+    }
+
+    pub(crate) fn validate_operands(
+        request: &ImsRequest,
+        ssas: &[Vec<u8>],
+        limits: HostLimits,
+    ) -> Result<(), HostProblem> {
         if !matches!(
-            self.request.operation,
+            request.operation,
             ImsOperation::GetUnique
                 | ImsOperation::GetNext
                 | ImsOperation::GetNextParent
                 | ImsOperation::GetHoldUnique
                 | ImsOperation::GetHoldNext
                 | ImsOperation::GetHoldNextParent
-        ) || !self.request.segments.is_empty()
-            || !self.request.qualifiers.is_empty()
-            || !self.request.data.is_empty()
-            || self.request.psb.is_some()
-            || self.request.checkpoint_id.is_some()
-            || self.request.system.is_some()
-            || self.request.q_class.is_some()
+        ) || !request.segments.is_empty()
+            || !request.qualifiers.is_empty()
+            || !request.data.is_empty()
+            || request.psb.is_some()
+            || request.checkpoint_id.is_some()
+            || request.system.is_some()
+            || request.q_class.is_some()
         {
             return Err(HostProblem::Malformed);
         }
-        if self.ssas.len() > 15
-            || self.ssas.len() > limits.max_fields
-            || self.ssas.iter().any(|ssa| ssa.len() > 32 * 1024)
-            || self
-                .ssas
+        if ssas.len() > 15
+            || ssas.len() > limits.max_fields
+            || ssas.iter().any(|ssa| ssa.len() > 32 * 1024)
+            || ssas
                 .iter()
                 .try_fold(0usize, |n, s| n.checked_add(s.len()))
                 .is_none_or(|n| n > limits.max_record_bytes)
         {
             return Err(HostProblem::ResourceExhausted);
         }
-        HostRequest::Ims(self.request.clone()).validate(limits)
+        HostRequest::Ims(request.clone()).validate(limits)
     }
 }
 

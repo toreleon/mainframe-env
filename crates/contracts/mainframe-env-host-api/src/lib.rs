@@ -79,6 +79,11 @@ pub use ims_metadata::{
     ImsTerminalPcbMetadata, validate_ims_metadata,
 };
 pub use ims_navigation::ImsNavigationRequest;
+mod ims_feedback;
+pub use ims_feedback::{
+    ImsPcbFeedbackRequestV1, ImsPcbFeedbackResultV1, ImsPcbFeedbackUnsupportedV1, ImsPcbFeedbackV1,
+    ImsPcbKeyFeedbackV1,
+};
 mod ims_gsam;
 pub use ims_gsam::{ImsGsamAddress, ImsGsamRequest, ImsGsamResult, ImsGsamSearchArgument};
 pub use ims_pcb::{
