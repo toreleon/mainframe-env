@@ -625,6 +625,60 @@ The pinned catalog denominator, official gate numerators and licensed-pending
 disposition remain unchanged. Default/assignment binding and actual typed catalog
 admission remain subsequent required implementation, not a metadata-only end state.
 
+The catalog followup rejects the earlier tables-only `metadata_only` proposal as
+the final catalog@2 destination. Preparation must preserve all ordinary value,
+default, constraint, relation/index/routine/package and privilege requirements;
+final schema/tag/IR, package and durable-version acceptance remain pending.
+Current exact numeric proofs and located default intents permit real default
+admission work, but source proofs, assigned values and decoded durable-cell proofs
+must stay distinct. No additional official Db2 bindings or credit are added.
+
+The manager declares `DB2-1202.located-numeric-operands`, parent DB2-1202, as the
+source-proof prerequisite for signed defaults separated by trivia. Exact worker
+ownership is `numeric_constant_types.rs`, `numeric_constant_values.rs` and
+`changes/unreleased/db2-located-numeric-operands.toml`. Extend existing classifier
+and materializer authorities to original operand/sign/number-token locations;
+validate all byte and line/column endpoints, source bounds, actual sign/number
+tokens and intervening trivia before value accumulation. Reuse the existing lexer
+without lexing unrelated surrounding SQL, fabricating normalized source, accepting
+extra expressions or duplicating numeric type/range/coefficient rules. Existing
+adjacent-spelling APIs, errors/fences and regressions remain intact. Returned
+opaque natural type/value proofs retain the original combined operand span.
+Manager owns public exports and default binding. Focused independent vectors,
+malformed/forged/provenance/trivia/boundary tests, package/MSRV and applicable
+policy/catalog/changelog/docs/seal checks precede the private feature commit.
+Only new private API reachability warnings may await public integration;
+diagnosed owned semantic/lint errors must be repaired without suppression.
+
+The manager also declares `DB2-1202.string-storage-assignment`, parent DB2-1202.
+Exact worker ownership is `type_system/string_constants.rs` only for child-module
+registration, new `type_system/string_constants/storage_assignment.rs` and
+`changes/unreleased/db2-string-storage-assignment.toml`. Consume only existing
+opaque literal proofs and validated resolved target types under caller-explicit
+Unicode UTF-8/MIXED character or binary target context. Same-encoding CHAR/VARCHAR
+storage may remove only excess trailing ASCII blanks and pads fixed targets with
+blanks; BINARY/VARBINARY rejects every oversize value and pads fixed targets with
+zero bytes. Preserve target length/nullability, original source span and explicit
+encoding; reject natural length-zero types used as declared targets. No arbitrary
+raw value/type constructor, CCSID inference, binary/BitData coercion, NULL value,
+retrieval truncation, host/SQLCA, default applicability or persistence is admitted.
+Other encoding/conversion/graphic/ordinary targets remain explicitly pending.
+Bounds and immutable-owned outputs precede allocation; use the current compatible
+type authority rather than a second conversion engine. Independent fixed padding,
+truncation/error/UTF-8/NUL/empty/ownership/context/target-limit tests plus focused
+package/MSRV and applicable policy/docs/exact-path sealing precede its commit.
+Manager owns root exports and independent public integration tests.
+
+These nonmutating proof/conversion slices have no backend/restart/authorization
+claim, no standalone language-element row and no SQL dispatch. SQL0050 default
+context remains pending binding, while its source delegates constants to assignment
+rules. String storage uses `db2z_stringassignmentintro.html`, 12061 bytes,
+`a72f1dd0d80391b8ef20100313bfca498dc881b9881fbb49beb9177263e7f46e`,
+with constants/character/binary and compatibility pins above. Main read the
+hash-verified archive source locally after retained-path checks; normal reading
+is TOC-blocked. No refresh or licensed credit is inferred. Exact 174-row obligation
+freeze remains required before broad DB2-1203 execution.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
