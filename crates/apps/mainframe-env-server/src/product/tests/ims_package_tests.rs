@@ -7,6 +7,8 @@ mod feedback_tests;
 mod gsam_checkpoint_tests;
 #[path = "ims_package_tests/gsam_tests.rs"]
 mod gsam_tests;
+#[path = "ims_package_tests/logical_feedback_tests.rs"]
+mod logical_feedback_tests;
 #[path = "ims_package_tests/null_ssa_tests.rs"]
 mod null_ssa_tests;
 #[path = "ims_package_tests/secondary_checkpoint_tests.rs"]

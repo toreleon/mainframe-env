@@ -5,6 +5,7 @@ use mainframe_env_host_api::{
 };
 
 mod failure_tests;
+mod logical_navigation_tests;
 
 fn snapshot(service: &ImsService) -> (Vec<u8>, RowVersions) {
     let d = service.lock().unwrap();

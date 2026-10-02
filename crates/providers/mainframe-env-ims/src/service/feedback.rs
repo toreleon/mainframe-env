@@ -149,7 +149,28 @@ fn primary_key(
         .iter()
         .find(|db| normalize(&db.name) == normalize(&pcb.database))
         .ok_or(HostProblem::InfrastructureFailure)?;
-    if !db.logical_relationships.is_empty() {
+    // Declarations can be hosted in either database's metadata. Do not turn
+    // an empty local declaration list into authority for a logical path.
+    let relationships = metadata
+        .databases
+        .iter()
+        .flat_map(|db| &db.logical_relationships)
+        .filter(|r| normalize(&r.child_database) == normalize(&db.name))
+        .map(|r| {
+            (
+                (
+                    normalize(&r.child_segment),
+                    normalize(&r.parent_database),
+                    normalize(&r.parent_segment),
+                ),
+                r,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    if (!db.logical_relationships.is_empty() || !relationships.is_empty())
+        && (!matches!(pcb.processing_options.as_str(), "G" | "AP")
+            || !logical_physical_path(state, request, db, &engine, &path, &relationships, limits)?)
+    {
         return Ok(ImsPcbKeyFeedbackV1::Unsupported(
             Unproved::LogicalRelationship,
         ));
@@ -191,4 +212,94 @@ fn primary_key(
         segment_level: u16::try_from(path.len()).map_err(|_| HostProblem::ResourceExhausted)?,
         bytes,
     })
+}
+
+// IMS 15.6 SEGM SOURCE (730–732), physical C and PCB mask rules; ADR-0038.
+// This is only a projection recipe, after existing navigation and integrity
+// validation. The link's destination data/keys never become source key bytes.
+fn logical_physical_path(
+    state: &State,
+    request: &ImsPcbFeedbackRequestV1,
+    db: &crate::ImsDatabaseMetadata,
+    engine: &crate::database::DatabaseEngine,
+    path: &[crate::database::RecordView],
+    relationships: &BTreeMap<(String, String, String), &crate::ImsLogicalRelationshipMetadata>,
+    limits: ImsLimits,
+) -> Result<bool, HostProblem> {
+    if request.context != mainframe_env_host_api::ImsExecutionContext::DbBatch
+        || db.organization != crate::ImsDatabaseOrganization::Hidam
+        || !matches!(
+            request.request.operation,
+            ImsOperation::GetUnique
+                | ImsOperation::GetHoldUnique
+                | ImsOperation::GetNext
+                | ImsOperation::GetHoldNext
+                | ImsOperation::GetNextParent
+                | ImsOperation::GetHoldNextParent
+        )
+    {
+        return Ok(false);
+    }
+    let last = path.last().ok_or(HostProblem::InfrastructureFailure)?;
+    for view in path {
+        let segment = db
+            .segments
+            .iter()
+            .find(|s| normalize(&s.name) == view.segment)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if segment.min_length != segment.max_length
+            || view.data.len() != segment.max_length
+            || !segment.fields.iter().any(|f| f.sequence && f.unique)
+            || (view.id != last.id
+                && relationships
+                    .keys()
+                    .any(|(child, _, _)| *child == view.segment))
+        {
+            return Ok(false);
+        }
+    }
+    let declared = relationships
+        .values()
+        .filter(|r| normalize(&r.child_segment) == last.segment)
+        .collect::<Vec<_>>();
+    let links = engine
+        .logical_links()
+        .iter()
+        .filter(|link| link.child == last.id)
+        .collect::<Vec<_>>();
+    if declared.is_empty() && links.is_empty() {
+        return Ok(true); // Unaffected ordinary physical path, in the same class.
+    }
+    if declared.len() != 1 || links.len() != 1 || last.parent.is_none() {
+        return Ok(false);
+    }
+    let (relationship, link) = (declared[0], links[0]);
+    if normalize(&relationship.parent_database) != link.parent_database
+        || normalize(&relationship.parent_segment) != link.parent_segment
+        || relationship.paired != link.paired
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let destination = generic::restored(state, &link.parent_database, limits)?;
+    let parent_path = destination
+        .path_to(link.parent)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if parent_path
+        .last()
+        .is_none_or(|view| view.segment != link.parent_segment)
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    for view in parent_path {
+        let segment = destination
+            .definition()
+            .segments
+            .iter()
+            .find(|s| s.name == view.segment)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if segment.min_length != segment.max_length || view.data.len() != segment.max_length {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }

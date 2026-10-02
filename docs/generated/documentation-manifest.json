@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 237,
+    "markdown_documents": 238,
     "navigation_groups": 6,
-    "normative_documents": 68,
+    "normative_documents": 69,
     "xtask_commands": 233
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 124,
-      "sha256": "sha256:9748a33613fddd3fd500803b772188ceb8610648d67a3a314b0c6b81e39f279f",
+      "relative_links": 125,
+      "sha256": "sha256:de5b56ecde87df2908b85fd3e5243c86d7ae2008525e894155cbef6518981fa4",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1083,6 +1083,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0038-logical-child-physical-key-feedback.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.logical-child-physical-key-feedback",
+      "sha256": "sha256:9150775b91e88fdc7c4411f79eb3881c45c48cb0e2863bf6dc7a44c95400417f",
+      "status": "Proposed",
+      "title": "ADR-0038: Real logical child physical-path key feedback",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 35,
@@ -1538,15 +1550,15 @@
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
       "relative_links": 18,
-      "sha256": "sha256:9e1766abefc5e2b74af4cd0ac923a5dc19db382e5839acf1ea7e0542472c3a45",
+      "sha256": "sha256:81aca3fd1161fdfa31c790746ffd39992a949148ed084c3f00d0d3e60d53675d",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/selected-pcb-feedback.md",
-      "relative_links": 1,
-      "sha256": "sha256:fc7bd7c2116f7a0cab3b544194ee871713e137934894a4351e48ef4e6898ea04",
+      "relative_links": 2,
+      "sha256": "sha256:62f98b92ce795fde6413dc089e579548838973ea3c9da4bbec1a02e71bf3abc9",
       "title": "Selected database PCB feedback: bounded contract and class review",
       "xtask_commands": 0
     },
@@ -2412,6 +2424,10 @@
           "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md"
         },
         {
+          "label": "ADR-0038: Real logical child physical-path key feedback",
+          "path": "docs/decisions/0038-logical-child-physical-key-feedback.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
@@ -2684,7 +2700,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:83c4c3540774b2d6292e6bbe106c5742109fdfeb6a3be62d3473e4019c3bb2e7",
+  "registry_sha256": "sha256:214fde7caa50256e7490d67e64a202a4a63706bda89d34343aae4ef0460cd1e1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

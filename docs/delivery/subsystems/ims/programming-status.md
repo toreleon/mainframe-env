@@ -4534,3 +4534,122 @@ and typed-boundary checks pass. The first dependency-policy invocation placed
 cleans Cargo output. The corrected cargo deny --offline check and formatting
 pass and clean. Normal docs/changelog and exact five-path content sealing are
 the remaining packaging checks, with actual outcomes recorded externally.
+
+## IMS-1403.logical-child-physical-key-feedback — bounded implementation declaration
+
+State: local bounded implementation and affected gates passed.
+The generated leaf seal is the completion boundary.
+Base `a8deb3d8a97be2660cfa0d38327ff246a194a910`.
+This leaf alone is authorized; IMS-1403 and the parent v0.14 remain incomplete.
+No official, HUMAN, licensed or participant acceptance credit is claimed.
+
+Applicability: DbBatch typed CALL, primary HIDAM database PCB with G/AP, successful six
+Get/Get Hold forms, fixed-length records with unique sequence fields along the
+actual physical source path. A selected real logical child must have one
+deduplicated forward declaration and one validated occurrence link, with an
+actual physical parent on the source path, including
+a non-root logical parent. Unaffected ordinary physical paths in such a
+database use the same proven source-key recipe. Other logical classes retain
+Unsupported: virtual/reverse/SOURCE aliases, multiple links, unkeyed/nonunique
+paths, variable lengths, secondary sequencing, logical ISRT feedback and other
+contexts. Failed-call witnesses remain unproved.
+
+Rows: `ibm-ims-15.6-dli-2026-08-31:dli-call-families`, selected retrieval
+0005/0006; affected inherited maintenance 0004/0008/0015 and checkpoint
+0002/0023/0025, exact `html-table:comparison;row:<n>;command` locators. No
+catalog denominator, bindings, schema, policy or ratchet edits. Source identities
+and verified hash/topic locators are retained in the external logical audit;
+ADR-0038 records this physical-direction recipe and its exclusions.
+
+Owners: only service/feedback.rs projects from the same unpublished proposal.
+Physical C/qualified SSA selection, engine cursor/position, key-only sensitivity,
+source/destination SAF, integrity/foreign undo/Q fences, correlated key
+maintenance, checkpoint capture and proposal/replay/CAS remain their existing
+owners. No host, shared CALL/TM/UOW, store or retained representation changes.
+ADR-0036 null SSA and ADR-0037 retention are separately owned and untouched.
+
+Exact handwritten allowlist: feedback.rs; generic/tests/feedback_tests.rs
+(module declaration); its new logical_navigation_tests.rs; server
+ims_package_tests.rs (module declaration); its new logical_feedback_tests.rs;
+this status; selected-pcb-feedback.md; the isolated
+ims-logical-child-physical-key-feedback-20261002.toml fragment; and Proposed
+docs/decisions/0038-logical-child-physical-key-feedback.md. The manager approved
+the necessary ADR registration in docs/documentation-registry.json and normal
+generated docs/README.md plus docs/generated/documentation-manifest.json output.
+These precise packaging paths extend the final allowlist to twelve files; they
+add no semantic authority or runtime scope. No other production edit.
+
+Backend/test map: fail-first public provider and signed selected package with
+literal A1C1 source key and two LPARENT(L2) occurrences under P9/Q8. Memory,
+file SQLite/fresh connections and a substantive subprocess parent cover all
+six Gets, PCB isolation, C/qualified path, binary keys, K sensitivity, failure
+witnesses, exclusions, SAF denies, integrity/foreign undo/Q, actual session CAS,
+capacity/lost acknowledgement, exact replay after mutation, old Unsupported
+receipts and mixed physical/secondary/GSAM checkpoint composition. Required
+focused inherited suites, scoped strict Clippy/fmt, deny/docs/changelog/coverage,
+architecture/module/API and catalog/schema/spec/assurance gates precede the
+exact generated leaf seal and committed --check. Receipts stay outside Git in
+worker-receipts/v014-completion-20261002/logical-feedback-implementation.
+
+The public provider and signed selected-package routes now project the real
+source physical key from the unpublished proposal. Literal destination twin
+fixtures discriminate the exact retained link, and direct engine-path checks
+confirm each selected/restored source position before later navigation. The
+existing checkpoint owner composes physical, secondary and GSAM PCBs; later
+source/destination changes do not reproject an exact retained reply. An
+independently authored historical Unsupported receipt retains its availability
+and bytes. No canonical, SQL, receipt, checkpoint or host representation changes.
+
+Required scoped Clippy/fmt, dependency/license/supply-chain policy,
+schema/spec/catalog/assurance/coverage, docs/changelog and affected execution/
+effect/provider-row/storage/SAF/retention/participant/module/typed-boundary guards
+pass. External receipts retain actual candidate inputs, fail-first outcomes and
+fixture/lint repairs. Cargo clean ends each Cargo sequence for this checkout.
+
+An additional global architecture-fast check fails before its broader checks:
+the exact base already has a DB2 -> encoding dependency missing from the declared
+graph. base-architecture-gap.json verifies unchanged manifest, graph/additions,
+root manifest and checker bytes. The affected guards pass independently; no
+graph or ratchet is edited. This unrelated parent integration gap is retained,
+not represented as a passing global architecture gate. No full campaign,
+licensed oracle, official/HUMAN/participant/parent completion, push or PR occurs.
+
+Remaining source gaps: virtual/reverse/SOURCE alias paths, destination
+KEY/DATA/RULES, failed-call witnesses and secondary feedback recipes. Other
+logical contexts, organizations, PCB options, variable/unkeyed/nonunique/multiple
+link paths, logical links attached to physical roots and logical ISRT feedback
+remain Unsupported as declared above. Root-link metadata supplies no proof of
+the approved physical-child ancestry. The selected pinned topics supply no
+root-link key recipe for this metadata shape; no such rule is inferred.
+
+### Root composition declaration for logical physical-key feedback
+
+Root integrates worker 0bea49ccfa28b407a01ee226b1654dd96d085216 onto
+6e3e24d014cfb4a58c6b79efff88e9b999bfc9cc. The exact twelve-path allowlist is
+unchanged. Merge conflicts keep both logical and null-SSA server test modules,
+both Proposed ADR-0037/0038 entries, and all previous status declarations.
+Generated README/manifest are refreshed normally. No worker runtime receipt is
+relabeled as root or CI proof. The only production feedback recipe is byte-for-
+byte the reviewed worker seal; root owns composition verification and packaging.
+
+Before any root result claim, select the eleven logical provider entries and
+two signed backend entries, the prior signed null-SSA route and one retained
+private recovery planner case. Strict affected all-target/all-feature lint,
+boundary guards, normal policy/docs/changelog and exact-path seal/check remain
+required. No global architecture retry for unchanged CICS sources: the separate
+metadata repair already corrects the worker's original graph failure, and its
+actual broader gate remains failed at the missing source prerequisite. Root
+does not refresh sources or waive that gate. Leaf/local proof does not complete
+IMS-1403, HUMAN/official/participant acceptance or full v0.14; licensed work stays
+excluded. Cargo clean ends each intended-checkout verification sequence.
+
+Root focused outcome: eleven logical provider entries and two signed backend
+entries pass, including three actual seed/mutate/reopen SQLite child processes.
+The separately selected prior signed null-SSA route and SQLite private-retention
+planner each execute one passing case. Strict IMS/server all-target/all-feature
+Clippy and formatting pass; Cargo clean removes this sequence's 6.5 GiB output.
+No production feedback bytes differ from the worker seal. Unchanged schema/spec,
+source/catalog/assurance/API-ratchet inputs retain their earlier passing root
+and worker policy receipts; no unchanged exploratory suite is repeated. Final
+boundary/dependency/docs/changelog and exact-path packaging outcome is recorded
+externally; the broader CICS prerequisite remains failed, not waived.

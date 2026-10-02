@@ -65,6 +65,7 @@
     "docs/decisions/0031-ims-tm-recovery-publication.md",
     "docs/decisions/0035-selected-pcb-feedback.md",
     "docs/decisions/0037-private-ims-recovery-retention-fence.md",
+    "docs/decisions/0038-logical-child-physical-key-feedback.md",
     "docs/decisions/0033-cobol-dli-call-boundary.md",
     "docs/decisions/0028-db2-typed-catalog-evolution.md",
     "docs/decisions/0029-db2-core-participant-evolution.md",
@@ -313,6 +314,10 @@
         {
           "label": "ADR-0037: Private IMS recovery retention fence",
           "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md"
+        },
+        {
+          "label": "ADR-0038: Real logical child physical-path key feedback",
+          "path": "docs/decisions/0038-logical-child-physical-key-feedback.md"
         },
         {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",

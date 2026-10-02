@@ -43,13 +43,56 @@ metadata and verified rules, not observations generated from the handler.
 | Selected secondary retrieval/ISRT feedback | Existing navigation returns the selected target's data (source pointer and target may differ); key/level/name are `Unsupported(SecondarySequence)`. Reviewed sources do not establish exact secondary-sequence feedback layout for the admitted pointer/ancestor shape. | Secondary/source owner must supply an exact authority-backed feedback recipe in its proposal. Rich secondary SSAs remain Unsupported on this manager base; newer worker code is not consumed. |
 | Successful secondary REPL | Key feedback is explicitly invalidated by the pinned source; no old bytes or valid length are exposed. Parentage and holds keep their existing owner. | No secondary algorithm change or parentage equivalence claim is made by this projection. |
 | Primary REPL and DLET feedback | `Unsupported(NonKeyOperation)`; neither reused previous bytes nor guessed invalidity is published. Status/affected count retain existing semantics. | Obtain exact per-call validity rules before extending the projection. |
-| Metadata without a sequence field; logical relationships | `Unsupported(MissingSequenceField)` or `Unsupported(LogicalRelationship)`; no zero-filled or guessed concatenated key. | Metadata/logical-route owner must supply a source-defined key recipe. |
+| Metadata without a sequence field; logical classes outside the physical recipe below | `Unsupported(MissingSequenceField)` or `Unsupported(LogicalRelationship)`; no zero-filled or guessed concatenated key. | Obtain the missing direction/layout/key authority before extending feedback. |
 | GSAM, DEDB, MSDB and other organizations; raw EBCDIC COBOL/C masks, reserved linkage, scheduled database-type SEGNAME, KEYLEN capacity | Route/physical ABI remains Unsupported/unproved. The current PCB metadata has no declared KEYLEN area size or reserved/raw framing source. | Their existing owners must provide source/ABI prerequisites; do not synthesize zeros, a raw mask, physical RSA or execution credit. |
 
 Unavailable invalidation semantics are distinguished from proved invalidity.
 Only `InvalidatedSecondaryReplace` asserts invalidity. Every Unsupported
 variant has no valid byte length. This packet does not close the full PCB
 feedback matrix or any official comparison row.
+
+## Real logical child through its physical source hierarchy
+
+Leaf `IMS-1403.logical-child-physical-key-feedback` narrows the former
+database-wide logical guard for DbBatch typed Get/Get Hold through a primary
+HIDAM PCB with G/AP. Every record on the actual source path must be fixed-length
+and uniquely keyed. The selected real child has one deduplicated forward declaration
+and one validated occurrence link, with an actual physical source parent;
+root-link key semantics remain unproved. Its exact destination record and fixed-length
+path must agree. A logical child in an ancestor position, multiple links,
+unkeyed/nonunique/variable paths, other logical organizations/contexts and
+logical ISRT feedback and other PCB options retain Unsupported. Ordinary physical
+retrieval in a database with relationships uses the same proved recipe when its path crosses
+no logical child. Selected secondary keys and failed witnesses stay unproved.
+
+ROOT(A1) -> CHILD(C1) linked to DROOT(P9) -> LPARENT(L2) returns source key
+`A1C1`, CHILD, level 2. Another LPARENT(L2) under Q8 has different data; the
+retained link determines which parent data is transferred. Neither `P9L2`,
+`Q8L2` nor concatenated result data supplies source key bytes. A physical C SSA
+and equivalent qualified source path select the same child. Child K sensitivity
+returns its key with no child or destination data. Source/destination SAF
+precedes observation for K and replay. Fresh reads retain the existing integrity,
+foreign-undo and Q fences; exact replay validates the retained receipt and
+returns it without refreshing or reprojecting the live occurrence.
+
+The projection reads the same unpublished engine occurrence as navigation.
+Capacity failure discards it; atomic publication, per-PCB hold/parentage, Q,
+foreign pending undo and correlated maintenance remain existing owners. Exact
+historical `Unsupported(LogicalRelationship)` receipts replay without new keys.
+The existing symbolic checkpoint saves source physical-path position alongside
+primary/secondary/GSAM PCBs; feedback adds no checkpoint variant or cursor.
+
+Source identities and direction limits are in
+[Proposed ADR-0038](../../../decisions/0038-logical-child-physical-key-feedback.md).
+The processing-logical pin establishes non-root logical parents; SEGM SOURCE
+683–742, especially 730–732, distinguishes physical-twin and logical-twin keys.
+The physical C and PCB mask pins define this admitted source recipe. Metadata
+has no virtual layout, SOURCE alias, reverse ordering, destination KEY/DATA or
+SEGM RULES; this leaf does not supply those missing recipes or raw mask framing.
+No host/canonical/SQL/receipt migration occurs. Inherited ADR-0035 downgrade and
+coherent-backup requirements apply; base rollback restores Unsupported for fresh
+logical calls. Parent v0.14 and official/HUMAN/licensed/participant acceptance
+remain incomplete.
 
 ## Pinned offline authority
 
