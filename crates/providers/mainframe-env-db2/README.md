@@ -154,6 +154,21 @@ floating, DECFLOAT and nonnumeric conversions remain distinct from datatype
 incompatibility. This surface does not establish binder/default applicability,
 evaluate expressions, assign host memory or implement typed cells/catalogs.
 
+The natural string-literal surface accepts an original located apostrophe,
+X character-hex or BX binary constant under explicit Unicode UTF-8 source
+context. Opaque owned proofs decode escaped delimiters/hex exactly once and
+retain matching VARCHAR/VARBINARY natural byte length, NOT NULL and original
+byte/line/column spans. Empty constants have natural length zero, not NULL;
+column/type constructors still require positive lengths. Character values carry
+CCSID 1208/MIXED independently of the explicit MIXED DATA flag, which controls
+X hex uppercase admission. Binary values have no CCSID and preserve arbitrary
+bytes, including NUL; they are not character FOR BIT DATA. The lexer admits BX
+as a first-class Binary string kind without changing existing literal payloads.
+Original source, spelling, token, body and decoded-value budgets precede
+allocation. Other encodings, delimiters, graphic and ordinary value families
+remain explicitly pending. This surface neither converts target values nor
+establishes defaults, collation, catalog/cell identities, execution or row credit.
+
 The searched DELETE/UPDATE surfaces own qualified targets and optional common
 search conditions; UPDATE also owns unique single-column expression/DEFAULT/
 NULL assignments. Scalar/predicate structure is validated at every expression

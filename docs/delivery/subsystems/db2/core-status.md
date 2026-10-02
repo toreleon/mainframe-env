@@ -585,7 +585,45 @@ source transfer, bounds, diagnostics, opaque proofs and all regressions; no pars
 type rule, baseline, accepted contract, dependency or gate criterion changes.
 Run affected regressions/package/MSRV and strict package Clippy with `--no-deps`;
 global dependency Clippy failures remain distinct and are not repeated unchanged.
-Seal all six exact paths and clean the assigned checkout after verification.
+The first scoped run exposed `drop_non_drop` in the existing public numeric
+ownership test. Ownership is expanded only to
+`tests/numeric_constant_values.rs` for returning a clone from the source/result
+lexical scope, preserving all independent assertions without lint suppression.
+Seal all seven exact paths and clean the assigned checkout after verification.
+
+The manager declares `DB2-1202.literal-string-surface` to expose the separately
+sealed, fully reviewed natural string-value proof without production changes.
+Exact ownership is provider `lib.rs`, `tests/string_constants.rs`, README, this
+status, `changes/unreleased/db2-literal-string-surface.toml` and the derived
+documentation manifest. Public fixed-vector tests cover decoded apostrophes,
+Unicode UTF-8 and X character bytes, first-class BX binary bytes, empty NOT NULL
+natural length zero versus unchanged column minima, explicit MIXED DATA case
+rules, complete original UTF-8/CRLF locations, ownership, forged spans,
+malformed/pending forms and independent source/spelling/token/value/publication
+bounds. Existing type, lexer and proof owners remain unchanged.
+
+The constants, character, binary, token and delimiter pins above are the source
+authority; these language elements have no standalone catalog rows. The additional
+delimiter pin is `db2z_apostrophesandquotesindelims.html`, 5549 bytes,
+`94746a42021315234baea45342774882f497fcaa3f8360cdd837c0673d414700`.
+Matching archive bytes were read locally; retained files are absent and normal
+reading remains TOC-blocked. Public integration requires current focused/package,
+MSRV, formatting, policy/catalog/changelog/docs and exact-path seal checks.
+No assignment/default applicability, other ordinary values, typed cells/catalog,
+execution, official row/gate or licensed differential credit is claimed.
+
+The natural string kernel and seven-path lint-readiness feature are integrated
+from separate sealed commits. Public string integration passes six independent
+tests and the combined Db2 package: 304 unit plus 64 integration tests, zero
+failures/skips. Rust 1.95 all-target/all-feature checking and strict package
+Clippy with `--no-deps` pass. Two newly observed string-owner Clippy expressions
+were repaired equivalently in a separate focused commit, without suppressions;
+all package tests and MSRV checking pass after that repair. Initial failed lint
+receipts retain their original identity. Global dependency Clippy, contract
+API-doc and architecture/source blockers are not discharged by this scoped pass.
+The pinned catalog denominator, official gate numerators and licensed-pending
+disposition remain unchanged. Default/assignment binding and actual typed catalog
+admission remain subsequent required implementation, not a metadata-only end state.
 
 ## Dependency gate
 
