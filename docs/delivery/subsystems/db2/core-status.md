@@ -324,6 +324,17 @@ path seals. Pure parser slices do not affect backend or durability routes.
 Source review of the 174-row map is a required scoped freeze prerequisite, not
 a whole-cache refresh/audit; no network or browser request is authorized.
 
+The freeze preparation identified a prerequisite mismatch: frozen participant
+v1 permits only the accepted CICS mapping and fixes Db2's dependency to a 0.13
+binding, while new 0.12 mutating integration requires an owned early binding.
+The manager's proposed [core participant evolution](../../../decisions/0029-db2-core-participant-evolution.md)
+preserves v1 and chooses a shared versioned extension for the bounded local
+Db2 core, with action/context applicability and minimum durable proof before
+admission. No capability has been accepted and no guard or runtime route changed.
+Full rollback and savepoint rollback cannot share a blanket CICS/IMS rejection:
+SQL0026 prohibits COMMIT there; SQL0119 permits only savepoint rollback there.
+Diagnostic/context sources and actual binding remain pending before mutation.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
