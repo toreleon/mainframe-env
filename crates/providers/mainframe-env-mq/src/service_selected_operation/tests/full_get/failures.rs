@@ -1,6 +1,50 @@
 use super::*;
 
 #[test]
+fn memory_sqlite_stored_ccsid_sentinels_refuse_without_publication_or_removal() {
+    for sqlite in [false, true] {
+        for version in [1, 2] {
+            for cp in [false, true] {
+                for ccsid in [i32::MIN, -2, -1, 0] {
+                    let mut stored = message(version, cp);
+                    match &mut stored.descriptor {
+                        MqMdValue::V1 { fields, .. } | MqMdValue::V2 { fields, .. } => {
+                            fields.coded_char_set_id = ccsid;
+                        }
+                    }
+                    let f = FullFixture::new(sqlite, version, cp, vec![stored]);
+                    let c = f.connect();
+                    let o = f.open(c);
+                    let unit = f.unit();
+                    let e = f.effect(
+                        3,
+                        request(
+                            c,
+                            o,
+                            version,
+                            cp,
+                            32,
+                            MqMqiUnitOfWork::Local { unit },
+                            false,
+                        ),
+                    );
+                    f.seed(&e);
+                    let rows = f.rows();
+                    let live = f.live();
+                    let audits = f.audits();
+                    assert_eq!(f.execute(&e), Err(HostProblem::Unsupported));
+                    assert_eq!(f.rows(), rows);
+                    assert_eq!(f.live(), live);
+                    assert_eq!(f.audits(), audits);
+                    assert_eq!(f.depth(), 1);
+                    assert_eq!(f.unit(), unit);
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn memory_sqlite_pending_modes_profiles_headers_and_partial_routes_do_not_mutate() {
     for sqlite in [false, true] {
         for case in 0..13 {

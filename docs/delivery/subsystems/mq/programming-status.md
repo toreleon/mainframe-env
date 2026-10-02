@@ -6,6 +6,19 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.selected-get-ccsid-boundary` distinguishes lossless full-storage
+observations from executable selected GET output. The finite unformatted profile
+now requires a stored explicit positive body CCSID, refusing Q_MGR/INHERIT and
+other nonpositive observations before candidate adoption or physical publication.
+Pinned supplemental `q097395_946–962` forbids successful GET returning the two
+sentinels; broader negative CCSID formats remain outside this finite profile.
+This is not input-MQMD validation, PUT/default resolution or conversion. Stored
+diagnostics, old canonical/replay/cold bytes and the source denominator stay exact.
+Memory/owned SQLite MD1/2 ASCII/CP037 negative cases check queue, current unit,
+live checkpoint, every physical row and audits remain unchanged. Parent full26,
+native full delivery, root/taskend/recovery/participant/CardDemo stay required;
+only the licensed oracle is skipped0/26.
+
 `MQ-1503.selected-full-get` consumes source-repaired sealed worker `b52553af6`
 on top of the live backout prerequisite. The private ordinary ZosBatch selected
 service now composes complete MD1/2, copied prefix, DataLength and exact reviewed

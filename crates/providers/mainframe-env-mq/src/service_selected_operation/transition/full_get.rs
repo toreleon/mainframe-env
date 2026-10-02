@@ -111,7 +111,12 @@ pub(super) fn prepare(
         // q097395_1498–1508: the stored GET output counter is bounded on
         // z/OS. The input MD counter is output-only and MUST NOT select policy.
         // Structured property transport is NOT native GMO/RFH2 admission.
-        if !(0..=255).contains(&message.descriptor.fields().backout_count)
+        // q097395_946–962: successful GET cannot return Q_MGR/INHERIT
+        // sentinels. Complete storage preserves diagnostic observations, but
+        // this unformatted profile requires an explicit positive body CCSID.
+        // Refuse rather than infer a queue default or perform conversion.
+        if message.descriptor.fields().coded_char_set_id <= 0
+            || !(0..=255).contains(&message.descriptor.fields().backout_count)
             || !message.properties.is_empty()
         {
             return Err(HostProblem::Unsupported);
