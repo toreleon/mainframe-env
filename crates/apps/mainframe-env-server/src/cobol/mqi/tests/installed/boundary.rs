@@ -4,6 +4,7 @@ use super::*;
 use mainframe_env_host_api::ProgramName;
 use mainframe_env_store_api::{EffectDigestFormat, ExecutionState, ProviderStateStore};
 use std::sync::atomic::{AtomicBool, AtomicU64};
+mod lookup;
 
 const SOURCE: &str = "IDENTIFICATION DIVISION. PROGRAM-ID. MQFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 QM PIC X(48) VALUE SPACES. 01 HC PIC S9(9) BINARY. 01 CC PIC S9(9) BINARY. 01 RC PIC S9(9) BINARY. PROCEDURE DIVISION. CALL 'MQCONN' USING QM HC CC RC. CALL 'MQDISC' USING HC CC RC. DISPLAY 'DONE'. STOP RUN.";
 type Admit = dyn Fn(&InstalledBatchAdmission<'_>) -> Result<Box<dyn InstalledMqFrameSession>, HostProblem>

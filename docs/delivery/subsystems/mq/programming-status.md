@@ -6,6 +6,18 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+Installed executable frames now forward read-only profile and current-unit
+observations through one exact-Invocation, pre/post-callback revocation guard.
+Panic revokes transport and returns protected Unknown without retry or cleanup;
+finish, abort and Drop suppress escaped observations. Present inherited ordinary
+batch MQ bindings are retained exactly; malformed or conflicting MQ contexts
+reject before factory/dispatch, and only missing child context receives trusted
+setup. Original parent/core/CALL provenance is never rewritten. Compiled-child
+and genuine coordinator Memory/SQLite regressions cover CONNECT/CMIT/BACK/DISC,
+but use fixture MQ/frame transport rather than an actual selected service/SAF.
+Source baseline `ibm-mq-9.4-mqi-2026-08-31`, rows `0001/0007/0008/0009/0012`,
+does not make these observations durable UOW or task-end authority.
+
 An explicit private trusted-host context plane now admits an unchanged original
 ordinary batch parent even when its MQ binding is absent. The opaque directory
 freezes binding-only versus explicit mode; old routes never fall back. Present
@@ -39,9 +51,8 @@ coordinator outcome before output mapping, and makes no durable decision on Drop
 Factory callbacks run outside setup locks; foreign physical store/control,
 late provenance/control changes and uncertain notifications fail closed.
 Fixtures prove actual compiled child/core/CALL dispatch, not an owned selected
-MQ service or independent root/topology. Actual host bridge, guarded local-UOW
-lookup forwarding and inherited-context contradiction checks remain composition
-obligations before public registration. Source baseline
+MQ service or independent root/topology. The actual same-service host bridge
+remains a composition obligation before public registration. Source baseline
 `ibm-mq-9.4-mqi-2026-08-31`, rows `0008/0009/0012`, distinguishes actual task
 end from child return; raw outcomes are not invented task-end authority.
 
@@ -67,8 +78,8 @@ sequence/key/actor and the selected provider's logical-owner/control/CAS checks
 remain unchanged. Reviewed status observations are copied exactly without local
 durable decisions; mismatched units, changed frames and unusable post-dispatch
 typed envelopes are protected Unknown before writeback. Legacy validation and
-checkpoint bytes remain unchanged. Actual host-session lookup containment and
-selected service wiring, shared participants and typed recovery remain required.
+checkpoint bytes remain unchanged. Selected service wiring, shared participants
+and typed recovery remain required.
 
 Private same-task batch-child ownership now consumes an opaque admitted parent
 lease and explicit host-supplied SAME TASK relationship. It retains the frozen

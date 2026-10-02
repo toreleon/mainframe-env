@@ -4,6 +4,7 @@ use mainframe_env_execution_api::{
     Abend, AbendDumpDisposition, ChildInvocation, Completion, Condition, Machine, MachineDrive,
     MachineResume, Quantum, Suspension, Transfer,
 };
+mod lookup;
 
 struct Stop;
 impl Machine for Stop {

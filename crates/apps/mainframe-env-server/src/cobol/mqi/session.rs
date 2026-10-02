@@ -1,6 +1,7 @@
 //! One bounded frame lifetime. Drop invalidates transport only.
 
 use super::*;
+use mainframe_env_host_api::{MqHconn, mq_mqi::MqMqiUnitOfWork};
 use mainframe_env_interpreter::MqMqiProgramProfile;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::AtomicBool;
@@ -24,17 +25,41 @@ struct ExecutableFrame {
     invocation: Invocation,
     inner: Arc<dyn MqMqiProgramFrame>,
 }
-impl MqMqiProgramFrame for ExecutableFrame {
-    fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
+impl ExecutableFrame {
+    fn observe<T>(
+        &self,
+        invocation: &Invocation,
+        callback: impl FnOnce(&dyn MqMqiProgramFrame) -> Result<T, HostProblem>,
+    ) -> Result<T, HostProblem> {
         if !self.active.load(Ordering::Acquire) || invocation != &self.invocation {
             return Err(HostProblem::Unauthorized);
         }
-        let result = self.inner.profile(invocation);
+        let result = match catch_unwind(AssertUnwindSafe(|| callback(self.inner.as_ref()))) {
+            Ok(result) => result,
+            Err(_) => {
+                // An uncertain callback cannot become a usable observation on retry.
+                self.active.store(false, Ordering::Release);
+                return Err(HostProblem::UnknownOutcome);
+            }
+        };
         // A callback cannot keep a usable transport after synchronous invalidation.
         if !self.active.load(Ordering::Acquire) {
             return Err(HostProblem::Unauthorized);
         }
         result
+    }
+}
+impl MqMqiProgramFrame for ExecutableFrame {
+    fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
+        self.observe(invocation, |frame| frame.profile(invocation))
+    }
+
+    fn local_unit(
+        &self,
+        invocation: &Invocation,
+        connection: MqHconn,
+    ) -> Result<MqMqiUnitOfWork, HostProblem> {
+        self.observe(invocation, |frame| frame.local_unit(invocation, connection))
     }
 }
 

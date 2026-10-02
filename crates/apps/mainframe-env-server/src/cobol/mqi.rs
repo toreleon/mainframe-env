@@ -135,20 +135,28 @@ impl CobolProgram {
             .observe_execution_control(call.parent())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         check_controls(call.parent(), before, 0)?;
-        if !invocation.bindings.contains_key("mq.host-context")
-            && invocation.bindings.len() >= InvocationLimits::default().max_bindings
-        {
-            return Err(HostProblem::ResourceExhausted);
+        if let Some(binding) = invocation.bindings.get("mq.host-context") {
+            // This configured factory admits only ordinary local-MQ batch. An
+            // inherited context is provenance, never a value to normalize away.
+            if binding.schema() != "mainframe-env.mq.host-context@1"
+                || binding.bytes() != b"zos-batch|queue-manager"
+            {
+                return Err(HostProblem::Malformed);
+            }
+        } else {
+            if invocation.bindings.len() >= InvocationLimits::default().max_bindings {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            invocation.bindings.insert(
+                "mq.host-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.mq.host-context@1",
+                    b"zos-batch|queue-manager".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            );
         }
-        invocation.bindings.insert(
-            "mq.host-context".into(),
-            BoundedPayload::new(
-                "mainframe-env.mq.host-context@1",
-                b"zos-batch|queue-manager".to_vec(),
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?,
-        );
         let admission = proof::admitted(
             self,
             call.parent(),

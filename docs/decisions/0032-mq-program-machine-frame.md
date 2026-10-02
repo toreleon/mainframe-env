@@ -85,6 +85,24 @@ Factories must roll back only newly owned volatile preparation on admission
 error and must not perform durable cleanup in session Drop. Actual source-bound
 UOW/task-end and fallible retirement policy belongs to the real selected bridge.
 
+The executable transport forwards both `profile` and `local_unit` through the
+same exact frozen Invocation and synchronous active check before and after the
+embedding callback. Lookup carries the actual issued connection token unchanged
+and returns only the embedding's observation; it cannot mint authority, decide
+work or rewrite the original effect. Revocation during a callback suppresses its
+returned observation. Callback panic revokes the transport and returns protected
+UnknownOutcome without retry or cleanup; ordinary abort/finish containment remains
+once-only. Older frames' default lookup remains Unsupported.
+
+For this explicitly configured ordinary batch profile, a present `mq.host-context`
+must have exactly schema `mainframe-env.mq.host-context@1` and payload
+`zos-batch|queue-manager`. Matching inherited bytes are preserved; wrong schema,
+malformed or conflicting context is rejected before factory admission or MQ
+dispatch. Only an absent child binding receives the configured trusted setup.
+The original parent and CALL/core occurrence are never normalized or rewritten.
+This compatibility check does not independently attest a host lifecycle or admit
+client, IMS, CICS or host-coordinated work through an ordinary batch factory.
+
 The first adapter maps MQCONN/MQDISC for ordinary z/OS batch. It validates exact
 argument count, MQCHAR48 input and signed fullword output storage before dispatch,
 preserves case/significant name padding, and retains actual issued HCONN tokens
@@ -113,8 +131,9 @@ or advances durable work or retires connection aliases. Unknown/duplicate,
 changed profile, wrong unit and unusable typed reply envelopes remain protected
 UnknownOutcome before application writes; legacy reply-validation errors and
 checkpoint bytes remain unchanged. These machine/frame fixtures are not a real
-installed MQ service producer, shared participant or task-end policy. The real
-session containment must forward the lookup through its live revocation guard.
+installed MQ service producer, shared participant or task-end policy. The server
+session containment forwards the lookup through its live revocation guard;
+actual selected-provider ownership and durable-control validation remain required.
 
 The unchanged legacy checkpoint schema has no typed lifecycle/alias references.
 Typed frames therefore do not emit that checkpoint or restore it. A serialized
