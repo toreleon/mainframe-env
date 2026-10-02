@@ -611,6 +611,62 @@ Acceptance is explicit baseline/topic/row citations, preserved prior patch bytes
 applicable static state fields/resource exclusions and precise unresolved authority.
 Source review earns zero execution/licensed credit and reserves no codec/API.
 
+The API documentation/module prerequisite is sealed at
+`d53aca908f63c62883e7b6cffccf0284f5d19924`: the full documentation ratchet,
+104 host contract tests and required architecture/format/docs/changelog/dependency
+gates pass. The source core handoff prerequisite is sealed at
+`3f46b954751832336645da7e550a8b6713cfa6fc`: five local negatives/race/quota/SQLite
+reopen tests, one actually executed PostgreSQL reopen test and ten existing
+coordinator regressions pass, with required gates and cleanup. It reads only the
+exact pinned suspension event; quota rollback is checked at the core commit.
+Neither prerequisite grants installed transfer execution or parent acceptance.
+
+`CIC-902.program-task.frames.attestation-prerequisite` is the next serialized
+integration slice for rows 0138/0263. It reuses the worker's private canonical
+source revalidation, exact inherited constructor proof and read-only instance CAS
+snapshot. The manager binds the warm existing instance Lease to its acquiring
+invocation so another execution/attempt/context cannot borrow that token. The
+allowlist is the seven reviewed server instance/replay implementation/test paths,
+ADR-0027, this status, a unique fragment and derived documentation. The worker's
+ignored future target-completion diagnostic stays external and earns no credit.
+Acceptance includes forged source/constructor/control/lease identity and immutable
+selection regressions, existing compiled pending routes and required gates.
+Snapshot tokens confer no source retirement, target execution, cold lease or
+receipt completion. Durable CALL phases and source-state authority remain pending.
+
+Two additional dependency-ready CLI lanes are declared for the current wave.
+`CIC-904.bts-container.root-lifetime-regressions` resumes the task-storage worker
+in a fresh checkout of `3f46b954751832336645da7e550a8b6713cfa6fc`. It owns only
+`mainframe-env-server/src/product/tests/bts_set_lifetime.rs` and its single test-only
+module registration inside the existing inline test module in `product.rs`,
+plus external receipts. `product/tests.rs` is absent; no such file is required. For row 0086, derive
+independent compiled root SET/dereference, different-container expiry,
+INTO/NODATA preservation and failed subsequent SET regressions from the verified
+BTS/channel sources. Begin with the actual selected route; keep deliberately red
+cases explicitly ignored diagnostics with their actual failure receipts. No
+runtime repair, allocation ABI, checkpoint codec, provider semantics, CALL schema,
+coverage or readiness change is authorized in this lane. Manager reviews the
+minimal root-policy repair and all shared contracts later. Acceptance is a
+reviewable disjoint regression patch, independently seeded observations, exact
+baseline failures/control successes, focused format/module checks and cleanup;
+diagnostics grant zero command or recovered credit.
+
+`SPI-1001.fepi-retained-context-closure` resumes the FEPI source session read-only
+in its existing isolated checkout. It owns external receipts only, reviewing the
+six CICS TS locators previously enumerated outside the 45-body cohort: developing
+FEPI `dfhp73r.html`, configuring FEPI `dfhp76q.html`, programming reference,
+EIB `dfha8me.html` and `dfha8mf.html`, and Passticket security. Preserve all 39 FEPI
+identities and prior receipts. Resolve committed pins first; for unregistered
+retained candidates check the pinned TOC and archived provenance and propose
+bounded hashes without silently accepting them. Explain the six absent fragments
+from the existing nine context bodies without substituting anchors. No z/OS,
+external book, network/browser refresh, whole-cache audit, manifests, grammar,
+runtime, denominator or coverage changes. Acceptance is exact retained provenance,
+applicable command/context linkage and explicit missing or unresolved identity;
+all new pins and semantic decisions stay manager-owned and private. Source review
+grants zero execution/licensed credit. These lanes are independent of the manager's
+server transfer-attestation validation and source-state authority review.
+
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before
 declaring source-required context closure and deriving private SPI-1001

@@ -468,6 +468,26 @@ volatile task loan or redispatch. The existing generic handoff remains unchanged
 Source snapshot semantics and the original CALL/instance proof chain are separate
 prerequisites before any runtime use.
 
+### Read-only transfer and warm instance attestation prerequisite
+
+The pending schema4 constructor is revalidated against the exact source
+Suspended record/event/checkpoint, canonical completed CICS Transfer effect,
+retained command replay and frozen immutable selection. The restored source
+machine must match the captured checkpoint and effect sequence; the target image
+must equal an independent fresh constructor with the exact inherited invocation
+and COMMAREA. Rehashed executed images or widened context do not gain admission.
+Live controls are checked without writes, target dispatch or fence changes.
+
+The existing warm instance Lease retains its acquiring invocation in memory.
+Read-only token observation requires that exact actor/context, source row CAS and
+payload, current run ownership/membership/active counts and a closed source.
+Only an idle compatible target and validated ordinary last-used target image are
+accepted. It returns observed run/source/target CAS versions without reserving,
+retiring or executing either program. It cannot reconstruct a token from cold
+busy rows, prove a source transfer disposition or create a completed CALL reply.
+This prerequisite preserves the existing schemas and unsupported runtime result;
+source-state snapshot authority and durable CALL/instance phases remain separate.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline

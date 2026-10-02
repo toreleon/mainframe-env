@@ -73,6 +73,63 @@ impl TransferIntent {
                 self.checkpoint_digest == format!("{:x}", Sha256::digest(checkpoint.bytes()))
             })
     }
+
+    /// Recheck retained proof; a staged intent digest alone is not authority.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn attest_source(
+        &self,
+        invocation: &Invocation,
+        execution: &ExecutionRecord,
+        checkpoint: &CheckpointRecord,
+        event: &LifecycleEvent,
+        machine: &ReferenceMachine,
+        observed: &Transfer,
+    ) -> Result<(), HostProblem> {
+        if !observed.replace_frame {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let current = machine.checkpoint().ok_or(HostProblem::UnknownOutcome)?;
+        if !self.valid()
+            || !self.matches(invocation, machine, observed)
+            || execution.version != self.source_version
+            || checkpoint.machine_schema_version != self.checkpoint_machine_schema
+            || self.checkpoint_schema != current.schema()
+            || execution.execution_id != invocation.execution_id
+            || execution.state != ExecutionState::Suspended
+            || execution.run_unit_id != invocation.run_unit_id
+            || execution.principal != *invocation.principal.id()
+            || execution.artifact != invocation.artifact
+            || execution.selector != invocation.selector
+            || execution.attempt != invocation.attempt
+            || execution.terminal_tick.is_some()
+            || event.kind != LifecycleEventKind::Suspended
+            || event.execution_id != invocation.execution_id
+            || event.run_unit_id != invocation.run_unit_id
+            || event.sequence != execution.version
+            || event.attempt != invocation.attempt
+            || event.tick == 0
+            || checkpoint.execution_id != invocation.execution_id
+            || checkpoint.run_unit_id != invocation.run_unit_id
+            || checkpoint.principal != *invocation.principal.id()
+            || checkpoint.artifact != invocation.artifact
+            || checkpoint.schema_version != 1
+            || checkpoint.provider_generation != mainframe_env_interpreter::INTERPRETER_GENERATION
+            || checkpoint.required_host_interfaces
+                != BTreeMap::from([
+                    ("mainframe-env.execution-api".into(), "1".into()),
+                    ("mainframe-env.host-api".into(), "1".into()),
+                ])
+            || checkpoint.payload_size != checkpoint.payload.len() as u64
+            || checkpoint.payload_digest != <[u8; 32]>::from(Sha256::digest(&checkpoint.payload))
+            || checkpoint.payload != current.bytes()
+            || checkpoint.effect_sequence != machine.effect_sequence()
+            || checkpoint.effect_sequence > u64::from(invocation.limits.max_effects)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        Ok(())
+    }
+
     fn valid(&self) -> bool {
         valid_identity(&self.selector)
             && !self.selector.contains(':')
@@ -239,40 +296,7 @@ fn prepare_transfer_receipt(
         checkpoint_machine_schema: checkpoint.machine_schema_version,
         checkpoint_schema: current.schema().into(),
     };
-    if !intent.valid()
-        || execution.execution_id != invocation.execution_id
-        || execution.state != ExecutionState::Suspended
-        || execution.run_unit_id != invocation.run_unit_id
-        || execution.principal != *invocation.principal.id()
-        || execution.artifact != invocation.artifact
-        || execution.selector != invocation.selector
-        || execution.attempt != invocation.attempt
-        || execution.terminal_tick.is_some()
-        || event.kind != LifecycleEventKind::Suspended
-        || event.execution_id != invocation.execution_id
-        || event.run_unit_id != invocation.run_unit_id
-        || event.sequence != execution.version
-        || event.attempt != invocation.attempt
-        || event.tick == 0
-        || checkpoint.execution_id != invocation.execution_id
-        || checkpoint.run_unit_id != invocation.run_unit_id
-        || checkpoint.principal != *invocation.principal.id()
-        || checkpoint.artifact != invocation.artifact
-        || checkpoint.schema_version != 1
-        || checkpoint.provider_generation != mainframe_env_interpreter::INTERPRETER_GENERATION
-        || checkpoint.required_host_interfaces
-            != BTreeMap::from([
-                ("mainframe-env.execution-api".into(), "1".into()),
-                ("mainframe-env.host-api".into(), "1".into()),
-            ])
-        || checkpoint.payload_size != checkpoint.payload.len() as u64
-        || checkpoint.payload_digest != <[u8; 32]>::from(Sha256::digest(&checkpoint.payload))
-        || checkpoint.payload != current.bytes()
-        || checkpoint.effect_sequence != machine.effect_sequence()
-        || checkpoint.effect_sequence > u64::from(invocation.limits.max_effects)
-    {
-        return Err(HostProblem::UnknownOutcome);
-    }
+    intent.attest_source(invocation, execution, checkpoint, event, machine, observed)?;
     receipt.schema_version = 3;
     receipt.transfer = Some(intent);
     receipt.metadata_digest = receipt_metadata_digest(&receipt);

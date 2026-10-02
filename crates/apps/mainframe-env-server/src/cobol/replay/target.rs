@@ -5,6 +5,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use mainframe_env_cics::CicsService;
 use mainframe_env_execution_api::{Machine, Transfer};
 
+mod admission;
+
 const MAX_STAGE_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -166,6 +168,46 @@ mod tests {
             );
         }
     }
+}
+
+fn target_invocation(
+    source: &Invocation,
+    receipt: &Receipt,
+    selection: &mainframe_env_host_api::ProgramLinkSelection,
+    observed: &Transfer,
+) -> Result<Invocation, HostProblem> {
+    let name = observed.selector.as_str();
+    let sequence = target_identity(receipt, selection.generation, &selection.content_identity);
+    let limits = InvocationLimits::default();
+    let mut next = source.clone();
+    next.request_id = RequestId::new(format!("online-transfer-request-{sequence}"), limits)
+        .map_err(|_| HostProblem::UnknownOutcome)?;
+    next.execution_id = ExecutionId::new(format!("online-transfer-execution-{sequence}"), limits)
+        .map_err(|_| HostProblem::UnknownOutcome)?;
+    next.parent_execution_id = Some(source.execution_id.clone());
+    next.selector = Selector::new(format!("program:{name}"), limits)
+        .map_err(|_| HostProblem::UnknownOutcome)?;
+    next.artifact = selection.artifact.clone();
+    next.trace_id = TraceId::new(format!("online-transfer-trace-{sequence}"), limits)
+        .map_err(|_| HostProblem::UnknownOutcome)?;
+    next.idempotency_key =
+        IdempotencyKey::new(format!("online-transfer-effect-{sequence}"), limits)
+            .map_err(|_| HostProblem::UnknownOutcome)?;
+    next.bindings.insert(
+        "cics.commarea".into(),
+        BoundedPayload::new(
+            "mainframe-env.cics.commarea@1",
+            observed.payload.bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::UnknownOutcome)?,
+    );
+    next.bindings.insert(
+        "cobol.call.arguments".into(),
+        super::super::selected_link::encode_selected_call(&[observed.payload.bytes().to_vec()])
+            .map_err(|_| HostProblem::UnknownOutcome)?,
+    );
+    Ok(next)
 }
 
 fn target_identity(receipt: &Receipt, generation: u64, content_identity: &str) -> String {
@@ -349,37 +391,7 @@ impl CobolProgram {
         let admitted = self
             .preflight_selected_program(name, &selection)
             .map_err(|_| HostProblem::UnknownOutcome)?;
-        let sequence = target_identity(&receipt, selection.generation, &selection.content_identity);
-        let limits = InvocationLimits::default();
-        let mut next = source.clone();
-        next.request_id = RequestId::new(format!("online-transfer-request-{sequence}"), limits)
-            .map_err(|_| HostProblem::UnknownOutcome)?;
-        next.execution_id =
-            ExecutionId::new(format!("online-transfer-execution-{sequence}"), limits)
-                .map_err(|_| HostProblem::UnknownOutcome)?;
-        next.parent_execution_id = Some(source.execution_id.clone());
-        next.selector = Selector::new(format!("program:{name}"), limits)
-            .map_err(|_| HostProblem::UnknownOutcome)?;
-        next.artifact = selection.artifact.clone();
-        next.trace_id = TraceId::new(format!("online-transfer-trace-{sequence}"), limits)
-            .map_err(|_| HostProblem::UnknownOutcome)?;
-        next.idempotency_key =
-            IdempotencyKey::new(format!("online-transfer-effect-{sequence}"), limits)
-                .map_err(|_| HostProblem::UnknownOutcome)?;
-        next.bindings.insert(
-            "cics.commarea".into(),
-            BoundedPayload::new(
-                "mainframe-env.cics.commarea@1",
-                observed.payload.bytes().to_vec(),
-                limits,
-            )
-            .map_err(|_| HostProblem::UnknownOutcome)?,
-        );
-        next.bindings.insert(
-            "cobol.call.arguments".into(),
-            super::super::selected_link::encode_selected_call(&[observed.payload.bytes().to_vec()])
-                .map_err(|_| HostProblem::UnknownOutcome)?,
-        );
+        let next = target_invocation(source, &receipt, &selection, observed)?;
         let invocation = StagedInvocation::capture(&next)?;
         let target_machine = ReferenceMachine::from_binary(
             admitted.executable.payload(),
@@ -414,6 +426,9 @@ impl CobolProgram {
             return Err(HostProblem::UnknownOutcome);
         }
         decode_receipt(&staged).map_err(|_| HostProblem::UnknownOutcome)?;
+        // Read-only revalidation precedes the CALL CAS. It grants no frame or
+        // instance admission and cannot turn this pending row into a reply.
+        self.attest_staged_transfer(&staged, source, machine, observed)?;
         store
             .put_provider_state(staged, Some(2))
             .map_err(|_| HostProblem::UnknownOutcome)

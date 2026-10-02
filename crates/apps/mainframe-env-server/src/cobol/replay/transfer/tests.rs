@@ -243,6 +243,55 @@ mod tests {
     }
 
     #[test]
+    fn transfer_intent_revalidation_rejects_newer_source_with_matching_new_event() {
+        let mut proof = Proof::new();
+        let staged = proof.prepare().unwrap();
+        let DecodedReceipt::Current(receipt) = decode_receipt(&staged).unwrap() else {
+            panic!("current intent required");
+        };
+        let intent = receipt.transfer.unwrap();
+        assert!(
+            intent
+                .attest_source(
+                    &proof.invocation,
+                    &proof.execution,
+                    &proof.checkpoint,
+                    &proof.event,
+                    &proof.machine,
+                    &proof.observed
+                )
+                .is_ok()
+        );
+        proof.execution.version += 1;
+        proof.event.sequence = proof.execution.version;
+        assert_eq!(
+            intent.attest_source(
+                &proof.invocation,
+                &proof.execution,
+                &proof.checkpoint,
+                &proof.event,
+                &proof.machine,
+                &proof.observed
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        proof.execution.version -= 1;
+        proof.event.sequence = proof.execution.version;
+        proof.observed.replace_frame = false;
+        assert_eq!(
+            intent.attest_source(
+                &proof.invocation,
+                &proof.execution,
+                &proof.checkpoint,
+                &proof.event,
+                &proof.machine,
+                &proof.observed
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+    }
+
+    #[test]
     fn transfer_intent_reader_preserves_legacy_and_active_retention() {
         let proof = Proof::new();
         assert!(decode_receipt(&proof.row).is_ok());

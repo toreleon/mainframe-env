@@ -4,6 +4,7 @@ use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite, StoreEr
 use serde::{Deserialize, Serialize};
 
 mod abend;
+mod transfer;
 
 use super::retention::{
     CALL_PROTOCOL_NAMESPACE, CANCEL_NAMESPACE, CobolRetentionRowDescriptor, CobolRetentionRowKind,
@@ -77,6 +78,7 @@ fn cancel_metadata_digest(receipt: &CancelReceipt) -> String {
 }
 
 pub(super) struct Lease {
+    invocation: Invocation,
     run: String,
     namespace: String,
     name: String,
@@ -577,6 +579,7 @@ impl Lease {
                 _ => HostProblem::InfrastructureFailure,
             })?;
         Ok(Self {
+            invocation: invocation.clone(),
             run,
             namespace,
             name,
