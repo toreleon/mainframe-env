@@ -23,6 +23,25 @@ Equal descriptor/generation values cannot substitute another selected provider;
 existing ready/missing refusals and independent invocation admission remain.
 This necessary bridge composition check grants no lifecycle, SAF or UOW permit.
 
+`MQ-1505.selected-connection-warning`, integrated `e85d389b`, now reuses the
+actual unique live issued connection for ordinary nonshared CONN/CONNX under
+the same logical owner, original CONNECT key, current unit and closed directory.
+Mandatory original core/SAF/control checks and atomic receipt/audit/CAS remain;
+exact reviewed `1/2002` performs no new allocation, delivery-clock advance or
+pending-work change. Cached replay must still match the actual issued reply and
+live authority. Manager composition passes 193 focused tests, zero ignored,
+including Memory/SQLite late-CAS, audit rollback, uncertainty and incarnation
+fences. Original baseline rows `0008/0009` distinguish a task from its subtasks.
+Private provider fixtures do not prove the configured installed/public route.
+
+`MQ-1506.execution-store-api-docs`, integrated `47e35251`, documents the
+execution/participant and audited publication/CAS boundaries without changing
+executable code. Exact missing-documentation ratchets decrease from execution
+303/176 and store 98/95 to execution 0 and store 72; no ceiling increases or
+exemptions are introduced. The original host failure 2546/1128 remains unwaived
+and is being repaired separately. Verified selected-package diagnostics are not
+a global API-documentation pass, licensed evidence or release acceptance.
+
 Next configured installed-batch bridge slice (parent `MQ-1505`) must consume
 genuine private installed artifact/core/CALL admission and independently retain
 unchanged original root/same-task child through the closed selected runtime.
@@ -67,9 +86,9 @@ partial descriptor remain unchanged; partial projection still refuses pending.
 Worker `71d66481`, ADR0033 and original rows `0015/0020/0021`, supplemental MQMD
 `q097390_/q097395_/q091870_` and the point-layout scalar/encoding pins define this
 slice. Full-message request/result, actual PUT/GET, context/SAF, delivery and
-durable evolution remain pending. The worker's global API-doc ratchet failure
-(execution 303/176, host 2546/1128, store 98/95) stays unwaived; zero diagnostics
-on this slice's new API items is not a global pass or release acceptance.
+durable evolution remain pending. The worker's original global API-doc failure
+retains its candidate identity; the bounded execution/store repair above does
+not waive the remaining host failure or constitute a global pass.
 
 The compiled typed adapter now recognizes original MQCONNX VERSION1 calls through
 an additive, default-Unsupported trusted profile/encoding port. It checks real
@@ -92,8 +111,8 @@ codec preserves its full canonical identity but reconstructs only historical
 non-executable handles; registry lifetime/owner checks remain independent.
 Original MQ 9.4 rows `0008/0009`, MQCONN usage line 271 and MQCONNX return lines
 76–78 define this source review. Selected provider reuse of its actual prior
-connection still needs composition; compiled warning writeback is separately
-integrated above. No token,
+connection and compiled warning writeback are separately integrated above.
+The genuine configured installed route remains pending. No token,
 duplicate connection, SAF permit or additional execution credit is fabricated.
 
 Installed executable frames now forward read-only profile and current-unit
@@ -184,9 +203,9 @@ Its original CONNECT key remains durable provenance while the admitted logical
 root owns the UOW; its actual child actor still owns the effect, SAF, audit and
 receipt. Normal nonfinal child return retains that connection, objects and work
 for surviving admitted frames, without implicit disconnect or UOW decision.
-Already-connected warning/output composition, final task end, abnormal/Unknown
-recovery, checkpoints, participants and full 26-call acceptance remain separate
-obligations. The source boundary is original baseline
+Already-connected warning/output composition is integrated above; final task
+end, configured abnormal/Unknown recovery, checkpoints, participants and full
+26-call acceptance remain separate obligations. The source boundary is original baseline
 `ibm-mq-9.4-mqi-2026-08-31`, rows `0008/0009/0012`; task excludes subtasks.
 
 The additive `mq-point-layout-sources` scope now registers twelve hash-verified
