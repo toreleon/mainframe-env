@@ -351,3 +351,6 @@ hook). `MQ-1505.service-row-codec-module` therefore owns a mechanical extraction
 of existing row persistence/projection helpers into one child module, preserving
 their bytes, CAS behavior and service facade. It must bring the affected service
 below its existing ceiling, without raising exemptions or changing schemas.
+The same slice updates `tools/check_provider_rows.py` and focused guard mutants
+to inspect the linked MQ row child as well as the service, preserving both
+required atomic-write checks and whole-state-serialization rejection.
