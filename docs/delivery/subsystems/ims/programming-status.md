@@ -230,6 +230,179 @@ locator failures are `gsam-policy-locator-initial-failure.md`. No older receipt
 is relabeled as this candidate. Licensed certification remains excluded by the
 user; official acceptance and parent completion remain unclaimed.
 
+## IMS-1401.secondary-ssa-navigation (implemented bounded leaf, 2026-10-02)
+
+Parent IMS-1401 remains open. Clean entry `174aa627330315024359a340cc8185ddfbfe2515`
+is preserved on `codex/v014-integrity-read-visibility-20261002`; this leaf starts
+from manager base `10ef210c67117d88a199e377ca01b66c00ae69da` on
+`codex/v014-secondary-ssa-navigation-20261002`. Integrity-read integration stays
+manager-owned; both operand forms retain the common execute_operands_at seam.
+Consumed dependency identities and licensed-pending dispositions below apply.
+
+Exact ownership: bounded database SSA/secondary selection helpers, generic/ssa.rs,
+minimal selected field-catalog projection, focused engine/public-provider/signed
+package tests, this appended status, unique fragment and routine docs manifest.
+No host ABI, checkpoint/backout/GSAM/STAT/integrity algorithm, index maintenance
+algorithm, cursor, store, coordinator, schema, dependency or official IR ownership.
+Shared seam: supply the existing parser with selected XDFLD length metadata and
+the existing secondary traversal with the existing rich SSA evaluator.
+The mandatory provider-row guard also needs a locator-only integration repair:
+the base extracted MQ/IMS persistence helpers to service/rows.rs, while the guard
+still searches facades alone. Read each explicit child plus its facade, require
+their existing module import, and preserve every required/forbidden pattern.
+
+Catalog context is `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0005/:0006`,
+with :0015/:0004/:0008 mutation-maintenance interactions. Obligation classes:
+named/offset binary relations and uniform Boolean qualification, XDFLD composite
+bytes, source-to-target pointer identity and indexed order, applicable commands,
+exact current/parentage/hold and GE/GB/GP/AK conditions, independent selected PCBs,
+sensitivity/key-only/SAF before observation, malformed/context no mutation,
+canonical replay/conflict, real REPL/DLET/rollback and primary maintenance,
+Memory/file SQLite reopen and process exit, real publication CAS and lost-ack
+UnknownOutcome. Supported contexts remain the existing full-function admitted
+physical-root-target hierarchy. Nonroot inversion/aliases, NULLVAL/exits/SUBSEQ,
+unsupported commands/mixed Boolean/raw/context classes remain explicit.
+Selected-secondary symbolic checkpoint capture/resolution stays blocked; no
+primary-key substitute is allowed. Recovery, participant admission, accepted
+official IR, licensed differential and parent/release obligations remain pending.
+
+Acceptance: fail-first public selected-provider and signed-package cases, focused
+passing engine/provider/server/backend regressions, strict scoped all-target
+Clippy --no-deps -D warnings, fmt, mandatory affected execution/effect/provider-row/
+storage/schema/catalog/assurance/security/retention/dependency/docs/changelog gates,
+exact-path seal/check for this leaf and one local completion commit. Receipts stay
+outside Git/target under worker-receipts/v014-completion-20261002/
+ims-secondary-ssa-navigation. No delegation, refresh, licensed run, push or PR.
+Local checks/source review/sealing grant zero official or licensed credit.
+
+### Implementation and source-derived behavior
+
+The public canonical ImsNavigation variant now parses once with the existing
+parser and a selected XDFLD field-length projection. Both rich and legacy
+requests use the existing secondary pointer traversal and caller-owned PCB
+cursor. Rich named/physical-offset predicates use the original binary relation
+and uniform Boolean evaluator; index predicates read the actual pointer key,
+including ordered composite bytes from a distinct source occurrence. No primary
+order fallback, copied maintenance/expression algorithm or new cursor is added.
+GNP checks parent-level qualification against that same selected pointer before
+selection, preserving GE/GP and retained hold/current/parentage distinctions.
+The existing sensitivity, key-only, SAF, replay, UOW, observer, update maintenance
+and atomic CAS publication owners remain authoritative. Physical C keys apply
+only to the admitted root-target hierarchy with keyed levels; D, one P and O
+retain their existing applicability and output/bounds rules.
+
+Source review verified IMS 15.6 explicit scopes ims-programming-contracts and
+ims-database-contracts using offline ibm_docs.py search/read, committed hashes
+and catalog rows. The retained topic-path root lacked all sixteen reviewed
+bodies; each exact SHA-archive body matched its committed byte count/hash and
+was read with the repository plain_text parser. No required body was missing or
+mismatched. Full identities and zero-credit source review are external in
+ims-secondary-ssa-navigation/sources.json and source-review.log. Primary pins:
+
+| Baseline / topic | SHA-256 |
+|---|---|
+| ibm-ims-15.6-database-contracts-2026-09-11 / APG ims_ssassecondaryindex.htm | 4b3a1ee3cc0eabbbb4984d23a0eb60fe93be50887e1853643e0f382710139900 |
+| Same database baseline / DAG ims_howhierrstruc_fullfunction.htm | 8535859c6dfc8e9683b34d307535bc524321cdc445bb6b94c1143d8d0206d1ca |
+| Same database baseline / DAG ims_howseindexmaint.htm | 910d3494d8be6d834eb24844d86153ce675f67566fd49a455056d8da230cb086 |
+| Same database baseline / DAG ims_replacecall.htm | 55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a |
+| Same database baseline / DAG ims_issuedeletecall.htm | f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23 |
+| ibm-ims-15.6-programming-contracts-2026-09-11 / APG ims_ssacodingrules.htm | cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5 |
+| Same programming baseline / APR ims_ccmdcode.htm | 038fcdaa210493f4c423ae2b0bc7fbbbf8bd381146a8ad25cf7615d28174d65a |
+| Same programming baseline / APR ims_gnpghnpcall.htm | 6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762 |
+
+Additional programming topics read at their committed pins are ims_ssas.htm,
+ims_ssacodingformats.htm, ims_ssas_cmdcodes.htm, ims_cmdcodref.htm,
+ims_gughucall.htm, ims_gnghncall.htm, ims_currentpos.htm and
+ims_processingoptions.htm. Full paths use SSEPH2_15.6.0/com.ibm.ims156.doc.apg,
+.apr or .dag as declared in the manifests; their exact hashes remain in the
+external source identity list. The root-target restructuring source preserves
+the physical hierarchy, while nonroot inversion and duplicate-reference aliases
+need metadata this base cannot represent. Those shapes remain rejected.
+
+### Compatibility and parent obligations
+
+No host ABI/canonical variant, SQL migration, namespace, retained row codec,
+descriptor or position shape changes. Existing rows and replay digests are not
+rewritten. Stop new admission and drain/reconcile indexed SSA effects, sessions,
+holds/reservations and witnessed UOWs before binary downgrade; the previous
+binary rejects this selected rich route before replay. Preserve a coherent
+pre-upgrade backup containing selected/retained metadata and package artifacts,
+database images, sessions, undo, checkpoints/recovery, journals, replay and
+audits. Do not strip pointer or selector fields to simulate rollback. Inherited
+extended-index/per-PCB/v2-undo writer compatibility limits still apply; this
+leaf is not coherent backup/restore certification or a retention-expiry pass.
+
+The selected-secondary symbolic CHKP/XRST guard is unchanged and remains a
+required unsupported recovery leaf after GSAM discriminant integration. No
+primary-key substitute is published. Manager-owned integrity-read visibility
+must be integrated around both operand forms in execute_operands_at before
+selection and atomic publication, retaining replay ordering and read fences.
+This leaf changes neither that common seam nor integrity algorithms. Application
+backout, GSAM restart, participant admission/fencing and official IR candidates
+remain with their owners. Unsupported A/F/G/L/M/N/Q/R/S/U/V/W/Z/subsets, mixed
+Boolean precedence, multiple P, nonroot aliases, NULLVAL/exits/SUBSEQ, virtual or
+unkeyed concatenated keys, raw language/EBCDIC framing and unsupported contexts
+remain explicit pending source-applicable classes. Deterministic duplicate-source
+tie order is a local rule, not licensed IBM tie-order equivalence. No parent,
+official row, maintainer approval, differential or release completion is claimed.
+
+### Local verification and packaging
+
+Fail-first provider and signed-package receipts reproduce Unsupported on the
+public route. The former root boundary test now proves B-before-A indexed order
+and exact selected pointer state while preserving the primary PCB. Local runs
+pass 36 affected PCB/secondary tests, 11 inherited primary SSA tests, 15 engine
+tests and the one selected-secondary symbolic-checkpoint guard. The final
+composite helper runs twice on Memory/file SQLite, including fresh-reader
+continuation with a distinct source occurrence. Four signed secondary cases
+cover opposite order, composite binary XDFLD, distinct source/target and SQLite
+reopen; one inherited signed primary SSA case preserves selection fences.
+Three separately executed SQLite child processes prove pointer/replay retention;
+the helper's ordinary no-environment invocation earns no process-restart credit.
+Filtered binaries with zero selected tests earn no evidence. Final helper/test
+additions were checked separately without relabeling earlier runtime receipts.
+
+Strict IMS/server all-target Clippy --no-deps -D warnings, format, offline deny,
+license notices, supply-chain policy, schemas, IMS catalog/assurance, shared spec
+integrity and changelog pass. Execution, canonical effect, provider-row (after
+the documented locator repair), storage, enterprise SAF, retention and pending
+participant guards pass. The global module ratchet passes without a ceiling
+increase; no frozen facade grows. Initial compiler/fixture/locator failures and
+their repaired results remain separate external receipts. No source refresh,
+PostgreSQL campaign, CardDemo-full, licensed differential, whole-cache audit or
+release certification ran. Such required parent obligations are not waived.
+
+Routine docs generation/check and the exact 17-path leaf seal/check are the final
+packaging sequence recorded in external handoff.md. All Cargo sequences end
+with cargo clean for this checkout; receipts remain outside disposable targets
+and Git. The local completion commit seals only IMS-1401.secondary-ssa-navigation
+at target 0.14.0, with zero official row/verdict or licensed credit. The next
+manager action is to integrate this leaf through the preserved common pipeline,
+including integrity-read fences, while retaining the secondary recovery guard.
+
+Manager integration consumes GSAM/STAT/integrity at sealed `a0165979` and keeps
+the common `service/execution.rs` fresh-read and exact-replay ordering. Both
+primary and selected secondary operands pass through that one publication
+pipeline; the selected-secondary checkpoint guard is not weakened. The older
+nested Session CAS shim remains a re-export of the shared test-only owner,
+which now gains the worker's lost-acknowledgement injection rather than a second
+race algorithm. The provider-row locator repair already present in the manager
+is unchanged and retains its removal/whole-state mutant checks.
+
+Integration found a valid child physical field sharing the XDFLD identity.
+The worker evaluator incorrectly used the pointer bytes for that child as well
+as the target; a public GU returned GE instead of literal `C2AZ`. The retained
+`secondary-ssa-integration-red.log` reproduces that failure. Parsing and matching
+now share the same selected-target field resolver, leaving a child's physical
+field scoped to its own data. The added Memory/SQLite public regression retains
+exact replay and verifies ordinary GU parentage, explicit root P parentage and
+negative GE. An initial private-ID/SQLite-constructor fixture compile failure
+and a later incorrect default-parentage assertion are separately retained in
+`secondary-ssa-integration-compile-failure.log` and
+`secondary-ssa-integration.log`; neither is credited passing. Final integrated
+checks are recorded separately in `secondary-ssa-integration-fixed.log` under
+the manager continuation receipt root outside Git and targets.
+
 ## IMS-1401.public-ssa-navigation (bounded slice implemented)
 
 Parent: IMS-1401. Candidate base: `4040bfef`, incorporating manager commits

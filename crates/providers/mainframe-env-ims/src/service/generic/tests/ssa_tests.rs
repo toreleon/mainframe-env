@@ -11,7 +11,7 @@ fn navigation(run: &str, sequence: u64, op: ImsOperation, ssas: &[&[u8]]) -> Ims
     }
 }
 
-fn public(
+pub(super) fn public(
     service: Arc<ImsService>,
     run: &str,
     req: ImsNavigationRequest,

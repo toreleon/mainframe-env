@@ -1,6 +1,92 @@
 use super::*;
 
 #[test]
+fn secondary_ssa_uses_existing_pointer_cursor_and_target_fields() {
+    use mainframe_env_host_api::{ImsSsaLimits, parse_ims_ssa};
+    let mut definition = descriptor();
+    definition.secondary_indexes[0].target_segment = Some("ROOT".into());
+    for segment in &mut definition.segments {
+        segment.min_length = 4;
+    }
+    let mut engine = DatabaseEngine::new(definition, Default::default()).unwrap();
+    let a = put(&mut engine, "ROOT", None, b"A1ZZ");
+    let ac = put(&mut engine, "CHILD", Some(a), b"C1ZZ");
+    put(&mut engine, "GRAND", Some(ac), b"G1ZZ");
+    let b = put(&mut engine, "ROOT", None, b"B2YY");
+    let bc = put(&mut engine, "CHILD", Some(b), b"C2YY");
+    let source = put(&mut engine, "GRAND", Some(bc), b"G2AA");
+    let request = ReadRequest {
+        kind: ReadKind::Unique,
+        target: Some("ROOT".into()),
+        path: vec![],
+        hold: true,
+    };
+    let fields = engine.ssa_fields(Some("BYVALUE"));
+    let ssa = parse_ims_ssa(
+        b"ROOT    (BYVALUE EQAA&FIRST   EQY)",
+        ImsSsaLimits::default(),
+        &fields,
+    )
+    .unwrap();
+    let mut position = PcbPosition::default();
+    assert_eq!(
+        engine
+            .read_ssas(&mut position, &request, &[ssa], Some("BYVALUE"), |_| true)
+            .unwrap()
+            .id,
+        b
+    );
+    assert_eq!(position.secondary.as_ref().unwrap().source, source);
+    assert_eq!(position.current(), Some(b));
+    assert_eq!(position.parentage(), Some(b));
+    assert!(position.is_held());
+    let child_request = ReadRequest {
+        kind: ReadKind::NextInParent,
+        target: Some("CHILD".into()),
+        path: vec![
+            SegmentSelector {
+                segment: "ROOT".into(),
+                predicates: vec![],
+            },
+            SegmentSelector {
+                segment: "CHILD".into(),
+                predicates: vec![],
+            },
+        ],
+        hold: false,
+    };
+    let mismatch = parse_ims_ssa(b"ROOT    (BYVALUE EQZZ)", Default::default(), &fields).unwrap();
+    let prior = position.clone();
+    assert_eq!(
+        engine.read_ssas(
+            &mut position,
+            &child_request,
+            &[mismatch],
+            Some("BYVALUE"),
+            |_| true
+        ),
+        Err(EngineProblem::PathMismatch)
+    );
+    assert_eq!(position, prior);
+    let matched = parse_ims_ssa(b"ROOT    (BYVALUE EQAA)", Default::default(), &fields).unwrap();
+    assert_eq!(
+        engine
+            .read_ssas(
+                &mut position,
+                &child_request,
+                &[matched],
+                Some("BYVALUE"),
+                |_| true
+            )
+            .unwrap()
+            .id,
+        bc
+    );
+    assert_eq!(position.parentage(), Some(b));
+    assert!(!position.is_held());
+}
+
+#[test]
 fn secondary_replace_keeps_parentage_when_index_bytes_are_unchanged() {
     for source_is_target in [true, false] {
         let mut definition = descriptor();

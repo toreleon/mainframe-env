@@ -209,11 +209,37 @@ impl DatabaseEngine {
         {
             return Err(EngineProblem::InvalidRequest);
         }
+        self.read_secondary_matching(name, position, &physical, |id, key| {
+            visible(&self.records[&id].segment)
+                && self.matches(
+                    id,
+                    physical.target.as_deref().or_else(|| {
+                        (request.kind == ReadKind::Unique).then_some(index.target_segment())
+                    }),
+                    &physical.path,
+                )
+                && indexed.iter().all(|predicate| {
+                    super::navigation::compare(key, &predicate.value, predicate.relation)
+                })
+        })
+    }
+
+    /// One pointer/cursor authority for legacy and rich SSA selection. Callers
+    /// validate operands before entering; matchers cannot change traversal state.
+    pub(super) fn read_secondary_matching(
+        &self,
+        name: &str,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        matches: impl Fn(RecordId, &[u8]) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
+        self.validate_secondary_navigation(name)?;
+        self.validate_read(request)?;
         let mut next = position.clone();
         next.held = None;
         let parent = if request.kind == ReadKind::NextInParent {
             let parent = next.parentage.ok_or(EngineProblem::ParentageRequired)?;
-            self.validate_parent_path(parent, &physical)?;
+            self.validate_parent_path(parent, request)?;
             Some(parent)
         } else {
             None
@@ -262,15 +288,7 @@ impl DatabaseEngine {
                     if parent.is_some_and(|parent| !self.is_descendant(id, parent)) {
                         continue;
                     }
-                    let target_name = physical.target.as_deref().or_else(|| {
-                        (request.kind == ReadKind::Unique).then_some(index.target_segment())
-                    });
-                    if visible(&self.records[&id].segment)
-                        && self.matches(id, target_name, &physical.path)
-                        && indexed.iter().all(|predicate| {
-                            super::navigation::compare(key, &predicate.value, predicate.relation)
-                        })
-                    {
+                    if matches(id, key) {
                         found = Some((id, *source));
                         break 'entries;
                     }
@@ -317,5 +335,26 @@ impl DatabaseEngine {
         }
         *position = next;
         Ok(self.view(id))
+    }
+
+    pub(super) fn selected_secondary_key(
+        &self,
+        name: &str,
+        position: &PcbPosition,
+    ) -> Result<&[u8], EngineProblem> {
+        let selected = position
+            .secondary
+            .as_ref()
+            .filter(|p| p.index == name)
+            .ok_or(EngineProblem::ParentageRequired)?;
+        self.indexes
+            .get(name)
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .find(|(_, sources)| sources.contains(&selected.source))
+            })
+            .map(|(key, _)| key.as_slice())
+            .ok_or(EngineProblem::ParentageRequired)
     }
 }

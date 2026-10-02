@@ -1,6 +1,7 @@
 use super::*;
 
 mod recovery_tests;
+mod rich_ssa_tests;
 mod session_cas;
 
 #[test]
@@ -30,16 +31,24 @@ fn secondary_rich_ssa_never_silently_uses_primary_order() {
             ssas: vec![b"ROOT     ".to_vec()],
         }),
     };
-    let before = serde_json::to_vec(&service.lock().unwrap().state).unwrap();
+    let primary = service.lock().unwrap().state.sessions[run].position.clone();
+    let result = ims_providers(service.clone(), InvocationLimits::default())[1]
+        .invoke(&invocation, effect)
+        .outcome
+        .unwrap();
+    let HostResult::Ims(result) = result else {
+        panic!("IMS result")
+    };
+    assert_eq!(result.status, "  ");
+    assert_eq!(result.segments[0].data, b"B2AX");
+    let session = service.lock().unwrap().state.sessions[run].clone();
+    assert_eq!(session.position, primary);
+    let indexed = pcb::position(&session, 2);
+    assert_eq!(indexed.current(), indexed.parentage());
+    assert!(!indexed.is_held());
     assert_eq!(
-        ims_providers(service.clone(), InvocationLimits::default())[1]
-            .invoke(&invocation, effect)
-            .outcome,
-        Err(HostProblem::Unsupported)
-    );
-    assert_eq!(
-        serde_json::to_vec(&service.lock().unwrap().state).unwrap(),
-        before
+        serde_json::to_value(indexed).unwrap()["secondary"],
+        serde_json::json!({"index":"BYCHILD", "source":3})
     );
 }
 
@@ -92,9 +101,11 @@ fn indexed_catalog(composite: bool, selected_index: bool) -> ImsMetadataCatalog 
 }
 
 fn seed_index(service: &Arc<ImsService>, composite: bool, selected_index: bool) {
-    service
-        .install_metadata(indexed_catalog(composite, selected_index))
-        .unwrap();
+    seed_index_with_catalog(service, indexed_catalog(composite, selected_index));
+}
+
+fn seed_index_with_catalog(service: &Arc<ImsService>, metadata: ImsMetadataCatalog) {
+    service.install_metadata(metadata).unwrap();
     let records = [
         ("ROOT", None, b"A1ZX"),
         ("CHILD", Some(0), b"C1ZA"),

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Connect public rich IMS SSA navigation to selected root-target secondary pointer order with shared predicates, independent PCB state, and existing atomic replay and update maintenance. Secondary symbolic checkpoint recovery remains unsupported."

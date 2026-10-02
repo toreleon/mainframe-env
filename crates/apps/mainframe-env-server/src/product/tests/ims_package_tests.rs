@@ -3,6 +3,9 @@ use super::*;
 mod application_recovery;
 #[path = "ims_package_tests/gsam_tests.rs"]
 mod gsam_tests;
+
+#[path = "ims_secondary_ssa_tests.rs"]
+mod secondary_ssa;
 use mainframe_env_host_api::{
     IMS_METADATA_SCHEMA_V1, ImsDatabaseMetadata, ImsDatabaseOrganization, ImsDatabasePcbMetadata,
     ImsDbLevel, ImsFieldMetadata, ImsMetadataCatalog, ImsOperation, ImsPcbMetadata, ImsPsbMetadata,

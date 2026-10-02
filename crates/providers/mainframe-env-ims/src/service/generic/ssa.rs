@@ -23,17 +23,15 @@ pub(in crate::service) fn prepare(
         return Err(HostProblem::Unsupported);
     }
     let pcb = session_pcb(state, run, navigation.request.pcb)?;
-    // Rich predicates do not yet have a secondary-sequence planner. Never
-    // silently execute them using primary order for an indexed PCB.
-    if pcb.secondary_index.is_some() {
-        return Err(HostProblem::Unsupported);
-    }
     let engine = restored(state, &normalize(&pcb.database), limits)?;
+    let selected_index = pcb.secondary_index.as_deref().map(normalize);
+    let secondary = selected_index.as_deref();
+    let fields = engine.ssa_fields(secondary);
     let ssas = navigation
         .ssas
         .iter()
         .map(|raw| {
-            parse_ims_ssa(raw, ImsSsaLimits::default(), &engine).map_err(|p| {
+            parse_ims_ssa(raw, ImsSsaLimits::default(), &fields).map_err(|p| {
                 if p == ImsSsaProblem::ResourceExhausted {
                     HostProblem::ResourceExhausted
                 } else {
@@ -89,11 +87,13 @@ pub(in crate::service) fn prepare(
             predicates: vec![],
         })
         .collect();
-    engine.validate_ssas(&read, &ssas).map_err(|p| match p {
-        EngineProblem::Unsupported => HostProblem::Unsupported,
-        EngineProblem::LimitExceeded => HostProblem::ResourceExhausted,
-        _ => HostProblem::Malformed,
-    })?;
+    engine
+        .validate_ssas(&read, &ssas, secondary)
+        .map_err(|p| match p {
+            EngineProblem::Unsupported => HostProblem::Unsupported,
+            EngineProblem::LimitExceeded => HostProblem::ResourceExhausted,
+            _ => HostProblem::Malformed,
+        })?;
     let form = if ssas.iter().any(|s| s.concatenated_key.is_some()) {
         ImsSsaForm::ConcatenatedKey
     } else if ssas
@@ -156,10 +156,17 @@ pub(in crate::service) fn read(
     let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
     let mut position = pcb::position(session, request.pcb);
     let parent_qualification = pcb::gnp_target_below_parent(&engine, &position, &prepared.read);
-    let outcome = engine.read_ssas(&mut position, &prepared.read, &prepared.ssas, |segment| {
-        prepared.read.target.is_some()
-            || (allowed(&pcb, segment, request.operation) && !pcb::key_only(&pcb, segment))
-    });
+    let secondary = pcb.secondary_index.as_deref().map(normalize);
+    let outcome = engine.read_ssas(
+        &mut position,
+        &prepared.read,
+        &prepared.ssas,
+        secondary.as_deref(),
+        |segment| {
+            prepared.read.target.is_some()
+                || (allowed(&pcb, segment, request.operation) && !pcb::key_only(&pcb, segment))
+        },
+    );
     pcb::set_position(session, request.pcb, position);
     let view = match outcome {
         Ok(view) => view,

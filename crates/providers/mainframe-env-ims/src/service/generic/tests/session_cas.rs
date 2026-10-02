@@ -8,6 +8,7 @@ pub(super) struct SessionCasStore {
     inner: Arc<dyn ProviderStateStore>,
     run: String,
     armed: AtomicBool,
+    lost_ack: AtomicBool,
 }
 
 impl SessionCasStore {
@@ -16,11 +17,16 @@ impl SessionCasStore {
             inner,
             run: run.into(),
             armed: AtomicBool::new(false),
+            lost_ack: AtomicBool::new(false),
         })
     }
 
     pub(super) fn arm(&self) {
         self.armed.store(true, Ordering::SeqCst);
+    }
+
+    pub(super) fn lose_ack(&self) {
+        self.lost_ack.store(true, Ordering::SeqCst);
     }
 }
 
@@ -110,6 +116,10 @@ impl ProviderStateStore for SessionCasStore {
             row.version += 1;
             self.inner.put_provider_state(row, Some(prior))?;
         }
-        self.inner.mutate_provider_states_atomic(mutations)
+        self.inner.mutate_provider_states_atomic(mutations)?;
+        if self.lost_ack.swap(false, Ordering::SeqCst) {
+            return Err(StoreError::Infrastructure("lost acknowledgement".into()));
+        }
+        Ok(())
     }
 }
