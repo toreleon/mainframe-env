@@ -5,7 +5,8 @@
 //! The existing application-command and CICS runtime authorities are unchanged.
 
 use crate::{
-    CicsApplicationConstraintStatus, CicsApplicationCvdaDomain, CicsApplicationOptionAlternative,
+    CicsApplicationConstraintStatus, CicsApplicationCvdaDomain, CicsApplicationCvdaNumericDomain,
+    CicsApplicationCvdaNumericValue, CicsApplicationOptionAlternative,
     CicsApplicationOptionDependency, CicsApplicationOptionDescriptor,
     CicsApplicationOptionDirection, CicsApplicationOptionValueShape,
 };
@@ -65,6 +66,8 @@ pub struct CicsAdministrativeGrammarContract {
     pub options: &'static [CicsApplicationOptionDescriptor],
     /// Optional scoped symbolic CVDA facts, without numeric or alias inference.
     pub cvda_domains: &'static [CicsApplicationCvdaDomain],
+    /// Optional reference numbers for explicitly sourced domain members only.
+    pub cvda_numeric_domains: &'static [CicsApplicationCvdaNumericDomain],
     /// Unconditional required operands only.
     pub required_options: &'static [&'static str],
     /// Required or optional alternatives, using the existing CICS constraint type.
@@ -93,6 +96,8 @@ pub struct CicsAdministrativeGrammarForm {
     pub options: &'static [CicsApplicationOptionDescriptor],
     /// Optional scoped symbolic CVDA facts, without numeric or alias inference.
     pub cvda_domains: &'static [CicsApplicationCvdaDomain],
+    /// Optional form-local reference numbers, without admission or alias credit.
+    pub cvda_numeric_domains: &'static [CicsApplicationCvdaNumericDomain],
     /// Unconditional required clauses within this form.
     pub required_options: &'static [&'static str],
     /// Required or optional choices using the existing CICS constraint type.
@@ -409,5 +414,83 @@ mod tests {
                 CicsApplicationConstraintStatus::Pending
             );
         }
+    }
+
+    #[test]
+    fn program_numeric_metadata_preserves_scope_collisions_and_unresolved_symbols() {
+        fn numbers(
+            contract: &CicsAdministrativeGrammarContract,
+            option: &str,
+        ) -> Vec<(&'static str, i32)> {
+            contract
+                .cvda_numeric_domains
+                .iter()
+                .find(|domain| domain.option == option)
+                .expect("source-reviewed numeric subset")
+                .values
+                .iter()
+                .map(|value| (value.symbol, value.number))
+                .collect()
+        }
+        let create = program_contract("0026");
+        let discard = program_contract("0084");
+        let inquire = program_contract("0155");
+        let set = program_contract("0241");
+        assert_eq!(numbers(create, "LOGMESSAGE"), [("LOG", 54), ("NOLOG", 55)]);
+        assert_eq!(
+            numbers(inquire, "COPY"),
+            [("NOTREQUIRED", 667), ("REQUIRED", 666)]
+        );
+        assert_eq!(numbers(set, "COPY"), [("NEWCOPY", 167), ("PHASEIN", 168)]);
+        assert_eq!(numbers(set, "RUNTIME"), [("JVM", 1080), ("NOJVM", 1081)]);
+        assert_eq!(
+            numbers(inquire, "PROGTYPE"),
+            [
+                ("MAP", 155),
+                ("MAPSET", 155),
+                ("PARTITIONSET", 156),
+                ("PROGRAM", 154)
+            ]
+        );
+        for option in ["LANGUAGE", "LANGDEDUCED"] {
+            assert!(
+                inquire
+                    .cvda_domains
+                    .iter()
+                    .find(|domain| domain.option == option)
+                    .unwrap()
+                    .values
+                    .contains(&"PL1")
+            );
+            let values = numbers(inquire, option);
+            assert!(values.contains(&("PLI", 152)));
+            assert!(!values.iter().any(|(symbol, _)| *symbol == "PL1"));
+        }
+        assert!(discard.cvda_numeric_domains.is_empty());
+        for contract in [create, discard, inquire, set] {
+            assert_eq!(
+                contract.forms[0].cvda_numeric_domains,
+                contract.cvda_numeric_domains
+            );
+            assert_eq!(
+                contract.constraint_status,
+                CicsApplicationConstraintStatus::Pending
+            );
+            for domain in contract.cvda_numeric_domains {
+                assert_eq!(
+                    domain.source_baseline,
+                    "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23"
+                );
+                assert_eq!(
+                    domain.source_topic,
+                    "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html"
+                );
+                assert_eq!(
+                    domain.source_sha256,
+                    "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381"
+                );
+            }
+        }
+        assert_eq!(CICS_SPI_FEPI_RUNTIME_HANDLERS, 0);
     }
 }

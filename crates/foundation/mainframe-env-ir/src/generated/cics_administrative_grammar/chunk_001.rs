@@ -4,6 +4,109 @@
 /// Partial source-reviewed grammar contracts, with Pending completeness and no routes.
 pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
     CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:fepi-commands:0022",
+        family: "fepi-resources",
+        label: "FEPI INSTALL PROPERTYSET",
+        source_baseline: "ibm-cics-ts-6x-fepi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-applications/commands-fepi/dfhp73b.html",
+        source_sha256: "sha256:271abb9a27122b9600f2ced1a2f197ef07f5e3368ca2366101adfbbeda5c9d24",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "BEGINSESSION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "CONTENTION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DATASTREAM", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "DEVICE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "ENDSESSION", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "EXCEPTIONQ", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "FJOURNALNAME", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "FJOURNALNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "FORMAT", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "FORMATTED", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "INBOUND", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "INITIALDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "INOUT", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "INPUT", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "LOSE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "LUP", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "MAXFLENGTH", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "MSGJRNL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NEGATIVE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOMSGJRNL", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOTINBOUND", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "OUTPUT", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "POSITIVE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "PROPERTYSET", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "STSN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "T3278M2", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3278M3", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3278M4", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3278M5", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3279M2", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3279M3", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3279M4", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "T3279M5", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TPS55M2", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TPS55M3", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TPS55M4", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "UNSOLDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
+            CicsApplicationOptionDescriptor { name: "UNSOLDATACK", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "WIN", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+        ],
+        cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &["PROPERTYSET"],
+        alternative_groups: &[
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["CONTENTION", "LOSE", "WIN"], &["DEVICE", "LUP", "T3278M2", "T3278M3", "T3278M4", "T3278M5", "T3279M2", "T3279M3", "T3279M4", "T3279M5", "TPS55M2", "TPS55M3", "TPS55M4"], &["DATASTREAM", "FORMAT", "FORMATTED"], &["INBOUND", "INITIALDATA", "NOTINBOUND"], &["INOUT", "INPUT", "MSGJRNL", "NOMSGJRNL", "OUTPUT"], &["NEGATIVE", "POSITIVE", "UNSOLDATACK"], &["FJOURNALNAME", "FJOURNALNUM"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
+        official_row: "ibm-cics-ts-6x-2026-08-31:fepi-commands:0023",
+        family: "fepi-resources",
+        label: "FEPI INQUIRE TARGET",
+        source_baseline: "ibm-cics-ts-6x-fepi-command-bodies-2026-09-12",
+        source_topic: "SSJL4D_6.x/reference-applications/commands-fepi/dfhp738.html",
+        source_sha256: "sha256:0719bc7b42d2520e3b852a142f709f24229a337ed37284d212b37809afd7fb75",
+        options: &[
+            CicsApplicationOptionDescriptor { name: "APPL", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "END", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "INSTLSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NEXT", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "SERVSTATUS", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "START", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
+            CicsApplicationOptionDescriptor { name: "TARGET", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::InputOutput, source_max_value_bytes: Some(8) },
+            CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(64) },
+        ],
+        cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
+        ],
+        required_options: &[],
+        alternative_groups: &[
+            CicsApplicationOptionAlternative { members: &["END", "START", "TARGET"], required: true },
+        ],
+        dependencies: &[
+            CicsApplicationOptionDependency { option: "NEXT", requires: &["TARGET"] },
+            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
+        ],
+        mutual_exclusion_groups: &[&["END", "NEXT", "START"], &["START", "TARGET"], &["END", "TARGET"]],
+        forms: &[
+        ],
+        constraint_status: CicsApplicationConstraintStatus::Pending,
+    },
+    CicsAdministrativeGrammarContract {
         official_row: "ibm-cics-ts-6x-2026-08-31:fepi-commands:0024",
         family: "fepi-resources",
         label: "FEPI INSTALL TARGETLIST",
@@ -22,6 +125,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "TARGETNUM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: None },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["APPLLIST", "TARGETLIST", "TARGETNUM"],
         alternative_groups: &[
@@ -51,6 +156,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "VALUE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["CONTROL", "CONVID"],
         alternative_groups: &[
@@ -91,6 +198,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["CONVID"],
         alternative_groups: &[
         ],
@@ -130,6 +239,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["CONVID"],
         alternative_groups: &[
         ],
@@ -160,6 +271,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["CONVID", "PASSTICKET"],
         alternative_groups: &[
@@ -193,6 +306,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["CONVID", "FROM"],
         alternative_groups: &[
         ],
@@ -224,6 +339,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["CONVID", "FROM"],
         alternative_groups: &[
@@ -266,6 +383,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &[],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["NODE", "NODELIST"], required: true },
@@ -307,6 +426,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["NODE"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["NODE", "NODELIST"], required: true },
@@ -345,6 +466,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["NODELIST", "NODENUM"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["NODE", "NODELIST"], required: true },
@@ -379,6 +502,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &[],
         alternative_groups: &[
@@ -415,6 +540,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["POOLLIST", "POOLNUM"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["POOL", "POOLLIST"], required: true },
@@ -449,6 +576,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(64) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["TARGET"],
         alternative_groups: &[
@@ -485,6 +614,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["TARGETLIST", "TARGETNUM"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["TARGET", "TARGETLIST"], required: true },
@@ -512,6 +643,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &[],
         alternative_groups: &[
@@ -543,6 +676,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "USERDATA", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(128) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["CONVID", "TRANSID"],
         alternative_groups: &[
@@ -611,6 +746,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["SET"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["AUTOINSTALL", "CONNECTION", "DB2CONN", "DB2ENTRY", "DISPATCHER", "ENQUEUE", "FILE", "JOURNALNAME", "JOURNALNUM", "JVMPROGRAM", "LSRPOOL", "MONITOR", "MVSTCB", "POOL", "PROGAUTO", "PROGRAM", "RECOVERY", "STATS", "STORAGE", "STREAMNAME", "SUBPOOL", "SYSDUMPCODE", "TABLEMGR", "TARGET", "TASKSUBPOOL", "TCLASS", "TCPIP", "TCPIPSERVICE", "TDQUEUE", "TERMINAL", "TRANCLASS", "TRANDUMPCODE", "TRANSACTION", "TSQUEUE", "VTAM"], required: true },
@@ -643,6 +780,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["ATOMSERVICE", "ATTRIBUTES"],
         alternative_groups: &[
@@ -677,6 +816,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["ATTRIBUTES", "BUNDLE"],
         alternative_groups: &[
         ],
@@ -707,6 +848,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
         ],
         cvda_domains: &[
+        ],
+        cvda_numeric_domains: &[
         ],
         required_options: &["ATTRIBUTES", "DOCTEMPLATE"],
         alternative_groups: &[
@@ -741,6 +884,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["ATTRIBUTES", "FILE"],
         alternative_groups: &[
         ],
@@ -773,6 +918,8 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
         ],
         cvda_domains: &[
         ],
+        cvda_numeric_domains: &[
+        ],
         required_options: &["ATTRIBUTES", "PIPELINE"],
         alternative_groups: &[
             CicsApplicationOptionAlternative { members: &["LOG", "LOGMESSAGE", "NOLOG"], required: false },
@@ -782,161 +929,6 @@ pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &[
             CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
         ],
         mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-        forms: &[
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0026",
-        family: "spi-program",
-        label: "CREATE PROGRAM",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createprogram.html",
-        source_sha256: "sha256:76455abf577d1b065989597e6e99b2c88ff859adf0be55283b286599d4907c84",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
-            CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
-            CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "PROGRAM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-        ],
-        cvda_domains: &[
-            CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"] },
-        ],
-        required_options: &["ATTRIBUTES", "PROGRAM"],
-        alternative_groups: &[
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "ATTRLEN", requires: &["ATTRIBUTES"] },
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-        forms: &[
-            CicsAdministrativeGrammarForm {
-                id: "named",
-                selector_options: &["PROGRAM"],
-                options: &[
-                    CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
-                    CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
-                    CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-                    CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-                    CicsApplicationOptionDescriptor { name: "PROGRAM", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-                    CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-                    CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-                ],
-                cvda_domains: &[
-                    CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"] },
-                ],
-                required_options: &["ATTRIBUTES", "PROGRAM"],
-                alternative_groups: &[
-                ],
-                dependencies: &[
-                    CicsApplicationOptionDependency { option: "ATTRLEN", requires: &["ATTRIBUTES"] },
-                    CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-                ],
-                mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-                constraint_status: CicsApplicationConstraintStatus::Pending,
-            },
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0035",
-        family: "spi-web-resources",
-        label: "CREATE URIMAP",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createurimap.html",
-        source_sha256: "sha256:17b48e240e4974608db0cb877bf3349089f54c2f8837c3e74aa64a07c296f448",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
-            CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
-            CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "URIMAP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-        ],
-        cvda_domains: &[
-        ],
-        required_options: &["ATTRIBUTES", "URIMAP"],
-        alternative_groups: &[
-            CicsApplicationOptionAlternative { members: &["LOG", "LOGMESSAGE", "NOLOG"], required: false },
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "ATTRLEN", requires: &["ATTRIBUTES"] },
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-        forms: &[
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0036",
-        family: "spi-web-resources",
-        label: "CREATE WEBSERVICE",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_createwebservice.html",
-        source_sha256: "sha256:0345ad12d5b5aec02d4e35232444c11c162c17d1ce1b17c758b9f347320d6d85",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "ATTRIBUTES", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(32767) },
-            CicsApplicationOptionDescriptor { name: "ATTRLEN", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(2) },
-            CicsApplicationOptionDescriptor { name: "LOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "LOGMESSAGE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "NOLOG", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "WEBSERVICE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-        ],
-        cvda_domains: &[
-        ],
-        required_options: &["ATTRIBUTES", "WEBSERVICE"],
-        alternative_groups: &[
-            CicsApplicationOptionAlternative { members: &["LOG", "LOGMESSAGE", "NOLOG"], required: false },
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "ATTRLEN", requires: &["ATTRIBUTES"] },
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[&["LOG", "LOGMESSAGE", "NOLOG"]],
-        forms: &[
-        ],
-        constraint_status: CicsApplicationConstraintStatus::Pending,
-    },
-    CicsAdministrativeGrammarContract {
-        official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0037",
-        family: "spi-csd-definition",
-        label: "CSD ADD",
-        source_baseline: "ibm-cics-ts-6x-spi-command-bodies-2026-09-12",
-        source_topic: "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_csd_add.html",
-        source_sha256: "sha256:b774b30626f2e694232795bf5f0203517498aa041c7c8ac137ed81e72538c741",
-        options: &[
-            CicsApplicationOptionDescriptor { name: "AFTER", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-            CicsApplicationOptionDescriptor { name: "BEFORE", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-            CicsApplicationOptionDescriptor { name: "GROUP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-            CicsApplicationOptionDescriptor { name: "LIST", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Input, source_max_value_bytes: Some(8) },
-            CicsApplicationOptionDescriptor { name: "NOHANDLE", value_shape: CicsApplicationOptionValueShape::Flag, direction: CicsApplicationOptionDirection::None, source_max_value_bytes: None },
-            CicsApplicationOptionDescriptor { name: "RESP", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-            CicsApplicationOptionDescriptor { name: "RESP2", value_shape: CicsApplicationOptionValueShape::Value, direction: CicsApplicationOptionDirection::Output, source_max_value_bytes: Some(4) },
-        ],
-        cvda_domains: &[
-        ],
-        required_options: &["GROUP", "LIST"],
-        alternative_groups: &[
-        ],
-        dependencies: &[
-            CicsApplicationOptionDependency { option: "RESP2", requires: &["RESP"] },
-        ],
-        mutual_exclusion_groups: &[&["AFTER", "BEFORE"]],
         forms: &[
         ],
         constraint_status: CicsApplicationConstraintStatus::Pending,

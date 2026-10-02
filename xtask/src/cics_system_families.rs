@@ -294,7 +294,7 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
             "CICS family source pin mismatch",
         )?;
         let grammar = &command["grammar"];
-        let known = validate_grammar(grammar, path)?;
+        let known = validate_grammar(root, grammar, path)?;
         if grammar.get("forms").is_some() {
             let forms = array(grammar, "forms", path)?;
             let ids = forms
@@ -307,7 +307,7 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
             )?;
             for form in forms {
                 let form_grammar = &form["grammar"];
-                let form_known = validate_grammar(form_grammar, path)?;
+                let form_known = validate_grammar(root, form_grammar, path)?;
                 require(
                     form_known.is_subset(&known),
                     "CICS form declares an option outside the parent source union",
@@ -355,7 +355,72 @@ fn validate(root: &Path, family: &str, artifact: &Value, path: &Path) -> TaskRes
     Ok(commands.len())
 }
 
-fn validate_grammar<'a>(grammar: &'a Value, path: &Path) -> TaskResult<BTreeSet<&'a str>> {
+fn validate_cvda_numeric_encoding(root: &Path, domain: &Value, path: &Path) -> TaskResult {
+    let Some(encoding) = domain.get("numeric_encoding") else {
+        return Ok(());
+    };
+    let manifest_path = root.join("conformance/0.9/manifests/cics-misc-tail-cvda-topics.json");
+    let manifest = json(&manifest_path)?;
+    let topic = array(&manifest, "topics", &manifest_path)?
+        .iter()
+        .find(|topic| {
+            topic["topic_path"] == "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html"
+        })
+        .ok_or("CICS numeric CVDA reference is not registered")?;
+    let source = &encoding["source"];
+    require(
+        source["baseline"] == manifest["baseline_id"]
+            && source["topic_path"] == topic["topic_path"]
+            && source["sha256"].as_str()
+                == Some(&format!(
+                    "sha256:{}",
+                    text(topic, "sha256", &manifest_path)?
+                )),
+        "CICS numeric CVDA reference pin mismatch",
+    )?;
+    let values = array(encoding, "values", path)?;
+    let symbols = values
+        .iter()
+        .map(|value| text(value, "symbol", path))
+        .collect::<TaskResult<Vec<_>>>()?;
+    let scoped = names(&domain["values"], path)?;
+    require(
+        !symbols.is_empty()
+            && symbols.windows(2).all(|pair| pair[0] < pair[1])
+            && symbols.iter().all(|symbol| scoped.contains(symbol)),
+        "CICS numeric CVDA symbols must be sorted unique scoped members",
+    )?;
+    for value in values {
+        require(
+            value["number"]
+                .as_i64()
+                .and_then(|number| i32::try_from(number).ok())
+                .is_some(),
+            "CICS numeric CVDA value is not a signed fullword",
+        )?;
+    }
+    for lines in std::iter::once(array(source, "lines", path)?).chain(
+        values
+            .iter()
+            .map(|value| array(value, "source_lines", path))
+            .collect::<TaskResult<Vec<_>>>()?,
+    ) {
+        require(
+            !lines.is_empty()
+                && lines
+                    .windows(2)
+                    .all(|pair| pair[0].as_u64() < pair[1].as_u64()),
+            "CICS numeric CVDA source lines must be sorted unique",
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_grammar<'a>(
+    root: &Path,
+    grammar: &'a Value,
+    path: &Path,
+) -> TaskResult<BTreeSet<&'a str>> {
     let options = array(grammar, "options", path)?;
     let option_names = options
         .iter()
@@ -393,6 +458,7 @@ fn validate_grammar<'a>(grammar: &'a Value, path: &Path) -> TaskResult<BTreeSet<
                 !values.is_empty() && values.windows(2).all(|pair| pair[0] < pair[1]),
                 "CICS CVDA symbols must be nonempty, unique and sorted",
             )?;
+            validate_cvda_numeric_encoding(root, domain, path)?;
         }
     }
     let references = |list: &Value| -> TaskResult {
@@ -826,6 +892,69 @@ mod tests {
             assert!(
                 valid("spi-program", &value).is_err(),
                 "domain mutation {mode}"
+            );
+        }
+    }
+
+    fn numeric_fixture() -> Value {
+        let mut value = cvda_fixture();
+        let manifest =
+            json(&root().join("conformance/0.9/manifests/cics-misc-tail-cvda-topics.json"))
+                .unwrap();
+        let topic = &manifest["topics"][0];
+        value["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"] = json!({
+            "source": {"baseline":manifest["baseline_id"], "topic_path":topic["topic_path"],
+                "sha256":format!("sha256:{}",topic["sha256"].as_str().unwrap()), "lines":[1,3]},
+            "values":[{"symbol":"A","number":7,"source_lines":[10]},
+                {"symbol":"B","number":7,"source_lines":[12]}]
+        });
+        value
+    }
+
+    #[test]
+    fn numeric_facets_allow_partial_domains_and_equal_numbers_in_scoped_forms() {
+        let mut value = numeric_fixture();
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        let shape = value["commands"][0]["grammar"].clone();
+        value["commands"][0]["grammar"]["forms"] = json!([{
+            "id":"named", "selector_options":["NAME"], "grammar":shape, "source_lines":[1]
+        }]);
+        value["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"]["values"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        for number in [i32::MIN, i32::MAX] {
+            value["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"]["values"][0]["number"] =
+                json!(number);
+            assert_eq!(valid("spi-program", &value).unwrap(), 4);
+        }
+    }
+
+    #[test]
+    fn numeric_facets_reject_pin_drift_unscoped_symbols_and_out_of_fullword_values() {
+        for mode in 0..13 {
+            let mut value = numeric_fixture();
+            let encoding =
+                &mut value["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"];
+            match mode {
+                0 => encoding["source"]["sha256"] = json!(format!("sha256:{}", "0".repeat(64))),
+                1 => encoding["source"]["baseline"] = json!("wrong-baseline"),
+                2 => encoding["source"]["topic_path"] = json!("wrong-topic"),
+                3 => encoding["values"][0]["symbol"] = json!("C"),
+                4 => encoding["values"][0]["number"] = json!(2_147_483_648_i64),
+                5 => encoding["values"][0]["number"] = json!(-2_147_483_649_i64),
+                6 => encoding["values"][0]["number"] = json!(true),
+                7 => encoding["values"][0]["symbol"] = json!("B"),
+                8 => encoding["values"].as_array_mut().unwrap().reverse(),
+                9 => encoding["values"] = json!([]),
+                10 => encoding["source"]["lines"] = json!([3, 1]),
+                11 => encoding["values"][0]["source_lines"] = json!([10, 10]),
+                _ => encoding["values"][0]["alias"] = json!("B"),
+            }
+            assert!(
+                valid("spi-program", &value).is_err(),
+                "numeric mutation {mode}"
             );
         }
     }

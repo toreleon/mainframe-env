@@ -280,6 +280,86 @@ class AdministrativeGrammarTests(unittest.TestCase):
             self.family if family is None else family, self.mapping, self.manifest
         )
 
+    def numeric_fixture(self):
+        family = self.cvda_fixture()
+        domain = family["commands"][0]["grammar"]["cvda_domains"][0]
+        domain["numeric_encoding"] = {
+            "source": {**catalog_tool.cvda_numeric_source(), "lines": [1, 3]},
+            "values": [{"symbol": "LOG", "number": 54, "source_lines": [864, 865]},
+                       {"symbol": "NOLOG", "number": 55, "source_lines": [1074, 1075]}],
+        }
+        return family
+
+    def test_numeric_facet_absence_preserves_legacy_product_preimage(self) -> None:
+        legacy = copy.deepcopy(self.family)
+        for command in legacy["commands"]:
+            for grammar in [command["grammar"], *(form["grammar"] for form in command["grammar"].get("forms", []))]:
+                for domain in grammar.get("cvda_domains", []):
+                    domain.pop("numeric_encoding", None)
+        facts = self.project(legacy)
+        for fact in facts:
+            for grammar in [fact["grammar"], *(form["grammar"] for form in fact["grammar"].get("forms", []))]:
+                for domain in grammar.get("cvda_domains", []):
+                    self.assertEqual(set(domain), {"option", "values"})
+        enriched = self.project()
+        stripped = copy.deepcopy(enriched)
+        for fact in stripped:
+            for grammar in [fact["grammar"], *(form["grammar"] for form in fact["grammar"].get("forms", []))]:
+                for domain in grammar.get("cvda_domains", []):
+                    domain.pop("numeric_encoding", None)
+        self.assertEqual(facts, stripped)
+        self.assertEqual(catalog_tool.canonical_bytes(facts), catalog_tool.canonical_bytes(stripped))
+
+    def test_numeric_source_lines_are_metadata_but_numbers_and_symbols_are_product_facts(self) -> None:
+        family = self.numeric_fixture()
+        encoding = family["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"]
+        before = self.project(family)
+        encoding["source"]["lines"] = [1, 3, 4]
+        encoding["values"][0]["source_lines"] = [864]
+        self.assertEqual(before, self.project(family))
+        encoding["values"][1]["number"] = 54
+        same_number = self.project(family)
+        self.assertNotEqual(before, same_number)
+        values = same_number[0]["grammar"]["cvda_domains"][0]["numeric_encoding"]["values"]
+        self.assertEqual(values, [{"symbol": "LOG", "number": 54}, {"symbol": "NOLOG", "number": 54}])
+        output = catalog_tool.render_grammar_facts(same_number)
+        self.assertIn(b'CicsApplicationCvdaNumericValue { symbol: "NOLOG", number: 54 }', output)
+        self.assertEqual(output.count(b"CicsApplicationConstraintStatus::Pending"), 8)
+
+    def test_numeric_projection_rejects_forged_pins_unscoped_symbols_and_invalid_fullwords(self) -> None:
+        for mutation in range(15):
+            family = self.numeric_fixture()
+            encoding = family["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"]
+            if mutation < 3:
+                key = ["baseline", "topic_path", "sha256"][mutation]
+                encoding["source"][key] = "forged"
+            elif mutation == 3:
+                encoding["values"][0]["symbol"] = "ENABLED"
+            elif mutation == 4:
+                encoding["values"][0]["number"] = True
+            elif mutation == 5:
+                encoding["values"][0]["number"] = 2 ** 31
+            elif mutation == 6:
+                encoding["values"][0]["number"] = -(2 ** 31) - 1
+            elif mutation == 7:
+                encoding["values"].append(copy.deepcopy(encoding["values"][0]))
+            elif mutation == 8:
+                encoding["values"].reverse()
+            elif mutation == 9:
+                encoding["values"] = []
+            elif mutation == 10:
+                encoding["values"][0]["source_lines"] = []
+            elif mutation == 11:
+                encoding["source"]["lines"] = [3, 1]
+            elif mutation == 12:
+                encoding["values"][0]["source_lines"] = [864, 864]
+            elif mutation == 13:
+                encoding["values"][0]["source_lines"] = [True]
+            else:
+                encoding["values"][0]["alias"] = "NOLOG"
+            with self.assertRaises(catalog_tool.CatalogError, msg=f"numeric mutation {mutation}"):
+                self.project(family)
+
     def test_chunked_projection_preserves_every_fact_order_and_digest_at_scale(self) -> None:
         template = self.project()[-1]
         facts = []

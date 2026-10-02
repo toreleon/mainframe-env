@@ -316,7 +316,46 @@ def render_rust(root: Path = ROOT) -> bytes:
     return render_rust_from_catalog(final_catalog(root))
 
 
-def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
+def cvda_numeric_source(root: Path = ROOT) -> dict[str, str]:
+    """Resolve the registered numeric reference; never read or embed its body."""
+    manifest = json.loads((root / "conformance/0.9/manifests/cics-misc-tail-cvda-topics.json").read_text())
+    topic = next(topic for topic in manifest["topics"] if topic["topic_path"] ==
+                 "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html")
+    return {"baseline": manifest["baseline_id"], "topic_path": topic["topic_path"],
+            "sha256": "sha256:" + topic["sha256"]}
+
+
+def compact_numeric_encoding(domain: dict[str, Any], root: Path) -> dict[str, Any]:
+    encoding = domain["numeric_encoding"]
+    require(isinstance(encoding, dict) and set(encoding) == {"source", "values"},
+            "CVDA numeric encoding fields drifted")
+    pin = encoding["source"]
+    expected = cvda_numeric_source(root)
+    require(isinstance(pin, dict) and set(pin) == set(expected) | {"lines"}
+            and all(pin[key] == value for key, value in expected.items()),
+            "CVDA numeric reference pin drifted")
+    entries = encoding["values"]
+    require(isinstance(entries, list) and 0 < len(entries) <= 256,
+            "CVDA numeric value bound/type drifted")
+    projected = []
+    for entry in entries:
+        require(isinstance(entry, dict) and set(entry) == {"symbol", "number", "source_lines"},
+                "CVDA numeric value fields drifted")
+        require(isinstance(entry["symbol"], str) and entry["symbol"] in domain["values"],
+                "CVDA numeric symbol is not in its scoped domain")
+        require(type(entry["number"]) is int and -(2 ** 31) <= entry["number"] < 2 ** 31,
+                "CVDA numeric value is not a signed fullword")
+        projected.append({"symbol": entry["symbol"], "number": entry["number"]})
+    symbols = [entry["symbol"] for entry in projected]
+    require(symbols == sorted(set(symbols)), "CVDA numeric symbols must be unique and sorted")
+    for lines in [pin["lines"], *(entry["source_lines"] for entry in entries)]:
+        require(isinstance(lines, list) and 0 < len(lines) <= 16
+                and all(type(line) is int and 1 <= line <= 100000 for line in lines)
+                and lines == sorted(set(lines)), "CVDA numeric source lines drifted")
+    return {"source": expected, "values": projected}
+
+
+def compact_grammar(grammar: dict[str, Any], root: Path = ROOT) -> dict[str, Any]:
     """Select common operand facts; source locators and case metadata stay external."""
     options = grammar["options"]
     names = [option["name"] for option in options]
@@ -332,7 +371,8 @@ def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
     }
     domains = grammar.get("cvda_domains", [])
     require(isinstance(domains, list) and len(domains) <= 256, "CVDA domain bound/type drifted")
-    require(all(isinstance(domain, dict) and set(domain) == {"option", "values", "source_lines"}
+    require(all(isinstance(domain, dict) and {"option", "values", "source_lines"} <= set(domain)
+                <= {"option", "values", "source_lines", "numeric_encoding"}
                 and isinstance(domain["option"], str)
                 and re.fullmatch(r"[A-Z][A-Z0-9]{0,63}", domain["option"])
                 for domain in domains), "CVDA domain fields drifted")
@@ -341,7 +381,6 @@ def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
     projected = []
     by_name = {option["name"]: option for option in options}
     for domain in domains:
-        require(set(domain) == {"option", "values", "source_lines"}, "unknown CVDA domain field")
         operand = by_name.get(domain["option"])
         require(operand is not None and operand["value_shape"] == "value"
                 and operand["direction"] != "none" and operand["source_max_value_bytes"] == 4,
@@ -351,7 +390,10 @@ def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
                 and all(isinstance(value, str) and re.fullmatch(r"[A-Z][A-Z0-9]{0,63}", value) for value in values),
                 "CVDA domain symbols drifted")
         require(values == sorted(set(values)), "CVDA domain symbols must be unique and sorted")
-        projected.append({"option": domain["option"], "values": values})
+        item = {"option": domain["option"], "values": values}
+        if "numeric_encoding" in domain:
+            item["numeric_encoding"] = compact_numeric_encoding(domain, root)
+        projected.append(item)
     if projected:
         compact["cvda_domains"] = projected
     return compact
@@ -359,7 +401,7 @@ def compact_grammar(grammar: dict[str, Any]) -> dict[str, Any]:
 
 
 def project_family_grammar(
-    family: dict[str, Any], mapping: dict[str, Any], manifest: dict[str, Any]
+    family: dict[str, Any], mapping: dict[str, Any], manifest: dict[str, Any], root: Path = ROOT
 ) -> list[dict[str, Any]]:
     """Project product facts only; full instance validation belongs to xtask."""
     require(
@@ -393,7 +435,7 @@ def project_family_grammar(
             "family grammar source identity drifted",
         )
         grammar = command["grammar"]
-        compact = compact_grammar(grammar)
+        compact = compact_grammar(grammar, root)
         forms = grammar.get("forms", [])
         require(len(forms) <= 16, "family form bound exceeded")
         ids = [form["id"] for form in forms]
@@ -401,7 +443,7 @@ def project_family_grammar(
         parent_names = {option["name"] for option in compact["options"]}
         projected_forms = []
         for form in forms:
-            shape = compact_grammar(form["grammar"])
+            shape = compact_grammar(form["grammar"], root)
             require("forms" not in form["grammar"], "nested family forms are not allowed")
             known = {option["name"] for option in shape["options"]}
             require(known <= parent_names, "form options exceed parent union")
@@ -438,7 +480,7 @@ def family_grammar_facts(root: Path = ROOT) -> list[dict[str, Any]]:
         interface = FAMILY_ROWS[path.stem][0]
         mapping = json.loads((root / f"conformance/0.10/cics/{interface}-command-source-map.json").read_text())
         manifest = json.loads((root / f"conformance/0.10/manifests/cics-{interface}-command-topics.json").read_text())
-        facts.extend(project_family_grammar(family, mapping, manifest))
+        facts.extend(project_family_grammar(family, mapping, manifest, root))
     return sorted(facts, key=lambda fact: fact["official_row"])
 
 
@@ -465,6 +507,21 @@ def render_grammar_facts(facts: list[dict[str, Any]]) -> bytes:
             lines.append("            CicsApplicationCvdaDomain { "
                          f"option: {rust_string(domain['option'])}, "
                          f"values: {rust_string_slice(domain['values'])} " + "},")
+        lines.append("        ],")
+        lines.append("        cvda_numeric_domains: &[")
+        for domain in grammar.get("cvda_domains", []):
+            if "numeric_encoding" not in domain:
+                continue
+            encoding = domain["numeric_encoding"]
+            pin = encoding["source"]
+            numbers = ", ".join("CicsApplicationCvdaNumericValue { "
+                                f"symbol: {rust_string(value['symbol'])}, number: {value['number']} "
+                                + "}" for value in encoding["values"])
+            lines.append("            CicsApplicationCvdaNumericDomain { "
+                         f"option: {rust_string(domain['option'])}, "
+                         f"source_baseline: {rust_string(pin['baseline'])}, "
+                         f"source_topic: {rust_string(pin['topic_path'])}, "
+                         f"source_sha256: {rust_string(pin['sha256'])}, values: &[{numbers}] " + "},")
         lines.append("        ],")
         lines.append(f"        required_options: {rust_string_slice(grammar['required'])},")
         lines.append("        alternative_groups: &[")

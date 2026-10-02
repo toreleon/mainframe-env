@@ -2211,3 +2211,209 @@ Web source integration passes 28 generator regressions, eight IR regressions
 and the actual Draft202012 family instance gate. Private source projection now
 has 143 command rows, 2636 operands and 4074 case candidates. All runtime,
 application, selected-route, recovery and licensed gates remain pending.
+
+### Pre-dispatch network repair and transaction-resource review
+
+- `SPI-1001.spi-network-connections-review-repair`: 24 exact rows, all 271 existing case identities; frozen SHA-256 `fe8650de5657c907949c2789cd13f63db9dcdc89d1330d1567baf211cb7699ab`. IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0005`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0013`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0028`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0066`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0073`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0085`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0108`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0112`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0124`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0128`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0129`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0130`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0131`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0168`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0169`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0194`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0196`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0210`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0214`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0225`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0226`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0227`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0248`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0249`. Repository ownership: `conformance/0.10/cics/families/spi-network-connections.json`.
+- `SPI-1001.spi-transaction-resources-contract-review`: 22 exact rows, all 737 existing case identities; frozen SHA-256 `beba8a363fc8dbec514100d7906700f2987a195fa893216dfd9b4b5378921394`. IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0010`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0024`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0031`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0032`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0082`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0088`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0089`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0115`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0153`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0156`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0167`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0176`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0178`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0188`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0192`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0217`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0240`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0247`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0256`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0258`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0264`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0268`. Repository ownership: none.
+
+Network repair depends on the complete independent 12-finding report: R001–R012,
+six high and six medium, including its hash-bound 126-pointer citation inventory.
+All existing rows/options/response identities/case IDs and pending obligations
+are preserved; exact source-required clauses, finite domains, eligible fixtures
+and source citations are repaired in the sole owned family. Any genuinely new
+source-negative case must be adjacent, source-bound and separately counted.
+No inferred standalone form, harmless OPEN action, numeric error or alternate
+schema is permitted. Reviewer contradictions are resolved against pinned bodies,
+not copied as semantic authority. A different terminal retained CLI thread owns
+repair; the original source workspace has no live writer.
+
+The transaction-resource reviewer uses a new isolated worktree at the 53-commit
+candidate and accounts every option/condition/form/domain/obligation/case/property
+against complete pinned command bodies. It owns only external reports.
+Both declarations precede CLI dispatch. The manager alone owns all shared
+authorities, status, actual Rust family-instance/mandatory integration gates and
+serial sealing. Complete source-linked repair/review accounting is required.
+All six gates, 269 SPI/39 FEPI acceptance, application dependency, selected-route,
+recovery and licensed evidence remain pending and credit zero.
+
+### Pre-dispatch terminal/session source repair
+
+SPI-1001.spi-terminal-sessions-review-repair depends on the terminal full
+review's verified terminal report and frozen family SHA-256
+`b6abebb5c265b0592079b2d0e555788151d6c24f12c769a8f07bb907247d3e64`. All 27 exact rows, 505 operand names, 200 numeric
+conditions plus two unmapped NOTFOUND clauses, 145 domains, ten forms and all
+1126 existing case identities are preserved. Assigned scope is R1–R16, exactly
+516 reported property/case instances, including 420 CVDA observation fixtures.
+Exact row IDs: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0001`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0018`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0021`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0022`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0025`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0027`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0030`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0034`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0064`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0080`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0083`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0087`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0098`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0099`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0102`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0138`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0144`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0149`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0154`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0172`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0189`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0207`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0209`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0233`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0237`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0252`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0265`.
+
+The retained reviewer thread becomes the single repair author in the terminal
+source workspace after verified terminal exit. Sole repository ownership is
+`conformance/0.10/cics/families/spi-terminal-sessions.json`; reports stay external.
+Every changed source assertion requires pinned search/read. Independent state,
+concrete request operands, required versus optional source syntax, distinct
+receiving storage, protected-prefix/surrogate targets, interval validation and
+pool failure distinctions must be repaired. Source conflicts remain precise
+pending; omitted-length/default delivery and licensed behavior are not guessed.
+R16's above-line LOG geometry is recorded separately; any default interpretation
+requires exact pinned notation authority and cannot be imported from a reviewer.
+All changes need an exact ledger and whole-original reverse/equality accounting,
+then review by a different thread. Shared schema/generator/IR/state/security,
+actual Rust family-instance and mandatory integration gates/status/sealing
+remain exclusively manager-owned. All six gates and 269 SPI/39 FEPI obligations
+remain pending, zero credit. This declaration precedes CLI dispatch.
+
+### Serialized common numeric CVDA source bindings
+
+SPI-1001.program-cvda-numeric-bindings is manager-owned and dependency-ready
+for private Wave A metadata: existing reviewed PROGRAM source domains, shared
+CICS operand/constraint types, and retained hash-verified numeric reference
+dfha80c (baseline ibm-cics-ts-6x-misc-tail-cvda-2026-09-23, SHA-256
+5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381).
+Common dfha80x keeps fullword storage and symbolic/DFHVALUE usage distinct from
+reference numeric representations. Catalog rows0026/0084/0155/0241 remain four
+separate PROGRAM identities. Every old symbolic domain and existing case stays
+intact; PL1 has no numeric reference row and remains unresolved, while PLI is
+explicitly named. Equal MAP/MAPSET numbers do not establish semantic aliases.
+
+The manager alone owns the optional bounded numeric facet in the existing
+family schema, sole generator, actual xtask validator, shared CICS IR types,
+PROGRAM source data, generated projections/chunks, fragment/status/docs.
+All live workers retain their frozen schema and disjoint owned family files;
+additive compatibility and provenance are preserved. No executable mapper,
+compiler admission, new dispatcher, route, state owner or response mapping
+is introduced. Runtime/application/selected-route/recovery/licensed gates stay
+pending with zero credit. Required checks are meaningful numeric source/member/
+32-bit-bound/pin negatives, old-preimage compatibility, shared IR scope/alias
+separation, actual family instances and mandatory integration/policy gates.
+
+### Pre-dispatch numeric-facet review and bounded ENQ source-conflict repair
+
+SPI-1001.program-cvda-numeric-bindings-review depends on the manager's complete
+source-pinned common numeric facet and frozen code/family snapshots. A distinct
+retained CLI thread owns only external review reports and a new isolated
+worktree at the 53-commit candidate. Review all common IR/facade exports, schema,
+sole generator, xtask validator, regressions, generated chunks and all 196
+scoped numeric values in 60 PROGRAM parent/form domains, rows0026/0084/0155/0241.
+Every original fact/case and legacy product preimage must be equal after removing
+only the additive numeric facet. Fullword bounds and pin/member/order negatives,
+partial-domain representation and distinct same-number names need review; no
+mapper, alias equivalence, admission or execution credit. Shared writes/gates
+and final sealing remain manager-owned.
+
+SPI-1001.spi-queue-enq-conflict-repair depends on the verified-terminal QSRR-01
+report. Sole repository ownership remains spi-queue-storage.json and only
+/commands/11/gaps/15 may change. Preserve both hash-pinned ENQ and UOWENQ
+diagrams' opposed filter-omission requiredness, their settled alternative
+branches and RESOURCE/RESLEN input pairing, and independent NEXT output roles.
+No union rejection, complete browse form or omission precedence is invented.
+All 30 rows and 903 cases remain exact; all other properties/bytes must reverse
+to the frozen repaired candidate. A different thread must re-review this one
+paragraph before actual instance/generator/integration gates.
+
+Both declarations precede dispatch; all shared authorities are manager-owned,
+all six gates, application/selected-route/recovery/license and 269 SPI/39 FEPI
+acceptance remain pending with zero credit.
+
+### Pre-dispatch database, event and platform source repairs
+
+- `SPI-1001.spi-database-messaging-review-repair`: exact 21 rows and 550 original case identities, findings DBMQ-R01–R08, frozen SHA-256 `13e14bc09070ba4424a5e942b898b2e08168f7e6b9ec041c05e6f368bd6b8849`. Sole repository ownership `conformance/0.10/cics/families/spi-database-messaging.json`. Exact rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0006`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0007`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0008`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0019`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0020`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0067`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0068`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0069`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0078`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0079`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0109`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0110`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0111`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0140`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0141`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0142`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0211`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0212`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0213`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0235`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0236`.
+- `SPI-1001.spi-event-policy-review-repair`: exact 19 rows and 705 original case identities, findings EVT-R1–R3, frozen SHA-256 `21383295d4773ced14a9a8626b2df03d1effc9b8f27530b57856a20442bfb131`. Sole repository ownership `conformance/0.10/cics/families/spi-event-policy.json`. Exact rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0103`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0104`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0105`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0106`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0119`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0120`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0121`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0122`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0123`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0126`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0151`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0152`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0158`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0200`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0220`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0221`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0222`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0223`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0242`.
+- `SPI-1001.spi-platform-programs-review-repair`: exact 19 rows and 562 original case identities, findings PP-01–PP-17, frozen SHA-256 `205459653198416048ba4175150eac58a5b9825b58ab5f59327194c449a3ab55`. Sole repository ownership `conformance/0.10/cics/families/spi-platform-programs.json`. Exact rows: `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0015`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0016`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0062`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0076`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0077`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0093`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0094`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0125`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0135`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0136`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0137`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0143`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0145`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0146`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0147`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0197`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0230`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0231`, `ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0232`.
+
+All three lanes depend on verified terminal full independent reviews. Retained
+reviewer threads become single repair authors in the already terminal source
+workspaces; neither writer is the original author of its assigned family. Each
+finding, full affected pointer/case inventory and source implication requires
+exact offline pinned search/read. Existing identities, source pins, response
+identities, old case IDs/order and all pending obligations remain intact.
+
+DATABASE/MQ fixes singleton output choices, valued/bare authorization exclusions,
+value-dependent stop prerequisites, all 36 selected-receiver fixtures/47 receivers,
+CREATE attribute phases and syncpoint fixtures, 100 bare-selector citations and
+the external search-provenance mismatch. Above-line graphical default meaning
+needs pinned notation authority; layout/default/source conflicts stay pending.
+EVENT fixes five source-settled START dependencies, all 38 condition receiver
+fixtures, and the FEATUREKEY diagram/example VALUE conflict. PLATFORM fixes
+17 findings covering missing operands/required actions, incompatible global/TRUE
+and JVM contexts, selected receiver storage and SET LIBRARY mutation isolation.
+No new browse form, guessed ABI/numeric alias or response, generic success or
+licensed interpretation is introduced. Preserve contradictory pinned facts.
+
+Each final artifact needs an exact property ledger, whole-original forward and
+reverse proof, unchanged case accounting and a different thread's changed-fact
+review. Only external receipts/reports may accompany the owned source file.
+Shared schema, generator, registries, IR/state/security/UOW, status and all actual
+Rust family-instance/mandatory integration gates/sealing remain manager-owned.
+All six gates, application dependency, selected-route/recovery/license and
+269 SPI/39 FEPI acceptance remain pending, credit zero. This declaration is
+written before CLI dispatch; no parent is sealed from partial children.
+
+### Pre-dispatch final ENQ source-conflict review
+
+SPI-1001.spi-queue-enq-conflict-review depends on verified terminal one-property
+QSRR-01 repair, final SHA-256
+`a7a4a7a270cf4a768d46fba275c253cf06598445b809157396ce0a450e5e4ecc`.
+A fresh independent CLI thread in its isolated review worktree owns external
+reports only. Scope is /commands/11/gaps/15 against both pinned ENQ/UOWENQ
+authorities and every preservation/provenance implication of that change.
+All other prior repaired facts and complete cases are reused only after exact
+whole-byte/source/report equality; all 30 rows and 903 case identities remain
+intact. No original repair writer runs in the review checkout. Shared authorities,
+actual family-instance/mandatory gates and serial sealing remain manager-owned.
+All runtime/parent/dependency/recovery/license gates remain pending, credit0.
+This declaration precedes dispatch.
+
+### Pre-dispatch terminal/session changed-fact review
+
+SPI-1001.spi-terminal-sessions-repair-review depends on terminal repaired
+SHA-256 `75289e71d56d5501b3ea141f0a649463394df0a9763869a52f20c2e3cd81577d`.
+A distinct retained thread owns external review only in a new isolated checkout.
+Scope is all 523 repair actions, 516 assigned-instance dispositions, 473 amended
+original cases and seven additional ATTRLEN-omission candidates across the same
+27 predeclared rows. All 653 untouched complete cases and original unrelated
+facts may be reused only with exact byte/hash/whole-original reverse proofs.
+420 CVDA observations require independently seeded state or explicit unresolved
+DEVICE/NOTAPPLIC mappings; symbolic membership is no output oracle. Both BMS
+source outcomes remain unresolved, four CHANGEAGREL digits do not establish
+four bytes, and pool failure retention or omitted LOG defaults are not invented.
+Every adjacent edit and preserved source conflict is included in review.
+Ownership is no repository writes; shared authorities, actual family-instance,
+generator/mandatory gates and serial sealing remain manager-owned. All runtime,
+parent, application/selected-route/recovery/license gates remain pending, zero
+credit. This declaration precedes retained CLI dispatch.
+
+### Pre-dispatch network changed-fact review
+
+SPI-1001.spi-network-connections-repair-review depends on terminal repaired
+SHA-256 `ab61a5de1ba08dc79baddddbfa9d15cb5e944e4c77566a21382816a97e5e5ee7`.
+A fresh independent CLI thread owns external reports only in an isolated review
+checkout. Scope covers all 244 property actions, four new closed source forms,
+38 semantically changed cases and 113 citation-only changes, including all 126
+assigned citation pointers, across the same 24 predeclared rows. All 120 untouched
+whole cases, IDs/order, 332 operand names/directions/widths, 188 response identities
+and original unrelated facts require exact equality and whole-original reversal.
+Review source-required action choices, independent status/certificate/security
+fixtures, phase-local CREATE operands and preserved source conflicts without
+inventing combined-action precedence, numeric mapping or harmless status changes.
+Shared authorities, actual Rust instance/generator/mandatory gates and serial
+sealing stay manager-owned. All six/runtime/parent/application/selected-route/
+recovery/license gates remain pending, credit0. Declaration precedes dispatch.
+
+Numeric CVDA source integration passes 31 generator regressions, nine shared IR
+regressions and 17 actual family-validator regressions. Independent changed-code
+and source review found no actionable defect: all 196 records in 60 PROGRAM
+parent/named domains, 106 original PROGRAM cases and 143 generated declarations
+are accounted, and removing only the additive facet restores every original
+source fact and the old product digest. PL1 numeric binding remains unavailable;
+PLI and equal-number MAP/MAPSET names remain distinct. No runtime encoder,
+compiler admission or execution behavior changes.
+
+All 11 currently integrated family instances pass the same actual Draft202012
+validator with --family, plus module/public-API/schema/format/architecture/docs/
+changelog/dependency gates. The global 18-family gate remains pending because
+seven enrolled source files are not yet integrated; its failed receipt is kept
+and no acceptance criterion is relaxed. Current private source projection still
+has 143 command rows (104 SPI, 39 FEPI), 2636 operands and 4074 case candidates.
+Runtime acceptance and official credit stay zero. Application, selected-route,
+recovery/licensed and parent SPI-1001 remain pending.

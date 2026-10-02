@@ -318,7 +318,36 @@
                     75,
                     76,
                     78
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "LOG",
+                        "number": 54,
+                        "source_lines": [
+                          864,
+                          865
+                        ]
+                      },
+                      {
+                        "symbol": "NOLOG",
+                        "number": 55,
+                        "source_lines": [
+                          1074,
+                          1075
+                        ]
+                      }
+                    ]
+                  }
                 }
               ]
             },
@@ -349,7 +378,36 @@
               75,
               76,
               78
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "LOG",
+                  "number": 54,
+                  "source_lines": [
+                    864,
+                    865
+                  ]
+                },
+                {
+                  "symbol": "NOLOG",
+                  "number": 55,
+                  "source_lines": [
+                    1074,
+                    1075
+                  ]
+                }
+              ]
+            }
           }
         ]
       },
@@ -2676,7 +2734,36 @@
                     124,
                     125,
                     132
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "CICSAPI",
+                        "number": 1052,
+                        "source_lines": [
+                          236,
+                          237
+                        ]
+                      },
+                      {
+                        "symbol": "OPENAPI",
+                        "number": 1053,
+                        "source_lines": [
+                          1320,
+                          1321
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "CEDFSTATUS",
@@ -2692,7 +2779,44 @@
                     177,
                     182,
                     184
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "CEDF",
+                        "number": 370,
+                        "source_lines": [
+                          210,
+                          211
+                        ]
+                      },
+                      {
+                        "symbol": "NOCEDF",
+                        "number": 371,
+                        "source_lines": [
+                          976,
+                          977
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "CHANGEAGENT",
@@ -2718,7 +2842,84 @@
                     200,
                     202,
                     204
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "AUTOINSTALL",
+                        "number": 1140,
+                        "source_lines": [
+                          118,
+                          119
+                        ]
+                      },
+                      {
+                        "symbol": "CREATESPI",
+                        "number": 844,
+                        "source_lines": [
+                          358,
+                          359
+                        ]
+                      },
+                      {
+                        "symbol": "CSDAPI",
+                        "number": 840,
+                        "source_lines": [
+                          362,
+                          363
+                        ]
+                      },
+                      {
+                        "symbol": "CSDBATCH",
+                        "number": 841,
+                        "source_lines": [
+                          364,
+                          365
+                        ]
+                      },
+                      {
+                        "symbol": "DREPAPI",
+                        "number": 843,
+                        "source_lines": [
+                          490,
+                          491
+                        ]
+                      },
+                      {
+                        "symbol": "DYNAMIC",
+                        "number": 178,
+                        "source_lines": [
+                          512,
+                          513
+                        ]
+                      },
+                      {
+                        "symbol": "OVERRIDE",
+                        "number": 1236,
+                        "source_lines": [
+                          1350,
+                          1351
+                        ]
+                      },
+                      {
+                        "symbol": "SYSTEM",
+                        "number": 643,
+                        "source_lines": [
+                          1826,
+                          1827
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "COBOLTYPE",
@@ -2736,7 +2937,52 @@
                     223,
                     226,
                     229
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "COBOL",
+                        "number": 151,
+                        "source_lines": [
+                          282,
+                          283
+                        ]
+                      },
+                      {
+                        "symbol": "COBOLII",
+                        "number": 375,
+                        "source_lines": [
+                          284,
+                          285
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "NOTINIT",
+                        "number": 376,
+                        "source_lines": [
+                          1232,
+                          1233
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "CONCURRENCY",
@@ -2752,7 +2998,44 @@
                     235,
                     238,
                     243
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "QUASIRENT",
+                        "number": 1050,
+                        "source_lines": [
+                          1468,
+                          1469
+                        ]
+                      },
+                      {
+                        "symbol": "REQUIRED",
+                        "number": 666,
+                        "source_lines": [
+                          1556,
+                          1557
+                        ]
+                      },
+                      {
+                        "symbol": "THREADSAFE",
+                        "number": 1051,
+                        "source_lines": [
+                          1890,
+                          1891
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "COPY",
@@ -2766,7 +3049,36 @@
                     273,
                     274,
                     278
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NOTREQUIRED",
+                        "number": 667,
+                        "source_lines": [
+                          1252,
+                          1253
+                        ]
+                      },
+                      {
+                        "symbol": "REQUIRED",
+                        "number": 666,
+                        "source_lines": [
+                          1556,
+                          1557
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "DATALOCATION",
@@ -2782,7 +3094,44 @@
                     283,
                     285,
                     287
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "ANY",
+                        "number": 158,
+                        "source_lines": [
+                          56,
+                          57
+                        ]
+                      },
+                      {
+                        "symbol": "BELOW",
+                        "number": 159,
+                        "source_lines": [
+                          160,
+                          161
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "DYNAMSTATUS",
@@ -2796,7 +3145,36 @@
                     299,
                     300,
                     304
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "DYNAMIC",
+                        "number": 178,
+                        "source_lines": [
+                          512,
+                          513
+                        ]
+                      },
+                      {
+                        "symbol": "NOTDYNAMIC",
+                        "number": 1021,
+                        "source_lines": [
+                          1212,
+                          1213
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "EXECKEY",
@@ -2812,7 +3190,44 @@
                     326,
                     328,
                     330
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "CICSEXECKEY",
+                        "number": 381,
+                        "source_lines": [
+                          242,
+                          243
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "USEREXECKEY",
+                        "number": 382,
+                        "source_lines": [
+                          2020,
+                          2021
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "EXECUTIONSET",
@@ -2829,7 +3244,44 @@
                     340,
                     342,
                     344
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "DPLSUBSET",
+                        "number": 383,
+                        "source_lines": [
+                          486,
+                          487
+                        ]
+                      },
+                      {
+                        "symbol": "FULLAPI",
+                        "number": 384,
+                        "source_lines": [
+                          654,
+                          655
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "HOLDSTATUS",
@@ -2845,7 +3297,44 @@
                     350,
                     352,
                     354
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "HOLD",
+                        "number": 163,
+                        "source_lines": [
+                          704,
+                          705
+                        ]
+                      },
+                      {
+                        "symbol": "NOHOLD",
+                        "number": 164,
+                        "source_lines": [
+                          1056,
+                          1057
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "INSTALLAGENT",
@@ -2869,7 +3358,76 @@
                     368,
                     370,
                     372
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "AUTOINSTALL",
+                        "number": 1140,
+                        "source_lines": [
+                          118,
+                          119
+                        ]
+                      },
+                      {
+                        "symbol": "BUNDLE",
+                        "number": 1180,
+                        "source_lines": [
+                          184,
+                          185
+                        ]
+                      },
+                      {
+                        "symbol": "CREATESPI",
+                        "number": 844,
+                        "source_lines": [
+                          358,
+                          359
+                        ]
+                      },
+                      {
+                        "symbol": "CSDAPI",
+                        "number": 840,
+                        "source_lines": [
+                          362,
+                          363
+                        ]
+                      },
+                      {
+                        "symbol": "DYNAMIC",
+                        "number": 178,
+                        "source_lines": [
+                          512,
+                          513
+                        ]
+                      },
+                      {
+                        "symbol": "GRPLIST",
+                        "number": 842,
+                        "source_lines": [
+                          680,
+                          681
+                        ]
+                      },
+                      {
+                        "symbol": "SYSTEM",
+                        "number": 643,
+                        "source_lines": [
+                          1826,
+                          1827
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "LANGDEDUCED",
@@ -2896,7 +3454,84 @@
                     404,
                     407,
                     410
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "ASSEMBLER",
+                        "number": 150,
+                        "source_lines": [
+                          84,
+                          85
+                        ]
+                      },
+                      {
+                        "symbol": "C",
+                        "number": 149,
+                        "source_lines": [
+                          188,
+                          189
+                        ]
+                      },
+                      {
+                        "symbol": "COBOL",
+                        "number": 151,
+                        "source_lines": [
+                          282,
+                          283
+                        ]
+                      },
+                      {
+                        "symbol": "JAVA",
+                        "number": 147,
+                        "source_lines": [
+                          800,
+                          801
+                        ]
+                      },
+                      {
+                        "symbol": "LE370",
+                        "number": 377,
+                        "source_lines": [
+                          842,
+                          843
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "NOTDEFINED",
+                        "number": 659,
+                        "source_lines": [
+                          1208,
+                          1209
+                        ]
+                      },
+                      {
+                        "symbol": "PLI",
+                        "number": 152,
+                        "source_lines": [
+                          1406,
+                          1407
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "LANGUAGE",
@@ -2922,7 +3557,76 @@
                     426,
                     429,
                     431
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "ASSEMBLER",
+                        "number": 150,
+                        "source_lines": [
+                          84,
+                          85
+                        ]
+                      },
+                      {
+                        "symbol": "C",
+                        "number": 149,
+                        "source_lines": [
+                          188,
+                          189
+                        ]
+                      },
+                      {
+                        "symbol": "COBOL",
+                        "number": 151,
+                        "source_lines": [
+                          282,
+                          283
+                        ]
+                      },
+                      {
+                        "symbol": "LE370",
+                        "number": 377,
+                        "source_lines": [
+                          842,
+                          843
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "NOTDEFINED",
+                        "number": 659,
+                        "source_lines": [
+                          1208,
+                          1209
+                        ]
+                      },
+                      {
+                        "symbol": "PLI",
+                        "number": 152,
+                        "source_lines": [
+                          1406,
+                          1407
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "LPASTATUS",
@@ -2938,7 +3642,44 @@
                     468,
                     471,
                     473
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "LPA",
+                        "number": 165,
+                        "source_lines": [
+                          876,
+                          877
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "NOTLPA",
+                        "number": 166,
+                        "source_lines": [
+                          1238,
+                          1239
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "PROGTYPE",
@@ -2957,7 +3698,52 @@
                     494,
                     495,
                     497
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "MAP",
+                        "number": 155,
+                        "source_lines": [
+                          890,
+                          891
+                        ]
+                      },
+                      {
+                        "symbol": "MAPSET",
+                        "number": 155,
+                        "source_lines": [
+                          892,
+                          893
+                        ]
+                      },
+                      {
+                        "symbol": "PARTITIONSET",
+                        "number": 156,
+                        "source_lines": [
+                          1358,
+                          1359
+                        ]
+                      },
+                      {
+                        "symbol": "PROGRAM",
+                        "number": 154,
+                        "source_lines": [
+                          1442,
+                          1443
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "REPLICATION",
@@ -2970,7 +3756,36 @@
                     511,
                     512,
                     515
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NOREPLICATOR",
+                        "number": 1212,
+                        "source_lines": [
+                          1142,
+                          1143
+                        ]
+                      },
+                      {
+                        "symbol": "REPLICATOR",
+                        "number": 1211,
+                        "source_lines": [
+                          1544,
+                          1545
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "RESIDENCY",
@@ -2984,7 +3799,36 @@
                     526,
                     527,
                     529
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NONRESIDENT",
+                        "number": 1202,
+                        "source_lines": [
+                          1100,
+                          1101
+                        ]
+                      },
+                      {
+                        "symbol": "RESIDENT",
+                        "number": 1201,
+                        "source_lines": [
+                          1564,
+                          1565
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "RUNTIME",
@@ -3006,7 +3850,68 @@
                     543,
                     546,
                     551
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "JVM",
+                        "number": 1080,
+                        "source_lines": [
+                          812,
+                          813
+                        ]
+                      },
+                      {
+                        "symbol": "LE370",
+                        "number": 377,
+                        "source_lines": [
+                          842,
+                          843
+                        ]
+                      },
+                      {
+                        "symbol": "NONLE370",
+                        "number": 1084,
+                        "source_lines": [
+                          1098,
+                          1099
+                        ]
+                      },
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "UNKNOWN",
+                        "number": 774,
+                        "source_lines": [
+                          1990,
+                          1991
+                        ]
+                      },
+                      {
+                        "symbol": "XPLINK",
+                        "number": 1068,
+                        "source_lines": [
+                          2094,
+                          2095
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "SHARESTATUS",
@@ -3022,7 +3927,44 @@
                     556,
                     560,
                     563
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NOTAPPLIC",
+                        "number": 1,
+                        "source_lines": [
+                          1192,
+                          1193
+                        ]
+                      },
+                      {
+                        "symbol": "PRIVATE",
+                        "number": 174,
+                        "source_lines": [
+                          1432,
+                          1433
+                        ]
+                      },
+                      {
+                        "symbol": "SHARED",
+                        "number": 173,
+                        "source_lines": [
+                          1682,
+                          1683
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "STATUS",
@@ -3036,7 +3978,36 @@
                     568,
                     569,
                     571
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "DISABLED",
+                        "number": 24,
+                        "source_lines": [
+                          442,
+                          443
+                        ]
+                      },
+                      {
+                        "symbol": "ENABLED",
+                        "number": 23,
+                        "source_lines": [
+                          528,
+                          529
+                        ]
+                      }
+                    ]
+                  }
                 }
               ]
             },
@@ -3073,7 +4044,36 @@
               124,
               125,
               132
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "CICSAPI",
+                  "number": 1052,
+                  "source_lines": [
+                    236,
+                    237
+                  ]
+                },
+                {
+                  "symbol": "OPENAPI",
+                  "number": 1053,
+                  "source_lines": [
+                    1320,
+                    1321
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "CEDFSTATUS",
@@ -3089,7 +4089,44 @@
               177,
               182,
               184
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "CEDF",
+                  "number": 370,
+                  "source_lines": [
+                    210,
+                    211
+                  ]
+                },
+                {
+                  "symbol": "NOCEDF",
+                  "number": 371,
+                  "source_lines": [
+                    976,
+                    977
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "CHANGEAGENT",
@@ -3115,7 +4152,84 @@
               200,
               202,
               204
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "AUTOINSTALL",
+                  "number": 1140,
+                  "source_lines": [
+                    118,
+                    119
+                  ]
+                },
+                {
+                  "symbol": "CREATESPI",
+                  "number": 844,
+                  "source_lines": [
+                    358,
+                    359
+                  ]
+                },
+                {
+                  "symbol": "CSDAPI",
+                  "number": 840,
+                  "source_lines": [
+                    362,
+                    363
+                  ]
+                },
+                {
+                  "symbol": "CSDBATCH",
+                  "number": 841,
+                  "source_lines": [
+                    364,
+                    365
+                  ]
+                },
+                {
+                  "symbol": "DREPAPI",
+                  "number": 843,
+                  "source_lines": [
+                    490,
+                    491
+                  ]
+                },
+                {
+                  "symbol": "DYNAMIC",
+                  "number": 178,
+                  "source_lines": [
+                    512,
+                    513
+                  ]
+                },
+                {
+                  "symbol": "OVERRIDE",
+                  "number": 1236,
+                  "source_lines": [
+                    1350,
+                    1351
+                  ]
+                },
+                {
+                  "symbol": "SYSTEM",
+                  "number": 643,
+                  "source_lines": [
+                    1826,
+                    1827
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "COBOLTYPE",
@@ -3133,7 +4247,52 @@
               223,
               226,
               229
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "COBOL",
+                  "number": 151,
+                  "source_lines": [
+                    282,
+                    283
+                  ]
+                },
+                {
+                  "symbol": "COBOLII",
+                  "number": 375,
+                  "source_lines": [
+                    284,
+                    285
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "NOTINIT",
+                  "number": 376,
+                  "source_lines": [
+                    1232,
+                    1233
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "CONCURRENCY",
@@ -3149,7 +4308,44 @@
               235,
               238,
               243
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "QUASIRENT",
+                  "number": 1050,
+                  "source_lines": [
+                    1468,
+                    1469
+                  ]
+                },
+                {
+                  "symbol": "REQUIRED",
+                  "number": 666,
+                  "source_lines": [
+                    1556,
+                    1557
+                  ]
+                },
+                {
+                  "symbol": "THREADSAFE",
+                  "number": 1051,
+                  "source_lines": [
+                    1890,
+                    1891
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "COPY",
@@ -3163,7 +4359,36 @@
               273,
               274,
               278
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NOTREQUIRED",
+                  "number": 667,
+                  "source_lines": [
+                    1252,
+                    1253
+                  ]
+                },
+                {
+                  "symbol": "REQUIRED",
+                  "number": 666,
+                  "source_lines": [
+                    1556,
+                    1557
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "DATALOCATION",
@@ -3179,7 +4404,44 @@
               283,
               285,
               287
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "ANY",
+                  "number": 158,
+                  "source_lines": [
+                    56,
+                    57
+                  ]
+                },
+                {
+                  "symbol": "BELOW",
+                  "number": 159,
+                  "source_lines": [
+                    160,
+                    161
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "DYNAMSTATUS",
@@ -3193,7 +4455,36 @@
               299,
               300,
               304
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "DYNAMIC",
+                  "number": 178,
+                  "source_lines": [
+                    512,
+                    513
+                  ]
+                },
+                {
+                  "symbol": "NOTDYNAMIC",
+                  "number": 1021,
+                  "source_lines": [
+                    1212,
+                    1213
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "EXECKEY",
@@ -3209,7 +4500,44 @@
               326,
               328,
               330
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "CICSEXECKEY",
+                  "number": 381,
+                  "source_lines": [
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "USEREXECKEY",
+                  "number": 382,
+                  "source_lines": [
+                    2020,
+                    2021
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "EXECUTIONSET",
@@ -3226,7 +4554,44 @@
               340,
               342,
               344
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "DPLSUBSET",
+                  "number": 383,
+                  "source_lines": [
+                    486,
+                    487
+                  ]
+                },
+                {
+                  "symbol": "FULLAPI",
+                  "number": 384,
+                  "source_lines": [
+                    654,
+                    655
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "HOLDSTATUS",
@@ -3242,7 +4607,44 @@
               350,
               352,
               354
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "HOLD",
+                  "number": 163,
+                  "source_lines": [
+                    704,
+                    705
+                  ]
+                },
+                {
+                  "symbol": "NOHOLD",
+                  "number": 164,
+                  "source_lines": [
+                    1056,
+                    1057
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "INSTALLAGENT",
@@ -3266,7 +4668,76 @@
               368,
               370,
               372
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "AUTOINSTALL",
+                  "number": 1140,
+                  "source_lines": [
+                    118,
+                    119
+                  ]
+                },
+                {
+                  "symbol": "BUNDLE",
+                  "number": 1180,
+                  "source_lines": [
+                    184,
+                    185
+                  ]
+                },
+                {
+                  "symbol": "CREATESPI",
+                  "number": 844,
+                  "source_lines": [
+                    358,
+                    359
+                  ]
+                },
+                {
+                  "symbol": "CSDAPI",
+                  "number": 840,
+                  "source_lines": [
+                    362,
+                    363
+                  ]
+                },
+                {
+                  "symbol": "DYNAMIC",
+                  "number": 178,
+                  "source_lines": [
+                    512,
+                    513
+                  ]
+                },
+                {
+                  "symbol": "GRPLIST",
+                  "number": 842,
+                  "source_lines": [
+                    680,
+                    681
+                  ]
+                },
+                {
+                  "symbol": "SYSTEM",
+                  "number": 643,
+                  "source_lines": [
+                    1826,
+                    1827
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "LANGDEDUCED",
@@ -3293,7 +4764,84 @@
               404,
               407,
               410
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "ASSEMBLER",
+                  "number": 150,
+                  "source_lines": [
+                    84,
+                    85
+                  ]
+                },
+                {
+                  "symbol": "C",
+                  "number": 149,
+                  "source_lines": [
+                    188,
+                    189
+                  ]
+                },
+                {
+                  "symbol": "COBOL",
+                  "number": 151,
+                  "source_lines": [
+                    282,
+                    283
+                  ]
+                },
+                {
+                  "symbol": "JAVA",
+                  "number": 147,
+                  "source_lines": [
+                    800,
+                    801
+                  ]
+                },
+                {
+                  "symbol": "LE370",
+                  "number": 377,
+                  "source_lines": [
+                    842,
+                    843
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "NOTDEFINED",
+                  "number": 659,
+                  "source_lines": [
+                    1208,
+                    1209
+                  ]
+                },
+                {
+                  "symbol": "PLI",
+                  "number": 152,
+                  "source_lines": [
+                    1406,
+                    1407
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "LANGUAGE",
@@ -3319,7 +4867,76 @@
               426,
               429,
               431
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "ASSEMBLER",
+                  "number": 150,
+                  "source_lines": [
+                    84,
+                    85
+                  ]
+                },
+                {
+                  "symbol": "C",
+                  "number": 149,
+                  "source_lines": [
+                    188,
+                    189
+                  ]
+                },
+                {
+                  "symbol": "COBOL",
+                  "number": 151,
+                  "source_lines": [
+                    282,
+                    283
+                  ]
+                },
+                {
+                  "symbol": "LE370",
+                  "number": 377,
+                  "source_lines": [
+                    842,
+                    843
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "NOTDEFINED",
+                  "number": 659,
+                  "source_lines": [
+                    1208,
+                    1209
+                  ]
+                },
+                {
+                  "symbol": "PLI",
+                  "number": 152,
+                  "source_lines": [
+                    1406,
+                    1407
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "LPASTATUS",
@@ -3335,7 +4952,44 @@
               468,
               471,
               473
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "LPA",
+                  "number": 165,
+                  "source_lines": [
+                    876,
+                    877
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "NOTLPA",
+                  "number": 166,
+                  "source_lines": [
+                    1238,
+                    1239
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "PROGTYPE",
@@ -3354,7 +5008,52 @@
               494,
               495,
               497
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "MAP",
+                  "number": 155,
+                  "source_lines": [
+                    890,
+                    891
+                  ]
+                },
+                {
+                  "symbol": "MAPSET",
+                  "number": 155,
+                  "source_lines": [
+                    892,
+                    893
+                  ]
+                },
+                {
+                  "symbol": "PARTITIONSET",
+                  "number": 156,
+                  "source_lines": [
+                    1358,
+                    1359
+                  ]
+                },
+                {
+                  "symbol": "PROGRAM",
+                  "number": 154,
+                  "source_lines": [
+                    1442,
+                    1443
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "REPLICATION",
@@ -3367,7 +5066,36 @@
               511,
               512,
               515
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NOREPLICATOR",
+                  "number": 1212,
+                  "source_lines": [
+                    1142,
+                    1143
+                  ]
+                },
+                {
+                  "symbol": "REPLICATOR",
+                  "number": 1211,
+                  "source_lines": [
+                    1544,
+                    1545
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "RESIDENCY",
@@ -3381,7 +5109,36 @@
               526,
               527,
               529
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NONRESIDENT",
+                  "number": 1202,
+                  "source_lines": [
+                    1100,
+                    1101
+                  ]
+                },
+                {
+                  "symbol": "RESIDENT",
+                  "number": 1201,
+                  "source_lines": [
+                    1564,
+                    1565
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "RUNTIME",
@@ -3403,7 +5160,68 @@
               543,
               546,
               551
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "JVM",
+                  "number": 1080,
+                  "source_lines": [
+                    812,
+                    813
+                  ]
+                },
+                {
+                  "symbol": "LE370",
+                  "number": 377,
+                  "source_lines": [
+                    842,
+                    843
+                  ]
+                },
+                {
+                  "symbol": "NONLE370",
+                  "number": 1084,
+                  "source_lines": [
+                    1098,
+                    1099
+                  ]
+                },
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "UNKNOWN",
+                  "number": 774,
+                  "source_lines": [
+                    1990,
+                    1991
+                  ]
+                },
+                {
+                  "symbol": "XPLINK",
+                  "number": 1068,
+                  "source_lines": [
+                    2094,
+                    2095
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "SHARESTATUS",
@@ -3419,7 +5237,44 @@
               556,
               560,
               563
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NOTAPPLIC",
+                  "number": 1,
+                  "source_lines": [
+                    1192,
+                    1193
+                  ]
+                },
+                {
+                  "symbol": "PRIVATE",
+                  "number": 174,
+                  "source_lines": [
+                    1432,
+                    1433
+                  ]
+                },
+                {
+                  "symbol": "SHARED",
+                  "number": 173,
+                  "source_lines": [
+                    1682,
+                    1683
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "STATUS",
@@ -3433,7 +5288,36 @@
               568,
               569,
               571
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "DISABLED",
+                  "number": 24,
+                  "source_lines": [
+                    442,
+                    443
+                  ]
+                },
+                {
+                  "symbol": "ENABLED",
+                  "number": 23,
+                  "source_lines": [
+                    528,
+                    529
+                  ]
+                }
+              ]
+            }
           }
         ]
       },
@@ -4905,7 +6789,36 @@
                     53,
                     54,
                     59
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "CEDF",
+                        "number": 370,
+                        "source_lines": [
+                          210,
+                          211
+                        ]
+                      },
+                      {
+                        "symbol": "NOCEDF",
+                        "number": 371,
+                        "source_lines": [
+                          976,
+                          977
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "COPY",
@@ -4919,7 +6832,36 @@
                     89,
                     90,
                     96
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NEWCOPY",
+                        "number": 167,
+                        "source_lines": [
+                          942,
+                          943
+                        ]
+                      },
+                      {
+                        "symbol": "PHASEIN",
+                        "number": 168,
+                        "source_lines": [
+                          1398,
+                          1399
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "EXECUTIONSET",
@@ -4933,7 +6875,36 @@
                     108,
                     109,
                     113
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "DPLSUBSET",
+                        "number": 383,
+                        "source_lines": [
+                          486,
+                          487
+                        ]
+                      },
+                      {
+                        "symbol": "FULLAPI",
+                        "number": 384,
+                        "source_lines": [
+                          654,
+                          655
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "REPLICATION",
@@ -4946,7 +6917,36 @@
                     161,
                     162,
                     165
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NOREPLICATOR",
+                        "number": 1212,
+                        "source_lines": [
+                          1142,
+                          1143
+                        ]
+                      },
+                      {
+                        "symbol": "REPLICATOR",
+                        "number": 1211,
+                        "source_lines": [
+                          1544,
+                          1545
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "RUNTIME",
@@ -4961,7 +6961,36 @@
                     171,
                     172,
                     174
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "JVM",
+                        "number": 1080,
+                        "source_lines": [
+                          812,
+                          813
+                        ]
+                      },
+                      {
+                        "symbol": "NOJVM",
+                        "number": 1081,
+                        "source_lines": [
+                          1064,
+                          1065
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "SHARESTATUS",
@@ -4976,7 +7005,36 @@
                     183,
                     184,
                     187
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "PRIVATE",
+                        "number": 174,
+                        "source_lines": [
+                          1432,
+                          1433
+                        ]
+                      },
+                      {
+                        "symbol": "SHARED",
+                        "number": 173,
+                        "source_lines": [
+                          1682,
+                          1683
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "STATUS",
@@ -4990,7 +7048,36 @@
                     193,
                     194,
                     197
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "DISABLED",
+                        "number": 24,
+                        "source_lines": [
+                          442,
+                          443
+                        ]
+                      },
+                      {
+                        "symbol": "ENABLED",
+                        "number": 23,
+                        "source_lines": [
+                          528,
+                          529
+                        ]
+                      }
+                    ]
+                  }
                 },
                 {
                   "option": "VERSION",
@@ -5007,7 +7094,36 @@
                     212,
                     213,
                     215
-                  ]
+                  ],
+                  "numeric_encoding": {
+                    "source": {
+                      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                      "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                      "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                      "lines": [
+                        1,
+                        3
+                      ]
+                    },
+                    "values": [
+                      {
+                        "symbol": "NEWCOPY",
+                        "number": 167,
+                        "source_lines": [
+                          942,
+                          943
+                        ]
+                      },
+                      {
+                        "symbol": "OLDCOPY",
+                        "number": 162,
+                        "source_lines": [
+                          1312,
+                          1313
+                        ]
+                      }
+                    ]
+                  }
                 }
               ]
             },
@@ -5044,7 +7160,36 @@
               53,
               54,
               59
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "CEDF",
+                  "number": 370,
+                  "source_lines": [
+                    210,
+                    211
+                  ]
+                },
+                {
+                  "symbol": "NOCEDF",
+                  "number": 371,
+                  "source_lines": [
+                    976,
+                    977
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "COPY",
@@ -5058,7 +7203,36 @@
               89,
               90,
               96
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NEWCOPY",
+                  "number": 167,
+                  "source_lines": [
+                    942,
+                    943
+                  ]
+                },
+                {
+                  "symbol": "PHASEIN",
+                  "number": 168,
+                  "source_lines": [
+                    1398,
+                    1399
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "EXECUTIONSET",
@@ -5072,7 +7246,36 @@
               108,
               109,
               113
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "DPLSUBSET",
+                  "number": 383,
+                  "source_lines": [
+                    486,
+                    487
+                  ]
+                },
+                {
+                  "symbol": "FULLAPI",
+                  "number": 384,
+                  "source_lines": [
+                    654,
+                    655
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "REPLICATION",
@@ -5085,7 +7288,36 @@
               161,
               162,
               165
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NOREPLICATOR",
+                  "number": 1212,
+                  "source_lines": [
+                    1142,
+                    1143
+                  ]
+                },
+                {
+                  "symbol": "REPLICATOR",
+                  "number": 1211,
+                  "source_lines": [
+                    1544,
+                    1545
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "RUNTIME",
@@ -5100,7 +7332,36 @@
               171,
               172,
               174
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "JVM",
+                  "number": 1080,
+                  "source_lines": [
+                    812,
+                    813
+                  ]
+                },
+                {
+                  "symbol": "NOJVM",
+                  "number": 1081,
+                  "source_lines": [
+                    1064,
+                    1065
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "SHARESTATUS",
@@ -5115,7 +7376,36 @@
               183,
               184,
               187
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "PRIVATE",
+                  "number": 174,
+                  "source_lines": [
+                    1432,
+                    1433
+                  ]
+                },
+                {
+                  "symbol": "SHARED",
+                  "number": 173,
+                  "source_lines": [
+                    1682,
+                    1683
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "STATUS",
@@ -5129,7 +7419,36 @@
               193,
               194,
               197
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "DISABLED",
+                  "number": 24,
+                  "source_lines": [
+                    442,
+                    443
+                  ]
+                },
+                {
+                  "symbol": "ENABLED",
+                  "number": 23,
+                  "source_lines": [
+                    528,
+                    529
+                  ]
+                }
+              ]
+            }
           },
           {
             "option": "VERSION",
@@ -5146,7 +7465,36 @@
               212,
               213,
               215
-            ]
+            ],
+            "numeric_encoding": {
+              "source": {
+                "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html",
+                "sha256": "sha256:5b95b620971d42a9f57511b362f9a12dc04e9ad4b9c26f42cc8e7be943221381",
+                "baseline": "ibm-cics-ts-6x-misc-tail-cvda-2026-09-23",
+                "lines": [
+                  1,
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "symbol": "NEWCOPY",
+                  "number": 167,
+                  "source_lines": [
+                    942,
+                    943
+                  ]
+                },
+                {
+                  "symbol": "OLDCOPY",
+                  "number": 162,
+                  "source_lines": [
+                    1312,
+                    1313
+                  ]
+                }
+              ]
+            }
           }
         ]
       },
