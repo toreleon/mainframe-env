@@ -238,6 +238,7 @@ payload_enum!(MqMqiOutput {
 });
 payload_enum!(MqMqiOutcome {
     tuples { Pending }
-    named { Completed { output, status }, StatusPending { output }, CallbackReturned { context } }
+    named { Completed { output, status }, StatusPending { output }, CallbackReturned { context },
+        ReviewedStatus { status } }
     units { UnknownOutcome, DuplicatePossible }
 });

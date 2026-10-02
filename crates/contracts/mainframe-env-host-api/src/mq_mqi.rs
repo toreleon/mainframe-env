@@ -471,6 +471,11 @@ pub enum MqMqiOutput {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqMqiOutcome {
+    /// A source-reviewed observed return identity. This carries no operation
+    /// output and does not calculate or assert provider execution success.
+    ReviewedStatus {
+        status: crate::mq_status::MqReviewedStatus,
+    },
     Completed {
         status: MqMqiStatus,
         output: MqMqiOutput,

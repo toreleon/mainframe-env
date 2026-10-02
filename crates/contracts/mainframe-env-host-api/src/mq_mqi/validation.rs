@@ -316,6 +316,13 @@ impl MqMqiResult {
     pub fn validate(&self, limits: MqMqiLimits) -> Result<(), MqMqiProblem> {
         limits.validate()?;
         let (status, output) = match &self.outcome {
+            MqMqiOutcome::ReviewedStatus { status } => {
+                return if status.call() == self.call {
+                    Ok(())
+                } else {
+                    Err(MqMqiProblem::StatusCallMismatch)
+                };
+            }
             MqMqiOutcome::Completed { status, output } => (Some(*status), output),
             MqMqiOutcome::StatusPending { output } => (None, output),
             MqMqiOutcome::CallbackReturned { .. } if self.call != MqMqiCall::CallbackFunction => {

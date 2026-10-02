@@ -1,0 +1,464 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/mq-completion-reason-catalog.schema.json",
+  "title": "Source-reviewed MQ call-return vocabulary; zero execution credit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "work_package",
+    "baseline_id",
+    "unique_call_count",
+    "source_position_count",
+    "call_return_count",
+    "callback_notification_count",
+    "pair_count",
+    "source_occurrence_count",
+    "admitted_pair_count",
+    "pending_pair_count",
+    "completion_symbols",
+    "completion_numeric_mapping",
+    "behavioral_coverage_credit",
+    "licensed_execution_credit",
+    "topic_manifest",
+    "source_call_list",
+    "structure_status_catalog",
+    "calls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.mq-completion-reason-catalog@1"
+    },
+    "target_version": {
+      "const": "0.15.0"
+    },
+    "work_package": {
+      "const": "MQ-1501.completion-reason-catalog"
+    },
+    "baseline_id": {
+      "const": "ibm-mq-9.4-mqi-2026-08-31"
+    },
+    "unique_call_count": {
+      "const": 26
+    },
+    "source_position_count": {
+      "const": 27
+    },
+    "call_return_count": {
+      "const": 25
+    },
+    "callback_notification_count": {
+      "const": 1
+    },
+    "pair_count": {
+      "const": 1030
+    },
+    "source_occurrence_count": {
+      "const": 1031
+    },
+    "admitted_pair_count": {
+      "const": 1020
+    },
+    "pending_pair_count": {
+      "const": 10
+    },
+    "completion_symbols": {
+      "const": [
+        "MQCC_OK",
+        "MQCC_WARNING",
+        "MQCC_FAILED"
+      ]
+    },
+    "completion_numeric_mapping": {
+      "const": "pending-not-in-call-pages"
+    },
+    "behavioral_coverage_credit": {
+      "const": 0
+    },
+    "licensed_execution_credit": {
+      "const": 0
+    },
+    "topic_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.2/manifests/mq-topics.json"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "source_call_list": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.15/mq/source-call-list.json"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "structure_status_catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.15/mq/structure-status-catalog.json"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "calls": {
+      "type": "array",
+      "minItems": 26,
+      "maxItems": 26,
+      "items": {
+        "$ref": "#/$defs/call"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completion_line",
+        "reason_line",
+        "number_line"
+      ],
+      "properties": {
+        "completion_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "reason_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "number_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,80}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completion_symbol",
+        "reason_symbol",
+        "declared_decimal",
+        "declared_hex",
+        "review",
+        "source_locations"
+      ],
+      "properties": {
+        "completion_symbol": {
+          "enum": [
+            "MQCC_OK",
+            "MQCC_WARNING",
+            "MQCC_FAILED"
+          ]
+        },
+        "reason_symbol": {
+          "type": "string",
+          "pattern": "^MQRC_[A-Z0-9_ ]{1,80}$"
+        },
+        "declared_decimal": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "declared_hex": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9A-F]{1,8}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review": {
+          "enum": [
+            "admitted",
+            "pending-number",
+            "pending-numeric-conflict",
+            "pending-symbol-conflict",
+            "pending-symbol-spelling"
+          ]
+        },
+        "source_locations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/location"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "review": {
+                "const": "pending-number"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "declared_decimal": {
+                "type": "null"
+              },
+              "declared_hex": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "declared_decimal": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "declared_hex": {
+                "type": "string",
+                "pattern": "^[0-9A-F]{1,8}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "review": {
+                "const": "pending-symbol-spelling"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason_symbol": {
+                "type": "string",
+                "pattern": "^MQRC_[A-Z0-9_]* [A-Z0-9_ ]+$"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reason_symbol": {
+                "type": "string",
+                "pattern": "^MQRC_[A-Z0-9_]{1,80}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "official_row",
+        "label",
+        "topic_path",
+        "topic_sha256",
+        "source_positions",
+        "return_kind",
+        "reason_section",
+        "context_notes",
+        "pairs",
+        "reviewed_projection_sha256"
+      ],
+      "properties": {
+        "official_row": {
+          "type": "string",
+          "pattern": "^ibm-mq-9\\.4-mqi-2026-08-31:mqi-calls-unique:[0-9]{4}$"
+        },
+        "label": {
+          "type": "string",
+          "pattern": "^MQ[A-Z0-9_]{1,30}$"
+        },
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]{6}_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_positions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 27
+          },
+          "uniqueItems": true
+        },
+        "return_kind": {
+          "enum": [
+            "call-return",
+            "callback-notification-no-call-return"
+          ]
+        },
+        "reason_section": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "first_line",
+                "last_line"
+              ],
+              "properties": {
+                "first_line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2000
+                },
+                "last_line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2000
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_notes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/context"
+          },
+          "uniqueItems": true
+        },
+        "pairs": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/pair"
+          },
+          "uniqueItems": true
+        },
+        "reviewed_projection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "return_kind": {
+                "const": "callback-notification-no-call-return"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "MQCB_FUNCTION"
+              },
+              "reason_section": {
+                "type": "null"
+              },
+              "pairs": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "label": {
+                "not": {
+                  "const": "MQCB_FUNCTION"
+                }
+              },
+              "reason_section": {
+                "type": "object"
+              },
+              "pairs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

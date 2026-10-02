@@ -14,6 +14,7 @@ mod ims_assurance_matrix;
 mod ims_catalog;
 mod jcl_catalog;
 mod jcl_conformance;
+mod mq_status_catalog;
 mod profile_intake;
 mod racf_catalog;
 mod release_attestation;
@@ -7879,6 +7880,7 @@ fn check_architecture(root: &Path) -> TaskResult {
 }
 
 fn check_mq_mqi_registry(root: &Path) -> TaskResult {
+    mq_status_catalog::check(root)?;
     let generator = root.join("tools/generate_mq_mqi_registry.py");
     require(
         generator.is_file(),
