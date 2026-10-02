@@ -108,11 +108,10 @@ pub(super) fn prepare(
     next.delivery.advance_tick(now).map_err(delivery_error)?;
     match request {
         MqMqiRequest::Connect(connect) | MqMqiRequest::ConnectExtended(connect) => {
-            // Child-only connection creation/return cleanup needs a separate
-            // policy. Existing parent connections use the checked logical origin.
-            if logical.is_child() {
-                return Err(HostProblem::Unsupported);
-            }
+            // A checked SAME TASK child can establish this processing unit's
+            // first connection. Registry ownership comes from the directory;
+            // durable provenance retains its logical origin and this caller's
+            // original CONNECT key. Ordinary CALL return does not end that task.
             if connect.options != MqMqiOptions::ContractDefault
                 || connect.sharing != MqHandleSharing::NonShared
             {

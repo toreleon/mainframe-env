@@ -3,17 +3,23 @@
 use super::*;
 use crate::mqi_lifecycle::{BatchChildBinding, InstalledBatchRelationship};
 
+#[path = "batch_child/first_connect.rs"]
+mod first_connect;
+
 struct Child {
     inv: Invocation,
     binding: BatchChildBinding,
 }
 impl Child {
     fn new(f: &Fixture) -> Self {
+        Self::named(f, "child")
+    }
+    fn named(f: &Fixture, name: &str) -> Self {
         let mut inv = f.inv.clone();
         let l = InvocationLimits::default();
-        inv.execution_id = ExecutionId::new("child-execution", l).unwrap();
-        inv.request_id = RequestId::new("child-request", l).unwrap();
-        inv.idempotency_key = IdempotencyKey::new("child-invocation", l).unwrap();
+        inv.execution_id = ExecutionId::new(format!("{name}-execution"), l).unwrap();
+        inv.request_id = RequestId::new(format!("{name}-request"), l).unwrap();
+        inv.idempotency_key = IdempotencyKey::new(format!("{name}-invocation"), l).unwrap();
         inv.parent_execution_id = Some(f.inv.execution_id.clone());
         let binding = f
             .service
@@ -345,7 +351,7 @@ fn memory_sqlite_child_rejects_parent_intent_and_receipt_collisions_before_saf()
 }
 
 #[test]
-fn memory_sqlite_preparation_substitution_rollback_and_child_only_connect_fail_closed() {
+fn memory_sqlite_preparation_substitution_rollback_and_already_connected_child_fail_closed() {
     for sqlite in [false, true] {
         let f = Fixture::new(sqlite);
         let (c, _, unit) = parent_pending(&f);

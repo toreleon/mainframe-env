@@ -23,9 +23,16 @@ durable UOW ownership against that proof without changing `UnitOwner@1` bytes.
 Child effects, retained core intent, SAF, audit and receipts keep the actual
 child actor; return/abort retire only the appropriate volatile frame. Same
 physical control/CAS, audited transaction and incarnation fences remain required.
-Fixture provider tests are not an installed/public host producer. Child-first
-CONNECT, final task end, abnormal/Unknown recovery, checkpoints, participant and
-full 26-call acceptance remain separate obligations.
+Fixture provider tests are not an installed/public host producer. A checked
+same-task child can now create the task's first default/nonshared connection.
+Its original CONNECT key remains durable provenance while the admitted logical
+root owns the UOW; its actual child actor still owns the effect, SAF, audit and
+receipt. Normal nonfinal child return retains that connection, objects and work
+for surviving admitted frames, without implicit disconnect or UOW decision.
+Already-connected warning/output composition, final task end, abnormal/Unknown
+recovery, checkpoints, participants and full 26-call acceptance remain separate
+obligations. The source boundary is original baseline
+`ibm-mq-9.4-mqi-2026-08-31`, rows `0008/0009/0012`; task excludes subtasks.
 
 The additive `mq-point-layout-sources` scope now registers twelve hash-verified
 retained MQ 9.4 layout/scalar/encoding topics independently of the frozen

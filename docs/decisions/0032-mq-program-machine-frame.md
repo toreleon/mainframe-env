@@ -114,10 +114,23 @@ replace the child's original intent. Reply uncertainty fences this service and
 leaves reconciliation with the existing recovery authority.
 
 Explicit preparation abort removes only a newly created child frame. Ordinary
-CALL return removes a nonfinal child reference without retiring parent handles
-or deciding pending work; no Drop cleanup is installed. Final task end, raw
-abnormal/unknown host outcomes and child-only CONNECT/return policy need separate
-owned integration. Cold restart restores retained UOW/receipt bytes, never opaque
+CALL return removes a nonfinal child reference without retiring task handles
+or deciding pending work; no Drop cleanup is installed. A checked same-task child
+may establish the task's first default, nonshared connection. Registry ownership
+uses the admitted task/thread/epoch; the unchanged durable owner record retains
+the logical origin and that child's original CONNECT key. Its core intent, SAF,
+audit and receipt retain the actual child actor. A surviving admitted parent or
+next same-task child can use the retained connection, objects and current UOW;
+explicit CMIT/BACK/DISC still require that caller's original controls, authority
+and whole audited publication. Repeated CONNECT remains explicitly unsupported
+until its existing-connection warning/output policy is composed.
+
+This rule relies on the trusted host proving an ordinary CALL in the same
+continuing task. MQCONN's nonshared z/OS scope is the task, excluding subtasks;
+the handle expires on MQDISC or termination of that processing unit. The source
+does not attest topology from Invocation fields, and CALL return is not treated
+as task termination. Final task end and raw abnormal/unknown host outcomes need
+separate owned integration. Cold restart restores retained UOW/receipt bytes, never opaque
 lineage or tokens; durable incarnation advancement remains mandatory. This
 private composition awaits the real installed host producer/session and deliberate
 cross-crate authority design. It does not register a ready public provider or

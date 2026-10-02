@@ -81,7 +81,9 @@ impl MqService {
             .abort_batch_child(binding)
     }
 
-    /// Normal child CALL return removes only a nonfinal volatile frame. Raw
+    /// Normal child CALL return removes only a nonfinal volatile frame, retaining
+    /// even child-created connections, objects and pending work for the surviving
+    /// checked same-task frames. Raw
     /// abnormal/unknown outcomes and final task end need the real host recovery
     /// authority; this method is neither implicit MQDISC nor a durable decision.
     pub(crate) fn return_selected_batch_child(
