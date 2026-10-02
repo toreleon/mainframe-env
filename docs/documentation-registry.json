@@ -69,6 +69,7 @@
     "docs/decisions/0029-db2-core-participant-evolution.md",
     "docs/decisions/0030-gsam-application-record-formats.md",
     "docs/decisions/0032-selected-secondary-checkpoint-position.md",
+    "docs/decisions/0036-null-ssa-command-slots.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -327,6 +328,10 @@
         {
           "label": "ADR-0032: Selected secondary checkpoint positions",
           "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md"
+        },
+        {
+          "label": "ADR-0036: Literal null SSA command slots",
+          "path": "docs/decisions/0036-null-ssa-command-slots.md"
         },
         {
           "label": "Decision index and template",

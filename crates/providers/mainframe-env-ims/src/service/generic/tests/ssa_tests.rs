@@ -1,6 +1,7 @@
 use super::*;
 use mainframe_env_host_api::{HostLimits, ImsNavigationRequest};
 
+mod null_slot_tests;
 mod pcb_tests;
 
 fn navigation(run: &str, sequence: u64, op: ImsOperation, ssas: &[&[u8]]) -> ImsNavigationRequest {

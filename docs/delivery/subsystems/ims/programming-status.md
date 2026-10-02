@@ -6,6 +6,70 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## IMS-1401.null-ssa-command-slots (bounded leaf declared, 2026-10-02)
+
+Parent IMS-1401 and v0.14 remain open. Entry candidate is
+`a8deb3d8a97be2660cfa0d38327ff246a194a910`; licensed certification is excluded
+with zero credit. This leaf recognizes the literal `-` null slot specified by
+IMS 15.6 `apr/ims_cmdcodref.htm`, SHA-256
+`cb1d0cc0cf765f13836b888efaea5538bcbcbbd0453028388b07f69736946093`,
+programming-contract baseline `ibm-ims-15.6-programming-contracts-2026-09-11`.
+The manager used the offline repository search/read and the verified existing
+source cache; no refresh, repin or publication body is required.
+
+Rows :0005/:0006 of `ibm-ims-15.6-dli-2026-08-31:dli-call-families` supply
+retrieval/Get Hold context, not official case or gate credit. The normative SSA
+grammar, its shared generator and bounded host parser own recognition. A null
+slot has no active command behavior; all slots count against the existing
+command bound. Existing request bytes, per-PCB positioning, sensitivity,
+authorization, replay and atomic publication remain authoritative. New active
+F/L/U/V/W semantics, update SSAs and raw CALL are outside this leaf.
+
+Declared proof: fail-first literal/null-plus-active parsing and public provider
+navigation; negative digits/terminators/slot saturation; independently expected
+ordinary/qualified/path/Get Hold behavior, exact request-conflict/no-mutation,
+Memory and file-SQLite reopen, and signed selected-package admission. Affected
+host/provider/server tests, generated catalog/schema checks, scoped strict lint,
+formatting, dependency policy, normal docs/changelog and unchanged module/API
+ratchets are required. [ADR-0036](../../../decisions/0036-null-ssa-command-slots.md)
+records compatibility. The declaration preceded edits and the final local
+results below; it does not establish parent or official acceptance.
+
+Resolved leaf allowlist: `conformance/0.14/ims/ssa-rules.json`,
+`conformance/0.14/schemas/ims-ssa-rules.schema.json`, `xtask/src/ims_catalog.rs`,
+host `src/ims.rs`, generated `src/generated/ims_ssa_rules.rs`,
+`tests/ims_null_ssa_slots.rs` and README; provider generic `tests/ssa_tests.rs`
+and its new `null_slot_tests.rs`; server `product/tests/ims_package_tests.rs`
+and its new `null_ssa_tests.rs`; this status, ADR-0036, the unique
+`ims-null-ssa-command-slots-20261002.toml` fragment, normal generated manifest,
+`docs/documentation-registry.json` and generated `docs/README.md`. The last two
+register the Proposed decision through the existing documentation authority.
+
+Local fail-first parser tests reproduce InvalidCommandCode; the public-provider
+test reproduces Malformed. The first generator attempt referenced its new
+constant before generation and failed compilation. Root restored the old parser
+for normal bootstrap generation, captured the public failure, then connected
+the generated constant; no generated source was edited by hand. Those failed
+receipts remain separate. Final focused checks pass two new parser cases, three
+new provider cases including file-SQLite reopen, 26 selected host contract cases,
+five existing parser cases, fourteen public-provider SSA cases and both the new
+signed null case and existing signed SSA regression. Repeated selected cases are
+not additional scenario credit. Strict affected all-feature/all-target Clippy
+and existing execution/effect/row/storage/SAF/retention/participant/typed/module
+guards pass. No process-restart, PostgreSQL, full matrix or official row claim is
+made by SQLite reopen. Normal docs generation/check, offline dependency and
+license-notice policy, catalog/assurance/schema/spec/coverage/changelog gates,
+formatting and exact existing public API ratchets pass. The initial docs failure
+for missing ADR applicability metadata was repaired and its receipt retained;
+no runtime suite was repeated for that metadata repair. The feature seal is the
+remaining local packaging step.
+
+Receipts are external under worker-receipts/v014-completion-20261002/null-ssa-*;
+each sequence cleans this checkout's Cargo target. The new grammar byte is
+generated privately; the active seventeen-letter inventory, twenty-five-row
+denominator, accepted IR rules, public DTOs and historical canonical fixtures
+are unchanged. Raw/TM owner approvals and full-minor acceptance remain open.
+
 ## IMS-1401.cobol-dli-call-boundary (declared contract-gap leaf)
 
 Parent IMS-1401 remains open. Clean entry `9e97502604d61440047e4c1643190bb178fef5df`

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 235,
+    "markdown_documents": 236,
     "navigation_groups": 6,
-    "normative_documents": 66,
+    "normative_documents": 67,
     "xtask_commands": 233
   },
   "documents": [
@@ -162,7 +162,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
       "relative_links": 1,
-      "sha256": "sha256:6b729d11f25a430c09ce5761397751e3045b1a222998122701f313ce3a3bf836",
+      "sha256": "sha256:9e6665eac6fcfb6ded3501de1ed735ceaa35925516249ad59bbd9462faba76f5",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 122,
-      "sha256": "sha256:9cf5e7a741417bb794ab58db389dad66759e7bc7a4da60a68e4e81c382e128b4",
+      "relative_links": 123,
+      "sha256": "sha256:8590966024ce1cb4e82175f5c8caf28b2ead0490f6eabc9670292547cf768199",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1059,6 +1059,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0036-null-ssa-command-slots.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.null-ssa-command-slots, target 0.14.0",
+      "sha256": "sha256:5cdf97fa10bb05233b73da47a99b3507ade37ca1011e250f22f206564b3e377a",
+      "status": "Proposed within the user-authorized bounded IMS leaf",
+      "title": "ADR-0036: Literal null SSA command slots",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 35,
@@ -1513,8 +1525,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 17,
-      "sha256": "sha256:fabd4615464b4ed648b79fb52f4bf2059f894f37a6a7f4dcaf24bc4731b70145",
+      "relative_links": 18,
+      "sha256": "sha256:bfd8f9a38c839b40612e036785170c0f6cda54786ce4fd9f021b59addbcead45",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -2404,6 +2416,10 @@
           "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md"
         },
         {
+          "label": "ADR-0036: Literal null SSA command slots",
+          "path": "docs/decisions/0036-null-ssa-command-slots.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2652,7 +2668,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:bd3c9addaca1c9e082810e76bcd63c6fc88b4e49a5ae391b9867653370ef3314",
+  "registry_sha256": "sha256:9c4d46aad995045f1bc7b325cc453de6eabbc7d85edbef12a3abf1436ede8b19",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

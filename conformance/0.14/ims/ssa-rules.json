@@ -42,6 +42,7 @@
   "segment_name_bytes": 8,
   "field_name_bytes": 8,
   "relational_operator_bytes": 2,
+  "null_command_encoding": "2d",
   "command_codes": [
     {"code": "A", "behavior": "clear-position", "subset_pointer": false, "dedb_only": false},
     {"code": "C", "behavior": "concatenated-key", "subset_pointer": false, "dedb_only": false},

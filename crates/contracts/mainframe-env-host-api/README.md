@@ -10,6 +10,9 @@ The IMS SSA contract uses reviewed, generated grammar metadata and a bounded
 display-code parser. Encoding adapters translate source bytes before parsing;
 generic DBD metadata supplies exact field lengths so comparative values remain
 binary and cannot be split by connector-shaped data.
+Literal `-` null command slots reserve syntax space without selecting an active
+command. Null and active slots share the parser bound; raw request bytes still
+bind canonical replay. The active-command inventory remains seventeen.
 
 The optional version-1 `ImsGsamFormat` declares application-area F/V/U format,
 access method, block bound and control selection in signed database metadata.

@@ -453,6 +453,11 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
         )?;
     }
 
+    let null_command = hex_byte(text(&rules, "null_command_encoding", &rules_path)?)?;
+    require(
+        null_command == b'-',
+        "IMS SSA null-command encoding drifted",
+    )?;
     let expected_codes = [
         "A", "C", "D", "F", "G", "L", "M", "N", "O", "P", "Q", "R", "S", "U", "V", "W", "Z",
     ];
@@ -553,6 +558,7 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
          pub const IMS_SSA_SEGMENT_NAME_BYTES: usize = 8;\n\
          pub const IMS_SSA_FIELD_NAME_BYTES: usize = 8;\n\
          pub const IMS_SSA_RELATIONAL_OPERATOR_BYTES: usize = 2;\n\n\
+         const IMS_SSA_NULL_COMMAND: u8 = {null_command};\n\n\
          pub const IMS_SSA_COMMAND_CODES: &[ImsSsaCommandCodeDescriptor] = &[\n",
         format!("sha256:{}", file_digest(&rules_path)?),
         format!(
