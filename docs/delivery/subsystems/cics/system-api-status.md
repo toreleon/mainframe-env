@@ -2852,3 +2852,29 @@ DATABASE integrated candidate passes 31 generator and nine IR regressions plus
 actual Draft202012 family instance validation. Private projection has 213 commands
 (174 SPI and 39 FEPI), 3604 head operands and 6232 case candidates. Four of 18
 enrolled family inputs remain unintegrated; all-family and runtime gates pending.
+
+NETWORK child SPI-1001.spi-network-connections-source-contracts is manager-owned
+and bounded to 24 enrolled network rows/24 obligations, 332 options, 188
+conditions, four forms, 73 scoped symbolic domains and 271 source-derived cases.
+Exact final a07e66ea26ed58adfceddae6cab0591f582c9af481262dccddc1c32f4a9b95c6
+passed prior full-family and different-thread final review. Manager inspected all
+14 final repaired properties and 12 complete amended cases; whole-byte forward
+and reverse replay preserve 259 other cases, IDs/order and all 200 precise gaps.
+Manager's two-topic/four-call pinned search/read consult rechecks SET TCPIP and
+SET TCPIPSERVICE; prior full-family 51-call review stays source provenance only.
+Coupled limit and OPEN/CLOSED effects, clamping, interrupted and partial opening,
+receiver validity and absent-resource fixture remain bounded pending candidates.
+No caller rollback, universal attainment or automatic redispatch is inferred.
+Baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12; exact catalog rows/body
+pins remain enrolled in spi-network-connections.json. Sources stay private,
+non-routing and unadvertised. Manager exclusively owns shared facade/generator,
+schema/status and serial integration; existing runtime/resource/condition/security/
+UOW/persistence authorities are unchanged. Only this source child may be sealed
+after actual family instance and focused/mandatory integration checks; all six
+command gates, SPI-1001 parent, application dependency, selected-route/recovery
+and licensed acceptance remain Pending with execution/official/licensed credit0.
+
+NETWORK integrated candidate passes 31 generator and nine IR regressions plus
+actual Draft202012 family instance validation. Private projection has 237 commands
+(198 SPI and 39 FEPI), 3936 head operands and 6503 case candidates. Three of 18
+enrolled family inputs remain unintegrated; all-family and runtime gates pending.
