@@ -6,6 +6,16 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1501.installed-connx-observation` forwards the additive trusted CONNX profile
+through the same exact-original Invocation and pre/post revocation guard as
+profile/current-unit lookup. Encoding/profile observations are unchanged; older
+embeddings remain Unsupported. Finish/abort/Drop suppress escaped observations,
+including a concurrent late return; callback panic irreversibly revokes transport
+as protected Unknown without cleanup/retry. This transport-only composition uses
+the already reviewed row `0009`/CNO source boundary and selects no ABI, queue
+manager, handle, SAF or UOW authority. The real configured producer remains the
+next installed integration obligation.
+
 The deliberately privileged Rust `MqTrustedBatchRuntime/Root/Frame` facet now
 opens only existing strict rich state and retains one selected service, physical
 store, mandatory SAF/clock and frozen limits. It preserves exact unbound original

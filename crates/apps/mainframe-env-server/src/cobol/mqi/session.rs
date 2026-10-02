@@ -2,7 +2,7 @@
 
 use super::*;
 use mainframe_env_host_api::{MqHconn, mq_mqi::MqMqiUnitOfWork};
-use mainframe_env_interpreter::MqMqiProgramProfile;
+use mainframe_env_interpreter::{MqMqiConnxProfile, MqMqiProgramProfile};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::AtomicBool;
 
@@ -52,6 +52,10 @@ impl ExecutableFrame {
 impl MqMqiProgramFrame for ExecutableFrame {
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
         self.observe(invocation, |frame| frame.profile(invocation))
+    }
+
+    fn connx_profile(&self, invocation: &Invocation) -> Result<MqMqiConnxProfile, HostProblem> {
+        self.observe(invocation, |frame| frame.connx_profile(invocation))
     }
 
     fn local_unit(
