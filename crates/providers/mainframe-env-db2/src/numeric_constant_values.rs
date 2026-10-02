@@ -29,6 +29,8 @@ use crate::{
 use mainframe_env_encoding::DecimalValue;
 use std::fmt;
 
+pub mod decfloat_assignment;
+
 /// Exact natural value; DECIMAL retains its scale even for zero or trailing zeros.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Db2NumericConstantValue {
