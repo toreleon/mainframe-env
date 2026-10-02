@@ -6,6 +6,35 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1501.typed-connection-warning` now preserves the exact reviewed warning
+`1/2002` and defined nonhistorical issued HCONN for compiled CONN/CONNX, reusing
+the same ABI alias or recording a child's first observation without minting a
+provider handle/UOW. Both calls capture bounded compiled ranges and recheck
+original frame/profile/layout/bytes before one atomic output batch. Undefined
+failed HCONN is retained; unusable/pending/historical/uncertain replies cannot
+partially write or install an alias. Sealed worker `a3bca54f` and integrated
+`e139bfd8`, original MQ9.4 rows `0008/0009` under
+`ibm-mq-9.4-mqi-2026-08-31`, define this machine slice, not actual provider reuse
+or installed-service/SAF acceptance.
+
+`MQ-1505.selected-provider-identity`, sealed `78cdde60`, adds only a read-only
+physical-Arc identity observation through the existing frozen host registry.
+Equal descriptor/generation values cannot substitute another selected provider;
+existing ready/missing refusals and independent invocation admission remain.
+This necessary bridge composition check grants no lifecycle, SAF or UOW permit.
+
+Next configured installed-batch bridge slice (parent `MQ-1505`) must consume
+genuine private installed artifact/core/CALL admission and independently retain
+unchanged original root/same-task child through the closed selected runtime.
+It must prove the same physical store, clock/control and registered provider,
+bound root/frame maps, preserve original occurrences and distinct atomic provider
+and coordinator audit records, and test real compiler/coordinator/Memory/SQLite
+with mandatory SAF, late refusal/CAS/Unknown and nonfinal return. Strict rich open
+must not invent deployment normalization or silently fall back at startup.
+Preparation abort, Drop containment, accepted checkpoint/retention/final task-end,
+participant and full26 requirements retain their separate owners. This declares
+the next slice; no configured bridge implementation/acceptance is claimed yet.
+
 `MQ-1501.installed-connx-observation` forwards the additive trusted CONNX profile
 through the same exact-original Invocation and pre/post revocation guard as
 profile/current-unit lookup. Encoding/profile observations are unchanged; older
@@ -51,8 +80,9 @@ atomic CONNX writeback reuse the existing machine authority. Original row `0009`
 (`q101770_` signature and COBOL lines 220–228), row `0008` (`q101760_` name rules)
 and supplemental `q091060_/q095410_/q095415_` define the source review. The worker
 is sealed as `8fdbcd93`; its compiler fixtures are not installed-provider/SAF
-acceptance. Server forwarding, actual selected service production, warning handle
-writeback, conditional Options output and accepted typed checkpoints remain
+acceptance. Guarded server forwarding and compiled warning handle writeback are
+now separately integrated; actual selected service production, conditional
+Options output and accepted typed checkpoints remain
 separate composition work. Legacy canonical and checkpoint identities stay exact.
 
 The existing reviewed-output contract now retains MQCONN/MQCONNX's exact
@@ -62,7 +92,8 @@ codec preserves its full canonical identity but reconstructs only historical
 non-executable handles; registry lifetime/owner checks remain independent.
 Original MQ 9.4 rows `0008/0009`, MQCONN usage line 271 and MQCONNX return lines
 76–78 define this source review. Selected provider reuse of its actual prior
-connection and compiled warning writeback still need composition; no token,
+connection still needs composition; compiled warning writeback is separately
+integrated above. No token,
 duplicate connection, SAF permit or additional execution credit is fabricated.
 
 Installed executable frames now forward read-only profile and current-unit
