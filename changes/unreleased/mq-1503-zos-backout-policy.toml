@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added an explicit private live z/OS complete-message backout candidate: removed syncpoint GET counters increment once and saturate at 255, invalid signed counters and prospective quotas refuse atomically, and existing storage-only backout and cold-recovery bytes remain unchanged. Selected semantic admission and final-task-end recovery remain separately required."

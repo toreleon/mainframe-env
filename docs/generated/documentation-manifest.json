@@ -1061,7 +1061,7 @@
       "path": "docs/decisions/0033-mq-full-md-value.md",
       "relative_links": 0,
       "scope": "complete descriptor/message values and codecs, not executable message policy",
-      "sha256": "sha256:90231034a250304c882d5eae9a3fb6461a069f18f16f659e21c2abb6b8b8a16e",
+      "sha256": "sha256:fcdfee2645e7928c7de9229b0553869defd7ef75f8f306d9646637929510dbd6",
       "status": "Proposed",
       "title": "Complete MQMD value primitive",
       "xtask_commands": 0
@@ -1598,7 +1598,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:439c2e160e84410db02fb2523024e67d369ef2a35a0945728c66f41029321d5e",
+      "sha256": "sha256:a00ab36025c7f49bb3d09d6bf6f179fb8312b5888ebbc49110e2d2bf3eddb685",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

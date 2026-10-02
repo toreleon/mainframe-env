@@ -197,3 +197,23 @@ Memory/owned SQLite private storage and audited-transaction tests are storage
 evidence only. Actual selected full PUT/GET, trusted behavioral/context producer,
 retention description, SAF, participant, full-26 and CardDemo acceptance remain
 incomplete; unknown outcomes never authorize rollback or redispatch.
+
+## Explicit live z/OS BackoutCount policy
+
+The separate private `backout_complete_zos` candidate applies the reviewed
+`q097395_` BackoutCount rule to complete payloads actually removed by syncpoint
+GET into the exact pending unit. It increments once, saturates at 255 on z/OS,
+and rejects signed observations outside 0..255 without changing any queue, unit,
+counter or finalization. Browse/rejected truncation and staged PUTs do not count;
+all other complete fields, body and properties remain exact. The existing
+candidate restores GETs/discards PUTs and checks finalization/encoded quotas
+before adoption. Repeated/unknown/committed decisions preserve existing behavior.
+
+The public storage-only `backout`, cold projections and their bytes remain
+unchanged. Selecting this explicit primitive requires the owning source-bound
+operation's context/unit/SAF/core/audited-publication admission. It does not
+initialize a native MQMD, resolve HardenGetBackout crash accuracy, authorize a
+final task end, or implement recovery. Negative surrounding test observations
+prove field preservation only, not native MQMD or licensed execution legality.
+Selected full GET/BACK composition and final-task-end recovery remain required;
+the primitive alone grants no executable call or full-v0.15 acceptance credit.

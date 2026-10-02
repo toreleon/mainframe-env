@@ -4,6 +4,7 @@ pub(crate) mod checkpoint;
 pub(crate) mod full_message;
 pub(crate) mod replay;
 mod restart;
+mod source_backout;
 use full_message::{Payload, PayloadGet, QueueProfile, QueueState};
 
 use crate::{

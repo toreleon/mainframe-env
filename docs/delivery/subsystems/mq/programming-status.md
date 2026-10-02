@@ -6,6 +6,26 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.zos-backout-policy` adds an explicit private live delivery candidate for
+the reviewed MQ9.4 BackoutCount rule (`q097395_` lines1498–1508, supplemental
+baseline2026-09-12; original MQBACK/MQGET rows0001/0015). Complete messages
+actually removed into a syncpoint unit increment once and saturate at255.
+Invalid signed counters refuse the whole unit; browse/rejected truncation,
+staged puts and other units do not count. Every other MD/body/property byte and
+the legacy partial/storage-only backout/cold projection remain exact. Existing
+candidate quota checks precede adoption. This is a deterministic policy primitive,
+not selected semantic admission, physical publication, HardenGetBackout crash
+accuracy, a task-end producer, native MQMD initialization or new call acceptance.
+Selected GET/BACK and final recovery must compose this rule before their native
+backout observations can earn credit. All parent requirements remain active.
+Five new policy and six unchanged full-storage regressions pass (11 focused
+tests, zero ignored), including MD1/2, ASCII/owned CP037, persistent/nonpersistent,
+exact repeated decision, invalid-counter mixed-unit rollback and finalization
+quota refusal. Thirteen policy tests, actual guards/four mutants, module952/34/4/1,
+fmt/docs/changelog pass. Diagnostic surrounding fields are preservation tests,
+not native-valid MQI execution fixtures. Unchanged contract/dependency inputs
+reuse exact earlier passes rather than new global/deny/CI claims.
+
 `MQ-1506.selected-retention-dependencies` now protects selected recovery graphs
 in the existing epoch-fenced core inventory. The owning full rich snapshot reader
 validates marker/catalog/delivery/control/unit/receipt together, delegating old
