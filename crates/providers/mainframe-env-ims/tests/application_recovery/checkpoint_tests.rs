@@ -6,6 +6,235 @@ mod integrity_tests;
 #[path = "checkpoint_tests/secondary_tests.rs"]
 mod secondary_tests;
 
+#[test]
+fn hisam_nonunique_checkpoint_clears_holds_xrst_declines_twins_and_restores_unique_root() {
+    backends("hisam-checkpoint", |store| {
+        let mut metadata = catalog();
+        metadata.databases[0].organization = ImsDatabaseOrganization::Hisam;
+        let mut child = metadata.databases[0].segments[0].clone();
+        child.name = "CHILD".into();
+        child.parent = Some("ROOT".into());
+        child.fields[0].name = Some("CHILDKEY".into());
+        child.fields[0].unique = false;
+        metadata.databases[0].segments.push(child);
+        let ImsPcbMetadata::Database(pcb) = &mut metadata.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.sensitive_segments.push(ImsSensitiveSegmentMetadata {
+            name: "CHILD".into(),
+            parent: Some("ROOT".into()),
+            processing_options: None,
+        });
+        let service = open_catalog(store.clone(), metadata);
+        let first = invocation();
+        let image = ImsGenericLoadImage {
+            database: "LOGDB".into(),
+            records: vec![
+                ImsGenericLoadRecord {
+                    segment: "ROOT".into(),
+                    parent: None,
+                    data: b"A1X".to_vec(),
+                },
+                ImsGenericLoadRecord {
+                    segment: "CHILD".into(),
+                    parent: Some(0),
+                    data: b"C1A".to_vec(),
+                },
+                ImsGenericLoadRecord {
+                    segment: "CHILD".into(),
+                    parent: Some(0),
+                    data: b"C2Z".to_vec(),
+                },
+            ],
+        };
+        for req in [
+            database_request(ImsOperation::Load, 10, &serde_json::to_vec(&image).unwrap()),
+            database_request(ImsOperation::Schedule, 11, &[]),
+            database_request(ImsOperation::Commit, 12, &[]),
+        ] {
+            assert_eq!(service.execute(&first, &req).unwrap().status, "  ");
+        }
+        invoke_call(
+            &service,
+            &store,
+            &first,
+            1,
+            ImsRecoveryCall::Restart {
+                selection: ImsRestartSelection::Normal,
+                area_lengths: vec![3],
+            },
+        );
+        assert_eq!(
+            service
+                .execute(&first, &get(1, 13, b"A1", false))
+                .unwrap()
+                .segments[0]
+                .data,
+            b"A1X"
+        );
+        let mut insert = database_request(ImsOperation::Insert, 14, b"C1B");
+        insert.segments = vec!["CHILD".into()];
+        assert_eq!(
+            service.execute(&first, &insert).unwrap().affected_segments,
+            1
+        );
+        service.execute(&first, &get(1, 15, b"A1", false)).unwrap();
+        for (seq, expected) in [(16, &b"C1A"[..]), (17, &b"C1B"[..])] {
+            let mut hold = database_request(ImsOperation::GetHoldNextParent, seq, &[]);
+            hold.segments = vec!["CHILD".into()];
+            assert_eq!(
+                service.execute(&first, &hold).unwrap().segments[0].data,
+                expected
+            );
+        }
+        let symbolic = call(
+            2,
+            ImsRecoveryCall::SymbolicCheckpoint {
+                id: "HISAMTWN".into(),
+                user_areas: vec![b"one".to_vec()],
+            },
+        );
+        intent(&*store, &first, &symbolic);
+        assert_eq!(
+            dispatch(service.clone(), store.clone(), &first, &symbolic).unwrap(),
+            ImsRecoveryResult::Checkpointed {
+                status: "  ".into(),
+                id: "HISAMTWN".into(),
+                sequence: 2
+            }
+        );
+        assert_eq!(
+            service
+                .execute(&first, &database_request(ImsOperation::Replace, 18, b"C1Q"))
+                .unwrap()
+                .status,
+            "DJ"
+        );
+        let rows = snapshot(&*store);
+        assert_eq!(
+            dispatch(service.clone(), store.clone(), &first, &symbolic).unwrap(),
+            ImsRecoveryResult::Checkpointed {
+                status: "  ".into(),
+                id: "HISAMTWN".into(),
+                sequence: 2
+            }
+        );
+        assert_eq!(snapshot(&*store), rows);
+        let reopened =
+            ImsService::open_authorized(store.clone(), ImsLimits::default(), Arc::new(Allow))
+                .unwrap();
+        let second = next_execution(&first, "hisam-twin-xrst");
+        assert_eq!(
+            invoke_call(
+                &reopened,
+                &store,
+                &second,
+                3,
+                ImsRecoveryCall::Restart {
+                    selection: ImsRestartSelection::Checkpoint("HISAMTWN".into()),
+                    area_lengths: vec![3]
+                }
+            ),
+            ImsRecoveryResult::Restarted {
+                status: "  ".into(),
+                checkpoint_id: Some("HISAMTWN".into()),
+                user_areas: vec![b"one".to_vec()],
+                pcb_statuses: vec![]
+            }
+        );
+        assert_eq!(
+            reopened
+                .execute(
+                    &second,
+                    &database_request(ImsOperation::GetNextParent, 19, &[])
+                )
+                .unwrap()
+                .status,
+            "GP"
+        );
+        assert_eq!(
+            reopened
+                .execute(
+                    &second,
+                    &database_request(ImsOperation::Replace, 20, b"C1Q")
+                )
+                .unwrap()
+                .status,
+            "DJ"
+        );
+        let all = reopened
+            .execute(&second, &database_request(ImsOperation::Unload, 21, &[]))
+            .unwrap();
+        assert_eq!(
+            all.segments
+                .iter()
+                .map(|s| s.data.as_slice())
+                .collect::<Vec<_>>(),
+            vec![&b"A1X"[..], &b"C1A"[..], &b"C1B"[..], &b"C2Z"[..]]
+        );
+        assert_eq!(
+            reopened
+                .execute(&second, &get(1, 22, b"A1", true))
+                .unwrap()
+                .segments[0]
+                .data,
+            b"A1X"
+        );
+        invoke_call(
+            &reopened,
+            &store,
+            &second,
+            4,
+            ImsRecoveryCall::SymbolicCheckpoint {
+                id: "HISAMROT".into(),
+                user_areas: vec![b"two".to_vec()],
+            },
+        );
+        assert_eq!(
+            reopened
+                .execute(
+                    &second,
+                    &database_request(ImsOperation::GetNextParent, 23, &[])
+                )
+                .unwrap()
+                .status,
+            "GP"
+        );
+        let third = next_execution(&second, "hisam-root-xrst");
+        assert_eq!(
+            invoke_call(
+                &reopened,
+                &store,
+                &third,
+                5,
+                ImsRecoveryCall::Restart {
+                    selection: ImsRestartSelection::Checkpoint("HISAMROT".into()),
+                    area_lengths: vec![3]
+                }
+            ),
+            ImsRecoveryResult::Restarted {
+                status: "  ".into(),
+                checkpoint_id: Some("HISAMROT".into()),
+                user_areas: vec![b"two".to_vec()],
+                pcb_statuses: vec![(1, "  ".into())]
+            }
+        );
+        assert_eq!(
+            reopened
+                .execute(&third, &database_request(ImsOperation::Replace, 24, b"A1Q"))
+                .unwrap()
+                .status,
+            "DJ"
+        );
+        let mut next = database_request(ImsOperation::GetNextParent, 25, &[]);
+        next.segments = vec!["CHILD".into()];
+        assert_eq!(
+            reopened.execute(&third, &next).unwrap().segments[0].data,
+            b"C1A"
+        );
+    });
+}
+
 pub(super) fn call(sequence: u64, call: ImsRecoveryCall) -> ImsRecoveryRequest {
     ImsRecoveryRequest {
         call,

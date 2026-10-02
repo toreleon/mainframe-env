@@ -191,7 +191,7 @@ impl ImsService {
         } else if request.operation == ImsOperation::System {
             system::apply_request(&mut next, run, request, self.limits)?
         } else if generic::is_generic(&next, run, request) {
-            generic::apply_request(&mut next, run, request, self.limits)?
+            generic::apply_request(&mut next, invocation, request, self.limits)?
         } else {
             apply_request(&mut next, run, request, self.limits)?
         };

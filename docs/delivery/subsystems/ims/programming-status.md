@@ -6,6 +6,29 @@ Target release: **0.14.0**
 
 Status: **Proposed**
 
+## Root HISAM integration declaration — 2026-10-03
+
+Root composes worker `55cf6d5baead04bcfe97caecdbf5a48b4ef9e145` onto source-only
+head `87f951c49f48b117e41f1bc7ec1d46b4ea9606b1`, with the same declared ten-path
+HISAM allowlist. The manager fully reviewed its source-backed handoff, production
+diff, literal public/signed histories, actual CHKP/XRST and independent SQLite
+child assertions. All seven Rust inputs must remain byte-exact to both the
+passing strict-lint and affected-regression receipts. Root's intervening source
+commit changed no Rust input; unchanged worker runtime results retain their own
+candidate identities and are not rerun or relabeled for this composition.
+
+The expected status/header insertion and generated status hash merge conflicts
+are resolved by preserving both complete leaf declarations, correcting only the
+ISRT catalog label to its literal committed label and normal documentation
+regeneration. No generated hash is authored manually. Changed root docs/check,
+changelog/check, coverage/check, formatting and exact ten-path generated seal/
+committed check are required; receipts remain external and the intended root
+Cargo target is cleaned after the sequence. Source-only pins grant no runtime
+credit, and this finite Batch insertion leaf is not explicit all-context IMS,
+HISAM/SHISAM, PostgreSQL/backup, official/HUMAN/participant or v0.14 completion.
+After this root seal, execution and mutation-consumer ownership can transfer to
+the same uncommitted U/V CLI lane. Shared raw CALL/TM approvals remain pending.
+
 ## IMS-1401.sequential-isrt-position-sources (source-only leaf declared, 2026-10-03)
 
 Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51`; target **0.14.0**. Register only
@@ -64,6 +87,119 @@ IR/HUMAN/official/licensed coverage credit. FIRST/HERE/F/L-on-ISRT, sentinel FF
 and general failed searches remain unfinished runtime classes. Raw CALL/TM
 ADR0031/0033 approvals remain unanswered; licensed certification is excluded.
 Parent IMS/full v0.14 remains active and incomplete.
+
+## IMS-1403.hisam-nonunique-dependent-last — bounded leaf declaration, 2026-10-03
+
+Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51` on
+`codex/v014-hisam-nonunique-dependent-last-20261003`, target 0.14.0. This leaf
+admits typed public-provider and signed-selected Batch invocation ordinary primary physical
+HISAM with exactly two fixed levels, one terminal child type, unique named root
+sequence key and named nonunique child sequence key. Actual root GU establishes
+live parentage before an ordinary unqualified terminal child ISRT. Validated
+selected metadata supplies the private insertion policy; existing RecordId/version
+ordering supplies default LAST. Successful insertion retains ancestor root
+parentage, sets inserted current and clears hold. Corresponding generic utility
+materialization uses the same metadata predicate. Historical standalone engine
+insertion defaults, descriptors, wire formats and retained bytes remain unchanged.
+
+Exact ten-path allowlist (manager-reviewed contextual handoff amendment):
+
+- `crates/providers/mainframe-env-ims/src/database/store.rs`
+- `crates/providers/mainframe-env-ims/src/service/generic.rs`
+- `crates/providers/mainframe-env-ims/src/service/execution.rs` (only trusted Invocation handoff)
+- `crates/providers/mainframe-env-ims/src/database/tests.rs`
+- `crates/providers/mainframe-env-ims/src/service/generic/tests/closure_tests.rs`
+- `crates/providers/mainframe-env-ims/tests/application_recovery/checkpoint_tests.rs`
+- `crates/apps/mainframe-env-server/src/product/tests/ims_package_tests.rs`
+- `docs/delivery/subsystems/ims/programming-status.md`
+- `changes/unreleased/ims-hisam-nonunique-dependent-last-20261003.toml`
+- `docs/generated/documentation-manifest.json` (normal generator only)
+
+Production owners are existing database insertion and generic metadata adaptation;
+tests stay inline in the listed owners. The existing execution caller passes its
+trusted Invocation into the crate-private generic adapter, which derives the same
+run_unit_id and fences new admission without requiring an authorizer. The legacy
+ImsRequest has no explicit execution context; Batch invocation proof does not
+establish all DbBatch/TmBatch/DBCTL/TM distinctions. No navigation/SSA/position-witness,
+feedback/recovery producer, other execution change, module declaration, F/L/null/logical test,
+ratchet, dependency, source pin, accepted rule or assurance-floor edit is declared.
+No new public API, RULES field, ABI, schema, witness, retention edge, authority or
+ADR0042 is authorized. Full-catalog logical participation at either endpoint,
+retained logical links, secondary processing, deeper/multiple/variable/unkeyed
+layouts, other organizations/contexts and SSA/raw update commands remain outside
+this finite class and mandatory unfinished work.
+
+Source baseline `ibm-ims-15.6-database-contracts-2026-09-11` HISAM, metadata
+baseline FIELD/SEGM (SEQ M and default LAST), programming baseline GU/GN/GNP
+(including GNP123–127 parentage), position/status and CHKP/XRST pins are consulted
+offline before edits, retained-path first then exact archive fallback. Catalog
+ISRT call `0008` is the new behavior; actual consumers `0005/0006/0015/0002/0023/0025`
+receive bounded proof. All25 remains mandatory. DLET `0004`, LOAD `0009`, II
+before-duplicate, general failed-parent ISRT progress, later-twin DLET continuation,
+sentinel FF, FIRST/HERE/L-update/raw/variable/deeper/context and SHISAM fixed
+admission remain separately unfinished. No source review is execution evidence.
+
+Required local proof: independent fail-first and repaired literal public/signed
+Memory/file-SQLite insertion/order/parentage, PCB isolation, hold/REPL/DA/DJ,
+canonical replay/conflicts, store failure/CAS/capacity/lost acknowledgement,
+SAF/sensitivity/cancellation, real backout/CHKP/XRST, and nonzero independent
+SQLite seed/hold, reopen/replay and next-occurrence/REPL processes. Required gates
+are focused changed-input regressions, strict affected IMS/server all-target/
+all-feature no-deps Clippy, fmt, offline deny/license/supply-chain, normal docs/
+changelog/coverage/schema/spec/catalog/assurance and affected boundary guards.
+Receipts stay external under `worker-receipts/v014-completion-20261002/hisam-nonunique-runtime/`;
+every build/test/lint/generator sequence ends in this checkout's Cargo clean.
+PostgreSQL parity is explicitly unrun/pending, not a required local backend gate.
+Old readers can read distinct IDs but reject further equal-key insertion with II;
+readable historical bytes do not establish equivalent downgrade semantics.
+Parent IMS/official/HUMAN/participant/full-v0.14 remains incomplete; shared raw
+CALL/TM ADR0031/0033 approvals remain unanswered, licensed exclusion earns zero
+credit and mixed-resource closure remains a 0.16 obligation.
+
+Runtime verification for this finite leaf passes: repaired independent public and
+signed Memory/file-SQLite fail-first cases originally observe II against literal
+blank, then return blank/affected1 with distinct twin IDs. The original setup
+compile errors and all intermediate fixture failures remain external and
+uncredited. Twelve IMS filter entries pass, of which the idle process worker
+earns no standalone credit; three substantive SQLite child invocations each
+report one executed test and their exact seed-hold/reopen-replay/next-replace
+success marker. Three signed entries pass, including four independent GN/GNP
+Memory/file-SQLite coordinator histories. Existing replay ownership requires the
+original execution/run/sequence; the signed fixture now preserves that owner and
+grants the existing read capability for its UNLOAD control.
+
+Literal proof covers inserted current/root parentage, real root-hold cancellation,
+C1A/C1B/C2Z traversal and bounded GE, independent A2Y/other PCB, held second
+ID/version and repeated nonkey REPL, DA/DJ, unchanged canonical replay after
+navigation/REPL, utility twins, all four non-Batch classes without an authorizer,
+metadata/access/condition fences, capacity/CAS/lost acknowledgement and competing
+insert, backout order and cancelled positions. Real CHKP/XRST runs on Memory and
+file SQLite clear the child hold and decline nonunique positioning without
+inventing a twin identity; the unique-root control repositions normally.
+Affected regressions pass 220 generic, 9 engine, 76 application-recovery and
+50 selected server tests (one existing ignored entry receives zero credit).
+Strict IMS/server all-target/all-feature no-deps Clippy passes with warnings
+denied. Source review is 13 selected verified archive fallbacks, zero retained
+matches or body mismatches, 13 successful actual reads and three searches; the
+partial programming-cache search reports unselected STAT unavailable. No source
+review result is relabeled as execution or as a fresh whole-corpus audit.
+
+All 23 declared policy/generated/boundary commands pass: fmt, offline deny,
+pinned supply-chain host policy, license notices, normal docs generation/check,
+changelog, coverage inventory, schemas/spec, IMS catalog/assurance, execution,
+effect encoding, provider rows, storage, SAF, retention, participant bindings and
+generator, typed/module and public API guards. The existing ignored private
+retention process worker runs substantively only under its separate bounded
+parent; its idle selection earns no credit here. Module budgets and API ratchets
+remain unchanged. This finite runtime leaf is complete; exact command outcomes
+and candidate hashes remain external, with the generated feature seal binding
+only the declared ten paths. Unchanged runtime inputs retain their original
+receipt identities across this documentation update; no runtime suite repeats
+for prose or sealing. The known global CICS source prerequisite remains unchanged
+and unrerun, not passed by these selected guards.
+No production owner beyond the declared ten paths changed. PostgreSQL, backup
+composition, official/HUMAN/participant acceptance and broader mandatory classes
+remain pending; a provider reopen is not process-restart or backup certification.
 
 ## Root F integration declaration — 2026-10-03
 

@@ -379,10 +379,11 @@ pub(super) fn resources(
 
 pub(super) fn apply_request(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
     match request.operation {
         ImsOperation::Schedule => {
             if state.sessions.contains_key(run) {
@@ -425,10 +426,10 @@ pub(super) fn apply_request(
         | ImsOperation::GetHoldNext
         | ImsOperation::GetHoldNextParent => read(state, run, request, limits),
         ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete => {
-            mutate(state, run, request, limits)
+            mutate(state, invocation, request, limits)
         }
         ImsOperation::Checkpoint => checkpoint(state, run, request, limits),
-        ImsOperation::Load => load(state, run, request, limits),
+        ImsOperation::Load => load(state, invocation, request, limits),
         ImsOperation::Unload => unload(state, run, request, limits),
         ImsOperation::Commit => {
             isolation::ensure_backout(state, run)?;
@@ -647,12 +648,86 @@ pub(super) fn reset_positions(state: &mut State, database: &str, except: Option<
     pcb::reset_database_positions(state, database, except);
 }
 
+/// Existing retained metadata is the only sequence-uniqueness authority. This
+/// finite default-LAST class does not change descriptors or infer a RULES value.
+fn hisam_nonunique_child(
+    state: &State,
+    name: &str,
+    engine: &DatabaseEngine,
+    limits: ImsLimits,
+) -> Result<Option<String>, HostProblem> {
+    let Some(catalog) = &state.metadata else {
+        return Ok(None);
+    };
+    let Some(database) = catalog
+        .databases
+        .iter()
+        .find(|db| normalize(&db.name) == name)
+    else {
+        return Ok(None);
+    };
+    if database.organization != crate::ImsDatabaseOrganization::Hisam
+        || database.segments.len() != 2
+        || !database.secondary_indexes.is_empty()
+        || !engine.logical_links().is_empty()
+        || catalog
+            .databases
+            .iter()
+            .flat_map(|db| &db.logical_relationships)
+            .any(|rel| {
+                normalize(&rel.parent_database) == name || normalize(&rel.child_database) == name
+            })
+        || definition(database)? != *engine.definition()
+    {
+        return Ok(None);
+    }
+    let Some(root) = database
+        .segments
+        .iter()
+        .find(|segment| segment.parent.is_none())
+    else {
+        return Ok(None);
+    };
+    let Some(child) = database.segments.iter().find(|segment| {
+        segment.parent.as_deref().map(normalize).as_deref() == Some(normalize(&root.name).as_str())
+    }) else {
+        return Ok(None);
+    };
+    for (segment, unique) in [(root, true), (child, false)] {
+        let mut keys = segment.fields.iter().filter(|field| field.sequence);
+        if segment.min_length != segment.max_length
+            || keys
+                .next()
+                .is_none_or(|key| key.name.is_none() || key.unique != unique)
+            || keys.next().is_some()
+        {
+            return Ok(None);
+        }
+    }
+    // Protect either endpoint even when a link is retained on another database.
+    for other in state
+        .generic_databases
+        .keys()
+        .filter(|other| other.as_str() != name)
+    {
+        if restored(state, other, limits)?
+            .logical_links()
+            .iter()
+            .any(|link| normalize(&link.parent_database) == name)
+        {
+            return Ok(None);
+        }
+    }
+    Ok(Some(normalize(&child.name)))
+}
+
 fn mutate(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
     let pcb = session_pcb(state, run, request.pcb)?.clone();
     let name = normalize(&pcb.database);
     let mut engine = restored(state, &name, limits)?;
@@ -763,11 +838,24 @@ fn mutate(
             if segment.parent.is_some() && parent.is_none() {
                 return Ok(status("GP"));
             }
-            let inserted = engine.insert(InsertRequest {
+            let nonunique = invocation.service_class == ServiceClass::Batch
+                && pcb.secondary_index.is_none()
+                && request.segments.len() == 1
+                && request.qualifiers.is_empty()
+                && position.current() == parent
+                && position.parentage() == parent
+                && hisam_nonunique_child(state, &name, &engine, limits)?.as_deref()
+                    == Some(target.as_str());
+            let insert = InsertRequest {
                 segment: target,
                 parent,
                 data: request.data.clone(),
-            });
+            };
+            let inserted = if nonunique {
+                engine.insert_nonunique_dependent_last(insert, false)
+            } else {
+                engine.insert(insert)
+            };
             match inserted {
                 Ok(view) => {
                     match logical::link_insert(state, limits, &name, &view, request, &mut engine) {
@@ -784,6 +872,10 @@ fn mutate(
                                 &mut position,
                                 view.id,
                             )
+                            .map(|()| 1usize)
+                    } else if nonunique {
+                        engine
+                            .position_after_nonunique_dependent_insert(&mut position, view.id)
                             .map(|()| 1usize)
                     } else {
                         position.set_current(view.id);
@@ -843,10 +935,11 @@ fn checkpoint(
 
 fn load(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
     let image = load_image::decode(state, &request.data)?;
     let name = normalize(&image.database);
     let prior = restored(state, &name, limits)?;
@@ -854,18 +947,27 @@ fn load(
     let mut engine = DatabaseEngine::new(prior.definition().clone(), engine_limits(limits))
         .map_err(install_error)?;
     let mut ids = Vec::new();
+    let nonunique_child = if invocation.service_class == ServiceClass::Batch {
+        hisam_nonunique_child(state, &name, &prior, limits)?
+    } else {
+        None
+    };
     for record in &image.records {
         let parent = record
             .parent
             .map(|index| ids.get(index).copied().ok_or(HostProblem::Malformed))
             .transpose()?;
-        let view = engine
-            .insert_loaded(InsertRequest {
-                segment: normalize(&record.segment),
-                parent,
-                data: record.data.clone(),
-            })
-            .map_err(install_error)?;
+        let insert = InsertRequest {
+            segment: normalize(&record.segment),
+            parent,
+            data: record.data.clone(),
+        };
+        let view = if nonunique_child.as_deref() == Some(insert.segment.as_str()) {
+            engine.insert_nonunique_dependent_last(insert, true)
+        } else {
+            engine.insert_loaded(insert)
+        }
+        .map_err(install_error)?;
         ids.push(view.id);
     }
     isolation::publish_image(state, run, &name, engine.image(), limits)?;

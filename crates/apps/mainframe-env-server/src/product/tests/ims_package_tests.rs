@@ -152,6 +152,430 @@ fn signed_ims_package(
     package
 }
 
+fn hisam_signed_install(server: &ProductServer) {
+    let trust = test_package_trust();
+    let mut package = signed_ims_package(&trust, 1, 1);
+    let metadata = package.sections.ims_metadata.as_mut().unwrap();
+    metadata.databases[0].organization = ImsDatabaseOrganization::Hisam;
+    for segment in &mut metadata.databases[0].segments {
+        segment.min_length = 3;
+        segment.max_length = 3;
+        segment.fields[0].length = 2;
+    }
+    metadata.databases[0].segments[1].fields[0].unique = false;
+    let ImsPcbMetadata::Database(first) = &mut metadata.psbs[0].pcbs[0] else {
+        unreachable!()
+    };
+    first.sensitive_segments[1].processing_options = None;
+    let mut other = first.clone();
+    other.name = "OTHERPCB".into();
+    metadata.psbs[0].pcbs.push(ImsPcbMetadata::Database(other));
+    resign_package(&mut package, &trust);
+    let installed = server.install_application_package_v2(&package).unwrap();
+    server.publish_application_generation(&installed).unwrap();
+    server
+        .bootstrap_administrator("IBMUSER", b"TESTPASS")
+        .unwrap();
+    for (class, name) in [("IMSPSB", "AUTHPSB"), ("IMSDB", "AUTHDB")] {
+        server
+            .racf
+            .define_profile(class, name, "IBMUSER", Some(AccessIntent::Control))
+            .unwrap();
+    }
+}
+
+fn hisam_signed_invocation(execution: &str) -> Invocation {
+    let mut inv = tm_invocation("signed-hisam", execution);
+    inv.service_class = ServiceClass::Batch;
+    inv.principal = Principal::new(
+        PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+        ["host.ims.read", "host.ims.write"]
+            .into_iter()
+            .map(|name| CapabilityId::new(name, InvocationLimits::default()).unwrap())
+            .collect(),
+        InvocationLimits::default(),
+    )
+    .unwrap();
+    inv
+}
+
+fn hisam_signed_request(op: ImsOperation, seq: u64, segments: &[&str], data: &[u8]) -> ImsRequest {
+    let mut req = application_recovery::recovery_db(op, seq, "signed-hisam");
+    req.segments = segments.iter().map(|s| (*s).into()).collect();
+    req.data = data.to_vec();
+    req
+}
+
+fn hisam_signed_result(effect: &EffectResult) -> &mainframe_env_host_api::ImsResult {
+    match &effect.outcome {
+        Ok(HostResult::Ims(result)) => result,
+        other => panic!("IMS: {other:?}"),
+    }
+}
+
+fn hisam_signed_seed(server: &ProductServer, inv: &Invocation) {
+    let image = mainframe_env_ims::ImsGenericLoadImage {
+        database: "AUTHDB".into(),
+        records: vec![
+            mainframe_env_ims::ImsGenericLoadRecord {
+                segment: "ROOT".into(),
+                parent: None,
+                data: b"A1X".to_vec(),
+            },
+            mainframe_env_ims::ImsGenericLoadRecord {
+                segment: "CHILD".into(),
+                parent: Some(0),
+                data: b"C1A".to_vec(),
+            },
+            mainframe_env_ims::ImsGenericLoadRecord {
+                segment: "CHILD".into(),
+                parent: Some(0),
+                data: b"C2Z".to_vec(),
+            },
+            mainframe_env_ims::ImsGenericLoadRecord {
+                segment: "ROOT".into(),
+                parent: None,
+                data: b"A2Y".to_vec(),
+            },
+        ],
+    };
+    for req in [
+        hisam_signed_request(
+            ImsOperation::Load,
+            1,
+            &[],
+            &serde_json::to_vec(&image).unwrap(),
+        ),
+        hisam_signed_request(ImsOperation::Schedule, 2, &[], b""),
+        hisam_signed_request(ImsOperation::Commit, 3, &[], b""),
+    ] {
+        assert_eq!(
+            server
+                .ims_execute_selected("SIGNED-IMS-APPLICATION", inv, &req)
+                .unwrap()
+                .status,
+            "  "
+        );
+    }
+}
+
+fn hisam_signed_fail_first(store: Arc<dyn PlatformStore>, cfg: ServerConfig) {
+    let server = ProductServer::open_with_package_trust(
+        cfg,
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+        Arc::new(test_package_trust()),
+    )
+    .unwrap();
+    hisam_signed_install(&server);
+    let inv = hisam_signed_invocation("signed-hisam-first");
+    hisam_signed_seed(&server, &inv);
+    let mut gu = hisam_signed_request(ImsOperation::GetUnique, 4, &["ROOT"], b"");
+    gu.qualifiers.push(ImsQualifier {
+        segment: "ROOT".into(),
+        field: "ROOTKEY".into(),
+        value: b"A1".to_vec(),
+    });
+    let results = application_recovery::run_recovery_machine(
+        &server,
+        store.clone(),
+        &inv,
+        vec![
+            HostRequest::Ims(gu),
+            HostRequest::Ims(hisam_signed_request(
+                ImsOperation::Insert,
+                5,
+                &["CHILD"],
+                b"C1B",
+            )),
+        ],
+    );
+    assert_eq!(hisam_signed_result(&results[0]).segments[0].data, b"A1X");
+    assert_eq!(hisam_signed_result(&results[1]).status, "  ");
+    assert_eq!(hisam_signed_result(&results[1]).affected_segments, 1);
+}
+
+#[test]
+fn hisam_nonunique_fail_first_signed_memory() {
+    hisam_signed_fail_first(Arc::new(MemoryStore::new(Default::default())), config());
+}
+
+#[test]
+fn hisam_nonunique_fail_first_signed_sqlite() {
+    let file =
+        std::env::temp_dir().join(format!("signed-hisam-first-{}.sqlite", std::process::id()));
+    let url = format!("sqlite:{}?mode=rwc", file.display());
+    let mut cfg = config();
+    cfg.store_profile = crate::StoreProfile::Sqlite;
+    cfg.sqlite_url = url.clone();
+    hisam_signed_fail_first(
+        Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap()),
+        cfg,
+    );
+    std::fs::remove_file(file).unwrap();
+}
+
+fn hisam_signed_cursor(store: &dyn PlatformStore, pcb: u16) -> serde_json::Value {
+    let row = store
+        .get_provider_state("ims-v1-session-index", "signed-hisam")
+        .unwrap()
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+    if pcb == 1 {
+        body["value"]["position"].clone()
+    } else {
+        body["value"]["pcb_positions"][pcb.to_string()].clone()
+    }
+}
+
+fn hisam_signed_root(seq: u64, pcb: u16, key: &[u8]) -> ImsRequest {
+    let mut req = hisam_signed_request(ImsOperation::GetUnique, seq, &["ROOT"], b"");
+    req.pcb = pcb;
+    req.qualifiers.push(ImsQualifier {
+        segment: "ROOT".into(),
+        field: "ROOTKEY".into(),
+        value: key.to_vec(),
+    });
+    req
+}
+
+fn hisam_signed_order(store: Arc<dyn PlatformStore>, cfg: ServerConfig, next: ImsOperation) {
+    let server = ProductServer::open_with_package_trust(
+        cfg.clone(),
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+        Arc::new(test_package_trust()),
+    )
+    .unwrap();
+    hisam_signed_install(&server);
+    let inv = hisam_signed_invocation("signed-hisam-order");
+    hisam_signed_seed(&server, &inv);
+    let phase = std::cell::Cell::new(0_u64);
+    let invoke = |server: &ProductServer, req: ImsRequest| {
+        let current = phase.get();
+        phase.set(current + 1);
+        let inv = hisam_signed_invocation(&format!("signed-hisam-order-{current}"));
+        application_recovery::run_recovery_machine(
+            server,
+            store.clone(),
+            &inv,
+            vec![HostRequest::Ims(req)],
+        )
+        .remove(0)
+    };
+    assert_eq!(
+        hisam_signed_result(&invoke(&server, hisam_signed_root(4, 2, b"A2"))).segments[0].data,
+        b"A2Y"
+    );
+    let other = hisam_signed_cursor(&*store, 2);
+    invoke(&server, hisam_signed_root(5, 1, b"A1"));
+    let insert = hisam_signed_request(ImsOperation::Insert, 6, &["CHILD"], b"C1B");
+    let receipt = invoke(&server, insert.clone());
+    assert_eq!(hisam_signed_result(&receipt).status, "  ");
+    assert_eq!(hisam_signed_result(&receipt).affected_segments, 1);
+    assert_eq!(
+        hisam_signed_cursor(&*store, 1),
+        serde_json::json!({"current":5,"parentage":1,"held":null,"after_end":false})
+    );
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(next, 7, &["CHILD"], b"")
+        ))
+        .segments[0]
+            .data,
+        b"C2Z"
+    );
+    invoke(&server, hisam_signed_root(8, 1, b"A1"));
+    for (seq, bytes) in [(9, &b"C1A"[..]), (10, &b"C1B"[..]), (11, &b"C2Z"[..])] {
+        assert_eq!(
+            hisam_signed_result(&invoke(
+                &server,
+                hisam_signed_request(ImsOperation::GetNextParent, seq, &["CHILD"], b"")
+            ))
+            .segments[0]
+                .data,
+            bytes
+        );
+    }
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(ImsOperation::GetNextParent, 12, &["CHILD"], b"")
+        ))
+        .status,
+        "GE"
+    );
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(ImsOperation::GetNext, 13, &[], b"")
+        ))
+        .segments[0]
+            .data,
+        b"A2Y"
+    );
+    invoke(&server, hisam_signed_root(14, 1, b"A1"));
+    invoke(
+        &server,
+        hisam_signed_request(ImsOperation::GetHoldNextParent, 15, &["CHILD"], b""),
+    );
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(ImsOperation::GetHoldNextParent, 16, &["CHILD"], b"")
+        ))
+        .segments[0]
+            .data,
+        b"C1B"
+    );
+    assert_eq!(
+        hisam_signed_cursor(&*store, 1)["held"],
+        serde_json::json!({"id":5,"version":1})
+    );
+    for seq in [17, 18] {
+        assert_eq!(
+            hisam_signed_result(&invoke(
+                &server,
+                hisam_signed_request(ImsOperation::Replace, seq, &[], b"C1Q")
+            ))
+            .status,
+            "  "
+        );
+    }
+    let held = hisam_signed_cursor(&*store, 1);
+    assert_eq!(held["held"], serde_json::json!({"id":5,"version":3}));
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(ImsOperation::Replace, 19, &[], b"C9Q")
+        ))
+        .status,
+        "DA"
+    );
+    assert_eq!(hisam_signed_cursor(&*store, 1), held);
+    drop(server);
+    let server = ProductServer::open_with_package_trust(
+        cfg,
+        store.clone(),
+        Arc::new(MemorySecretResolver::default()),
+        default_program_router(),
+        Arc::new(test_package_trust()),
+    )
+    .unwrap();
+    let before = [
+        "ims-v1-generic-database",
+        "ims-v1-session-index",
+        "ims-v1-generic-unit-of-work",
+        "ims-v1-replay",
+    ]
+    .map(|ns| store.list_provider_state(ns, 65_536).unwrap());
+    let journal = store
+        .effect(&insert.mutation.as_ref().unwrap().idempotency_key)
+        .unwrap()
+        .unwrap();
+    let insert_owner = hisam_signed_invocation("signed-hisam-order-2");
+    assert_eq!(journal.execution_id, insert_owner.execution_id);
+    assert_eq!(
+        journal.request_digest,
+        mainframe_env_host_api::canonical_request_digest(&HostRequest::Ims(insert.clone()))
+            .unwrap()
+    );
+    assert_eq!(
+        server
+            .ims_service()
+            .execute(&insert_owner, &insert)
+            .unwrap(),
+        *hisam_signed_result(&receipt)
+    );
+    let replay = server
+        .ims_execute_selected("SIGNED-IMS-APPLICATION", &insert_owner, &insert)
+        .unwrap();
+    assert_eq!(&replay, hisam_signed_result(&receipt));
+    assert_eq!(
+        [
+            "ims-v1-generic-database",
+            "ims-v1-session-index",
+            "ims-v1-generic-unit-of-work",
+            "ims-v1-replay"
+        ]
+        .map(|ns| store.list_provider_state(ns, 65_536).unwrap()),
+        before
+    );
+    assert_eq!(hisam_signed_cursor(&*store, 1), held);
+    let mut conflict = insert;
+    conflict.data = b"C1D".to_vec();
+    assert_eq!(
+        server.ims_execute_selected("SIGNED-IMS-APPLICATION", &insert_owner, &conflict),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(ImsOperation::GetNextParent, 20, &["CHILD"], b"")
+        ))
+        .segments[0]
+            .data,
+        b"C2Z"
+    );
+    let unheld = hisam_signed_cursor(&*store, 1);
+    assert_eq!(
+        hisam_signed_result(&invoke(
+            &server,
+            hisam_signed_request(ImsOperation::Replace, 21, &[], b"C2Q")
+        ))
+        .status,
+        "DJ"
+    );
+    assert_eq!(hisam_signed_cursor(&*store, 1), unheld);
+    assert_eq!(hisam_signed_cursor(&*store, 2), other);
+    let all = invoke(
+        &server,
+        hisam_signed_request(ImsOperation::Unload, 22, &[], b""),
+    );
+    assert_eq!(
+        hisam_signed_result(&all)
+            .segments
+            .iter()
+            .map(|s| s.data.as_slice())
+            .collect::<Vec<_>>(),
+        vec![
+            &b"A1X"[..],
+            &b"C1A"[..],
+            &b"C1Q"[..],
+            &b"C2Z"[..],
+            &b"A2Y"[..]
+        ]
+    );
+}
+
+#[test]
+fn hisam_nonunique_signed_coordinator_order_hold_replay_memory_and_file_sqlite() {
+    for next in [ImsOperation::GetNext, ImsOperation::GetNextParent] {
+        hisam_signed_order(
+            Arc::new(MemoryStore::new(Default::default())),
+            config(),
+            next,
+        );
+        let file = std::env::temp_dir().join(format!(
+            "signed-hisam-order-{next:?}-{}.sqlite",
+            std::process::id()
+        ));
+        let url = format!("sqlite:{}?mode=rwc", file.display());
+        let mut cfg = config();
+        cfg.store_profile = crate::StoreProfile::Sqlite;
+        cfg.sqlite_url = url.clone();
+        hisam_signed_order(
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap()),
+            cfg,
+            next,
+        );
+        std::fs::remove_file(file).unwrap();
+    }
+}
+
 fn signed_tm_package(
     trust: &HmacSha256PackageTrust,
     generation: u64,

@@ -1,5 +1,106 @@
 use super::*;
 
+#[test]
+fn hisam_nonunique_private_last_preserves_historical_insert_and_image() {
+    let mut descriptor = definition(DatabaseOrganization::Hisam);
+    descriptor.segments.truncate(2);
+    descriptor.secondary_indexes.clear();
+    for segment in &mut descriptor.segments {
+        segment.max_length = 3;
+    }
+    let descriptor_bytes = serde_json::to_vec(&descriptor).unwrap();
+    let mut engine = DatabaseEngine::new(descriptor, EngineLimits::default()).unwrap();
+    let root = insert(&mut engine, "ROOT", None, b"A1X");
+    let first = insert(&mut engine, "CHILD", Some(root), b"C1A");
+    let later = insert(&mut engine, "CHILD", Some(root), b"C2Z");
+    let duplicate = InsertRequest {
+        segment: "CHILD".into(),
+        parent: Some(root),
+        data: b"C1B".to_vec(),
+    };
+    let before = engine.state_digest();
+    assert_eq!(
+        engine.insert(duplicate.clone()),
+        Err(EngineProblem::Duplicate)
+    );
+    assert_eq!(
+        engine.insert_loaded(duplicate.clone()),
+        Err(EngineProblem::Duplicate)
+    );
+    assert_eq!(engine.state_digest(), before);
+    let inserted = engine
+        .insert_nonunique_dependent_last(duplicate, false)
+        .unwrap();
+    assert_ne!(inserted.id, first);
+    let mut position = PcbPosition::default();
+    position.set_current(root);
+    engine
+        .position_after_nonunique_dependent_insert(&mut position, inserted.id)
+        .unwrap();
+    assert_eq!(position.current(), Some(inserted.id));
+    assert_eq!(position.parentage(), Some(root));
+    assert!(!position.is_held());
+    assert_eq!(
+        engine
+            .export_records()
+            .iter()
+            .map(|r| (r.id, r.data.as_slice()))
+            .collect::<Vec<_>>(),
+        vec![
+            (root, &b"A1X"[..]),
+            (first, &b"C1A"[..]),
+            (later, &b"C2Z"[..]),
+            (inserted.id, &b"C1B"[..])
+        ]
+    );
+    position.set_current(root);
+    for bytes in [&b"C1A"[..], &b"C1B"[..], &b"C2Z"[..]] {
+        assert_eq!(
+            read(
+                &engine,
+                &mut position,
+                ReadKind::NextInParent,
+                Some("CHILD"),
+                vec![],
+                false
+            )
+            .unwrap()
+            .data,
+            bytes
+        );
+    }
+    assert_eq!(
+        serde_json::to_vec(engine.definition()).unwrap(),
+        descriptor_bytes
+    );
+    let bytes = serde_json::to_vec(&engine.image()).unwrap();
+    let mut restored = DatabaseEngine::restore(
+        serde_json::from_slice(&bytes).unwrap(),
+        EngineLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(serde_json::to_vec(&restored.image()).unwrap(), bytes);
+    assert_eq!(
+        restored.insert(InsertRequest {
+            segment: "CHILD".into(),
+            parent: Some(root),
+            data: b"C1Q".to_vec()
+        }),
+        Err(EngineProblem::Duplicate)
+    );
+    let utility = restored
+        .insert_nonunique_dependent_last(
+            InsertRequest {
+                segment: "CHILD".into(),
+                parent: Some(root),
+                data: b"C1Q".to_vec(),
+            },
+            true,
+        )
+        .unwrap();
+    assert!(utility.id > inserted.id);
+}
+
 fn field(name: &str, offset: usize, length: usize) -> FieldDefinition {
     FieldDefinition {
         name: name.into(),

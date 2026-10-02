@@ -3,7 +3,7 @@ use super::*;
 
 impl DatabaseEngine {
     pub fn insert(&mut self, request: InsertRequest) -> Result<RecordView, EngineProblem> {
-        self.insert_internal(request, false)
+        self.insert_internal(request, false, false)
     }
 
     /// Utility load can materialize index pointer rows; DL/I ISRT cannot.
@@ -11,13 +11,59 @@ impl DatabaseEngine {
         &mut self,
         request: InsertRequest,
     ) -> Result<RecordView, EngineProblem> {
-        self.insert_internal(request, true)
+        self.insert_internal(request, true, false)
+    }
+
+    /// The generic adapter alone supplies validated SEQ M/default LAST admission.
+    /// Historical engine insertion entry points continue to require unique keys.
+    pub(crate) fn insert_nonunique_dependent_last(
+        &mut self,
+        request: InsertRequest,
+        utility_load: bool,
+    ) -> Result<RecordView, EngineProblem> {
+        let segments = &self.definition.segments;
+        if self.definition.organization != DatabaseOrganization::Hisam
+            || segments.len() != 2
+            || !self.definition.secondary_indexes.is_empty()
+            || !self.logical_links.is_empty()
+            || segments[0].parent.is_some()
+            || segments[1].parent.as_deref() != Some(segments[0].name.as_str())
+            || segments
+                .iter()
+                .any(|s| s.min_length != s.max_length || s.key_field.is_none())
+            || request.segment != segments[1].name
+            || request.parent.is_none_or(|id| {
+                self.records
+                    .get(&id)
+                    .is_none_or(|r| r.segment != segments[0].name)
+            })
+        {
+            return Err(EngineProblem::Unsupported);
+        }
+        self.insert_internal(request, utility_load, true)
+    }
+
+    /// ISRT preserves established ancestor parentage; it does not establish a
+    /// new parent at the inserted occurrence. No retained position field changes.
+    pub(crate) fn position_after_nonunique_dependent_insert(
+        &self,
+        position: &mut PcbPosition,
+        id: RecordId,
+    ) -> Result<(), EngineProblem> {
+        let record = self.records.get(&id).ok_or(EngineProblem::InvalidRequest)?;
+        let parentage = position
+            .parentage
+            .filter(|parent| record.parent == Some(*parent));
+        position.set_current(id);
+        position.parentage = parentage;
+        Ok(())
     }
 
     fn insert_internal(
         &mut self,
         request: InsertRequest,
         utility_load: bool,
+        nonunique_sequence: bool,
     ) -> Result<RecordView, EngineProblem> {
         if is_index_database(self.definition.organization) && !utility_load {
             return Err(EngineProblem::Unsupported);
@@ -48,7 +94,8 @@ impl DatabaseEngine {
             return Err(EngineProblem::Unsupported);
         }
         let key = self.primary_key(&definition, &request.data)?;
-        if let Some(key) = &key
+        if !nonunique_sequence
+            && let Some(key) = &key
             && self.siblings(request.parent).iter().any(|id| {
                 self.records
                     .get(id)
