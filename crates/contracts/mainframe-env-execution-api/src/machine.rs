@@ -250,6 +250,16 @@ pub trait Machine {
         None
     }
 
+    /// Return an optional live terminal state image for atomic completion publication.
+    ///
+    /// The default returns `None`, preserving implementations without terminal capture.
+    /// This observation writes no state and grants no cleanup or resume authority.
+    /// Callers that require a terminal image must fence an absent capture; they must
+    /// publish any supplied image with the exact Completed event in one transaction.
+    fn completion_checkpoint(&self) -> Option<BoundedPayload> {
+        None
+    }
+
     /// Report the machine's current effect sequence to the caller.
     ///
     /// The default reports zero; sequencing semantics belong to the implementation.

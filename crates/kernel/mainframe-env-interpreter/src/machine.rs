@@ -8721,10 +8721,7 @@ impl Machine for ReferenceMachine {
     }
 
     fn checkpoint(&self) -> Option<BoundedPayload> {
-        if self.pending.is_some() {
-            return None;
-        }
-        let bytes = snapshot_codec::encode_snapshot(&self.snapshot())?;
+        let bytes = self.checkpoint_bytes()?;
         BoundedPayload::new(
             "mainframe-env.reference-machine-checkpoint@12",
             bytes,
@@ -8741,6 +8738,9 @@ impl Machine for ReferenceMachine {
             },
         )
         .ok()
+    }
+    fn completion_checkpoint(&self) -> Option<BoundedPayload> {
+        self.scoped_completion_checkpoint()
     }
 
     fn effect_sequence(&self) -> u64 {

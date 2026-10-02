@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 static NEXT_RECOVERY_TEST: AtomicU64 = AtomicU64::new(1);
 
 mod handoff;
+mod terminal_checkpoint;
 
 struct OneMutation {
     request: Option<EffectRequest>,

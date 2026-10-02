@@ -570,3 +570,31 @@ Require compiled handler isolation/caller restoration, shared file update and
 rollback, lower RETURN, identity/depth/concurrency fences, deny/cancel/failure
 and unknown-outcome recovery, SQLite/PostgreSQL reopen and mandatory gates.
 This is neither full program-family closure nor licensed differential evidence.
+
+## Atomic scoped terminal capture
+
+Machine has an optional default-None completion checkpoint observation. A scoped
+ReferenceMachine supplies it only after its actual live GOBACK or EXIT PROGRAM
+return marker; constructors, ordinary unscoped machines, cold restores and
+abnormal exits cannot supply that observation. The exact storage-entry schema
+opts in but its opaque payload does not confer source or admission authority.
+The core coordinator preserves Completing, then publishes a supplied image in
+the same existing journal transaction as Completed, its event and outbox. It
+uses the existing suspended CheckpointRecord identity/metadata contract, including
+valid zero effect sequence; checkpoint codecs and resume eligibility do not change.
+
+An unavailable observation keeps compatibility: default-None leaves an earlier
+checkpoint intact. Therefore a checkpoint beside Completed is insufficient for
+scope close. The serialized consumer must require fresh live captured bytes,
+exact current core event/state/version/attempt, artifact/run/principal/generation/
+interfaces and the current source lease, then atomically publish provider scope
+close and original CALL reply. Publication failure leaves Completing and cannot
+redispatch. No execution or cleanup authority is reconstructed from these bytes.
+
+Kernel tests cover live native returns, unsupported resources and all stale or
+abnormal exclusions. Repository selected-store tests retain real MemoryStore,
+SQLite and explicitly selected isolated PostgreSQL atomicity/reopen regressions;
+ignored PostgreSQL selectors earn zero credit until actually executed. These
+bounded tests do not close the scoped storage or application acceptance gates.
+Source authority remains the pinned calling flow/rules and LINK row0138 cited
+in ADR0029; no publication text or licensed execution receipt enters Git.

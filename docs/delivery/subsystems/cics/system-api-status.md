@@ -1063,3 +1063,54 @@ verification and cannot replace live scope admission or close authority.
 Integrated live source primitive: six focused tests pass with zero ignores;
 mandatory policy gates must pass before its bounded seal. Actual scope routing
 and application acceptance remain pending.
+
+The checkpoint worker's six-path implementation is reviewed and reconciled
+serially after the sealed live source guard. The manager adds repository backend
+regressions under recovery_tests/terminal_checkpoint.rs with one parent module
+registration; these own test fixtures only. Memory/SQLite compatibility, failure
+atomicity and physical reopen are mandatory; four isolated PostgreSQL selectors
+are executed explicitly, with ignored defaults carrying no credit. Current-input
+integration gates and the bounded seal remain pending. No scoped writer or
+application/parent acceptance is enabled by checkpoint capture.
+
+### Scoped member reservation preparation (2026-10-02)
+
+`CIC-902.program-task.frames.scoped-member-reservation` delegates a bounded
+private preparation helper from sealed `344472e7` in an isolated checkout.
+It owns only new instance/scoped/reservation.rs and reservation/tests.rs. The
+manager supplies and freezes one private parent module registration, retaining
+all row schemas, factories, replay/status/docs/generator and publication ownership.
+Dependencies are the sealed Entry1 and RunState3/Instance3 readers; terminal
+capture is unnecessary for admission preparation. Exact obligations: validate
+the trusted root limits, complete member set and original source/target entry
+identity; native CALL retains its scope, a LINK entry creates a fresh level with
+a busy creator member; reject an existing busy target or changed selected
+artifact/INITIAL metadata; preserve idle working state for non-INITIAL native
+calls and clear it for INITIAL; reserve root-wide member/scope/frame/monotonic
+CALL charges and exact target/root CAS writes without mutating inputs.
+No helper may dispatch, mutate a store, mint a live lease, migrate generations
+or declare a known reply/close/recovery. The manager must validate indexed CALL
+rows and couple the prepared writes with original pending receipt/source CAS
+and current core/control/LINK origin before actual admission. Acceptance requires
+independent exact keys/levels/state expectations, negative rehashed identity/
+member/capacity/CAS mutations, no state changes on failure, focused Rust tests
+and module/format/dependency checks; mandatory integrated gates and a bounded
+seal follow manager review. Source search/read uses the pinned calling flow/rules
+and LINK row0138. No nested workers, other edits, fresh source/licensed runs or
+parent completion is authorized.
+
+Integrated terminal checkpoint checks: 39 kernel/coordinator and ten Memory/
+SQLite selectors pass. Four PostgreSQL 18.6 selectors are explicitly executed
+and pass on four fresh databases, including both native returns, invalid image
+and payload-limit failure with physical reopen and no redispatch. Default
+registration ignores earn zero credit; the four explicit runs remain separate.
+Mandatory gates must pass before this bounded seal. Scoped routing/close and
+application acceptance remain pending.
+
+Integrated terminal checkpoint checks: 39 kernel/coordinator and ten Memory/
+SQLite selectors pass. Four PostgreSQL 18.6 selectors are explicitly executed
+and pass on four fresh databases, including both native returns, invalid image
+and payload-limit failure with physical reopen and no redispatch. Default
+registration ignores earn zero credit; the four explicit runs remain separate.
+Mandatory gates must pass before this bounded seal. Scoped routing/close and
+application acceptance remain pending.

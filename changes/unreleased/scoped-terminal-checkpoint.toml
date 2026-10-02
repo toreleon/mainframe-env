@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Capture scoped live COBOL normal-return images with the existing atomic core completion journal commit, preserving default compatibility and terminal replay fences; add selected-store restart regressions."

@@ -1,6 +1,23 @@
 use super::*;
 
 impl ReferenceMachine {
+    pub(super) fn checkpoint_bytes(&self) -> Option<Vec<u8>> {
+        if self.pending.is_some() {
+            return None;
+        }
+        snapshot_codec::encode_snapshot(&self.snapshot())
+    }
+
+    pub(super) fn scoped_completion_checkpoint(&self) -> Option<BoundedPayload> {
+        // Presence is opt-in only. Storage authority is validated by the owner.
+        let binding = self.invocation.bindings.get("cobol.storage-entry")?;
+        if binding.schema() != "mainframe-env.cobol.storage-entry@1" {
+            return None;
+        }
+        self.attest_installed_program_return().ok()?;
+        self.checkpoint()
+    }
+
     pub(super) fn complete_installed_step(
         &mut self,
         operation: &Operation,
