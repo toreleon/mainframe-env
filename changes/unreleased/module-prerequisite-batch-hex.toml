@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Extract batch hexadecimal formatting into a private helper to restore the existing service module ceiling without changing output."
