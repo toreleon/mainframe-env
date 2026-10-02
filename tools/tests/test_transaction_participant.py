@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import re
 from pathlib import Path
 import unittest
 
@@ -69,6 +70,33 @@ class TransactionParticipantTests(unittest.TestCase):
         }
         with self.assertRaises(participant.ContractError):
             participant.validate_fixtures(mutated, self.contract)
+
+    def test_frame_codec_declaration_matches_existing_provider_readers(self) -> None:
+        source = (ROOT / "crates/providers/mainframe-env-cics/src/retention.rs").read_text()
+        codecs = re.findall(r'const UOW_V\d_MAGIC: &\[u8; 5\] = b"(MECU\d)";', source)
+        schemas = self.contract["participants"][0]["capabilities"]["schemas"]
+        self.assertEqual(schemas["uow_read"], codecs)
+        self.assertEqual(schemas["uow_write"], "MECU2")
+        self.assertEqual(schemas["uow_frame_write"], "MECU3")
+
+    def test_legacy_declaration_retains_its_version_one_shape(self) -> None:
+        legacy = copy.deepcopy(self.contract)
+        schemas = legacy["participants"][0]["capabilities"]["schemas"]
+        del schemas["uow_frame_write"]
+        schemas["uow_read"] = ["MECU1", "MECU2"]
+        participant.validate_contract(legacy)
+        self.assertIn("uow_frame_write: None", participant.render(legacy))
+
+    def test_partial_or_unknown_frame_codec_metadata_is_rejected(self) -> None:
+        for field, value in [("uow_frame_write", "MECU4"), ("uow_frame_write", None), ("uow_read", ["MECU1", "MECU2"])]:
+            mutated = copy.deepcopy(self.contract)
+            mutated["participants"][0]["capabilities"]["schemas"][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(participant.ContractError):
+                participant.validate_contract(mutated)
+        mutated = copy.deepcopy(self.contract)
+        del mutated["participants"][0]["capabilities"]["schemas"]["uow_frame_write"]
+        with self.assertRaises(participant.ContractError):
+            participant.validate_contract(mutated)
 
 
 if __name__ == "__main__":

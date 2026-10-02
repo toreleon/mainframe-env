@@ -88,6 +88,14 @@ migrations, rollback procedure, and retention descriptions. A compatible
 restore must preserve both sides and every referenced checkpoint, audit, and
 replay identity; independent provider restore is not mixed-resource closure.
 
-CICS continues to write `MECU2`, read `MECU1` and `MECU2`, use
-`MECUNDO1`, and publish outer replay through `MECER003`. No durable schema or
-public route changes in this early contract.
+CICS root UOW writers retain `MECU2`. The optional `uow_frame_write` declaration
+names `MECU3` for the existing distinct effect-actor/task-root provenance path;
+with that declaration, readers must accept `MECU1`, `MECU2` and `MECU3`. Historical
+version-one declarations without it retain their original `MECU1`/`MECU2` reader
+set and remain valid for that narrower scope. Unknown frame codecs or mixed
+writer/reader declarations fail closed. The declaration changes no UOW bytes or
+context admission and does not accept the complete frame execution family.
+Existing writers continue to use `MECUNDO1` and publish outer replay through
+`MECER003`. Downgrade of a frame-aware provider requires drained writers and a
+compatible reader or verified pre-change backup, as described in ADR-0027;
+never strip task-root provenance to produce a legacy row.

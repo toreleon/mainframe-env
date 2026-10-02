@@ -191,9 +191,11 @@
           "canonical_effect": "mainframe-env.effect-canonical@1",
           "uow_namespace": "cics-uow",
           "uow_write": "MECU2",
+          "uow_frame_write": "MECU3",
           "uow_read": [
             "MECU1",
-            "MECU2"
+            "MECU2",
+            "MECU3"
           ],
           "undo_namespace": "cics-uow-undo",
           "undo_read_write": "MECUNDO1",

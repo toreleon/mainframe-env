@@ -52,7 +52,7 @@ const GENERATED_TRANSACTION_PARTICIPANT_V1: TransactionParticipantContract =
         participant_recovery_owner: "cics-uow-and-replay-rows",
         reconciliation: "service-specific-fenced-observation",
         automatic_redispatch: false,
-        schemas: ParticipantSchemas { request: "mainframe-env.cics.request@1", canonical_effect: "mainframe-env.effect-canonical@1", uow_namespace: "cics-uow", uow_write: "MECU2", uow_read: &["MECU1", "MECU2"], undo_namespace: "cics-uow-undo", undo_read_write: "MECUNDO1", replay_namespace: "cics-effect-replay-v1", replay_write: "MECER003" },
+        schemas: ParticipantSchemas { request: "mainframe-env.cics.request@1", canonical_effect: "mainframe-env.effect-canonical@1", uow_namespace: "cics-uow", uow_write: "MECU2", uow_frame_write: Some("MECU3"), uow_read: &["MECU1", "MECU2", "MECU3"], undo_namespace: "cics-uow-undo", undo_read_write: "MECUNDO1", replay_namespace: "cics-effect-replay-v1", replay_write: "MECER003" },
         retention_target: "cics-unit-of-work",
         retention_watermark: "idempotency",
         protect_live_checkpoint_audit_replay: true,

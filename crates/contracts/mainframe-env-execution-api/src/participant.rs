@@ -174,6 +174,8 @@ pub struct ParticipantSchemas {
     pub canonical_effect: &'static str,
     pub uow_namespace: &'static str,
     pub uow_write: &'static str,
+    /// Conditional codec when the effect actor differs from the original task owner.
+    pub uow_frame_write: Option<&'static str>,
     pub uow_read: &'static [&'static str],
     pub undo_namespace: &'static str,
     pub undo_read_write: &'static str,
@@ -396,7 +398,14 @@ fn validate_accepted_capabilities(
         || !capabilities.security_audit.deny_and_failure_audited
         || !capabilities.security_audit.shared_store_atomic_publication
         || capabilities.schemas.canonical_effect != "mainframe-env.effect-canonical@1"
-        || capabilities.schemas.uow_read != ["MECU1", "MECU2"]
+        || capabilities.schemas.uow_write != "MECU2"
+        || !matches!(
+            (
+                capabilities.schemas.uow_frame_write,
+                capabilities.schemas.uow_read
+            ),
+            (None, ["MECU1", "MECU2"]) | (Some("MECU3"), ["MECU1", "MECU2", "MECU3"])
+        )
         || !capabilities.protect_live_checkpoint_audit_replay
         || !capabilities.deadline_is_retention_lower_bound
     {
@@ -454,6 +463,35 @@ mod tests {
         assert_eq!(
             read_transaction_participant_contract(2),
             Err(ParticipantContractProblem::IncompatibleVersion)
+        );
+    }
+
+    #[test]
+    fn frame_codec_declaration_preserves_legacy_and_rejects_incomplete_readers() {
+        let mut capabilities = transaction_participant_contract_v1()
+            .participant("cics")
+            .unwrap()
+            .capabilities
+            .unwrap();
+        assert_eq!(capabilities.schemas.uow_write, "MECU2");
+        assert_eq!(capabilities.schemas.uow_frame_write, Some("MECU3"));
+        assert_eq!(capabilities.schemas.uow_read, ["MECU1", "MECU2", "MECU3"]);
+        capabilities.schemas.uow_read = &["MECU1", "MECU2"];
+        assert_eq!(
+            validate_accepted_capabilities(&capabilities),
+            Err(ParticipantContractProblem::InvalidContract)
+        );
+        capabilities.schemas.uow_frame_write = None;
+        assert_eq!(validate_accepted_capabilities(&capabilities), Ok(()));
+        capabilities.schemas.uow_read = &["MECU1", "MECU2", "MECU3"];
+        assert_eq!(
+            validate_accepted_capabilities(&capabilities),
+            Err(ParticipantContractProblem::InvalidContract)
+        );
+        capabilities.schemas.uow_frame_write = Some("MECU4");
+        assert_eq!(
+            validate_accepted_capabilities(&capabilities),
+            Err(ParticipantContractProblem::InvalidContract)
         );
     }
 

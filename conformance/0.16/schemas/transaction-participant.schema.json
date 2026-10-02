@@ -457,12 +457,20 @@
         "canonical_effect": { "const": "mainframe-env.effect-canonical@1" },
         "uow_namespace": { "const": "cics-uow" },
         "uow_write": { "const": "MECU2" },
-        "uow_read": { "const": ["MECU1", "MECU2"] },
+        "uow_frame_write": { "const": "MECU3" },
+        "uow_read": { "enum": [["MECU1", "MECU2"], ["MECU1", "MECU2", "MECU3"]] },
         "undo_namespace": { "const": "cics-uow-undo" },
         "undo_read_write": { "const": "MECUNDO1" },
         "replay_namespace": { "const": "cics-effect-replay-v1" },
         "replay_write": { "const": "MECER003" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["uow_frame_write"] },
+          "then": { "properties": { "uow_read": { "const": ["MECU1", "MECU2", "MECU3"] } } },
+          "else": { "properties": { "uow_read": { "const": ["MECU1", "MECU2"] } } }
+        }
+      ]
     },
     "retention": {
       "type": "object",

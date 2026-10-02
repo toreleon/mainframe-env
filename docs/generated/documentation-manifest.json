@@ -633,7 +633,7 @@
       "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
       "relative_links": 0,
       "scope": "provider-neutral transaction participant capabilities and obligations",
-      "sha256": "sha256:0296920878168ec84636b9387536909fff42699bd1898d11ea67d3aec48af115",
+      "sha256": "sha256:2156b6c40f6f381d09d7c0e07aae102aaea5685e6ba2582918a8b5234f69edcc",
       "status": "Frozen early additive INT-1601 prerequisite",
       "title": "Transaction participant contract, version 1",
       "xtask_commands": 0
@@ -1242,7 +1242,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
       "relative_links": 93,
-      "sha256": "sha256:07eb9391f9453194ca032d6ad635c2e3b2611e6aa6f61cac7de1955ed44dba59",
+      "sha256": "sha256:4a677b2d93825a7aa985b7c6eddf4d49e2ca2356d9199f0b0f5350c37bb48e37",
       "title": "CICS — Application API progress",
       "xtask_commands": 4
     },
