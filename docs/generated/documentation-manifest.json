@@ -1394,7 +1394,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
       "relative_links": 3,
-      "sha256": "sha256:64ce6e71822c0aa2d70ba3017829421c035cd85bfd91387875cc33ce901b223e",
+      "sha256": "sha256:5c9a5477ff26f9517e3a6877a431b4c275a7e6215a38500e44530ece8d0dea37",
       "title": "Db2 — Engine and common SQL progress",
       "xtask_commands": 0
     },

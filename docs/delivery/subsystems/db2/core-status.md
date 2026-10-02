@@ -679,6 +679,37 @@ hash-verified archive source locally after retained-path checks; normal reading
 is TOC-blocked. No refresh or licensed credit is inferred. Exact 174-row obligation
 freeze remains required before broad DB2-1203 execution.
 
+The scalar followup inventories existing CP037, fixed-decimal and decimal-floating
+primitives separately from COBOL-owned policies and IEEE floating paths. It leaves
+HFP layout/tie/extrema/diagnostic closure, mixed DECFLOAT arithmetic precision,
+string provenance/CCSID combinations and disputed datetime/zone contexts open.
+No ordinary family is deferred merely because unsupported. Main read the complete
+external review; its proposed vectors were not executed or maintainer-accepted.
+
+The manager declares `DB2-1202.floating-type-aliases`, parent DB2-1202, for actual
+source-backed type resolution, independently of unavailable HFP value semantics.
+Worker ownership is `type_system/mod.rs` only for FLOAT resolution/comments,
+`type_system/tests.rs`, `result_combination_types.rs` only comments and affected
+tests, new `tests/floating_type_aliases.rs`, and
+`changes/unreleased/db2-floating-type-aliases.toml`. Resolve FLOAT(1..21) to the
+existing REAL shape and FLOAT(22..53), including omitted precision 53, to DOUBLE.
+Preserve syntax provenance in the AST and resolved nullability; reject zero/54,
+extra arguments and unsupported time-zone/attribute contexts as before. This is
+an intentional development resolver behavior adjustment, not a wire/schema or
+floating storage claim. Retain the existing public Float variant and explicit
+unresolved-shape guard rather than removing APIs or admitting raw fabricated types.
+
+Independent public tests verify all precision values 1..53, defaults/boundaries,
+parser-to-resolver ownership, canonical alias equivalence and existing assignment,
+comparison/arithmetic/result-combination consumers. Only affected obsolete alias
+expectations migrate; unrelated production rules, coefficient owners and source
+fences remain unchanged. Focused/package/MSRV, strict scoped Clippy, formatting,
+policy/catalog/changelog/docs and exact five-path sealing precede this commit.
+The SQL0050 CREATE TABLE pin above, complete floating type rule lines 220..227,
+provides alias authority; main verified and read it locally. HFP values, IEEE host
+conversion, floating literals/evaluation, exact SQL diagnostics, typed catalog and
+licensed differential remain required pending implementation and evidence.
+
 ## Dependency gate
 
 All three release commits are ancestors of the candidate.
