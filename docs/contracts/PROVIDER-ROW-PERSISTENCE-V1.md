@@ -113,3 +113,60 @@ preexisting rich rows, narrowed limits and stale dependency CAS fail closed.
 Rollback after publication requires stopping admission and restoring the
 pre-import backup with its retained replay/core references; an old reader is
 not a downgrade path.
+
+## Private MQ stored-authority reader
+
+`MQ-1505.rich-service-state-reader` prepares private single-service composition.
+It captures one bounded `list_provider_state_prefix("mq-", limit + 1)` snapshot
+and decodes only those records, returning exactly one normalized v1 legacy
+authority or v2 rich authority. Memory's owned lock and SQLite's owned SELECT
+provide that namespace snapshot; this does not serialize unrelated namespaces
+or certify a later transaction. The reader never writes, migrates, opens missing
+state as empty, advances a fence, or selects a public runtime. Public legacy
+`MqService::open` keeps its existing explicit historical migration behavior and
+rejects a v2 marker.
+
+The v1 path shares the existing object-envelope decoder, catalog codec, legacy
+types, replay validator and state invariants. Its schema adapters reject unknown,
+missing and duplicate fields, including nested message/pending schemas and
+duplicate or noncanonical legacy handle keys. Normalized manifests must have
+explicit null `definitions`; historical flat-state conversion remains solely
+with the old loader. A manifest-only uninstalled normalized state is accepted
+only when the original state validator permits it. Installed state requires the
+exact catalog/queue/trigger cross-references. Any rich rows beside v1 fail closed.
+
+The v2 path strictly parses the import marker's exact fields: `schema_version`,
+`target_row_prefix`, `identity`, `source_manifest_version`,
+`source_catalog_version` and `legacy_next_handle`. Positive SQL-compatible source
+versions are historical provenance: each current dependency must be greater
+than its source version, rather than equal to its initial import successor.
+Generation and recovery fence are trusted service inputs. The marker and rich
+metadata must both match the identity computed from those inputs and the captured
+catalog's canonical encoded bytes. Rich delivery restores through the existing row and live
+checkpoint validators from that same snapshot. The trusted profile also supplies
+default persistence; its default is the import's persistent policy. Ordinary
+generation/fence advancement requires an explicit manager-owned atomic CAS of
+the marker and rich metadata. Reads never repair disagreement.
+
+Leftover legacy queue, handle or pending rows, missing dependencies, mixed or
+unknown namespaces, orphan rich members, unsupported schemas, malformed keys,
+versions, catalogs or payloads fail closed. Retained catalog, marker and replay
+physical records and versions remain available as exact dependencies. Legacy
+replay values are decoded with the existing recorded-result/retention validator,
+without rewriting bytes, digest domains or optional owner metadata. Numeric
+legacy replay handles remain historical values; they do not issue fresh opaque
+handles. This MQ-prefix read does not independently prove referenced core
+effect/retention records; their transaction composition remains required.
+
+Before typed decoding, checked aggregate byte accounting includes every captured
+record, separately from row counts and per-row limits. Default physical ceilings
+are 114,467 records, 64 MiB per row and 128 MiB aggregate, within the store's
+bounded scan contract. The aggregate permits the import's retained legacy
+corpus alongside its rich row footprint, including the replacement marker's
+overhead. V1 full state, v2 retained replay and rich delivery each keep their
+respective 64 MiB ceilings; catalog guards and the combined physical budget
+also apply to retained catalog/marker records. Smaller explicit profiles may
+narrow these limits. Live resume and persistent-only cold restart/backout policies are
+unchanged. Public runtime/ABI selection, non-quiescent migration, lifecycle owner
+minting, typed replay, SAF, audit/coordinator composition and participant
+acceptance remain integration requirements.

@@ -197,7 +197,8 @@ impl DeliveryRows {
         )
     }
 
-    fn restore(
+    /// Pure restore of an already captured physical snapshot. No store reads.
+    pub(crate) fn restore(
         records: Vec<ProviderStateRecord>,
         catalog: &MqObjectCatalog,
         expected: DeliveryRowIdentity,

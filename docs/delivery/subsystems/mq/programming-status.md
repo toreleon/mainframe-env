@@ -539,18 +539,54 @@ handles/UOW state or erase uncertainty after dispatch; the actual service must
 map uncertainty through the existing shared effect authority. Missing additional
 property/conversion required-length output forms remain pending, not invented.
 
-The current three retained CLI lanes still use `gpt-6.1-sol`, high effort, fast
-off, goal mode/bypass and no nested workers or orchestration skill:
+### Single-snapshot reader and independent composition review
 
-- N implements the declared single-snapshot `rich-service-state-reader`.
-- O performs bounded offline `retained-supplemental-source-inventory`: exact
-  linked structure/constant/attribute topics needed for remaining mappings,
-  narrowly resolved from archive metadata; unpinned candidates are not normative
-  source or execution evidence. No repository writes, refresh or whole-cache audit.
-- M independently reviews the other authors' lifecycle/import/publication
-  composition boundaries and reports concrete findings and the next end-to-end
-  service proof contract. It may run only a narrowly justified isolated diagnostic;
-  it must not edit the manager or another lane's source or bless its own feature.
+The manager integrates lane N's sealed `311e0511` reader without changing its
+production bytes. It captures one bounded physical `mq-` snapshot and returns
+exactly one legacy or rich authority. Public legacy opening is unchanged; no
+automatic migration or public MQI selection occurs. Rich identity must match
+both the import marker and delivery metadata, with historical source versions
+remaining lower bounds. Replay records retain exact bytes/versions and existing
+retention validation; numeric replay handles are not issued opaque tokens.
+Separate 64 MiB legacy/replay and rich-row budgets plus a 128 MiB aggregate
+accept valid imported combined footprints, including an exact-ceiling source
+whose replacement marker is larger. The manager's 49 service regressions pass;
+affected object-service, row guards, formatting, docs/changelog and exact seal
+receipts accompany the integrated candidate rather than relabeling worker logs.
+
+Lane M's read-only review found no actionable defect in the other authors'
+lifecycle/import/audited-publication boundaries through clean `ef02809d`.
+Incoming reader integration was explicitly excluded. It ran no new diagnostics
+or tests and did not independently approve its own original-effect feature.
+The external report binds exact path hashes and remaining service/participant
+proof obligations. Root's restart clarification records that process-local
+directory counters require a separate durably retained registry epoch advance.
+
+Lane O completed a bounded offline inventory of 80 retained supplemental topic
+candidates, all matching metadata hashes/byte counts and pinned TOC headings.
+There are 31 priority prerequisites, 40 additional structure/constant topics,
+and nine reason topics covering ten unchanged pending declarations. All remain
+unreviewed for semantics; no independent browser-reproduction or freshness claim
+is made. This inventory changes neither official source pins nor execution credit.
+
+The current three retained CLI lanes use `gpt-6.1-sol`, high effort, fast off,
+goal mode/bypass and no nested workers or orchestration skill:
+
+- N owns `MQ-1505.rich-state-publication-fence`: the same rich authority's bounded
+  ordinary delta and explicit checked persisted fence plan, exact marker/meta/
+  catalog CAS, no automatic recovery decision or adoption before full commit.
+- O owns `MQ-1501.supplemental-source-pins`: a separate zero-credit 0.15 manifest
+  and shared-reader registry extension for the exact 80 inventory topics. The
+  immutable 0.2 call baseline and pending semantic states remain unchanged.
+- M owns `MQ-1505.original-effect-core-intent-binding`: original service admission
+  bound to a real retained coordinator intent and the same physical PlatformStore
+  audited transaction. No fabricated intent, private journal, SAF permission,
+  UOW minting, public selection or core completion is supplied by this boundary.
+
+N exclusively owns the rich-state/delivery-row helpers and provider-row contract;
+O owns supplemental manifests/shared reader/xtask registry and cache runbook;
+M owns the new private intent-binding module and narrow effect-replay note.
+Minimal facade hooks and generated-doc overlaps are reconciled by the manager.
 
 The manager owns actual selected service/ABI/host admission, separately durable
 UOW ownership, SAF/security context and audit/replay composition, participant

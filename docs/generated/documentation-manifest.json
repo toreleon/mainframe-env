@@ -597,7 +597,7 @@
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
       "relative_links": 1,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:63908e082bd065d926e44ac70411285fe4f4e5c06a58deaf514e0770c57b2cef",
+      "sha256": "sha256:fa1ed544aa3749b9ddf95a6efac6ef4a81ad61035fb0b13b04f148a6443cf024",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -1510,7 +1510,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:ad885020ef0ac7d274fb141c38ad1ac586c5dbcf042a0585432b78ecbc29b6e2",
+      "sha256": "sha256:776deda3d1c77952ba040e352672c13fcc5813b39bf00825a2ab0ece6e6a9319",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

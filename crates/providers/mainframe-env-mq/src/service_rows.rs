@@ -163,7 +163,18 @@ pub(super) fn load_row_map<T: DeserializeOwned>(
     let records = store
         .list_provider_state(namespace, fetch)
         .map_err(store_error)?;
-    if records.len() > max {
+    decode_row_map(records.iter(), namespace, max, limits, versions)
+}
+
+/// Pure decoding shared by the legacy loader and the captured-snapshot reader.
+pub(super) fn decode_row_map<'a, T: DeserializeOwned>(
+    records: impl Iterator<Item = &'a ProviderStateRecord> + Clone,
+    namespace: &str,
+    max: usize,
+    limits: MqLimits,
+    versions: &mut RowVersions,
+) -> Result<BTreeMap<String, T>, HostProblem> {
+    if records.clone().count() > max {
         return Err(HostProblem::ResourceExhausted);
     }
     let mut values = BTreeMap::new();
@@ -181,7 +192,7 @@ pub(super) fn load_row_map<T: DeserializeOwned>(
             return Err(HostProblem::InfrastructureFailure);
         }
         versions.insert((namespace.into(), record.key.clone()), record.version);
-        if values.insert(record.key, row.value).is_some() {
+        if values.insert(record.key.clone(), row.value).is_some() {
             return Err(HostProblem::InfrastructureFailure);
         }
     }

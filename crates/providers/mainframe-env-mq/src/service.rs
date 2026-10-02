@@ -45,6 +45,9 @@ use rows::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
 #[path = "service_legacy_delivery_import.rs"]
 pub(crate) mod legacy_delivery_import;
 
+#[path = "service_rich_state.rs"]
+mod rich_state;
+
 #[path = "service_object_integration.rs"]
 mod object_integration;
 use object_integration::{encode_catalog_row, load_catalog_row};
