@@ -96,6 +96,22 @@ module, format/schema/docs gates and focused integration regressions are pending
 No feature package, application prerequisite or parent is sealed by these
 structural checkpoints, and no public SPI/FEPI route is enabled.
 
+The combined candidate at `0c0bfd7d5382c42019bdfa0cb7f9bcf577b6a918` passes
+46 focused integration regressions, dependency policy, format, schema, docs,
+changelog, license notices and source-input policy. Architecture-fast stops at
+the effect-encoding guard because a new test-only IMS import precedes production
+code and its legacy scanner truncates there. The manager owns a narrow follow-up
+to place that import inside the existing test module, lower the honest IMS
+inventory count and rerun the affected regression/architecture/module checks;
+no scanner relaxation or subsystem semantics are assigned.
+
+The user explicitly extended scope with "Ok finish v0.9 first" in response to
+the CICS application prerequisite question. The manager will complete the
+`cics.application-api` v0.9 gaps and local integration/recovery acceptance first,
+then resume v0.10 SPI/FEPI. This supersedes the earlier prohibition on completing
+those prerequisite gaps; the licensed-run waiver remains `differential=pending`,
+zero licensed credit. Other subsystem/release work is not implicitly added.
+
 The manager integration checkout is
 `/Users/tore/code/.codex-worktrees/mainframe-env/v010-completion-20261002`,
 branch `codex/v010-spi-fepi-completion-20261002`, based on fetched
@@ -500,6 +516,15 @@ The manager retains exclusive manifest/index, reader, generator, schema,
 status and integration ownership; any later source registration remains private
 and grants zero semantic, execution or licensed credit. This inventory does
 not depend on accepting the unsealed row maps or the application integration.
+
+The user explicitly extended the goal on 2026-10-02 to finish the CICS v0.9
+application API prerequisite before resuming SPI/FEPI. The first bounded wave is
+declared in `application-api-status.md`: remaining command authority (0027,
+0093, 0114), installed same-level target admission (0097/0263), and task-wide
+BTS SET storage review (0086). The manager owns shared contracts, generated
+authorities, status, conformance bindings and integration; workers have disjoint
+server implementation or external review ownership. The licensed-run waiver
+keeps differential pending with zero credit and does not waive local acceptance.
 
 Keep the source-map checkpoint private and unsealed until the three SPI row equivalences, required
 cache bodies and module gate are resolved. Then seal its exact allowlist before

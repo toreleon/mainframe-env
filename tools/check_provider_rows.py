@@ -70,10 +70,23 @@ def check(root: Path) -> None:
     }
     for label, (path, specific) in targets.items():
         source = production_source(path)
+        require(source, specific, label)
+        persistence = source
+        if label in ("MQ", "IMS"):
+            require(
+                source,
+                (
+                    "mod row_store;",
+                    "use row_store::{",
+                    "load_or_migrate(",
+                    "commit_row_changes(",
+                ),
+                label,
+            )
+            persistence += "\n" + production_source(path.with_suffix("") / "row_store.rs")
         require(
-            source,
-            specific
-            + (
+            persistence,
+            (
                 "struct RowStoreManifest",
                 "struct ObjectRow<T>",
                 "fn load_or_migrate(",
@@ -94,7 +107,7 @@ def check(root: Path) -> None:
             "payload: serde_json::to_vec(&next)",
             "durable.state.clone()",
         )
-        present = [fragment for fragment in forbidden if fragment in source]
+        present = [fragment for fragment in forbidden if fragment in persistence]
         if present:
             raise ValueError(f"{label} regressed to whole-state persistence: {present}")
 

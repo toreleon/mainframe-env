@@ -120,7 +120,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-ims/src/service.rs",
-      "max_production_lines": 1744,
+      "max_production_lines": 1741,
       "responsibility": "IMS session, PSB/database resolution, DL/I operations, unit-of-work state, and replay share one service module.",
       "split_boundary": "Separate session/PSB binding, database operation handlers, and unit-of-work persistence/replay."
     },

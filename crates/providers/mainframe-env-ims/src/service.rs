@@ -26,9 +26,6 @@ use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 mod row_store;
 use row_store::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
 
-#[cfg(test)]
-use row_store::encode_object_row;
-
 mod generic;
 mod system;
 mod utility_bridge;
@@ -1744,6 +1741,7 @@ pub fn ims_providers(
 
 #[cfg(test)]
 mod tests {
+    use super::row_store::encode_object_row;
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,
