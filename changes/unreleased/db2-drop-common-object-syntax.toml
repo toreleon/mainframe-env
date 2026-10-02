@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add private bounded Db2 DROP TABLE, VIEW, INDEX and non-PUBLIC ALIAS syntax with owned effective names, original spans and preserved optional FOR TABLE spelling; binding, execution and full-row recognition remain pending."
