@@ -22,7 +22,9 @@
         "spi-csd-browse",
         "spi-monitoring-control",
         "spi-region-lifecycle",
-        "fepi-session-data"
+        "fepi-session-data",
+        "spi-web-resources",
+        "spi-queue-storage"
       ]
     },
     "runtime_binding": {

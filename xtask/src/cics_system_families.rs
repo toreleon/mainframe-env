@@ -8,7 +8,7 @@ use std::path::Path;
 const SCHEMA: &str = "conformance/0.10/schemas/cics-system-family-contract.schema.json";
 const DIRECTORY: &str = "conformance/0.10/cics/families";
 const MAX_ARTIFACT_BYTES: u64 = 4 * 1024 * 1024;
-const FAMILIES: [&str; 10] = [
+const FAMILIES: [&str; 12] = [
     "spi-program",
     "fepi-pool",
     "spi-file",
@@ -19,6 +19,8 @@ const FAMILIES: [&str; 10] = [
     "spi-monitoring-control",
     "spi-region-lifecycle",
     "fepi-session-data",
+    "spi-web-resources",
+    "spi-queue-storage",
 ];
 
 fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
@@ -69,6 +71,22 @@ fn rows(family: &str) -> TaskResult<(&'static str, &'static [&'static str])> {
             &[
                 "0002", "0003", "0004", "0005", "0006", "0012", "0013", "0014", "0015", "0016",
                 "0025", "0026", "0027", "0028", "0029", "0030", "0031", "0038", "0039",
+            ],
+        )),
+        "spi-web-resources" => Ok((
+            "spi",
+            &[
+                "0003", "0009", "0023", "0035", "0036", "0063", "0070", "0081", "0091", "0092",
+                "0097", "0114", "0150", "0187", "0190", "0191", "0193", "0198", "0206", "0216",
+                "0239", "0263", "0266", "0267", "0269",
+            ],
+        )),
+        "spi-queue-storage" => Ok((
+            "spi",
+            &[
+                "0011", "0014", "0017", "0029", "0033", "0071", "0074", "0075", "0086", "0090",
+                "0107", "0117", "0118", "0132", "0133", "0134", "0162", "0170", "0171", "0179",
+                "0180", "0181", "0182", "0219", "0228", "0229", "0250", "0251", "0259", "0260",
             ],
         )),
         _ => Err(format!("unknown CICS system family {family}")),
@@ -397,13 +415,13 @@ mod tests {
                 );
             }
         }
-        assert_eq!(identities.len(), 118);
+        assert_eq!(identities.len(), 173);
         assert_eq!(
             identities
                 .iter()
                 .filter(|(interface, _)| *interface == "spi")
                 .count(),
-            79
+            134
         );
         assert_eq!(
             identities
@@ -427,6 +445,8 @@ mod tests {
             ("spi-monitoring-control", 21),
             ("spi-region-lifecycle", 25),
             ("fepi-session-data", 19),
+            ("spi-web-resources", 25),
+            ("spi-queue-storage", 30),
         ] {
             assert_eq!(valid(family, &fixture(family)).unwrap(), count);
         }

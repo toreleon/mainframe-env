@@ -147,7 +147,7 @@ class AdministrativeGrammarTests(unittest.TestCase):
                 self.assertEqual(row["state"], "mapped")
                 topic = row["topic"]
                 self.assertEqual(topic["sha256"], "sha256:" + pinned[topic["topic_path"]]["sha256"])
-        self.assertEqual(len(seen), 118)
+        self.assertEqual(len(seen), 173)
 
     def form_fixture(self):
         family = copy.deepcopy(self.family)

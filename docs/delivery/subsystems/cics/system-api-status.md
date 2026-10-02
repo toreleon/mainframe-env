@@ -1761,3 +1761,31 @@ The generated grammar digest changes for four explicit named forms; all parent
 and form readiness remains Pending. Union174 operand facts remain unchanged,
 and239 source-review candidates are not execution evidence. Mandatory gates
 precede this bounded slice seal.
+
+Manager source-wave-three enrollment declares two disjoint dependency-ready
+source slices before dispatch: SPI-1001.spi-web-resource-contract owns only
+families/spi-web-resources.json (25 exact SPI rows), and
+SPI-1001.spi-queue-storage-contract owns only families/spi-queue-storage.json
+(30 exact SPI rows). Full exact rows and committed primary pins are frozen
+by source-wave-three/cohorts.json outside Git and by the sole generator/validator
+cohort inventories. Each row has a reviewed source-map join; four TSQUEUE/TSQNAME variants retain
+their distinct reviewed combined-page form locators; no unresolved
+0201/0203/0204 equivalence is included. Dependencies are this enrollment's passed
+shared schema/cohort/linkage/policy gates. Workers independently search/read all
+primary and needed pinned contexts, derive complete bounded option/constraint/
+response/security/audit/lifecycle/UOW/recovery facts and concrete independent
+candidates, preserving unregistered contexts and contradictions pending.
+Each owns only its isolated family file and external handoff; no shared
+facade/schema/generator/IR/compiler/provider/state/status edits are delegated.
+Manager owns actual Draft202012 and mandatory integration gates, independent
+review, repairs, generated output and serial sealing. Existing source contracts
+and generated facts remain unchanged by enrollment; absent future inputs stay
+pending. All308 identities and all application/route/recovery/license/parent
+gates remain pending. Six current repair/review workers plus these two source
+workers use at most eight actual CLI slots, gpt-6.1-sol/high/default/fastOFF.
+
+Cohort enrollment passes thirteen focused validator tests (including all twelve
+synthetic cohorts), 23 current generator tests and seven unchanged IR contract
+checks, with no ignores. Current present inputs pass exact linkage; absent future
+inputs remain pending. Identity/grammar output bytes do not change until a
+reviewed input is added. Mandatory gates precede this infrastructure seal.
