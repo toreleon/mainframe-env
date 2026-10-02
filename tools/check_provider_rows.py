@@ -70,6 +70,13 @@ def check(root: Path) -> None:
     }
     for label, (path, specific) in targets.items():
         source = production_source(path)
+        if label == "MQ":
+            require(
+                source,
+                ('#[path = "service_rows.rs"]', "mod rows;", "use rows::{"),
+                "MQ linked row module",
+            )
+            source += "\n" + production_source(path.with_name("service_rows.rs"))
         require(
             source,
             specific
