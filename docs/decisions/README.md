@@ -41,6 +41,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0033](0033-mq-full-md-value.md) | complete lossless MQMD1/2 value and bounded separate canonical value codec | Proposed |
 | [0033](0033-mq-historical-handle-observation.md) | historical MQ canonical handle identity without live registry authority | Proposed |
 | [0035](0035-mq-root-scoped-abi-aliases.md) | explicit volatile SAME TASK connection aliases and atomic machine writeback | Proposed |
+| [0036 (conformance)](0036-conformance-pending-obligations.md) | explicit mandatory pending obligations and bounded selected MQ evidence | Proposed |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

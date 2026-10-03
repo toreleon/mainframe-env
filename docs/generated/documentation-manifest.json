@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 252,
+    "markdown_documents": 253,
     "navigation_groups": 6,
-    "normative_documents": 82,
-    "xtask_commands": 235
+    "normative_documents": 83,
+    "xtask_commands": 237
   },
   "documents": [
     {
@@ -98,9 +98,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:0edccc95419c94af0caeeab6776bb89c765b719abb3c37dd7a5e148489dfea73",
+      "sha256": "sha256:b9c8b2ea1272a51a174b8b54366351ca211ef3caf578576b7e6991d6ca1ea424",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 2
+      "xtask_commands": 3
     },
     {
       "normative": false,
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 138,
-      "sha256": "sha256:92926dbd5653ef0f36b8df2de00b06a8b2cf17f3202c6c5cfa5531817444f9bb",
+      "relative_links": 139,
+      "sha256": "sha256:36f230d9c0ffabb915aa1de6894344f68d12d3f72c7ad1e250ff0908d0f567f7",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -417,10 +417,10 @@
       "path": "docs/architecture/CONFORMANCE-IR.md",
       "relative_links": 0,
       "scope": "conformance catalog, binding, execution, and evidence authority",
-      "sha256": "sha256:73101bdc6bf80443b29e3c632718d80972988d6efe35180a791044f12664842c",
+      "sha256": "sha256:0d557c80284f87b6c16a9daa60988cd9f709e06945529ae88ea8a49d836e60b0",
       "status": "Normative from 0.3.0",
       "title": "Conformance IR and executable coverage",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
       "applies_from": "mainframe-env 0.2.0",
@@ -1175,6 +1175,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "Conformance and MQ maintainers",
+      "path": "docs/decisions/0036-conformance-pending-obligations.md",
+      "relative_links": 0,
+      "scope": "existing shared Conformance IR v1 only",
+      "sha256": "sha256:608f6ffb4c49677dd528e44dbc0f34c4a140e419df81681d1590145dba6773fa",
+      "status": "Proposed (bounded driver foundation)",
+      "title": "ADR 0036: explicit pending Conformance IR obligations",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "host-contract and IMS provider maintainers",
@@ -1261,8 +1273,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 43,
-      "sha256": "sha256:0d49191946169751c57cc558425f2b6017aaa977121c17e71f951ea9625ccb41",
+      "relative_links": 44,
+      "sha256": "sha256:90cef4cbb2a01525f11960660a6f36686af66b9e84a5c697d8a90767e3905d67",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1794,7 +1806,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:071e4bd032f182e759a2d3927b78ec7bbc7bf2bb15a6b16010733c4edc039ca9",
+      "sha256": "sha256:5832fb37e2076f38c4f1702bd46c62fdcb8f98d3cc7ff5f11f9b1db2d937ebc4",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2616,6 +2628,10 @@
           "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
         },
         {
+          "label": "ADR-0036: Explicit pending Conformance IR obligations",
+          "path": "docs/decisions/0036-conformance-pending-obligations.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         },
@@ -2916,7 +2932,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:ad18eecb6571551a8bf3f300e02aadf4e6e0ab497a8e672e441f066c34b56d29",
+  "registry_sha256": "sha256:7c94e169ce769a15c3804f767ffbee5934474a4d00f7730993836c498d19fe87",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

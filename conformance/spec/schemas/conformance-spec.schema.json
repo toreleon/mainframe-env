@@ -74,7 +74,8 @@
       "properties": {
         "row_id": {"$ref": "#/$defs/id"},
         "obligation_id": {"$ref": "#/$defs/id"},
-        "applicable_gates": {"$ref": "#/$defs/gates"}
+        "applicable_gates": {"$ref": "#/$defs/gates"},
+        "pending_reason": {"$ref": "#/$defs/id"}
       }
     },
     "case": {

@@ -63,3 +63,23 @@ bodies without changing any old baseline. Their expected hashes and byte counts
 were verified and read offline. Availability resolves the source-location gap,
 not human rule acceptance; the candidate's source validator rejects mismatched
 topic/hash/baseline identities. No publication body is retained in Git.
+
+MQ uses this same IR, runner and ledger, not a subsystem-local verdict authority.
+All 26 unique calls retain mandatory complete-profile obligations with bounded
+`pending_reason` identifiers. These cannot bind cases or receive passing verdicts;
+absence of the field preserves strict case closure for existing specifications.
+The original 27 source positions and all six gate meanings remain unchanged.
+
+`cargo xtask conformance --subsystem mq --gate local --check` runs finite selected
+Memory/SQLite originals through the product runtime and durable coordinator.
+Separate typed emission-source, independent expectation and empty physical setup
+digests bind the fixtures. Ordered SAF decisions preserve original/replay
+attribution; the checked Foundation encoder supplies bounded ASCII setup.
+The fixture Consumer is not compiled COBOL or installed/native/JES provenance.
+Sixteen executions and two conditioned reuses share two backend transcripts.
+Receipt counts and matching success audits are not independent canonical receipt
+decoding, atomic receipt/audit linkage or proof of both audit layers. Orderly
+SQLite close/reopen checks MQ rows, not the complete core graph or crash recovery.
+Full MQ completion and gates lacking executable evidence refuse while required
+profiles remain missing. Source references and Unsupported dispositions earn no
+execution credit; the licensed oracle is separately human-skipped at zero credit.

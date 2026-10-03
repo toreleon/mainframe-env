@@ -281,6 +281,31 @@ and fuzzing instead.
 
 ## Migration from 0.2
 
+An obligation may declare a bounded `pending_reason` when the executable profile
+is still missing. It remains mandatory for every declared gate; cases cannot bind
+it and the shared ledger remains Pending. Specs without this field retain strict
+case closure. See ADR 0036. This is not non-applicability or an Unsupported pass.
+
+The MQ foundation joins all 26 typed call identities and retains the 27 source
+positions. Finite selected Memory/SQLite fixtures drive genuine original core
+intents through the existing durable coordinator and MQ runtime, starting from a
+generated empty quiescent profile fixture. The fixture consumer is not compiled
+COBOL or installed/JES attestation. Its independent transcript checks typed
+outputs, exact bytes, ordered attributed SAF decisions, original core closure,
+receipt counts and matching success audits, denied PUT nonmutation and replay.
+Receipt counts and audit matches do not independently decode every canonical
+receipt or prove atomic receipt/audit linkage or both audit layers. SQLite orderly
+close/reopen compares MQ rows, not the entire core graph or process-crash recovery.
+The 18 finite verdicts comprise 16 executions and two conditioned reuses of two
+physical backend transcripts, not 18 independent product executions. Every call
+remains Pending across its six mandatory complete-profile gates.
+
+`cargo xtask conformance --subsystem mq --gate local --check` emits finite verdicts
+and the existing derived ledger. Without an explicit finite gate/replay selection,
+full26 completion is refused while mandatory complete-profile obligations remain
+pending. Gates without executable evidence also refuse; no fake future case
+receives credit from a provider Unsupported disposition.
+
 The 0.2 catalog authority, row identities, six-gate contract, and historical
 evidence remain frozen. Do not retrofit 0.2 receipts. Version 0.3 introduces the
 shared Conformance IR and begins emitting executable bindings for COBOL rows.

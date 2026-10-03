@@ -104,6 +104,7 @@ explicitly names that authority as superseded.
 - [ADR-0033: MQ historical handle observation](decisions/0033-mq-historical-handle-observation.md)
 - [ADR-0034: MQ root publication framework](decisions/0034-mq-root-terminal-publication.md)
 - [ADR-0035: Volatile task-root MQI ABI aliases](decisions/0035-mq-root-scoped-abi-aliases.md)
+- [ADR-0036: Explicit pending Conformance IR obligations](decisions/0036-conformance-pending-obligations.md)
 - [Decision index and template](decisions/README.md)
 - [ADR-0034: Bounded GSAM logical record addresses](decisions/0034-gsam-logical-address.md)
 - [ADR-0031: IMS TM recovery publication and work settlement](decisions/0031-ims-tm-recovery-publication.md)

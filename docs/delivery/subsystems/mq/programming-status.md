@@ -6,6 +6,40 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Shared finite conformance driver and explicit pending obligations
+
+`MQ-1506.shared-conformance-driver` integrates the repaired cumulative worker
+`7d125ead` after independent review of 3,317 identity/binding checks, its 12 final
+seal paths and original prerequisite history. Two feature fragments retain the
+driver and its evidence-binding repair. Already integrated Foundation ASCII and
+upstream IMS registries/hooks remain intact; historical failing candidates and
+their receipts are not imported as passing evidence.
+
+One shared IR now represents all 26 unique MQ calls and 27 source positions.
+Mandatory missing profiles use bounded pending identifiers, never fake cases or
+Unsupported passes. Finite selected Memory/SQLite originals exercise the product
+runtime/coordinator with separate actual emission-source, independent expectation
+and empty physical setup digests, ordered attributed SAF, exact bytes, denied
+PUT nonmutation and original/replay core identities. Eighteen local verdicts
+comprise 16 executions and two conditioned reuses of two physical transcripts.
+All 26 calls remain Pending across their six mandatory complete-profile gates;
+full26 and recovered requests must refuse missing evidence.
+
+Receipt counts plus matching attributed success audits do not independently
+decode each canonical receipt, prove atomic receipt/audit linkage or both audit
+layers. SQLite orderly close/reopen checks MQ rows, not a complete core graph,
+cold restore or process-crash recovery. Typed Consumer fixtures are not compiled,
+installed/native/JES or deployed RACF evidence. PUT1 is a reference, not an
+executed case. No production MQ/provider/store/canonical semantics are changed.
+
+Fourteen frozen MQ9.4 source pins retain reviewed offline SHA/bytes: original
+baseline2026-08-31 BACK0001, CLOSE0006, CMIT0007, CONN0008, DISC0012, GET0015,
+OPEN0019, PUT0020, reference PUT10021 and call-list q101650_; supplement
+baseline2026-09-12 MD q097390_/q097395_, GMO q096715_ and PMO q098655_.
+Source credit0; no refresh or publication bodies in Git. Historical d8 dependency
+policy is reused only for all32 unchanged inputs. Only the licensed oracle is
+human-skipped0/26; full v0.15 and other nonlicensed acceptance remain unfinished.
+
 ## Installed supplied zero and binary correlation IDs
 
 `MQ-1503.installed-supplied-correlation-id` integrates reviewed sealed worker

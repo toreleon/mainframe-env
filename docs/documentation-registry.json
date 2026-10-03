@@ -72,6 +72,7 @@
     "docs/decisions/0033-mq-historical-handle-observation.md",
     "docs/decisions/0034-mq-root-terminal-publication.md",
     "docs/decisions/0035-mq-root-scoped-abi-aliases.md",
+    "docs/decisions/0036-conformance-pending-obligations.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -355,6 +356,10 @@
         {
           "label": "ADR-0035: Volatile task-root MQI ABI aliases",
           "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
+        },
+        {
+          "label": "ADR-0036: Explicit pending Conformance IR obligations",
+          "path": "docs/decisions/0036-conformance-pending-obligations.md"
         },
         {
           "label": "Decision index and template",

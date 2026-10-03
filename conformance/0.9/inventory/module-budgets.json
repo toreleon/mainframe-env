@@ -42,7 +42,7 @@
     },
     {
       "path": "crates/contracts/mainframe-env-coverage/src/conformance.rs",
-      "max_production_lines": 2811,
+      "max_production_lines": 2808,
       "responsibility": "Coverage conformance catalogs, binding validation, evidence projection, and gate accounting share this contract module.",
       "split_boundary": "Separate catalog decoding, binding validation, evidence ledger projection, and gate summary contracts."
     },

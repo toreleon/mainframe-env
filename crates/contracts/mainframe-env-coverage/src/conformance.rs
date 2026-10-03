@@ -3,6 +3,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
+mod binding_closure;
 
 pub const CONFORMANCE_SPEC_DOCUMENT_CONTRACT: &str = "mainframe-env.conformance-spec@1";
 pub const CONFORMANCE_VERDICT_CONTRACT: &str = "mainframe-env.conformance-verdict@1";
@@ -244,6 +245,7 @@ pub struct MandatoryObligation {
     row_id: OfficialRowId,
     obligation_id: ObligationId,
     applicable_gates: BTreeSet<CoverageGate>,
+    pending_reason: Option<String>,
 }
 
 impl MandatoryObligation {
@@ -611,18 +613,7 @@ impl CompiledSpec {
                 return Err(SpecProblem::DuplicateBinding(format_binding(&key)));
             }
         }
-        for obligation in obligations.values() {
-            for gate in &obligation.applicable_gates {
-                let key = BindingKey {
-                    row_id: obligation.row_id.clone(),
-                    obligation_id: obligation.obligation_id.clone(),
-                    gate: *gate,
-                };
-                if !cases.contains_key(&key) {
-                    return Err(SpecProblem::MissingBinding(format_binding(&key)));
-                }
-            }
-        }
+        binding_closure::check(obligations.values(), &cases)?;
         if raw.scenarios.len() > limits.max_scenarios {
             return Err(SpecProblem::LimitExceeded("scenarios"));
         }
@@ -1472,6 +1463,8 @@ struct RawObligation {
     row_id: String,
     obligation_id: String,
     applicable_gates: Vec<String>,
+    #[serde(default, deserialize_with = "binding_closure::pending_reason")]
+    pending_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1670,6 +1663,9 @@ fn compile_obligation(
         .ok_or_else(|| SpecProblem::UnknownRow(row_id.to_string()))?;
     let obligation_id = ObligationId::new(raw.obligation_id, limits)?;
     let applicable_gates = compile_gates(raw.applicable_gates)?;
+    if let Some(reason) = &raw.pending_reason {
+        validate_token(reason, limits)?;
+    }
     if !applicable_gates.is_subset(&row.applicable_gates) {
         return Err(SpecProblem::IncompatibleGate(format!(
             "{row_id}/{obligation_id}"
@@ -1679,6 +1675,7 @@ fn compile_obligation(
         row_id,
         obligation_id,
         applicable_gates,
+        pending_reason: raw.pending_reason,
     })
 }
 
@@ -2993,6 +2990,43 @@ mod conformance_tests {
             limits(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn pending_obligations_remain_mandatory_without_fake_cases() {
+        let mut value = document();
+        value["cases"] = json!([]);
+        for obligation in value["obligations"].as_array_mut().unwrap() {
+            obligation["pending_reason"] = json!("implementation-required");
+        }
+        let spec = compile(&value).unwrap();
+        let ledger = DerivedConformanceLedger::derive_partial(&spec, &context(), vec![]).unwrap();
+        let bytes = ledger.canonical_json().unwrap();
+        let text = String::from_utf8(bytes).unwrap();
+        assert!(text.contains("pending"));
+        assert!(!text.contains("\"state\":\"passed\""));
+
+        value["cases"] = document()["cases"].clone();
+        assert!(matches!(
+            compile(&value),
+            Err(SpecProblem::IncompatibleGate(_))
+        ));
+        value["cases"] = json!([]);
+        value["obligations"][0]["pending_reason"] = json!("");
+        assert!(compile(&value).is_err());
+        value["obligations"][0]["pending_reason"] = json!(null);
+        assert!(matches!(
+            compile(&value),
+            Err(SpecProblem::MalformedDocument(_))
+        ));
+        value["obligations"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("pending_reason");
+        assert!(matches!(
+            compile(&value),
+            Err(SpecProblem::MissingBinding(_))
+        ));
     }
 
     struct Echo;
