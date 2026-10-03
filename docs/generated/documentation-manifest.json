@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 227,
+    "markdown_documents": 228,
     "navigation_groups": 6,
-    "normative_documents": 61,
+    "normative_documents": 62,
     "xtask_commands": 212
   },
   "documents": [
@@ -325,8 +325,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 117,
-      "sha256": "sha256:6c75b80f28ca3e6f0d5861af2693451314877aeb36b6bd2419f9638bd8ca2753",
+      "relative_links": 118,
+      "sha256": "sha256:d152f44bd0eaf0bfb2bb8379fc5c77cc10f64c34bc5b8ff384278a06f73376e8",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -565,6 +565,18 @@
       "sha256": "sha256:01075a1461bb211e26a1841e4cdb66bac5c588a4805da24925b17364137d8807",
       "title": "CardDemo reached compatibility copybooks",
       "xtask_commands": 2
+    },
+    {
+      "applies_from": "mainframe-env 0.10.0 development preparation",
+      "normative": true,
+      "owner": "CICS command, ProgramControl, security and storage maintainers",
+      "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md",
+      "relative_links": 0,
+      "scope": "named PROGRAM STATUS for a trusted public, local, non-Java cohort",
+      "sha256": "sha256:529b3da7448769587860553efcee1bbb9900d2ef4b025d59d2e289212ed94188",
+      "status": "Proposed private prerequisite",
+      "title": "Private named PROGRAM STATUS consumption boundary",
+      "xtask_commands": 0
     },
     {
       "applies_from": "mainframe-env 0.8.3 hardening",
@@ -1301,8 +1313,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:21916747dd3c40fb7f5f620f5251268ad08e8bceaf886e62b9d2d95b020c5b96",
+      "relative_links": 1,
+      "sha256": "sha256:827f297782e17692e95c33f7002ae99825ede3c4d784874d89bdaf458a345c63",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 3
     },
@@ -2147,6 +2159,10 @@
           "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"
         },
         {
+          "label": "Proposed named PROGRAM STATUS boundary",
+          "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md"
+        },
+        {
           "label": "Durable storage profile",
           "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md"
         },
@@ -2548,7 +2564,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:6715ffd6171d1a3933c82f753671b118919ac7ff475b47eda563d9282857018d",
+  "registry_sha256": "sha256:dbfd734fb3a08bbeda9385e121954f6b24f67834b2664cb5cef8eebf7a1a2975",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

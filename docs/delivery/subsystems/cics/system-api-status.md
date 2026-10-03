@@ -3372,3 +3372,118 @@ and all62 numeric domains/217 numeric records stay unchanged. Exactly40 source
 extent scalars and40 scoped symbolic domains are added to the existing authority.
 Application dependency audit retains its separate evidence gate; runtime and
 parent acceptance remain Pending.
+
+### SYNCPOINT dependency consumption and private PROGRAM preparation
+
+Manager-owned child: `SPI-1001.application-syncpoint-contract-consumption`.
+This bounded child consumes application row 0218 SYNCPOINT's frozen registration,
+condition, participant context, canonical effect and UOW contracts through the
+existing compiled pilot. It does not accept the full application API or enable
+SPI routing. All 263 application identities stay intact; user-deferred unready
+rows 0027 CICSMESSAGE, 0093 GETNEXT TIMER and 0114 ISSUE COPY stay Pending.
+Licensed differentials stay Pending, with no licensed execution credit.
+
+Before dispatch, the manager declared separate exact ownership: the CLI author
+owns only the new private test module
+`crates/tooling/mainframe-env-conformance/src/cics_pilot/tests/contract_consumption.rs`;
+the manager owns its cfg(test) registration, shared compiler repair, status,
+prepared contract, fragment, generated documentation and serialized integration.
+No worker changes shared schemas, generators, providers, fixtures or runtime
+facades. CLI workers use gpt-6.1-sol/high/default, fast mode off, no nested agents
+and isolated worktrees. Independent review uses a different retained CLI thread.
+
+The demonstrated consumption gap is current binding of row/descriptor/EIBFN,
+compiled conditions and participant contexts to durable effect, UOW, audit and
+physical SQLite reopen observations. Independent frozen participant/golden
+fixtures supply expectations. The author retained a failing duplicate-ROLLBACK
+regression: the existing parser coalesced repeated ROLLBACK despite row 0218's
+frozen duplicate-option rejection. The manager excludes only ROLLBACK from bare
+flag coalescing. The complete 263-row option inventory confines ROLLBACK to this
+row; exact repeated NOHANDLE and every other compatibility rule remain intact.
+This is a frozen product admission repair, not an IBM repeated-keyword claim.
+
+Affected acceptance checks are the four new consumption regressions, existing
+exact-flag/value-repeat/legacy-SPI controls and three affected participant,
+unknown-outcome and compiled-pilot selectors. Manager integration also requires
+module, public API, schema, format, architecture, documentation, changelog,
+dependency-policy and bounded work-package seal checks. Worker-local receipts
+cannot supply integrated-candidate evidence. No broad certification is implied.
+The existing participant codec metadata and MQ context repairs remain intact;
+new coordinator, dispatcher, evidence ledger or automatic redispatch is forbidden.
+
+Source review precedes semantic changes. Exact application row 0218 sources are
+baseline `ibm-cics-ts-6x-application-api-sources-c-2026-09-10`, topics
+`SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpoint.html`
+(SHA-256 `2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34`,
+parser 22–41) and `dfhp4_syncpointrollback.html`
+(SHA-256 `566d8661a0af02559d8679234e959d2e2aa2577dcf14c55211ec07c7c03e2954`,
+parser 22–24 and 46–51). Matching retained bodies were read offline through the
+pinned search/read tool; no refresh, repin or publication text enters Git.
+
+The separate named PROGRAM STATUS preparation is documented in
+[the prepared contract](../../../contracts/CICS-NAMED-PROGRAM-STATUS-V1.md).
+Its exact scope is SPI row 0155, trusted public/local/non-Java artifact-backed
+cohort, existing ProgramControl/State observation, distinct future typed identity
+and validated STATUS receiver. The existing helper is already sealed and is not
+reimplemented. Different-thread independent review found no actionable error in
+all 30 clauses after 14 successful source calls covering 211 parser lines. The
+contract retains exact source pins and prerequisite ownership. Trusted issuer,
+complete visible namespace, configured command/resource security activation,
+resolved receivers, route binding and selected-backend evidence remain Pending.
+No new operation tag, executable profile or advertised SPI route is assigned.
+
+These are bounded dependency and private preparation children. PostgreSQL,
+full application acceptance, all six SPI/FEPI command gates, restart acceptance,
+licensed differentials and parent completion remain Pending with zero new
+command coverage. Actual local test counts are not official row credit.
+
+Module gate found the three-line test registration exceeds the existing facade's
+frozen 1321-line production ceiling. Manager owns a structural correction only:
+move the new module under the existing terminal test module at
+`cics_pilot/tests/contract_consumption.rs` and register it inside `mod tests`.
+Adjust only its two relative include paths and selector prefix. No ceiling,
+inventory, fixture or behavior changes. Independent review must consume the
+final registration/layout delta before seal.
+
+The first integrated attempt executed ten regressions with no failure or
+ignore: four contract-consumption tests, three exact-flag/duplicate-option/legacy
+SPI controls and three participant/unknown-outcome/compiled-pilot controls. The
+then-current tests exercise eight context forms on Memory and SQLite, eight physical
+SQLite reopens and two golden commit/backout record reopens. They bind typed
+registration and EIBFN, independent response/condition fields, canonical effect
+identity/result, UOW owner/state/codec and mandatory audit/lifecycle observations.
+Subordinate rejection preserves provider business state; unknown outcomes retain
+no automatic redispatch. This grants focused local regression evidence only.
+Existing Conformance IR has three pilot rows and needs its own current scoped
+consumption receipt before runtime admission; no full-row credit is inferred.
+
+Independent review identified a test-expectation defect: default/NOHANDLE could
+accept a Respond policy because output expectations came from the decoded plan
+and the Respond branch accepted every input. Manager owns a bounded test repair:
+fixed expected output lists supplied from the source cases, with Respond allowed
+only for the three explicit RESP forms. Keep every case and the compiler repair.
+Final layout/test delta requires independent review; local tests are rerun for
+changed expectations. The documentation gate also requires the new contract's
+exact registration in `docs/documentation-registry.json`; manager owns that
+one-entry addition, preserving all existing document identities and order.
+
+Documentation validation requires supported normative metadata and navigation.
+Manager will mark the prepared document Proposed, supply its existing owner,
+bounded scope and development version, keep runtime admission/integration
+explicitly Pending, and register its single navigation entry. The reviewed body
+remains exact; no source rule or runtime prerequisite is changed. Final header
+and navigation delta join the independent incremental review before seal.
+
+Final independent review scope: SYNC-REV-01 expectation repair, test-only
+registration/layout and Proposed contract metadata/navigation delta. Reuse
+unchanged source/fixture/semantic inputs only by exact hash. Manager retains
+serialized integration and all acceptance gates.
+
+After SYNC-REV-01's fixed independent expectations, the final four-test module
+passes with zero failure/ignore. Module and public API checks also pass on that
+final test input. The six compatibility controls and schema check retain their
+actual previous-attempt receipts with unchanged relevant inputs; they are not
+relabeled as new executions. Final contract metadata now uses supported Proposed
+status with explicit Pending admission and a single navigation registration.
+The reviewed semantic body remains unchanged. Final independent delta review
+and outstanding mandatory documentation/policy/seal gates precede integration.

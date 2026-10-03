@@ -28,6 +28,7 @@
     "docs/architecture/PLUGIN-AND-SECURITY.md",
     "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
     "docs/architecture/RELEASE-BUILDER.md",
+    "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md",
     "docs/contracts/DURABLE-STORAGE-PROFILE.md",
     "docs/contracts/EFFECT-CANONICAL-V1.md",
     "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
@@ -149,6 +150,10 @@
         {
           "label": "Program and route registries",
           "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"
+        },
+        {
+          "label": "Proposed named PROGRAM STATUS boundary",
+          "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md"
         },
         {
           "label": "Durable storage profile",
