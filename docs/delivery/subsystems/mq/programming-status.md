@@ -6,6 +6,44 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Contained Batch all-effect transport prerequisite
+
+`MQ-1503.batch-contained-all-effect-loan` integrates reviewed sealed worker
+`a3b8afe2`. The explicit privileged callback receives every actual Batch-built
+host occurrence with exact original PRE Invocation/request/sequence/key/deadline.
+Program alone also borrows the genuine RunningStepAdmission and actual POST
+jes.work-id view. Private construction, no Clone/Serde/row factory and before/
+after scope checks preserve actual transport observations, not Core/JES authority.
+The sole existing DD/security/catalog/dataset/spool/internal-reader and Program
+builders are reused. Old plain and Program-only paths retain their behavior.
+
+The external callback owns real scoped preflight/result/audit/journal settlement;
+this explicit route performs no ordinary fallback or second Batch audit. Missing
+callback refuses before observation/selection/writes. Raw sequence fault/panic
+retains Unknown, and Malformed/control/CAS/uncertainty stop every later action.
+Try-borrow reentry refuses; callbacks run outside Batch locks. Genuine Program
+step views revoke before decoding/next action; known success may retire, while
+Drop never dispatches cleanup. Existing Selected/Running remain sequential and
+old sequences are not claimed to form one coordinator cursor.
+
+Independent review binds16paths/36commands/120stable6historical artifacts,
+2805input versions/100362occurrences,11frozen trees and32exact d8dependency inputs.
+Final235unit/11compile-fail,13policy/fouractualmutants and sameHEAD seal are
+verified; earlier failed compile,6/8fixture assertions,233/11run and metadata-only
+ADR/doc repair remain tied to their actual inputs. Memory/owned SQLite exercise
+actual scoped fixture transport, literal Program identities, real normalized
+Malformed audit, view lifetime, full retained physical rows/checkpoints/counters/
+trace, DD and internal reader coverage, missing owner and no double Batch audit.
+Main verifies the composed Batch/consumers/rustdoc and mandatory gates. Service
+ratchet lowers7250→7212; no API/module allowance is raised.
+
+This infrastructure activates no coordinator/JES claim/physical clock/native
+producer, atomic selection/core join, root/UOW terminal or DefaultContext policy.
+Fixture delegates and orderly SQLite reopen earn no installed/native/JES/crash
+or official acceptance. Actual owner/cursor/sequence allocator, physical claim
+fences and all nonlicensed parent gates remain required. All26 full-call gates
+stay Pending; fullv0.15 unfinished. Only licensed oracle human-skipped0/26.
+
 ## Actual Batch run-owner stop prerequisite
 
 `MQ-1503.batch-run-stop-containment` integrates reviewed worker `b929da52` with

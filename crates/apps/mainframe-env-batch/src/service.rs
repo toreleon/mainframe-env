@@ -1,4 +1,6 @@
 mod dd_allocation;
+mod effect_loan;
+mod host_dispatch;
 mod problem;
 mod program_dispatch;
 mod run_retirement;
@@ -6,6 +8,7 @@ mod run_selection;
 mod run_stop;
 mod running_step;
 
+pub use effect_loan::BatchEffectOccurrence;
 use run_stop::RunInput;
 pub use run_stop::{BatchRunControl, BatchRunExit};
 use running_step::ProgramDispatch;
@@ -222,47 +225,6 @@ pub struct BatchService {
 }
 
 impl BatchService {
-    fn invoke_host(
-        &self,
-        invocation: &(impl RunInput + ?Sized),
-        now_tick: u64,
-        cancellation_requested: bool,
-        request: EffectRequest,
-    ) -> EffectResult {
-        let control = match invocation.check() {
-            Ok(control) => control,
-            Err(problem) => {
-                return EffectResult {
-                    sequence: request.sequence,
-                    outcome: Err(problem),
-                };
-            }
-        };
-        let result = ScopedHostService::invoke(
-            &self.host,
-            invocation.original(),
-            control.map_or(now_tick, |control| control.now_tick),
-            cancellation_requested || control.is_some_and(|control| control.cancellation_requested),
-            request,
-        )
-        .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
-        if let Err(problem) = &result.outcome
-            && run_stop::fence_host_reply(invocation.contained(), problem)
-        {
-            return EffectResult {
-                sequence: result.sequence,
-                outcome: Err(invocation.poison(problem.clone())),
-            };
-        }
-        if let Err(problem) = invocation.check() {
-            return EffectResult {
-                sequence: result.sequence,
-                outcome: Err(problem),
-            };
-        }
-        result
-    }
-
     pub fn open(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
@@ -7858,7 +7820,7 @@ mod tests {
         ))
     }
 
-    fn invocation() -> Invocation {
+    pub(super) fn invocation() -> Invocation {
         let limits = InvocationLimits::default();
         let grants = [
             "host.security.authorize",

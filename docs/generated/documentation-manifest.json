@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 258,
+    "markdown_documents": 259,
     "navigation_groups": 6,
-    "normative_documents": 88,
+    "normative_documents": 89,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 144,
-      "sha256": "sha256:5ed6695fc016ca3766afab9bbda724a680fa7ba8073275a3167a5ea98abb1e47",
+      "relative_links": 145,
+      "sha256": "sha256:c7f1705be4858c1e3a783a19dbd4a1dc9372c5024805905cc12991f6248d1fe3",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1307,6 +1307,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0043-batch-contained-all-effect-loan.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-contained-all-effect-loan, target 0.15.0",
+      "sha256": "sha256:53872b1d2621d3f4900485e91210726acb3a557f4e59c270230b00ab49481b53",
+      "status": "Accepted bounded transport prerequisite; enclosing owner activation pending.",
+      "title": "ADR-0043: Batch contained all-effect loan",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.15.0",
       "normative": true,
       "owner": "store contract and Memory/SQLite adapter maintainers.",
@@ -1321,8 +1333,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 47,
-      "sha256": "sha256:893f0b1965d982c2187ed1f280f1b789bde388bfa71a2ffd608bedcd163f0f3a",
+      "relative_links": 48,
+      "sha256": "sha256:5c2775fdd6c71e4dc99f52f6d8f4e9b804d998d59a7d2b8d11601bd0ef217160",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1866,7 +1878,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:49136eeea3d1f944f5d4ab6584c0e1b7a15465bdde9f17fc15c8290d9b755d0d",
+      "sha256": "sha256:7e06bcc1f9d0f0b731da2a559eb75989610312e705a88425c71a9ee54dea46e8",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2766,6 +2778,10 @@
         {
           "label": "ADR-0040: Batch run stop containment",
           "path": "docs/decisions/0040-batch-run-stop-containment.md"
+        },
+        {
+          "label": "ADR-0043: Batch contained all-effect loan",
+          "path": "docs/decisions/0043-batch-contained-all-effect-loan.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3012,7 +3028,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:8bc5ed36e1364c307e576a261098f2e38821765cce696725a45a37b6dda93d8e",
+  "registry_sha256": "sha256:a17935e5edd0dcb3f35478a1c7f1e29a0152c716ca12a4de8fb8e25e6b0bf39c",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

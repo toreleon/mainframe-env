@@ -17,6 +17,14 @@ pub(super) struct Fault {
     checkpoints: Arc<dyn CheckpointStore>,
     captured: Option<(Physical, Vec<EffectRequest>, EffectResult, EffectResult)>,
 }
+pub(super) fn normalized_catalog_fault(f: &Fixture) -> Fault {
+    Fault {
+        kind: Kind::Catalog,
+        store: f.store.clone(),
+        checkpoints: f.checkpoints.clone(),
+        captured: None,
+    }
+}
 impl Fault {
     pub(super) fn corrupt(
         &mut self,

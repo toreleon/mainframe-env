@@ -6,6 +6,7 @@ use std::cell::Cell;
 use std::path::PathBuf;
 use std::sync::Weak;
 
+mod all_effect_loan;
 mod malformed_reply;
 
 struct Spy {
@@ -46,6 +47,13 @@ struct Fixture {
     fault: Arc<Mutex<Option<malformed_reply::Fault>>>,
 }
 fn fixture(store: Arc<dyn ProviderStateStore>, checkpoints: Arc<dyn CheckpointStore>) -> Fixture {
+    fixture_with_program(store, checkpoints, builtins())
+}
+fn fixture_with_program(
+    store: Arc<dyn ProviderStateStore>,
+    checkpoints: Arc<dyn CheckpointStore>,
+    program: Arc<dyn HostProvider>,
+) -> Fixture {
     let trace = Arc::new(Mutex::new(Vec::new()));
     let batch_link = Arc::new(Mutex::new(None));
     let fault = Arc::new(Mutex::new(None));
@@ -66,7 +74,7 @@ fn fixture(store: Arc<dyn ProviderStateStore>, checkpoints: Arc<dyn CheckpointSt
         deny_internal_reader: false,
     });
     let dataset = DatasetService::open(store.clone(), DatasetLimits::default()).unwrap();
-    let mut providers = vec![security, builtins()];
+    let mut providers = vec![security, program];
     providers.extend(dataset_providers(dataset.clone(), limits));
     providers.extend(spool_test_providers(store.clone()));
     let providers = providers

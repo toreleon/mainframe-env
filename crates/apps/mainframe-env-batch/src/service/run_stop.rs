@@ -134,6 +134,12 @@ pub(super) fn fence_step_error(contained: bool, problem: &HostProblem) -> bool {
 // Invocation keeps every legacy timing/path unchanged; it has no run owner.
 pub(super) trait RunInput {
     fn original(&self) -> &Invocation;
+    fn all_effects(&self) -> bool {
+        false
+    }
+    fn loan(&self, _occurrence: &BatchEffectOccurrence<'_>) -> Result<EffectResult, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
     fn check(&self) -> Result<Option<BatchRunControl>, HostProblem> {
         Ok(None)
     }
@@ -176,9 +182,15 @@ impl<I: RunInput + ?Sized> RunInput for Projected<'_, I> {
     fn contained(&self) -> bool {
         self.scope.contained()
     }
+    fn all_effects(&self) -> bool {
+        self.scope.all_effects()
+    }
+    fn loan(&self, occurrence: &BatchEffectOccurrence<'_>) -> Result<EffectResult, HostProblem> {
+        self.scope.loan(occurrence)
+    }
 }
 
-struct RunScope<'a, O> {
+pub(super) struct RunScope<'a, O> {
     original: &'a Invocation,
     observer: RefCell<&'a mut O>,
     last_tick: Cell<Option<u64>>,
@@ -291,7 +303,7 @@ where
 }
 
 impl<O> RunScope<'_, O> {
-    fn exit(
+    pub(super) fn exit(
         &self,
         outcome: Result<Option<JobSnapshot>, HostProblem>,
     ) -> Result<Option<BatchRunExit>, HostProblem> {
@@ -343,6 +355,21 @@ impl<O> RunScope<'_, O> {
     }
 }
 
+impl<'a, O> RunScope<'a, O> {
+    pub(super) fn new(original: &'a Invocation, observe: &'a mut O) -> Self {
+        Self {
+            original,
+            observer: RefCell::new(observe),
+            last_tick: Cell::new(None),
+            lifetime: Arc::new(RunLifetime {
+                active: AtomicBool::new(false),
+                stop: Mutex::new(None),
+            }),
+            owner: RefCell::new(None),
+        }
+    }
+}
+
 impl BatchService {
     /// Run through genuine Batch admission with bounded synchronous observations
     /// and the original Program callback. Opaque exits describe this actual run;
@@ -372,16 +399,7 @@ impl BatchService {
         if Arc::as_ptr(&self.store).cast::<()>() != Arc::as_ptr(checkpoints).cast::<()>() {
             return Err(HostProblem::Unsupported);
         }
-        let scope = RunScope {
-            original: invocation,
-            observer: RefCell::new(observe),
-            last_tick: Cell::new(None),
-            lifetime: Arc::new(RunLifetime {
-                active: AtomicBool::new(false),
-                stop: Mutex::new(None),
-            }),
-            owner: RefCell::new(None),
-        };
+        let scope = RunScope::new(invocation, observe);
         scope.check()?;
         let topology = self.topology()?;
         let members = topology

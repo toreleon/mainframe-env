@@ -85,7 +85,14 @@ impl BatchService {
                 service: None,
             }),
         };
-        let result = if let Some(dispatch) = dispatch {
+        let result = if invocation.all_effects() {
+            let owner = running_step::StepOwner::admit(self, invocation, job, step, program)?;
+            let admission = owner.borrow();
+            let result =
+                effect_loan::dispatch(invocation, request, Some((&program_invocation, &admission)));
+            drop(owner);
+            result
+        } else if let Some(dispatch) = dispatch {
             let owner = running_step::StepOwner::admit(self, invocation, job, step, program)?;
             let admission = owner.borrow();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
