@@ -12,6 +12,7 @@ use std::future::Future;
 use std::path::Path;
 use tokio::runtime::Builder;
 
+mod checked_read;
 mod container_retention;
 mod provider_retention;
 mod publication;
@@ -950,6 +951,7 @@ async fn finish_read_transaction<T>(
 }
 
 impl ProviderStateStore for SqliteStateStore {
+    crate::checked_read::checked_read_methods!();
     fn advance_logical_clock(&self, observed_floor: u64) -> Result<u64, StoreError> {
         let observed_floor =
             i64::try_from(observed_floor.max(1)).map_err(|_| StoreError::CapacityExceeded)?;
@@ -1116,13 +1118,6 @@ impl ProviderStateStore for SqliteStateStore {
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
         self.mutate_provider_rows(mutations)
-    }
-
-    fn publish_provider_states_audited(
-        &self,
-        request: mainframe_env_store_api::AuditedProviderPublication,
-    ) -> Result<(), StoreError> {
-        self.publish_audited(request)
     }
 
     fn archive_provider_state_replacement(

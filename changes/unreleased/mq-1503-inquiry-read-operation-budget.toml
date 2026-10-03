@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Included the emitted typed audit in the checked-read publication operation ceiling, preserving the 4096 bound and separate nonpublishing replay capacity."

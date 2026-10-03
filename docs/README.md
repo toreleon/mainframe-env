@@ -116,6 +116,7 @@ explicitly names that authority as superseded.
 - [ADR-0040: Private primary level witnesses and search boundary](decisions/0040-primary-level-position-search-boundary.md)
 - [ADR-0041: First direct child SSA selection](decisions/0041-first-direct-child-ssa-selection.md)
 - [ADR-0042: Private IMS TM output identity and local completion order](decisions/0042-ims-tm-output-identity-local-order.md)
+- [ADR-0043: Checked provider read publication](decisions/0043-inquiry-checked-read-publication.md)
 - [ADR-0033: Raw COBOL DL/I CALL and PCB binding contract](decisions/0033-cobol-dli-call-boundary.md)
 - [ADR-0030: GSAM application record formats and owned length](decisions/0030-gsam-application-record-formats.md)
 - [ADR-0032: Selected secondary checkpoint positions](decisions/0032-selected-secondary-checkpoint-position.md)

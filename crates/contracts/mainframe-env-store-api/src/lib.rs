@@ -44,6 +44,7 @@
 #![forbid(unsafe_code)]
 
 mod audited_publication;
+mod checked_read;
 mod model;
 mod root_preparation;
 mod root_provider;
@@ -51,6 +52,7 @@ mod root_terminal;
 mod traits;
 
 pub use audited_publication::{AuditedProviderPublication, MAX_AUDITED_PROVIDER_MUTATIONS};
+pub use checked_read::{CheckedProviderReadPublication, ProviderReplayAssertion};
 pub use root_preparation::RootPreparationPublication;
 pub use root_provider::RootProviderPublication;
 pub use root_terminal::{

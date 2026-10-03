@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod checked_read;
 mod durable;
 mod durable_retention;
 mod local_artifact;

@@ -30,6 +30,7 @@ use provider_retention::validate_memory_provider_dependency;
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
+mod checked_read;
 mod container_retention;
 mod journal;
 mod lifecycle;
@@ -980,6 +981,7 @@ impl IdempotencyStore for MemoryStore {
 }
 
 impl ProviderStateStore for MemoryStore {
+    crate::checked_read::checked_read_methods!();
     fn advance_logical_clock(&self, observed_floor: u64) -> Result<u64, StoreError> {
         if observed_floor > i64::MAX as u64 {
             return Err(StoreError::CapacityExceeded);
@@ -1159,13 +1161,6 @@ impl ProviderStateStore for MemoryStore {
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
         self.mutate_provider_rows(mutations)
-    }
-
-    fn publish_provider_states_audited(
-        &self,
-        request: mainframe_env_store_api::AuditedProviderPublication,
-    ) -> Result<(), StoreError> {
-        self.publish_audited(request)
     }
 
     fn archive_provider_state_replacement(

@@ -58,8 +58,15 @@ impl MemoryStore {
             &request.mutations,
             false,
         )?;
-        journal::journaled(&mut state, |state, journal| {
-            Self::apply_mutations_locked(state, journal, request.mutations, self.limits)?;
+        Self::append_audited_locked(&mut state, request, self.limits)
+    }
+    pub(super) fn append_audited_locked(
+        state: &mut State,
+        request: AuditedProviderPublication,
+        limits: StoreLimits,
+    ) -> Result<(), StoreError> {
+        journal::journaled(state, |state, journal| {
+            Self::apply_mutations_locked(state, journal, request.mutations, limits)?;
             journal.touch_logical_tick(state);
             state.logical_tick = request.observed_tick;
             journal.touch_next_audit_ordinal(state);
@@ -70,7 +77,7 @@ impl MemoryStore {
                     &format!("memory:{ordinal:020}"),
                 ));
             }
-            Self::append_audit_locked(state, request.audit, self.limits)
+            Self::append_audit_locked(state, request.audit, limits)
         })
     }
     pub(super) fn mutate_provider_rows(

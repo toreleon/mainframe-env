@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 256,
+    "markdown_documents": 257,
     "navigation_groups": 6,
-    "normative_documents": 86,
+    "normative_documents": 87,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 142,
-      "sha256": "sha256:e67c9bda63c29fbc80d7b9a6da436b5e9708a55091c9222265b0158c0b43b5db",
+      "relative_links": 143,
+      "sha256": "sha256:d3076bef4a245fdecaf7dc0e6750c897f63e027de841a1f758facc60ce6b93cb",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1295,6 +1295,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "store contract and Memory/SQLite adapter maintainers.",
+      "path": "docs/decisions/0043-inquiry-checked-read-publication.md",
+      "relative_links": 0,
+      "scope": "atomic provider read assertions, receipt/audit publication and replay fences.",
+      "sha256": "sha256:e007e9cdce34e55e2ff5c27639b3ebb60b8d63950358f29c3ceaa70baa500c87",
+      "status": "Implemented store prerequisite; provider/native inquiry remains pending.",
+      "title": "ADR 0043: Checked provider read publication",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 46,
@@ -1842,7 +1854,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:2da188304039e24e5ce714fda2bf55fc0e0e1ebe1100b37c187e4116bc17f378",
+      "sha256": "sha256:aacea42e7c45fbd42fc77dceb7e7eac65fb1225f005a8919aa9e9b751d67ab29",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2712,6 +2724,10 @@
           "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
         },
         {
+          "label": "ADR-0043: Checked provider read publication",
+          "path": "docs/decisions/0043-inquiry-checked-read-publication.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
@@ -2980,7 +2996,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:301c26d9420775fe2aa15a8aa04db2de0c4640a89f0f4758ca657ac91cf729e5",
+  "registry_sha256": "sha256:c05c57e9fef03fc310100e5c28d82f6b64b90459f77f45b3657a4203ae6626d1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

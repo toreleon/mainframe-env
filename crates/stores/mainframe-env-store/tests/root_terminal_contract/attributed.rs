@@ -1,5 +1,7 @@
 //! Physical original-record fixtures; not installed host/SAF/succession proof.
 use super::*;
+#[path = "checked_read.rs"]
+mod checked_read;
 #[path = "attributed_physical.rs"]
 mod physical;
 

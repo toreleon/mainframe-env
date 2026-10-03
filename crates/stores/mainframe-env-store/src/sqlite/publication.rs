@@ -105,6 +105,13 @@ impl SqliteStateStore {
         self.root_guard_writer_scopes(transaction, document.as_ref(), &request.mutations, false)
             .await?;
 
+        self.append_audited_in(transaction, request).await
+    }
+    pub(super) async fn append_audited_in(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+        request: AuditedProviderPublication,
+    ) -> Result<(), StoreError> {
         // Use the existing direct audit ordinal/key namespace and exact codec.
         // Prefix matching is by bytes, including non-ASCII execution identities.
         let prefix = crate::durable::audit_storage_key(&request.audit.execution_id, "direct:");

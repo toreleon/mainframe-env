@@ -459,6 +459,26 @@ pub trait IdempotencyStore: Send + Sync {
 
 /// Versioned per-object provider state and atomic mutation batches.
 pub trait ProviderStateStore: AuditSink + Send + Sync {
+    /// Assert exact provider reads, full current execution and original Intent
+    /// under one physical lock/transaction, then insert one receipt and its audit.
+    /// Audit-only Deny is allowed; exact dependencies are never mutated.
+    /// Unsupported adapters refuse without sequential read/write/audit fallback.
+    fn publish_provider_read_audited(
+        &self,
+        _request: crate::CheckedProviderReadPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Assert current exact read/receipt/root/original occurrence observations
+    /// without any row, audit, clock or epoch writes. Returns no dispatch permit.
+    /// Completed uses its real completion metadata, never Intent publication.
+    /// Unsupported adapters refuse; callers must not recompute or redispatch.
+    fn assert_provider_replay(
+        &self,
+        _request: crate::ProviderReplayAssertion,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Atomically assert an exact live canonical coordinator intent and publish
     /// bounded provider rows plus their typed audit. Core completion remains
     /// coordinator-owned. No transaction may span provider/SAF dispatch.

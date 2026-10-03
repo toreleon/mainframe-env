@@ -6,6 +6,43 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Atomic checked-read store prerequisite
+
+`MQ-1503.inquiry-checked-read-publication` integrates reviewed worker `59ded33c`
+with separately sealed `d29d2a4b` operation-budget repair. Non-Serde structural
+observations recheck full original effect, current Running execution and unique
+Exact/Absent dependencies under one Memory lock or SQLite writer transaction.
+Success inserts one version1 receipt and the existing typed provider audit;
+audit-only Deny has no receipt. Observed queue/catalog/control bytes and versions
+are not changed to simulate a read fence. Separate Intent/Completed replay
+assertion returns only `()` and writes no provider/audit/ordinal/epoch/clock state.
+Neither operation grants host, frame, SAF, root or JES permission.
+
+Physical attribution requires actual Open/live root membership and registered
+endpoints. This new API conservatively refuses simultaneous namespace/row indexes
+even for the same root; older root contracts are unchanged. Unindexed legacy
+actors cannot borrow indexed scopes. The 4096 combined requested-read, mutation
+and emitted-audit limit permits success4094 dependencies, Deny4095 and replay4096.
+Checked arithmetic, the existing64MiB/blob limits, SQLite byte-length preflights,
+audit-key bounds and existing touched-row/transaction rollback remain mandatory.
+No new table, codec/index/control migration, callback fallback or history release.
+The actual durable adapter is `SqliteStateStore`; PostgreSQL defaults to refusal.
+
+Independent reviews bind23original paths/75commands plus7follow-up paths/29commands,
+105follow-up frozen authorities,215historical artifacts and32exact historical d8
+dependency inputs. Final20unit/9root,13policy/fouractualmutants and sameHEAD seals
+are verified. Earlier18unit/9root,17audit/31attribution retain their actual inputs;
+failed compile, fixture, module, documentation and premature rustdoc cleanup
+receipts stay separate. Main verifies the composed affected contracts/consumers
+and mandatory gates. Owned SQLite orderly reopen is not process-crash evidence.
+
+Infrastructure-only work adds no IBM source or official execution credit. Actual
+MQINQ INQUIRE-open/normal-local definition origin, current frame/handles/SAF,
+original replay failure/denial audit ownership and compiled table ABI remain
+separate required work. No provider/native/installed/JES/full26 activation follows.
+All26 full-call gates remain Pending; only licensed oracle human-skipped0/26.
+Fullv0.15 and every other nonlicensed acceptance gate remain unfinished.
+
 ## Checked numeric local-type inquiry prerequisite
 
 `MQ-1503.inquiry-local-type-contract` integrates reviewed sealed worker
