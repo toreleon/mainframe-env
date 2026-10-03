@@ -51,6 +51,14 @@ actual installed/JES sources, generated IDs/defaults/priority/expiry, root termi
 recovery/participants/full26/CardDemo remain required. Parent remains ACTIVE;
 licensed IBM oracle ONLY human-skipped0/26, with zero credit.
 
+Manager staging preceded completion of the ledger-only documentation sequence,
+so sealed featurec5f731625 retained the previous generated ledger digest while
+the source ledger was current. A separate documentation-only correction preserves
+that commit and its494-test evidence; normal docs generation/check, changelog,
+whitespace and an exact two-path seal cover this changed ledger/manifest. The
+overlapping manager sequence and its receipts are retained, not relabeled as
+serial verification. No Rust/source/contract inputs or acceptance claims change.
+
 `MQ-1503.put-context-md-writeback` adds the atomic descriptor context writer
 needed by later compiled PUT/PUT1 forwarding. Eight actual default/no-context
 output fields use the same generated widths/kinds/offsets and prefix copier;
