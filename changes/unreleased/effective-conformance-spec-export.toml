@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose a read-only validated effective Conformance IR export through the existing shared builder, including admitted pilot scenarios and catalog/spec identities without execution credit."

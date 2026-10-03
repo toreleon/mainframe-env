@@ -8,6 +8,7 @@ mod carddemo_v09_host;
 mod changelog;
 mod cics_system_families;
 mod cobol_differential;
+mod conformance_spec_export;
 mod db2_statement_catalog;
 mod docs;
 mod evidence_seal;
@@ -24,6 +25,7 @@ mod work_package_seal;
 mod zosmf_contracts;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
+use conformance_spec_export::compile_shared_spec;
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
     CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
@@ -251,6 +253,7 @@ enum XtaskCommand {
     ImsAssuranceMatrix(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
+    ConformanceSpecExport,
     WorkPackageSeal(WorkPackageSealArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -603,6 +606,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             },
         ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
+        XtaskCommand::ConformanceSpecExport => (
+            "conformance-spec-export",
+            false,
+            conformance_spec_export::run(root),
+        ),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
                 || args.gate.is_some()
@@ -4680,23 +4688,6 @@ fn format_generated_rust(root: &Path, source: Vec<u8>) -> TaskResult<Vec<u8>> {
         ),
     )?;
     Ok(output.stdout)
-}
-
-fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
-    let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
-    let spec_path = root.join("conformance/spec/v1/spec.json");
-    let mut spec_value = json(&spec_path)?;
-    augment_ams_spec(root, &mut spec_value)?;
-    augment_docs_driven_pilots(root, &mut spec_value)?;
-    let bytes = serde_json::to_vec(&spec_value).map_err(|error| error.to_string())?;
-    CompiledSpec::compile_json(
-        &catalog_digest,
-        official_catalog_rows(root)?,
-        &bytes,
-        ConformanceLimits::default(),
-    )
-    .map_err(|problem| problem.to_string())
 }
 
 fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {

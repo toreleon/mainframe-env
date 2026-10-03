@@ -56,3 +56,19 @@ pressure; cache and parallelism changes need elapsed-time and peak-storage
 measurements first.
 
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
+
+## Effective Conformance IR inspection
+
+`cargo xtask conformance-spec-export` emits a JSON tooling bundle containing the
+validated effective document used by the existing runner, including admitted
+pilot augmentation, normalized catalog rows and candidate/catalog/spec digests.
+The committed static spec alone does not include every admitted pilot. Consumers
+can reconstruct `OfficialCatalogRow` values and compile `spec_document` with the
+existing `CompiledSpec::compile_json` API, checking the exported spec digest.
+Both export and execution use the same builder and augmentation order.
+
+Retain exports outside Git. They contain metadata and bindings, never execution
+or licensed acceptance; both credit fields are zero. Actual selected product
+route observations and verdict/ledger receipts are still required. An export's
+candidate identity is its exact producing checkout, including relevant dirty
+state, and cannot be relabeled for another candidate.

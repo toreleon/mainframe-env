@@ -3487,3 +3487,45 @@ relabeled as new executions. Final contract metadata now uses supported Proposed
 status with explicit Pending admission and a single navigation registration.
 The reviewed semantic body remains unchanged. Final independent delta review
 and outstanding mandatory documentation/policy/seal gates precede integration.
+
+### Pre-dispatch scoped SYNCPOINT Conformance IR consumption
+
+Manager declares SPI-1001.syncpoint-consumption-ledger from sealed71 f36532348edfbe7c29d4cf4bfb86c5281e0e23bd, tree10073f310d9b4c3f5a65398059a139bb109098ab. Exact application dependency row0218 SYNCPOINT, non-differential local consumption proof only. Demonstrated gap: sealed four-test compiled consumption proof does not yet bind observations through the existing Conformance IR/verdict/ledger machinery. Existing effective shared pilot has READ0156/REWRITE0181/SYNCPOINT0218,12obligations30gatecases and cics.file-uow.local ScenarioSpec; no full260 acceptance follows. User defers only0027/0093/0114, retain all263 identities and readiness flags. No licensed execution, parent credit or public SPI admission.
+CLI author owns only NEW crates/tooling/mainframe-env-conformance/src/cics_pilot/tests/contract_consumption/ledger.rs plus a module registration (and only any strictly necessary private test helper access adjustment, reported exactly) inside existing sealed crates/tooling/mainframe-env-conformance/src/cics_pilot/tests/contract_consumption.rs. The entire old test module body/fourtests, frozen source/golden/participant/command fixtures and compiler predicate must remain exact except minimal declared helper visibility or module-registration changes. Manager solely owns global Conformance IR/spec/schema/generator/xtask/public facades/fixtures/status/ABI/security/runtime/integration. Worker must not alter those paths or construct a second dispatcher, coordinator, response mapper, evidence ledger or admitted source authority.
+Implement a bounded test-side consumption binding using the actual existing Conformance IR/RuntimeRegistry/ConformanceRunner, ScenarioSpec, ObservationCheck, RunnerContext and canonical verdict event formats. Reuse the actual existing compiled COBOL -> binary interpreter -> durable coordinator -> CICS path and independent frozen six participant cases plus applicable omitted-local controls and SQLite reopen. Bind official row, rule/obligation/gate, candidate, spec, fixture/environment and scenario/artifact identities through existing framework. Prefer extending/consuming the existing SYNCPOINT ScenarioSpec and declared obligations; do not create a disconnected lookalike spec or hardcode pass verdicts. Inspect actual existing effective xtask augmentation; do not make the old static-spec-only inference. If a manager-owned seam prevents safe reuse, demonstrate the exact minimal required interface rather than bypassing it or writing shared paths. New private driver glue may adapt actual test helpers but cannot return generic success or predict actual values from itself. Independent expected responses/contexts/UOW/audit/effect identities stay frozen. Add meaningful negative controls: corrupt a returned condition/context/effect observation and prove the existing evaluator produces Fail; malformed/missing binding must fail closed. Keep all scenarios local/non-differential, scoped, candidate-bound and zero licensed credit. Do not assert trusted deployment context or complete row/application acceptance from pilot bindings; broad MQ capacity/trusted controls remain Pending unless actually exercised.
+Acceptance: demonstrate inventory gap first, implement real compiled-route ledger tests, focused new filter executes nonzero tests and passes; existing four consumption tests stay green. Preserve actual logs, input hashes, fixtures/scenario/gate counts and candidate/ledger binding receipts externally; do not relabel historical71 receipts. Rust module ceilings/pinned tools apply; no broad Cargo/whole-cache/source campaign. Manager reviews independent expectations and actual effective spec binding, then integrates/mandatory-gates/seals exact bounded child serially. No manager/root writes, push/PR/license/install/delegation or schema/criteria loosening. Each build/test/lint sequence cargo clean the isolated intended checkout in finally; receipts outside target, CARGO_BUILD_JOBS2, --locked --offline. Source BEFORE semantic comparisons: pinned Python -B conformance/tools/ibm_docs.py --cache the configured retained topic cache search/read exact sources-c SYNCPOINT dfhp4_syncpoint.html SHA2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34 full44lines and dfhp4_syncpointrollback.html SHA566d8661a0af02559d8679234e959d2e2aa2577dcf14c55211ec07c7c03e2954 full54lines; verify manifests and host/archive bytes first. No refresh/cache writes/repin. Reuse exact prior normative reads only after hash equality; no duplicate full dependency or source-family audit. Commit owned coherent implementation only after required focused pass; manager owns actual sealing. Handoff concise handoff.md/findings.json/source-receipts.json/validation.json with actual tests, current spec/scenario inputs, input hashes/candidate/tree/cleanup and full.diff. Stop at bounded handoff.
+
+Manager independent receipt lane: execute the existing effective
+`cics.file-uow.local` ScenarioSpec through `cargo xtask conformance --subsystem
+cics --gate local` on an isolated clean sealed71 checkout. This is actual current
+three-row/twelve-obligation local evidence, not the new context-extension worker
+or full application acceptance. The manager owns only external receipts and
+checkout-local disposable target; source/index are read-only. Record exact
+candidate/tree, spec/environment/verdict identities, actual passes/failures and
+cleanup. No source refresh, full certification, license or runtime promotion.
+
+### Manager-owned effective Conformance IR export seam
+
+`SPI-1001.effective-conformance-spec-export` follows sealed71. The compiled
+consumption worker demonstrated that the test crate cannot call xtask's private
+effective-spec builder; the committed static spec omits the existing CICS pilot.
+Manager owns only a read-only `conformance-spec-export` CLI seam, extracting
+`compile_shared_spec` into one owner module and retaining the exact augmentation
+order, catalog validation and compilation for both old/new entrypoints. Export
+validated raw effective document, normalized catalog metadata and current
+candidate/catalog/spec identities as tooling output; never execution acceptance,
+licensed evidence or a second spec/ledger builder. No row, obligation, rule,
+fixture, registry admission or evaluator policy changes. Manager owns
+`xtask/src/main.rs`, new `xtask/src/conformance_spec_export.rs`, the existing
+verification runbook, unique fragment, status and derived documentation. Worker
+owns only its declared private test paths and cannot edit this seam. Independent
+review, actual same-builder roundtrip/effective-pilot checks and mandatory gates
+precede serial child seal. Current clean71 receipt has30local verdicts passing
+on three pilot rows/twelve obligations; it is distinct from new context-extension
+evidence and does not accept260application rows or any SPI runtime route.
+
+Pre-dispatch independent export-seam review: exact frozen owner module,
+main routing/builder extraction and verification-runbook delta. Manager authored
+this infrastructure change; different retained CLI reviewer owns external
+findings only. No runtime or source rule changes, no duplicate worker ownership.
+Actual focused/export and mandatory integration gates remain manager-owned.
