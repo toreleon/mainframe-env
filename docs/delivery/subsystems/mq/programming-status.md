@@ -17,8 +17,10 @@ dependencies and its original digest, without replay provider/audit/event writes
 An actual refusal atomically publishes its existing audit plus literal next
 EffectResult lifecycle/outbox while leaving Completed and receipt unchanged.
 Memory uses one lock; SQLite uses one writer transaction and bounded byte/key
-preflights. Invalid output/sequence, panic, stale observations and scope loss
-retain actual Unknown as required; rollback and read/publication bounds remain.
+preflights. Invalid output/sequence, stale observations and scope loss retain
+actual Unknown. A replay callback panic after valid observations may settle as
+the existing InfrastructureFailure with its actual scoped audit; missing
+observations or failed settlement retain Unknown. Rollback and bounds remain.
 
 The nonwriting assertion retains4096 dependency capacity. Refusal reserves ten
 physical/accounting operations, admitting at most4086 dependencies within the
