@@ -43,6 +43,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0035](0035-mq-root-scoped-abi-aliases.md) | explicit volatile SAME TASK connection aliases and atomic machine writeback | Proposed |
 | [0036 (conformance)](0036-conformance-pending-obligations.md) | explicit mandatory pending obligations and bounded selected MQ evidence | Proposed |
 | [0037](0037-running-step-program-transport.md) | opaque revocable Running-step observation and neutral Program context transport; activation pending | Accepted (bounded transport) |
+| [0038](0038-coordinator-original-dispatch-extraction.md) | one private original HostCall implementation borrowed by the real coordinator drive; controller activation pending | Accepted (bounded extraction) |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

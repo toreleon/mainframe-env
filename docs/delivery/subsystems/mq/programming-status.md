@@ -6,6 +6,38 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Private coordinator original-dispatch prerequisite
+
+`MQ-1503.coordinator-original-dispatch-extraction` integrates reviewed sealed
+worker`1f93bc24`. The actual machine drive delegates its existing HostCall branch
+to one private child borrowing the same Invocation, optional JournalCursor,
+control and observer. Only the machine sets resume after known success; stop
+branches return directly without duplicate terminal/audit publication. Original
+admission/Running, canonical/core metadata, intent/result/event/outbox ownership,
+observer order, native restrictions, explicit reconciled Completed replay and
+ordinary panic limitations remain unchanged. No public Running facade, controller,
+Program-context selector, synthetic effect/Machine, new journal or lease exists.
+
+The manager-approved guard repair requires the actual child and separate request,
+replay-result and new-result digest controls while preserving mandatory parent
+module/construction/callsite/lifecycle controls. Comment/string decoys and missing
+child cannot supply them; the global persisted-Debug scan remains unchanged.
+Independent review binds11Git paths,74closed receipts,2772unique input versions,
+204260input occurrences,1468exact Rust/build/fixture inputs per retained runtime
+command,249retained Rust tests (227interpreter,17server,5MQ consumer),14fresh
+guard tests,21frozen authorities,32historical d8 dependency objects and same-HEAD
+seal. Static reverse projection preserves1388original branch tokens; actual loop
+inspection confirms no extra work after the match on replay success. Historical
+failures remain separate; Python-only guard changes did not repeat Rust suites.
+Main checks the composed current interpreter/consumers and mandatory gates.
+
+Genuine enclosing controller ownership/ControllerExit/stop latch, private server
+JesClaimRun, physical Work/Job decision-time expiry, scheduled compiled/root
+terminal policy and DefaultContext/JES/GMT remain required separate work. Fixture
+ports are not installed/native/JES/SAF/crash or full26 evidence. Source credit0;
+only licensed oracle human-skipped0/26. All nonlicensed v0.15 acceptance remains
+required and unfinished.
+
 ## Initial-root preparation store prerequisite
 
 `MQ-1505.root-preparation-publication` integrates reviewed sealed worker

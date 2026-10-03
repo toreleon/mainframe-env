@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 255,
+    "markdown_documents": 256,
     "navigation_groups": 6,
-    "normative_documents": 85,
+    "normative_documents": 86,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 141,
-      "sha256": "sha256:e213cd4b5b089bb21e944cc163425c96cf585b9bed125115151c43ca8b73d6fa",
+      "relative_links": 142,
+      "sha256": "sha256:e67c9bda63c29fbc80d7b9a6da436b5e9708a55091c9222265b0158c0b43b5db",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1223,6 +1223,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Interpreter and execution-coordinator maintainers",
+      "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md",
+      "relative_links": 1,
+      "scope": "MQ-1503.coordinator-original-dispatch-extraction, target 0.15.0",
+      "sha256": "sha256:3ebbf864af69043162ae45890c9b07e4374d10d747f76b4cb1eb5fd8c616e496",
+      "status": "Accepted bounded internal extraction; controller activation pending.",
+      "title": "ADR-0038: Private coordinator original dispatch extraction",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "IMS provider maintainers",
@@ -1285,8 +1297,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 45,
-      "sha256": "sha256:29c6061afe8b5532862879ee52cb41cbb3418268461e17bebf993ce691ba787e",
+      "relative_links": 46,
+      "sha256": "sha256:1eb3c13985ae1f2fdd89e235b219d251517ef7717d2165172cd53117e5236cf0",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1830,7 +1842,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:3752e741c1a857629c6e9ea295dd2e81558c15e1ff11f7ba64414532f4b243cd",
+      "sha256": "sha256:9ecfac7698176de1476df479b643579ad56db03fe5d20c52ca449381eb273eea",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2718,6 +2730,10 @@
         {
           "label": "ADR-0037: Running-step Program context transport",
           "path": "docs/decisions/0037-running-step-program-transport.md"
+        },
+        {
+          "label": "ADR-0038: Private coordinator original dispatch extraction",
+          "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2964,7 +2980,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:b336ef93f554b0eb6a67ee3c8206fc32240295054907a826e7d3c136e0781470",
+  "registry_sha256": "sha256:301c26d9420775fe2aa15a8aa04db2de0c4640a89f0f4758ca657ac91cf729e5",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
