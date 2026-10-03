@@ -11,6 +11,7 @@ use mainframe_env_host_api::mq_raw_layout::{
 use mainframe_env_host_api::mq_status::{MqCompletion, MqReviewedStatus};
 use mainframe_env_host_api::mq_wire_options::{self, MqWireBindings, MqWireQueueManagerPlatform};
 
+mod full_get;
 mod full_put;
 mod layout;
 
@@ -64,7 +65,7 @@ pub trait MqMqiNativePoint: MqWireBindings + Send + Sync {
     fn recheck(&self) -> Result<(), HostProblem>;
     /// Delegate to the SAME opaque point's homogeneous descriptor version.
     /// Never infer it from caller MQMD or copy foreign configuration as proof.
-    /// Existing embeddings refuse full PUT until deliberately forwarding it.
+    /// Existing embeddings refuse full PUT/GET until deliberately forwarding it.
     fn descriptor_version(&self) -> Result<i32, HostProblem> {
         Err(HostProblem::Unsupported)
     }
@@ -113,6 +114,7 @@ pub(super) struct Capture {
     pub(super) arguments: Vec<connx::Storage>,
     members: Vec<connx::Storage>,
     put: Option<full_put::Capture>,
+    get: Option<full_get::Capture>,
 }
 impl std::fmt::Debug for Capture {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -130,6 +132,7 @@ impl PartialEq for Capture {
             && self.arguments == other.arguments
             && self.members == other.members
             && self.put == other.put
+            && self.get == other.get
     }
 }
 impl Eq for Capture {}
@@ -292,6 +295,7 @@ impl ReferenceMachine {
             arguments,
             members,
             put: None,
+            get: None,
         };
         self.recheck_point(&capture)?;
         Ok((
@@ -367,6 +371,9 @@ impl ReferenceMachine {
             .ok_or(MachineProblem::UnexpectedHostResult)?;
         if capture.put.is_some() {
             return self.finish_full_put(targets, outcome);
+        }
+        if capture.get.is_some() {
+            return self.finish_full_get(targets, outcome);
         }
         let (status, output) = match outcome {
             MqMqiOutcome::Completed {

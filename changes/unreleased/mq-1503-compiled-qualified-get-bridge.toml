@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added finite compiled nine-reference MQGET forwarding through the existing qualified full GET request/result, opaque point profile and root-shared live object aliases. Complete MD1/2, GMO1, copied body prefix, DataLength and exact reviewed status are staged for one atomic writeback; absent observations preserve caller bytes. Canonical, replay, durable and checkpoint identities are unchanged. Installed selected-provider/root-terminal and full MQ acceptance remain required."

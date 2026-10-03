@@ -1778,6 +1778,28 @@ required. Installed pending PUT/normal/CEE3ABD/removed GET, actual crash/recover
 participants, IR, full26, CardDemo and other nonlicensed gates remain required.
 Only the licensed oracle is human-skipped0/26; this feature earns zero such credit.
 
+## Compiled qualified complete GET forwarding
+
+`MQ-1503.compiled-qualified-get-bridge` integrates reviewed sealed `98ccbfa2c`.
+Nine actual references retain complete MD1/2/GMO1/COPY/member/suffix/body/storage
+identities and genuine root-shared aliases. Independent same-point structure,
+descriptor version and queue/QM/product maxima precede decode. Original
+QualifiedFullGet/Got and the sole raw writers join MD/GMO/body prefix/DataLength/
+CC/RC only after all final callbacks, pure complete storage/cancellation checks
+and a held parent/object-use guard. No callbacks, allocations or fallible lookup
+follow. Generated Signal1 is opaque; SET_SIGNAL remains unsupported.
+
+Complete OK/0, accepted WARNING/2079, rejected WARNING/2080 and NoMessage
+FAILED/2033 stay exact. Rejected truncation carries represented MD/prefix/length
+but no QName; NoMessage preserves all absent caller outputs. Private actual
+compiler/frame/reply fixtures are engine-only evidence, not installed selected
+Memory/SQLite/core/SAF/JES/LE/native pending-work acceptance. Six retained-first
+pins from baseline2026-08-31 GET0015/q101830 and supplements2026-09-12 GMO/MD/
+constants were independently reproduced offline. Source credit0. Broader GET
+forms, genuine wrappers/source, removed GET/pending PUT normal/CEE3ABD, owning
+recovery/participants/IR/full26/CardDemo remain required. Only licensed oracle
+is human-skipped0/26; all other acceptance remains open.
+
 ## Qualified complete GET result
 
 `MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through

@@ -1045,3 +1045,32 @@ or official26 credit. Manager integration must supply actual opaque wrappers,
 independent installed source provenance and original selected publication,
 including pending PUT normal/CEE3ABD and removed-GET root acceptance. Recovery,
 participants, full applicable26 and CardDemo remain required parent work.
+
+### Compiled qualified complete GET
+
+The finite nine-reference MQGET route emits original `QualifiedFullGet`, with
+actual live root HCONN/HOBJ and opaque same-point descriptor/body maxima before
+raw decode. Complete MD1/2 and GMO1, generated members, COPY wrappers, suffixes,
+normal big-endian PIC S9(9), ASCII structure and separate fixed body bounds are
+captured. The existing full GET constructor owns finite unit/truncation decoding;
+actual queue access, SAF and UOW admission remain selected-provider responsibilities.
+This profile is normal local INPUT_SHARED removal without wait, conversion,
+properties, additional ID selectors, groups or segments.
+
+Request-bound results retain OK/0, accepted WARNING/2079, rejected WARNING/2080
+and NoMessage FAILED/2033. Represented MD/prefix/DataLength includes rejected
+truncation; actual Some QName is written only for complete/accepted outcomes.
+NoMessage leaves absent MD/body/DataLength/QName unchanged. Sole MD/GMO writers
+and scalar encodings stage all writes before final callbacks, complete physical
+and pure storage checks, cancellation and a held parent/object-use guard. Joined
+copy has no callback, allocation, fallible lookup or UOW decision afterward.
+Unknown, malformed, late drift, panic, cancellation and Drop fence without retry.
+
+Pinned baseline2026-08-31 GET0015 q101830_5–48/121–125 and supplements2026-09-12
+q096710_115–162, q096715_1225–1268, q097390_/q097395_, q091510_ supply signature,
+warning pairs, complete MD and GMO declarations/definedness. Signal1's generated
+four-byte COBOL BINARY slot remains opaque; SET_SIGNAL and pointer dereference
+are refused. All old canonical/replay/schema/catalog authorities remain unchanged.
+Source and private compiled-frame fixtures earn zero installed/native/SAF/JES/LE/
+pending-work/official/licensed credit. Genuine host forwarding, removed GET and
+pending PUT normal/CEE3ABD, recovery, participants, IR/full26/CardDemo remain required.

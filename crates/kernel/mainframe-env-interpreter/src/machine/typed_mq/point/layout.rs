@@ -142,7 +142,11 @@ impl ReferenceMachine {
             match field.kind {
                 MqRawFieldKind::Characters | MqRawFieldKind::Bytes
                     if member.layout.category == LayoutCategory::Alphanumeric => {}
-                MqRawFieldKind::Long | MqRawFieldKind::Alias => {
+                // GMO1 Signal1 is the source-declared COBOL four-byte BINARY
+                // slot, but raw capture retains it as opaque signal/pointer
+                // bytes. No value/address conversion or dereference occurs;
+                // the finite GET constructor refuses SET_SIGNAL entirely.
+                MqRawFieldKind::Long | MqRawFieldKind::Alias | MqRawFieldKind::SignalSlot => {
                     self.mq_long_target(&member.layout.name)?;
                     if member.layout.native_binary || member.view.offset % 4 != 0 {
                         return Err(MachineProblem::UnsupportedForm);

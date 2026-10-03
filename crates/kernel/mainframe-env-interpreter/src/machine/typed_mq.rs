@@ -181,7 +181,10 @@ impl ReferenceMachine {
         let call = args.first().ok_or(MachineProblem::InvalidOperation)?;
         let call = normalize(call.trim_matches(['\'', '"']));
         let state = self.mqi.as_ref().ok_or(MachineProblem::UnsupportedForm)?;
-        let profile = if matches!(call.as_str(), "MQCONN" | "MQCONNX" | "MQPUT" | "MQPUT1") {
+        let profile = if matches!(
+            call.as_str(),
+            "MQCONN" | "MQCONNX" | "MQPUT" | "MQPUT1" | "MQGET"
+        ) {
             connx::contained(|| state.current(&self.invocation))?
         } else {
             state.current(&self.invocation)?
@@ -264,6 +267,7 @@ impl ReferenceMachine {
             "MQCONNX" => self.prepare_connx(&parameters)?,
             "MQOPEN" | "MQCLOSE" => self.prepare_point(&parameters, call == "MQOPEN")?,
             "MQPUT" | "MQPUT1" => self.prepare_full_put(&parameters, call == "MQPUT1")?,
+            "MQGET" => self.prepare_full_get(&parameters)?,
             "MQDISC" => {
                 if parameters.len() != 3 {
                     return Err(MachineProblem::InvalidOperation);
