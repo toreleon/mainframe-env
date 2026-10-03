@@ -72,3 +72,23 @@ or licensed acceptance; both credit fields are zero. Actual selected product
 route observations and verdict/ledger receipts are still required. An export's
 candidate identity is its exact producing checkout, including relevant dirty
 state, and cannot be relabeled for another candidate.
+
+## Scoped CICS contract-consumption tests
+
+The SYNCPOINT ledger tests consume a fresh same-builder export. Before running
+them or the full workspace tests, export the current checkout into an ignored
+file or an external receipt directory and supply its path explicitly:
+
+```sh
+mkdir -p target/conformance-inputs &&
+cargo run --quiet --locked -p xtask -- conformance-spec-export > target/conformance-inputs/effective-spec.json &&
+MAINFRAME_ENV_CONFORMANCE_SPEC_EXPORT="$PWD/target/conformance-inputs/effective-spec.json" \
+    cargo test --locked -p mainframe-env-conformance cics_pilot::tests::contract_consumption::
+```
+
+Regenerate after changing candidate inputs. Missing, malformed or stale input
+fails the tests; it earns no skipped or successful evidence. The existing Jenkins
+Foundation stage generates the same input before the unchanged workspace test
+command. Retain required receipts outside disposable targets before cleanup.
+The export is metadata with zero execution and licensed credit; the tests still
+have to obtain and evaluate observations from the compiled product path.

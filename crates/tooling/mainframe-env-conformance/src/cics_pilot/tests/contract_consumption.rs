@@ -849,3 +849,5 @@ fn syncpoint_contract_consumption_rejects_duplicate_rollback() {
         "row 0218 frozen options.duplicate_option=reject: accepted duplicate ROLLBACK"
     );
 }
+
+mod ledger;

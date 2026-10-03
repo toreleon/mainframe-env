@@ -1314,7 +1314,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 1,
-      "sha256": "sha256:d4cf862581734c5b536257e1ff1ff7ffc41bec58e61af24d9214775211b9008f",
+      "sha256": "sha256:8182dee1ebaf1170ea401b0adeef8cdb1af8853daeeacb03783d6317f8e98dc1",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 4
     },
@@ -1906,7 +1906,7 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:6e4e6b4684fc24ac4c939a1e38b38a3699324b459374676eb46570622a379fb4",
+      "sha256": "sha256:8da50bdaeb42a3b7fe559be1547d71b0713e043c84f0bd8b1fbd79c91bb1b04a",
       "title": "Verification workflow",
       "xtask_commands": 1
     },

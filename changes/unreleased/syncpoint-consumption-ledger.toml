@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Bind scoped compiled SYNCPOINT participant observations to the existing Conformance IR verdict and ledger machinery, with fresh effective-spec input setup and fail-closed negative controls; full application and SPI acceptance remain pending."

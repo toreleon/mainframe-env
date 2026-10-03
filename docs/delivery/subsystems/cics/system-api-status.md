@@ -3529,3 +3529,100 @@ main routing/builder extraction and verification-runbook delta. Manager authored
 this infrastructure change; different retained CLI reviewer owns external
 findings only. No runtime or source rule changes, no duplicate worker ownership.
 Actual focused/export and mandatory integration gates remain manager-owned.
+
+### Resume scoped SYNCPOINT ledger implementation after owned seam repair
+
+The same retained CLI author resumes on sealed72 after SCL-01 is repaired by
+the independently reviewed same-builder export. Ownership stays limited to
+`cics_pilot/tests/contract_consumption/ledger.rs` and minimal private-test parent
+registration/access. Export is external, exact-candidate metadata with credit0;
+all prior tests and source/fixture/rule/obligation identities remain intact.
+Actual compiler/coordinator/provider observations and negative verdict proofs
+remain required. Manager retains shared spec/fixture/CI and integration ownership;
+no duplicated builder, hidden positive skip or runtime/parent/license acceptance.
+
+### Manager-owned test input setup for scoped ledger consumption
+
+Before integration, the manager declares the bounded setup dependency of
+SPI-1001.syncpoint-consumption-ledger. The new private tests require a freshly
+exported effective Conformance IR bundle; missing input must fail, never skip.
+Manager ownership is limited to Jenkinsfile's existing Foundation test setup,
+the existing verification runbook, a unique change fragment, status and derived
+documentation. Preserve the existing workspace test invocation, evidence recorder
+and all gate policy. Generate the bundle through the sealed same-builder exporter
+before Cargo tests, retain it in the existing ignored CI output and pass its path
+explicitly. The developer recipe likewise exports outside Git before the focused
+tests. No worker edits these shared files; author80596 still exclusively owns its
+two private test paths. Independently review final setup and test binding together;
+focused integrated regressions and mandatory gates precede the child seal.
+Source/spec/catalog/rule identities and official, runtime and licensed credit
+remain unchanged. This setup does not accept the full application prerequisite.
+
+Pre-dispatch independent review SPI-1001.syncpoint-ledger-input-setup-review:
+exact manager-owned Jenkins Foundation export setup and developer recipe only.
+The different retained CLI reviewer reads frozen full original/candidate files
+and exact diff, repository/index/author80596/cache/history read-only. No Cargo,
+repair, source refresh or broad audit; review actual export path/ignored-output/
+failure propagation/current-candidate setup and preserved test/evidence commands.
+Author ledger code is live and excluded from this review; its final frozen full
+diff will require separate independent acceptance before integration.
+
+### Pre-dispatch private PROGRAM physical SQLite observation
+
+Manager declares SPI-1001.program-status-sqlite-reopen from sealed72 b6345483cad3bb2515999d26961b18758496fc16. Exact SPIrow0155 INQUIRE PROGRAM, stable immutable named definition observation only, no command admission or row credit. Demonstrated inventory gap: existing administrative_status/tests.rs recreates an owner over the same retained MemoryStore and explicitly disclaims physical restart; it contains no SQLite reopen proof. Existing concurrency/no-load/corruption tests remain sealed and are not repeated as new implementation.
+The isolated CLI author owns only NEW crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests/sqlite_reopen.rs plus one minimal module registration in existing administrative_status/tests.rs, preserving every old test/helper body. Manager alone owns production helper/facades, shared schemas/generators/IR/xtask/CI/status/fragments/documentation and serialized integration. Dependencies are sealed existing helper, MECPGD1/catalog owner/SQLite APIs and Proposed CICS-NAMED-PROGRAM-STATUS-V1 boundary. No dependency on live SYNCPOINT test paths; author does not inspect or edit them.
+Prove actual last SQLite Arc close and fresh SqliteStateStore/CicsService reopen of stable enabled/disabled/multi-generation definitions, legacy NameOnly and absence, exact immutable references, full catalog/provider bytes and no query mutation. Reopen preserves local/non-Java cohort assumptions; no private/public issuer inference, loader call, autoinstall, new namespace/resource codec/status/response mapper, generic dispatcher or new operation/public route. Artifact storage is the existing authority; state exactly whether separately retained memory artifacts or physical artifact store is used, and never claim more than actual closure. Add meaningful malformed/truncated durable MECPGD1 and catalog inconsistency controls through existing store/API, requiring existing fail-closed outcome without fallback. No production fix without exact demonstrated defect and manager ownership disposition. Avoid redundant old concurrency/property/helper tests. PostgreSQL, warm restart, cross-instance freshness, selected product route, namespace/SAF/receiver and full application/SPI/license gates remain Pending0.
+Source before expectations: pinned Python search/read INQUIRE PROGRAM own baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12 dfha8_inquireprogram.html SHAe3d8ed4c069bd26822c6373b35278ec126591e2efaf020b8fbcf8b811845f20f, no-load35-56/status566-572 and namespace/conditions scope. Consult current exact prepared contract; matching retained cache/archive only, no refresh/repin/publication bodies Git or oracle. Do not repeat whole cache/source campaigns.
+Acceptance focused new module filter must execute nonzero SQLite tests0failure0ignore, old helper tests preserved and relevant focused controls pass, all stores physically dropped before reopening, fixtures/temp paths bounded and cleaned; logs/hash/closure/candidate/source receipts outside targets. CLI gpt-6.1-sol/high/default fastOFF,multi_agentfalse workspace-write/never, no nestedworkers. Pinned host Cargo/Python jobs2 --locked --offline; cargo clean intended checkout in finally. No Cargo.toml/lock or shared changes, push/PR/seal/install/license/network. Coherent owned test commit and concrete handoff.md/findings.json/validation.json/source-receipts.json/full.diff. Manager performs different-thread review and integrated focused/mandatory/sealer gates serially.
+
+Independent setup review SETUP-R1 found the developer recipe did not enforce
+export success before tests in an ordinary shell. Manager repairs only shell
+sequencing by joining directory creation, export and the environment-bound test
+with &&; quoted paths, selector and test flags remain exact. Jenkins already
+uses its existing strict shell. Final delta review and actual integrated consumer
+checks remain required; the original finding and frozen review are preserved.
+Author-local final verification passes two new ledger tests, four frozen
+consumption tests and the unknown-outcome compatibility test with zero failure
+or ignore. Those actual worker receipts do not substitute for integrated checks.
+
+Pre-dispatch SPI-1001.syncpoint-consumption-ledger-full-review: different retained
+CLI reviewer consumes frozen actual passing attempt3 inputs (whole931-line new
+module and exact two-line parent registration), existing independent fixtures,
+actual same-builder export/ScenarioSpec/registry/verdict/ledger binding and
+SETUP-R1's exact repaired developer sequencing plus unchanged Jenkins setup.
+Frozen input hashes must match current validated author bytes. Author80596 may
+finish external bookkeeping only; any new code delta invalidates this packet.
+Repository/index/author/root/cache/source/history read-only, reviewer owns only
+external review artifacts. No Cargo, repair, nestedworker or broad source audit;
+fresh bounded pinned SYNCPOINT search/read required before semantic expectation
+review. Manager alone integrates and seals after independent acceptance and
+actual focused/mandatory integrated checks. Full app/SPI/FEPI/license Pending0.
+
+Manager serialization begins after actual author80596 terminal0. Passing owned
+bytes are imported with exact attempt3 hashes; worker sandbox staging failure
+remains a retained diagnostic and is handled only by the authorized manager lane.
+Manager review identifies a provenance validation gap: the exported catalog digest
+hashes the committed index and the compiled spec digest hashes the raw document;
+neither hashes supplied normalized row metadata. Row count/gate closure alone
+therefore cannot reject altered source locators, families or subsystem metadata.
+Before acceptance, manager owns a bounded private-test repair: bind the complete
+normalized exported row array to the frozen current same-builder projection hash
+and add altered-row-metadata negatives. No second catalog loader or evidence
+builder, source/schema/spec/catalog policy change or credit is introduced.
+Original validated author bytes/review packet remain preserved. Changed expectations
+require actual focused rerun and independent final delta review before seal.
+
+### User-authorized CLI worker sandbox change
+
+The user explicitly requests Codex CLI workers without the sandbox after shared
+Git index.lock denials. Future CLI dispatches/resumes use --sandbox
+danger-full-access -a never with the same current account, gpt-6.1-sol/high/default,
+fastOFF and multi_agentfalse. Existing live turns finish before their retained
+thread resumes; no quiet-process restart, alternate account or nested workers.
+Exact path ownership, isolated checkouts, source-refresh limits, cleanup and
+acceptance gates remain in force. Manager owns root/shared authorities/integration.
+First bounded retained author resume owns only a coherent local Git checkpoint
+of the exact two already-passed attempt3 test files. Preserve all original
+failure/handoff/validation receipts; no code or expectation edit and no repeated
+Cargo tests. This worker checkpoint is unsealed and grants no acceptance credit.
+Actual integrated repaired candidate review/gates/sealer remain manager-owned.
