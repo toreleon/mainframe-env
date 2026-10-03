@@ -3,6 +3,7 @@ use super::*;
 use mainframe_env_host_api::{MqHconn, mq_mqi::MqMqiUnitOfWork};
 use std::sync::{Barrier, atomic::AtomicUsize};
 mod connx;
+mod native_point;
 
 struct LookupFrame {
     invocation: Invocation,

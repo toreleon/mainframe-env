@@ -193,6 +193,44 @@ participant, full26 and CardDemo acceptance remain separately required. This
 explicit configured profile does not change the public default or grant licensed
 credit.
 
+`ConfiguredInstalledMqHost::open_native_points` is a separate deliberate Rust
+setup over strict existing native-rich state. It installs the existing
+NoContext-only producer-source port once on the unique inactive runtime and the
+same physical store. It supplies neither JES/default context nor GMT and refuses
+CP037 at the compiled structure boundary. The older `open` route retains its
+connection-only behavior. Native point mode requires genuine eager compiled
+root admission, never a lazily inferred root from an installed child.
+
+Before driving that original root, the host charges and preallocates one bounded
+`Arc<MqMqiAbiScope>` from the actual opaque root context. Separately compiled
+SAME TASK CALL frames inherit that exact allocation through their retained live
+parent. Equal context bytes, bindings, a foreign table or historical aliases
+cannot replace it. Raw OPEN/CLOSE decoding captures the same opaque selected
+structure profile first; decoded lookup/access or actual HOBJ is then bound to
+the same provider point profile. All wire queries and rechecks delegate to those
+tuple-bound observations. Successful CLOSE retains its captured retired-object
+encoding policy without reviving the object.
+
+The existing installed session transport forwards both the original ABI scope
+and native structure port. Escaped structure and point objects share its atomic
+revocation gate; finish, preparation abort, Drop or a callback panic disables
+their executable observations without invoking durable cleanup. Encoding and
+platform are captured immutable scalars before the final delegated recheck,
+never authorization. Revocation during a callback suppresses its returned
+observation, and subsequent guarded queries make no underlying callback.
+
+The host completes control callbacks before its final delegated physical
+comparison. Its source checks frozen compiled/original ownership and atomic
+activity with a nonblocking topology observation, releasing that map before
+store/control callbacks. It never reacquires the held frame or selected-service
+mutex. No later external callback follows a successful final physical check.
+Unknown, cancellation, panic or late changes fence and retain; they cannot
+rewind dispatch, clean up a UOW or choose task end. OPEN/CLOSE composition is
+separate from pending PUT/removed GET terminal acceptance, deployment
+normalization, DefaultContext, checkpoint/recovery, participant and full26
+acceptance. Neither source review nor setup fixture generation earns execution
+or licensed credit.
+
 `MqTrustedBatchRuntime` is an explicit privileged Rust embedding facet over one
 selected `MqService`, its same physical `Arc<dyn PlatformStore>`, mandatory
 enterprise authorizer/clock and frozen provider/host/MQI profiles. Opening uses

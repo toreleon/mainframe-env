@@ -3,6 +3,7 @@ use super::*;
 mod bounds;
 mod flows;
 mod lifecycle;
+mod native_point;
 mod native_root;
 mod nested;
 mod refusals;

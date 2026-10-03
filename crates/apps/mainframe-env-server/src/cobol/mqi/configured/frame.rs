@@ -21,6 +21,7 @@ pub(super) struct ClosedFrame {
     active: AtomicBool,
     state: Mutex<State>,
     compiled: Option<CompiledFrame>,
+    pub(super) abi: Option<super::native_point::RootAbi>,
 }
 /// Frozen genuine published/catalog admission, retained after normal child return.
 /// This read-only observation grants no executable/lifecycle authority.
@@ -30,6 +31,12 @@ pub(super) struct CompiledFrame {
     pub(super) content: [u8; 32],
 }
 impl ClosedFrame {
+    pub(super) fn original(&self) -> &Invocation {
+        &self.original
+    }
+    pub(super) fn same_control(&self, control: &Arc<dyn ProgramExecutionControl>) -> bool {
+        Arc::ptr_eq(&self.control, control)
+    }
     pub(super) fn compiled(&self) -> Option<&CompiledFrame> {
         self.compiled.as_ref()
     }
@@ -59,12 +66,56 @@ impl ClosedFrame {
             control,
             active: AtomicBool::new(true),
             compiled: None,
+            abi: None,
             state: Mutex::new(State {
                 facet,
                 dispatched: false,
                 floor,
             }),
         }
+    }
+    pub(super) fn with_abi(
+        mut self,
+        abi: Option<super::native_point::RootAbi>,
+    ) -> Result<Self, HostProblem> {
+        if let Some(abi) = &abi {
+            let state = self
+                .state
+                .get_mut()
+                .map_err(|_| HostProblem::UnknownOutcome)?;
+            let context = state.facet.context();
+            if context.as_ref() != Ok(&abi.context) {
+                let _ = state.facet.abort_preparation();
+                return Err(context.err().unwrap_or(HostProblem::Unauthorized));
+            }
+        }
+        self.abi = abi;
+        Ok(self)
+    }
+    /// Finish all host callbacks before the final selected physical comparison.
+    /// ProducerSource uses immutable/atomic proof and never reacquires this lock.
+    pub(super) fn with_final_profile<T>(
+        &self,
+        original: &Invocation,
+        capture: impl FnOnce(&mut State) -> Result<T, HostProblem>,
+        recheck: impl FnOnce(&mut State, &T) -> Result<(), HostProblem>,
+    ) -> Result<T, HostProblem> {
+        self.check_original(original)?;
+        let mut state = self.state.lock().map_err(|_| HostProblem::UnknownOutcome)?;
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            self.live(&mut state)?;
+            let value = capture(&mut state)?;
+            self.live(&mut state)?;
+            recheck(&mut state, &value)?;
+            // No clock/control/source callback follows the final physical check.
+            self.check_original(original)?;
+            Ok(value)
+        }))
+        .unwrap_or(Err(HostProblem::UnknownOutcome));
+        if result.is_err() && state.dispatched {
+            self.uncertain(&mut state);
+        }
+        result
     }
     pub(super) fn check_original(&self, original: &Invocation) -> Result<(), HostProblem> {
         if !self.active.load(Ordering::SeqCst) || &self.original != original {
@@ -190,10 +241,18 @@ impl CompiledFrame {
     ) -> Result<usize, HostProblem> {
         let catalog = proof.catalog_record().ok_or(HostProblem::Unsupported)?;
         let metadata = proof.artifact_metadata();
+        Self::charge_parts(catalog, metadata, &proof.child().artifact, ceiling)
+    }
+    pub(super) fn charge_parts(
+        catalog: &mainframe_env_store_api::ProviderStateRecord,
+        metadata: &mainframe_env_store_api::ExecutableArtifactMetadata,
+        artifact: &mainframe_env_execution_api::ArtifactRef,
+        ceiling: usize,
+    ) -> Result<usize, HostProblem> {
         if !metadata.validate()
             || catalog.payload.len() > 128
             || catalog.namespace != "batch-program"
-            || catalog.payload != proof.child().artifact.as_str().as_bytes()
+            || catalog.payload != artifact.as_str().as_bytes()
         {
             return Err(HostProblem::Unauthorized);
         }
@@ -227,6 +286,28 @@ impl CompiledFrame {
 }
 pub(super) struct Observation(pub(super) Arc<ClosedFrame>);
 impl MqMqiProgramFrame for Observation {
+    fn abi_scope(
+        &self,
+        original: &Invocation,
+    ) -> Result<Option<Arc<mainframe_env_interpreter::MqMqiAbiScope>>, HostProblem> {
+        self.0.with_active(original, |state| {
+            let Some(abi) = &self.0.abi else {
+                return Ok(None);
+            };
+            if state.facet.context()? != abi.context {
+                return Err(HostProblem::Unauthorized);
+            }
+            Ok(Some(abi.scope.clone()))
+        })
+    }
+    fn native_structure(
+        &self,
+        original: &Invocation,
+        call: mainframe_env_host_api::mq_mqi::MqMqiCall,
+        connection: MqHconn,
+    ) -> Result<Arc<dyn mainframe_env_interpreter::MqMqiNativeStructure>, HostProblem> {
+        super::native_point::capture(self.0.clone(), original, call, connection)
+    }
     fn profile(&self, original: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
         self.0.with_active(original, |state| {
             Ok(MqMqiProgramProfile {

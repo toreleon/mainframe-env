@@ -307,6 +307,32 @@ fn mutation(row: &ProviderStateMutation) -> RootTerminalResourceRow<'_> {
 
 struct RootObservation(Arc<Mutex<Option<Arc<ClosedFrame>>>>);
 impl mainframe_env_interpreter::MqMqiProgramFrame for RootObservation {
+    fn abi_scope(
+        &self,
+        original: &Invocation,
+    ) -> Result<Option<Arc<mainframe_env_interpreter::MqMqiAbiScope>>, HostProblem> {
+        let frame = self
+            .0
+            .lock()
+            .map_err(|_| HostProblem::UnknownOutcome)?
+            .clone()
+            .ok_or(HostProblem::Unauthorized)?;
+        frame::Observation(frame).abi_scope(original)
+    }
+    fn native_structure(
+        &self,
+        original: &Invocation,
+        call: mainframe_env_host_api::mq_mqi::MqMqiCall,
+        connection: mainframe_env_host_api::MqHconn,
+    ) -> Result<Arc<dyn mainframe_env_interpreter::MqMqiNativeStructure>, HostProblem> {
+        let frame = self
+            .0
+            .lock()
+            .map_err(|_| HostProblem::UnknownOutcome)?
+            .clone()
+            .ok_or(HostProblem::Unauthorized)?;
+        frame::Observation(frame).native_structure(original, call, connection)
+    }
     fn profile(
         &self,
         original: &Invocation,
@@ -385,7 +411,21 @@ impl NativeRootHooks for Hooks<'_, '_> {
         {
             return Err(HostProblem::UnknownOutcome);
         }
-        let charge = budget::charge(d.original, d.mq.host_limits.max_state_bytes)?;
+        let compiled_charge = if d.mq.native_points {
+            frame::CompiledFrame::charge_parts(
+                catalog,
+                &d.admitted.metadata,
+                &d.original.artifact,
+                d.mq.host_limits.max_state_bytes,
+            )?
+        } else {
+            0
+        };
+        let charge = budget::charge(d.original, d.mq.host_limits.max_state_bytes)?
+            .checked_add(compiled_charge)
+            .ok_or(HostProblem::ResourceExhausted)?
+            .checked_add(super::native_point::abi_charge(d.mq)?)
+            .ok_or(HostProblem::ResourceExhausted)?;
         {
             let mut map =
                 d.mq.topology
@@ -402,11 +442,21 @@ impl NativeRootHooks for Hooks<'_, '_> {
         }
         // Failure keeps the reserved ownership; it is never a fresh root.
         let root = Arc::new(d.mq.runtime.admit_root(d.original.clone())?);
-        let frame = Arc::new(ClosedFrame::new(
-            root.frame(),
-            d.mq.control.clone(),
-            proof.claim().admission().event.tick,
-        ));
+        let facet = root.frame();
+        let abi = super::native_point::allocate(d.mq, &facet)?;
+        let frame = Arc::new(
+            ClosedFrame::new_compiled(
+                facet,
+                d.mq.control.clone(),
+                proof.claim().admission().event.tick,
+                d.mq.native_points.then(|| frame::CompiledFrame {
+                    catalog: catalog.clone(),
+                    metadata: d.admitted.metadata.clone(),
+                    content: *d.admitted.executable.content_id().as_bytes(),
+                }),
+            )
+            .with_abi(abi)?,
+        );
         {
             let mut map =
                 d.mq.topology

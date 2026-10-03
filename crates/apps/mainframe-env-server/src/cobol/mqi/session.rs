@@ -5,6 +5,7 @@ use mainframe_env_host_api::{MqHconn, mq_mqi::MqMqiUnitOfWork};
 use mainframe_env_interpreter::{MqMqiConnxProfile, MqMqiProgramProfile};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::AtomicBool;
+mod native_point;
 
 /// Trusted embedding session. No method implies task/process termination.
 /// Preparation abort retires only newly owned volatile admission; finish observes
@@ -50,6 +51,27 @@ impl ExecutableFrame {
     }
 }
 impl MqMqiProgramFrame for ExecutableFrame {
+    fn abi_scope(
+        &self,
+        invocation: &Invocation,
+    ) -> Result<Option<Arc<mainframe_env_interpreter::MqMqiAbiScope>>, HostProblem> {
+        self.observe(invocation, |frame| frame.abi_scope(invocation))
+    }
+
+    fn native_structure(
+        &self,
+        invocation: &Invocation,
+        call: mainframe_env_host_api::mq_mqi::MqMqiCall,
+        connection: MqHconn,
+    ) -> Result<Arc<dyn mainframe_env_interpreter::MqMqiNativeStructure>, HostProblem> {
+        self.observe(invocation, |frame| {
+            native_point::structure(
+                self.active.clone(),
+                frame.native_structure(invocation, call, connection)?,
+            )
+        })
+    }
+
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
         self.observe(invocation, |frame| frame.profile(invocation))
     }

@@ -27,12 +27,18 @@ pub(super) struct Saf {
     pub resources: Mutex<Vec<EnterpriseResource>>,
     pub hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     pub terminal_hook: Mutex<Option<Box<dyn FnMut() + Send>>>,
+    pub queue_hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 impl EnterpriseAuthorizer for Saf {
     fn authorize(&self, _: &PrincipalId, resource: &EnterpriseResource) -> Result<(), HostProblem> {
         self.resources.lock().unwrap().push(resource.clone());
         if let Some(hook) = self.hook.lock().unwrap().take() {
             hook();
+        }
+        if resource.class == EnterpriseResourceClass::MqQueue {
+            if let Some(hook) = self.queue_hook.lock().unwrap().take() {
+                hook();
+            }
         }
         if resource.class == EnterpriseResourceClass::MqUnitOfWork
             && resource.name.as_str() == "CURRENT"
@@ -56,10 +62,9 @@ struct SetupRow {
     version: u64,
     payload: Vec<u8>,
 }
-pub(super) fn normalize_fixture(store: &dyn PlatformStore) {
+fn normalize_fixture_bytes(store: &dyn PlatformStore, bytes: &[u8]) {
     // Reproducible provider-generated setup data only. Not production import.
-    let stages: Vec<Vec<SetupRow>> =
-        serde_json::from_slice(include_bytes!("rich_fixture.json")).unwrap();
+    let stages: Vec<Vec<SetupRow>> = serde_json::from_slice(bytes).unwrap();
     for rows in stages {
         for prior in store.list_provider_state_prefix("mq-", 4096).unwrap() {
             if !rows
@@ -206,6 +211,31 @@ impl Fixture {
         foreign_control: bool,
         capacity: usize,
     ) -> Self {
+        Self::with_rows(
+            sqlite,
+            frames,
+            wrapped,
+            foreign_control,
+            capacity,
+            false,
+            include_bytes!("rich_fixture.json"),
+        )
+    }
+    pub fn native_points(sqlite: bool, rows: &[u8]) -> Self {
+        Self::with_rows(sqlite, 16, false, false, 65536, true, rows)
+    }
+    pub fn native_points_quota(sqlite: bool, rows: &[u8], capacity: usize) -> Self {
+        Self::with_rows(sqlite, 16, false, false, capacity, true, rows)
+    }
+    fn with_rows(
+        sqlite: bool,
+        frames: usize,
+        wrapped: bool,
+        foreign_control: bool,
+        capacity: usize,
+        native_points: bool,
+        rows: &[u8],
+    ) -> Self {
         let root = hardening::TestRoot::new();
         let url = format!(
             "sqlite://{}?mode=rwc",
@@ -219,8 +249,17 @@ impl Fixture {
                 ..Default::default()
             }))
         };
-        normalize_fixture(&*store);
-        Self::from_normalized(root, store, url, frames, wrapped, foreign_control, false)
+        normalize_fixture_bytes(&*store, rows);
+        Self::from_normalized(
+            root,
+            store,
+            url,
+            frames,
+            wrapped,
+            foreign_control,
+            false,
+            native_points,
+        )
     }
     pub fn same_store(store: Arc<dyn PlatformStore>, url: String) -> Self {
         Self::from_normalized(
@@ -231,11 +270,21 @@ impl Fixture {
             false,
             false,
             false,
+            false,
         )
     }
     pub fn foreign_program(sqlite: bool) -> Self {
         let prior = Self::new(sqlite);
-        Self::from_normalized(prior.root, prior.store, prior.url, 16, false, false, true)
+        Self::from_normalized(
+            prior.root,
+            prior.store,
+            prior.url,
+            16,
+            false,
+            false,
+            true,
+            false,
+        )
     }
     fn from_normalized(
         root: hardening::TestRoot,
@@ -245,10 +294,16 @@ impl Fixture {
         wrapped: bool,
         foreign_control: bool,
         foreign_program: bool,
+        native_points: bool,
     ) -> Self {
         let saf = Arc::new(Saf::default());
         let clock = Arc::new(Clock(AtomicU64::new(20), Mutex::new(None)));
-        let mq = ConfiguredInstalledMqHost::open(
+        let open = if native_points {
+            ConfiguredInstalledMqHost::open_native_points
+        } else {
+            ConfiguredInstalledMqHost::open
+        };
+        let mq = open(
             store.clone(),
             saf.clone(),
             clock.clone(),

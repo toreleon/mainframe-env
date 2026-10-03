@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex, Weak};
 mod budget;
 mod frame;
 pub(in crate::cobol) mod native_call;
+mod native_point;
 mod native_root;
 use frame::{ClosedFrame, Session};
 
@@ -84,6 +85,7 @@ pub struct ConfiguredInstalledMqHost {
     fence: u64,
     topology: Mutex<Topology>,
     this: Weak<Self>,
+    native_points: bool,
 }
 impl ConfiguredInstalledMqHost {
     /// Strict selected open with one store, mandatory SAF and one replay/control
@@ -101,6 +103,34 @@ impl ConfiguredInstalledMqHost {
         fence: u64,
         bounds: InstalledMqHostBounds,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_configured(
+            store,
+            authorizer,
+            clock,
+            descriptor,
+            mq_limits,
+            host_limits,
+            mqi_limits,
+            generation,
+            fence,
+            bounds,
+            false,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn open_configured(
+        store: Arc<dyn PlatformStore>,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+        clock: Arc<dyn MqReplayClock>,
+        descriptor: CapabilityDescriptor,
+        mq_limits: MqLimits,
+        host_limits: HostLimits,
+        mqi_limits: MqMqiLimits,
+        generation: u64,
+        fence: u64,
+        bounds: InstalledMqHostBounds,
+        native_points: bool,
+    ) -> Result<Arc<Self>, HostProblem> {
         if bounds.max_roots == 0
             || bounds.max_roots > 4096
             || bounds.max_frames == 0
@@ -109,7 +139,7 @@ impl ConfiguredInstalledMqHost {
             return Err(HostProblem::ResourceExhausted);
         }
         let control: Arc<dyn ProgramExecutionControl> = Arc::new(ClockControl(clock.clone()));
-        let runtime = MqTrustedBatchRuntime::open(
+        let mut runtime = MqTrustedBatchRuntime::open(
             store.clone(),
             mq_limits,
             generation,
@@ -120,7 +150,16 @@ impl ConfiguredInstalledMqHost {
             host_limits,
             mqi_limits,
         )?;
-        Ok(Arc::new_cyclic(|this| Self {
+        let source = native_points.then(|| {
+            Arc::new(native_point::Source::new(
+                store.clone(),
+                host_limits.max_name_bytes,
+            ))
+        });
+        if let Some(source) = &source {
+            runtime.configure_producer_source(&store, source.clone())?;
+        }
+        let host = Arc::new_cyclic(|this| Self {
             runtime,
             store,
             control,
@@ -133,7 +172,12 @@ impl ConfiguredInstalledMqHost {
             fence,
             topology: Mutex::new(Topology::default()),
             this: this.clone(),
-        }))
+            native_points,
+        });
+        if let Some(source) = source {
+            source.bind(&host)?;
+        }
+        Ok(host)
     }
     /// Exact physical control for frozen router binding, not a clock adapter
     /// evaluated with a fabricated Invocation.
@@ -170,6 +214,11 @@ impl ConfiguredInstalledMqHost {
                 }
                 Some(RootEntry::Preparing) => return Err(HostProblem::IdempotencyConflict),
                 None => {}
+            }
+            if self.native_points {
+                // Native points require eager genuine compiled root association;
+                // a lazy fixture/local parent is not its root producer.
+                return Err(HostProblem::Unsupported);
             }
             if map.roots.len() >= self.bounds.max_roots {
                 return Err(HostProblem::ResourceExhausted);
@@ -253,12 +302,15 @@ impl ConfiguredInstalledMqHost {
                 } else {
                     None
                 };
-                let frame = Arc::new(ClosedFrame::new_compiled(
-                    facet,
-                    self.control.clone(),
-                    proof.observed_control().now_tick,
-                    compiled,
-                ));
+                let frame = Arc::new(
+                    ClosedFrame::new_compiled(
+                        facet,
+                        self.control.clone(),
+                        proof.observed_control().now_tick,
+                        compiled,
+                    )
+                    .with_abi(parent.abi.clone())?,
+                );
                 created = Some(frame.clone());
                 Ok(frame)
             })

@@ -8,7 +8,7 @@ use mainframe_env_store_api::*;
 
 const ROOT: &str = "IDENTIFICATION DIVISION. PROGRAM-ID. MQROOT. DATA DIVISION. WORKING-STORAGE SECTION. 01 QM PIC X(48) VALUE SPACES. 01 HC PIC S9(9) BINARY. 01 CC PIC S9(9) BINARY. 01 RC PIC S9(9) BINARY. PROCEDURE DIVISION. CALL 'MQCONN' USING QM HC CC RC. IF CC NOT = 0 OR RC NOT = 0 DISPLAY 'BAD-CONN' END-IF. DISPLAY 'ROOT-DONE'. GOBACK.";
 
-fn original(f: &Fixture) -> Invocation {
+pub(super) fn original(f: &Fixture) -> Invocation {
     let admitted = f
         .router
         .cobol

@@ -1800,6 +1800,36 @@ forms, genuine wrappers/source, removed GET/pending PUT normal/CEE3ABD, owning
 recovery/participants/IR/full26/CardDemo remain required. Only licensed oracle
 is human-skipped0/26; all other acceptance remains open.
 
+## Installed finite native OPEN/CLOSE host
+
+`MQ-1503.installed-native-point-host` integrates reviewed sealed `1ba108807`.
+Deliberate Rust setup retains strict existing complete state, SAME physical
+store/mandatory SAF/control, and a once-installed inactive NoContext source.
+Genuine eager compiled parentNone roots charge compiled metadata and preallocate
+one ABI table; original separately compiled SAME TASK children inherit that exact
+Arc. Existing lazy/default ProductServer behavior is unchanged. Native structure
+precedes decode, and selected point observations remain actual tuple-bound
+authority. Compiled ASCII/normal big-endian only; no JES/default context/GMT.
+
+Original SessionGuard transports ABI/structure observations with revocation,
+panic containment and before/after active checks. Topology is released before
+callbacks; source never reacquires frame/service mutexes. All callbacks precede
+final physical comparison, with pure storage/atomic checks afterward. Finish,
+abort, Drop and Unknown never decide UOW, task end, retry or cleanup.
+
+Genuine installed MD1/2 OUTPUT/INPUT_SHARED OPEN/CLOSE/DISC and separately compiled
+child-first/parent-object-close flows run on Memory/owned SQLite with original
+core/CALL/actor/digests and both effect audit layers. SAF, cancellation, CAS, audit
+saturation, late source mutation/panic/expiry, retired/foreign aliases, admission
+Drop, topology contention and actual cold CONNECT fencing are distinct negatives.
+Generated fixture4ea7 supplies only exact setup data, not pending work or authority.
+Two retained-first pinned baseline2026-08-31 OPEN0019/q101870 and CLOSE0006/q101740
+were independently reproduced offline; source credit0. PUT1 is explicitly refused
+at this composed prerequisite until its separate host feature is approved.
+Pending PUT normal/CEE3ABD, removed GET, DefaultContext/JES/GMT, broader forms,
+owning recovery/participants/IR/full26/CardDemo remain required. Only licensed
+oracle is human-skipped0/26; no full native-terminal or official credit is claimed.
+
 ## Qualified complete GET result
 
 `MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through
