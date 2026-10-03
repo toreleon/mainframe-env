@@ -17,7 +17,8 @@ pub enum MqTrustedBatchPointTarget {
     },
     /// Independently resolved predefined normal-local PUT1 target.
     PutOne { lookup: MqRouteLookup },
-    /// Already issued live HOBJ; PUT requires OUTPUT, CLOSE requires predefined.
+    /// Already issued live HOBJ; PUT requires OUTPUT, GET INPUT_SHARED,
+    /// and CLOSE requires predefined. No capability is inferred from a name.
     Object(MqHobj),
 }
 /// Source profile before raw OD/MD decoding. No Clone/Serde/public constructor.
@@ -110,7 +111,12 @@ impl MqWireBindings for MqTrustedBatchPointProfile {
         // noncluster route. 718: read-ahead ignored for nonclient applications.
         // Explicit INPUT_SHARED avoids DefInputOpen. Complete producer has no
         // properties/HMSG and requires explicit PMO_SYNC_RESPONSE (q098655_315–320).
-        // GET/partial PUT/general zero modifiers are NOT represented by this port.
+        // GET is ONLY the existing complete GMO1 NoWait/Remove profile, whose
+        // owner refuses nonempty structured properties/headers, conversion and
+        // group/segment forms before adoption. q096715_1167–1204/1515–1520 does
+        // NOT establish a generic PropertyControl default. The full adapter
+        // restricts options before this gate; partial GET/PUT/general defaults
+        // cannot reuse these observations as per-call admission.
         let exact = match &self.target {
             MqTrustedBatchPointTarget::Open { lookup: exact, .. }
             | MqTrustedBatchPointTarget::PutOne { lookup: exact } => {
@@ -157,7 +163,8 @@ impl MqWireBindings for MqTrustedBatchPointProfile {
 }
 impl MqTrustedBatchFrame {
     /// Fresh same-service/store/frame lookup BEFORE raw OD/MD decode. Only this
-    /// initial OPEN/PUT/PUT1/CLOSE profile; no default/symbolic HCONN or body ABI.
+    /// initial OPEN/complete GET/PUT/PUT1/CLOSE profile; no default/symbolic
+    /// HCONN or body ABI. GET output ResolvedQName remains separately unrepresented.
     pub fn structure_profile(
         &self,
         call: MqMqiCall,
@@ -219,7 +226,7 @@ impl MqTrustedBatchFrame {
     }
     /// Fresh ABI encoding preflight. Stable facts compare independently of
     /// normal physical catalog/marker/control row-version advancement. These
-    /// four calls do not decide/advance the current unit; unit decisions use the
+    /// five calls do not decide/advance the current unit; unit decisions use the
     /// owning current-unit API and require a separately captured profile.
     pub fn recheck_structure_profile(
         &self,

@@ -815,11 +815,12 @@ current retained local unit. It does not allocate, dispatch, sample context/GMT,
 create cursors, authorize SAF, publish audit/receipt or change durable rows.
 
 The initial binding is predefined normal-local OPEN (explicit OUTPUT or
-INPUT_SHARED), complete PUT/PUT1 (PMO1 explicit synchronous), or CLOSE NONE.
+INPUT_SHARED), complete GET (held INPUT_SHARED, GMO1 removal/no-wait), complete
+PUT/PUT1 (PMO1 explicit synchronous), or CLOSE NONE.
 Actual complete queue version/structure characters and native maxima are observed;
 body Encoding/CCSID never chooses structure ABI. CP037 facts remain truthful but
 the first compiled adapter must refuse them until its character projection is
-implemented. GET, partial PUT, browse, wait and general zero modifier/default
+implemented. Partial GET/PUT, browse, wait and general zero modifier/default
 policy cannot reuse this finite observation as admission.
 
 Cluster binding applies only to cluster queues (pinned MQOPEN q101870_350–389);
@@ -850,3 +851,21 @@ publication or cleanup and cannot wait for cross-thread service reentry. This
 setup is not application/JSON attestation, installed/JES proof or public readiness.
 Actual compiled forwarding, atomic native writeback, host provenance, root/core
 recovery, SAF, participants, full26 and CardDemo remain required.
+
+The GET binding observes the same complete queue profile and existing owned local
+unit before decoding MD/GMO. The existing full GMO1 adapter admits only removal,
+no wait, finite sync/truncation controls and binary MsgId/CorrelId matching; the
+selected FullGet owner independently refuses stored structured properties,
+conversion/header/group/segment forms before live adoption. It does not infer
+PropertyControl from a local name: q096715_1167–1204 and1515–1520 leave generic
+property/RFH2 behavior outside this finite empty-property profile. The z/OS
+syncpoint default is source-defined (q096715_201–215), but an explicit choice
+remains preferable; either uses the actual owning current unit, never a guessed
+integer. Output-only descriptor fields do not become selectors or permissions.
+
+FullGet still lacks the complete GMO ResolvedQName output (q096715_1260–1268).
+These read-only facts neither fabricate that field nor authorize native GET
+writeback without it. A separate result/canonical/replay/ABI composition remains
+required. GET pre/post comparisons keep the held input object live; only CLOSE
+has the explicit retired-object comparison. Known GET publication advances row
+versions while preserving ABI facts, and CMIT/BACK require a newly captured unit.

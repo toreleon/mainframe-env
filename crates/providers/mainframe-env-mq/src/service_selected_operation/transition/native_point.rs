@@ -169,7 +169,11 @@ impl MqService {
     ) -> Result<(StructureFacts, Option<PointFacts>), HostProblem> {
         if !matches!(
             call,
-            MqMqiCall::Open | MqMqiCall::Close | MqMqiCall::Put | MqMqiCall::PutOne
+            MqMqiCall::Open
+                | MqMqiCall::Close
+                | MqMqiCall::Get
+                | MqMqiCall::Put
+                | MqMqiCall::PutOne
         ) || !matches!(connection, MqHconn::Issued(_))
         {
             return Err(HostProblem::Unsupported);
@@ -253,7 +257,10 @@ impl MqService {
                 (MqMqiCall::PutOne, MqTrustedBatchPointTarget::PutOne { lookup }) => {
                     local_lookup(lookup)?
                 }
-                (MqMqiCall::Put | MqMqiCall::Close, MqTrustedBatchPointTarget::Object(object)) => {
+                (
+                    MqMqiCall::Get | MqMqiCall::Put | MqMqiCall::Close,
+                    MqTrustedBatchPointTarget::Object(object),
+                ) => {
                     if let Some(old) = closed {
                         if call != MqMqiCall::Close {
                             return Err(HostProblem::Unsupported);
@@ -274,6 +281,11 @@ impl MqService {
                         if object.path != [object.queue.as_str()]
                             || (call == MqMqiCall::Put
                                 && !object.access.contains(&MqRouteOpenAccess::Output))
+                            // MQGET row0015 q101830_14–20: the existing finite
+                            // FullGet owner admits INPUT_SHARED, not a guessed
+                            // default/input-exclusive/browse capability.
+                            || (call == MqMqiCall::Get
+                                && !object.access.contains(&MqRouteOpenAccess::InputShared))
                         {
                             return Err(HostProblem::Unsupported);
                         }

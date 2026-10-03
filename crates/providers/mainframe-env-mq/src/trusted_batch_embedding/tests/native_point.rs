@@ -9,6 +9,9 @@ use mainframe_env_host_api::mq_md_value::*;
 use mainframe_env_host_api::mq_wire_options::MqWireBindings;
 use std::sync::Weak;
 
+#[path = "native_point/get.rs"]
+mod get;
+
 #[derive(Default)]
 struct Source {
     gmt: AtomicU64,
@@ -394,7 +397,7 @@ fn native_foreign_original_frame_stale_physical_dependencies_and_controls_refuse
         for c in [MqHconn::Default, MqHconn::Unassociated] {
             assert!(child.structure_profile(MqMqiCall::Open, c).is_err());
         }
-        assert!(child.structure_profile(MqMqiCall::Get, c).is_err());
+        assert!(child.structure_profile(MqMqiCall::Commit, c).is_err());
         let original = child.original.clone();
         child.original.deadline_tick -= 1;
         assert!(child.structure_profile(MqMqiCall::Put, c).is_err());
@@ -957,6 +960,12 @@ impl FinalClock {
 }
 #[test]
 fn native_final_clock_physical_dependency_mutation_refuses_facts_without_writes() {
+    for call in [MqMqiCall::Open, MqMqiCall::Get] {
+        final_clock_physical_dependency_mutation_refuses_facts(call);
+    }
+}
+
+fn final_clock_physical_dependency_mutation_refuses_facts(call: MqMqiCall) {
     for sqlite in [false, true] {
         let clock = Arc::new(FinalClock::default());
         let f = NativeFixture::with_clock(sqlite, 1, false, Some(clock.clone()));
@@ -982,11 +991,7 @@ fn native_final_clock_physical_dependency_mutation_refuses_facts_without_writes(
                 )])
                 .unwrap();
         });
-        assert!(
-            frame
-                .structure_profile(MqMqiCall::Open, connection)
-                .is_err()
-        );
+        assert!(frame.structure_profile(call, connection).is_err());
         let mut expected = before;
         expected
             .iter_mut()
@@ -1002,6 +1007,12 @@ fn native_final_clock_physical_dependency_mutation_refuses_facts_without_writes(
 
 #[test]
 fn native_final_clock_panic_and_selected_reentry_are_contained_without_poisoning() {
+    for call in [MqMqiCall::Open, MqMqiCall::Get] {
+        final_clock_panic_and_selected_reentry_are_contained(call);
+    }
+}
+
+fn final_clock_panic_and_selected_reentry_are_contained(call: MqMqiCall) {
     for sqlite in [false, true] {
         for panic in [false, true] {
             let clock = Arc::new(FinalClock::default());
@@ -1020,7 +1031,7 @@ fn native_final_clock_panic_and_selected_reentry_are_contained_without_poisoning
                     Err(HostProblem::Unsupported)
                 ));
             });
-            let result = frame.structure_profile(MqMqiCall::Open, connection);
+            let result = frame.structure_profile(call, connection);
             if panic {
                 assert!(matches!(result, Err(HostProblem::ProviderFailure)));
             } else {
@@ -1029,7 +1040,7 @@ fn native_final_clock_panic_and_selected_reentry_are_contained_without_poisoning
             assert_eq!(f.rows(), before);
             // The contained read did not poison the selected mutex or mark the
             // frame dispatched. A fresh bounded observation remains usable.
-            assert!(frame.structure_profile(MqMqiCall::Open, connection).is_ok());
+            assert!(frame.structure_profile(call, connection).is_ok());
             assert_eq!(f.rows(), before);
             assert_eq!(f.source.gmt.load(Ordering::SeqCst), 0);
             assert_eq!(f.source.batch.load(Ordering::SeqCst), 0);
@@ -1054,6 +1065,12 @@ impl MqReplayClock for ZeroClock {
 }
 #[test]
 fn native_initial_and_final_zero_clock_refuse_without_write_or_poison() {
+    for call in [MqMqiCall::Open, MqMqiCall::Get] {
+        initial_and_final_zero_clock_refuse_without_write(call);
+    }
+}
+
+fn initial_and_final_zero_clock_refuse_without_write(call: MqMqiCall) {
     for sqlite in [false, true] {
         for final_callback in [false, true] {
             let clock = Arc::new(ZeroClock::default());
@@ -1069,7 +1086,7 @@ fn native_initial_and_final_zero_clock_refuse_without_write_or_poison() {
                 clock.zero.store(true, Ordering::SeqCst);
             }
             assert!(matches!(
-                frame.structure_profile(MqMqiCall::Open, connection),
+                frame.structure_profile(call, connection),
                 Err(HostProblem::Malformed)
             ));
             assert_eq!(f.rows(), before);
@@ -1078,7 +1095,7 @@ fn native_initial_and_final_zero_clock_refuse_without_write_or_poison() {
                 u64::from(final_callback)
             );
             clock.zero.store(false, Ordering::SeqCst);
-            assert!(frame.structure_profile(MqMqiCall::Open, connection).is_ok());
+            assert!(frame.structure_profile(call, connection).is_ok());
             assert_eq!(f.rows(), before);
             assert_eq!(f.source.gmt.load(Ordering::SeqCst), 0);
             assert_eq!(f.source.batch.load(Ordering::SeqCst), 0);

@@ -1678,3 +1678,39 @@ compiled original OPEN/PUT/GET/property writeback, genuine pending-PUT normal/
 native-Abend root terminal, recovery/participants/IR/CardDemo and all applicable
 nonlicensed full26 acceptance remain required. Only the licensed oracle is
 human-skipped0/26 with zero credit; the parent v0.15 goal stays active.
+
+## Complete GET read-only native binding
+
+`MQ-1503.trusted-native-get-bindings` composes sealed `eb407075` with the
+manager's final-clock containment and physical-snapshot fix. The opaque
+structure-before-decode observation now admits complete GET MD1/MD2 and GMO1
+on the actual held normal-local INPUT_SHARED object. Exact live frame, original
+Running core, ordinary batch connection, same physical provider, catalog@2 and
+current owned Local unit remain mandatory. Cursor and wait-conversion ports
+remain unavailable. The sole existing full adapter separately restricts options
+to Remove/NoWait, explicit or reviewed z/OS local syncpoint, accepted/rejected
+truncation and binary MsgId/CorrelId matching. No generic PropertyControl,
+RFH2/header/group/segment, conversion, index/WLM or zero-modifier permission is
+inferred from these facts.
+
+The known selected GET may advance physical versions without changing stable
+ABI facts; GET always requires its object still live. CLOSE's no-resurrection
+special case is not used for GET. Read-only observation samples neither context
+nor GMT and performs no delivery reservation, unit allocation, audit or cleanup.
+The manager's physical-version mutation, panic/reentry and initial/final zero
+clock regressions now exercise GET as well as OPEN, on Memory and owned SQLite.
+Private selected tests use actual FullPUT-produced messages, not seeded payloads;
+their core/source fixture setup still earns no compiled installed/JES/LE/RACF,
+root-terminal, official or licensed execution credit.
+
+Source references are original baseline `ibm-mq-9.4-mqi-2026-08-31`
+MQGET0015/q101830 and MQOPEN0019/q101870, supplemental baseline2026-09-12
+GMO q096715 and MD q097395, and producer-attribute baseline2026-09-12
+QM/queue CCSID, maxima and delivery sequence. All eight pins were reproduced
+offline after retained-topic SHA/byte checks; source review earns zero credit.
+GMO q096715 lines1260–1268 defines the actual ResolvedQName output, but the
+existing FullGot result does not contain it. This feature does not synthesize
+that output from cached queue facts, alter canonical/replay bytes or claim
+native GET writeback readiness. The additive result and installed ABI forwarding
+remain required, alongside full nonlicensed v0.15 acceptance. Only the licensed
+oracle is human-skipped0/26; no other gate is waived.
