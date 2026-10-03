@@ -1,5 +1,6 @@
 //! Finite original selected MQGET. No numeric GMO, PUT policy or new authority.
 //! MQ9.4 original row0015 q101830_; supplemental q096715_/q097395_/q097390_.
+use super::super::producer;
 use super::*;
 use crate::delivery::full_message::QueueProfile;
 use mainframe_env_host_api::mq_md_value::{MqMdCharacterEncoding, MqMdValue};
@@ -79,6 +80,10 @@ pub(super) fn prepare(
     now: u64,
     authorizer: &dyn EnterpriseAuthorizer,
     next: &mut Candidate,
+    qualified: bool,
+    service: &MqService,
+    frame: FrameLease,
+    admitted: &crate::mqi_admission::MqMqiAdmitted<'_>,
 ) -> Result<(), HostProblem> {
     let request = controls(get)?;
     let binding = require_object(
@@ -90,6 +95,30 @@ pub(super) fn prepare(
     )?;
     let unit = resolve_unit(next, logical, get.connection, get.unit)?;
     authorize_path(authorizer, invocation, &binding.path, AccessIntent::Read)?;
+    if qualified {
+        // Exact held predefined local route and actual native structure profile,
+        // never OD text, a caller encoding claim or an alias/model fallback.
+        let attrs = state
+            .catalog
+            .native_attributes()
+            .ok_or(HostProblem::Unsupported)?;
+        if attrs.characters.md() != get.descriptor.characters()
+            || binding.path != [binding.queue.as_str()]
+            || !attrs.queues.iter().any(|q| q.name == binding.queue)
+            || !state.catalog.definitions().any(|d| matches!(d,
+                crate::MqObjectDefinition::LocalQueue { name, usage: crate::MqLocalQueueUsage::Normal, .. }
+                    if name == &binding.queue)) {
+            return Err(HostProblem::Unsupported);
+        }
+        producer::recheck(
+            service,
+            frame,
+            invocation,
+            admitted,
+            &runtime.directory,
+            now,
+        )?;
+    }
     // One existing kernel staging clone; no side inventory or public DTO
     // narrowing. Validate the exact first matching payload before installing
     // any candidate clock/UOW changes, never skip an unsupported selected head.
@@ -164,14 +193,57 @@ pub(super) fn prepare(
             .ok_or(HostProblem::Malformed)?
             .touch_queue(binding.queue.as_str())?;
     }
+    let output = if qualified {
+        // q096715_1260–1268: local queue of retrieved message. Rejected
+        // truncation preserves the explicitly defined MD/prefix/length, but
+        // lacks an explicit QName applicability fact in the pinned call page.
+        // Preserve absence/caller GMO bytes, never manufacture blanks/success.
+        let resolved_queue = if matches!(
+            disposition,
+            MqGetDisposition::Message(
+                MqTruncationDisposition::Complete { .. }
+                    | MqTruncationDisposition::AcceptedRemoved { .. }
+            )
+        ) {
+            Some(producer::fixed(
+                service,
+                binding.queue.as_str(),
+                get.descriptor.characters(),
+            )?)
+        } else {
+            None
+        };
+        producer::recheck(
+            service,
+            frame,
+            invocation,
+            admitted,
+            &runtime.directory,
+            service
+                .replay_clock
+                .as_ref()
+                .ok_or(HostProblem::Unsupported)?
+                .now_tick()?,
+        )?;
+        MqMqiOutput::QualifiedFullGot(MqMqiQualifiedGot {
+            characters: get.descriptor.characters(),
+            disposition,
+            message,
+            cursor,
+            data_length,
+            resolved_queue,
+        })
+    } else {
+        MqMqiOutput::FullGot {
+            disposition,
+            message,
+            cursor,
+            data_length,
+        }
+    };
     next.delivery = staged;
     next.reviewed_status = Some(status);
-    next.output = MqMqiOutput::FullGot {
-        disposition,
-        message,
-        cursor,
-        data_length,
-    };
+    next.output = output;
     Ok(())
 }
 
@@ -183,6 +255,7 @@ pub(super) fn require_replay(
     get: &MqMqiFullGet,
     invocation: &Invocation,
     authorizer: &dyn EnterpriseAuthorizer,
+    qualified: bool,
 ) -> Result<(), HostProblem> {
     controls(get).map_err(|_| HostProblem::UnknownOutcome)?;
     let object = require_object(
@@ -193,6 +266,26 @@ pub(super) fn require_replay(
         MqRouteOpenAccess::InputShared,
     )
     .map_err(|_| HostProblem::UnknownOutcome)?;
+    if qualified {
+        let attrs = state
+            .catalog
+            .native_attributes()
+            .ok_or(HostProblem::UnknownOutcome)?;
+        if attrs.characters.md() != get.descriptor.characters()
+            || object.path != [object.queue.as_str()]
+            || !attrs.queues.iter().any(|q| q.name == object.queue)
+            || state
+                .delivery
+                .full_queue_profile(&object.queue)
+                .map_err(|_| HostProblem::UnknownOutcome)?
+                != (QueueProfile::Complete {
+                    version: get.descriptor.version(),
+                    characters: get.descriptor.characters(),
+                })
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+    }
     let binding = runtime
         .connections
         .iter()

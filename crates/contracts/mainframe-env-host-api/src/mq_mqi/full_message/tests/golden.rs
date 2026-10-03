@@ -1,6 +1,7 @@
 //! Independent byte assembly, with fixed fixture values and no production codec.
 use super::*;
 use sha2::{Digest, Sha256};
+mod qualified_get;
 fn text(s: &str) -> Vec<u8> {
     let mut b = vec![1];
     b.extend_from_slice(&(s.len() as u64).to_le_bytes());

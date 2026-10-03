@@ -192,7 +192,9 @@ pub(super) fn recheck(
 ) -> Result<(), HostProblem> {
     if !matches!(
         admitted.envelope.request,
-        MqMqiRequest::FullPut { .. } | MqMqiRequest::FullPutOne { .. }
+        MqMqiRequest::FullPut { .. }
+            | MqMqiRequest::FullPutOne { .. }
+            | MqMqiRequest::QualifiedFullGet(_)
     ) {
         return Ok(());
     }

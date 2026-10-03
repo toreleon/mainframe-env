@@ -13,6 +13,8 @@
 
 mod encoding;
 mod full_message;
+mod qualified_get;
+pub use qualified_get::MqMqiQualifiedGot;
 pub(crate) mod producer;
 pub use producer::{MqMqiDestinationCount, MqMqiIgnoredCounter, MqMqiProduced};
 pub mod property;
@@ -326,6 +328,9 @@ pub enum MqMqiRequest {
     Get(MqMqiGet),
     /// Complete descriptor input; source matching/conversion execution is pending.
     FullGet(MqMqiFullGet),
+    /// Opt-in complete GET with defined resolved-local-name observations.
+    /// Shape does not authorize native execution or reconstruct a held object.
+    QualifiedFullGet(MqMqiFullGet),
     Inquire(MqMqiInquiry),
     InquireProperty(MqMqiPropertyInquiry),
     /// Checked source-profile property request; older private property DTOs stay exact.
@@ -406,7 +411,7 @@ impl MqMqiRequest {
             Self::Disconnect { .. } => MqMqiCall::Disconnect,
             Self::DeleteMessageHandle { .. } => MqMqiCall::DeleteMessageHandle,
             Self::DeleteProperty { .. } => MqMqiCall::DeleteProperty,
-            Self::Get(_) | Self::FullGet(_) => MqMqiCall::Get,
+            Self::Get(_) | Self::FullGet(_) | Self::QualifiedFullGet(_) => MqMqiCall::Get,
             Self::Inquire(_) => MqMqiCall::Inquire,
             Self::InquireProperty(_) => MqMqiCall::InquireProperty,
             Self::Property(value) => value.call(),
@@ -484,6 +489,8 @@ pub enum MqMqiStatus {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqMqiOutput {
+    /// Additive qualified GET return; historical FullGot bytes remain exact.
+    QualifiedFullGot(MqMqiQualifiedGot),
     /// Complete finite producer feedback; original FullPut bytes are unchanged.
     Produced(MqMqiProduced),
     /// Complete descriptor observation from MQPUT/MQPUT1, not queue mutation proof.

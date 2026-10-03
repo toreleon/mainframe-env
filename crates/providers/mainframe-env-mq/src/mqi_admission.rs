@@ -364,7 +364,7 @@ fn pending_form(
         R::Rfh2(_) => None,
         // Full GET has one finite private selected profile. ContractDefault is
         // kernel intent, NEVER evidence for arbitrary native MQGMO option bits.
-        R::FullGet(value) => options(value.options)
+        R::FullGet(value) | R::QualifiedFullGet(value) => options(value.options)
             .or_else(|| unit(value.unit))
             .or_else(|| {
                 (environment != MqHostEnvironment::ZosBatch

@@ -874,7 +874,7 @@ Structured property/MQGET/RFH2 policy remains separately owned and pending.
 
 Output preflight compares stable ABI/catalog/route facts, not historical physical
 row versions that known publication legitimately advances. Current-unit change
-invalidates these four-call profiles; unit decisions require a new owning lookup.
+invalidates these finite profiles; unit decisions require a new owning lookup.
 The final physical comparison occurs after the final bounded clock callback and
 fresh core/frame checks. Clock panic is contained without poisoning the selected
 mutex; selected-service reentry is refused while observing the clock. A callback
@@ -904,9 +904,31 @@ syncpoint default is source-defined (q096715_201–215), but an explicit choice
 remains preferable; either uses the actual owning current unit, never a guessed
 integer. Output-only descriptor fields do not become selectors or permissions.
 
-FullGet still lacks the complete GMO ResolvedQName output (q096715_1260–1268).
-These read-only facts neither fabricate that field nor authorize native GET
-writeback without it. A separate result/canonical/replay/ABI composition remains
-required. GET pre/post comparisons keep the held input object live; only CLOSE
+The legacy FullGet output lacks GMO ResolvedQName (q096715_1260–1268); the
+additive qualified result below carries its defined value. These read-only facts
+neither fabricate that field nor authorize native GET writeback. Native ABI
+composition remains required. GET pre/post comparisons keep the held input object live; only CLOSE
 has the explicit retired-object comparison. Known GET publication advances row
 versions while preserving ABI facts, and CMIT/BACK require a newly captured unit.
+
+### Qualified complete GET observation
+
+The additive QualifiedFullGet request and QualifiedFullGot output preserve the
+old FullGet/FullGot API and bytes. The same selected complete GET owner observes
+the held predefined normal-local INPUT_SHARED queue and catalog@2 structure
+characters, encoding exact ResolvedQName through the privileged existing source.
+Body Encoding/CCSID, OD text or copied rows cannot select or attest that profile.
+No GMT/context/time sample, extra registry, queue engine or receipt journal is added.
+Defined complete MD/prefix/DataLength and current Local/NoSyncpoint controls remain
+owned by the original core/SAF/UOW/candidate/audited-publication path.
+
+GMO q096715_1260–1268 supplies the retrieved local queue name; aliases/models remain
+unsupported by this finite profile. Complete/accepted removal includes exact48
+bytes; rejected truncation/no-message/unknown retains absence and caller GMO bytes
+for the unestablished field while preserving defined MD/prefix/length. The sole
+canonical encoder uses distinct additive tags and the sole replay codec admits
+storage@6 only for the qualified output, refusing class/schema mismatches. Earlier
+versions and source/status/numeric identities remain exact. See ADR0033 for strict
+codec, rollback and definedness boundaries. Native compiler/server forwarding,
+atomic writeback, broader GMO policies, root/recovery/participant/full26/CardDemo
+acceptance remain required; private fixture tests supply none of their credit.

@@ -1,6 +1,7 @@
 //! Full storage@2 composition; no durable publication or live authority claim.
 use super::*;
 use mainframe_env_host_api::mq_md_value::*;
+mod qualified_get;
 
 pub(super) fn md(v2: bool, cp037: bool) -> MqMdValue {
     let characters = if cp037 {

@@ -1,5 +1,13 @@
 //! Additive tags using the one streaming authority and the owned full MD encoder.
 use super::*;
+object!(MqMqiQualifiedGot {
+    characters,
+    cursor,
+    data_length,
+    disposition,
+    message,
+    resolved_queue
+});
 variants!(MqMqiDestinationCount { UndefinedZos });
 variants!(MqMqiIgnoredCounter {
     PreservedIgnoredInput

@@ -340,3 +340,20 @@ references, CAS and existing retention proofs. The strict stored-authority reade
 accepts no new namespace here. Public service/host dispatch, SAF, durable UOWs,
 replay publication/retention, participant and CardDemo remain required. Only the
 licensed IBM MQ differential oracle is human-skipped, with zero licensed credit.
+
+The same result codec's additive storage@6 admits only `QualifiedFullGot` from
+the explicit QualifiedFullGet request. It retains the existing complete MD,
+ordered properties/body prefix, length/cursor/disposition and explicit structure
+character profile with nullable exact48-byte resolved local queue name. The
+selected predefined-local profile supplies the name for complete or accepted
+removal via its privileged structure source; rejected truncation/no-message/
+unknown preserve absence/no writeback where applicability is not established.
+Original FullGet/FullGot and @1/@2/@3/@4 RFH2/@5 Produced bytes remain exact.
+@6 iff classification, strict typed shape/preallocation quotas, deterministic
+field order/bytes and full original HostResult digest prevent ambiguous relabeling.
+The existing occurrence namespace, row envelope, retained core/CALL/audit/resource
+references and retention owner are unchanged. Decoding grants no live handle or
+native-profile permission and exact replay never samples QName anew. Old readers
+refuse @6; rollback requires compatible retained readers or a verified backup,
+not dropping/relabeling protected receipts or redispatching Unknown. No automatic
+migration, public/native writeback readiness or deployment authority is implied.

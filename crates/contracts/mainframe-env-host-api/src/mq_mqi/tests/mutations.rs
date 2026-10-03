@@ -58,7 +58,7 @@ fn payload_mutations_for_every_call_change_the_digest() {
                 *connection = g.connection;
             }
             MqMqiRequest::Get(v) => v.get.buffer_capacity -= 1,
-            MqMqiRequest::FullGet(v) => v.buffer_capacity -= 1,
+            MqMqiRequest::FullGet(v) | MqMqiRequest::QualifiedFullGet(v) => v.buffer_capacity -= 1,
             MqMqiRequest::FullPut { put, .. } | MqMqiRequest::FullPutOne { put, .. } => {
                 put.message.body.push(1)
             }

@@ -13,11 +13,16 @@ mod atomic;
 mod authority;
 #[path = "full_put/failures.rs"]
 mod failures;
+#[path = "full_put/qualified_get.rs"]
+mod qualified_get;
 #[path = "full_put/storage.rs"]
 mod storage;
 
 #[derive(Default)]
 struct Ports {
+    encoder_calls: AtomicU64,
+    encoder_mode: AtomicU8,
+    encoder_hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     gmt_calls: AtomicU64,
     context_calls: AtomicU64,
     live_calls: AtomicU64,
@@ -31,6 +36,17 @@ impl ProducerSource for Ports {
         text: &str,
         chars: MqMdCharacterEncoding,
     ) -> Result<Vec<u8>, HostProblem> {
+        self.encoder_calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(hook) = self.encoder_hook.lock().unwrap().take() {
+            hook();
+        }
+        match self.encoder_mode.load(Ordering::SeqCst) {
+            1 => return Err(HostProblem::ProviderFailure),
+            2 => panic!("QName source panic fixture"),
+            3 => return Ok(vec![]),
+            4 => return Err(HostProblem::Unsupported),
+            _ => {}
+        }
         if chars == MqMdCharacterEncoding::AsciiCompatible {
             return Ok(text.as_bytes().to_vec());
         }

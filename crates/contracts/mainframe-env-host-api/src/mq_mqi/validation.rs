@@ -125,7 +125,7 @@ impl MqMqiRequestEnvelope {
                 unit(value.unit)?;
                 Some(value.connection)
             }
-            R::FullGet(value) => {
+            R::FullGet(value) | R::QualifiedFullGet(value) => {
                 super::full_message::descriptor(&value.descriptor, message)?;
                 value
                     .controls()
@@ -377,7 +377,7 @@ impl MqMqiRequestEnvelope {
                 }
                 return Ok(MqMqiPending::StructureAndWireMapping);
             }
-            MqMqiRequest::FullGet(get) => {
+            MqMqiRequest::FullGet(get) | MqMqiRequest::QualifiedFullGet(get) => {
                 return Ok(
                     if matches!(get.unit, MqMqiUnitOfWork::ExternalPending { .. }) {
                         MqMqiPending::ExternalUnitOfWork
@@ -434,6 +434,14 @@ pub(super) fn validate_output(
         return Ok(());
     }
     let matched = match (call, output) {
+        (C::Get, O::QualifiedFullGot(value)) => {
+            value.validate(limits.message)?;
+            status.is_none()
+                || matches!(
+                    value.disposition,
+                    MqGetDisposition::Message(crate::MqTruncationDisposition::Complete { .. })
+                )
+        }
         (C::Put | C::PutOne, O::Produced(value)) => {
             value.validate(limits.message)?;
             status.is_none()

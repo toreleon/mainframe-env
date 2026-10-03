@@ -217,3 +217,51 @@ final task end, or implement recovery. Negative surrounding test observations
 prove field preservation only, not native MQMD or licensed execution legality.
 Selected full GET/BACK composition and final-task-end recovery remain required;
 the primitive alone grants no executable call or full-v0.15 acceptance credit.
+
+## Qualified full GET resolved-name observation
+
+`QualifiedFullGet(MqMqiFullGet)` explicitly selects the additive
+`QualifiedFullGot(MqMqiQualifiedGot)` value. Original FullGet/FullGot literals,
+canonical domains/preimages and storage@1–@5 classes remain exact. The new tuple
+tags and MqMqiQualifiedGot typed object join the sole canonical encoder; fields
+are characters, cursor, data_length, disposition, message, resolved_queue in its
+canonical field order. Explicit structure characters are independent of body
+Encoding/CCSID and are checked against meaningful complete MD and the original
+request. No serialization of live object or context authority is introduced.
+
+Pinned MQGET row0015 q101830_24/39/48 defines MD, copied prefix and DataLength for
+both truncation forms. GMO q096715_1260–1268 defines ResolvedQName as the actual
+local queue of a retrieved message, including alias/model differences. The first
+qualified selected profile remains predefined ordinary local INPUT_SHARED,
+Remove/NoWait, MD1/2 matching catalog@2, empty properties/header-free and actual
+Local or NoSyncpoint. It encodes the held resolved queue through the existing
+privileged structure source at the independently configured character profile;
+no OD name, default/body charset, principal, copied row or GMT/JES sample supplies it.
+
+Complete and accepted-removal observations carry exact48 bytes. No-message and
+unknown retain absence. The pinned call page does not explicitly guarantee this
+GMO field for rejected truncation/incomplete processing; this finite observation
+retains absence there while preserving every defined MD/prefix/length. Absence
+means no native writeback, preserving caller bytes, not an IBM-defined blank or
+universal undefined assertion. Broader output applicability remains a source
+review obligation rather than a fabricated output.
+
+Same original core occurrence/current frame, live object/logical owner/unit,
+typed Read SAF, catalog/marker/meta/control dependencies, delivery candidate and
+insert-only exact result receipt publish under the existing audited transaction.
+Known full commit alone adopts. Source errors, panic/reentry refusal and late
+CAS/control/core/cancel/quota failures adopt nothing; postcommit Unknown retains
+the receipt and fences without cleanup or redispatch. Replay rechecks the original
+receipt/current authority and does not resample the resolved name. This boundary
+does not implement interpreter/server/native aliases or all-argument writeback.
+
+The sole replay codec chooses storage@6 iff QualifiedFullGot is present. Strict
+required nullable fields, profile/type/48-byte width, duplicate/unknown/missing/
+trailing/collection checks precede typed allocation; @6 additionally requires
+its deterministic stored field order and bytes. Full original HostResult digest
+is recomputed; old classes under @6 or the new class under old versions refuse.
+No namespace, row-envelope, rich marker or delivery schema changes occur.
+Older readers fail closed. Operator rollback needs a compatible reader or verified
+backup preserving core/CALL/audit/receipt references; stripping/relabeling/deleting
+protected new receipts or replay-dispatch is forbidden. No startup rewrite or
+operator admission is granted by this implementation.

@@ -1757,3 +1757,34 @@ Declaration/short-name/z/OS availability disagreements remain explicit, and
 source review/raw fixtures earn zero installed native, official or licensed
 execution credit. All nonlicensed parent v0.15 gates remain required; only the
 licensed oracle is human-skipped0/26.
+
+## Qualified complete GET result
+
+`MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through
+the same selected complete GET owner. The additive QualifiedFullGet and
+QualifiedFullGot leave old FullGet/FullGot literals, canonical bytes and replay
+versions unchanged. The actual held predefined normal-local INPUT_SHARED queue,
+catalog@2 structure characters and privileged existing encoder supply exact48
+ResolvedQName only for complete or accepted removal. Rejected truncation,
+no-message and unknown outputs retain absence, preserving caller GMO bytes for
+the unestablished field; defined MD, prefix and DataLength remain represented.
+There is no alias/model inference, GMT/context sample, new queue engine or
+parallel receipt authority. Original core, SAF, current unit, physical store,
+audited publication and uncertainty fences remain the owners.
+
+Distinct additive canonical tags and sole replay storage@6 preserve old versions
+and reject request/result class, structure profile, status, shape and byte-limit
+mismatches. Fresh composed checks cover host values, admission, replay, selected
+full-message operations and trusted native observations. Private full PUT-to-GET
+fixtures on Memory and owned SQLite are not installed compiled, JES, native LE,
+RACF, root-terminal, official-call or licensed execution evidence.
+
+Offline sources are original baseline `ibm-mq-9.4-mqi-2026-08-31`
+MQGET0015/q101830 and MQOPEN0019/q101870, supplemental baseline2026-09-12
+GMO q096715 and MD q097395, and producer-attribute baseline2026-09-12
+QM/queue CCSID, maxima and delivery sequence. All eight pins were independently
+reproduced after retained-first hash/byte checks; source review earns zero credit.
+Native GMO writeback and the all-argument MD/GMO/body/length/status join remain
+separate work, as do installed forwarding, root/recovery/participants, IR,
+CardDemo and full nonlicensed v0.15 acceptance. Only the licensed oracle is
+human-skipped0/26; the parent goal remains active.

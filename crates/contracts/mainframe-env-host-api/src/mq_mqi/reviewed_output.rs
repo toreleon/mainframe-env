@@ -35,6 +35,32 @@ pub(super) fn validate(
     // Borrow the same exhaustive bounded shape authority used by old outcomes.
     // Its pending-mode shape check does not claim a reviewed completion.
     super::validation::validate_output(call, None, output, limits)?;
+    if let MqMqiOutput::QualifiedFullGot(value) = output {
+        let matches = match (
+            status.completion(),
+            status.reason_symbol(),
+            value.disposition,
+        ) {
+            (MqCompletion::Ok, "MQRC_NONE", MqGetDisposition::Message(T::Complete { .. }))
+            | (
+                MqCompletion::Warning,
+                "MQRC_TRUNCATED_MSG_ACCEPTED",
+                MqGetDisposition::Message(T::AcceptedRemoved { .. }),
+            )
+            | (MqCompletion::Failed, "MQRC_NO_MSG_AVAILABLE", MqGetDisposition::NoMessage) => true,
+            (
+                MqCompletion::Warning,
+                "MQRC_TRUNCATED_MSG_FAILED",
+                MqGetDisposition::Message(T::RejectedRetained { .. }),
+            ) => value.cursor.is_none(),
+            _ => false,
+        };
+        return if matches {
+            Ok(())
+        } else {
+            Err(MqMqiProblem::StatusCallMismatch)
+        };
+    }
     if let MqMqiOutput::Rfh2Observation(value) = output {
         return if value.validate_status(status) {
             Ok(())

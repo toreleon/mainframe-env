@@ -162,6 +162,11 @@ pub(super) fn got(
 }
 
 pub(super) fn bind(request: &MqMqiRequest, output: &MqMqiOutput) -> Result<(), MqMqiProblem> {
+    if matches!(request, MqMqiRequest::QualifiedFullGet(_))
+        || matches!(output, MqMqiOutput::QualifiedFullGot(_))
+    {
+        return super::qualified_get::bind(request, output);
+    }
     match (request, output) {
         (
             MqMqiRequest::FullPut { put, .. } | MqMqiRequest::FullPutOne { put, .. },
@@ -175,27 +180,7 @@ pub(super) fn bind(request: &MqMqiRequest, output: &MqMqiOutput) -> Result<(), M
                 ..
             },
         ) => {
-            if get.options != MqMqiOptions::ContractDefault {
-                return Err(MqMqiProblem::OutputCallMismatch);
-            }
-            disposition
-                .validate(&get.controls())
-                .map_err(MqMqiProblem::Message)?;
-            if message.as_ref().is_some_and(|m| {
-                m.descriptor.version() != get.descriptor.version()
-                    || m.descriptor.characters() != get.descriptor.characters()
-                    || m.body.len() > get.buffer_capacity
-                    || (matches!(
-                        disposition,
-                        MqGetDisposition::Message(
-                            MqTruncationDisposition::RejectedRetained { .. }
-                                | MqTruncationDisposition::AcceptedRemoved { .. }
-                                | MqTruncationDisposition::AcceptedBrowsed { .. }
-                        )
-                    ) && m.body.len() != get.buffer_capacity)
-            }) {
-                return Err(MqMqiProblem::Buffer);
-            }
+            bind_get(get, *disposition, message.as_ref())?;
         }
         (
             MqMqiRequest::FullPut { put, .. } | MqMqiRequest::FullPutOne { put, .. },
@@ -221,6 +206,35 @@ pub(super) fn bind(request: &MqMqiRequest, output: &MqMqiOutput) -> Result<(), M
             return Err(MqMqiProblem::OutputCallMismatch);
         }
         _ => {}
+    }
+    Ok(())
+}
+
+pub(super) fn bind_get(
+    get: &MqMqiFullGet,
+    disposition: MqGetDisposition,
+    message: Option<&MqFullMessage>,
+) -> Result<(), MqMqiProblem> {
+    if get.options != MqMqiOptions::ContractDefault {
+        return Err(MqMqiProblem::OutputCallMismatch);
+    }
+    disposition
+        .validate(&get.controls())
+        .map_err(MqMqiProblem::Message)?;
+    if message.is_some_and(|m| {
+        m.descriptor.version() != get.descriptor.version()
+            || m.descriptor.characters() != get.descriptor.characters()
+            || m.body.len() > get.buffer_capacity
+            || (matches!(
+                disposition,
+                MqGetDisposition::Message(
+                    MqTruncationDisposition::RejectedRetained { .. }
+                        | MqTruncationDisposition::AcceptedRemoved { .. }
+                        | MqTruncationDisposition::AcceptedBrowsed { .. }
+                )
+            ) && m.body.len() != get.buffer_capacity)
+    }) {
+        return Err(MqMqiProblem::Buffer);
     }
     Ok(())
 }

@@ -16,6 +16,7 @@ mod full_message;
 mod handles;
 mod producer;
 mod property;
+mod qualified_get;
 mod rfh2;
 mod shape;
 use shape::{StoredOutcome, StoredResult};
@@ -27,6 +28,7 @@ pub(crate) const PROPERTY_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@3"
 // Distinct admitted classes share this sole codec; older bytes retain their versions.
 pub(crate) const RFH2_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@4";
 pub(crate) const PRODUCER_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@5";
+pub(crate) const QUALIFIED_GET_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@6";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReplayPending {
@@ -68,7 +70,9 @@ pub(crate) fn encode(
     refuse_special_connections(result)?;
     let digest = validate_and_digest(result, host, mqi)?;
     let stored = StoredResult {
-        schema_version: if producer_output(result) {
+        schema_version: if qualified_get_output(result) {
+            QUALIFIED_GET_SCHEMA
+        } else if producer_output(result) {
             PRODUCER_SCHEMA
         } else if rfh2_output(result) {
             RFH2_SCHEMA
@@ -109,13 +113,28 @@ pub(crate) fn decode(
     let stored: StoredResult = serde_json::from_slice(bytes).map_err(|_| ReplayError::Malformed)?;
     if !matches!(
         stored.schema_version.as_str(),
-        SCHEMA | FULL_SCHEMA | PROPERTY_SCHEMA | RFH2_SCHEMA | PRODUCER_SCHEMA
+        SCHEMA
+            | FULL_SCHEMA
+            | PROPERTY_SCHEMA
+            | RFH2_SCHEMA
+            | PRODUCER_SCHEMA
+            | QUALIFIED_GET_SCHEMA
     ) || (stored.schema_version == FULL_SCHEMA) != stored.outcome.is_full()
         || (stored.schema_version == PROPERTY_SCHEMA) != stored.outcome.is_property()
         || (stored.schema_version == PRODUCER_SCHEMA) != stored.outcome.is_producer()
         || (stored.schema_version == RFH2_SCHEMA) != stored.outcome.is_rfh2()
+        || (stored.schema_version == QUALIFIED_GET_SCHEMA) != stored.outcome.is_qualified_get()
     {
         return Err(ReplayError::UnsupportedSchema);
+    }
+    if stored.schema_version == QUALIFIED_GET_SCHEMA {
+        // New @6 freezes exact typed field order/length and JSON bytes. Do not
+        // broaden/reinterpret historical versions' accepted byte vocabulary.
+        let mut sink = budget::Sink::new(byte_ceiling);
+        serde_json::to_writer(&mut sink, &stored).map_err(|_| ReplayError::Bounds)?;
+        if sink.into_bytes() != bytes {
+            return Err(ReplayError::Malformed);
+        }
     }
     let call = MqMqiCall::ALL
         .into_iter()
@@ -134,6 +153,11 @@ pub(crate) fn decode(
 fn rfh2_output(value: &MqMqiResult) -> bool {
     matches!(&value.outcome, MqMqiOutcome::ReviewedOutput { output, .. }
         if matches!(output, MqMqiOutput::Rfh2Observation(_)))
+}
+fn qualified_get_output(value: &MqMqiResult) -> bool {
+    matches!(&value.outcome, MqMqiOutcome::Completed { output, .. }
+        | MqMqiOutcome::StatusPending { output } | MqMqiOutcome::ReviewedOutput { output, .. }
+        if matches!(output, MqMqiOutput::QualifiedFullGot(_)))
 }
 fn property_output(value: &MqMqiResult) -> bool {
     matches!(&value.outcome,MqMqiOutcome::Completed {output,..}|MqMqiOutcome::StatusPending {output}|MqMqiOutcome::ReviewedOutput {output,..}

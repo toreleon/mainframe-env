@@ -380,6 +380,7 @@ impl MqService {
                 ) if matches!(
                     admitted.envelope.request,
                     MqMqiRequest::FullGet(_)
+                        | MqMqiRequest::QualifiedFullGet(_)
                         | MqMqiRequest::FullPut { .. }
                         | MqMqiRequest::FullPutOne { .. }
                 ) || (error == HostProblem::InfrastructureFailure

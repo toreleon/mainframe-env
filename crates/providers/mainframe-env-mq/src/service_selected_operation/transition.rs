@@ -112,7 +112,7 @@ pub(super) fn prepare(
         | MqMqiRequest::Back { connection, .. }
         | MqMqiRequest::Disconnect { connection } => Some(*connection),
         MqMqiRequest::Get(get) => Some(get.connection),
-        MqMqiRequest::FullGet(get) => Some(get.connection),
+        MqMqiRequest::FullGet(get) | MqMqiRequest::QualifiedFullGet(get) => Some(get.connection),
         MqMqiRequest::Close(close) => Some(close.connection()),
         _ => None,
     };
@@ -156,11 +156,23 @@ pub(super) fn prepare(
             return Ok(next);
         }
     }
-    if let MqMqiRequest::FullGet(get) = request {
+    if let MqMqiRequest::FullGet(get) | MqMqiRequest::QualifiedFullGet(get) = request {
         // Complete profile/payload preflight occurs before clock, pending or
         // cursor changes can become a publication candidate.
         full_get::prepare(
-            state, runtime, invocation, logical, owner, get, now, authorizer, &mut next,
+            state,
+            runtime,
+            invocation,
+            logical,
+            owner,
+            get,
+            now,
+            authorizer,
+            &mut next,
+            matches!(request, MqMqiRequest::QualifiedFullGet(_)),
+            service,
+            frame,
+            admitted,
         )?;
         return Ok(next);
     }
@@ -753,8 +765,17 @@ pub(super) fn resolve_reply(
                 state, runtime, logical, owner, request, invocation, authorizer,
             )
         }
-        (_, MqMqiRequest::FullGet(get)) => {
-            full_get::require_replay(state, runtime, logical, owner, get, invocation, authorizer)
+        (_, MqMqiRequest::FullGet(get) | MqMqiRequest::QualifiedFullGet(get)) => {
+            full_get::require_replay(
+                state,
+                runtime,
+                logical,
+                owner,
+                get,
+                invocation,
+                authorizer,
+                matches!(request, MqMqiRequest::QualifiedFullGet(_)),
+            )
         }
         (
             MqMqiOutcome::Completed {

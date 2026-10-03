@@ -86,6 +86,12 @@ fn copied_capacities(request: &MqMqiRequest, outcome: &MqMqiOutcome) -> Result<(
     use MqMqiOutput as O;
     use MqMqiRequest as R;
     match (request, output) {
+        (R::QualifiedFullGet(request), O::QualifiedFullGot(value)) => {
+            if let Some(message) = &value.message {
+                bound(message.body.len(), request.buffer_capacity)?;
+            }
+            Ok(()) // Sole host validator binds complete MD, lengths and QName definedness/profile.
+        }
         (R::FullPut { .. } | R::FullPutOne { .. }, O::Produced(_)) => Ok(()),
         (R::Rfh2(request), O::Rfh2Observation(value)) => {
             if let (

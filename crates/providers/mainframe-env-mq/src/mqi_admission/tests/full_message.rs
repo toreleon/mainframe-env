@@ -64,6 +64,7 @@ fn complete_message_forms_are_explicitly_unsupported_without_rewriting_original_
         unit: MqMqiUnitOfWork::NoSyncpoint,
     };
     for request in [
+        MqMqiRequest::QualifiedFullGet(get.clone()),
         MqMqiRequest::FullGet(get),
         MqMqiRequest::FullPut {
             connection,

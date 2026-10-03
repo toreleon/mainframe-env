@@ -165,6 +165,9 @@ pub(super) struct Item {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum Output {
+    QualifiedFullGot {
+        observation: super::qualified_get::Observation,
+    },
     Produced {
         value: super::producer::Produced,
     },
@@ -239,6 +242,9 @@ pub(super) enum Output {
 impl Output {
     fn from_output(value: &MqMqiOutput) -> Result<Self, ReplayError> {
         Ok(match value {
+            MqMqiOutput::QualifiedFullGot(value) => Self::QualifiedFullGot {
+                observation: super::qualified_get::Observation::capture(value)?,
+            },
             MqMqiOutput::Produced(value) => Self::Produced {
                 value: super::producer::Produced::capture(value)?,
             },
@@ -343,6 +349,9 @@ impl Output {
     }
     fn into_output(self) -> Result<MqMqiOutput, ReplayError> {
         Ok(match self {
+            Self::QualifiedFullGot { observation } => {
+                MqMqiOutput::QualifiedFullGot(observation.restore()?)
+            }
             Self::Produced { value } => MqMqiOutput::Produced(value.restore()?),
             Self::Rfh2Observation { observation } => {
                 MqMqiOutput::Rfh2Observation(observation.restore()?)
@@ -462,6 +471,10 @@ pub(super) enum StoredOutcome {
     DuplicatePossible {},
 }
 impl StoredOutcome {
+    pub(super) fn is_qualified_get(&self) -> bool {
+        matches!(self, Self::Completed { output, .. } | Self::StatusPending { output }
+            | Self::ReviewedOutput { output, .. } if matches!(output, Output::QualifiedFullGot { .. }))
+    }
     pub(super) fn is_producer(&self) -> bool {
         matches!(self, Self::Completed { output, .. } | Self::StatusPending { output }
             | Self::ReviewedOutput { output, .. } if matches!(output, Output::Produced { .. }))

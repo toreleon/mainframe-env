@@ -204,7 +204,7 @@ pub(super) fn request(value: &MqMqiRequest, limits: HostLimits) -> Result<(), Ho
             alternate(value.modifiers().alternate_user.as_ref(), limits)
         }
         R::Get(value) => get(&value.get, limits),
-        R::FullGet(value) => {
+        R::FullGet(value) | R::QualifiedFullGet(value) => {
             full_descriptor(limits)?;
             bound(value.buffer_capacity, limits.max_record_bytes)
         }
@@ -338,6 +338,21 @@ pub(super) fn result(value: &MqMqiResult, limits: HostLimits) -> Result<(), Host
             if let Some(n) = data_length {
                 bound(
                     usize::try_from(*n).map_err(|_| HostProblem::Malformed)?,
+                    limits.max_record_bytes,
+                )?;
+            }
+            Ok(())
+        }
+        O::QualifiedFullGot(value) => {
+            if value.resolved_queue.is_some() {
+                bound(48, limits.max_name_bytes)?;
+            }
+            if let Some(message) = &value.message {
+                full_message(message, limits)?;
+            }
+            if let Some(n) = value.data_length {
+                bound(
+                    usize::try_from(n).map_err(|_| HostProblem::Malformed)?,
                     limits.max_record_bytes,
                 )?;
             }
