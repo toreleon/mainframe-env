@@ -14,6 +14,10 @@ use std::sync::Arc;
 mod rfh2_source;
 pub use rfh2_source::MqBatchLeDllCodesetSource;
 pub(crate) use rfh2_source::capturing as rfh2_source_capturing;
+mod native_point;
+pub use native_point::{
+    MqTrustedBatchPointProfile, MqTrustedBatchPointTarget, MqTrustedBatchStructureProfile,
+};
 
 /// Independently selected host topology; matching Invocation IDs are not proof.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -76,6 +80,25 @@ pub struct MqTrustedBatchFrame {
 }
 
 impl MqTrustedBatchRuntime {
+    /// PRIVILEGED host-only Rust setup, once before activation, on this unique
+    /// runtime and SAME physical store. The adapter must use the sole owned
+    /// structure encoder and independently check original installed host/frame
+    /// provenance. This is not application admission, JES attestation or SAF.
+    ///
+    /// Source callbacks must be bounded/nonblocking, may not publish or perform
+    /// cleanup, and may not wait for cross-thread service reentry. Panics/errors
+    /// fail closed. NoContext-only adapters may leave GMT/context Unsupported;
+    /// DefaultContext then remains unavailable. Old unconfigured runtimes remain
+    /// unable to execute complete producers.
+    pub fn configure_producer_source(
+        &mut self,
+        store: &Arc<dyn PlatformStore>,
+        source: Arc<dyn crate::MqTrustedBatchProducerSource>,
+    ) -> Result<(), HostProblem> {
+        let runtime = Arc::get_mut(&mut self.inner).ok_or(HostProblem::Unsupported)?;
+        MqService::configure_producer_sources(&mut runtime.service, store, source)
+    }
+
     /// Privileged host setup, not a ready route advertisement. Deployment/recovery
     /// supplies generation/fence, the mandatory authorizer/clock and frozen profiles.
     /// Opening requires existing strict rich rows. It never initializes, imports,

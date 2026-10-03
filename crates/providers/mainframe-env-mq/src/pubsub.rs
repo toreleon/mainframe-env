@@ -267,6 +267,12 @@ pub struct MqPubsubKernel {
 }
 
 impl MqPubsubKernel {
+    /// Observe the sole registry without reclamation, staging, allocation or
+    /// token minting. This grants no dispatch, SAF or original-core authority.
+    pub(crate) fn registry(&self) -> &MqHandleRegistry {
+        &self.handles.registry
+    }
+
     pub fn new(
         catalog: MqObjectCatalog,
         limits: MqPubsubLimits,
@@ -1357,6 +1363,68 @@ mod tests {
             .settle_event(&retry, MqDeliveryOutcome::Accepted)
             .unwrap();
         assert!(kernel.pending(&name("SUB.D")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn immutable_registry_observation_preserves_bindings_and_mutable_cleanup() {
+        let (mut kernel, hconn) = connected(MqPubsubLimits::default(), 1);
+        let pair = kernel
+            .subscribe(
+                owner(),
+                hconn,
+                &name("SUB.D"),
+                MqSubscriptionMode::Create {
+                    publications_on_request: false,
+                },
+                MqPubsubAuthorization::Permit,
+            )
+            .unwrap();
+        kernel
+            .register_callback(owner(), hconn, pair.hobj, 42, MqPubsubAuthorization::Permit)
+            .unwrap();
+        kernel
+            .control(owner(), hconn, MqCallbackControl::Start)
+            .unwrap();
+        let snapshot = kernel.snapshot().unwrap();
+        let active = kernel.registry().active_handles();
+        let bindings = kernel.bindings.len();
+        for _ in 0..3 {
+            assert!(
+                kernel
+                    .registry()
+                    .validate_connection(owner(), hconn)
+                    .is_ok()
+            );
+            assert!(
+                kernel
+                    .registry()
+                    .validate(owner(), hconn, pair.hobj.into(), MqHandleKind::Object)
+                    .is_ok()
+            );
+            assert_eq!(kernel.registry().active_handles(), active);
+            assert_eq!(kernel.snapshot().unwrap(), snapshot);
+            assert_eq!(kernel.bindings.len(), bindings);
+            assert_eq!(kernel.callbacks.len(), 1);
+            assert_eq!(kernel.controls.len(), 1);
+        }
+        // Simulate retirement below the composed cleanup boundary. A pure read
+        // must leave the stale volatile bindings for the existing mutable path.
+        kernel.handles.registry.disconnect(owner(), hconn).unwrap();
+        assert!(
+            kernel
+                .registry()
+                .validate_connection(owner(), hconn)
+                .is_err()
+        );
+        assert_eq!(kernel.registry().active_handles(), 0);
+        assert_eq!(kernel.bindings.len(), bindings);
+        assert_eq!(kernel.callbacks.len(), 1);
+        assert_eq!(kernel.snapshot().unwrap(), snapshot);
+        drop(kernel.handles_mut());
+        assert!(kernel.bindings.is_empty());
+        assert!(kernel.callbacks.is_empty());
+        assert!(kernel.controls.is_empty());
+        assert_eq!(kernel.snapshot().unwrap(), snapshot);
     }
 
     #[test]

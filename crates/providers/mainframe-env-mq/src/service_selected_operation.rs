@@ -45,6 +45,7 @@ mod transition;
 mod trusted_embedding;
 
 use ownership::Control;
+pub(crate) use transition::native_point::{PointFacts, StructureFacts};
 
 /// Lives inside RichStoredState, under the SAME mutex as catalog/delivery rows.
 /// Cold restoration constructs none of these volatile authorities.

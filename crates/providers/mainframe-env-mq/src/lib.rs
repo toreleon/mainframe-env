@@ -18,6 +18,10 @@ mod retention;
 mod service;
 mod service_mqi_intent;
 mod trusted_batch_embedding;
+pub use service::{
+    ProducerBatchContext as MqTrustedBatchContextObservation,
+    ProducerGmt as MqTrustedBatchGmtObservation, ProducerSource as MqTrustedBatchProducerSource,
+};
 
 pub use delivery::{
     MQ_DELIVERY_SCHEMA, MqDeliveryError, MqDeliveryGet, MqDeliveryKernel, MqDeliveryLimits,
@@ -56,6 +60,7 @@ pub use service::{
     MqInstallReceipt, MqLimits, MqQueueDefinition, MqReplayClock, MqService, mq_providers,
 };
 pub use trusted_batch_embedding::{
-    MqBatchLeDllCodesetSource, MqTrustedBatchFrame, MqTrustedBatchRelationship, MqTrustedBatchRoot,
-    MqTrustedBatchRuntime,
+    MqBatchLeDllCodesetSource, MqTrustedBatchFrame, MqTrustedBatchPointProfile,
+    MqTrustedBatchPointTarget, MqTrustedBatchRelationship, MqTrustedBatchRoot,
+    MqTrustedBatchRuntime, MqTrustedBatchStructureProfile,
 };

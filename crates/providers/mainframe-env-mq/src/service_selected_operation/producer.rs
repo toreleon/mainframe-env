@@ -6,12 +6,14 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 /// Checked physical Gregorian UTC observation. Seconds60 is explicitly refused;
 /// the adapter must choose a genuine available non-leap instant, never normalize.
-pub(crate) struct ProducerGmt {
+pub struct ProducerGmt {
     date: [u8; 8],
     time: [u8; 8],
 }
 impl ProducerGmt {
-    pub(crate) fn new(
+    /// Check one exact physical UTC observation without normalizing its calendar
+    /// or leap seconds. This value does not attest where the host obtained it.
+    pub fn new(
         year: u16,
         month: u8,
         day: u8,
@@ -52,13 +54,15 @@ impl ProducerGmt {
     }
 }
 /// Trusted batch observation, not constructed from Invocation binding/name text.
-pub(crate) struct ProducerBatchContext {
+pub struct ProducerBatchContext {
     job: String,
     user: Option<String>,
     accounting: Option<[u8; 32]>,
 }
 impl ProducerBatchContext {
-    pub(crate) fn new(
+    /// Check the finite batch observation shape; the configured trusted host
+    /// port must independently attest its provenance and optional observations.
+    pub fn new(
         job: String,
         user: Option<String>,
         accounting: Option<[u8; 32]>,
@@ -82,7 +86,7 @@ impl ProducerBatchContext {
 /// Host-owned synchronous bounded port. Observation errors are NOT absence.
 /// Adapter must derive context from independently admitted batch provenance.
 /// Calls must not block/reenter any service or perform publication/cleanup.
-pub(crate) trait ProducerSource: Send + Sync {
+pub trait ProducerSource: Send + Sync {
     /// Trusted host adapter uses the existing owned character encoder for this
     /// declared structure profile. No context/time sample or mutation here.
     fn encode_structure(
@@ -90,9 +94,20 @@ pub(crate) trait ProducerSource: Send + Sync {
         text: &str,
         characters: MqMdCharacterEncoding,
     ) -> Result<Vec<u8>, HostProblem>;
+    /// Independently verify this exact original host frame remains live. Caller
+    /// binding equality, principal text and matching copied store rows are not proof.
     fn check_live(&self, invocation: &Invocation) -> Result<(), HostProblem>;
-    fn physical_gmt(&self, invocation: &Invocation) -> Result<ProducerGmt, HostProblem>;
-    fn batch_context(&self, invocation: &Invocation) -> Result<ProducerBatchContext, HostProblem>;
+    /// Real physical UTC/GMT only. NoContext-only adapters refuse by default;
+    /// logical ticks, fabricated timestamps or silently normalized leap seconds
+    /// cannot substitute for a host clock observation.
+    fn physical_gmt(&self, _: &Invocation) -> Result<ProducerGmt, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
+    /// Real independently admitted batch context. Absence of optional user or
+    /// accounting differs from a source error. NoContext-only adapters refuse.
+    fn batch_context(&self, _: &Invocation) -> Result<ProducerBatchContext, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 }
 pub(in crate::service) struct ProducerSources {
     store: Arc<dyn PlatformStore>,
@@ -163,6 +178,9 @@ fn call<T>(
     let _sampling = Sampling(&service.producer_sampling);
     catch_unwind(AssertUnwindSafe(|| f(&*configured.source)))
         .map_err(|_| HostProblem::ProviderFailure)?
+}
+pub(super) fn check_live(service: &MqService, invocation: &Invocation) -> Result<(), HostProblem> {
+    call(service, |s| s.check_live(invocation))
 }
 pub(super) fn recheck(
     service: &MqService,

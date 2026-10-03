@@ -804,3 +804,49 @@ Behavioral credit requires independently bound Conformance IR obligations and
 verdicts for each applicable recognized, validated, executed, conditioned,
 recovered and differential gate. Missing licensed or source evidence remains
 pending; it is never inferred from registry presence or broad workload success.
+
+## Privileged native point observations
+
+The trusted batch facet supplies an opaque structure profile before raw OD/MD
+decode, then an exact decoded lookup or retained HOBJ point profile. It reads
+the same selected service, physical store snapshot, frozen original frame,
+directory owner, issued nonshared batch connection, incarnation, catalog@2 and
+current retained local unit. It does not allocate, dispatch, sample context/GMT,
+create cursors, authorize SAF, publish audit/receipt or change durable rows.
+
+The initial binding is predefined normal-local OPEN (explicit OUTPUT or
+INPUT_SHARED), complete PUT/PUT1 (PMO1 explicit synchronous), or CLOSE NONE.
+Actual complete queue version/structure characters and native maxima are observed;
+body Encoding/CCSID never chooses structure ABI. CP037 facts remain truthful but
+the first compiled adapter must refuse them until its character projection is
+implemented. GET, partial PUT, browse, wait and general zero modifier/default
+policy cannot reuse this finite observation as admission.
+
+Cluster binding applies only to cluster queues (pinned MQOPEN q101870_350–389);
+the selected owning route is predefined normal-local, with no cluster dispatch.
+Read-ahead is ignored for nonclient applications (q101870_718), explicit
+INPUT_SHARED does not use DefInputOpen, and explicit PMO_SYNC_RESPONSE overrides
+default response (q098655_315–320). These operation-specific facts are rechecked
+through the exact wire query tuple; LocalQueue name alone never opens the gate.
+Structured property/MQGET/RFH2 policy remains separately owned and pending.
+
+Output preflight compares stable ABI/catalog/route facts, not historical physical
+row versions that known publication legitimately advances. Current-unit change
+invalidates these four-call profiles; unit decisions require a new owning lookup.
+The final physical comparison occurs after the final bounded clock callback and
+fresh core/frame checks. Clock panic is contained without poisoning the selected
+mutex; selected-service reentry is refused while observing the clock. A callback
+that advances a physical catalog/control row cannot return stale usable facts.
+CLOSE encoding preflight preserves the opaque captured queue facts without
+requiring or reviving the retired HOBJ. Equal observations never resolve a raw
+uncertain result or grant historical handle authority.
+
+Privileged Rust-only source setup requires one unique inactive runtime and the
+same physical Arc store, once before activation. The host supplies the sole
+owned character encoder and independently admitted live source. NoContext-only
+adapters leave GMT/context Unsupported; DefaultContext cannot fabricate JES/time.
+Callbacks are bounded/nonblocking, contained and nonreentrant; they perform no
+publication or cleanup and cannot wait for cross-thread service reentry. This
+setup is not application/JSON attestation, installed/JES proof or public readiness.
+Actual compiled forwarding, atomic native writeback, host provenance, root/core
+recovery, SAF, participants, full26 and CardDemo remain required.

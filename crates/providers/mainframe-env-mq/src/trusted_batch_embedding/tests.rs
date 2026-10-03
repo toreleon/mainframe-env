@@ -17,6 +17,7 @@ mod connection_warning;
 mod flows;
 mod installed_fixture;
 mod lifecycle;
+mod native_point;
 mod publication;
 mod refusals;
 mod replay;

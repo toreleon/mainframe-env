@@ -42,9 +42,8 @@ mod rows;
 pub(crate) use rows::encode_object_row;
 use rows::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
 // Closed Rust integration facade. This does not attest installed/JES provenance.
-pub(crate) use selection::operations::producer::{
-    ProducerBatchContext, ProducerGmt, ProducerSource,
-};
+pub use selection::operations::producer::{ProducerBatchContext, ProducerGmt, ProducerSource};
+pub(crate) use selection::operations::{PointFacts, StructureFacts};
 
 #[path = "service_legacy_delivery_import.rs"]
 pub(crate) mod legacy_delivery_import;
@@ -246,6 +245,10 @@ struct DurableState {
 /// Trusted durable logical-time source used to age newly persisted replay rows.
 pub trait MqReplayClock: Send + Sync {
     /// Observe the current nonzero durable logical tick.
+    /// Callbacks must be bounded/nonblocking and must not reenter a service,
+    /// publish, perform cleanup or wait for cross-thread service work. Native
+    /// point observations contain panics and refuse selected-service reentry;
+    /// returned ticks never replace physical core/provider dependency checks.
     fn now_tick(&self) -> Result<u64, HostProblem>;
 }
 

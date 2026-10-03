@@ -14,6 +14,8 @@ mod connection_warning;
 mod full_get;
 #[path = "transition/full_put.rs"]
 mod full_put;
+#[path = "transition/native_point.rs"]
+pub(in crate::service) mod native_point;
 
 #[derive(Clone)]
 pub(super) struct ConnectionBinding {

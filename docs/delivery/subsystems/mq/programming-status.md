@@ -1637,3 +1637,44 @@ counts; several previously extracted modules need lower-count inventory refresh.
 Those untouched inputs are not waived, and this batch repair is not a passing
 global module gate or full-release acceptance. They require distinct scoped
 repairs with verification before the final v0.15 candidate can pass that gate.
+
+## Explicit native point and source facets
+
+`MQ-1503.trusted-native-point-bindings` composes sealed `5669842a` with the
+existing finite producer and RFH2 authorities. Structure-before-decode and exact
+lookup/held-object observations use the same selected service, physical Arc
+store, original Running core/frame, sole immutable registry, catalog@2,
+native attributes and current owning local unit. The finite calls are OPEN
+OUTPUT/INPUT_SHARED, complete PUT/PUT1 with explicit synchronous PMO1, and
+predefined CLOSE NONE. CP037 observations are truthful but do not grant the
+first ASCII/big-endian compiled adapter permission. Default queue behavior is
+call-specific; a LocalQueue label alone is not admission. Known row versions
+may advance independently of stable ABI facts. CLOSE output preflight checks
+captured queue facts without reviving the retired object.
+
+Manager review reproduced a stale observation on Memory when the final clock
+callback advanced a physical control row after its comparison. The final
+physical snapshot now follows every host callback and fresh frame/core checks;
+clock panic is contained, and selected-service reentry refuses without poisoning
+the selected mutex. Memory and owned SQLite regressions cover that mutation,
+panic/reentry, read-only state, original pending full PUT and old source behavior.
+Historical failing receipts retain their candidate identities, not success credit.
+Privileged producer-source setup is unique, once-only, preactivation and same-store;
+default GMT/context methods refuse, and NoContext does not sample them. The actual
+installed Foundation encoder/JES/GMT and native forwarding remain separate work.
+
+Source scope is `ibm-mq-9.4-mqi-2026-08-31` OPEN0019/q101870,
+CLOSE0006/q101740, PUT0020/q101880 and PUT10021/q101890, programming supplements
+OD q098100/q098105 and PMO q098655, and producer-attribute baseline2026-09-12.
+The manager reproduced all sixteen hash/byte-verified offline selected pins
+after retained-topic checks. Cluster/read-ahead, explicit access/response and
+undefined CLOSE output applicability are recorded, not guessed. No source bodies,
+browser/network refresh or source/execution/native/licensed credit is introduced.
+
+This facet does not install a host or manufacture original effects, SAF,
+capability/root/handle/UOW permission. The separately sealed root ABI scope is
+volatile connection alias storage, not forwarding. HOBJ/HMSG alias families,
+compiled original OPEN/PUT/GET/property writeback, genuine pending-PUT normal/
+native-Abend root terminal, recovery/participants/IR/CardDemo and all applicable
+nonlicensed full26 acceptance remain required. Only the licensed oracle is
+human-skipped0/26 with zero credit; the parent v0.15 goal stays active.
