@@ -13,8 +13,10 @@ use mainframe_env_host_api::{
 };
 use std::sync::Arc;
 
+mod abi_scope;
 mod connection_writeback;
 mod connx;
+pub use abi_scope::MqMqiAbiScope;
 pub use connx::MqMqiConnxProfile;
 
 /// A trusted embedding's already-admitted program frame. Implementations must
@@ -24,6 +26,18 @@ pub use connx::MqMqiConnxProfile;
 /// responsible for supplying the same frame to its selected provider route.
 pub trait MqMqiProgramFrame: Send + Sync {
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem>;
+
+    /// The SAME independently admitted task-root ABI allocation, shared by its
+    /// SAME TASK frames. Equality of context/bindings is not a sharing proof.
+    /// Old embeddings retain their per-machine connection-only ABI; native
+    /// point/property consumers must require the deliberate shared scope.
+    /// The returned table supplies no registry, original-effect or SAF authority.
+    fn abi_scope(
+        &self,
+        _invocation: &Invocation,
+    ) -> Result<Option<Arc<MqMqiAbiScope>>, HostProblem> {
+        Ok(None)
+    }
 
     /// Independently selected structure ABI and ordinary connection profile.
     /// No invocation binding or application Options value attests this input.
@@ -59,6 +73,7 @@ pub(super) struct State {
     connections: BTreeMap<i32, MqHconn>,
     next_connection: i32,
     connx_profile: Option<MqMqiConnxProfile>,
+    scope: Option<Arc<MqMqiAbiScope>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,6 +86,10 @@ pub(super) struct Targets {
     unit: Option<u64>,
     connx: Option<connx::Capture>,
     connect: Option<connection_writeback::Capture>,
+    scope: Option<Arc<MqMqiAbiScope>>,
+    reservation: Option<abi_scope::Reservation>,
+    scoped_arguments: Vec<connx::Storage>,
+    pending_lease: Option<abi_scope::PendingLease>,
 }
 
 pub(super) fn is_call(program: &str) -> bool {
@@ -82,10 +101,21 @@ pub(super) fn validate_reply(
     pending: &Pending,
     result: &EffectResult,
 ) -> Result<(), MachineProblem> {
+    if let PendingKind::MqMqi(targets) = &pending.kind
+        && matches!(result.outcome, Err(HostProblem::UnknownOutcome))
+        && let Some(scope) = &targets.scope
+    {
+        scope.fence();
+    }
     result
         .validate(pending.sequence, HostLimits::default())
         .map_err(|problem| {
             MachineProblem::Host(if matches!(&pending.kind, PendingKind::MqMqi(_)) {
+                if let PendingKind::MqMqi(targets) = &pending.kind
+                    && let Some(scope) = &targets.scope
+                {
+                    scope.fence();
+                }
                 // The typed call has already been dispatched. An unusable
                 // envelope cannot establish that its owned work did not occur.
                 HostProblem::UnknownOutcome
@@ -109,12 +139,23 @@ impl ReferenceMachine {
             .profile(&self.invocation)
             .map_err(MachineProblem::Host)?;
         profile_valid(profile)?;
+        let scope = connx::contained(|| {
+            frame
+                .abi_scope(&self.invocation)
+                .map_err(MachineProblem::Host)
+        })?;
+        if let Some(scope) = &scope {
+            scope
+                .require_context(profile.context)
+                .map_err(MachineProblem::Host)?;
+        }
         self.mqi = Some(State {
             frame,
             profile,
             connections: BTreeMap::new(),
             next_connection: 1,
             connx_profile: None,
+            scope,
         });
         Ok(())
     }
@@ -149,7 +190,7 @@ impl ReferenceMachine {
                 _ => parameters.push(normalize(argument)),
             }
         }
-        let (request, targets) = match call.as_str() {
+        let (request, mut targets) = match call.as_str() {
             "MQCONN" => {
                 if parameters.len() != 4 {
                     return Err(MachineProblem::InvalidOperation);
@@ -159,8 +200,9 @@ impl ReferenceMachine {
                 self.mq_long_target(&parameters[3])?;
                 self.mq_output_aliases(&parameters)?;
                 let capture = self.capture_connect(&parameters)?;
-                if state.connections.len() >= MQ_MAX_HANDLE_SLOTS
-                    || state.next_connection == i32::MAX
+                if state.scope.is_none()
+                    && (state.connections.len() >= MQ_MAX_HANDLE_SLOTS
+                        || state.next_connection == i32::MAX)
                 {
                     return Err(MachineProblem::ResourceExhausted);
                 }
@@ -194,6 +236,10 @@ impl ReferenceMachine {
                         unit: None,
                         connx: None,
                         connect: Some(capture),
+                        scope: None,
+                        reservation: None,
+                        scoped_arguments: Vec::new(),
+                        pending_lease: None,
                     },
                 )
             }
@@ -209,11 +255,7 @@ impl ReferenceMachine {
                 let value = self.decimal(&parameters[0])?;
                 let wire =
                     i32::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)?;
-                let connection = state
-                    .connections
-                    .get(&wire)
-                    .copied()
-                    .ok_or(MachineProblem::Host(HostProblem::Malformed))?;
+                let connection = state.connection(wire)?;
                 (
                     MqMqiRequest::Disconnect { connection },
                     Targets {
@@ -225,6 +267,10 @@ impl ReferenceMachine {
                         unit: None,
                         connx: None,
                         connect: None,
+                        scope: None,
+                        reservation: None,
+                        scoped_arguments: Vec::new(),
+                        pending_lease: None,
                     },
                 )
             }
@@ -239,11 +285,7 @@ impl ReferenceMachine {
                 let value = self.decimal(&parameters[0])?;
                 let wire =
                     i32::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)?;
-                let connection = state
-                    .connections
-                    .get(&wire)
-                    .copied()
-                    .ok_or(MachineProblem::Host(HostProblem::Malformed))?;
+                let connection = state.connection(wire)?;
                 let unit = state
                     .frame
                     .local_unit(&self.invocation, connection)
@@ -277,6 +319,10 @@ impl ReferenceMachine {
                         unit: Some(unit),
                         connx: None,
                         connect: None,
+                        scope: None,
+                        reservation: None,
+                        scoped_arguments: Vec::new(),
+                        pending_lease: None,
                     },
                 )
             }
@@ -287,6 +333,26 @@ impl ReferenceMachine {
         }
         if let Some(capture) = &targets.connect {
             self.recheck_connect(capture)?;
+        }
+        targets.scope = state.scope.clone();
+        if let Some(scope) = &targets.scope {
+            targets.pending_lease = Some(abi_scope::PendingLease::new(scope.clone()));
+            targets.scoped_arguments = parameters
+                .iter()
+                .map(|p| self.connx_storage(p))
+                .collect::<Result<Vec<_>, _>>()?;
+            if targets.scoped_arguments.iter().any(|s| {
+                s.layout.category == LayoutCategory::Binary
+                    && (s.layout.native_binary || s.view.offset % 4 != 0)
+            }) {
+                return Err(MachineProblem::UnsupportedForm);
+            }
+            if matches!(
+                targets.call,
+                MqMqiCall::Connect | MqMqiCall::ConnectExtended
+            ) {
+                targets.reservation = Some(scope.reserve().map_err(MachineProblem::Host)?);
+            }
         }
         let connx_profile = targets.connx.as_ref().map(|capture| capture.profile);
         let step = self.effect(
@@ -300,6 +366,14 @@ impl ReferenceMachine {
             }),
             PendingKind::MqMqi(targets),
         )?;
+        if let Some(Pending {
+            kind: PendingKind::MqMqi(targets),
+            ..
+        }) = &self.pending
+            && let Some(lease) = &targets.pending_lease
+        {
+            lease.arm();
+        }
         if let Some(profile) = connx_profile {
             self.mqi
                 .as_mut()
@@ -356,6 +430,7 @@ impl ReferenceMachine {
         targets: Targets,
         value: MqMqiHostResult,
     ) -> Result<(), MachineProblem> {
+        let mut scope_completion = abi_scope::CompletionGuard::new(targets.scope.clone());
         let state = self
             .mqi
             .as_ref()
@@ -465,6 +540,14 @@ impl ReferenceMachine {
             }
             _ => return Err(MachineProblem::Host(HostProblem::Unsupported)),
         };
+        if targets.scope.is_some() {
+            self.finish_scoped_mq(&targets, connection, completion, reason, completed)?;
+            if let Some(lease) = &targets.pending_lease {
+                lease.known();
+            }
+            scope_completion.known();
+            return Ok(());
+        }
         let wire = if let Some(connection) = connection {
             let state = self
                 .mqi
@@ -541,14 +624,39 @@ impl ReferenceMachine {
 }
 
 impl State {
+    fn connection(&self, wire: i32) -> Result<MqHconn, MachineProblem> {
+        if let Some(scope) = &self.scope {
+            scope.connection(wire).map_err(MachineProblem::Host)
+        } else {
+            self.connections
+                .get(&wire)
+                .copied()
+                .ok_or(MachineProblem::Host(HostProblem::Malformed))
+        }
+    }
     fn current(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, MachineProblem> {
-        let profile = self
-            .frame
-            .profile(invocation)
-            .map_err(MachineProblem::Host)?;
+        let lookup = || self.frame.profile(invocation).map_err(MachineProblem::Host);
+        let profile = if self.scope.is_some() {
+            connx::contained(lookup)?
+        } else {
+            lookup()?
+        };
         profile_valid(profile)?;
         if profile != self.profile {
             return Err(MachineProblem::Host(HostProblem::IdempotencyConflict));
+        }
+        let scope = connx::contained(|| {
+            self.frame
+                .abi_scope(invocation)
+                .map_err(MachineProblem::Host)
+        })?;
+        if scope != self.scope {
+            return Err(MachineProblem::Host(HostProblem::IdempotencyConflict));
+        }
+        if let Some(scope) = &scope {
+            scope
+                .require_context(profile.context)
+                .map_err(MachineProblem::Host)?;
         }
         Ok(profile)
     }

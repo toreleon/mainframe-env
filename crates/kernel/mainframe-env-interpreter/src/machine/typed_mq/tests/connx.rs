@@ -19,7 +19,7 @@ struct ConnxFrame {
     connection: MqHconn,
     unit: AtomicU64,
 }
-fn ordinary() -> MqMqiConnxProfile {
+pub(in crate::machine::typed_mq) fn ordinary() -> MqMqiConnxProfile {
     MqMqiConnxProfile {
         profile: MqConnxProfile::OrdinaryOwnedNonshared,
         encoding: MqRawStructureEncoding {
@@ -88,7 +88,7 @@ impl MqMqiProgramFrame for ConnxFrame {
 fn compiled() -> ReferenceMachine {
     compiled_text(include_str!("connx.mir"))
 }
-fn compiled_text(text: &str) -> ReferenceMachine {
+pub(in crate::machine::typed_mq) fn compiled_text(text: &str) -> ReferenceMachine {
     let module = mainframe_env_ir::parse_text(text, CodecLimits::default()).unwrap();
     let binary = mainframe_env_ir::encode_binary(&module, CodecLimits::default()).unwrap();
     ReferenceMachine::from_binary(

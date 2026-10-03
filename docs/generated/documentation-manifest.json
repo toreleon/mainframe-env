@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 235,
+    "markdown_documents": 236,
     "navigation_groups": 6,
-    "normative_documents": 67,
+    "normative_documents": 68,
     "xtask_commands": 213
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 123,
-      "sha256": "sha256:851bb0a03f8e54e342f460d856824114a5a7895983a777df108842e06c592473",
+      "relative_links": 124,
+      "sha256": "sha256:0681b34deb31d2eb592d79e0a7868b2566059f82caf999321d88e9a0e81d886f",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -499,9 +499,9 @@
       "normative": true,
       "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
-      "relative_links": 2,
+      "relative_links": 3,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:51f11a52c2d4e9fe9f1ed359780bf6cef502dd5f82f9204d4fcaece129a97fab",
+      "sha256": "sha256:db88c6c51db766616c2f359c40cf84ff7586a27922e6102c906d6052c973e857",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -1079,10 +1079,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ host/interpreter maintainers",
+      "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md",
+      "relative_links": 0,
+      "scope": "connection alias translation, not executable handle or terminal authority",
+      "sha256": "sha256:05adff591f3e5f07d3d4a78a83891f76b37f9479e8b60663047baf451d2950a2",
+      "status": "Proposed",
+      "title": "Volatile task-root MQI ABI aliases",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 36,
-      "sha256": "sha256:d6c1aef2bf8212207a8196c3fd2cd0ff517a1b16703abe40e1f689341d078135",
+      "relative_links": 37,
+      "sha256": "sha256:d0effd980564de5da19358664ba177e2ac95862234112ab58c78484c3a8bc679",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -2412,6 +2424,10 @@
           "path": "docs/decisions/0033-mq-historical-handle-observation.md"
         },
         {
+          "label": "ADR-0035: Volatile task-root MQI ABI aliases",
+          "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -2660,7 +2676,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:da961e9365fa1e702fc4b3d419dfce21552eff7e72a424d748621d0c12f6009e",
+  "registry_sha256": "sha256:a1fd0ce26c35c42c902d6cd4bd5876024ff3593db8566cc396a88660af94c2c7",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

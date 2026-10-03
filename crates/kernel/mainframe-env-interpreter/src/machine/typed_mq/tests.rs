@@ -3,12 +3,12 @@ use mainframe_env_host_api::mq_mqi::MqMqiResult;
 use mainframe_env_host_api::{MqHandleOwner, MqHandleRegistry};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-mod connx;
+pub(super) mod connx;
 mod syncpoint;
 
-struct Frame {
-    invocation: Invocation,
-    changed: AtomicBool,
+pub(super) struct Frame {
+    pub(super) invocation: Invocation,
+    pub(super) changed: AtomicBool,
 }
 impl MqMqiProgramFrame for Frame {
     fn profile(&self, invocation: &Invocation) -> Result<MqMqiProgramProfile, HostProblem> {
@@ -28,7 +28,7 @@ impl MqMqiProgramFrame for Frame {
         })
     }
 }
-fn context() -> MqMqiContext {
+pub(super) fn context() -> MqMqiContext {
     MqMqiContext {
         owner: MqHandleOwner {
             environment: MqHostEnvironment::ZosBatch,
@@ -98,7 +98,7 @@ fn field(machine: &mut ReferenceMachine, name: &str, bytes: Vec<u8>, numeric: bo
         },
     );
 }
-fn unbound_fixture() -> ReferenceMachine {
+pub(super) fn unbound_fixture() -> ReferenceMachine {
     let invocation = super::super::tests::invocation();
     let mut machine = ReferenceMachine::from_binary(
         &super::super::tests::binary(),
@@ -121,7 +121,10 @@ fn fixture() -> (ReferenceMachine, Arc<Frame>) {
     machine.bind_mqi_program_frame(frame.clone()).unwrap();
     (machine, frame)
 }
-fn call(machine: &mut ReferenceMachine, args: &[&str]) -> Result<EffectRequest, MachineProblem> {
+pub(super) fn call(
+    machine: &mut ReferenceMachine,
+    args: &[&str],
+) -> Result<EffectRequest, MachineProblem> {
     let operation = machine.operations[0].clone();
     let args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     match machine.program_effect(&operation, "call", &args)? {
@@ -129,14 +132,14 @@ fn call(machine: &mut ReferenceMachine, args: &[&str]) -> Result<EffectRequest, 
         _ => panic!("typed effect required"),
     }
 }
-fn connect(machine: &mut ReferenceMachine) -> EffectRequest {
+pub(super) fn connect(machine: &mut ReferenceMachine) -> EffectRequest {
     call(
         machine,
         &["'MQCONN'", "USING", "MANAGER", "HCONN", "CC", "REASON"],
     )
     .unwrap()
 }
-fn reply(
+pub(super) fn reply(
     machine: &mut ReferenceMachine,
     effect: &EffectRequest,
     outcome: MqMqiOutcome,
@@ -155,7 +158,7 @@ fn reply(
         })),
     })
 }
-fn issued() -> MqHconn {
+pub(super) fn issued() -> MqHconn {
     MqHandleRegistry::new(1, 4)
         .unwrap()
         .connect(context().owner, MqHandleSharing::NonShared)

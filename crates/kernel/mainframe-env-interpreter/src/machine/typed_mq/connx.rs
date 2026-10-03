@@ -131,7 +131,9 @@ impl ReferenceMachine {
         }
         let state = self.mqi.as_ref().ok_or(MachineProblem::UnsupportedForm)?;
         let profile = state.checked_connx(&self.invocation, None)?;
-        if state.connections.len() >= MQ_MAX_HANDLE_SLOTS || state.next_connection == i32::MAX {
+        if state.scope.is_none()
+            && (state.connections.len() >= MQ_MAX_HANDLE_SLOTS || state.next_connection == i32::MAX)
+        {
             return Err(MachineProblem::ResourceExhausted);
         }
         for parameter in &parameters[2..] {
@@ -286,6 +288,10 @@ impl ReferenceMachine {
                     members,
                 }),
                 connect: None,
+                scope: None,
+                reservation: None,
+                scoped_arguments: Vec::new(),
+                pending_lease: None,
             },
         ))
     }

@@ -751,6 +751,21 @@ conversion/context/group/MDE profiles, installed forwarding, durable payload,
 recovery/participant/IR/CardDemo and remaining applicable 26-call acceptance
 remain parent work; only the licensed oracle is human-skipped0/26.
 
+### Explicit volatile root ABI scope
+
+An admitted frame may now supply the same `MqMqiAbiScope` allocation to its SAME
+TASK machines. Predispatch bounded connection reservations, non-reused aliases,
+exact argument rechecks and one callback-free caller-byte/alias commit prevent
+late partial adoption. DISC retires aliases across frames; unusable or dropped
+dispatched calls fence the shared scope without provider cleanup or a UOW decision.
+Equal contexts are not sharing proof, and the sole provider registry remains
+executable authority. The default absent port preserves older connection-only
+embeddings; typed scopes cannot be serialized or restored. See
+[ADR0035](../decisions/0035-mq-root-scoped-abi-aliases.md) for source rows,
+finite ABI and compatibility. Installed root forwarding, HOBJ/HMSG families and
+genuine compiled provider verticals remain pending; private adapter fixtures
+grant no installed-host execution credit.
+
 ### Coverage identity
 
 The MQ-1506 licensed adapter at
