@@ -41,6 +41,25 @@ class TransactionParticipantTests(unittest.TestCase):
         with self.assertRaises(participant.ContractError):
             participant.validate_contract(mutated)
 
+    def test_ims_preparation_is_optional_and_cannot_admit_or_hide_blockers(self) -> None:
+        old = copy.deepcopy(self.contract)
+        del old["participants"][2]["preparation"]
+        participant.validate_contract(old)
+        for field, replacement in [
+            ("status", "accepted"),
+            ("capabilities", self.contract["participants"][0]["capabilities"]),
+            ("preparation", {"scope": "ims-local-database-provider-route"}),
+            ("preparation", None),
+        ]:
+            mutated = copy.deepcopy(self.contract)
+            mutated["participants"][2][field] = replacement
+            with self.assertRaises(participant.ContractError):
+                participant.validate_contract(mutated)
+        for index in [0, 1, 3]:
+            mutated = copy.deepcopy(self.contract)
+            mutated["participants"][index]["preparation"] = mutated["participants"][2]["preparation"]
+            with self.assertRaises(participant.ContractError):
+                participant.validate_contract(mutated)
     def test_outcome_partition_cannot_hide_unknown_or_heuristic_state(self) -> None:
         mutated = copy.deepcopy(self.contract)
         outcomes = mutated["participants"][0]["capabilities"]["outcomes"]

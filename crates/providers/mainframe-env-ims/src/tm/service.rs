@@ -22,7 +22,6 @@ use mainframe_env_host_api::{AccessIntent, EnterpriseAuthorizer, HostProblem};
 use mainframe_env_store_api::{ProviderStateMutation, ProviderStateStore, WorkRecord, WorkStore};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-
 mod conversation;
 
 pub(super) const WORK_PAYLOAD_SCHEMA: &str = "mainframe-env.ims-tm-work@1";
@@ -881,8 +880,7 @@ impl TmService {
             );
         };
         self.ensure_outbound_capacity(1)?;
-        let (output_key, output) =
-            output_row(&session, &key, buffer, session.pending_output_ids.len())?;
+        let (output_key, output) = output_row(&session, &key, buffer, session_version, 0)?;
         if !output.available {
             session.pending_output_ids.push(output_key.clone());
         }
@@ -970,12 +968,8 @@ impl TmService {
         }
         for (ordinal, (key, buffer)) in session.output_buffers.iter().enumerate() {
             self.authorize_destination(invocation, &buffer.destination)?;
-            let (output_key, mut output) = output_row(
-                &session,
-                key,
-                buffer.clone(),
-                session.pending_output_ids.len() + ordinal,
-            )?;
+            let (output_key, mut output) =
+                output_row(&session, key, buffer.clone(), session_version, ordinal)?;
             output.available = true;
             output_ids.push(output_key.clone());
             mutations.push(put(

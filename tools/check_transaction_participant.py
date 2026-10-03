@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import re
+import json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,24 @@ def require_fragments(source: str, fragments: tuple[str, ...], label: str) -> No
 
 
 def check(root: Path = ROOT) -> None:
+    contract = json.loads((root / "conformance/0.16/contracts/transaction-participant.json").read_text())
+    ims = next(p for p in contract["participants"] if p["provider_id"] == "ims")
+    preparation = ims.get("preparation")
+    if preparation is not None:
+        if ims["status"] != "pending" or ims["capabilities"] is not None:
+            raise ValueError("IMS preparation must not admit a participant")
+        require_fragments(
+            (root / preparation["contract_test"]).read_text(),
+            (
+                "fn memory_local_commit_rollback_replay_and_batch_limit()",
+                "fn authorization_and_malformed_failures_preserve_all_rows()",
+                "fn sqlite_process_restart_preserves_commit_undo_and_unknown_replay()",
+                "fn sqlite_child_phase()",
+                "ims_providers(", "std::process::Command::new",
+                "HostProblem::UnknownOutcome", "ParticipantStatus::Pending",
+            ),
+            "IMS local preparation tests (not acceptance evidence)",
+        )
     coordinator = production_source(
         root / "crates/kernel/mainframe-env-interpreter/src/coordinator.rs"
     )

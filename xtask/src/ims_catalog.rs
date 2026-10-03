@@ -157,6 +157,34 @@ fn validate_metadata_schema(root: &Path) -> TaskResult {
     bad_name["databases"][0]["segments"][0]["name"] = json!("TOO-LONG");
     let mut bad_kind = instance.clone();
     bad_kind["psbs"][0]["pcbs"][1]["kind"] = json!("io");
+    let mut format = instance.clone();
+    format["databases"][0] = json!({"name":"AUTHDB", "version":7, "organization":"GSAM",
+        "segments":[{"name":"RECORD", "parent":null, "min_length":12, "max_length":16, "fields":[]}],
+        "secondary_indexes":[], "logical_relationships":[],
+        "gsam_format":{"version":1, "record_format":"U", "access_method":"Bsam",
+            "block_size":16, "control":"None"}});
+    require(
+        validator.is_valid(&format),
+        "IMS metadata schema rejected explicit GSAM format",
+    )?;
+    for (field, value) in [
+        ("version", json!(2)),
+        ("access_method", json!("Vsam")),
+        ("block_size", json!(0)),
+        ("raw_pcb", json!([0, 0, 0, 12])),
+    ] {
+        let mut bad = format.clone();
+        bad["databases"][0]["gsam_format"][field] = value;
+        require(
+            !validator.is_valid(&bad),
+            &format!("IMS metadata schema accepted invalid format {field}"),
+        )?;
+    }
+    format["databases"][0]["organization"] = json!("HIDAM");
+    require(
+        !validator.is_valid(&format),
+        "IMS metadata schema accepted non-GSAM format",
+    )?;
     let mut bad_bound = instance;
     bad_bound["databases"][0]["segments"][0]["max_length"] = json!(32769);
     for (label, mutation) in [
@@ -425,6 +453,11 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
         )?;
     }
 
+    let null_command = hex_byte(text(&rules, "null_command_encoding", &rules_path)?)?;
+    require(
+        null_command == b'-',
+        "IMS SSA null-command encoding drifted",
+    )?;
     let expected_codes = [
         "A", "C", "D", "F", "G", "L", "M", "N", "O", "P", "Q", "R", "S", "U", "V", "W", "Z",
     ];
@@ -525,6 +558,7 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
          pub const IMS_SSA_SEGMENT_NAME_BYTES: usize = 8;\n\
          pub const IMS_SSA_FIELD_NAME_BYTES: usize = 8;\n\
          pub const IMS_SSA_RELATIONAL_OPERATOR_BYTES: usize = 2;\n\n\
+         const IMS_SSA_NULL_COMMAND: u8 = {null_command};\n\n\
          pub const IMS_SSA_COMMAND_CODES: &[ImsSsaCommandCodeDescriptor] = &[\n",
         format!("sha256:{}", file_digest(&rules_path)?),
         format!(

@@ -87,6 +87,32 @@ contract change.
 
 ## Provider full codecs and dependency proofs
 
+### Private IMS recovery presence amendment
+
+For `IMS-1405.private-recovery-retention-fence`, IMS owns a conservative
+presence predicate over the reserved `ims-recovery-v1-` namespace prefix.
+The existing prefix API requests one row: any returned row is sufficient,
+including malformed bytes or unknown versions/subnamespaces. A successful empty
+query proves absence; an error fails closed. This is not a private graph decoder
+or attribution/age proof. The server ORs presence into its existing `unowned`
+core dependency inventory between the existing epoch reads. Store forecast and
+archive/delete use the same snapshot, and the archive transaction rechecks the
+exact provider epoch and existing source CAS.
+
+Presence globally protects `resolved-effects`, `terminal-work`,
+`lifecycle-events` and `terminal-executions`, even for unrelated owners. This may
+prevent core retention progress indefinitely and leave bounded stores full.
+There is no private expiry/cleanup authority or additional target/order/lifetime.
+Ordinary IMS replay still uses its existing full codec and archive proof.
+`audit` and `delivered-outbox` are outside this unowned fence. Legacy `ims-state`,
+ordinary session/checkpoint/session-index/undo and generic undo families outside
+the reserved prefix receive no additional protection from this amendment.
+Older maintenance clients must be drained before retention over private graphs;
+unchanged payload/SQL compatibility does not make their inventory safe. See
+[ADR-0037](../decisions/0037-private-ims-recovery-retention-fence.md).
+
+### Existing provider codec boundaries
+
 The core server asks the owning provider to fully decode every provider source
 row before constructing a plan. A descriptor binds the exact namespace, key,
 CAS/source version, SHA-256 of the exact payload, supported codec version,

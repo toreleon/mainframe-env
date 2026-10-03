@@ -73,25 +73,69 @@ pub enum CheckpointKind {
     Symbolic,
 }
 
-/// A PCB's last stable key, not a claim that position will be restored.
+/// A PCB's retained hierarchy key, GSAM position, or selected secondary identity.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SavedPcbPosition {
+    /// Exact owned format/bounds identity. Absent preserves old checkpoint bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gsam_format: Option<[u8; 32]>,
     pub pcb: String,
     pub database: String,
     pub segment_key: Vec<u8>,
+    /// GSAM has no hierarchy key. Absent preserves historical digest bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gsam: Option<SavedGsamPosition>,
+    /// Selected pointer identity is distinct from hierarchy keys and GSAM RSA.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary: Option<super::SavedSecondaryPosition>,
+}
+
+/// Provider-derived logical positions, never physical IBM RSA layouts.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum SavedGsamPosition {
+    Beginning,
+    Eof,
+    Record(mainframe_env_host_api::ImsGsamAddress),
+    /// Output resumes appending after an integrity-checked live prefix.
+    Output {
+        records: usize,
+        prefix_digest: [u8; 32],
+    },
 }
 
 impl SavedPcbPosition {
     fn validate(&self, limits: RecoveryLimits) -> Result<(), RecoveryProblem> {
         if !valid_name(&self.pcb, limits.max_database_name_bytes)
             || !valid_name(&self.database, limits.max_database_name_bytes)
-            || self.segment_key.is_empty()
+            || (self.segment_key.is_empty() != (self.gsam.is_some() || self.secondary.is_some()))
+            || (self.gsam.is_some() && self.secondary.is_some())
+            || self.gsam_format.is_some() && self.gsam.is_none()
+            || self.gsam_format == Some([0; 32])
         {
             return Err(RecoveryProblem::InvalidRequest);
         }
         if self.segment_key.len() > limits.max_position_key_bytes {
             return Err(RecoveryProblem::LimitExceeded);
+        }
+        if let Some(position) = &self.secondary {
+            position.validate(limits)?;
+        }
+        if let Some(position) = &self.gsam {
+            match position {
+                SavedGsamPosition::Record(address)
+                    if address.database != self.database || address.token == [0; 32] =>
+                {
+                    return Err(RecoveryProblem::InvalidRequest);
+                }
+                SavedGsamPosition::Output { records, .. }
+                    if *records > limits.max_utility_records =>
+                {
+                    return Err(RecoveryProblem::LimitExceeded);
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
@@ -136,6 +180,11 @@ impl CheckpointRequest {
         let mut names = BTreeSet::new();
         for position in &self.positions {
             position.validate(limits)?;
+            if self.kind == CheckpointKind::Basic
+                && (position.gsam.is_some() || position.secondary.is_some())
+            {
+                return Err(RecoveryProblem::Unsupported);
+            }
             if !names.insert(position.pcb.as_str()) {
                 return Err(RecoveryProblem::InvalidRequest);
             }

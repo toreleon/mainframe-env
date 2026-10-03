@@ -3,11 +3,13 @@
 mod contracts;
 mod log_utilities;
 mod runtime;
+mod secondary_position;
 pub(crate) mod utilities;
 
 pub use contracts::*;
 pub use log_utilities::*;
 pub use runtime::*;
+pub use secondary_position::*;
 pub use utilities::*;
 
 #[cfg(test)]

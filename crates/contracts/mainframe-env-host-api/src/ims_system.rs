@@ -77,48 +77,48 @@ pub struct ImsPositionSsa {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// OSAM/VSAM modeled statistics pool identity.
+/// Buffer-pool category in the local statistics and runtime-definition projection.
 pub enum ImsBufferPoolKind {
-    /// OSAM modeled pool.
+    /// OSAM pool identity.
     Osam,
-    /// VSAM modeled pool.
+    /// VSAM pool identity.
     Vsam,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// STAT function family retained separately from output format and extension selection.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// STAT function-family identity; enhanced execution support is separately bounded.
 pub enum ImsStatisticsFamily {
-    /// DBAS function family.
+    /// Basic OSAM-family selector.
     Dbas,
-    /// DBES function family; the only family permitting extended selection.
+    /// Enhanced OSAM-family selector; a typed identity does not admit enhanced observations.
     Dbes,
-    /// VBAS function family.
+    /// Basic VSAM-family selector.
     Vbas,
-    /// VBES function family.
+    /// Enhanced VSAM-family selector; a typed identity does not admit enhanced observations.
     Vbes,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// STAT output format validated with family and extended-mode applicability.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// STAT format selector; returned host observations are not raw print/binary layouts.
 pub enum ImsStatisticsFormat {
-    /// Full statistics representation.
+    /// Full-format selector identity.
     Full,
-    /// OSAM representation, restricted to DBAS/DBES.
+    /// OSAM-specific format selector, rejected with VSAM families.
     Osam,
-    /// Summary representation, without extended selection.
+    /// Summary-format selector identity.
     Summary,
-    /// Unformatted statistics representation.
+    /// Unformatted selector identity, without a raw-layout equivalence claim.
     Unformatted,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// STAT family/format/extension selection; only represented validated combinations are admitted.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// STAT family, format and extension flag validated before capacity or result checks.
 pub struct ImsStatisticsFunction {
-    /// Exact STAT function family.
+    /// Requested statistics family.
     pub family: ImsStatisticsFamily,
-    /// Format checked against the selected family.
+    /// Requested format selector.
     pub format: ImsStatisticsFormat,
-    /// Extended mode admitted only for DBES Full, Osam or Unformatted.
+    /// Whether the extended function is requested; capacity support may remain Unsupported.
     pub extended: bool,
 }
 
@@ -157,6 +157,13 @@ pub enum ImsSystemCall {
     Statistics {
         /// Validated STAT family/format/extension selection.
         function: ImsStatisticsFunction,
+    },
+    /// Bounded host projection, not IBM print records or binary fullword layout.
+    StatisticsV2 {
+        /// STAT selector; support and capacity are checked separately from its identity.
+        function: ImsStatisticsFunction,
+        /// Caller capacity in bytes, bounded by the conservative minimum and host ceiling.
+        io_area_bytes: u32,
     },
 }
 
@@ -216,54 +223,106 @@ pub struct ImsBufferStatistics {
     pub writes: u64,
 }
 
+/// Only explicitly published read/write counters are projected. No other IBM
+/// buffer-handler, error, hiperspace or coupling-facility statistic is implied.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Typed system observations with bounded areas/PCB lists; call-specific interpretation remains with the caller.
-pub enum ImsSystemResult {
-    /// Accepted group observation.
-    Accepted {
-        /** Retained accepted group selector. */
-        group: ImsStatusGroup,
+pub enum ImsStatisticsObservationV2 {
+    /// One explicitly ordered VSAM subpool observation.
+    Subpool {
+        /// Published geometry and counters for the selected subpool.
+        statistics: ImsBufferStatistics,
     },
-    /// Observed target PCB availability.
-    Query {
-        /** Observed queried PCB metadata. */
-        pcb: ImsPcbAvailability,
-    },
-    /// Bounded refreshed PCB observations.
-    Refreshed {
-        /** Bounded refreshed PCB observations, not live ownership tokens. */
-        pcbs: Vec<ImsPcbAvailability>,
-    },
-    /// Observed reservation release count.
-    Dequeued {
-        /** Number of released modeled reservations. */
-        released: u32,
-    },
-    /// Modeled SCD/PST address observation.
-    Gscd {
-        /** Modeled 32-bit SCD address, not a native process pointer. */
-        scd_address: u32,
-        /** Modeled 32-bit PST address, not a native process pointer. */
-        pst_address: u32,
-    },
-    /// Bounded modeled area observations.
-    Positioned {
-        /** Bounded modeled area position observations. */
-        areas: Vec<ImsPositionArea>,
-    },
-    /// Optional modeled pool observation.
-    Statistics {
-        /** Optional modeled pool statistics; absence is preserved rather than synthesized. */
-        pool: Option<ImsBufferStatistics>,
+    /// Aggregate basic buffer geometry and published read/write counters.
+    Totals {
+        /// Aggregate buffer count.
+        buffers: u64,
+        /// Aggregate modeled buffer storage in bytes.
+        storage_bytes: u64,
+        /// Aggregate published read count.
+        reads: u64,
+        /// Aggregate published write count.
+        writes: u64,
     },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Modeled 32-bit directory addresses, not process pointers or access authority.
+/// Owned system-call observation; validate bounds and unsupported statistics families before use.
+pub enum ImsSystemResult {
+    /// Acknowledged typed status-group selection.
+    Accepted {
+        /// Status group reported by the operation.
+        group: ImsStatusGroup,
+    },
+    /// Availability observation for one PCB.
+    Query {
+        /// Numbered PCB status and organization observation.
+        pcb: ImsPcbAvailability,
+    },
+    /// Bounded refreshed PCB availability list.
+    Refreshed {
+        /// PCB observations bounded by max_fields.
+        pcbs: Vec<ImsPcbAvailability>,
+    },
+    /// Modeled Q reservation release count.
+    Dequeued {
+        /// Number of reservations released by this operation.
+        released: u32,
+    },
+    /// Installed local directory values, without physical address equivalence.
+    Gscd {
+        /// Modeled SCD address value from installed runtime metadata.
+        scd_address: u32,
+        /// Modeled PST address value from installed runtime metadata.
+        pst_address: u32,
+    },
+    /// Bounded modeled DEDB area observations.
+    Positioned {
+        /// Area observations bounded by max_records.
+        areas: Vec<ImsPositionArea>,
+    },
+    /// Legacy optional pool-statistics observation.
+    Statistics {
+        /// Observed pool, or None when no pool observation is returned.
+        pool: Option<ImsBufferStatistics>,
+    },
+    /// Basic typed observation with the original requested selector.
+    StatisticsV2 {
+        /// Selector associated with this observation; unsupported enhanced families reject.
+        function: ImsStatisticsFunction,
+        /// Published observation, or None when no observation is available.
+        observation: Option<ImsStatisticsObservationV2>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+/// Subpool category used with explicit definition order.
+pub enum ImsVsamSubpoolType {
+    /// Data-buffer subpool identity.
+    Data,
+    /// Index-buffer subpool identity.
+    Index,
+}
+
+/// Explicit LSR definition order; names are resource identities, never sort keys.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImsVsamSubpoolMetadata {
+    /// Subpool resource identity referencing a modeled VSAM buffer pool.
+    pub subpool: String,
+    /// LSR pool identifier used to group explicit definitions.
+    pub lsr_pool: u16,
+    /// Explicit order within the installed subpool definitions; names do not order selection.
+    pub definition_order: u16,
+    /// Data or index buffer category.
+    pub subpool_type: ImsVsamSubpoolType,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Installed local directory projection; values do not assert process or IBM physical addresses.
 pub struct ImsSystemDirectory {
-    /// Modeled 32-bit SCD address, not a native process pointer.
+    /// Modeled SCD address returned by the local directory route.
     pub scd_address: u32,
-    /// Modeled 32-bit PST address, not a native process pointer.
+    /// Modeled PST address returned by the local directory route.
     pub pst_address: u32,
 }
 
@@ -302,6 +361,60 @@ pub struct ImsSystemRuntimeDefinition {
     pub dedb_areas: Vec<ImsDedbAreaDefinition>,
     /// Modeled pool definitions installed through existing provider storage.
     pub buffer_pools: Vec<ImsBufferPoolDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Optional ordered VSAM subpool metadata; absent historical fields default to an empty list.
+    pub vsam_subpools_v2: Vec<ImsVsamSubpoolMetadata>,
+}
+
+impl ImsStatisticsFunction {
+    /// Reject invalid family/format/extension combinations without granting observation support.
+    pub fn validate(self) -> Result<(), HostProblem> {
+        if self.extended
+            && !(self.family == ImsStatisticsFamily::Dbes
+                && matches!(
+                    self.format,
+                    ImsStatisticsFormat::Full
+                        | ImsStatisticsFormat::Osam
+                        | ImsStatisticsFormat::Unformatted
+                ))
+            || self.format == ImsStatisticsFormat::Osam
+                && matches!(
+                    self.family,
+                    ImsStatisticsFamily::Vbas | ImsStatisticsFamily::Vbes
+                )
+        {
+            Err(HostProblem::Malformed)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Conservative capacity from the specific format topics. E1 capacities
+    /// and DBASO lack a consistent proven form in this bounded contract.
+    pub fn minimum_io_area_bytes(self) -> Result<u32, HostProblem> {
+        self.validate()?;
+        if self.extended
+            || self.family == ImsStatisticsFamily::Dbas && self.format == ImsStatisticsFormat::Osam
+        {
+            return Err(HostProblem::Unsupported);
+        }
+        Ok(match (self.family, self.format) {
+            (ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Vbas, ImsStatisticsFormat::Full) => {
+                360
+            }
+            (ImsStatisticsFamily::Dbes | ImsStatisticsFamily::Vbes, ImsStatisticsFormat::Full) => {
+                600
+            }
+            (
+                ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Vbas,
+                ImsStatisticsFormat::Summary,
+            ) => 180,
+            (_, ImsStatisticsFormat::Summary | ImsStatisticsFormat::Osam) => 360,
+            (ImsStatisticsFamily::Dbes, ImsStatisticsFormat::Unformatted) => 84,
+            (ImsStatisticsFamily::Vbes, ImsStatisticsFormat::Unformatted) => 104,
+            (_, ImsStatisticsFormat::Unformatted) => 72,
+        })
+    }
 }
 
 impl ImsSystemRequest {
@@ -342,25 +455,16 @@ impl ImsSystemRequest {
                 }
                 Ok(())
             }
-            ImsSystemCall::Statistics { function } => {
-                if function.extended
-                    && !(function.family == ImsStatisticsFamily::Dbes
-                        && matches!(
-                            function.format,
-                            ImsStatisticsFormat::Full
-                                | ImsStatisticsFormat::Osam
-                                | ImsStatisticsFormat::Unformatted
-                        ))
-                    || function.format == ImsStatisticsFormat::Osam
-                        && !matches!(
-                            function.family,
-                            ImsStatisticsFamily::Dbas | ImsStatisticsFamily::Dbes
-                        )
-                {
-                    Err(HostProblem::Malformed)
-                } else {
-                    Ok(())
+            ImsSystemCall::Statistics { function } => function.validate(),
+            ImsSystemCall::StatisticsV2 {
+                function,
+                io_area_bytes,
+            } => {
+                let minimum = function.minimum_io_area_bytes()?;
+                if *io_area_bytes < minimum || *io_area_bytes as usize > limits.max_record_bytes {
+                    return Err(HostProblem::Malformed);
                 }
+                Ok(())
             }
             _ => Ok(()),
         }
@@ -398,6 +502,37 @@ impl ImsSystemResult {
                 if !valid_name(&pool.pool) || pool.buffer_bytes == 0 || pool.buffers == 0 =>
             {
                 Err(HostProblem::Malformed)
+            }
+            Self::StatisticsV2 {
+                function,
+                observation,
+            } => {
+                function.minimum_io_area_bytes()?;
+                if matches!(
+                    function.family,
+                    ImsStatisticsFamily::Dbes | ImsStatisticsFamily::Vbes
+                ) {
+                    return Err(HostProblem::Unsupported);
+                }
+                match observation {
+                    Some(ImsStatisticsObservationV2::Subpool { statistics }) => {
+                        if function.family != ImsStatisticsFamily::Vbas
+                            || statistics.kind != ImsBufferPoolKind::Vsam
+                        {
+                            return Err(HostProblem::Malformed);
+                        }
+                        Self::Statistics {
+                            pool: Some(statistics.clone()),
+                        }
+                        .validate(limits)
+                    }
+                    Some(ImsStatisticsObservationV2::Totals {
+                        buffers,
+                        storage_bytes,
+                        ..
+                    }) if *buffers == 0 || *storage_bytes == 0 => Err(HostProblem::Malformed),
+                    _ => Ok(()),
+                }
             }
             _ => Ok(()),
         }

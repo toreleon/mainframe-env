@@ -120,7 +120,7 @@ struct CallProtocol {
 
 enum DecodedReceipt {
     Legacy(LegacyReceipt),
-    Current(Receipt),
+    Current(Box<Receipt>),
 }
 
 enum DecodedProtocol {
@@ -367,7 +367,7 @@ fn decode_receipt(
         return Err(CobolRetentionValidationError::CorruptPayload);
     }
     if let Ok(receipt) = serde_json::from_slice::<Receipt>(&record.payload)
-        && matches!(receipt.schema_version, 2 | 3 | 4)
+        && matches!(receipt.schema_version, 2..=4)
     {
         if !valid_digest(&receipt.fingerprint)
             || receipt.replay_key != record.key
@@ -392,7 +392,7 @@ fn decode_receipt(
         {
             return Err(CobolRetentionValidationError::InconsistentState);
         }
-        return Ok(DecodedReceipt::Current(receipt));
+        return Ok(DecodedReceipt::Current(Box::new(receipt)));
     }
     let receipt: LegacyReceipt = serde_json::from_slice(&record.payload)
         .map_err(|_| CobolRetentionValidationError::CorruptPayload)?;
@@ -788,7 +788,7 @@ impl CobolProgram {
         let key = identity(parent, effect)?;
         let fingerprint = fingerprint(parent, effect, program, payload)?;
         let outer_identity = outer_program_identity(effect)?;
-        if outer_identity && effect.sequence > u64::from(parent.limits.max_effects) {
+        if outer_identity && effect.sequence > parent.limits.max_effects {
             return Err(HostProblem::ResourceExhausted);
         }
         let preflight = || match selection {
@@ -1272,7 +1272,7 @@ mod identity_tests {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let fixture = Fixture::new(&root, store.clone(), HostProblem::NotFound, false);
         let mut oversized = valid;
-        oversized.sequence = u64::from(actor.limits.max_effects) + 1;
+        oversized.sequence = actor.limits.max_effects + 1;
         assert_eq!(
             fixture.router.cobol.execute_installed_effect(
                 &actor,

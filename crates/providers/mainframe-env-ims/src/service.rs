@@ -1,3 +1,9 @@
+use crate::database::{DatabaseEngineImage, PcbPosition};
+use crate::retention::{
+    ImsReplayOwnerKind, ims_pending_replay_matches, prepare_ims_replay, resolve_ims_replay,
+    validate_ims_recorded_result,
+};
+use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
 use mainframe_env_execution_api::{
     CapabilityId, IdempotencyKey, Invocation, InvocationLimits, ServiceClass,
 };
@@ -15,21 +21,24 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
-
-use crate::database::{DatabaseEngineImage, PcbPosition};
-use crate::retention::{
-    ImsReplayOwnerKind, ims_pending_replay_matches, prepare_ims_replay, resolve_ims_replay,
-    validate_ims_recorded_result,
-};
-use crate::{ImsMetadataCatalog, ImsMetadataLimits, validate_ims_metadata};
-
+mod application_backout;
+mod application_recovery;
+mod execution;
 mod generic;
+mod legacy_load;
+use legacy_load::{load, unload};
+mod providers;
+pub use providers::ims_providers;
+mod rows;
+pub use application_recovery::ims_providers_with_recovery;
+use rows::*;
+mod feedback;
+mod gsam;
 mod system;
 mod utility_bridge;
 mod validation;
 pub use generic::{ImsGenericLoadImage, ImsGenericLoadRecord};
-use validation::{validate_definition, validate_state};
-
+use validation::*;
 const STATE_NAMESPACE: &str = "ims-state";
 const STATE_KEY: &str = "catalog";
 const ROW_STORE_SCHEMA: &str = "mainframe-env.ims-row-store@1";
@@ -42,7 +51,6 @@ const PENDING_NAMESPACE: &str = "ims-v1-unit-of-work";
 pub(crate) const GENERIC_DATABASE_NAMESPACE: &str = "ims-v1-generic-database";
 const GENERIC_PENDING_NAMESPACE: &str = "ims-v1-generic-unit-of-work";
 const SYSTEM_NAMESPACE: &str = "ims-v1-system";
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ImsLimits {
     pub max_databases: usize,
@@ -165,8 +173,12 @@ struct Session {
     last: Option<SegmentLocation>,
     #[serde(default)]
     position: PcbPosition,
+    #[serde(default, deserialize_with = "generic::pcb::read_positions")]
+    pcb_positions: BTreeMap<u16, PcbPosition>,
     #[serde(default)]
     system: system::SystemSession,
+    #[serde(default)]
+    recovery: application_recovery::ExecutionRecovery,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -208,6 +220,10 @@ pub(crate) struct RecordedResult {
     pub(crate) affected_segments: u64,
     #[serde(default)]
     pub(crate) system: Option<mainframe_env_host_api::ImsSystemResult>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) gsam: Option<gsam::ReplayOutput>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) pcb_feedback_v1: Option<mainframe_env_host_api::ImsPcbFeedbackV1>,
 }
 
 impl RecordedResult {
@@ -239,6 +255,8 @@ impl RecordedResult {
             checkpoint_id: result.checkpoint_id.clone(),
             affected_segments: result.affected_segments,
             system: result.system.clone(),
+            gsam: None,
+            pcb_feedback_v1: None,
         }
     }
 
@@ -276,7 +294,7 @@ struct State {
     #[serde(default)]
     pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseState>>>>,
     #[serde(default)]
-    generic_pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseEngineImage>>>>,
+    generic_pending_undo: BTreeMap<String, Arc<generic::isolation::PendingUndo>>,
     #[serde(default)]
     system: BTreeMap<String, Arc<system::SystemState>>,
 }
@@ -424,210 +442,6 @@ impl ImsService {
         generic::install_metadata(self, metadata)
     }
 
-    pub fn execute(
-        &self,
-        invocation: &Invocation,
-        request: &ImsRequest,
-    ) -> Result<ImsResult, HostProblem> {
-        self.execute_at(invocation, request, invocation.deadline_tick)
-    }
-
-    fn execute_at(
-        &self,
-        invocation: &Invocation,
-        request: &ImsRequest,
-        resolution_lower_bound: u64,
-    ) -> Result<ImsResult, HostProblem> {
-        if resolution_lower_bound == 0 {
-            return Err(HostProblem::Malformed);
-        }
-        let mut durable = self.lock()?;
-        refresh_replay(&*self.store, self.limits, &mut durable)?;
-        if durable.state.metadata.is_some() {
-            generic::refresh_databases(&*self.store, self.limits, &mut durable)?;
-        }
-        let system_resources = if request.operation == ImsOperation::System {
-            Some(system::resources(&durable.state, invocation, request)?)
-        } else {
-            None
-        };
-        if let Some(authorizer) = &self.authorizer {
-            for resource in if let Some(resources) = system_resources {
-                resources
-            } else {
-                ims_resources(&durable.state, invocation, request)?
-            } {
-                authorizer.authorize(invocation.principal.id(), &resource)?;
-            }
-        }
-        refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let request_sha256 = request_digest(request)?;
-        let replay_key = request
-            .mutation
-            .as_ref()
-            .map(|mutation| mutation.idempotency_key.as_str());
-        let sequence = request.mutation.as_ref().map(|mutation| mutation.sequence);
-        if let Some(key) = replay_key
-            && let Some(recorded) = durable.state.replay.get(key)
-        {
-            match recorded.request_digest_format {
-                ReplayDigestFormat::LegacyDebugV0 => return Err(HostProblem::UnknownOutcome),
-                ReplayDigestFormat::CanonicalHostV1
-                    if recorded.request_sha256 == request_sha256 =>
-                {
-                    let result = recorded.result();
-                    let pending = ims_pending_replay_matches(
-                        recorded,
-                        key,
-                        invocation,
-                        sequence.ok_or(HostProblem::MissingIdempotency)?,
-                    )?;
-                    if pending {
-                        self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
-                            .map_err(|_| HostProblem::UnknownOutcome)?;
-                    }
-                    return Ok(result);
-                }
-                ReplayDigestFormat::CanonicalHostV1 => {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            }
-        }
-        let mut next = durable.state.scoped_snapshot();
-        let run = invocation.run_unit_id.as_str();
-        let result = if request.operation == ImsOperation::System {
-            system::apply_request(&mut next, run, request, self.limits)?
-        } else if generic::is_generic(&next, run, request) {
-            generic::apply_request(&mut next, run, request, self.limits)?
-        } else {
-            apply_request(&mut next, run, request, self.limits)?
-        };
-        if request.operation != ImsOperation::System {
-            system::observe_database_call(&mut next, run, request, &result, self.limits)?;
-        }
-        if invocation.service_class == ServiceClass::Batch
-            && matches!(
-                request.operation,
-                ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
-            )
-        {
-            next.pending_undo.remove(run);
-            next.generic_pending_undo.remove(run);
-        }
-        let uow = request.operation == ImsOperation::Commit
-            || request.operation == ImsOperation::Rollback;
-        if uow
-            && next.definitions.is_none()
-            && next.metadata.is_none()
-            && !durable.state.pending_undo.contains_key(run)
-            && !durable.state.generic_pending_undo.contains_key(run)
-        {
-            return Ok(result);
-        }
-        if request.operation.is_mutating() {
-            let key = replay_key.ok_or(HostProblem::MissingIdempotency)?;
-            if next.replay.len() >= self.limits.max_replays {
-                return Err(HostProblem::ResourceExhausted);
-            }
-            let mut recorded = RecordedResult::from_result(request_sha256, &result);
-            prepare_ims_replay(
-                &mut recorded,
-                key,
-                invocation,
-                sequence.ok_or(HostProblem::MissingIdempotency)?,
-                self.limits,
-            )?;
-            next.replay.insert(key.into(), Arc::new(recorded));
-            validate_state(&next, self.limits)?;
-            self.persist(&mut durable, next)?;
-            self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
-                .map_err(|_| HostProblem::UnknownOutcome)?;
-        }
-        Ok(result)
-    }
-
-    fn finalize_replay_metadata(
-        &self,
-        durable: &mut DurableState,
-        key: &str,
-        resolution_lower_bound: u64,
-    ) -> Result<(), HostProblem> {
-        let Some(clock) = &self.replay_clock else {
-            return Ok(());
-        };
-        let observed_tick = clock.now_tick()?;
-        if observed_tick == 0 {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let mut next = durable.state.scoped_snapshot();
-        let recorded = next
-            .replay
-            .get_mut(key)
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        resolve_ims_replay(
-            Arc::make_mut(recorded),
-            key,
-            observed_tick,
-            resolution_lower_bound,
-        )?;
-        validate_state(&next, self.limits)?;
-        self.persist(durable, next)
-    }
-
-    /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
-    ///
-    /// Legacy receipts are never replayed or redispatched implicitly. The caller
-    /// must attest the exact retained digest before this metadata-only migration.
-    pub fn reconcile_legacy_replay(
-        &self,
-        key: &IdempotencyKey,
-        expected_legacy_digest: [u8; 32],
-        request: &ImsRequest,
-    ) -> Result<(), HostProblem> {
-        if !request.operation.is_mutating()
-            || request
-                .mutation
-                .as_ref()
-                .map(|mutation| &mutation.idempotency_key)
-                != Some(key)
-        {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let canonical = request_digest(request)?;
-        let mut durable = self.lock()?;
-        refresh_replay(&*self.store, self.limits, &mut durable)?;
-        let retained = durable
-            .state
-            .replay
-            .get(key.as_str())
-            .ok_or(HostProblem::NotFound)?;
-        match retained.request_digest_format {
-            ReplayDigestFormat::CanonicalHostV1 => {
-                return if retained.request_sha256 == canonical {
-                    Ok(())
-                } else {
-                    Err(HostProblem::IdempotencyConflict)
-                };
-            }
-            ReplayDigestFormat::LegacyDebugV0
-                if retained.request_sha256 != expected_legacy_digest =>
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            ReplayDigestFormat::LegacyDebugV0 => {}
-        }
-        let mut next = durable.state.scoped_snapshot();
-        let retained = next
-            .replay
-            .get_mut(key.as_str())
-            .ok_or(HostProblem::NotFound)?;
-        let retained = Arc::make_mut(retained);
-        retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
-        retained.request_sha256 = canonical;
-        validate_state(&next, self.limits)?;
-        self.persist(&mut durable, next)
-    }
-
     pub fn hierarchy(&self, database: &str) -> Result<Vec<ImsLoadRoot>, HostProblem> {
         let durable = self.lock()?;
         let database = durable
@@ -665,44 +479,8 @@ impl ImsService {
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
-        let changes = row_changes(
-            &durable.state,
-            &state,
-            &durable.versions,
-            self.limits,
-            false,
-        )?;
-        commit_row_changes(&*self.store, changes, &mut durable.versions)?;
-        durable.state = state;
-        Ok(())
+        generic::integrity::persist(self, durable, state, &Default::default())
     }
-}
-
-fn refresh_replay(
-    store: &dyn ProviderStateStore,
-    limits: ImsLimits,
-    durable: &mut DurableState,
-) -> Result<(), HostProblem> {
-    let mut replay_versions = RowVersions::new();
-    let replay: BTreeMap<String, Arc<RecordedResult>> = load_row_map(
-        store,
-        REPLAY_NAMESPACE,
-        limits.max_replays,
-        limits,
-        &mut replay_versions,
-    )?;
-    if replay
-        .iter()
-        .any(|(key, recorded)| validate_ims_recorded_result(key, recorded, limits).is_err())
-    {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    durable
-        .versions
-        .retain(|(namespace, _), _| namespace != REPLAY_NAMESPACE);
-    durable.versions.extend(replay_versions);
-    durable.state.replay = replay;
-    Ok(())
 }
 
 struct RowChange {
@@ -710,374 +488,6 @@ struct RowChange {
     key: String,
     next_version: Option<u64>,
     mutation: ProviderStateMutation,
-}
-
-fn load_or_migrate(
-    store: &dyn ProviderStateStore,
-    limits: ImsLimits,
-) -> Result<(State, RowVersions), HostProblem> {
-    let Some(manifest_record) = store
-        .get_provider_state(STATE_NAMESPACE, STATE_KEY)
-        .map_err(store_error)?
-    else {
-        ensure_row_namespaces_empty(store)?;
-        return Ok((State::default(), RowVersions::new()));
-    };
-    if manifest_record.namespace != STATE_NAMESPACE
-        || manifest_record.key != STATE_KEY
-        || manifest_record.version == 0
-        || manifest_record.payload.len() > limits.max_state_bytes
-    {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    if let Ok(manifest) = serde_json::from_slice::<RowStoreManifest>(&manifest_record.payload) {
-        if manifest.schema_version != ROW_STORE_SCHEMA {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let mut versions = RowVersions::from([(
-            (STATE_NAMESPACE.into(), STATE_KEY.into()),
-            manifest_record.version,
-        )]);
-        let state = State {
-            definitions: manifest.definitions,
-            metadata: manifest.metadata,
-            databases: load_row_map(
-                store,
-                DATABASE_NAMESPACE,
-                limits.max_databases,
-                limits,
-                &mut versions,
-            )?,
-            generic_databases: load_row_map(
-                store,
-                GENERIC_DATABASE_NAMESPACE,
-                limits.max_databases,
-                limits,
-                &mut versions,
-            )?,
-            system: load_row_map(store, SYSTEM_NAMESPACE, 1, limits, &mut versions)?,
-            sessions: load_row_map(
-                store,
-                SESSION_NAMESPACE,
-                limits.max_sessions,
-                limits,
-                &mut versions,
-            )?,
-            checkpoints: load_row_map(
-                store,
-                CHECKPOINT_NAMESPACE,
-                limits.max_checkpoints,
-                limits,
-                &mut versions,
-            )?,
-            replay: load_row_map(
-                store,
-                REPLAY_NAMESPACE,
-                limits.max_replays,
-                limits,
-                &mut versions,
-            )?,
-            pending_undo: load_row_map(
-                store,
-                PENDING_NAMESPACE,
-                limits.max_sessions,
-                limits,
-                &mut versions,
-            )?,
-            generic_pending_undo: load_row_map(
-                store,
-                GENERIC_PENDING_NAMESPACE,
-                limits.max_sessions,
-                limits,
-                &mut versions,
-            )?,
-        };
-        validate_state(&state, limits)?;
-        return Ok((state, versions));
-    }
-
-    let legacy: State = serde_json::from_slice(&manifest_record.payload)
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-    validate_state(&legacy, limits)?;
-    ensure_row_namespaces_empty(store)?;
-    let mut versions = RowVersions::from([(
-        (STATE_NAMESPACE.into(), STATE_KEY.into()),
-        manifest_record.version,
-    )]);
-    let changes = row_changes(&State::default(), &legacy, &versions, limits, true)?;
-    commit_row_changes(store, changes, &mut versions)?;
-    Ok((legacy, versions))
-}
-
-fn ensure_row_namespaces_empty(store: &dyn ProviderStateStore) -> Result<(), HostProblem> {
-    for namespace in [
-        DATABASE_NAMESPACE,
-        SESSION_NAMESPACE,
-        CHECKPOINT_NAMESPACE,
-        REPLAY_NAMESPACE,
-        PENDING_NAMESPACE,
-        GENERIC_DATABASE_NAMESPACE,
-        GENERIC_PENDING_NAMESPACE,
-        SYSTEM_NAMESPACE,
-    ] {
-        if !store
-            .list_provider_state(namespace, 1)
-            .map_err(store_error)?
-            .is_empty()
-        {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-    }
-    Ok(())
-}
-
-fn load_row_map<T: DeserializeOwned>(
-    store: &dyn ProviderStateStore,
-    namespace: &str,
-    max: usize,
-    limits: ImsLimits,
-    versions: &mut RowVersions,
-) -> Result<BTreeMap<String, T>, HostProblem> {
-    let fetch = max.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
-    let records = store
-        .list_provider_state(namespace, fetch)
-        .map_err(store_error)?;
-    if records.len() > max {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut values = BTreeMap::new();
-    for record in records {
-        if record.namespace != namespace
-            || record.key.is_empty()
-            || record.version == 0
-            || record.payload.len() > limits.max_state_bytes
-        {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let row: ObjectRow<T> = serde_json::from_slice(&record.payload)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if row.schema_version != OBJECT_ROW_SCHEMA || row.object_key != record.key {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        versions.insert((namespace.into(), record.key.clone()), record.version);
-        if values.insert(record.key, row.value).is_some() {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-    }
-    Ok(values)
-}
-
-fn row_changes(
-    current: &State,
-    next: &State,
-    versions: &RowVersions,
-    limits: ImsLimits,
-    force_manifest_write: bool,
-) -> Result<Vec<RowChange>, HostProblem> {
-    let mut changes = Vec::new();
-    let current_manifest = RowStoreManifest {
-        schema_version: ROW_STORE_SCHEMA.into(),
-        definitions: current.definitions.clone(),
-        metadata: current.metadata.clone(),
-    };
-    let next_manifest = RowStoreManifest {
-        schema_version: ROW_STORE_SCHEMA.into(),
-        definitions: next.definitions.clone(),
-        metadata: next.metadata.clone(),
-    };
-    if force_manifest_write
-        || current_manifest != next_manifest
-        || !versions.contains_key(&(STATE_NAMESPACE.into(), STATE_KEY.into()))
-    {
-        let payload =
-            serde_json::to_vec(&next_manifest).map_err(|_| HostProblem::InfrastructureFailure)?;
-        changes.push(put_row_change(
-            STATE_NAMESPACE,
-            STATE_KEY,
-            payload,
-            versions,
-            limits.max_state_bytes,
-        )?);
-    }
-    map_arc_row_changes(
-        DATABASE_NAMESPACE,
-        &current.databases,
-        &next.databases,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        GENERIC_DATABASE_NAMESPACE,
-        &current.generic_databases,
-        &next.generic_databases,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        SESSION_NAMESPACE,
-        &current.sessions,
-        &next.sessions,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        CHECKPOINT_NAMESPACE,
-        &current.checkpoints,
-        &next.checkpoints,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        REPLAY_NAMESPACE,
-        &current.replay,
-        &next.replay,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        PENDING_NAMESPACE,
-        &current.pending_undo,
-        &next.pending_undo,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        GENERIC_PENDING_NAMESPACE,
-        &current.generic_pending_undo,
-        &next.generic_pending_undo,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    map_arc_row_changes(
-        SYSTEM_NAMESPACE,
-        &current.system,
-        &next.system,
-        versions,
-        limits,
-        &mut changes,
-    )?;
-    Ok(changes)
-}
-
-fn map_arc_row_changes<T: Serialize>(
-    namespace: &str,
-    current: &BTreeMap<String, Arc<T>>,
-    next: &BTreeMap<String, Arc<T>>,
-    versions: &RowVersions,
-    limits: ImsLimits,
-    changes: &mut Vec<RowChange>,
-) -> Result<(), HostProblem> {
-    for (key, value) in next {
-        if !current
-            .get(key)
-            .is_some_and(|current| Arc::ptr_eq(current, value))
-        {
-            changes.push(put_row_change(
-                namespace,
-                key,
-                encode_object_row(key, value)?,
-                versions,
-                limits.max_state_bytes,
-            )?);
-        }
-    }
-    for key in current.keys().filter(|key| !next.contains_key(*key)) {
-        let version = versions
-            .get(&(namespace.into(), key.clone()))
-            .copied()
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        changes.push(RowChange {
-            namespace: namespace.into(),
-            key: key.clone(),
-            next_version: None,
-            mutation: ProviderStateMutation::Delete {
-                namespace: namespace.into(),
-                key: key.clone(),
-                expected_version: version,
-            },
-        });
-    }
-    Ok(())
-}
-
-fn encode_object_row<T: Serialize>(key: &str, value: &T) -> Result<Vec<u8>, HostProblem> {
-    serde_json::to_vec(&ObjectRow {
-        schema_version: OBJECT_ROW_SCHEMA.into(),
-        object_key: key.into(),
-        value,
-    })
-    .map_err(|_| HostProblem::InfrastructureFailure)
-}
-
-fn put_row_change(
-    namespace: &str,
-    key: &str,
-    payload: Vec<u8>,
-    versions: &RowVersions,
-    max_state_bytes: usize,
-) -> Result<RowChange, HostProblem> {
-    if payload.len() > max_state_bytes {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let current = versions.get(&(namespace.into(), key.into())).copied();
-    let next = current
-        .unwrap_or(0)
-        .checked_add(1)
-        .ok_or(HostProblem::ResourceExhausted)?;
-    Ok(RowChange {
-        namespace: namespace.into(),
-        key: key.into(),
-        next_version: Some(next),
-        mutation: ProviderStateMutation::Put(ProviderStateWrite {
-            record: ProviderStateRecord {
-                namespace: namespace.into(),
-                key: key.into(),
-                version: next,
-                payload,
-            },
-            expected_version: current,
-        }),
-    })
-}
-
-fn commit_row_changes(
-    store: &dyn ProviderStateStore,
-    changes: Vec<RowChange>,
-    versions: &mut RowVersions,
-) -> Result<(), HostProblem> {
-    if changes.is_empty() {
-        return Ok(());
-    }
-    let applied = changes
-        .iter()
-        .map(|change| {
-            (
-                (change.namespace.clone(), change.key.clone()),
-                change.next_version,
-            )
-        })
-        .collect::<Vec<_>>();
-    store
-        .mutate_provider_states_atomic(changes.into_iter().map(|change| change.mutation).collect())
-        .map_err(store_error)?;
-    for (key, version) in applied {
-        match version {
-            Some(version) => {
-                versions.insert(key, version);
-            }
-            None => {
-                versions.remove(&key);
-            }
-        }
-    }
-    Ok(())
 }
 
 fn install_receipt(
@@ -1135,10 +545,14 @@ fn ims_resources(
                 databases.insert(context(state, run)?.0);
             }
         }
-        ImsOperation::Commit | ImsOperation::Rollback => match state.pending_undo.get(run) {
-            Some(pending) => databases.extend(pending.keys().cloned()),
-            None => return Ok(resources),
-        },
+        ImsOperation::Commit | ImsOperation::Rollback => {
+            databases.extend(system::reservations::owned_databases(state, run)?);
+            if let Some(pending) = state.pending_undo.get(run) {
+                databases.extend(pending.keys().cloned());
+            } else if databases.is_empty() {
+                return Ok(resources);
+            }
+        }
         ImsOperation::Schedule => {
             let psb = normalize(request.psb.as_deref().ok_or(HostProblem::Malformed)?);
             let definition = state
@@ -1260,7 +674,9 @@ fn schedule(
             current_root: None,
             last: None,
             position: PcbPosition::default(),
+            pcb_positions: BTreeMap::new(),
             system: system::SystemSession::default(),
+            recovery: application_recovery::ExecutionRecovery::default(),
         }),
     );
     Ok(status("  "))
@@ -1602,90 +1018,6 @@ fn checkpoint(
     })
 }
 
-fn load(
-    state: &mut State,
-    request: &ImsRequest,
-    limits: ImsLimits,
-) -> Result<ImsResult, HostProblem> {
-    let image: ImsLoadImage =
-        serde_json::from_slice(&request.data).map_err(|_| HostProblem::Malformed)?;
-    let database_name = normalize(&image.database);
-    let (_, root_definition, child_definition) = database_definition(state, &database_name)?;
-    let child_definition = child_definition.ok_or(HostProblem::NotFound)?;
-    if image.roots.len() > limits.max_roots {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut database = DatabaseState::default();
-    let mut affected_count = 0u64;
-    for root in image.roots {
-        validate_segment_data(&root.data, &root_definition, limits)?;
-        if root.children.len() > limits.max_children_per_root {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let root_key = data_key(&root.data, &root_definition)?;
-        let mut record = RootRecord {
-            data: root.data,
-            children: BTreeMap::new(),
-        };
-        for child in root.children {
-            validate_segment_data(&child, &child_definition, limits)?;
-            let child_key = data_key(&child, &child_definition)?;
-            if record.children.insert(child_key, child).is_some() {
-                return Err(HostProblem::Malformed);
-            }
-            affected_count += 1;
-        }
-        if database.roots.insert(root_key.clone(), record).is_some() {
-            return Err(HostProblem::Malformed);
-        }
-        database.secondary_index.insert(root_key.clone(), root_key);
-        affected_count += 1;
-    }
-    state.databases.insert(database_name, Arc::new(database));
-    Ok(affected(affected_count))
-}
-
-fn unload(state: &State, run: &str, request: &ImsRequest) -> Result<ImsResult, HostProblem> {
-    let database_name = request
-        .psb
-        .as_ref()
-        .map(|name| normalize(name))
-        .or_else(|| context(state, run).ok().map(|context| context.0))
-        .ok_or(HostProblem::Malformed)?;
-    let (_, root_definition, child_definition) = database_definition(state, &database_name)?;
-    let database = state
-        .databases
-        .get(&database_name)
-        .ok_or(HostProblem::NotFound)?;
-    let mut segments = Vec::new();
-    for (root_key, root) in &database.roots {
-        segments.push(ImsSegment {
-            name: root_definition.name.clone(),
-            parent_key: None,
-            data: root.data.clone(),
-        });
-        if let Some(child_definition) = &child_definition {
-            for child in root.children.values() {
-                segments.push(ImsSegment {
-                    name: child_definition.name.clone(),
-                    parent_key: Some(decode_key(root_key)?),
-                    data: child.clone(),
-                });
-            }
-        }
-        if segments.len() >= request.max_segments as usize {
-            break;
-        }
-    }
-    Ok(ImsResult {
-        status: "  ".into(),
-        segments,
-        checkpoint_id: None,
-        affected_segments: 0,
-        system: None,
-    })
-}
-
 fn context(
     state: &State,
     run: &str,
@@ -1843,10 +1175,6 @@ fn segment(name: &str, parent_key: Option<Vec<u8>>, data: Vec<u8>) -> ImsResult 
     }
 }
 
-fn request_digest(request: &ImsRequest) -> Result<[u8; 32], HostProblem> {
-    canonical_ims_request_digest(request)
-}
-
 fn normalize(value: &str) -> String {
     value.trim().to_ascii_uppercase()
 }
@@ -1859,55 +1187,6 @@ fn store_error(problem: StoreError) -> HostProblem {
         }
         _ => HostProblem::InfrastructureFailure,
     }
-}
-
-struct ImsProvider {
-    service: Arc<ImsService>,
-    descriptor: CapabilityDescriptor,
-}
-
-impl HostProvider for ImsProvider {
-    fn descriptor(&self) -> &CapabilityDescriptor {
-        &self.descriptor
-    }
-
-    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
-        let sequence = effect.sequence;
-        let resolution_tick = effect.deadline_tick.max(invocation.deadline_tick);
-        let outcome = match effect.request {
-            HostRequest::Ims(request) => self
-                .service
-                .execute_at(invocation, &request, resolution_tick)
-                .map(HostResult::Ims),
-            _ => Err(HostProblem::Malformed),
-        };
-        EffectResult { sequence, outcome }
-    }
-}
-
-pub fn ims_providers(
-    service: Arc<ImsService>,
-    limits: InvocationLimits,
-) -> Vec<Arc<dyn HostProvider>> {
-    ["host.ims.read", "host.ims.write"]
-        .into_iter()
-        .map(|capability| {
-            Arc::new(ImsProvider {
-                service: service.clone(),
-                descriptor: CapabilityDescriptor {
-                    capability: CapabilityId::new(capability, limits)
-                        .expect("static IMS capability"),
-                    provider_id: "mainframe-env-ims".into(),
-                    generation: "1".into(),
-                    request_schema: "mainframe-env.ims-request@1".into(),
-                    result_schema: "mainframe-env.ims-result@1".into(),
-                    max_request_bytes: 4 * 1024 * 1024,
-                    max_result_bytes: 16 * 1024 * 1024,
-                    ready: true,
-                },
-            }) as Arc<dyn HostProvider>
-        })
-        .collect()
 }
 
 #[cfg(test)]

@@ -9,6 +9,13 @@ The selected JES COBOL program accepts its primary source through `SYSIN` and
 ordered copybook members through `SYSLIB*` DDs. `FORMAT=FIXED` selects fixed
 source; the old no-library free-form route remains compatible.
 
+The composed IMS host provider accepts the additive typed DB-batch LOG
+projection against published/installed IMS metadata. The canonical execution
+coordinator owns its intent, audit and terminal result; RecoverySession owns
+the log and the existing utility bridge publishes its selected-generation fence.
+This bounded host route does not admit IMS into a shared transaction participant
+or add COBOL recovery operand lowering. Remaining recovery families stay pending.
+
 Selected signed application packages are also the composition boundary for
 batch controllers. The server checks the selected package identity, decodes
 the bounded property contract into typed batch plans, and atomically publishes

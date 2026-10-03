@@ -245,6 +245,7 @@ pub fn parse_ims_ssa(
     let mut cursor = IMS_SSA_SEGMENT_NAME_BYTES;
     let mut command_format = false;
     let mut commands = Vec::new();
+    let mut command_slots = 0usize;
 
     match input[cursor] {
         b' ' => {
@@ -265,10 +266,18 @@ pub fn parse_ims_ssa(
             command_format = true;
             cursor += 1;
             while cursor < input.len() && !matches!(input[cursor], b' ' | b'(') {
-                if commands.len() >= limits.max_command_codes {
+                if command_slots >= limits.max_command_codes {
                     return Err(ImsSsaProblem::ResourceExhausted);
                 }
+                command_slots += 1;
                 let code = input[cursor];
+                if code == IMS_SSA_NULL_COMMAND {
+                    cursor += 1;
+                    if input.get(cursor).is_some_and(u8::is_ascii_digit) {
+                        return Err(ImsSsaProblem::InvalidSubsetPointer);
+                    }
+                    continue;
+                }
                 let descriptor =
                     ims_ssa_command_code(code).ok_or(ImsSsaProblem::InvalidCommandCode)?;
                 cursor += 1;

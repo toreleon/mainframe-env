@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a versioned owned selected database PCB feedback route with same-proposal primary key projection, key-only/path handling and exact retained replay on typed and signed package routes; missing failure witnesses, secondary key layouts and physical masks remain explicit Unsupported classes without official or licensed credit."

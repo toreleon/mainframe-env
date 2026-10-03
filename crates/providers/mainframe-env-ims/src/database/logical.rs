@@ -73,6 +73,9 @@ impl DatabaseEngine {
                 version: record.version,
             }),
             after_end: false,
+            secondary: None,
+            secondary_restart: None,
+            primary_search: None,
         };
         self.delete(&mut position)
     }

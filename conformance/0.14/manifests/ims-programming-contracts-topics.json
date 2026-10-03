@@ -10,10 +10,10 @@
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
   "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
   "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
-  "topic_count": 26,
-  "total_bytes": 574527,
+  "topic_count": 27,
+  "total_bytes": 591162,
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
-  "topic_manifest_digest": "a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594",
+  "topic_manifest_digest": "119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182",
   "coverage_credit": 0,
   "retained_in_repository": false,
   "topics": [
@@ -172,6 +172,12 @@
       "sha256": "038fcdaa210493f4c423ae2b0bc7fbbbf8bd381146a8ad25cf7615d28174d65a",
       "bytes": 5283,
       "last_modified": "2026-02-09"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_statcall.htm",
+      "sha256": "cc777a81e45ccaedc704c8319a9f9b6a6eb7b30521b00b110cd371491eb5fb51",
+      "bytes": 16635,
+      "last_modified": "not-recorded-in-retained-archive"
     }
   ]
 }

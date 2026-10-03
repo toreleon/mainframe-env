@@ -180,17 +180,16 @@ fn registry(root: &Path) -> Result<Registry> {
             }
             entries.push((label.into(), path.into()));
         }
-        if let Some(flag) = group.get("subsystem_entries") {
-            if flag
+        if let Some(flag) = group.get("subsystem_entries")
+            && flag
                 .as_bool()
                 .ok_or("navigation subsystem_entries must be boolean")?
-            {
-                for (label, path) in subsystems::navigation(&subsystems) {
-                    if !paths.insert(path.clone()) {
-                        return Err(format!("navigation repeats subsystem target {path}"));
-                    }
-                    entries.push((label, path));
+        {
+            for (label, path) in subsystems::navigation(&subsystems) {
+                if !paths.insert(path.clone()) {
+                    return Err(format!("navigation repeats subsystem target {path}"));
                 }
+                entries.push((label, path));
             }
         }
         let note = group

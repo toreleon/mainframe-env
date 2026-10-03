@@ -2,6 +2,8 @@
 
 use super::*;
 
+mod ims_stat_tests;
+
 fn bytes<T: Canonical + ?Sized>(value: &T, domain: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
     let count = encode(value, domain, MAX_CANONICAL_EFFECT_BYTES, &mut |part| {

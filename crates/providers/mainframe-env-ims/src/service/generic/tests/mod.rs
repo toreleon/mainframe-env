@@ -20,7 +20,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
 
+mod basic_checkpoint_tests;
 mod closure_tests;
+mod feedback_tests;
+mod gsam_tests;
+mod integrity_tests;
+mod isolation_tests;
+mod pcb_tests;
+mod reservation_tests;
+mod session_cas;
+mod ssa_tests;
+mod stat_tests;
 
 pub(crate) fn catalog() -> ImsMetadataCatalog {
     fn field(name: &str, offset: usize, sequence: bool) -> ImsFieldMetadata {
@@ -44,6 +54,7 @@ pub(crate) fn catalog() -> ImsMetadataCatalog {
     ImsMetadataCatalog {
         schema_version: IMS_METADATA_SCHEMA_V1.into(),
         databases: vec![ImsDatabaseMetadata {
+            gsam_format: None,
             name: "GENDB".into(),
             version: 1,
             organization: ImsDatabaseOrganization::Hidam,
@@ -61,6 +72,7 @@ pub(crate) fn catalog() -> ImsMetadataCatalog {
                 name: "GENPCB".into(),
                 database: "GENDB".into(),
                 database_version: Some(1),
+                secondary_index: None,
                 processing_options: "AP".into(),
                 sensitive_segments: vec![
                     ImsSensitiveSegmentMetadata {
@@ -721,6 +733,7 @@ fn exercise_system(store: Arc<dyn ProviderStateStore>) {
                 buffer_bytes: 4096,
                 buffers: 8,
             }],
+            vsam_subpools_v2: Vec::new(),
         })
         .unwrap();
     let run = "system-run";
@@ -998,7 +1011,7 @@ fn exercise_system(store: Arc<dyn ProviderStateStore>) {
         ImsCallSyntax::Call,
         ImsSystemCall::Statistics { function },
     );
-    assert_eq!(execute(&service, run, &exhausted).status, "GE");
+    assert_eq!(execute(&service, run, &exhausted), observed);
     let no_vsam_pool = system_request(
         run,
         23,
@@ -1187,9 +1200,20 @@ fn system_authorization_precedes_stat_observation_and_replay() {
                 buffer_bytes: 4096,
                 buffers: 8,
             }],
+            vsam_subpools_v2: Vec::new(),
         })
         .unwrap();
     let run = "system-auth";
+    service
+        .publish_buffer_statistics(ImsBufferStatistics {
+            pool: "OSAM1".into(),
+            kind: ImsBufferPoolKind::Osam,
+            buffer_bytes: 4096,
+            buffers: 8,
+            reads: 0,
+            writes: 0,
+        })
+        .unwrap();
     execute(
         &service,
         run,

@@ -829,3 +829,1089 @@ fn sqlite_reopen_preserves_package_bound_work_across_selection_rollback() {
     }
     std::fs::remove_dir_all(&directory).unwrap();
 }
+
+// Test-only source-backed gap: ordinary express TM PURG completes each group.
+// No commit, next input, private row fabrication or recovery acceptance here.
+fn public_express_purg_groups(
+    provider: Arc<dyn ProviderStateStore>,
+    work_store: Arc<dyn WorkStore>,
+    second_group: bool,
+) {
+    let service = TmService::open(
+        provider.clone(),
+        work_store.clone(),
+        Arc::new(RecordingAuthorizer::default()),
+        TmLimits::default(),
+    )
+    .unwrap();
+    let mut catalog = definitions();
+    for transaction in &mut catalog.transactions {
+        transaction.alternate_pcbs.push(TmAlternatePcbDefinition {
+            name: "EXP".into(),
+            destination: TmDestination::Fixed("TERM2".into()),
+            express: true,
+        });
+    }
+    service.install(catalog).unwrap();
+    let admitted = enqueue(&service, "express-group-input", "PAY1", None);
+    let work = service
+        .claim("PAY1", "express-group-worker", 1, 50)
+        .unwrap()
+        .unwrap();
+    assert_eq!(work.work_id, admitted.work_id);
+    assert_eq!(work.state, WorkState::Claimed);
+    assert!(work.lease_id.is_some());
+    assert!(work.lease_epoch > 0);
+    assert!(work.lease_expiry_tick.unwrap() > 1);
+    service
+        .start(
+            &invocation("express-group-run", "express-start", 1000),
+            &work,
+        )
+        .unwrap();
+    let input = service
+        .call(
+            &invocation("express-group-run", "express-gu", 1000),
+            TmCall::GetUnique,
+        )
+        .unwrap();
+    assert_eq!(input.status, TmPcbStatus::SUCCESS);
+    assert_eq!(input.segment, Some(b"first".to_vec()));
+    for (key, segment) in [
+        ("express-first-one", b"first-one".to_vec()),
+        ("express-first-two", b"first-two".to_vec()),
+    ] {
+        assert_eq!(
+            service
+                .call(
+                    &invocation("express-group-run", key, 1000),
+                    TmCall::Insert {
+                        pcb: TmPcb::Alternate("EXP".into()),
+                        segment,
+                    },
+                )
+                .unwrap()
+                .status,
+            TmPcbStatus::SUCCESS
+        );
+    }
+    assert!(service.outbound("TERM2", 16).unwrap().is_empty());
+    let purge = TmCall::Purge {
+        pcb: TmPcb::Alternate("EXP".into()),
+    };
+    let first_invocation = invocation("express-group-run", "express-first-purg", 1000);
+    let first = service.call(&first_invocation, purge.clone()).unwrap();
+    assert_eq!(first.status, TmPcbStatus::SUCCESS);
+    assert!(!first.replayed);
+    assert_eq!(first.output_message_ids.len(), 1);
+    let first_groups = service.outbound("TERM2", 16).unwrap();
+    assert_eq!(first_groups.len(), 1);
+    assert_eq!(first_groups[0].message_id, first.output_message_ids[0]);
+    assert_eq!(first_groups[0].destination, "TERM2");
+    assert!(first_groups[0].express);
+    assert_eq!(
+        first_groups[0].segments,
+        vec![b"first-one".to_vec(), b"first-two".to_vec()]
+    );
+    let first_rows = provider
+        .list_provider_state("ims-tm-v1-outbound", 16)
+        .unwrap();
+    assert_eq!(first_rows.len(), 1);
+    let replay = service.call(&first_invocation, purge.clone()).unwrap();
+    assert_eq!(replay.status, TmPcbStatus::SUCCESS);
+    assert!(replay.replayed);
+    assert_eq!(replay.output_message_ids, first.output_message_ids);
+    assert_eq!(service.outbound("TERM2", 16).unwrap(), first_groups);
+    assert_eq!(
+        provider
+            .list_provider_state("ims-tm-v1-outbound", 16)
+            .unwrap(),
+        first_rows
+    );
+    assert_eq!(work_store.get_work(&work.work_id).unwrap(), Some(work));
+    eprintln!(
+        "PUBLIC EXPRESS CONTROL: live enqueue/claim/start/GU; first literal group and exact PURG replay passed"
+    );
+    if second_group {
+        for (key, segment) in [
+            ("express-second-one", b"second-one".to_vec()),
+            ("express-second-two", b"second-two".to_vec()),
+        ] {
+            assert_eq!(
+                service
+                    .call(
+                        &invocation("express-group-run", key, 1000),
+                        TmCall::Insert {
+                            pcb: TmPcb::Alternate("EXP".into()),
+                            segment,
+                        },
+                    )
+                    .unwrap()
+                    .status,
+                TmPcbStatus::SUCCESS
+            );
+        }
+        let second_invocation = invocation("express-group-run", "express-second-purg", 1000);
+        assert_ne!(
+            second_invocation.execution_id,
+            first_invocation.execution_id
+        );
+        assert_ne!(
+            second_invocation.idempotency_key,
+            first_invocation.idempotency_key
+        );
+        let second = service.call(&second_invocation, purge);
+        let actual_groups = service.outbound("TERM2", 16).unwrap();
+        let actual_rows = provider
+            .list_provider_state("ims-tm-v1-outbound", 16)
+            .unwrap();
+        eprintln!(
+            "PUBLIC EXPRESS FAIL-FIRST: second={second:?}; stored_groups={actual_groups:?}; outbound_rows={actual_rows:?}"
+        );
+        assert_eq!(
+            actual_rows.iter().find(|row| row.key == first_rows[0].key),
+            Some(&first_rows[0]),
+            "the completed first group must remain immutable"
+        );
+        assert_eq!(
+            second.as_ref().map(|result| result.status),
+            Ok(TmPcbStatus::SUCCESS)
+        );
+        let second = second.unwrap();
+        assert_eq!(second.output_message_ids.len(), 1);
+        assert_ne!(second.output_message_ids[0], first.output_message_ids[0]);
+        assert_eq!(actual_groups.len(), 2);
+        assert_eq!(
+            actual_groups[0].segments,
+            vec![b"first-one".to_vec(), b"first-two".to_vec()]
+        );
+        assert_eq!(
+            actual_groups[1].segments,
+            vec![b"second-one".to_vec(), b"second-two".to_vec()]
+        );
+        assert_eq!(actual_groups[1].message_id, second.output_message_ids[0]);
+        assert!(actual_groups[1].sequence > actual_groups[0].sequence);
+        assert_eq!(actual_rows.len(), 2);
+    }
+}
+
+struct ExpressPurgSqliteDirectory(std::path::PathBuf);
+
+impl Drop for ExpressPurgSqliteDirectory {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.0).unwrap();
+    }
+}
+
+fn public_express_purg_sqlite(second_group: bool) {
+    let directory = ExpressPurgSqliteDirectory(std::env::temp_dir().join(format!(
+        "ims-public-express-purg-{}-{second_group}",
+        std::process::id()
+    )));
+    std::fs::create_dir(&directory.0).unwrap();
+    let url = format!("sqlite:{}?mode=rwc", directory.0.join("state.db").display());
+    let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    public_express_purg_groups(store.clone(), store, second_group);
+}
+
+#[test]
+fn public_express_purg_output_identity_failfirst_memory() {
+    let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+    public_express_purg_groups(store.clone(), store, true);
+}
+
+#[test]
+fn public_express_purg_output_identity_failfirst_sqlite() {
+    public_express_purg_sqlite(true);
+}
+
+#[test]
+fn public_express_purg_first_group_replay_control_memory() {
+    let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+    public_express_purg_groups(store.clone(), store, false);
+}
+
+#[test]
+fn public_express_purg_first_group_replay_control_sqlite() {
+    public_express_purg_sqlite(false);
+}
+
+// These explicit external-fixture entries are run with --ignored --exact and
+// a required path. An unselected helper is never process or compatibility proof.
+fn identity_definitions() -> TmDefinitionSet {
+    let mut definitions = definitions();
+    for transaction in &mut definitions.transactions {
+        for name in ["EXP", "EXP2"] {
+            transaction.alternate_pcbs.push(TmAlternatePcbDefinition {
+                name: name.into(),
+                destination: TmDestination::Fixed("TERM2".into()),
+                express: true,
+            });
+        }
+    }
+    definitions
+}
+
+fn identity_open(store: Arc<dyn ProviderStateStore>, work: Arc<dyn WorkStore>) -> Arc<TmService> {
+    TmService::open(
+        store,
+        work,
+        Arc::new(RecordingAuthorizer::default()),
+        TmLimits::default(),
+    )
+    .unwrap()
+}
+
+fn identity_start(service: &TmService, id: &str, key: &str) -> WorkRecord {
+    enqueue(service, id, "PAY1", None);
+    let work = service.claim("PAY1", key, 1, 500).unwrap().unwrap();
+    assert_eq!(work.state, WorkState::Claimed);
+    assert!(work.lease_id.is_some());
+    service
+        .start(
+            &invocation("identity-run", &format!("{key}-start"), 1_000),
+            &work,
+        )
+        .unwrap();
+    assert_eq!(
+        service
+            .call(
+                &invocation("identity-run", &format!("{key}-gu"), 1_000),
+                TmCall::GetUnique
+            )
+            .unwrap()
+            .segment,
+        Some(b"first".to_vec())
+    );
+    work
+}
+
+fn identity_insert(service: &TmService, key: &str, pcb: &str, bytes: &[u8]) {
+    let result = service
+        .call(
+            &invocation("identity-run", key, 1_000),
+            TmCall::Insert {
+                pcb: TmPcb::Alternate(pcb.into()),
+                segment: bytes.to_vec(),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.status, TmPcbStatus::SUCCESS);
+    assert!(!result.replayed);
+}
+
+fn identity_purge(service: &TmService, key: &str, pcb: &str) -> mainframe_env_ims::TmCallResult {
+    let result = service
+        .call(
+            &invocation("identity-run", key, 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate(pcb.into()),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.status, TmPcbStatus::SUCCESS);
+    assert!(!result.replayed);
+    assert_eq!(result.output_message_ids.len(), 1);
+    result
+}
+
+fn identity_snapshot(store: &dyn ProviderStateStore) -> serde_json::Value {
+    let mut rows = Vec::new();
+    for namespace in [
+        "ims-tm-v1-session",
+        "ims-tm-v1-outbound",
+        "ims-tm-v1-replay",
+    ] {
+        for row in store.list_provider_state(namespace, 1024).unwrap() {
+            rows.push(serde_json::json!({"namespace": namespace, "key": row.key,
+                "version": row.version, "payload": row.payload}));
+        }
+    }
+    serde_json::Value::Array(rows)
+}
+
+fn identity_fixture() -> (std::path::PathBuf, Arc<SqliteStateStore>) {
+    let path = std::path::PathBuf::from(
+        std::env::var("IMS_TM_IDENTITY_FIXTURE").expect("explicit external fixture path required"),
+    );
+    let url = format!("sqlite:{}?mode=rwc", path.display());
+    let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    (path, store)
+}
+
+#[test]
+#[ignore = "explicit external base/new writer process"]
+fn tm_identity_fixture_writer_process() {
+    let (path, store) = identity_fixture();
+    let service = identity_open(store.clone(), store.clone());
+    service.install(identity_definitions()).unwrap();
+    identity_start(&service, "compat-input", "compat");
+    identity_insert(&service, "compat-express-insert", "EXP", b"legacy-express");
+    let first = identity_purge(&service, "compat-express-purg", "EXP");
+    identity_insert(
+        &service,
+        "compat-pending-insert",
+        "FIXED",
+        b"legacy-pending",
+    );
+    let pending = identity_purge(&service, "compat-pending-purg", "FIXED");
+    assert_ne!(first.output_message_ids, pending.output_message_ids);
+    let groups = service.outbound("TERM2", 10).unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].segments, vec![b"legacy-express".to_vec()]);
+    assert_eq!(
+        store
+            .list_provider_state("ims-tm-v1-outbound", 10)
+            .unwrap()
+            .len(),
+        2
+    );
+    std::fs::write(
+        path.with_extension("rows.json"),
+        serde_json::to_vec_pretty(&identity_snapshot(store.as_ref())).unwrap(),
+    )
+    .unwrap();
+    println!(
+        "PHASE WRITER: real enqueue/live claim/start/GU; available express and pending ordinary; ids={:?}/{:?}",
+        first.output_message_ids, pending.output_message_ids
+    );
+}
+
+#[test]
+#[ignore = "explicit external read-only compatibility process"]
+fn tm_identity_fixture_readonly_process() {
+    let (path, store) = identity_fixture();
+    let before = identity_snapshot(store.as_ref());
+    let expected: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(path.with_extension("rows.json")).unwrap()).unwrap();
+    assert_eq!(before, expected);
+    let service = identity_open(store.clone(), store.clone());
+    let groups = service.outbound("TERM2", 10).unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].segments, vec![b"legacy-express".to_vec()]);
+    let rows = store.list_provider_state("ims-tm-v1-outbound", 10).unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().any(|row| {
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        value["value"]["available"] == false
+    }));
+    assert_eq!(identity_snapshot(store.as_ref()), before);
+    println!(
+        "PHASE READONLY: genuine fixture opened; exact rows/versions/payloads preserved; available express and pending ordinary"
+    );
+}
+
+#[test]
+#[ignore = "explicit independent replay process"]
+fn tm_identity_fixture_replay_process() {
+    let (path, store) = identity_fixture();
+    let expected: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(path.with_extension("rows.json")).unwrap()).unwrap();
+    assert_eq!(identity_snapshot(store.as_ref()), expected);
+    let service = identity_open(store.clone(), store.clone());
+    let first = service
+        .call(
+            &invocation("identity-run", "compat-express-purg", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into()),
+            },
+        )
+        .unwrap();
+    assert_eq!(first.status, TmPcbStatus::SUCCESS);
+    assert!(first.replayed);
+    assert_eq!(
+        first.output_message_ids,
+        vec![service.outbound("TERM2", 10).unwrap()[0].message_id.clone()]
+    );
+    assert_eq!(
+        service.call(
+            &invocation("identity-run", "compat-express-purg", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("FIXED".into())
+            }
+        ),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(identity_snapshot(store.as_ref()), expected);
+    println!(
+        "PHASE REPLAY: exact old PURG after later state/reopen; changed PCB canonical conflict; no duplicate or rewind"
+    );
+}
+
+fn identity_mixed_history(provider: Arc<dyn ProviderStateStore>, work_store: Arc<dyn WorkStore>) {
+    let service = identity_open(provider.clone(), work_store.clone());
+    service.install(identity_definitions()).unwrap();
+    let initial_work = identity_start(&service, "mixed-input", "mixed");
+    let mut immutable = Vec::new();
+    for (insert, purg, bytes) in [
+        ("mixed-a-in", "mixed-a-purg", b"first-express".as_slice()),
+        ("mixed-b-in", "mixed-b-purg", b"second-express".as_slice()),
+    ] {
+        identity_insert(&service, insert, "EXP", bytes);
+        identity_purge(&service, purg, "EXP");
+        immutable = provider
+            .list_provider_state("ims-tm-v1-outbound", 100)
+            .unwrap();
+    }
+    let snapshot = identity_snapshot(provider.as_ref());
+    let replay = service
+        .call(
+            &invocation("identity-run", "mixed-a-purg", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into()),
+            },
+        )
+        .unwrap();
+    assert!(replay.replayed);
+    assert_eq!(
+        replay.output_message_ids,
+        vec![
+            service.outbound("TERM2", 100).unwrap()[0]
+                .message_id
+                .clone()
+        ]
+    );
+    assert_eq!(
+        service.call(
+            &invocation("identity-run", "mixed-a-purg", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP2".into())
+            }
+        ),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(identity_snapshot(provider.as_ref()), snapshot);
+    identity_insert(&service, "mixed-pending-in", "FIXED", b"pending-ordinary");
+    let pending = identity_purge(&service, "mixed-pending-purg", "FIXED");
+    let pending_before = provider
+        .get_provider_state("ims-tm-v1-outbound", &pending.output_message_ids[0])
+        .unwrap()
+        .unwrap();
+    assert_eq!(service.outbound("TERM2", 100).unwrap().len(), 2);
+    identity_insert(&service, "mixed-c-in", "EXP2", b"third-express");
+    identity_purge(&service, "mixed-c-purg", "EXP2");
+    for (key, pcb, bytes) in [
+        ("mixed-commit-a", "EXP", b"commit-exp".as_slice()),
+        ("mixed-commit-b", "EXP2", b"commit-exp2".as_slice()),
+        ("mixed-commit-c", "FIXED", b"commit-fixed".as_slice()),
+    ] {
+        identity_insert(&service, key, pcb, bytes);
+    }
+    service
+        .call(
+            &invocation("identity-run", "mixed-commit-io", 1_000),
+            TmCall::Insert {
+                pcb: TmPcb::Io,
+                segment: b"commit-io".to_vec(),
+            },
+        )
+        .unwrap();
+    let result = service
+        .call(
+            &invocation("identity-run", "mixed-commit", 1_000),
+            TmCall::Commit {
+                conversation: Some(TmConversationAction::End),
+            },
+        )
+        .unwrap();
+    assert!(!result.replayed);
+    assert_eq!(result.output_message_ids.len(), 5);
+    assert_eq!(result.output_message_ids[0], pending.output_message_ids[0]);
+    let groups = service.outbound("TERM2", 100).unwrap();
+    assert_eq!(
+        groups
+            .iter()
+            .map(|g| g.segments.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            vec![b"first-express".to_vec()],
+            vec![b"second-express".to_vec()],
+            vec![b"pending-ordinary".to_vec()],
+            vec![b"third-express".to_vec()],
+            vec![b"commit-exp".to_vec()],
+            vec![b"commit-exp2".to_vec()],
+            vec![b"commit-fixed".to_vec()],
+        ]
+    );
+    assert!(groups.windows(2).all(|w| w[0].sequence < w[1].sequence));
+    assert_eq!(
+        groups
+            .iter()
+            .map(|group| group.sequence)
+            .collect::<Vec<_>>(),
+        vec![4, 6, 8, 10, 15, 16, 17]
+    );
+    assert_eq!(
+        service.outbound("TERM1", 100).unwrap()[0].segments,
+        vec![b"commit-io".to_vec()]
+    );
+    assert_eq!(service.outbound("TERM1", 100).unwrap()[0].sequence, 18);
+    assert!(
+        provider
+            .get_provider_state("ims-tm-v1-session", "identity-run")
+            .unwrap()
+            .is_none()
+    );
+    for row in &immutable {
+        assert_eq!(
+            provider
+                .get_provider_state(&row.namespace, &row.key)
+                .unwrap()
+                .as_ref(),
+            Some(row)
+        );
+    }
+    let pending_after = provider
+        .get_provider_state("ims-tm-v1-outbound", &pending.output_message_ids[0])
+        .unwrap()
+        .unwrap();
+    let before: serde_json::Value = serde_json::from_slice(&pending_before.payload).unwrap();
+    let after: serde_json::Value = serde_json::from_slice(&pending_after.payload).unwrap();
+    assert_eq!(before["value"]["message"], after["value"]["message"]);
+    assert_eq!(after["value"]["available"], true);
+    assert_eq!(pending_after.version, pending_before.version + 1);
+    assert_eq!(
+        work_store
+            .get_work(&initial_work.work_id)
+            .unwrap()
+            .unwrap()
+            .state,
+        WorkState::Completed
+    );
+
+    let second_work = identity_start(&service, "reuse-input", "reuse");
+    assert_ne!(second_work.work_id, initial_work.work_id);
+    identity_insert(&service, "reuse-express-in", "EXP", b"reuse-express");
+    let second = identity_purge(&service, "reuse-express-purg", "EXP");
+    assert!(
+        !groups
+            .iter()
+            .any(|g| second.output_message_ids.contains(&g.message_id))
+    );
+    let sent = provider
+        .get_provider_state("ims-tm-v1-outbound", &second.output_message_ids[0])
+        .unwrap()
+        .unwrap();
+    identity_insert(
+        &service,
+        "reuse-pending-in",
+        "FIXED",
+        b"discard-on-rollback",
+    );
+    let discarded = identity_purge(&service, "reuse-pending-purg", "FIXED");
+    service
+        .call(
+            &invocation("identity-run", "reuse-rollback", 1_000),
+            TmCall::Rollback,
+        )
+        .unwrap();
+    assert_eq!(
+        provider
+            .get_provider_state(&sent.namespace, &sent.key)
+            .unwrap()
+            .as_ref(),
+        Some(&sent)
+    );
+    assert!(
+        provider
+            .get_provider_state("ims-tm-v1-outbound", &discarded.output_message_ids[0])
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        work_store
+            .get_work(&second_work.work_id)
+            .unwrap()
+            .unwrap()
+            .state,
+        WorkState::Queued
+    );
+    let reclaimed = service
+        .claim("PAY1", "reclaimed-worker", 2, 500)
+        .unwrap()
+        .unwrap();
+    assert_eq!(reclaimed.work_id, second_work.work_id);
+    assert!(reclaimed.lease_epoch > second_work.lease_epoch);
+    assert_ne!(reclaimed.lease_id, second_work.lease_id);
+    service
+        .start(
+            &invocation("identity-run", "reclaimed-start", 1_000),
+            &reclaimed,
+        )
+        .unwrap();
+    identity_insert(&service, "reclaimed-in", "EXP", b"reclaimed-express");
+    let third = identity_purge(&service, "reclaimed-purg", "EXP");
+    assert_ne!(third.output_message_ids, second.output_message_ids);
+    service
+        .call(
+            &invocation("identity-run", "reclaimed-commit", 1_000),
+            TmCall::Commit {
+                conversation: Some(TmConversationAction::End),
+            },
+        )
+        .unwrap();
+    identity_start(&service, "cancel-input", "cancel");
+    identity_insert(&service, "cancel-exp-in", "EXP", b"cancel-express");
+    let fourth = identity_purge(&service, "cancel-exp-purg", "EXP");
+    let cancel_sent = provider
+        .get_provider_state("ims-tm-v1-outbound", &fourth.output_message_ids[0])
+        .unwrap()
+        .unwrap();
+    identity_insert(&service, "cancel-fixed-in", "FIXED", b"discard-on-cancel");
+    let cancel_pending = identity_purge(&service, "cancel-fixed-purg", "FIXED");
+    service
+        .cancel(
+            &invocation("identity-run", "cancel-call", 1_000),
+            "cancel-input",
+        )
+        .unwrap();
+    assert_eq!(
+        provider
+            .get_provider_state(&cancel_sent.namespace, &cancel_sent.key)
+            .unwrap()
+            .as_ref(),
+        Some(&cancel_sent)
+    );
+    assert!(
+        provider
+            .get_provider_state("ims-tm-v1-outbound", &cancel_pending.output_message_ids[0])
+            .unwrap()
+            .is_none()
+    );
+    println!(
+        "MIXED: strict same-incarnation order; commit slots, prior pending bytes; real new input/released-reclaimed epochs; express immutable through ordinary commit/rollback/cancel"
+    );
+}
+
+#[test]
+fn tm_output_identity_mixed_order_reuse_memory() {
+    let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+    identity_mixed_history(store.clone(), store);
+}
+
+#[test]
+fn tm_output_identity_mixed_order_reuse_sqlite() {
+    let directory = ExpressPurgSqliteDirectory(
+        std::env::temp_dir().join(format!("ims-identity-mixed-{}", std::process::id())),
+    );
+    std::fs::create_dir(&directory.0).unwrap();
+    let url = format!("sqlite:{}?mode=rwc", directory.0.join("state.db").display());
+    let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    identity_mixed_history(store.clone(), store);
+}
+
+fn identity_capacity(provider: Arc<dyn ProviderStateStore>, work: Arc<dyn WorkStore>) {
+    let service = TmService::open(
+        provider.clone(),
+        work,
+        Arc::new(RecordingAuthorizer::default()),
+        TmLimits {
+            max_outbound_messages: 1,
+            ..TmLimits::default()
+        },
+    )
+    .unwrap();
+    service.install(identity_definitions()).unwrap();
+    identity_start(&service, "capacity-input", "capacity");
+    identity_insert(&service, "capacity-first", "EXP", b"immutable-first");
+    identity_purge(&service, "capacity-purg", "EXP");
+    identity_insert(&service, "capacity-second", "EXP", b"not-published");
+    let before = identity_snapshot(provider.as_ref());
+    assert_eq!(
+        service.call(
+            &invocation("identity-run", "capacity-reject", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into())
+            }
+        ),
+        Err(HostProblem::ResourceExhausted)
+    );
+    assert_eq!(identity_snapshot(provider.as_ref()), before);
+    assert_eq!(
+        service.call(
+            &invocation("identity-run", "capacity-commit-reject", 1_000),
+            TmCall::Commit {
+                conversation: Some(TmConversationAction::End)
+            }
+        ),
+        Err(HostProblem::ResourceExhausted)
+    );
+    assert_eq!(identity_snapshot(provider.as_ref()), before);
+    assert_eq!(
+        service.outbound("TERM2", 1).unwrap()[0].segments,
+        vec![b"immutable-first".to_vec()]
+    );
+}
+
+#[test]
+fn tm_output_identity_capacity_memory() {
+    let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+    identity_capacity(store.clone(), store);
+}
+
+#[test]
+fn tm_output_identity_capacity_sqlite() {
+    let directory = ExpressPurgSqliteDirectory(
+        std::env::temp_dir().join(format!("ims-identity-capacity-{}", std::process::id())),
+    );
+    std::fs::create_dir(&directory.0).unwrap();
+    let url = format!("sqlite:{}?mode=rwc", directory.0.join("state.db").display());
+    let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    identity_capacity(store.clone(), store);
+}
+
+enum IdentityPublicationFault {
+    Before,
+    After,
+    Compete(Arc<std::sync::Barrier>),
+}
+
+struct IdentityPublicationStore {
+    inner: Arc<dyn ProviderStateStore>,
+    fault: Mutex<Option<IdentityPublicationFault>>,
+}
+
+impl mainframe_env_store_api::AuditSink for IdentityPublicationStore {
+    fn record_audit(
+        &self,
+        record: mainframe_env_execution_api::AuditRecord,
+    ) -> Result<(), StoreError> {
+        self.inner.record_audit(record)
+    }
+    fn audit_records(
+        &self,
+        id: &ExecutionId,
+        start: u64,
+        max: usize,
+    ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+        self.inner.audit_records(id, start, max)
+    }
+}
+
+impl ProviderStateStore for IdentityPublicationStore {
+    fn advance_logical_clock(&self, floor: u64) -> Result<u64, StoreError> {
+        self.inner.advance_logical_clock(floor)
+    }
+    fn get_provider_state(
+        &self,
+        namespace: &str,
+        key: &str,
+    ) -> Result<Option<mainframe_env_store_api::ProviderStateRecord>, StoreError> {
+        self.inner.get_provider_state(namespace, key)
+    }
+    fn list_provider_state(
+        &self,
+        namespace: &str,
+        max: usize,
+    ) -> Result<Vec<mainframe_env_store_api::ProviderStateRecord>, StoreError> {
+        self.inner.list_provider_state(namespace, max)
+    }
+    fn list_provider_state_prefix(
+        &self,
+        prefix: &str,
+        max: usize,
+    ) -> Result<Vec<mainframe_env_store_api::ProviderStateRecord>, StoreError> {
+        self.inner.list_provider_state_prefix(prefix, max)
+    }
+    fn put_provider_state(
+        &self,
+        record: mainframe_env_store_api::ProviderStateRecord,
+        expected: Option<u64>,
+    ) -> Result<(), StoreError> {
+        self.inner.put_provider_state(record, expected)
+    }
+    fn delete_provider_state(
+        &self,
+        namespace: &str,
+        key: &str,
+        expected: u64,
+    ) -> Result<(), StoreError> {
+        self.inner.delete_provider_state(namespace, key, expected)
+    }
+    fn move_provider_state(
+        &self,
+        record: mainframe_env_store_api::ProviderStateRecord,
+        old: &str,
+        expected: u64,
+    ) -> Result<(), StoreError> {
+        self.inner.move_provider_state(record, old, expected)
+    }
+    fn put_provider_states_atomic(
+        &self,
+        writes: Vec<mainframe_env_store_api::ProviderStateWrite>,
+    ) -> Result<(), StoreError> {
+        self.inner.put_provider_states_atomic(writes)
+    }
+    fn mutate_provider_states_atomic(
+        &self,
+        mutations: Vec<mainframe_env_store_api::ProviderStateMutation>,
+    ) -> Result<(), StoreError> {
+        let publication = mutations.iter().any(|m| matches!(m, mainframe_env_store_api::ProviderStateMutation::Put(w) if w.record.namespace == "ims-tm-v1-outbound"));
+        let fault = if publication {
+            self.fault.lock().unwrap().take()
+        } else {
+            None
+        };
+        match fault {
+            Some(IdentityPublicationFault::Before) => {
+                Err(StoreError::Infrastructure("before publication".into()))
+            }
+            Some(IdentityPublicationFault::After) => {
+                self.inner.mutate_provider_states_atomic(mutations)?;
+                Err(StoreError::Infrastructure(
+                    "lost publication acknowledgement".into(),
+                ))
+            }
+            Some(IdentityPublicationFault::Compete(barrier)) => {
+                barrier.wait();
+                self.inner.mutate_provider_states_atomic(mutations)
+            }
+            None => self.inner.mutate_provider_states_atomic(mutations),
+        }
+    }
+}
+
+fn identity_fault_history(provider: Arc<dyn ProviderStateStore>, work: Arc<dyn WorkStore>) {
+    let fault_store = Arc::new(IdentityPublicationStore {
+        inner: provider.clone(),
+        fault: Mutex::new(None),
+    });
+    let service = identity_open(fault_store.clone(), work.clone());
+    service.install(identity_definitions()).unwrap();
+    identity_start(&service, "fault-input", "fault");
+    identity_insert(&service, "fault-pre-in", "EXP", b"pre-failure-retry");
+    let before = identity_snapshot(provider.as_ref());
+    *fault_store.fault.lock().unwrap() = Some(IdentityPublicationFault::Before);
+    let request = invocation("identity-run", "fault-pre-purg", 1_000);
+    let call = TmCall::Purge {
+        pcb: TmPcb::Alternate("EXP".into()),
+    };
+    assert_eq!(
+        service.call(&request, call.clone()),
+        Err(HostProblem::UnknownOutcome)
+    );
+    assert_eq!(identity_snapshot(provider.as_ref()), before);
+    let first = service.call(&request, call.clone()).unwrap();
+    assert_eq!(first.status, TmPcbStatus::SUCCESS);
+    assert!(!first.replayed);
+    identity_insert(
+        &service,
+        "fault-post-in",
+        "EXP",
+        b"post-failure-exactly-once",
+    );
+    let before_post = identity_snapshot(provider.as_ref());
+    *fault_store.fault.lock().unwrap() = Some(IdentityPublicationFault::After);
+    let post_request = invocation("identity-run", "fault-post-purg", 1_000);
+    assert_eq!(
+        service.call(&post_request, call.clone()),
+        Err(HostProblem::UnknownOutcome)
+    );
+    let after = identity_snapshot(provider.as_ref());
+    assert_ne!(before_post, after);
+    assert_eq!(
+        provider
+            .list_provider_state("ims-tm-v1-outbound", 100)
+            .unwrap()
+            .len(),
+        2
+    );
+    let reopened = identity_open(provider.clone(), work.clone());
+    let retry = reopened.call(&post_request, call).unwrap();
+    assert_eq!(retry.status, TmPcbStatus::SUCCESS);
+    assert!(retry.replayed);
+    assert_ne!(retry.output_message_ids, first.output_message_ids);
+    assert_eq!(identity_snapshot(provider.as_ref()), after);
+    assert_eq!(
+        reopened
+            .outbound("TERM2", 100)
+            .unwrap()
+            .iter()
+            .map(|g| g.segments.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            vec![b"pre-failure-retry".to_vec()],
+            vec![b"post-failure-exactly-once".to_vec()]
+        ]
+    );
+
+    identity_insert(&reopened, "fault-cas-in", "EXP", b"one-cas-winner");
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let competitors = ["fault-cas-a", "fault-cas-b"].map(|key| {
+        let wrapper = Arc::new(IdentityPublicationStore {
+            inner: provider.clone(),
+            fault: Mutex::new(Some(IdentityPublicationFault::Compete(barrier.clone()))),
+        });
+        let competitor = identity_open(wrapper, work.clone());
+        std::thread::spawn(move || {
+            (
+                key,
+                competitor.call(
+                    &invocation("identity-run", key, 1_000),
+                    TmCall::Purge {
+                        pcb: TmPcb::Alternate("EXP".into()),
+                    },
+                ),
+            )
+        })
+    });
+    let outcomes = competitors.map(|thread| thread.join().unwrap());
+    assert_eq!(outcomes.iter().filter(|(_, r)| r.is_ok()).count(), 1);
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|(_, r)| *r == Err(HostProblem::IdempotencyConflict))
+            .count(),
+        1
+    );
+    for (key, result) in &outcomes {
+        assert_eq!(
+            provider
+                .get_provider_state("ims-tm-v1-replay", key)
+                .unwrap()
+                .is_some(),
+            result.is_ok()
+        );
+    }
+    assert_eq!(reopened.outbound("TERM2", 100).unwrap().len(), 3);
+    let winner = outcomes.iter().find(|(_, r)| r.is_ok()).unwrap();
+    let exact = reopened
+        .call(
+            &invocation("identity-run", winner.0, 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into()),
+            },
+        )
+        .unwrap();
+    assert!(exact.replayed);
+    assert_eq!(
+        exact.output_message_ids,
+        winner.1.as_ref().unwrap().output_message_ids
+    );
+    let current = identity_snapshot(provider.as_ref());
+    let replay_count = provider
+        .list_provider_state("ims-tm-v1-replay", 1024)
+        .unwrap()
+        .len();
+    let bounded = TmService::open(
+        provider.clone(),
+        work,
+        Arc::new(RecordingAuthorizer::default()),
+        TmLimits {
+            max_replays: replay_count,
+            ..TmLimits::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        bounded.call(
+            &invocation("identity-run", "fault-replay-full", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into())
+            }
+        ),
+        Err(HostProblem::ResourceExhausted)
+    );
+    assert_eq!(identity_snapshot(provider.as_ref()), current);
+    println!(
+        "FAULTS: pre/post publication UnknownOutcome; retry/reopen exact once; two live CAS writers one winner/no loser replay; retained replay capacity fails closed"
+    );
+}
+
+#[test]
+fn tm_output_identity_atomic_failures_cas_memory() {
+    let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+    identity_fault_history(store.clone(), store);
+}
+
+#[test]
+fn tm_output_identity_atomic_failures_cas_sqlite() {
+    let directory = ExpressPurgSqliteDirectory(
+        std::env::temp_dir().join(format!("ims-identity-fault-{}", std::process::id())),
+    );
+    std::fs::create_dir(&directory.0).unwrap();
+    let url = format!("sqlite:{}?mode=rwc", directory.0.join("state.db").display());
+    let store = Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+    identity_fault_history(store.clone(), store);
+}
+
+#[test]
+#[ignore = "explicit independent lost-acknowledgement writer process"]
+fn tm_identity_lost_ack_writer_process() {
+    let (path, store) = identity_fixture();
+    let wrapper = Arc::new(IdentityPublicationStore {
+        inner: store.clone(),
+        fault: Mutex::new(None),
+    });
+    let service = identity_open(wrapper.clone(), store.clone());
+    service.install(identity_definitions()).unwrap();
+    identity_start(&service, "lost-ack-input", "lost-ack");
+    identity_insert(&service, "lost-ack-in", "EXP", b"lost-ack-literal");
+    *wrapper.fault.lock().unwrap() = Some(IdentityPublicationFault::After);
+    assert_eq!(
+        service.call(
+            &invocation("identity-run", "lost-ack-purg", 1_000),
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into())
+            }
+        ),
+        Err(HostProblem::UnknownOutcome)
+    );
+    let groups = service.outbound("TERM2", 10).unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].segments, vec![b"lost-ack-literal".to_vec()]);
+    assert!(
+        store
+            .get_provider_state("ims-tm-v1-replay", "lost-ack-purg")
+            .unwrap()
+            .is_some()
+    );
+    std::fs::write(
+        path.with_extension("rows.json"),
+        serde_json::to_vec_pretty(&identity_snapshot(store.as_ref())).unwrap(),
+    )
+    .unwrap();
+    println!(
+        "PHASE LOST ACK WRITER: actual atomic publication then UnknownOutcome, no in-process retry; id={}",
+        groups[0].message_id
+    );
+}
+
+#[test]
+#[ignore = "explicit independent lost-acknowledgement retry process"]
+fn tm_identity_lost_ack_replay_process() {
+    let (path, store) = identity_fixture();
+    let expected: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(path.with_extension("rows.json")).unwrap()).unwrap();
+    assert_eq!(identity_snapshot(store.as_ref()), expected);
+    let service = identity_open(store.clone(), store.clone());
+    let before = service.outbound("TERM2", 10).unwrap();
+    assert_eq!(before.len(), 1);
+    assert_eq!(before[0].segments, vec![b"lost-ack-literal".to_vec()]);
+    let request = invocation("identity-run", "lost-ack-purg", 1_000);
+    let retry = service
+        .call(
+            &request,
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP".into()),
+            },
+        )
+        .unwrap();
+    assert_eq!(retry.status, TmPcbStatus::SUCCESS);
+    assert!(retry.replayed);
+    assert_eq!(retry.output_message_ids, vec![before[0].message_id.clone()]);
+    assert_eq!(
+        service.call(
+            &request,
+            TmCall::Purge {
+                pcb: TmPcb::Alternate("EXP2".into())
+            }
+        ),
+        Err(HostProblem::IdempotencyConflict)
+    );
+    assert_eq!(service.outbound("TERM2", 10).unwrap(), before);
+    assert_eq!(identity_snapshot(store.as_ref()), expected);
+    println!(
+        "PHASE LOST ACK REPLAY: independent SQLite reopen/retry exact retained ID, bytes and rows; changed canonical conflicts; no partial or duplicate group"
+    );
+}

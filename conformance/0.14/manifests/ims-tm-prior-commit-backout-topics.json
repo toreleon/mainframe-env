@@ -1,0 +1,27 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-tm-prior-commit-backout-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 prior-commit backout archive supplement for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_backingoutpriorcommit.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 1,
+  "total_bytes": 21191,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "b58649136d3fcb9d8a426eafd588f28ca2a4996974a229dba05b08f4964ed857",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_backingoutpriorcommit.htm",
+      "sha256": "38fab0bbc03546ddaf2cfecbb92c0a19631f32c79eb24f29ba25ffe56b639b23",
+      "bytes": 21191,
+      "last_modified": "not-recorded-in-retained-archive"
+    }
+  ]
+}

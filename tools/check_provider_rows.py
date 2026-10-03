@@ -77,6 +77,9 @@ def check(root: Path) -> None:
                 "MQ linked row module",
             )
             source += "\n" + production_source(path.with_name("service_rows.rs"))
+        if label == "IMS":
+            require(source, ("mod rows;", "use rows::*;"), "IMS linked row module")
+            source += "\n" + production_source(path.with_suffix("") / "rows.rs")
         require(
             source,
             specific

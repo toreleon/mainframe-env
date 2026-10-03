@@ -5967,17 +5967,7 @@ fn tso_run_program(control: &str) -> Result<String, HostProblem> {
 }
 
 fn ims_controller_selector(parameter: &str) -> Result<BatchControllerSelector, HostProblem> {
-    let normalized = parameter
-        .trim()
-        .trim_matches(|character| matches!(character, '\'' | '"' | '(' | ')'));
-    let fields = normalized.split(',').map(str::trim).collect::<Vec<_>>();
-    if fields.len() < 2 || fields.len() > 3 {
-        return Err(HostProblem::Unsupported);
-    }
-    let mode = fields.first().copied().ok_or(HostProblem::Malformed)?;
-    let program = fields.get(1).copied().ok_or(HostProblem::Malformed)?;
-    let qualifier = fields.get(2).copied().filter(|value| !value.is_empty());
-    BatchControllerSelector::ims(mode, program, qualifier)
+    crate::ims_launcher::selector(parameter)
 }
 
 struct SdsfFileControl {

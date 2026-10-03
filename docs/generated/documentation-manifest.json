@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 237,
+    "markdown_documents": 252,
     "navigation_groups": 6,
-    "normative_documents": 69,
-    "xtask_commands": 213
+    "normative_documents": 82,
+    "xtask_commands": 235
   },
   "documents": [
     {
@@ -98,9 +98,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:30e5824717f946cf358039655fb4d10b738fdd73a64db769716a15c737dcc6d0",
+      "sha256": "sha256:0edccc95419c94af0caeeab6776bb89c765b719abb3c37dd7a5e148489dfea73",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -130,7 +130,7 @@
       "normative": false,
       "path": "crates/apps/mainframe-env-server/README.md",
       "relative_links": 0,
-      "sha256": "sha256:073db7972b5da005e02cb52d40f8d0dc2c40b79810f907f3f351f16f8b5d6a22",
+      "sha256": "sha256:89c26c9b8e3310ff1fd43e1e42881da0f6e852b8f101a10d8eb9d7944d0d9874",
       "title": "mainframe-env-server",
       "xtask_commands": 0
     },
@@ -169,8 +169,8 @@
     {
       "normative": false,
       "path": "crates/contracts/mainframe-env-host-api/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:d2ca82620540cbc6b7b1ee01a44d15eb893bc1a04ea415471a7f08bb1197f1ee",
+      "relative_links": 1,
+      "sha256": "sha256:9e6665eac6fcfb6ded3501de1ed735ceaa35925516249ad59bbd9462faba76f5",
       "title": "mainframe-env-host-api",
       "xtask_commands": 1
     },
@@ -273,8 +273,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 2,
-      "sha256": "sha256:c3fd3c9a6ff1e6338cec3d1451cbede29cead963bbd9e97beefd13eb02a97985",
+      "relative_links": 7,
+      "sha256": "sha256:93e482fcd6ff03cae681539bfff715fe10522473804131b4f34008815af590c8",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 125,
-      "sha256": "sha256:ed7258ddd2fdde01bb342bdada1bd5e32bd607919ef26a13b785814e6a731e7f",
+      "relative_links": 138,
+      "sha256": "sha256:92926dbd5653ef0f36b8df2de00b06a8b2cf17f3202c6c5cfa5531817444f9bb",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -591,9 +591,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 3,
+      "relative_links": 7,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:923062eac599fa2de06b07ed2a3ea51754b0c0deeff9a07e5f67d9991b9d91e2",
+      "sha256": "sha256:21f143276a080c6bc3a3b3e00828c8651ebfed62742a6b7cfa696ad2057682c0",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -627,9 +627,9 @@
       "normative": true,
       "owner": "store-contract, provider, and core-server maintainers",
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
-      "relative_links": 4,
+      "relative_links": 5,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:ec4f5f311628ffe9f6aea6eb16f6bae3c6844dfeb761c0d7ae1b45ea493149a9",
+      "sha256": "sha256:99d051dfe0ccadcb88ce0f84a87b3910f9bb616e0007731974b60b1a53a125c4",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -641,7 +641,7 @@
       "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
       "relative_links": 0,
       "scope": "provider-neutral transaction participant capabilities and obligations",
-      "sha256": "sha256:0296920878168ec84636b9387536909fff42699bd1898d11ea67d3aec48af115",
+      "sha256": "sha256:96efe95328cdfba430d16afce4788094c05815bfa26989e4a7a6e06ab041cf3b",
       "status": "Frozen early additive INT-1601 prerequisite",
       "title": "Transaction participant contract, version 1",
       "xtask_commands": 0
@@ -1019,6 +1019,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0030-gsam-application-record-formats.md",
+      "relative_links": 1,
+      "scope": "IMS-1403.gsam-record-formats",
+      "sha256": "sha256:af1bd4755f2d53f02eb3527a59a204a678c1bcab1b498e50d1ff6bc3ac3109f7",
+      "status": "Proposed within the authorized bounded IMS leaf",
+      "title": "ADR-0030: GSAM application record formats and owned undefined length",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.15.0",
       "normative": true,
       "owner": "MQ contract and provider maintainers",
@@ -1028,6 +1040,18 @@
       "sha256": "sha256:0ca2fd1212ac74001aeefb02102870192a3e8c9d4273a94a94f61d518ae9cfb8",
       "status": "Proposed",
       "title": "Private MQ host lifecycle directory",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 investigation; implementation pending owner decision",
+      "normative": true,
+      "owner": "store/execution contracts and coordinator maintainers, with host and IMS owners",
+      "path": "docs/decisions/0031-ims-tm-recovery-publication.md",
+      "relative_links": 0,
+      "scope": "proposed shared publication/settlement boundary; no actual TM recovery admission",
+      "sha256": "sha256:c4d8476ef89497c096ee28a79dd316b3c75d08c80a8292601f7ad340244ad9da",
+      "status": "Proposed; shared contract-owner decision required",
+      "title": "ADR-0031: IMS TM recovery publication and work settlement",
       "xtask_commands": 0
     },
     {
@@ -1055,6 +1079,30 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS recovery and database maintainers",
+      "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md",
+      "relative_links": 5,
+      "scope": "IMS-1405.secondary-index-checkpoint-restart, target 0.14.0",
+      "sha256": "sha256:bb31c1ff6872c27282e10b6a3812c84112639da4aa2b826226ad3772befd5bb9",
+      "status": "Proposed within the user-authorized bounded IMS leaf",
+      "title": "ADR-0032: Selected secondary checkpoint positions",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "compiler, interpreter, host-contract and IMS maintainers",
+      "path": "docs/decisions/0033-cobol-dli-call-boundary.md",
+      "relative_links": 0,
+      "scope": "IMS-1401.cobol-dli-call-boundary",
+      "sha256": "sha256:5fa0493c1e99df285789340f15d7b1112c0ca780a99cbe35a6777d4b980037d2",
+      "status": "Proposed; raw execution blocked pending contract-owner decisions",
+      "title": "ADR-0033: Raw COBOL DL/I needs an owned CALL and PCB binding contract",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.15.0",
       "normative": true,
       "owner": "MQ host contract maintainers",
@@ -1076,6 +1124,18 @@
       "sha256": "sha256:79cd0b0cc58466676e59d752d9fd932efe4d46f32a8668655ccf10619922f583",
       "status": "Proposed",
       "title": "MQ historical handle observation",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS maintainers",
+      "path": "docs/decisions/0034-gsam-logical-address.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart",
+      "sha256": "sha256:6b04a663374075e850c6ddd717a5a3f2c1dcbd714e5382093b8e6e3864a97040",
+      "status": "Proposed within the human-authorized bounded IMS implementation",
+      "title": "ADR-0034: GSAM logical record addresses on the owned host route",
       "xtask_commands": 0
     },
     {
@@ -1103,10 +1163,106 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0035-selected-pcb-feedback.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.selected-pcb-feedback, owned host projection",
+      "sha256": "sha256:ddf22e63e542d796857580176bcb3147fbd3592fd8c51a4fb4c268de01c5201a",
+      "status": "Proposed",
+      "title": "ADR-0035: Versioned selected database PCB feedback",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "host-contract and IMS provider maintainers",
+      "path": "docs/decisions/0036-null-ssa-command-slots.md",
+      "relative_links": 1,
+      "scope": "IMS-1401.null-ssa-command-slots, target 0.14.0",
+      "sha256": "sha256:5cdf97fa10bb05233b73da47a99b3507ade37ca1011e250f22f206564b3e377a",
+      "status": "Proposed within the user-authorized bounded IMS leaf",
+      "title": "ADR-0036: Literal null SSA command slots",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider and core-server retention maintainers",
+      "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md",
+      "relative_links": 0,
+      "scope": "IMS-1405.private-recovery-retention-fence, existing unowned core dependency fence",
+      "sha256": "sha256:929712574fdf4097ba0711ca6bf41cc162562ca8bd932ac85ae2d32e65e6b508",
+      "status": "Proposed",
+      "title": "ADR-0037: Private IMS recovery retention fence",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0038-logical-child-physical-key-feedback.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.logical-child-physical-key-feedback",
+      "sha256": "sha256:9150775b91e88fdc7c4411f79eb3881c45c48cb0e2863bf6dc7a44c95400417f",
+      "status": "Proposed",
+      "title": "ADR-0038: Real logical child physical-path key feedback",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0039-last-direct-child-ssa-selection.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.ssa-last-direct-child, bounded local runtime leaf",
+      "sha256": "sha256:2ae1bd4e55b90690e9756dccc9b1023e3a309f6a67ce9706d5c26c98ddbb33eb",
+      "status": "Proposed",
+      "title": "ADR-0039: Last remaining direct child SSA selection",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0040-primary-level-position-search-boundary.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.primary-level-position-closure, reviewed private design",
+      "sha256": "sha256:f659f096668a1c867e20bb5db617611f8d926fe8b9987c771ee5904a0974a79d",
+      "status": "Proposed",
+      "title": "ADR-0040: Private primary level witnesses and search boundary",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0041-first-direct-child-ssa-selection.md",
+      "relative_links": 0,
+      "scope": "IMS-1403.ssa-first-direct-child, bounded local runtime leaf",
+      "sha256": "sha256:623abfdb216f3c212fbc738f1e32a738f5b282af6ea4b4bbe838b2601e226763",
+      "status": "Proposed",
+      "title": "ADR-0041: First direct child SSA selection",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.14.0 development",
+      "normative": true,
+      "owner": "IMS provider maintainers",
+      "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md",
+      "relative_links": 0,
+      "scope": "IMS-1404.tm-output-identity-local-order, finite local runtime leaf",
+      "sha256": "sha256:2df3a15664e230cf421bc6ffd43c750b74820615f12754c7049c4e2783a0df97",
+      "status": "Proposed",
+      "title": "ADR-0042: Private IMS TM output identity and local completion order",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 37,
-      "sha256": "sha256:d0effd980564de5da19358664ba177e2ac95862234112ab58c78484c3a8bc679",
+      "relative_links": 43,
+      "sha256": "sha256:0d49191946169751c57cc558425f2b6017aaa977121c17e71f951ea9625ccb41",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1540,6 +1696,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/subsystems/ims/mixed-boolean-ssa-gap.md",
+      "relative_links": 0,
+      "sha256": "sha256:0c7363ab0f7a38e2e823f48336a6353073b76c7b04dd5e7d1e89b736e7a17c16",
+      "title": "IMS mixed Boolean SSA acceptance gap",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-plan.md",
       "relative_links": 2,
       "sha256": "sha256:7658762291bf3f444b66c2a70a9ae6c19c3f4b209e09cb138ddcae9fb27f67ac",
@@ -1549,10 +1713,18 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:e490a57ab72e47f719f8ea25fe29c320dfc3b4553cee4c62655478414f3519f9",
+      "relative_links": 18,
+      "sha256": "sha256:ae80e998c721e8dfc55982f33383b413278d47dbea90d387c73e1dcf531c677e",
       "title": "IMS — DB / TM programming surface progress",
-      "xtask_commands": 4
+      "xtask_commands": 25
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/ims/selected-pcb-feedback.md",
+      "relative_links": 2,
+      "sha256": "sha256:62f98b92ce795fde6413dc089e579548838973ea3c9da4bbec1a02e71bf3abc9",
+      "title": "Selected database PCB feedback: bounded contract and class review",
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -1566,7 +1738,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/integration/transactions-status.md",
       "relative_links": 0,
-      "sha256": "sha256:a9ec8c3cbc0fb314c8ac7b204d4c51d6e9bcbd52dd294bc223562ba6e4bc8d9e",
+      "sha256": "sha256:bf5a711149f6aeca463edc41e832594fe88960068e25ae339cc1c7c5c45653e2",
       "title": "Cross-resource integration — Transactions and recovery progress",
       "xtask_commands": 0
     },
@@ -1902,7 +2074,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:477889aa92857ab366d0a498aa54ac5f73a7efcddf0496228e323b1aeb0eba95",
+      "sha256": "sha256:7a4488ab1d796e90eb529af0fdb71491f23eda85e1f44131b11166311140d7c3",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -2446,6 +2618,58 @@
         {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
+        },
+        {
+          "label": "ADR-0034: Bounded GSAM logical record addresses",
+          "path": "docs/decisions/0034-gsam-logical-address.md"
+        },
+        {
+          "label": "ADR-0031: IMS TM recovery publication and work settlement",
+          "path": "docs/decisions/0031-ims-tm-recovery-publication.md"
+        },
+        {
+          "label": "ADR-0035: Versioned selected database PCB feedback",
+          "path": "docs/decisions/0035-selected-pcb-feedback.md"
+        },
+        {
+          "label": "ADR-0037: Private IMS recovery retention fence",
+          "path": "docs/decisions/0037-private-ims-recovery-retention-fence.md"
+        },
+        {
+          "label": "ADR-0038: Real logical child physical-path key feedback",
+          "path": "docs/decisions/0038-logical-child-physical-key-feedback.md"
+        },
+        {
+          "label": "ADR-0039: Last remaining direct child SSA selection",
+          "path": "docs/decisions/0039-last-direct-child-ssa-selection.md"
+        },
+        {
+          "label": "ADR-0040: Private primary level witnesses and search boundary",
+          "path": "docs/decisions/0040-primary-level-position-search-boundary.md"
+        },
+        {
+          "label": "ADR-0041: First direct child SSA selection",
+          "path": "docs/decisions/0041-first-direct-child-ssa-selection.md"
+        },
+        {
+          "label": "ADR-0042: Private IMS TM output identity and local completion order",
+          "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
+        },
+        {
+          "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
+          "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
+        },
+        {
+          "label": "ADR-0030: GSAM application record formats and owned length",
+          "path": "docs/decisions/0030-gsam-application-record-formats.md"
+        },
+        {
+          "label": "ADR-0032: Selected secondary checkpoint positions",
+          "path": "docs/decisions/0032-selected-secondary-checkpoint-position.md"
+        },
+        {
+          "label": "ADR-0036: Literal null SSA command slots",
+          "path": "docs/decisions/0036-null-ssa-command-slots.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2692,7 +2916,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:6b3a60a5a83b4bf27899f7ef36bf6fc5e694a6ebe4d54d45d2447a4e08ffb5b6",
+  "registry_sha256": "sha256:ad18eecb6571551a8bf3f300e02aadf4e6e0ab497a8e672e441f066c34b56d29",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

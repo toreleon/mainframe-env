@@ -163,6 +163,16 @@ impl Canonical for ImsSystemCall {
                 out.text("function")?;
                 function.encode(out)
             }
+            Self::StatisticsV2 {
+                function,
+                io_area_bytes,
+            } => {
+                out.variant("ImsSystemCall", "StatisticsV2", 2)?;
+                out.text("function")?;
+                function.encode(out)?;
+                out.text("io_area_bytes")?;
+                io_area_bytes.encode(out)
+            }
         }
     }
 }
@@ -282,6 +292,44 @@ impl Canonical for ImsSystemResult {
                 out.variant("ImsSystemResult", "Statistics", 1)?;
                 out.text("pool")?;
                 pool.encode(out)
+            }
+            Self::StatisticsV2 {
+                function,
+                observation,
+            } => {
+                out.variant("ImsSystemResult", "StatisticsV2", 2)?;
+                out.text("function")?;
+                function.encode(out)?;
+                out.text("observation")?;
+                observation.encode(out)
+            }
+        }
+    }
+}
+
+impl Canonical for ImsStatisticsObservationV2 {
+    fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
+        match self {
+            Self::Subpool { statistics } => {
+                out.variant("ImsStatisticsObservationV2", "Subpool", 1)?;
+                out.text("statistics")?;
+                statistics.encode(out)
+            }
+            Self::Totals {
+                buffers,
+                storage_bytes,
+                reads,
+                writes,
+            } => {
+                out.variant("ImsStatisticsObservationV2", "Totals", 4)?;
+                out.text("buffers")?;
+                buffers.encode(out)?;
+                out.text("reads")?;
+                reads.encode(out)?;
+                out.text("storage_bytes")?;
+                storage_bytes.encode(out)?;
+                out.text("writes")?;
+                writes.encode(out)
             }
         }
     }

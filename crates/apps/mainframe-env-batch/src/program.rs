@@ -287,17 +287,8 @@ pub(crate) fn validate_program_controls(
         }
         ControlGrammar::UpdateCards => validate_update_cards(input),
         ControlGrammar::Ims => {
-            let fields = input
-                .parameter
-                .as_deref()
-                .unwrap_or_default()
-                .split(',')
-                .count();
-            if fields > 3 {
-                Err(HostProblem::Unsupported)
-            } else {
-                Ok(())
-            }
+            crate::ims_launcher::selector(input.parameter.as_deref().unwrap_or_default())
+                .map(|_| ())
         }
         ControlGrammar::Sort
         | ControlGrammar::Idcams

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Give future IMS TM completed output groups distinct private input/work/CAS occurrence identities and checked local completion order, preserving immutable express output, pending groups and retained replay; old writers must stop and drain before admission, without shared TM recovery or rolling-writer authority."

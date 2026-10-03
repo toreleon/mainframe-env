@@ -236,7 +236,8 @@ impl RetentionPlanner {
             .map_err(store_problem)?;
         let mut executions = BTreeSet::new();
         let mut effects = BTreeSet::new();
-        let mut unowned = false;
+        let mut unowned =
+            ims_private_recovery_retention_required(self.store.as_ref()).map_err(store_problem)?;
         let mut observations = ObservationMap::new();
         let mq_records = self.bounded_prefix("mq-")?;
         // Presence detection is not attribution. Unknown selected namespaces
@@ -839,6 +840,8 @@ impl RetentionPlanner {
             }
         }
 
+        #[cfg(test)]
+        self.run_forecast_epoch_hook();
         if self
             .store
             .provider_state_retention_epoch()

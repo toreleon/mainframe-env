@@ -17,3 +17,13 @@ pub use model::{
 };
 pub use package::TmPackageBinding;
 pub use service::TmService;
+
+/// Recovery must not settle a TM-backed run through the DB-only adapter.
+pub(crate) fn has_session(
+    store: &dyn mainframe_env_store_api::ProviderStateStore,
+    run: &str,
+    max: usize,
+) -> Result<bool, mainframe_env_host_api::HostProblem> {
+    codec::read::<model::SessionRow>(store, codec::SESSION_NAMESPACE, run, max)
+        .map(|row| row.is_some())
+}
