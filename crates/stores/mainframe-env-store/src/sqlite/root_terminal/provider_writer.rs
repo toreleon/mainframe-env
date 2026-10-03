@@ -51,7 +51,7 @@ impl SqliteStateStore {
         }
         Ok(())
     }
-    async fn root_guard_writer_identity(
+    pub(in crate::sqlite) async fn root_guard_writer_identity(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         doc: Option<&Document>,

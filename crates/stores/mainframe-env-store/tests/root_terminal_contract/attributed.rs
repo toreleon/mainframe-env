@@ -53,7 +53,12 @@ fn intent(store: &dyn PlatformStore, execution: &ExecutionRecord) -> EffectRecor
     store.record_intent(actual.clone()).unwrap();
     store.effect(&actual.key).unwrap().unwrap()
 }
-fn put(namespace: &str, key: &str, version: u64, expected: Option<u64>) -> ProviderStateMutation {
+pub(super) fn put(
+    namespace: &str,
+    key: &str,
+    version: u64,
+    expected: Option<u64>,
+) -> ProviderStateMutation {
     ProviderStateMutation::Put(ProviderStateWrite {
         record: ProviderStateRecord {
             namespace: namespace.into(),

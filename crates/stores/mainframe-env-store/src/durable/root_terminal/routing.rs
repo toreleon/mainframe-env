@@ -12,6 +12,12 @@ pub(crate) fn audit_storage_key(execution_id: &ExecutionId, suffix: &str) -> Str
 
 macro_rules! root_journal_methods {
     (SqliteStateStore) => {
+        fn mutate_root_preparation_states(
+            &self,
+            request: mainframe_env_store_api::RootPreparationPublication,
+        ) -> Result<(), StoreError> {
+            self.root_mutate_preparation(request)
+        }
         fn mutate_root_provider_states(
             &self,
             request: mainframe_env_store_api::RootProviderPublication,

@@ -251,6 +251,16 @@ pub trait RetentionStore: Send + Sync {
 
 /// Atomic execution, event, effect, checkpoint, and outbox transactions.
 pub trait JournalStore: Send + Sync {
+    /// Publish only already registered initial-root preparation rows. The actual
+    /// root must remain Admitted version1, Open, root-only and effect/work/checkpoint
+    /// free inside the same physical transaction. Structural observations are not
+    /// host permission. Unsupported adapters refuse without sequential fallback.
+    fn mutate_root_preparation_states(
+        &self,
+        _request: crate::RootPreparationPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Mutate only already registered scopes of this exact Open root/actor/original
     /// canonical intent. All observations and both Move endpoints are checked inside
     /// one physical lock/transaction. No audit, intent completion or fallback is minted.

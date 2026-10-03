@@ -6,6 +6,38 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Initial-root preparation store prerequisite
+
+`MQ-1505.root-preparation-publication` integrates reviewed sealed worker
+`e94ee811`. The default-refusing nonSerde operation rechecks the exact original
+Admitted version1 execution, original Open/root-only membership, single original
+Admitted event and every initial index in one Memory lock or SQLite writer TX.
+Any actor/run effect, work, checkpoint, acquired lease or advanced phase refuses.
+Registered anchor and both Move endpoints require same-root ownership; phantom
+memberships and overlapping foreign indexes refuse. Existing bounded mutation
+kernel and rollback publish rows and logical clock atomically. SQLite accounts
+retained root length before owned payload capture; no callback runs under the
+physical lock. Existing wire/schema/index/anonymous/audited/terminal behavior
+remains unchanged. Durable routes SQLite; other adapters refuse.
+
+Independent review binds22worker paths,99external artifacts,28commands and
+36186original input versions,18final Rust input equivalences,133distinct owning
+tests (113root,3Memory adversarial,17audit), a later12SQLite-test snapshot,
+2store-api rustdoc tests,135frozen authorities,32historical d8 dependency objects
+and same-HEAD seal. Failed compile and empty-anchor candidates remain separate;
+the final SQLite length preflight is not relabeled as the earlier113-test run.
+Main checks its composed root/audit/native-root consumers and mandatory gates.
+Store fixtures and owned orderly reopen are not installed/native/crash credit.
+
+Genuine admitted server schema3 setup, retained original CALL writer wiring,
+strict successor-aware full overlap/history closure and scheduled Work/Job
+decision-time fencing remain separate work. Logical freshness is not physical
+JES expiry after writer-lock wait. No dynamic enrollment, fabricated intent,
+RunningLifecycle bypass, terminal decision, history release or deployed migration
+is supplied. Source credit0; only licensed oracle human-skipped0/26. Native-root,
+recovery/participants/full26/CardDemo and all other nonlicensed v0.15 gates remain
+required and unfinished.
+
 ## Separately pinned inquiry attribute source prerequisite
 
 `MQ-1501.inquiry-attribute-source-pins` integrates reviewed sealed worker

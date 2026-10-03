@@ -605,7 +605,7 @@
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
       "relative_links": 3,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:9a75144dd07b6010daa9cafbe3e5207e7590c157637bd8d899c5b24a043ffde8",
+      "sha256": "sha256:7363d65cdf10ba0a3d3f170600f7742f7694e6f8d2a6a8e0c857af3d1774e4a5",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -1145,7 +1145,7 @@
       "path": "docs/decisions/0034-mq-root-terminal-publication.md",
       "relative_links": 0,
       "scope": "the explicitly configured synchronous ordinary z/OS batch root",
-      "sha256": "sha256:3d62c7b15c3b0082cb3595bff2ebaab408df169eab04ebb2d4e31cbe124d0d59",
+      "sha256": "sha256:ca3e55ae6db1321faba75e95ed4183a0eee3ed7736eb679d53fdf8126fba4270",
       "status": "Proposed (implemented framework prerequisite; native acceptance remains pending)",
       "title": "MQ root publication framework",
       "xtask_commands": 0
@@ -1830,7 +1830,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:2f3095fdc144363b1d58ae8bf8a1bcd8afc3be2f7e35c9b64245199dcf3fc501",
+      "sha256": "sha256:3752e741c1a857629c6e9ea295dd2e81558c15e1ff11f7ba64414532f4b243cd",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

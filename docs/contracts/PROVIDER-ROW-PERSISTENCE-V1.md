@@ -56,6 +56,18 @@ schema or outbox/retention behavior is supplied by the attributed operation.
 Genuine server wiring and a lifecycle path without an original effect remain
 separate required contracts; see [ADR 0034](../decisions/0034-mq-root-terminal-publication.md).
 
+Initial-root preparation additionally uses the default-refusing
+`JournalStore::mutate_root_preparation_states`. Its nonSerde structural observation
+is rechecked under the same Memory lock/SQLite transaction: exact current original
+Admitted version1 execution, original Open root-only membership, single Admitted
+event and all initial indexes, with no actor/run effect, work or checkpoint.
+Registered anchor and both Move endpoints must belong to that same retained root.
+The shared4096-operation/64-MiB bounds and narrower backend quotas apply before
+deep decoding; the existing mutation kernel atomically publishes rows and logical
+clock with whole rollback. No schema, audit, intent, enrollment, lifecycle outcome
+or server wiring is added. Logical tick freshness is not physical Job expiry;
+scope reuse and eager admitted server protocol setup remain separate requirements.
+
 A logical provider mutation computes only changed object rows and submits their
 CAS puts/deletes in one `mutate_provider_states_atomic` call. Rows outside the
 mutation's write/dependency set keep both their payload and record version.

@@ -45,7 +45,7 @@ pub(in crate::memory) fn guard_writer_scopes(
     Ok(())
 }
 
-fn guard_writer_identity(
+pub(super) fn guard_writer_identity(
     state: &State,
     document: Option<&Document>,
     namespace: &str,

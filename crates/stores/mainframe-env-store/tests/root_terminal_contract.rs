@@ -9,6 +9,8 @@ mod writer_guards;
 
 #[path = "root_terminal_contract/attributed.rs"]
 mod attributed;
+#[path = "root_terminal_contract/preparation.rs"]
+mod preparation;
 #[path = "root_terminal_contract/publication_failures.rs"]
 mod publication_failures;
 

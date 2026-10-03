@@ -163,7 +163,30 @@ Unowned legacy rows and audit-only/deny forms retain their existing semantics.
 Rooted batches share the 4,096-operation/64-MiB bound, with Move counted twice.
 Anonymous APIs and all existing ownership/index/schema bytes stay unchanged.
 
-This is step 1, not server writer wiring or scope succession. Genuine server
+### Initial root preparation prerequisite
+
+The additive `JournalStore::mutate_root_preparation_states` accepts a nonSerde
+`RootPreparationPublication` observation and owned finite row batch. Memory and
+SQLite require the full original current Admitted version1 execution, exact
+original inserted Open/root-only membership, single exact Admitted event and
+every initial actor/run/namespace/exact-row index inside the existing physical
+transaction. Any effect for the actor/run, work or checkpoint refuses. The
+registered anchor and both Move endpoints must belong to the same claim, with
+all applicable indexes checked for conflicting ownership. No dynamic enrollment,
+intent/audit/event/outbox construction, terminal decision or Running/child stage
+is provided. Unsupported adapters refuse without fallback; Durable routes only
+SQLite. Existing wire/schema bytes and anonymous/original-effect guards remain
+unchanged. The sole mutation kernel and touched-entry rollback publish the batch
+and logical clock together under existing4096-operation/64-MiB and backend bounds.
+
+The observed tick must be at or after admission and the retained floor and before
+the original deadline. An acquired lease or advanced execution refuses. This is
+logical freshness, not a physical Work/Job expiry decision after lock wait. Eager
+schema3 setup in the actual admitted server hook is a separate next feature;
+this store prerequisite neither wires that hook nor bypasses original CALL
+publication. Scope succession, retention and native acceptance stay pending.
+
+The original-effect operation is step 1, not server writer wiring or scope succession. Genuine server
 protocol/instance/CALL writers must later supply their retained original effect
 and current controls. A lifecycle writer without an original effect needs a
 separately reviewed live-actor contract, never a fabricated intent. Scope reuse

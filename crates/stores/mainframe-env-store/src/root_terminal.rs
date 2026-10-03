@@ -8,6 +8,7 @@ use mainframe_env_execution_api::{
 use mainframe_env_store_api::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+mod preparation;
 mod provider_writer;
 pub(crate) use provider_writer::mutation_endpoints;
 
