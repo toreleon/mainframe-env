@@ -6,6 +6,37 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Installed supplied zero and binary correlation IDs
+
+`MQ-1503.installed-supplied-correlation-id` integrates reviewed sealed worker
+`adbb24c2` as tests only over the unchanged compiled supplied-ID profile.
+Actual compiler/catalog-published MD1/MD2 PUT/PUT1 artifacts supply24-byte
+LOW-VALUES or an independently checked binary X-literal. Memory and owned
+SQLite prove the original complete request/Produced descriptor and stored MD,
+pending normal commit versus genuine CEE3ABD discard, whole terminal originals,
+sameTASK parentSome CALL/core digest and shared ABI retirement. Caller suffixes,
+body padding, ignored BackoutCount and undefined counts remain exact.
+NEW_MSG_ID/NEW_CORREL_ID and zero MsgId refuse before PUT publication; preceding
+genuine CONN/OPEN writes are expected, not erased or called whole-store absence.
+
+Independent review verifies seven worker Git paths, four final Rust/CBL owning
+inputs,1321 frozen authorities,123 receipts, six passing Rust tests and72 new
+bounded cases. Historical failed attempts remain preserved. The recording SAF
+port is not deployed RACF/JES authentication; a new SQLite connection is not cold
+restore or process-crash evidence. Main reruns changed installed tests and old
+PUT compatibility with mandatory policy/API/module/consumer/documentation gates.
+
+Five sources retain exact manifest SHA/bytes and ten offline search/read receipts:
+original MQ9.4 baseline2026-08-31 PUT0020/q101880_ and PUT10021/q101890_;
+supplement baseline2026-09-12 MDq097395_1336–1497, PMOq098655_115–157 and
+constantsq092190_. Retained topic_path is checked first, then exact archive
+fallback through the repository parser; source credit0, no network refresh.
+No production/compiler/provider/store/schema/default policy changes. Historical
+d8 deny reuse requires all32 unchanged inputs, not fresh deny/CI. Generated IDs,
+genuine JES/DefaultContext, fresh-root succession, recovery/participants/retention,
+shared IR/full26/CardDemo and other nonlicensed acceptance remain mandatory.
+Only the licensed oracle is human-skipped0/26; full v0.15 remains unfinished.
+
 ## Compiled supplied correlation IDs
 
 `MQ-1503.compiled-supplied-correlation-id` composes reviewed sealed worker

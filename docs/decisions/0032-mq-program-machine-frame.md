@@ -392,7 +392,7 @@ attestation. Configured and revocable session wrappers finish every observation
 before the existing final physical comparison; the approved compiler then joins
 pure MD/PMO/status writeback under its retained alias guard. Old embeddings keep
 Unsupported getter defaults. This finite ASCII/big-endian NoContext profile
-requires nonzero supplied IDs and explicit descriptor policy; it supplies neither
+requires nonzero supplied MsgId and explicit descriptor policy; it supplies neither
 DefaultContext, JES/GMT nor generated IDs/defaults. Genuine compiled pending PUT
 normal completion and CEE3ABD backout compose the existing native-root publication
 framework on Memory and owned SQLite. Reopen is logical persistence evidence,
@@ -460,3 +460,13 @@ ports, not installed RACF or shared-participant proof. Deployment normalization,
 final task-end/recovery, typed checkpoint/retention, all applicable 26-call
 contexts and CardDemo still require their own composed acceptance before broader
 readiness.
+
+The supplied-identifier profile distinguishes a nonzero caller MsgId from CorrelId:
+supplied MQCI_NONE (all24 binary-zero bytes) and other supplied24-byte correlation
+values do not request generation. Compiled MD1/MD2 PUT/PUT1 tests retain these exact
+bytes in NoContext returned descriptors and pending/committed messages, including
+same-task child CALL provenance and genuine CEE3ABD discard. NEW_MSG_ID,
+NEW_CORREL_ID and zero MsgId still refuse before PUT publication. This evidence
+does not supply generated IDs, fresh crossroot, JES/DefaultContext or official26
+acceptance. Source: supplemental MD q097395_ lines1435–1494, PMO q098655_
+lines122–142 and constants q092190_; original PUT0020/PUT10021 baseline unchanged.

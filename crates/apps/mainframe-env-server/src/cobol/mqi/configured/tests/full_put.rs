@@ -9,6 +9,18 @@ use mainframe_env_host_api::*;
 use mainframe_env_store_api::*;
 
 mod refusals;
+mod supplied_correlation;
+
+const CORRELATION: [u8; 24] = *b"ZYXWVUTSRQPONMLKJIHGFEDC";
+
+fn correlated(mut md: MqMdValue, correlation: [u8; 24]) -> MqMdValue {
+    match &mut md {
+        MqMdValue::V1 { fields, .. } | MqMdValue::V2 { fields, .. } => {
+            fields.correl_id = correlation;
+        }
+    }
+    md
+}
 
 pub(super) fn source(version: i32, one: bool, abnormal: bool) -> String {
     let mut text = if version == 1 {
@@ -102,6 +114,15 @@ fn input_md(version: i32) -> MqMdValue {
     md
 }
 fn assert_original_put(f: &Fixture, actor: &Invocation, version: i32, one: bool) {
+    assert_original_put_correlated(f, actor, version, one, CORRELATION);
+}
+fn assert_original_put_correlated(
+    f: &Fixture,
+    actor: &Invocation,
+    version: i32,
+    one: bool,
+    correlation: [u8; 24],
+) {
     let calls = f.mq.originals.lock().unwrap();
     let (original,effect,reply)=calls.iter().find(|(inv,e,_)| inv==actor && matches!(&e.request,
         HostRequest::MqMqi(host) if matches!(host.envelope.request,MqMqiRequest::FullPut{..}|MqMqiRequest::FullPutOne{..}))).unwrap();
@@ -146,7 +167,7 @@ fn assert_original_put(f: &Fixture, actor: &Invocation, version: i32, one: bool)
         put,
         &MqMqiFullPut {
             message: MqFullMessage {
-                descriptor: input_md(version),
+                descriptor: correlated(input_md(version), correlation),
                 body: b"HELLO".to_vec(),
                 properties: vec![]
             },
@@ -187,7 +208,10 @@ fn assert_original_put(f: &Fixture, actor: &Invocation, version: i32, one: bool)
         panic!("lossless Produced")
     };
     assert_eq!(status.wire_pair(), (0, 0));
-    assert_eq!(produced.descriptor, expected_md(version, false));
+    assert_eq!(
+        produced.descriptor,
+        correlated(expected_md(version, false), correlation)
+    );
     assert_eq!(produced.outcome, MqDeliveryOutcome::Pending);
     assert_eq!(
         produced.backout_count,
@@ -207,7 +231,7 @@ fn assert_original_put(f: &Fixture, actor: &Invocation, version: i32, one: bool)
     manager[..2].copy_from_slice(b"QM");
     assert_eq!(produced.resolved_manager, manager);
 }
-fn assert_message(entry: &serde_json::Value, version: i32) {
+fn assert_message_correlated(entry: &serde_json::Value, version: i32, correlation: [u8; 24]) {
     assert_eq!(entry["expires_at"], serde_json::Value::Null);
     assert_eq!(entry["persistent"], true);
     assert_eq!(entry["message"]["kind"], "complete");
@@ -215,7 +239,7 @@ fn assert_message(entry: &serde_json::Value, version: i32) {
     let md: Vec<u8> = serde_json::from_value(m["md"].clone()).unwrap();
     assert_eq!(
         mq_md_value_decode(&md, 2048).unwrap(),
-        expected_md(version, true)
+        correlated(expected_md(version, true), correlation)
     );
     assert_eq!(
         serde_json::from_value::<Vec<u8>>(m["body"].clone()).unwrap(),
@@ -224,6 +248,9 @@ fn assert_message(entry: &serde_json::Value, version: i32) {
     assert_eq!(m["properties"], serde_json::json!([]));
 }
 fn pending(store: &dyn PlatformStore, version: i32) {
+    pending_correlated(store, version, CORRELATION);
+}
+fn pending_correlated(store: &dyn PlatformStore, version: i32, correlation: [u8; 24]) {
     let queues = store
         .list_provider_state("mq-delivery-live-v1-queue", 128)
         .unwrap();
@@ -238,9 +265,18 @@ fn pending(store: &dyn PlatformStore, version: i32) {
     assert_eq!(ops.len(), 1);
     assert_eq!(ops[0]["queue"], "Q");
     assert_eq!(ops[0]["put"], true);
-    assert_message(&ops[0]["entry"], version);
+    assert_message_correlated(&ops[0]["entry"], version, correlation);
 }
 fn terminal(f: &Fixture, original: &Invocation, version: i32, abnormal: bool) {
+    terminal_correlated(f, original, version, abnormal, CORRELATION);
+}
+fn terminal_correlated(
+    f: &Fixture,
+    original: &Invocation,
+    version: i32,
+    abnormal: bool,
+    correlation: [u8; 24],
+) {
     assert!(
         f.store
             .list_provider_state("mq-delivery-live-v1-pending", 128)
@@ -255,7 +291,7 @@ fn terminal(f: &Fixture, original: &Invocation, version: i32, abnormal: bool) {
     let messages = q["messages"].as_array().unwrap();
     assert_eq!(messages.len(), usize::from(!abnormal));
     if !abnormal {
-        assert_message(&messages[0], version);
+        assert_message_correlated(&messages[0], version, correlation);
     }
     let owners = f
         .store
