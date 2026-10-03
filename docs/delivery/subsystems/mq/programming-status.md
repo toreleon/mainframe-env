@@ -1788,3 +1788,42 @@ Native GMO writeback and the all-argument MD/GMO/body/length/status join remain
 separate work, as do installed forwarding, root/recovery/participants, IR,
 CardDemo and full nonlicensed v0.15 acceptance. Only the licensed oracle is
 human-skipped0/26; the parent goal remains active.
+
+## Compiled OPEN/CLOSE and root-shared object aliases
+
+`MQ-1503.compiled-native-point-bridge` composes sealed `5324cf98` as the
+permitted first coherent OPEN/CLOSE slice. The actual compiled CALL emits the
+original typed effect, preserving invocation, sequence, mutation and identity.
+The privileged default-Unsupported structure port precedes OD1 decoding and
+delegates exact target facts to the existing selected opaque point authority.
+Only ASCII/normal big-endian complete fixed OD1 declarations, including one
+checked COPY wrapper, explicit OUTPUT/INPUT_SHARED and predefined CLOSE NONE
+are admitted. Ignored DynamicQName and undefined z/OS CLOSE HOBJ bytes remain
+exact. No copied caller CCSID/default facts select ABI or supply permission.
+
+One preallocated root table distinguishes connection/object families, binds
+HOBJ to its actual live parent HCONN and burns nonreused positive PIC aliases.
+OPEN reserves before dispatch and adopts only a known nonhistorical issued
+object; CLOSE retires only that object, DISC its parent-associated objects.
+All argument/member bytes, layouts, capacity, suffix and live profile rechecks
+precede one held-table callback-free write/adoption. Unknown, late drift, panic,
+cancellation and abandoned dispatched calls fence the scope without provider
+cleanup, UOW or root-terminal decisions. Cold/historical/foreign/wrong-family/
+parent aliases refuse. No new canonical/replay/storage/checkpoint is introduced.
+
+Source review reproduces twelve retained-first verified topic entries: original
+MQ9.4 baseline2026-08-31 CLOSE0006/q101740, OPEN0019/q101870, PUT0020/q101880,
+PUT10021/q101890; programming-supplements baseline2026-09-12 ODq098100/q098105,
+MDq097390/PMOq098650 and numeric option q091070/q092100; point-layout q092060/
+q093600. Actual parser fragments, hashes and search/read receipts remain outside
+Git. Source/engine fixture evidence earns zero installed selected Memory/SQLite,
+JES/SAF/RACF/root-terminal, official-call or licensed credit. The earlier failed
+compiler/test/module attempts retain their original identities; successful
+focused composition does not relabel those receipts.
+
+PUT/PUT1 still require the complete Produced observation and existing descriptor
+context/PMO all-argument writer, with actual configured Foundation encoder.
+Genuine installed root-shared allocation and same-service profile wrappers,
+compiled pendingPUT normal/CEE3ABD and removedGET terminal proofs, recovery,
+participants, IR/full26/CardDemo remain required. Parent v0.15 stays active;
+only the unavailable licensed oracle is human-skipped0/26 with zero credit.

@@ -52,7 +52,7 @@ mod layout_resolution;
 mod legacy_mq;
 mod snapshot_codec;
 mod typed_cics;
-mod typed_mq;
+pub(crate) mod typed_mq;
 pub use typed_mq::{MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile};
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};

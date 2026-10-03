@@ -292,6 +292,7 @@ impl ReferenceMachine {
                 reservation: None,
                 scoped_arguments: Vec::new(),
                 pending_lease: None,
+                point: None,
             },
         ))
     }

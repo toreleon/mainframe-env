@@ -2,10 +2,10 @@
 use super::super::tests::{context, issued};
 use super::*;
 
-fn scope(capacity: usize) -> Arc<MqMqiAbiScope> {
+pub(super) fn scope(capacity: usize) -> Arc<MqMqiAbiScope> {
     Arc::new(MqMqiAbiScope::new(context(), capacity).unwrap())
 }
-fn adopt(scope: &Arc<MqMqiAbiScope>, token: MqHconn) -> i32 {
+pub(super) fn adopt(scope: &Arc<MqMqiAbiScope>, token: MqHconn) -> i32 {
     let reservation = scope.reserve().unwrap();
     let plan = scope.plan(Some(&reservation), Some(token), None).unwrap();
     let alias = plan.wire().unwrap();

@@ -12,6 +12,7 @@ mod value;
 pub use coordinator::{
     CoordinatorLimits, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
 };
+pub use machine::typed_mq::{MqMqiNativePoint, MqMqiNativePointTarget, MqMqiNativeStructure};
 pub use machine::{
     MachineProblem, MachineSnapshot, MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame,
     MqMqiProgramProfile, ReferenceMachine, SUPPORTED_LAYOUT_CATEGORIES, encode_cobol_call_result,

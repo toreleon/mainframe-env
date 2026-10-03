@@ -16,8 +16,10 @@ use std::sync::Arc;
 mod abi_scope;
 mod connection_writeback;
 mod connx;
+mod point;
 pub use abi_scope::MqMqiAbiScope;
 pub use connx::MqMqiConnxProfile;
+pub use point::{MqMqiNativePoint, MqMqiNativePointTarget, MqMqiNativeStructure};
 
 /// A trusted embedding's already-admitted program frame. Implementations must
 /// independently mint/check lifecycle ownership under the selected MQ authority,
@@ -43,6 +45,20 @@ pub trait MqMqiProgramFrame: Send + Sync {
     /// No invocation binding or application Options value attests this input.
     /// Existing embeddings refuse CONNX until deliberately forwarding this port.
     fn connx_profile(&self, _invocation: &Invocation) -> Result<MqMqiConnxProfile, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
+
+    /// Capture the actual selected frame's structure ABI BEFORE reading raw
+    /// application descriptors. Implementations wrap the same opaque provider
+    /// observation and preserve its original root/store/frame/current-unit
+    /// identity. Bindings and numeric descriptor fields cannot select this port.
+    /// Old embeddings refuse native point calls until deliberately configured.
+    fn native_structure(
+        &self,
+        _invocation: &Invocation,
+        _call: MqMqiCall,
+        _connection: MqHconn,
+    ) -> Result<Arc<dyn MqMqiNativeStructure>, HostProblem> {
         Err(HostProblem::Unsupported)
     }
 
@@ -90,6 +106,7 @@ pub(super) struct Targets {
     reservation: Option<abi_scope::Reservation>,
     scoped_arguments: Vec<connx::Storage>,
     pending_lease: Option<abi_scope::PendingLease>,
+    point: Option<point::Capture>,
 }
 
 pub(super) fn is_call(program: &str) -> bool {
@@ -240,10 +257,12 @@ impl ReferenceMachine {
                         reservation: None,
                         scoped_arguments: Vec::new(),
                         pending_lease: None,
+                        point: None,
                     },
                 )
             }
             "MQCONNX" => self.prepare_connx(&parameters)?,
+            "MQOPEN" | "MQCLOSE" => self.prepare_point(&parameters, call == "MQOPEN")?,
             "MQDISC" => {
                 if parameters.len() != 3 {
                     return Err(MachineProblem::InvalidOperation);
@@ -271,6 +290,7 @@ impl ReferenceMachine {
                         reservation: None,
                         scoped_arguments: Vec::new(),
                         pending_lease: None,
+                        point: None,
                     },
                 )
             }
@@ -323,6 +343,7 @@ impl ReferenceMachine {
                         reservation: None,
                         scoped_arguments: Vec::new(),
                         pending_lease: None,
+                        point: None,
                     },
                 )
             }
@@ -349,7 +370,7 @@ impl ReferenceMachine {
             }
             if matches!(
                 targets.call,
-                MqMqiCall::Connect | MqMqiCall::ConnectExtended
+                MqMqiCall::Connect | MqMqiCall::ConnectExtended | MqMqiCall::Open
             ) {
                 targets.reservation = Some(scope.reserve().map_err(MachineProblem::Host)?);
             }
@@ -450,6 +471,14 @@ impl ReferenceMachine {
         value
             .validate(HostLimits::default())
             .map_err(MachineProblem::Host)?;
+        if targets.point.is_some() {
+            self.finish_point_mq(&targets, value.result.outcome)?;
+            if let Some(lease) = &targets.pending_lease {
+                lease.known();
+            }
+            scope_completion.known();
+            return Ok(());
+        }
         // Writeback may normalize a validated OK/NONE observation locally;
         // the journal retains the full original result and its canonical tag.
         let outcome = match value.result.outcome {

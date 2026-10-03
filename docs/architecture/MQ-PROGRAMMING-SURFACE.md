@@ -932,3 +932,39 @@ versions and source/status/numeric identities remain exact. See ADR0033 for stri
 codec, rollback and definedness boundaries. Native compiler/server forwarding,
 atomic writeback, broader GMO policies, root/recovery/participant/full26/CardDemo
 acceptance remain required; private fixture tests supply none of their credit.
+
+### Compiled OPEN/CLOSE and typed object aliases
+
+The interpreter's finite compiled OPEN/CLOSE bridge requires a deliberate SAME
+TASK root ABI allocation and privileged `native_structure` port, which defaults
+to Unsupported. It captures the opaque selected structure observation before
+OD1 decoding and binds the exact predefined normal-local target through the
+same point observation and existing numeric wire constructors. ASCII structures,
+normal big-endian PIC S9(9) BINARY arguments, explicit OUTPUT or INPUT_SHARED,
+and predefined CLOSE NONE are its initial profile. Generated OD1 fields must
+match a complete fixed compiled group or one checked COPY wrapper. Model,
+remote, alternate-user and general option forms remain unsupported; DynamicQName
+is preserved as source-ignored on this independently verified nonmodel route.
+
+One preallocated volatile table distinguishes connection and object aliases,
+binds each object to its live parent HCONN, and burns nonreused positive aliases
+before dispatch. Known OPEN alone adopts a nonhistorical provider-issued HOBJ.
+Known CLOSE retires only that object while retaining undefined z/OS HOBJ bytes;
+DISC retires its associated object aliases across all sharing frames. Complete
+argument/member snapshots, live profile checks and a final held table guard
+precede one callback-free touched-storage copy/adoption. Unusable replies, stale
+storage/profile, callback panic, cancellation or an abandoned dispatched call
+fence the volatile root without provider cleanup or a UOW/terminal decision.
+No new canonical, replay, durable schema or accepted checkpoint is introduced.
+
+Source applicability is the pinned MQ 9.4 baseline2026-08-31 CLOSE row0006
+`q101740_14–20/274–284` and OPEN row0019 `q101870_881–893`, with supplemental
+baseline2026-09-12 OD1 `q098100_186–198` and DynamicQName `q098105_152–155`.
+Compiled fixture dispatch/writeback and real registry-issued token tests are
+engine evidence, not installed selected Memory/SQLite, real SAF/root-terminal,
+native IBM or official row acceptance. Host wrappers must delegate to the same
+actual selected opaque observations, never copied binding/default facts. The
+complete compiled PUT/PUT1 continuation needs actual Produced feedback and the
+configured Foundation descriptor encoder; it cannot use the partial PUT shape.
+Installed forwarding, root recovery, participants, all applicable26 and CardDemo
+remain required parent work.

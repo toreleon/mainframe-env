@@ -1,7 +1,10 @@
 //! Volatile root-owned wire aliases, never a second executable handle registry.
 use super::*;
+use mainframe_env_host_api::MqHobj;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, MutexGuard};
+
+mod objects;
 
 const LAST_ALIAS: i32 = 999_999_999; // Explicit PIC S9(9) BINARY product ABI.
 
@@ -9,9 +12,17 @@ const LAST_ALIAS: i32 = 999_999_999; // Explicit PIC S9(9) BINARY product ABI.
 enum Slot {
     Empty,
     Reserved(i32),
-    Connection { alias: i32, token: MqHconn },
+    Connection {
+        alias: i32,
+        token: MqHconn,
+    },
+    Object {
+        alias: i32,
+        parent: MqHconn,
+        token: MqHobj,
+    },
 }
-struct Table {
+pub(super) struct Table {
     slots: Vec<Slot>,
     next: i32,
     fenced: bool,
@@ -247,8 +258,13 @@ impl Plan {
         if let Some((slot, alias, token, _)) = self.adoption {
             table.slots[slot] = Slot::Connection { alias, token };
         }
-        if let Some((slot, _, _)) = self.retired {
+        if let Some((slot, _, connection)) = self.retired {
             table.slots[slot] = Slot::Empty;
+            for value in &mut table.slots {
+                if matches!(value, Slot::Object { parent, .. } if *parent == connection) {
+                    *value = Slot::Empty;
+                }
+            }
         }
     }
 }
