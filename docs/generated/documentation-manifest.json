@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 259,
+    "markdown_documents": 260,
     "navigation_groups": 6,
-    "normative_documents": 89,
+    "normative_documents": 90,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 145,
-      "sha256": "sha256:c7f1705be4858c1e3a783a19dbd4a1dc9372c5024805905cc12991f6248d1fe3",
+      "relative_links": 146,
+      "sha256": "sha256:bac3604f2ceec2d0bbc5b3599c8006e4dc2b6cd7e19c8130e1fe628e6a9f3220",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1331,10 +1331,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0045-batch-prepared-selection-plan.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-prepared-selection-plan, target 0.15.0",
+      "sha256": "sha256:4f134f8fd02ddcc772e75068cd807720393ba08ab6fa8d6ac853db017261578e",
+      "status": "Accepted bounded prerequisite; atomic joined admission remains pending.",
+      "title": "ADR-0045: Batch prepared-selection observation",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 48,
-      "sha256": "sha256:5c2775fdd6c71e4dc99f52f6d8f4e9b804d998d59a7d2b8d11601bd0ef217160",
+      "relative_links": 49,
+      "sha256": "sha256:c54d61579055cdaeb5fadb9082862166ab27eaa1eb4555ac8735af120c3ac6bf",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1878,7 +1890,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:7e06bcc1f9d0f0b731da2a559eb75989610312e705a88425c71a9ee54dea46e8",
+      "sha256": "sha256:5d2c16b5ff0bd1c418c6175193efe968f365ab3500f72a79edba8163739dc5b8",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2782,6 +2794,10 @@
         {
           "label": "ADR-0043: Batch contained all-effect loan",
           "path": "docs/decisions/0043-batch-contained-all-effect-loan.md"
+        },
+        {
+          "label": "ADR-0045: Batch prepared-selection observation",
+          "path": "docs/decisions/0045-batch-prepared-selection-plan.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3028,7 +3044,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:a17935e5edd0dcb3f35478a1c7f1e29a0152c716ca12a4de8fb8e25e6b0bf39c",
+  "registry_sha256": "sha256:f08f57c76188d96812c7ae0f1b960c3ee9e4983ca17dff4ac2047c6d03e4a937",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

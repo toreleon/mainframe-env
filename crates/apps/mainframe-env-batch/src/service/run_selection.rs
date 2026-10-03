@@ -84,33 +84,8 @@ impl BatchService {
         let Some(id) = id else {
             return Ok(None);
         };
-        let authorized = if invocation.contained() {
-            let current = self
-                .lock()?
-                .jobs
-                .get(&id)
-                .cloned()
-                .ok_or(HostProblem::NotFound)?;
-            if current.state != JobState::Queued
-                || current.attempt != 0
-                || current.steps.iter().any(|step| step.attempt != 0)
-                || !current.spool.is_empty()
-                || current.program_registrations.is_empty()
-                || current.program_registrations.values().any(|registration| {
-                    registration.handler != RegisteredProgramHandler::ProgramService
-                })
-            {
-                return Err(HostProblem::Unsupported);
-            }
-            self.authorize(
-                invocation,
-                "JESJOBS",
-                &format!("JOB.{}", current.name),
-                AccessIntent::Execute,
-                2,
-            )?;
-            invocation.check()?;
-            Some(current)
+        let prepared = if invocation.contained() {
+            Some(self.prepare_selection(invocation, &id, &member, initiator)?)
         } else {
             None
         };
@@ -118,23 +93,28 @@ impl BatchService {
         if cancelled || invocation.original().cancellation_requested() {
             return self.cancel(invocation.original(), &id).map(Some);
         }
+        if let Some(plan) = &prepared {
+            invocation.check()?;
+            plan.revalidate(self, invocation.original())
+                .map_err(|problem| invocation.poison(problem))?;
+        }
         let mut job = {
             let mut state = self.lock()?;
             let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
             if current.owner != invocation.original().principal.id().as_str() {
                 return Err(HostProblem::Unauthorized);
             }
-            if let Some(authorized) = &authorized {
-                if job_record(authorized)? != job_record(&current)?
-                    || self
-                        .store
-                        .get_provider_state("jes-job", &id)
-                        .map_err(store_error)?
-                        .as_ref()
-                        != Some(&job_record(&current)?)
-                {
+            if let Some(plan) = prepared {
+                if plan.current_row() != &job_record(&current)? {
                     return Err(invocation.poison(HostProblem::IdempotencyConflict));
                 }
+                let (selected, running) = plan.into_edges();
+                // Same sequential CAS/publication, not a joined admission.
+                self.persist_job(&selected, Some(current.version))?;
+                state.jobs.insert(id.clone(), selected.clone());
+                self.persist_job(&running, Some(selected.version))?;
+                state.jobs.insert(id.clone(), running.clone());
+                running
             } else {
                 self.authorize(
                     invocation,
@@ -143,37 +123,15 @@ impl BatchService {
                     AccessIntent::Execute,
                     2,
                 )?;
+                let edges = prepared_selection::SelectionEdges::prepare(&current, self.limits)?;
+                let selected = edges.selected(&current, &member, initiator, self.limits)?;
+                self.persist_job(&selected, Some(current.version))?;
+                state.jobs.insert(id.clone(), selected.clone());
+                let running = edges.running(&selected, self.limits)?;
+                self.persist_job(&running, Some(selected.version))?;
+                state.jobs.insert(id.clone(), running.clone());
+                running
             }
-            ensure_job_event_capacity(&current, self.limits.max_events, 4)?;
-            let selected_version = next_job_version(current.version)?;
-            let running_version = next_job_version(selected_version)?;
-            let running_attempt = current
-                .attempt
-                .checked_add(1)
-                .filter(|attempt| *attempt <= self.limits.max_attempts)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            let mut selected = current.clone();
-            selected.version = selected_version;
-            selected.state = JobState::Selected;
-            selected.initiator = Some(initiator.into());
-            selected.route.owner_member = Some(member.clone());
-            push_job_event(
-                &mut selected,
-                self.limits.max_events,
-                format!("selected:{initiator}"),
-            )?;
-            self.persist_job(&selected, Some(current.version))?;
-            state.jobs.insert(id.clone(), selected.clone());
-            let mut running = selected.clone();
-            running.version = running_version;
-            running.attempt = running_attempt;
-            running.state = JobState::Running;
-            running.initiator = Some(initiator.into());
-            running.route.owner_member = Some(member);
-            push_job_event(&mut running, self.limits.max_events, "running")?;
-            self.persist_job(&running, Some(selected.version))?;
-            state.jobs.insert(id.clone(), running.clone());
-            running
         };
         let outcome = self.execute(invocation, &mut job, dispatch);
         invocation.revoke_run();

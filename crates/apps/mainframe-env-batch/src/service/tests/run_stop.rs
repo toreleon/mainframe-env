@@ -8,6 +8,7 @@ use std::sync::Weak;
 
 mod all_effect_loan;
 mod malformed_reply;
+mod selection_plan;
 
 struct Spy {
     inner: Arc<dyn HostProvider>,

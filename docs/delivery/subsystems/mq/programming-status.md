@@ -6,6 +6,40 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Private prepared Batch selection prerequisite
+
+`MQ-1503.batch-prepared-selection-plan` integrates reviewed sealed worker
+`95b06366`. A private non-Clone/non-Serde observation borrows the actual Batch
+service and exact original Invocation. It captures the bounded complete Job
+namespace, physical/cache equality, semantic configuration and its physical
+rows where present, plus literal expected Selected/Running writes. The sole
+existing selection-edge builders remain authoritative. Fresh contained runs
+revalidate after real JESJOBS preflight and the last control callback, before
+the existing sequential CAS publications. Callbacks stay outside Batch locks.
+
+The finite profile reserves two configuration observations within4096 records,
+uses max-plus-one scans and checked64MiB accounting before selected Job cloning,
+and refuses drift, stale versions, absent registration, overflow or malformed
+membership. Actual version-zero semantic configuration is not a fabricated CAS
+row. Planning creates no run owner, Core record, checkpoint or admission token.
+Old ordinary and Program-only behavior and preflight audit order remain exact.
+
+Independent review closes12paths/40commands/147stable artifacts,2816input
+versions/111658occurrences,248unit/11compile-fail,13policy/fouractualmutants,
+32unchanged historical dependency inputs and the identical worker HEAD seal.
+Earlier failed fixture, epoch and metadata attempts retain their actual inputs.
+Memory/owned SQLite exercise literal Job transitions, namespace/configuration
+drift and callback reentry. Main checks composed Batch, consumers, rustdoc and
+mandatory gates; the service ratchet lowers7212 to7210 without raising allowances.
+
+This observation is not atomic whole-graph capture, a phantom/configuration
+freeze, current Work lease/backend decision time, Core-original cursor or JES
+admission. Preflight's existing standalone audit is not physically claim-fenced.
+Those future joins and actual private controller ownership remain required.
+Fixture transport and orderly reopen grant no installed/native/JES/crash or
+official acceptance. All26 full-call gates remain Pending; fullv0.15 unfinished.
+Only the licensed IBM oracle is human-skipped0/26; other parent gates remain.
+
 ## Contained Batch all-effect transport prerequisite
 
 `MQ-1503.batch-contained-all-effect-loan` integrates reviewed sealed worker

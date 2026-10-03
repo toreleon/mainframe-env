@@ -1,6 +1,7 @@
 mod dd_allocation;
 mod effect_loan;
 mod host_dispatch;
+mod prepared_selection;
 mod problem;
 mod program_dispatch;
 mod run_retirement;
@@ -9,6 +10,7 @@ mod run_stop;
 mod running_step;
 
 pub use effect_loan::BatchEffectOccurrence;
+use prepared_selection::next_job_version;
 use run_stop::RunInput;
 pub use run_stop::{BatchRunControl, BatchRunExit};
 use running_step::ProgramDispatch;
@@ -6982,10 +6984,6 @@ fn ensure_job_event_capacity(
     } else {
         Ok(())
     }
-}
-
-fn next_job_version(version: u64) -> Result<u64, HostProblem> {
-    version.checked_add(1).ok_or(HostProblem::ResourceExhausted)
 }
 
 fn push_job_event(
