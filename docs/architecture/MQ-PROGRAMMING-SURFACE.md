@@ -964,8 +964,8 @@ Compiled fixture dispatch/writeback and real registry-issued token tests are
 engine evidence, not installed selected Memory/SQLite, real SAF/root-terminal,
 native IBM or official row acceptance. Host wrappers must delegate to the same
 actual selected opaque observations, never copied binding/default facts. The
-complete compiled PUT/PUT1 continuation needs actual Produced feedback and the
-configured Foundation descriptor encoder; it cannot use the partial PUT shape.
+complete compiled PUT/PUT1 continuation below consumes actual Produced feedback
+from the configured Foundation descriptor encoder; it cannot use the partial PUT shape.
 Installed forwarding, root recovery, participants, all applicable26 and CardDemo
 remain required parent work.
 
@@ -989,3 +989,59 @@ final full storage comparisons and joined copy without fallible work. Supported
 owned CP037 raw observations do not establish compiler CP037 support. Native
 installed GET forwarding, trusted foundation encoder/JES/GMT, root pending-work,
 recovery/participants/IR/full26/CardDemo acceptance remain independently required.
+
+### Compiled complete PUT/PUT1
+
+The finite compiled bridge forwards eight by-reference arguments into the
+existing `FullPut` or `FullPutOne` original typed host effect. PUT resolves a
+root-shared live object alias under its exact live HCONN; PUT1 retains the actual
+HCONN and independently established predefined normal-local OD1 lookup. The
+privileged structure observation precedes raw OD/MD/PMO decoding. Two additive
+read-only point getters, descriptor version and lesser queue/QM body maximum,
+default to Unsupported and must delegate to the SAME opaque selected point
+observation. Caller Encoding, CCSID, bindings and equal foreign rows cannot
+select or attest that profile.
+
+ASCII-compatible structures and normal big-endian PIC S9(9) BINARY scalars are
+checked against the sole generated complete MD1/2 and PMO1 fields. Fixed groups
+and one COPY wrapper retain complete member/view identities and suffix bytes.
+The body has a separate fixed-storage limit bounded by the actual queue/QM
+maximum and frozen product message limit; only the checked BufferLength prefix
+enters the message. Structure/CNO capture retains its existing 1024-byte limit.
+The existing `put_full` constructor admits explicit synchronous response,
+syncpoint/no-syncpoint and default/no-context, with an independently admitted
+local unit. This initial compiled profile requires supplied nonzero message and
+correlation IDs, explicit priority0, unlimited expiry, persistence0/1, positive
+reviewed body CCSID37/819, Format NONE and no properties, header, groups or
+segments. Queue defaults, generated IDs and other modes remain unsupported.
+
+Known success requires the original-request-bound actual `Produced` observation;
+legacy partial PUT/FullPut, status-only success and unsupported warnings cannot
+be substituted. The interpreter does not sample JES/GMT or encode context. The
+existing MD writer copies the eight already encoded actual context fields and
+preserves IDs, ignored BackoutCount, MD2 extension and all other input bytes.
+The sole PMO writer copies actual resolved names while retaining undefined z/OS
+destination counts, ignored Context, reserved Timeout and suffix bytes. A known
+reviewed FAILED status-only reply changes only the exact CC/RC, under an owned
+no-output policy; it makes no assertion about undefined IBM failure fields.
+
+All output bytes are prepared before final physical/profile callbacks, exact
+argument/member comparison and a pure held root parent/object-use guard. The
+joined copy has no callback, allocation, fallible lookup or alias mutation after
+that guard. Late storage/profile changes, malformed output, panic, cancellation,
+uncertainty and abandoned dispatched calls fence the volatile root without
+cleanup, backout or redispatch. No canonical, replay, durable or checkpoint
+schema changes are introduced.
+
+Source baseline2026-08-31 PUT row0020 `q101880_5–98` and PUT1 row0021
+`q101890_5–65` establish the signature and actual connection/object/body inputs.
+Supplement baseline2026-09-12 `q098655_194–227/315–319/382–446` establishes
+context, synchronous response, ignored/reserved fields and z/OS count
+definedness; `q098650_162–188` and `q097390_` provide declarations through the
+unchanged raw projection. `q092190_44–52/77–88` corroborates the existing option
+values. Sources and compiled private frame/reply fixtures provide zero installed
+selected Memory/SQLite, real SAF/JES/LE/core/root-terminal, native IBM, licensed
+or official26 credit. Manager integration must supply actual opaque wrappers,
+independent installed source provenance and original selected publication,
+including pending PUT normal/CEE3ABD and removed-GET root acceptance. Recovery,
+participants, full applicable26 and CardDemo remain required parent work.

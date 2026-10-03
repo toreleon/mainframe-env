@@ -11,6 +11,7 @@ use mainframe_env_host_api::mq_raw_layout::{
 use mainframe_env_host_api::mq_status::{MqCompletion, MqReviewedStatus};
 use mainframe_env_host_api::mq_wire_options::{self, MqWireBindings, MqWireQueueManagerPlatform};
 
+mod full_put;
 mod layout;
 
 /// Exact decoded native target, not a topology assertion or registry permit.
@@ -26,6 +27,13 @@ pub enum MqMqiNativePointTarget {
     },
     /// A live ABI-resolved object, never a numeric handle reconstruction.
     Object(MqHobj),
+    /// Exact predefined local PUT1 lookup. The provider still resolves and
+    /// checks the original call/connection/current unit and actual catalog.
+    PutOne {
+        /// Exact application lookup; the selected catalog owns resolution and
+        /// independently proves predefined normal-local applicability.
+        lookup: MqRouteLookup,
+    },
 }
 
 /// Privileged wrapper of the actual opaque same-service structure observation.
@@ -54,6 +62,18 @@ pub trait MqMqiNativePoint: MqWireBindings + Send + Sync {
     /// final physical snapshot after any source/clock callback. No permission,
     /// allocation, queue transition, UOW decision or cleanup follows from this.
     fn recheck(&self) -> Result<(), HostProblem>;
+    /// Delegate to the SAME opaque point's homogeneous descriptor version.
+    /// Never infer it from caller MQMD or copy foreign configuration as proof.
+    /// Existing embeddings refuse full PUT until deliberately forwarding it.
+    fn descriptor_version(&self) -> Result<i32, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
+    /// Delegate to the lesser actual queue/QM body maxima of that SAME point.
+    /// Product and per-call quotas are independent. This is not an allocation
+    /// or permission grant, and existing embeddings remain fail-closed.
+    fn max_message_bytes(&self) -> Result<usize, HostProblem> {
+        Err(HostProblem::Unsupported)
+    }
 }
 
 // The sole wire API requires a sized receiver. Forward every query, rather than
@@ -90,8 +110,9 @@ pub(super) struct Capture {
     connection_alias: i32,
     connection: MqHconn,
     object_alias: Option<i32>,
-    arguments: Vec<connx::Storage>,
+    pub(super) arguments: Vec<connx::Storage>,
     members: Vec<connx::Storage>,
+    put: Option<full_put::Capture>,
 }
 impl std::fmt::Debug for Capture {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -108,6 +129,7 @@ impl PartialEq for Capture {
             && self.object_alias == other.object_alias
             && self.arguments == other.arguments
             && self.members == other.members
+            && self.put == other.put
     }
 }
 impl Eq for Capture {}
@@ -254,6 +276,7 @@ impl ReferenceMachine {
                 .map(MqMqiRequest::Close)
                 .map_err(|_| MachineProblem::Host(HostProblem::Unsupported))
             }
+            MqMqiNativePointTarget::PutOne { .. } => Err(MachineProblem::UnsupportedForm),
         })?;
         let capture = Capture {
             structure,
@@ -268,6 +291,7 @@ impl ReferenceMachine {
             },
             arguments,
             members,
+            put: None,
         };
         self.recheck_point(&capture)?;
         Ok((
@@ -341,6 +365,9 @@ impl ReferenceMachine {
             .point
             .as_ref()
             .ok_or(MachineProblem::UnexpectedHostResult)?;
+        if capture.put.is_some() {
+            return self.finish_full_put(targets, outcome);
+        }
         let (status, output) = match outcome {
             MqMqiOutcome::Completed {
                 status: MqMqiStatus::OkNone,

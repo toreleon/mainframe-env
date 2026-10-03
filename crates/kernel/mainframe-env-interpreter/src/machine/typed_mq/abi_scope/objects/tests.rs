@@ -158,3 +158,41 @@ fn concurrent_same_token_has_one_root_table_winner() {
         1
     );
 }
+
+#[test]
+fn pure_use_guard_holds_parent_and_object_without_alias_mutation_or_aba() {
+    let shared = scope(4);
+    let (c, other, token) = tokens();
+    let ca = adopt(&shared, c);
+    let oa = adopt(&shared, other);
+    let ob = object(&shared, ca, c, token);
+    assert!(shared.use_plan(oa, other, Some((ob, token))).is_err());
+    assert!(shared.use_plan(ob, c, None).is_err());
+    let put = shared.use_plan(ca, c, Some((ob, token))).unwrap();
+    let put1 = shared.use_plan(ca, c, None).unwrap();
+    let before = {
+        let table = shared.lock().unwrap();
+        (table.slots.clone(), table.next)
+    };
+    let guard = put.guard(&shared).unwrap();
+    assert!(shared.table.try_lock().is_err());
+    drop(guard);
+    assert_eq!(
+        {
+            let table = shared.lock().unwrap();
+            (table.slots.clone(), table.next)
+        },
+        before
+    );
+    let close = shared.object_plan(ca, c, None, None, Some(ob)).unwrap();
+    let mut guard = close.guard(&shared).unwrap();
+    close.commit(&mut guard);
+    drop(guard);
+    assert!(put.guard(&shared).is_err());
+    drop(put1.guard(&shared).unwrap());
+    let disc = shared.plan(None, None, Some(ca)).unwrap();
+    let mut guard = disc.guard(&shared).unwrap();
+    disc.commit(&mut guard);
+    drop(guard);
+    assert!(put1.guard(&shared).is_err());
+}

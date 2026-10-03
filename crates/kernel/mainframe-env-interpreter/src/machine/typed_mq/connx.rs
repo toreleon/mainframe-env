@@ -14,7 +14,7 @@ pub struct MqMqiConnxProfile {
 }
 
 // Deliberate adapter bound, not an IBM CURRENT_LENGTH or accepted wire identity.
-const MAX_CNO_CAPACITY: usize = 1024;
+pub(super) const MAX_CNO_CAPACITY: usize = 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct Storage {
@@ -86,11 +86,21 @@ impl State {
 
 impl ReferenceMachine {
     pub(super) fn connx_storage(&self, name: &str) -> Result<Storage, MachineProblem> {
+        self.fixed_mq_storage(name, MAX_CNO_CAPACITY)
+    }
+
+    // Body capture has its own actual profile bound. CNO/structure callers keep
+    // their existing 1024-byte ceiling, fixed declaration and containing view.
+    pub(super) fn fixed_mq_storage(
+        &self,
+        name: &str,
+        capacity: usize,
+    ) -> Result<Storage, MachineProblem> {
         let layout = self
             .layout(name)
             .cloned()
             .ok_or(MachineProblem::UnknownStorage)?;
-        if !fixed(&layout) || layout.length > MAX_CNO_CAPACITY {
+        if !fixed(&layout) || layout.length > capacity {
             return Err(MachineProblem::UnsupportedForm);
         }
         let view = self

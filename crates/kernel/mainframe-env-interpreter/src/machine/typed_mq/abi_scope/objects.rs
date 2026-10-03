@@ -6,8 +6,36 @@ pub(in crate::machine::typed_mq) struct ObjectPlan {
     reserved: Option<(usize, i32)>,
     adopted: Option<(usize, i32, MqHobj)>,
     retired: Option<(usize, i32, MqHobj)>,
+    used: Option<(usize, i32, MqHobj)>,
 }
 impl MqMqiAbiScope {
+    // Read-only alias plan for PUT/PUT1. Retain exact slots, then compare them
+    // under the final table lock through the entire all-storage copy. No alias
+    // allocation/adoption/retirement, and no provider token lifetime assertion.
+    pub(in crate::machine::typed_mq) fn use_plan(
+        &self,
+        connection_alias: i32,
+        connection: MqHconn,
+        object: Option<(i32, MqHobj)>,
+    ) -> Result<ObjectPlan, HostProblem> {
+        let mut plan = self.object_plan(connection_alias, connection, None, None, None)?;
+        if let Some((alias, token)) = object {
+            let table = self.lock()?;
+            let slot = table
+                .slots
+                .iter()
+                .position(|s| {
+                    *s == Slot::Object {
+                        alias,
+                        parent: connection,
+                        token,
+                    }
+                })
+                .ok_or(HostProblem::UnknownOutcome)?;
+            plan.used = Some((slot, alias, token));
+        }
+        Ok(plan)
+    }
     pub(in crate::machine::typed_mq) fn object(
         &self,
         alias: i32,
@@ -101,6 +129,7 @@ impl MqMqiAbiScope {
             reserved,
             adopted,
             retired,
+            used: None,
         })
     }
 }
@@ -129,6 +158,14 @@ impl ObjectPlan {
                     .any(|s| matches!(s, Slot::Object { token: old, .. } if *old == token))
             })
             || self.retired.is_some_and(|(slot, alias, token)| {
+                table.slots[slot]
+                    != (Slot::Object {
+                        alias,
+                        parent: connection,
+                        token,
+                    })
+            })
+            || self.used.is_some_and(|(slot, alias, token)| {
                 table.slots[slot]
                     != (Slot::Object {
                         alias,

@@ -1859,3 +1859,34 @@ installed native/JES/LE/RACF/root-terminal/official/licensed execution credit.
 Joined compiled GET, actual installed source and native point/root forwarding,
 pendingPUT normal/CEE3ABD/removedGET terminal, recovery/participants/IR/full26/
 CardDemo remain mandatory. Parent active; licensed oracle alone human-skipped0/26.
+
+## Compiled complete PUT/PUT1 forwarding
+
+`MQ-1503.compiled-full-put-bridge` integrates independently reviewed sealed
+`14739c4e` over the approved compiled OPEN/CLOSE authority. The actual eight
+references retain generated complete MD1/2 and PMO1 groups, COPY wrappers,
+members and suffixes. Independent opaque structure observations precede decode;
+descriptor version and body maxima default to Unsupported and must delegate to
+the same selected profile. Actual root HCONN/HOBJ aliases and predefined PUT1
+lookup enter only the existing full-PUT constructor and original typed effect.
+The body uses a separate queue/QM/product bound; the CNO/group cap stays1024.
+
+Known success requires request-bound Produced. Existing writers copy only the
+eight already encoded context fields and actual PMO resolved names, retaining
+IDs, BackoutCount, MD2 tail, ignored/reserved fields and suffix. Exact reviewed
+FAILED status-only writes only CC/RC; warning, legacy/partial success, malformed,
+unknown, late drift, panic, cancellation and Drop fence without UOW cleanup or
+retry. All writes are staged before final callbacks, exact storage checks and a
+held pure parent/object guard; joined copy has no callback, allocation or
+fallible work after that guard. No canonical, replay or durable schema changes.
+
+Actual engine evidence remains private compiled frame/reply fixtures, not
+installed selected Memory/SQLite, core/SAF/JES/LE/native root pending work or
+official26 acceptance. Source baseline2026-08-31 PUT0020/q101880 and
+PUT10021/q101890 plus eight programming-supplements baseline2026-09-12 topics
+were independently verified retained-first and reproduced by offline search/read;
+all source review earns zero execution credit. Worker snapshots and failed
+attempts retain their actual identities, not new post-commit test labels.
+Genuine installed opaque wrappers/source, pendingPUT normal/CEE3ABD and removedGET,
+joined compiled GET, DefaultContext, recovery/participants/IR/full26/CardDemo
+remain required. Parent active; licensed oracle alone human-skipped0/26.

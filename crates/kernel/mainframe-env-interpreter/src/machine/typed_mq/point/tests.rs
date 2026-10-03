@@ -71,7 +71,8 @@ impl MqWireBindings for Point {
         q: Option<&MqRouteLookup>,
     ) -> bool {
         match &self.target {
-            MqMqiNativePointTarget::Open { lookup, .. } => o.is_none() && q == Some(lookup),
+            MqMqiNativePointTarget::Open { lookup, .. }
+            | MqMqiNativePointTarget::PutOne { lookup } => o.is_none() && q == Some(lookup),
             MqMqiNativePointTarget::Object(object) => o == Some(*object) && q.is_none(),
         }
     }

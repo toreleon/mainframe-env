@@ -3,6 +3,51 @@ use super::*;
 use mainframe_env_host_api::mq_raw_layout::{MqRawFieldKind, mq_raw_layout};
 
 impl ReferenceMachine {
+    pub(in crate::machine::typed_mq) fn point_suffix_members(
+        &self,
+        group: &connx::Storage,
+        members: &mut Vec<connx::Storage>,
+    ) -> Result<(), MachineProblem> {
+        for layout in self.layouts.values().filter(|l| {
+            l.category != LayoutCategory::Condition
+                && l.offset >= group.layout.offset
+                && l.offset < group.layout.offset + group.layout.length
+        }) {
+            let mut parent = layout.parent.as_deref();
+            let mut depth = 0;
+            while let Some(name) = parent {
+                if name == group.layout.name {
+                    if !members.iter().any(|m| m.layout.name == layout.name) {
+                        let member = self.connx_storage(&layout.name)?;
+                        if member.view.base != group.view.base
+                            || member.view.offset < group.view.offset
+                            || member.layout.offset.checked_sub(group.layout.offset)
+                                != member.view.offset.checked_sub(group.view.offset)
+                            || member
+                                .view
+                                .offset
+                                .checked_add(member.view.length)
+                                .is_none_or(|end| end > group.view.offset + group.view.length)
+                        {
+                            return Err(MachineProblem::UnsupportedForm);
+                        }
+                        members
+                            .try_reserve(1)
+                            .map_err(|_| MachineProblem::ResourceExhausted)?;
+                        members.push(member);
+                    }
+                    break;
+                }
+                depth += 1;
+                if depth > 32 {
+                    return Err(MachineProblem::UnsupportedForm);
+                }
+                parent = self.layouts.get(name).and_then(|l| l.parent.as_deref());
+            }
+        }
+        Ok(())
+    }
+
     pub(in crate::machine::typed_mq) fn point_group(
         &self,
         group: &connx::Storage,
@@ -97,7 +142,7 @@ impl ReferenceMachine {
             match field.kind {
                 MqRawFieldKind::Characters | MqRawFieldKind::Bytes
                     if member.layout.category == LayoutCategory::Alphanumeric => {}
-                MqRawFieldKind::Long => {
+                MqRawFieldKind::Long | MqRawFieldKind::Alias => {
                     self.mq_long_target(&member.layout.name)?;
                     if member.layout.native_binary || member.view.offset % 4 != 0 {
                         return Err(MachineProblem::UnsupportedForm);

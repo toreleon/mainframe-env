@@ -181,7 +181,7 @@ impl ReferenceMachine {
         let call = args.first().ok_or(MachineProblem::InvalidOperation)?;
         let call = normalize(call.trim_matches(['\'', '"']));
         let state = self.mqi.as_ref().ok_or(MachineProblem::UnsupportedForm)?;
-        let profile = if matches!(call.as_str(), "MQCONN" | "MQCONNX") {
+        let profile = if matches!(call.as_str(), "MQCONN" | "MQCONNX" | "MQPUT" | "MQPUT1") {
             connx::contained(|| state.current(&self.invocation))?
         } else {
             state.current(&self.invocation)?
@@ -263,6 +263,7 @@ impl ReferenceMachine {
             }
             "MQCONNX" => self.prepare_connx(&parameters)?,
             "MQOPEN" | "MQCLOSE" => self.prepare_point(&parameters, call == "MQOPEN")?,
+            "MQPUT" | "MQPUT1" => self.prepare_full_put(&parameters, call == "MQPUT1")?,
             "MQDISC" => {
                 if parameters.len() != 3 {
                     return Err(MachineProblem::InvalidOperation);
@@ -358,10 +359,14 @@ impl ReferenceMachine {
         targets.scope = state.scope.clone();
         if let Some(scope) = &targets.scope {
             targets.pending_lease = Some(abi_scope::PendingLease::new(scope.clone()));
-            targets.scoped_arguments = parameters
-                .iter()
-                .map(|p| self.connx_storage(p))
-                .collect::<Result<Vec<_>, _>>()?;
+            targets.scoped_arguments = if let Some(point) = &targets.point {
+                point.arguments.clone()
+            } else {
+                parameters
+                    .iter()
+                    .map(|p| self.connx_storage(p))
+                    .collect::<Result<Vec<_>, _>>()?
+            };
             if targets.scoped_arguments.iter().any(|s| {
                 s.layout.category == LayoutCategory::Binary
                     && (s.layout.native_binary || s.view.offset % 4 != 0)
@@ -461,6 +466,8 @@ impl ReferenceMachine {
             connx::contained(|| state.current(&self.invocation))?
         } else if let Some(capture) = &targets.connect {
             self.recheck_connect(capture)?;
+            connx::contained(|| state.current(&self.invocation))?
+        } else if targets.point.is_some() {
             connx::contained(|| state.current(&self.invocation))?
         } else {
             state.current(&self.invocation)?
