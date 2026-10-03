@@ -7,6 +7,7 @@ struct Walk<'a> {
     limits: MqObjectLimits,
     field: &'a str,
     depth: usize,
+    producer: bool,
 }
 impl<'de> DeserializeSeed<'de> for Walk<'_> {
     type Value = ();
@@ -23,6 +24,9 @@ impl<'de> Visitor<'de> for Walk<'_> {
         f.write_str("bounded catalog structure")
     }
     fn visit_unit<E: serde::de::Error>(self) -> Result<(), E> {
+        if self.field == "producer_defaults" {
+            return Err(E::custom("catalog defaults must be explicit"));
+        }
         Ok(())
     }
     fn visit_bool<E: serde::de::Error>(self, _: bool) -> Result<(), E> {
@@ -52,6 +56,7 @@ impl<'de> Visitor<'de> for Walk<'_> {
                 limits: self.limits,
                 field: self.field,
                 depth: self.depth + 1,
+                producer: self.producer,
             })?
             .is_some()
         {
@@ -72,10 +77,14 @@ impl<'de> Visitor<'de> for Walk<'_> {
                 limits: self.limits,
                 field: &key,
                 depth: self.depth + 1,
+                producer: self.producer,
             })?;
         }
         // Required nullable fields are a structural @2 rule. @1's historical
         // parser/defaults are untouched; no product transition is derived here.
+        if !self.producer && self.field == "queues" && keys.contains("producer_defaults") {
+            return Err(serde::de::Error::custom("catalog@2 defaults field"));
+        }
         let required: &[&str] = match self.field {
             "queue_manager" => &["default_transmission_queue"],
             "model_instances" => &["trigger_process"],
@@ -93,12 +102,17 @@ impl<'de> Visitor<'de> for Walk<'_> {
         Ok(())
     }
 }
-pub(super) fn check(bytes: &[u8], limits: MqObjectLimits) -> Result<(), MqObjectError> {
+pub(super) fn check(
+    bytes: &[u8],
+    limits: MqObjectLimits,
+    producer: bool,
+) -> Result<(), MqObjectError> {
     let mut d = serde_json::Deserializer::from_slice(bytes);
     Walk {
         limits,
         field: "",
         depth: 0,
+        producer,
     }
     .deserialize(&mut d)
     .map_err(|_| MqObjectError::CorruptSnapshot)?;

@@ -24,6 +24,7 @@ fn attrs() -> MqNativeAttributes {
             name: MqObjectName::new("Q").unwrap(),
             max_msg_length: 0,
             delivery_sequence: MqNativeDeliverySequence::Fifo,
+            producer_defaults: None,
         }],
     }
 }
@@ -62,6 +63,91 @@ fn catalog_native2_explicit_domains_exact_old1_and_roundtrip() {
         }
         assert!(catalog().with_native_attributes(a).is_err());
     }
+}
+
+#[test]
+fn producer_catalog3_has_strict_defaults_and_keeps_old2_bytes_exact() {
+    let old = catalog()
+        .with_native_attributes(attrs())
+        .unwrap()
+        .encode()
+        .unwrap();
+    assert_eq!(old, br#"{"schema_version":"mainframe-env.mq-object-catalog@2","queue_manager":{"name":"QM","default_transmission_queue":null},"objects":[{"kind":"local-queue","name":"Q","usage":"normal","trigger_process":null}],"model_instances":[],"next_dynamic_id":1,"native_attributes":{"coded_char_set_id":819,"characters":"Ascii819","max_msg_length":32768,"max_priority":2147483647,"queues":[{"name":"Q","max_msg_length":0,"delivery_sequence":"Fifo"}]}}"#);
+    let mut a = attrs();
+    a.max_priority = 9;
+    a.queues[0].producer_defaults = Some(MqNativeProducerDefaults {
+        priority: 7,
+        persistence: MqNativePersistence::Persistent,
+        response: MqNativePutResponse::Synchronous,
+    });
+    let bytes = catalog()
+        .with_native_attributes(a.clone())
+        .unwrap()
+        .encode()
+        .unwrap();
+    let decoded = MqObjectCatalog::decode(&bytes, Default::default()).unwrap();
+    assert_eq!(decoded.native_attributes(), Some(&a));
+    assert_eq!(decoded.encode().unwrap(), bytes);
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    for defect in 0..9 {
+        let mut wrong = value.clone();
+        match defect {
+            0 => wrong["schema_version"] = serde_json::json!(MQ_OBJECT_NATIVE_CATALOG_SCHEMA),
+            1 => {
+                wrong["native_attributes"]["queues"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("producer_defaults");
+            }
+            2 => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"] =
+                    serde_json::Value::Null
+            }
+            3 => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"]["priority"] =
+                    serde_json::json!(-1)
+            }
+            4 => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"]["priority"] =
+                    serde_json::json!(10)
+            }
+            5 => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"]["persistence"] =
+                    serde_json::json!("QueueDefault")
+            }
+            6 => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"]["response"] =
+                    serde_json::json!(0)
+            }
+            7 => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("response");
+            }
+            _ => {
+                wrong["native_attributes"]["queues"][0]["producer_defaults"]["foreign"] =
+                    serde_json::json!(1)
+            }
+        }
+        assert!(
+            MqObjectCatalog::decode(&serde_json::to_vec(&wrong).unwrap(), Default::default())
+                .is_err(),
+            "defect {defect}"
+        );
+    }
+    let mut old_value: serde_json::Value = serde_json::from_slice(&old).unwrap();
+    old_value["native_attributes"]["queues"][0]["producer_defaults"] = serde_json::Value::Null;
+    assert!(
+        MqObjectCatalog::decode(&serde_json::to_vec(&old_value).unwrap(), Default::default())
+            .is_err()
+    );
+    let duplicate = String::from_utf8(bytes.clone())
+        .unwrap()
+        .replace("\"priority\":7", "\"priority\":7,\"priority\":7");
+    assert!(MqObjectCatalog::decode(duplicate.as_bytes(), Default::default()).is_err());
+    a.queues[0].producer_defaults.as_mut().unwrap().response = MqNativePutResponse::Asynchronous;
+    catalog().with_native_attributes(a).unwrap(); // configuration is not execution.
 }
 #[test]
 fn catalog_native2_strict_required_unknown_duplicate_schema_counts_and_bytes() {

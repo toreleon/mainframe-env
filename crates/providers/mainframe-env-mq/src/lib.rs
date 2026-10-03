@@ -33,13 +33,14 @@ pub use message_handle::{
 };
 
 pub use object::{
-    MQ_OBJECT_CATALOG_SCHEMA, MQ_OBJECT_NAME_BYTES, MQ_OBJECT_NATIVE_CATALOG_SCHEMA, MqAliasTarget,
-    MqChannelRoute, MqCloseMode, MqCloseOutcome, MqDynamicQueueKind, MqDynamicQueuePattern,
-    MqDynamicQueueState, MqLifecycleOwner, MqLocalQueueUsage, MqModelInstance, MqNativeAttributes,
-    MqNativeCharacters, MqNativeDeliverySequence, MqNativeQueueAttributes, MqObjectCapability,
-    MqObjectCatalog, MqObjectDefinition, MqObjectError, MqObjectIdentity, MqObjectKind,
-    MqObjectLimits, MqObjectLookup, MqObjectName, MqQueueManagerDefinition, MqResolution,
-    MqResolvedTarget, MqSubscriptionDestination,
+    MQ_OBJECT_CATALOG_SCHEMA, MQ_OBJECT_NAME_BYTES, MQ_OBJECT_NATIVE_CATALOG_SCHEMA,
+    MQ_OBJECT_PRODUCER_CATALOG_SCHEMA, MqAliasTarget, MqChannelRoute, MqCloseMode, MqCloseOutcome,
+    MqDynamicQueueKind, MqDynamicQueuePattern, MqDynamicQueueState, MqLifecycleOwner,
+    MqLocalQueueUsage, MqModelInstance, MqNativeAttributes, MqNativeCharacters,
+    MqNativeDeliverySequence, MqNativePersistence, MqNativeProducerDefaults, MqNativePutResponse,
+    MqNativeQueueAttributes, MqObjectCapability, MqObjectCatalog, MqObjectDefinition,
+    MqObjectError, MqObjectIdentity, MqObjectKind, MqObjectLimits, MqObjectLookup, MqObjectName,
+    MqQueueManagerDefinition, MqResolution, MqResolvedTarget, MqSubscriptionDestination,
 };
 
 pub use pubsub::{

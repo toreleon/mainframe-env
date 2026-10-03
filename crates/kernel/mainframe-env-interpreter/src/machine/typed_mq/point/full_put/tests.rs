@@ -80,6 +80,9 @@ impl MqWireBindings for Point {
         o: Option<MqHobj>,
         q: Option<&MqRouteLookup>,
     ) -> bool {
+        if self.0.mode.load(Ordering::SeqCst) == 8 {
+            return false;
+        }
         match &self.1 {
             MqMqiNativePointTarget::Open { lookup, .. }
             | MqMqiNativePointTarget::PutOne { lookup } => o.is_none() && q == Some(lookup),
@@ -513,9 +516,9 @@ fn invalid_complete_groups_controls_profiles_and_body_bounds_refuse_before_dispa
                 7 => m.write("MD-STRUCID", b"BAD ").unwrap(),
                 8 => m.write("MD-MSGID", &[0; 24]).unwrap(),
                 9 => m.write("MD-CORRELID", &[0; 24]).unwrap(),
-                10 => m.write("MD-PRIORITY", &(-1_i32).to_be_bytes()).unwrap(),
+                10 => m.write("MD-PRIORITY", &(-2_i32).to_be_bytes()).unwrap(),
                 11 => m.write("MD-EXPIRY", &1_i32.to_be_bytes()).unwrap(),
-                12 => m.write("MD-PERSISTENCE", &2_i32.to_be_bytes()).unwrap(),
+                12 => m.write("MD-PERSISTENCE", &3_i32.to_be_bytes()).unwrap(),
                 13 => m
                     .write("MD-CODEDCHARSETID", &1208_i32.to_be_bytes())
                     .unwrap(),
@@ -910,6 +913,46 @@ fn both_positive_reviewed_ccsid_and_persistence_values_remain_complete_observati
             reply(&mut m, &e, ok(MqMqiOutput::Produced(produced(&e)))).unwrap();
             assert_eq!(m.read("MD-CODEDCHARSETID").unwrap(), ccsid.to_be_bytes());
             assert_eq!(m.read("MD-PERSISTENCE").unwrap(), persistence.to_be_bytes());
+        }
+    }
+}
+
+#[test]
+fn compiled_queue_policy_sentinels_default_response_and_input_only_fields_stay_exact() {
+    for one in [false, true] {
+        for v2 in [false, true] {
+            for response in [0, 131072] {
+                let (mut m, _, _, _, _) = started(one, v2);
+                m.write("MD-PRIORITY", &(-1_i32).to_be_bytes()).unwrap();
+                m.write("MD-PERSISTENCE", &2_i32.to_be_bytes()).unwrap();
+                m.write("PMO-OPTIONS", &(response + 16384_i32 + 4).to_be_bytes())
+                    .unwrap();
+                let e = effect(&mut m);
+                assert_eq!(request(&e).message.descriptor.fields().priority, -1);
+                assert_eq!(request(&e).message.descriptor.fields().persistence, 2);
+                reply(&mut m, &e, ok(MqMqiOutput::Produced(produced(&e)))).unwrap();
+                assert_eq!(m.read("MD-PRIORITY").unwrap(), (-1_i32).to_be_bytes());
+                assert_eq!(m.read("MD-PERSISTENCE").unwrap(), 2_i32.to_be_bytes());
+            }
+        }
+        for missing in [false, true] {
+            let (mut m, frame, _, _, _) = started(one, false);
+            m.write(
+                "PMO-OPTIONS",
+                &(16384_i32 + if missing { 4 } else { 2 }).to_be_bytes(),
+            )
+            .unwrap();
+            if missing {
+                frame.signals.mode.store(8, Ordering::SeqCst);
+            }
+            if missing || one {
+                assert!(!matches!(
+                    m.drive(MachineResume::Start, Quantum::new(100, 65536).unwrap()),
+                    MachineDrive::HostCall(_)
+                ));
+            } else {
+                effect(&mut m);
+            }
         }
     }
 }

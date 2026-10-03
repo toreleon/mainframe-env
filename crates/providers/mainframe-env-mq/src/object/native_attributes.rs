@@ -7,6 +7,37 @@ mod tests;
 
 /// Additive catalog format; @1 remains unchanged and contains no native defaults.
 pub const MQ_OBJECT_NATIVE_CATALOG_SCHEMA: &str = "mainframe-env.mq-object-catalog@2";
+/// Explicit producer defaults; older catalog encodings remain unchanged.
+pub const MQ_OBJECT_PRODUCER_CATALOG_SCHEMA: &str = "mainframe-env.mq-object-catalog@3";
+
+/// Actual configured queue persistence, with no pending/default interpretation.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum MqNativePersistence {
+    /// MQPER_NOT_PERSISTENT; cold restart does not retain the message.
+    NonPersistent,
+    /// MQPER_PERSISTENT; persistence applies once the put is committed, including
+    /// an immediate no-syncpoint put, not an uncommitted local-unit candidate.
+    Persistent,
+}
+/// Explicit configured put response, distinct from successful publication.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum MqNativePutResponse {
+    /// Complete synchronous producer output is represented by this profile.
+    Synchronous,
+    /// Retained configuration; default asynchronous execution remains pending.
+    Asynchronous,
+}
+/// q103140_/q103180_/q103190_: source-defined attributes in the sole catalog.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MqNativeProducerDefaults {
+    /// Effective priority at put time, zero through the actual QM MaxPriority.
+    pub priority: i32,
+    /// Effective message persistence at put time; not application MD writeback.
+    pub persistence: MqNativePersistence,
+    /// Captured ordinary queue default; no client override or async receipt claim.
+    pub response: MqNativePutResponse,
+}
 /// Explicit supported fixed-character policy, distinct from body CCSID.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum MqNativeCharacters {
@@ -26,7 +57,7 @@ impl MqNativeCharacters {
 /// Source-defined delivery ordering observation; producer execution is narrower.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum MqNativeDeliverySequence {
-    /// FIFO ordering; ordinary priority0 producer needs no effective reordering.
+    /// FIFO arrival ordering, independently of the message's effective priority.
     Fifo,
     /// Priority ordering is retained metadata, pending this producer profile.
     Priority,
@@ -41,6 +72,10 @@ pub struct MqNativeQueueAttributes {
     pub max_msg_length: i32,
     /// q103300_: exact configured delivery ordering.
     pub delivery_sequence: MqNativeDeliverySequence,
+    /// Explicit defaults select catalog@3. Absence preserves exact catalog@2
+    /// bytes and refuses default policy rather than supplying startup guesses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub producer_defaults: Option<MqNativeProducerDefaults>,
 }
 /// Native metadata extension of the sole MqObjectCatalog, installed explicitly.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -107,6 +142,13 @@ impl MqObjectCatalog {
                 .any(|(name, a)| **name != a.name || !(0..=104857600).contains(&a.max_msg_length))
         {
             return Err(MqObjectError::InvalidReferenceKind);
+        }
+        if attrs.queues.iter().any(|q| {
+            q.producer_defaults
+                .as_ref()
+                .is_some_and(|d| d.priority < 0 || d.priority > attrs.max_priority)
+        }) {
+            return Err(MqObjectError::CorruptSnapshot);
         }
         Ok(())
     }

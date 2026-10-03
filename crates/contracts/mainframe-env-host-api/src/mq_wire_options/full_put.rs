@@ -19,6 +19,35 @@ pub fn put_full(
     bindings: &impl MqWireBindings,
     limits: MqMessageLimits,
 ) -> Result<MqMqiFullPut, MqWireProblem> {
+    decode(connection, None, input, bindings, limits)
+}
+
+/// Decode the same finite producer intent with an exact retained object or
+/// predefined PUT1 lookup. Only the existing trusted binding may establish a
+/// synchronous queue default; caller fields do not attest it. PUT1 under
+/// syncpoint/default response remains pending (q098655_336–341). No unit,
+/// permission, queue transition or output is created by this adapter.
+pub fn put_full_for_target(
+    connection: MqHconn,
+    object: Option<MqHobj>,
+    lookup: Option<&MqRouteLookup>,
+    input: MqWireFullPut,
+    bindings: &impl MqWireBindings,
+    limits: MqMessageLimits,
+) -> Result<MqMqiFullPut, MqWireProblem> {
+    if object.is_some() == lookup.is_some() {
+        return Err(MqWireProblem::IllegalCombination);
+    }
+    decode(connection, Some((object, lookup)), input, bindings, limits)
+}
+
+fn decode(
+    connection: MqHconn,
+    target: Option<(Option<MqHobj>, Option<&MqRouteLookup>)>,
+    input: MqWireFullPut,
+    bindings: &impl MqWireBindings,
+    limits: MqMessageLimits,
+) -> Result<MqMqiFullPut, MqWireProblem> {
     connection_check(connection)?;
     version(
         input.pmo_version,
@@ -29,7 +58,7 @@ pub fn put_full(
     let bits = options(input.options, MqWireFamily::Put, MQPMO_KNOWN)?;
     let sync = bits & (MQPMO_SYNCPOINT | MQPMO_NO_SYNCPOINT);
     let context = bits & (MQPMO_DEFAULT_CONTEXT | MQPMO_NO_CONTEXT);
-    if sync.count_ones() != 1 || context.count_ones() != 1 || bits & MQPMO_SYNC_RESPONSE == 0 {
+    if sync.count_ones() != 1 || context.count_ones() != 1 {
         return Err(MqWireProblem::IllegalCombination);
     }
     represented(
@@ -41,6 +70,18 @@ pub fn put_full(
             | MQPMO_NO_CONTEXT
             | MQPMO_SYNC_RESPONSE,
     )?;
+    if bits & MQPMO_SYNC_RESPONSE == MQPMO_RESPONSE_AS_Q_DEF {
+        let (object, lookup) = target.ok_or(MqWireProblem::IllegalCombination)?;
+        if bindings.queue_manager_platform() != MqWireQueueManagerPlatform::Zos
+            || (lookup.is_some() && sync == MQPMO_SYNCPOINT)
+            || !bindings.queue_defaults_are_represented(connection, object, lookup)
+        {
+            return Err(MqWireProblem::PendingOptions {
+                family: MqWireFamily::Put,
+                bits: MQPMO_RESPONSE_AS_Q_DEF,
+            });
+        }
+    }
     let put = MqMqiFullPut {
         message: input.message,
         message_handle: None,

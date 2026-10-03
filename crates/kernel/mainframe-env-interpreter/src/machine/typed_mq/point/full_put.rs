@@ -151,7 +151,8 @@ impl ReferenceMachine {
         let descriptor = md
             .to_full_md_value()
             .map_err(|_| MachineProblem::UnsupportedForm)?;
-        // This first route does not generate identifiers or select default policy.
+        // Supplied identifiers remain mandatory; the selected producer alone
+        // resolves supported queue policy, never the interpreter's raw fields.
         if descriptor.fields().msg_id == [0; 24] || descriptor.fields().correl_id == [0; 24] {
             return Err(MachineProblem::Host(HostProblem::Unsupported));
         }
@@ -179,8 +180,13 @@ impl ReferenceMachine {
             _ => return Err(MachineProblem::UnsupportedForm),
         };
         let put = connx::contained(|| {
-            mq_wire_options::put_full(
+            mq_wire_options::put_full_for_target(
                 connection,
+                object,
+                match &target {
+                    MqMqiNativePointTarget::PutOne { lookup } => Some(lookup),
+                    _ => None,
+                },
                 MqWireFullPut {
                     message: MqFullMessage {
                         descriptor,

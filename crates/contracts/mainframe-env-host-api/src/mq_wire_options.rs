@@ -9,7 +9,7 @@ mod full_get;
 mod full_put;
 mod generated;
 pub use full_get::{MqWireFullGet, get_full};
-pub use full_put::{MqWireFullPut, put_full};
+pub use full_put::{MqWireFullPut, put_full, put_full_for_target};
 #[cfg(test)]
 mod tests;
 

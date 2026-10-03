@@ -3,6 +3,8 @@ use super::super::producer;
 use super::*;
 use crate::delivery::full_message::QueueProfile;
 use mainframe_env_host_api::mq_md_value::MqMdValue;
+#[path = "full_put/policy.rs"]
+mod policy;
 
 fn fields(request: &MqMqiRequest) -> Result<(MqHconn, &MqMqiFullPut), HostProblem> {
     match request {
@@ -87,6 +89,7 @@ fn target(
     if put.message.body.len() > attrs.max_msg_length.min(q.max_msg_length) as usize {
         return Err(HostProblem::ResourceExhausted);
     }
+    policy::effective(&state.catalog, &queue, put)?;
     Ok((queue, path))
 }
 pub(super) fn prepare(
@@ -154,8 +157,13 @@ pub(super) fn prepare(
     )?;
     let mut stored = put.message.clone();
     stored.descriptor = returned.clone();
+    let (priority, persistence) = policy::effective(&state.catalog, &queue, put)?;
     match &mut stored.descriptor {
-        MqMdValue::V1 { fields, .. } | MqMdValue::V2 { fields, .. } => fields.backout_count = 0,
+        MqMdValue::V1 { fields, .. } | MqMdValue::V2 { fields, .. } => {
+            fields.backout_count = 0;
+            fields.priority = priority;
+            fields.persistence = persistence;
+        }
     }
     next.delivery.advance_tick(now).map_err(delivery_error)?;
     let outcome = next

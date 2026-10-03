@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicU8, AtomicU64};
 mod atomic;
 #[path = "full_put/authority.rs"]
 mod authority;
+#[path = "full_put/defaults.rs"]
+mod defaults;
 #[path = "full_put/failures.rs"]
 mod failures;
 #[path = "full_put/qualified_get.rs"]
@@ -178,6 +180,7 @@ fn catalog(cp: bool, max: i32) -> MqObjectCatalog {
             name: q,
             max_msg_length: max,
             delivery_sequence: MqNativeDeliverySequence::Fifo,
+            producer_defaults: None,
         }],
     })
     .unwrap()

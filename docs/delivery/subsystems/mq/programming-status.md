@@ -1868,6 +1868,37 @@ checkpoint/retention, participants/IR/full26/CardDemo/public selection and all
 other nonlicensed acceptance remain required. Only licensed oracle skipped0/26;
 full native-root and v0.15 completion are not claimed.
 
+## Finite complete PUT queue defaults
+
+`MQ-1503.full-put-queue-defaults` integrates reviewed sealed `e23c1f1c`.
+The sole explicit catalog adds strict@3 producer defaults while absent defaults
+preserve exact historical@1/@2 bytes. Existing quiescent installation only;
+typed Rust construction adds optional producer_defaults, and old readers refuse@3.
+Stored Priority/Persistence resolve at PUT; returned caller input fields remain
+unchanged. FIFO arrival is independent of effective priority. The target-aware
+constructor and existing opaque same-point query admit actual synchronous default
+response or explicit sync override, without copied configuration authority.
+Implicit async, PUT1 default response under Syncpoint and above-MaxPriority
+warning/capped placement remain Unsupported before mutation. No schema/status/
+canonical/replay/UOW/journal or queue engine changes beyond additive catalog@3.
+
+Independent review verifies24 worker Git paths,306 distinct passing Rust tests
+across actual separately bound snapshots,170 frozen authority files,273 external
+identity occurrences, same-HEAD seal/cleanup and32 unchanged oldd8 dependency
+inputs. One manager count assertion303 was corrected to actual306 without any
+product/test change or rerun. New opaque query -> constructor -> original selected
+PUT/PUT1 -> replay -> GET checks are separately executed, not attached to older
+point receipts. Private selected/compiled fixtures earn zero installed/JES/native/
+root-terminal/official-call credit; SQLite reopen is not subprocess-crash proof.
+
+Fourteen retained-first manifest/SHA/byte/parser identities and33 actual manager
+offline search/read commands cover original baseline2026-08-31 PUT0020/q101880,
+PUT10021/q101890, supplements2026-09-12 MDq097395/PMOq098655/constantsq092190
+and all9 producer-attribute topics baseline2026-09-12. Source execution credit0.
+Async/warning/ordering/generated-ID/expiry/general forms, DefaultContext/JES/GMT,
+cross-root succession, crash/recovery/retention/participants/shared IR/full26/
+CardDemo remain mandatory. Only licensed oracle skipped0/26; parent unfinished.
+
 ## Qualified complete GET result
 
 `MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through

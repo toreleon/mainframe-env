@@ -110,7 +110,8 @@ impl MqWireBindings for MqTrustedBatchPointProfile {
         // q101870_350–389: cluster binding does not apply to this actual owned
         // noncluster route. 718: read-ahead ignored for nonclient applications.
         // Explicit INPUT_SHARED avoids DefInputOpen. Complete producer has no
-        // properties/HMSG and requires explicit PMO_SYNC_RESPONSE (q098655_315–320).
+        // properties/HMSG. Explicit PMO_SYNC_RESPONSE or the exact retained
+        // synchronous queue default is admitted by the full adapter.
         // GET is ONLY the existing complete GMO1 NoWait/Remove profile, whose
         // owner refuses nonempty structured properties/headers, conversion and
         // group/segment forms before adoption. q096715_1167–1204/1515–1520 does
@@ -124,7 +125,22 @@ impl MqWireBindings for MqTrustedBatchPointProfile {
             }
             MqTrustedBatchPointTarget::Object(exact) => object == Some(*exact) && lookup.is_none(),
         };
+        let synchronous_default = !matches!(self.call, MqMqiCall::Put | MqMqiCall::PutOne)
+            || self
+                .facts
+                .structure
+                .catalog
+                .native_attributes()
+                .is_some_and(|a| {
+                    a.queues.iter().any(|q| {
+                        q.name == self.facts.queue
+                            && q.producer_defaults.as_ref().is_some_and(|d| {
+                                d.response == crate::MqNativePutResponse::Synchronous
+                            })
+                    })
+                });
         exact
+            && synchronous_default
             && self
                 .root
                 .runtime

@@ -68,3 +68,89 @@ fn complete_pmo_rejects_implicit_response_context_new_ids_and_unrepresented_bits
         );
     }
 }
+
+#[test]
+fn queue_default_response_requires_exact_target_existing_binding_and_finite_sync_behavior() {
+    let (c, o) = handles();
+    let q = MqRouteLookup::Queue {
+        name: MqRouteName::new("Q").unwrap(),
+        manager: None,
+        dynamic_pattern: None,
+    };
+    for one in [false, true] {
+        for sync in [2, 4] {
+            for represented in [false, true] {
+                let mut p = crate::mq_mqi::producer::tests::input(false, false);
+                let crate::mq_md_value::MqMdValue::V1 { fields, .. } = &mut p.message.descriptor
+                else {
+                    panic!()
+                };
+                fields.priority = -1;
+                fields.persistence = 2;
+                let b = Bindings {
+                    zos: true,
+                    policy: represented,
+                    unit: Some(MqMqiUnitOfWork::Local { unit: 19 }),
+                    ..Default::default()
+                };
+                let build = |response| MqWireFullPut {
+                    message: p.message.clone(),
+                    pmo_version: 1,
+                    options: i64::from(sync | 16384 | response),
+                };
+                let result = put_full_for_target(
+                    c,
+                    (!one).then_some(o),
+                    one.then_some(&q),
+                    build(0),
+                    &b,
+                    Default::default(),
+                );
+                assert_eq!(result.is_ok(), represented && (!one || sync == 4));
+                if let Ok(got) = result {
+                    assert_eq!(got.message, p.message);
+                    assert_eq!(got.options, MqMqiOptions::PutV1Synchronous);
+                }
+                // Explicit synchronous response overrides missing/async defaults.
+                put_full_for_target(
+                    c,
+                    (!one).then_some(o),
+                    one.then_some(&q),
+                    build(131072),
+                    &b,
+                    Default::default(),
+                )
+                .unwrap();
+                assert!(
+                    put_full_for_target(
+                        c,
+                        (!one).then_some(o),
+                        one.then_some(&q),
+                        build(65536),
+                        &b,
+                        Default::default()
+                    )
+                    .is_err()
+                );
+                assert!(
+                    put_full_for_target(
+                        c,
+                        (!one).then_some(o),
+                        one.then_some(&q),
+                        build(65536 | 131072),
+                        &b,
+                        Default::default()
+                    )
+                    .is_err()
+                );
+                assert!(
+                    put_full_for_target(c, None, None, build(0), &b, Default::default()).is_err()
+                );
+                assert!(
+                    put_full_for_target(c, Some(o), Some(&q), build(0), &b, Default::default())
+                        .is_err()
+                );
+            }
+        }
+    }
+}

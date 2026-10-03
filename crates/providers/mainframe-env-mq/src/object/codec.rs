@@ -16,7 +16,15 @@ impl MqObjectCatalog {
         let bytes = if let Some(native_attributes) = &self.native_attributes {
             self.validate_native_attributes(native_attributes)?;
             serde_json::to_vec(&NativeCatalogEnvelope {
-                schema_version: MQ_OBJECT_NATIVE_CATALOG_SCHEMA.into(),
+                schema_version: if native_attributes
+                    .queues
+                    .iter()
+                    .any(|q| q.producer_defaults.is_some())
+                {
+                    MQ_OBJECT_PRODUCER_CATALOG_SCHEMA.into()
+                } else {
+                    MQ_OBJECT_NATIVE_CATALOG_SCHEMA.into()
+                },
                 queue_manager: envelope.queue_manager,
                 objects: envelope.objects,
                 model_instances: envelope.model_instances,
@@ -46,10 +54,22 @@ impl MqObjectCatalog {
                     .map_err(|_| MqObjectError::CorruptSnapshot)?,
                 None,
             ),
-            MQ_OBJECT_NATIVE_CATALOG_SCHEMA => {
-                preflight::check(bytes, limits)?;
+            MQ_OBJECT_NATIVE_CATALOG_SCHEMA | MQ_OBJECT_PRODUCER_CATALOG_SCHEMA => {
+                preflight::check(
+                    bytes,
+                    limits,
+                    identity.schema_version == MQ_OBJECT_PRODUCER_CATALOG_SCHEMA,
+                )?;
                 let e: NativeCatalogEnvelope =
                     serde_json::from_slice(bytes).map_err(|_| MqObjectError::CorruptSnapshot)?;
+                if e.native_attributes
+                    .queues
+                    .iter()
+                    .any(|q| q.producer_defaults.is_some())
+                    != (identity.schema_version == MQ_OBJECT_PRODUCER_CATALOG_SCHEMA)
+                {
+                    return Err(MqObjectError::CorruptSnapshot);
+                }
                 (
                     CatalogEnvelope {
                         schema_version: MQ_OBJECT_CATALOG_SCHEMA.into(),

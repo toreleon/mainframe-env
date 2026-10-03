@@ -43,7 +43,7 @@ fn source_errors_invalid_inputs_catalog_lengths_and_saf_refuse_without_payload_a
             };
             match variant {
                 0 => fields.msg_id = [0; 24],
-                1 => fields.priority = 1,
+                1 => fields.priority = -2,
                 2 => fields.persistence = 2,
                 3 => fields.expiry = 1,
                 4 => fields.report = 1,

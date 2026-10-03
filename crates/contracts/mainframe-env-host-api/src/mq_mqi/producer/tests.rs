@@ -132,9 +132,9 @@ fn producer_coherent_output_mutations_and_invalid_input_profiles_refused() {
         match change {
             0 => f.msg_id = [0; 24],
             1 => f.coded_char_set_id = 500,
-            2 => f.priority = 1,
+            2 => f.priority = -2,
             3 => f.report = 1,
-            4 => f.persistence = 2,
+            4 => f.persistence = 3,
             _ => f.expiry = 0,
         }
         assert!(p.validate_producer_profile().is_err());
@@ -211,5 +211,36 @@ fn additive_producer_tags_frozen_and_feedback_fields_bind_full_host_digest() {
             },
         };
         assert_ne!(digest(changed), original);
+    }
+}
+
+#[test]
+fn producer_queue_policy_inputs_remain_exact_not_effective_application_output() {
+    for (priority, persistence) in [(-1, 2), (7, 0), (i32::MAX, 1)] {
+        let mut p = input(true, false);
+        let MqMdValue::V2 { fields, .. } = &mut p.message.descriptor else {
+            panic!()
+        };
+        fields.priority = priority;
+        fields.persistence = persistence;
+        p.validate_producer_profile().unwrap();
+        let r = result(&p);
+        r.bind(&p).unwrap();
+        assert_eq!(r.descriptor.fields().priority, priority);
+        assert_eq!(r.descriptor.fields().persistence, persistence);
+        for which in [true, false] {
+            let mut changed = r.clone();
+            let MqMdValue::V2 { fields, .. } = &mut changed.descriptor else {
+                panic!()
+            };
+            if which {
+                fields.priority = 3
+            } else {
+                fields.persistence = 0
+            };
+            if changed.descriptor != r.descriptor {
+                assert!(changed.bind(&p).is_err());
+            }
+        }
     }
 }

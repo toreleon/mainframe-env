@@ -9,6 +9,8 @@ use mainframe_env_host_api::mq_md_value::*;
 use mainframe_env_host_api::mq_wire_options::MqWireBindings;
 use std::sync::Weak;
 
+#[path = "native_point/defaults.rs"]
+mod defaults;
 #[path = "native_point/get.rs"]
 mod get;
 #[path = "native_point/installed_fixture.rs"]
@@ -137,6 +139,16 @@ impl NativeFixture {
         version: i32,
         cp: bool,
         selected_clock: Option<Arc<dyn MqReplayClock>>,
+        capture: impl FnMut(&Arc<dyn PlatformStore>),
+    ) -> Self {
+        Self::with_defaults(sqlite, version, cp, selected_clock, None, capture)
+    }
+    fn with_defaults(
+        sqlite: bool,
+        version: i32,
+        cp: bool,
+        selected_clock: Option<Arc<dyn MqReplayClock>>,
+        defaults: Option<crate::MqNativeProducerDefaults>,
         mut capture: impl FnMut(&Arc<dyn PlatformStore>),
     ) -> Self {
         let db = sqlite.then(Database::new);
@@ -168,6 +180,7 @@ impl NativeFixture {
                 name: queue.clone(),
                 max_msg_length: 2048,
                 delivery_sequence: MqNativeDeliverySequence::Fifo,
+                producer_defaults: defaults,
             }],
         })
         .unwrap();
@@ -302,7 +315,7 @@ fn native_root_child_structure_tuple_current_unit_facts_are_read_only() {
                 let put = child.structure_profile(MqMqiCall::Put, c).unwrap();
                 let p = child.point_profile(&put, object_target(o)).unwrap();
                 assert!(
-                    p.wire_bindings()
+                    !p.wire_bindings()
                         .queue_defaults_are_represented(c, Some(o), None)
                 );
                 assert!(child.point_profile(&put, open_target()).is_err());
@@ -310,10 +323,11 @@ fn native_root_child_structure_tuple_current_unit_facts_are_read_only() {
                 let p = child
                     .point_profile(&one, MqTrustedBatchPointTarget::PutOne { lookup: lookup() })
                     .unwrap();
-                assert!(
-                    p.wire_bindings()
-                        .queue_defaults_are_represented(c, None, Some(&lookup()))
-                );
+                assert!(!p.wire_bindings().queue_defaults_are_represented(
+                    c,
+                    None,
+                    Some(&lookup())
+                ));
                 assert_eq!(f.rows(), rows);
                 assert_eq!(unit(&child, c), current);
                 assert_eq!(f.saf.calls.load(Ordering::SeqCst), calls);

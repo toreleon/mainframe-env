@@ -969,6 +969,47 @@ from the configured Foundation descriptor encoder; it cannot use the partial PUT
 Installed forwarding, root recovery, participants, all applicable26 and CardDemo
 remain required parent work.
 
+### Selected full PUT queue defaults
+
+The same explicit native queue catalog can retain reviewed DefPriority,
+DefPersistence and DefaultPutResponse in strict private catalog@3. Historical
+catalog@1/@2 without these fields keeps its exact bytes; no startup default or
+automatic migration is supplied. Install or replace configuration only through
+the existing quiescent owning path. A live catalog change invalidates captured
+physical/profile fences, rather than rebinding an open object to new defaults.
+
+For the finite direct predefined normal-local FIFO route, full PUT/PUT1 accepts
+an explicit priority through the actual QM MaxPriority or the generated MQMD
+default sentinel, and explicit persistence0/1 or its default sentinel. At put
+time the existing selected candidate resolves only the stored descriptor's
+policy. Returned Produced retains the caller's input-only Priority/Persistence;
+the raw MD writer still changes only the existing eight context outputs. A
+nonzero default priority does not reorder FIFO arrival. The existing original
+request, complete result, payload, replay@5/@6 and canonical bytes are unchanged.
+
+The target-aware `put_full_for_target` uses the same retained opaque point's
+existing queue-default query. Explicit synchronous response overrides the queue
+default. Default response is supported only when that actual catalog records
+synchronous response; PUT1 default response under syncpoint stays unsupported
+because the source describes asynchronous behavior without a represented client
+override. Above-max priority also stays unsupported before mutation: its source
+warning and capped placement are not represented by this producer result.
+Asynchronous response, priority ordering, generated IDs, expiry, distribution,
+groups/segments and further profiles remain required follow-ons. Existing
+source-bound NoContext/DefaultContext, actual SAF, live connection/object/unit,
+original core occurrence, audit and single physical CAS publication remain the
+owning authorities; attributes and constructor validation grant no permission.
+
+Source review uses original baseline2026-08-31 PUT row0020 `q101880_` and PUT1
+row0021 `q101890_`, supplemental baseline2026-09-12
+`q097395_1221–1272/1301–1335` (input vs stored policy),
+`q098655_277–341` (response applicability), and producer-attribute baseline
+`ibm-mq-9.4-producer-attribute-sources-2026-09-12`
+`q103190_22–31`, `q103180_22–38`, `q103140_` and `q103300_19–33`.
+Reference review earns zero execution credit. Private selected Memory/owned-file
+SQLite and compiled engine fixtures do not establish installed JES/LE/native,
+root-terminal, participant, official26 or CardDemo acceptance.
+
 ### Qualified GMO1 value staging
 
 The raw capture's `stage_qualified_full_get_gmo` prepares GMO1 scratch from an
@@ -1008,12 +1049,13 @@ and one COPY wrapper retain complete member/view identities and suffix bytes.
 The body has a separate fixed-storage limit bounded by the actual queue/QM
 maximum and frozen product message limit; only the checked BufferLength prefix
 enters the message. Structure/CNO capture retains its existing 1024-byte limit.
-The existing `put_full` constructor admits explicit synchronous response,
+The initial sealed `put_full` constructor admits explicit synchronous response,
 syncpoint/no-syncpoint and default/no-context, with an independently admitted
-local unit. This initial compiled profile requires supplied nonzero message and
-correlation IDs, explicit priority0, unlimited expiry, persistence0/1, positive
-reviewed body CCSID37/819, Format NONE and no properties, header, groups or
-segments. Queue defaults, generated IDs and other modes remain unsupported.
+local unit. It requires supplied nonzero message and correlation IDs, unlimited
+expiry, positive reviewed body CCSID37/819, Format NONE and no properties,
+header, groups or segments. The queue-default extension above broadens only
+priority, persistence and synchronous response through `put_full_for_target`;
+generated IDs and other modes remain unsupported.
 
 Known success requires the original-request-bound actual `Produced` observation;
 legacy partial PUT/FullPut, status-only success and unsupported warnings cannot

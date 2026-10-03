@@ -68,8 +68,9 @@ impl MqMqiFullPut {
             || !initial(MqRawLayoutKind::Md1, "Feedback", f.feedback)
             || !initial(MqRawLayoutKind::Md1, "Expiry", f.expiry)
             || f.format != [blank; 8]
-            || !matches!(f.persistence, 0 | 1)
-            || f.priority != 0
+            || !(matches!(f.persistence, 0 | 1)
+                || initial(MqRawLayoutKind::Md1, "Persistence", f.persistence))
+            || !(f.priority >= 0 || initial(MqRawLayoutKind::Md1, "Priority", f.priority))
             || !matches!(f.coded_char_set_id, 37 | 819)
             || f.msg_id == [0; 24]
             || f.reply_to_q != [blank; 48]
