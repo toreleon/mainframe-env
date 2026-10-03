@@ -7,6 +7,7 @@ use crate::retention::{
     target_namespace, target_watermark, target_window_open, validate_request,
 };
 use crate::validation;
+mod bounded_provider_read;
 mod provider_retention;
 use mainframe_env_execution_api::{
     ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
@@ -1034,17 +1035,16 @@ impl ProviderStateStore for MemoryStore {
         namespace: &str,
         max: usize,
     ) -> Result<Vec<ProviderStateRecord>, StoreError> {
-        if max == 0 || max > mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN {
-            return Err(StoreError::CapacityExceeded);
-        }
-        Ok(self
-            .lock()?
-            .provider_state
-            .iter()
-            .filter(|((candidate, _), _)| candidate == namespace)
-            .take(max)
-            .map(|(_, record)| record.clone())
-            .collect())
+        self.legacy_provider_page(namespace, max)
+    }
+
+    fn list_provider_state_bounded(
+        &self,
+        namespace: &str,
+        max: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+        self.bounded_provider_page(namespace, max, max_bytes)
     }
 
     fn list_provider_state_prefix(

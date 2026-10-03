@@ -162,7 +162,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 1508,
+      "max_production_lines": 1489,
       "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
       "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },

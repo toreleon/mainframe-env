@@ -6,6 +6,43 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Bounded provider prefetch prerequisite
+
+`MQ-1503.batch-bounded-provider-prefetch` integrates reviewed sealed worker
+`262bde8b`. Its additive default-refusing Store API observes one key-ordered
+physical namespace page. Before payload materialization, Memory checks borrowed
+records under one lock; SQLite checks byte/type/version metadata and bounded
+UTF-8 keys, then fetches that same page in one read transaction. Positive row
+limits retain the existing262145 ceiling; positive page budgets are at most64MiB.
+The budget includes namespace bytes per row, key bytes and payload bytes, not
+allocator, metadata or database-engine buffers. Malformed/over-budget pages
+return no partial result; unsupported adapters refuse without legacy fallback.
+
+Only private contained prepared selection uses the new read, with its existing
+max-plus-one4096-family and64MiB limits. Configuration/prospective-write
+accounting, physical/cache/version equality, preflight and final recapture remain
+separate and unchanged. Both legacy namespace-list bodies are byte-exact;
+ordinary and older Program-only paths retain their behavior. No schema, root,
+index, receipt, Core or Work migration is added. Main composes minimal shared
+registrations with retained replay code, and lowers its SQLite cap1508 to1489.
+
+Independent review closes20worker paths/43commands/141stable receipts,
+2823input versions/120658occurrences and the recomputed exact seal. Ten Store
+tests,250Batch units/11compile-fail examples,13policy/fouractualmutants and
+required guards passed on their recorded inputs. Two initial fixture compilation
+failures remain separately preserved. The final documentation-index edit changed
+no Rust inputs. Main runs focused composed Store/Batch, affected all-target
+consumers, rustdoc and mandatory gates before sealing; dependency policy reuse
+binds32exact historical d8inputs, not fresh deny or CI execution.
+
+This is a bounded structural read, not a whole-graph/phantom/configuration fence,
+total-heap quota, publication permission, physical claim clock or atomic
+Work/Job/absentCore admission. Fixtures and orderly SQLite reopen grant no
+installed/native/SAF/JES/crash/full26 credit. Actual controller ownership,
+supervised handover, late-failure consumption and all other nonlicensed v0.15
+acceptance remain required. All26 full-call gates stay Pending; fullv0.15 remains
+unfinished. Only the licensed IBM oracle is human-skipped0/26, with zero credit.
+
 ## Retained checked replay and refusal prerequisite
 
 `MQ-1503.checked-inquiry-replay-refusal` integrates reviewed sealed worker

@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 261,
+    "markdown_documents": 262,
     "navigation_groups": 6,
-    "normative_documents": 91,
+    "normative_documents": 92,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 147,
-      "sha256": "sha256:f935366ac4cc2e2eac66df5032def7ed5b0721d6ac0321fa3280495aa9a28b55",
+      "relative_links": 148,
+      "sha256": "sha256:162265d7f950f3cf28b3272c287caabdda4f40dc28120a88b37389ac397c99e2",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1355,10 +1355,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Store and Batch maintainers",
+      "path": "docs/decisions/0046-batch-bounded-provider-prefetch.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-bounded-provider-prefetch, target 0.15.0",
+      "sha256": "sha256:ba16e17af7e99b4d451520fec0e98703e56f8f5fd272babf02bfeb2216cd67af",
+      "status": "Accepted bounded infrastructure prerequisite; joined admission remains pending.",
+      "title": "ADR-0046: Bounded provider namespace prefetch",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 49,
-      "sha256": "sha256:c54d61579055cdaeb5fadb9082862166ab27eaa1eb4555ac8735af120c3ac6bf",
+      "relative_links": 50,
+      "sha256": "sha256:77a69f8bbb37a55302e790a77a8bf59cdad4b91255024d31d4d1b20277d9ad0e",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1902,7 +1914,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:2c321220f89c311ad892121721dbe6e499c7f2e4f3d1483dd3ee03491f8a4e29",
+      "sha256": "sha256:f4cef5488e29d871e47e62edbbff1ad5bef39642ebb36af52c656ed906576b35",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2814,6 +2826,10 @@
         {
           "label": "ADR-0045: Batch prepared-selection observation",
           "path": "docs/decisions/0045-batch-prepared-selection-plan.md"
+        },
+        {
+          "label": "ADR-0046: Bounded provider namespace prefetch",
+          "path": "docs/decisions/0046-batch-bounded-provider-prefetch.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -3060,7 +3076,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:903bbfa505662fc3f63e142ab54b533fbcf2dda7250efe40bd7a12d52da815a1",
+  "registry_sha256": "sha256:08e36db02233956b6657b7adf855bd7f0819c083fde13560e5467f26d46f8f47",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

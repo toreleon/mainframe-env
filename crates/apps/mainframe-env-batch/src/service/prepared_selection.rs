@@ -205,7 +205,7 @@ impl BatchService {
         let max_jobs = self.limits.max_jobs.min(MAX_SELECTION_RECORDS - 2);
         let rows = self
             .store
-            .list_provider_state("jes-job", max_jobs + 1)
+            .list_provider_state_bounded("jes-job", max_jobs + 1, MAX_SELECTION_BYTES)
             .map_err(store_error)?;
         // Check physical cardinality and payload budget BEFORE copying any Job.
         let namespace_bytes = bounded_records(&rows, self.limits.max_jobs, 0)?;

@@ -523,6 +523,24 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
         namespace: &str,
         max: usize,
     ) -> Result<Vec<ProviderStateRecord>, StoreError>;
+    /// Read one key-ordered namespace page, preflighting bytes before owning payloads.
+    ///
+    /// `max` must be positive and at most `MAX_PROVIDER_STATE_SCAN`; `max_bytes`
+    /// must be positive and at most 64 MiB. The byte budget includes each row's
+    /// namespace and key UTF-8 bytes plus payload bytes, excluding allocation and
+    /// metadata overhead. Implementations validate the whole selected page's
+    /// field, version and payload bounds before copying/fetching its payloads,
+    /// using one lock or read transaction. This observation grants no later
+    /// publication or whole-graph membership authority. Unsupported adapters
+    /// refuse; callers must not fall back to unrestricted reads.
+    fn list_provider_state_bounded(
+        &self,
+        _namespace: &str,
+        _max: usize,
+        _max_bytes: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// List a bounded, key-ordered snapshot across provider namespaces sharing a prefix.
     fn list_provider_state_prefix(
         &self,

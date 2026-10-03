@@ -47,6 +47,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0040](0040-batch-run-stop-containment.md) | genuine opt-in Batch run owner, opaque exit and irrevocable next-action stop; host activation pending | Accepted (bounded prerequisite) |
 | [0043](0043-batch-contained-all-effect-loan.md) | explicit contained all-effect occurrence transport with external audit ownership; enclosing controller activation pending | Accepted (bounded transport) |
 | [0045](0045-batch-prepared-selection-plan.md) | private bounded exact selection observation with complete Job/configuration revalidation; atomic joined admission pending | Accepted (bounded prerequisite) |
+| [0046](0046-batch-bounded-provider-prefetch.md) | bounded provider namespace byte/shape preflight before payload materialization; joined admission pending | Accepted (bounded prerequisite) |
 
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each

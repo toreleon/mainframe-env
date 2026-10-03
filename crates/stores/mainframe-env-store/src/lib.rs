@@ -9,6 +9,7 @@ mod local_artifact;
 mod memory;
 mod postgres;
 mod postgres_artifact;
+mod provider_scan;
 mod publication;
 mod replay_refusal;
 mod retention;

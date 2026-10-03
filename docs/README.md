@@ -127,6 +127,7 @@ explicitly names that authority as superseded.
 - [ADR-0040: Batch run stop containment](decisions/0040-batch-run-stop-containment.md)
 - [ADR-0043: Batch contained all-effect loan](decisions/0043-batch-contained-all-effect-loan.md)
 - [ADR-0045: Batch prepared-selection observation](decisions/0045-batch-prepared-selection-plan.md)
+- [ADR-0046: Bounded provider namespace prefetch](decisions/0046-batch-bounded-provider-prefetch.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
