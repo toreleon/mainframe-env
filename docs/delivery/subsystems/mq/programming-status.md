@@ -1918,8 +1918,32 @@ search/read receipts remain bound to their original candidates; source credit0.
 Physical store contracts and actual compiled connection-only/root-child fixtures
 do not prove pending PUT/removed GET, DefaultContext, JES, native MQ or licensed
 execution. Six additional ordinary-writer gaps reproduced by the separate
-reviewed `MQ-1505.root-writer-guards` feature still require their own integration;
+reviewed `MQ-1505.root-writer-guards` feature are addressed separately below;
 this prerequisite is not advertised as a complete root delivery contract.
 Genuine installed point/PUT/GET, pendingPUT normal/CEE3ABD/removedGET, failure/
 restart, participants/IR/full26/CardDemo and other nonlicensed gates remain
 required. Parent active; only licensed oracle human-skipped0/26.
+
+## Root ordinary-writer guard parity
+
+`MQ-1505.root-writer-guards` integrates reviewed sealed `f72d4a1f` as a
+separate feature over the root framework. Actual regressions exposed six gaps:
+Memory direct/journal checkpoints and root-terminal event insertion; SQLite
+Uncertain new outbox and audit-only publication; standalone Closing denial
+audit on both adapters; and copied actual terminal audit subjects inserted by
+generic provider-row writers on both adapters. Existing physical guards and
+effect-audit decoding now refuse each before publication. The private composed
+root writer remains the sole producer of terminal subjects. No API, codec,
+schema, membership constructor or new transaction engine is introduced.
+
+The initial failures remain bound to their actual candidates. An overbroad
+SQLite repair also refused existing delivery and was corrected: exact unchanged
+outbox delivery remains permitted outside Closing, including Terminal and
+Uncertain, without execution or settlement authority. Genuine child normal
+completion/ABEND and nonnative checkpoint behavior remain compatible. Indexed
+root history has no age/release permit. This infrastructure repair needs no new
+IBM semantic lookup and supplies zero compiled/native/installed/SAF/JES/LE/
+pendingwork/official/licensed credit. Original pendingPUT normal/CEE3ABD and
+removedGET, installed source, restart/crash/recovery, participants/IR/full26/
+CardDemo and other nonlicensed gates remain required. Parent active; only the
+licensed oracle is human-skipped0/26.

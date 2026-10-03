@@ -12,7 +12,8 @@ use mainframe_env_store_api::{
 };
 mod guards;
 pub(super) use guards::{
-    guard_actor, guard_effect, guard_outbox_delivery, guard_provider, guard_unenrolled, guard_work,
+    guard_actor, guard_effect, guard_event, guard_outbox_delivery, guard_provider,
+    guard_unenrolled, guard_work, record_audit,
 };
 
 fn row<'a>(

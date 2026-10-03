@@ -4,6 +4,9 @@ use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[path = "root_terminal_contract/writer_guards.rs"]
+mod writer_guards;
+
 fn event(execution: &ExecutionRecord, sequence: u64, kind: LifecycleEventKind) -> LifecycleEvent {
     LifecycleEvent {
         execution_id: execution.execution_id.clone(),

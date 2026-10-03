@@ -42,6 +42,23 @@ checkpoint/provider writers must respect the same gate. This first synchronous
 profile refuses scheduled work, live checkpoints, recovery leases and unknown
 descendant closure. It does not truncate a global scan into an ownership claim.
 
+Direct checkpoint insertion and checkpoint-bearing journal steps both refuse
+enrolled actors, including while Open. Direct event append and journal steps
+classify the event kind independently of an optional state update: root
+Completing/terminal events require the composed terminal publication. Genuine
+child completion and ABEND remain permitted while Open. SQLite audit-only
+publication rechecks the same actor gate inside its writer transaction; new
+outbox insertion also refuses Uncertain. Existing exact outbox delivery remains
+available outside Closing, including Terminal and Uncertain; it cannot insert or
+change notification content. These guard parity repairs supply physical store evidence,
+not installed native pending-work acceptance.
+
+Standalone effect-audit writes also obey the enrolled actor gate. Generic
+provider-row writers cannot copy or insert a root-terminal audit subject;
+the existing effect-audit decoder rejects that class, and only the composed
+root publication's private physical writer creates it. Unenrolled legacy
+authorization diagnostics retain their existing authority and behavior.
+
 `close_root_driver` captures the complete bounded graph under the physical
 lock/transaction. Distinct `Exact` and `Absent` dependencies are not provider
 mutations. The mutation vocabulary remains Put/Delete/Move. The server's full

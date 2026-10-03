@@ -265,6 +265,10 @@ impl JournalStore for MemoryStore {
     ) -> Result<ExecutionRecord, StoreError> {
         let mut state = self.lock()?;
         super::root_terminal::guard_actor(&state, execution_id, next_state)?;
+        super::root_terminal::guard_event(&state, &event)?;
+        if checkpoint.is_some() {
+            super::root_terminal::guard_work(&state, execution_id)?;
+        }
         let limits = self.limits;
         journaled(&mut state, |state, journal| {
             let current = state

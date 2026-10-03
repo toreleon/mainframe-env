@@ -62,6 +62,10 @@ impl SqliteStateStore {
         if epoch < 0 || tick < 0 {
             return Err(StoreError::IncompatibleVersion);
         }
+        // Even an audit-only or unscoped row batch belongs to its enrolled
+        // actor. Assert the root gate under this same physical writer lock.
+        self.root_guard_actor(transaction, &request.intent.execution_id, false)
+            .await?;
         let writes = request
             .mutations
             .iter()

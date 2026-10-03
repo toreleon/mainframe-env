@@ -54,7 +54,7 @@ impl ExecutionStore for MemoryStore {
 impl EventStore for MemoryStore {
     fn append_event(&self, event: LifecycleEvent) -> Result<(), StoreError> {
         let mut state = self.lock()?;
-        root_terminal::guard_actor(&state, &event.execution_id, None)?;
+        root_terminal::guard_event(&state, &event)?;
         Self::append_event_locked(&mut state, event, self.limits)
     }
 

@@ -1,7 +1,7 @@
 //! Existing SQLite writers share the exact native-root Closing gate.
 use super::*;
 impl SqliteStateStore {
-    async fn root_guard_actor(
+    pub(in crate::sqlite) async fn root_guard_actor(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         execution: &ExecutionId,
@@ -185,11 +185,15 @@ impl SqliteStateStore {
                     let document =
                         Document::read(&self.root_row(tx, ROOT_DRIVER_NAMESPACE, root).await?)?;
                     if document.phase == Phase::Closing
-                        || (document.phase == Phase::Terminal && proposed.is_none())
+                        || (document.phase == Phase::Uncertain && retained.is_none())
+                        || (matches!(document.phase, Phase::Terminal | Phase::Uncertain)
+                            && proposed.is_none())
                     {
                         return Err(StoreError::InvalidTransition);
                     }
-                    if document.phase == Phase::Terminal && Some(bytes) == proposed {
+                    if matches!(document.phase, Phase::Terminal | Phase::Uncertain)
+                        && Some(bytes) == proposed
+                    {
                         let old = durable::decode_outbox(
                             &retained.as_ref().ok_or(StoreError::NotFound)?.payload,
                             version,
@@ -218,6 +222,12 @@ impl SqliteStateStore {
                 {
                     return Err(StoreError::InvalidTransition);
                 }
+            } else if namespace == durable::AUDIT_NAMESPACE {
+                // Reuse the existing effect codec; a terminal subject can only
+                // enter through root_commit's private physical row primitive.
+                let audit = durable::decode_audit(bytes)?;
+                self.root_guard_actor(tx, &audit.execution_id, false)
+                    .await?;
             } else if matches!(
                 namespace,
                 "cobol-call-replay@1"

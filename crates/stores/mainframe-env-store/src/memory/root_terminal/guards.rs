@@ -60,6 +60,29 @@ pub(in crate::memory) fn guard_actor(
     Ok(())
 }
 
+/// A root terminal event requires the same composed publication as its state.
+/// Enrolled child completion is still an ordinary Open-phase operation.
+pub(in crate::memory) fn guard_event(
+    state: &State,
+    event: &LifecycleEvent,
+) -> Result<(), StoreError> {
+    use mainframe_env_execution_api::LifecycleEventKind;
+    let terminal = matches!(
+        event.kind,
+        LifecycleEventKind::Completing
+            | LifecycleEventKind::Completed { .. }
+            | LifecycleEventKind::Abend
+            | LifecycleEventKind::Failed
+            | LifecycleEventKind::Cancelled
+            | LifecycleEventKind::TimedOut
+    );
+    guard_actor(
+        state,
+        &event.execution_id,
+        terminal.then_some(ExecutionState::Completing),
+    )
+}
+
 pub(in crate::memory) fn guard_unenrolled(
     state: &State,
     execution: &ExecutionRecord,
@@ -81,7 +104,7 @@ pub(in crate::memory) fn guard_work(
         .provider_state
         .contains_key(&(ACTOR_NAMESPACE.into(), execution.as_str().into()))
     {
-        // Scheduled roots/checkpoint transfer are an explicitly unsupported
+        // Scheduled work/checkpoint transfer are an explicitly unsupported
         // profile in this synchronous compiled driver. Never silently enqueue.
         return Err(StoreError::InvalidTransition);
     }
@@ -108,6 +131,15 @@ pub(in crate::memory) fn guard_outbox_delivery(
     }
 }
 
+pub(in crate::memory) fn record_audit(
+    state: &mut State,
+    record: AuditRecord,
+    limits: StoreLimits,
+) -> Result<(), StoreError> {
+    guard_actor(state, &record.execution_id, None)?;
+    MemoryStore::append_audit_locked(state, record, limits)
+}
+
 pub(in crate::memory) fn guard_provider(
     state: &State,
     namespace: &str,
@@ -131,6 +163,23 @@ pub(in crate::memory) fn guard_provider(
             if doc.phase != Phase::Open {
                 return Err(StoreError::InvalidTransition);
             }
+        }
+    }
+    if namespace == AUDIT_NAMESPACE && state.provider_state.keys().any(|(n, _)| n == RUN_NAMESPACE)
+    {
+        let old = state.provider_state.get(&(namespace.into(), key.into()));
+        for bytes in old
+            .map(|r| r.payload.as_slice())
+            .into_iter()
+            .chain(proposed)
+        {
+            if bytes.len() > mainframe_env_store_api::MAX_ROOT_PAYLOAD_BYTES {
+                return Err(StoreError::CapacityExceeded);
+            }
+            // The existing effect audit decoder rejects terminal subjects.
+            // Only root_commit's private physical writer may create those.
+            let audit = crate::durable::decode_audit(bytes)?;
+            guard_actor(state, &audit.execution_id, None)?;
         }
     }
     if state.provider_state.keys().any(|(n, _)| n == RUN_NAMESPACE)

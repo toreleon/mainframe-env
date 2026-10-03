@@ -294,7 +294,7 @@ impl AuditSink for MemoryStore {
     }
     fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
         let mut state = self.lock()?;
-        Self::append_audit_locked(&mut state, record, self.limits)
+        root_terminal::record_audit(&mut state, record, self.limits)
     }
 
     fn audit_records(
@@ -619,7 +619,7 @@ impl CheckpointStore for MemoryStore {
         validation::checkpoint(&record)?;
         Self::validate_encoded_size(encode_checkpoint(&record)?, self.limits)?;
         let mut state = self.lock()?;
-        root_terminal::guard_actor(&state, &record.execution_id, None)?;
+        root_terminal::guard_work(&state, &record.execution_id)?;
         let old = state
             .checkpoints
             .get(&record.execution_id)
