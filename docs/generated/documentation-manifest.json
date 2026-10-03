@@ -525,7 +525,7 @@
       "path": "docs/architecture/PACKAGE-MAP.md",
       "relative_links": 3,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:699022f46d6e8f52d862653a63ff16d98eda0cc144e5cd628bf32a63028e9476",
+      "sha256": "sha256:f3f5394172b2e0f5cd33cc539396ce3397f8658790b1841bcfa85f5161adbbfe",
       "status": "Accepted; current topology governed by ADR-0009",
       "title": "0.1 Package Map",
       "xtask_commands": 0

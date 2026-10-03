@@ -125,6 +125,13 @@ ADR-0009.
 | `mainframe-env-encoding` | CCSID/EBCDIC conversion and collation primitives | compiler/execution engines |
 | `mainframe-env-ir` | in-memory IR, verifier, versioned text/binary/envelope codecs | COBOL AST, backends |
 
+Foundation encoding also owns `encode_ascii`, a bounded ASCII identity copy into
+owned bytes. It preserves all128 ASCII values, including controls, and rejects
+non-ASCII before checking the caller's inclusive byte bound or allocating.
+Fallible reservation has a distinct allocation error; no replacement, trimming,
+CCSID mapping or locale selection occurs. This additive helper leaves CP037,
+numeric primitives and the `mainframe-env.encoding@1` identity unchanged.
+
 ## Contract packages
 
 | Package | Owns |
