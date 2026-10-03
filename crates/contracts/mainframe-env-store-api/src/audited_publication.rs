@@ -36,45 +36,55 @@ impl AuditedProviderPublication {
         if self.audit.decision == AuditDecision::Deny && !self.mutations.is_empty() {
             return Err(StoreError::InvalidTransition);
         }
-        for mutation in &self.mutations {
-            let (namespace, key) = match mutation {
-                ProviderStateMutation::Put(write) => {
-                    write.record.validate_write(max_payload_bytes)?;
-                    if write
-                        .expected_version
-                        .map_or(write.record.version != 1, |expected| {
-                            expected == 0 || expected.checked_add(1) != Some(write.record.version)
-                        })
-                    {
-                        return Err(StoreError::Conflict);
-                    }
-                    (&write.record.namespace, &write.record.key)
-                }
-                ProviderStateMutation::Move {
-                    record,
-                    old_key,
-                    expected_version,
-                } => {
-                    record.validate_move(old_key, *expected_version, max_payload_bytes)?;
-                    // Both endpoints of a move must stay in provider ownership.
-                    provider_identity(&record.namespace, old_key)?;
-                    (&record.namespace, &record.key)
-                }
-                ProviderStateMutation::Delete {
-                    namespace,
-                    key,
-                    expected_version,
-                } => {
-                    if *expected_version == 0 || *expected_version > i64::MAX as u64 {
-                        return Err(StoreError::Conflict);
-                    }
-                    (namespace, key)
-                }
-            };
-            provider_identity(namespace, key)?;
-        }
-        Ok(())
+        validate_provider_mutations(&self.mutations, max_payload_bytes)
     }
+}
+
+pub(crate) fn validate_provider_mutations(
+    mutations: &[ProviderStateMutation],
+    max_payload_bytes: usize,
+) -> Result<(), StoreError> {
+    if mutations.len() > MAX_AUDITED_PROVIDER_MUTATIONS {
+        return Err(StoreError::CapacityExceeded);
+    }
+    for mutation in mutations {
+        let (namespace, key) = match mutation {
+            ProviderStateMutation::Put(write) => {
+                write.record.validate_write(max_payload_bytes)?;
+                if write
+                    .expected_version
+                    .map_or(write.record.version != 1, |expected| {
+                        expected == 0 || expected.checked_add(1) != Some(write.record.version)
+                    })
+                {
+                    return Err(StoreError::Conflict);
+                }
+                (&write.record.namespace, &write.record.key)
+            }
+            ProviderStateMutation::Move {
+                record,
+                old_key,
+                expected_version,
+            } => {
+                record.validate_move(old_key, *expected_version, max_payload_bytes)?;
+                // Both endpoints of a move must stay in provider ownership.
+                provider_identity(&record.namespace, old_key)?;
+                (&record.namespace, &record.key)
+            }
+            ProviderStateMutation::Delete {
+                namespace,
+                key,
+                expected_version,
+            } => {
+                if *expected_version == 0 || *expected_version > i64::MAX as u64 {
+                    return Err(StoreError::Conflict);
+                }
+                (namespace, key)
+            }
+        };
+        provider_identity(namespace, key)?;
+    }
+    Ok(())
 }
 
 fn provider_identity(namespace: &str, key: &str) -> Result<(), StoreError> {

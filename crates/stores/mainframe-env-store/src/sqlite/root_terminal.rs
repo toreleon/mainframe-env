@@ -9,6 +9,7 @@ use mainframe_env_execution_api::{AuditSubjectRecord, ExecutionId, InvocationLim
 use mainframe_env_store_api::*;
 mod capture;
 mod guards;
+mod provider_writer;
 
 fn put(record: ProviderStateRecord, expected_version: Option<u64>) -> ProviderStateMutation {
     ProviderStateMutation::Put(ProviderStateWrite {

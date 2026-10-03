@@ -7,6 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[path = "root_terminal_contract/writer_guards.rs"]
 mod writer_guards;
 
+#[path = "root_terminal_contract/attributed.rs"]
+mod attributed;
 #[path = "root_terminal_contract/publication_failures.rs"]
 mod publication_failures;
 

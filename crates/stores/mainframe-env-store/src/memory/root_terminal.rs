@@ -11,10 +11,12 @@ use mainframe_env_store_api::{
     RootTerminalCommit, RootTerminalPublication, TerminalRowDependency,
 };
 mod guards;
+mod provider_writer;
 pub(super) use guards::{
     guard_actor, guard_effect, guard_event, guard_outbox_delivery, guard_provider,
     guard_unenrolled, guard_work, record_audit,
 };
+pub(super) use provider_writer::{guard_writer_scopes, writer_document};
 
 fn row<'a>(
     state: &'a State,

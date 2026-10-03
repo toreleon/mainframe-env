@@ -95,6 +95,15 @@ impl SqliteStateStore {
         let execution =
             crate::durable::decode_execution(&execution_row.payload, execution_row.version)?;
         crate::publication::assert_fence(&request, &retained, &execution, tick as u64)?;
+        // Same writer TX, after exact original intent validation; never a DTO permit.
+        let document = self
+            .root_writer_document(transaction, &execution, &request.mutations)
+            .await?;
+        if let Some(document) = &document {
+            document.require_live(request.observed_tick, tick as u64)?;
+        }
+        self.root_guard_writer_scopes(transaction, document.as_ref(), &request.mutations, false)
+            .await?;
 
         // Use the existing direct audit ordinal/key namespace and exact codec.
         // Prefix matching is by bytes, including non-ASCII execution identities.
@@ -185,6 +194,24 @@ impl SqliteStateStore {
         transaction: &mut Transaction<'_, Sqlite>,
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
+        // The existing per-row triggers bump this signed integer. SQLite would
+        // otherwise promote an overflowing epoch to REAL and lose fencing.
+        // Check all physical endpoints before any touched row under this TX.
+        let writes = mutations.iter().try_fold(0_i64, |total, mutation| {
+            total
+                .checked_add(crate::root_terminal::mutation_endpoints(mutation).count() as i64)
+                .ok_or(StoreError::CapacityExceeded)
+        })?;
+        let epoch: i64 = sqlx::query_scalar("SELECT epoch FROM retention_lock WHERE singleton=1")
+            .fetch_one(&mut **transaction)
+            .await
+            .map_err(infrastructure)?;
+        if epoch < 0 {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        epoch
+            .checked_add(writes)
+            .ok_or(StoreError::CapacityExceeded)?;
         for mutation in mutations {
             match &mutation {
                 ProviderStateMutation::Put(w) => w.record.validate_write(self.max_payload_bytes)?,

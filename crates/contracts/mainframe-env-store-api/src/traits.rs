@@ -251,6 +251,16 @@ pub trait RetentionStore: Send + Sync {
 
 /// Atomic execution, event, effect, checkpoint, and outbox transactions.
 pub trait JournalStore: Send + Sync {
+    /// Mutate only already registered scopes of this exact Open root/actor/original
+    /// canonical intent. All observations and both Move endpoints are checked inside
+    /// one physical lock/transaction. No audit, intent completion or fallback is minted.
+    /// Unsupported adapters refuse without writes; this is not host admission.
+    fn mutate_root_provider_states(
+        &self,
+        _request: crate::RootProviderPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Admit one genuine configured root and its core ownership atomically.
     /// Structural data does not attest host admission; other backends refuse.
     fn admit_root_driver(

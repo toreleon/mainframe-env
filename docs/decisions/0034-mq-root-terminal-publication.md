@@ -143,6 +143,33 @@ backup is required. A retained root cannot be erased to make an old binary work.
 
 ## Evidence boundary and remaining work
 
+### Original-effect attributed writer prerequisite
+
+`JournalStore::mutate_root_provider_states` accepts a nonserializable
+`RootProviderPublication`: the existing structural root claim and occurrence,
+exact current execution and original intent metadata, plus owned mutations.
+Memory and SQLite compare the actual retained execution, canonical unresolved
+intent, actor/run indexes, Open document, live deadline/lease/clock and every
+namespace or exact-row membership inside their sole publication lock or writer
+transaction. Both Move endpoints must belong to this same root. Structural
+observations are not host admission or a writer permit; unsupported adapters
+refuse without a sequential fallback. The existing mutation kernel owns writes
+and rollback. The operation creates no audit, intent, result or terminal decision.
+
+Intent-audited publication derives its private root attribution only after its
+existing physical intent/execution fence succeeds. Each indexed scope must have
+that same enrolled actor's root owner; an Open actor elsewhere is insufficient.
+Unowned legacy rows and audit-only/deny forms retain their existing semantics.
+Rooted batches share the 4,096-operation/64-MiB bound, with Move counted twice.
+Anonymous APIs and all existing ownership/index/schema bytes stay unchanged.
+
+This is step 1, not server writer wiring or scope succession. Genuine server
+protocol/instance/CALL writers must later supply their retained original effect
+and current controls. A lifecycle writer without an original effect needs a
+separately reviewed live-actor contract, never a fabricated intent. Scope reuse
+remains refused; no history, outbox delivery, retention or recovery authority is
+released by this prerequisite. Store tests supply no compiled/native acceptance.
+
 The framework's physical store tests and genuine compiled connection/CALL tests
 are separately identified external receipts. They are not complete native PUT,
 installed default, shared-participant, all-26 or licensed execution evidence.

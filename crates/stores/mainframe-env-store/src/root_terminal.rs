@@ -8,6 +8,8 @@ use mainframe_env_execution_api::{
 use mainframe_env_store_api::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+mod provider_writer;
+pub(crate) use provider_writer::mutation_endpoints;
 
 pub(crate) const ACTOR_NAMESPACE: &str = "durable-root-actor-v1";
 pub(crate) const RUN_NAMESPACE: &str = "durable-root-run-v1";

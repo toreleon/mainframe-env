@@ -36,6 +36,26 @@ limit without requiring a restart.
 
 ## Atomic changes and in-memory ownership
 
+Registered native root scopes additionally support the bounded original-effect
+`JournalStore::mutate_root_provider_states` operation. Its nonserializable
+`RootProviderPublication` carries observations, not permission. Memory/SQLite
+recheck the complete current execution, actual canonical unresolved intent and
+exact metadata, root claim, actor/run indexes, live clock/lease/deadline and
+registered namespace or row ownership in the same physical transaction as all
+Put/Delete/Move operations. Both Move endpoints must match; foreign, ambiguous,
+unregistered and non-Open ownership refuses atomically. The combined batch and
+captured bytes are limited to 4,096 operations and 64 MiB before deep decoding,
+further limited by backend quotas. Unsupported adapters refuse without fallback.
+
+Existing intent-audited publication privately derives the same root ownership
+after its exact intent/execution fence. An enrolled actor in another Open root
+cannot authorize an indexed scope. Unowned legacy rows and audit-only/deny
+forms retain their existing behavior; anonymous writer guards stay in force.
+No intent completion, audit construction, terminal outcome, scope reuse, new
+schema or outbox/retention behavior is supplied by the attributed operation.
+Genuine server wiring and a lifecycle path without an original effect remain
+separate required contracts; see [ADR 0034](../decisions/0034-mq-root-terminal-publication.md).
+
 A logical provider mutation computes only changed object rows and submits their
 CAS puts/deletes in one `mutate_provider_states_atomic` call. Rows outside the
 mutation's write/dependency set keep both their payload and record version.

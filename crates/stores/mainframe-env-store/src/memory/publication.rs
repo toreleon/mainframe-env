@@ -44,24 +44,20 @@ impl MemoryStore {
             .executions
             .get(&request.intent.execution_id)
             .ok_or(StoreError::NotFound)?;
-        let mut floor = state.logical_tick;
-        if let Some(legacy) = state
-            .provider_state
-            .get(&("jes-worker-meta".into(), "logical-clock".into()))
-        {
-            let tick = u64::from_be_bytes(
-                legacy
-                    .payload
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| StoreError::IncompatibleVersion)?,
-            );
-            if tick == 0 || tick > i64::MAX as u64 || legacy.version == 0 {
-                return Err(StoreError::IncompatibleVersion);
-            }
-            floor = floor.max(tick);
-        }
+        let floor = logical_floor(&state)?;
         crate::publication::assert_fence(&request, retained, execution, floor)?;
+        // Private attribution exists only after the real intent/execution fence.
+        let document =
+            super::root_terminal::writer_document(&state, execution, &request.mutations)?;
+        if let Some(document) = &document {
+            document.require_live(request.observed_tick, floor)?;
+        }
+        super::root_terminal::guard_writer_scopes(
+            &state,
+            document.as_ref(),
+            &request.mutations,
+            false,
+        )?;
         journal::journaled(&mut state, |state, journal| {
             Self::apply_mutations_locked(state, journal, request.mutations, self.limits)?;
             journal.touch_logical_tick(state);
@@ -206,4 +202,26 @@ impl MemoryStore {
         }
         Ok(())
     }
+}
+
+/// The same physical floor for original-effect and audited row publications.
+pub(super) fn logical_floor(state: &State) -> Result<u64, StoreError> {
+    let mut floor = state.logical_tick;
+    if let Some(legacy) = state
+        .provider_state
+        .get(&("jes-worker-meta".into(), "logical-clock".into()))
+    {
+        let tick = u64::from_be_bytes(
+            legacy
+                .payload
+                .as_slice()
+                .try_into()
+                .map_err(|_| StoreError::IncompatibleVersion)?,
+        );
+        if tick == 0 || tick > i64::MAX as u64 || legacy.version == 0 {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        floor = floor.max(tick);
+    }
+    Ok(floor)
 }

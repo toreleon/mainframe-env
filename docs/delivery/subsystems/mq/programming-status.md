@@ -6,6 +6,37 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Attributed Open-root provider writer prerequisite
+
+MQ-1505.attributed-root-provider-writers integrates reviewed sealed workerdd2b756a.
+The default-refusing nonSerde JournalStore operation physically rechecks exact
+current execution, original canonical unresolved intent/metadata, root claim,
+actor/run/index membership and every registered Put/Delete/Move endpoint under
+the same Memory lock or SQLite writer transaction. Existing mutation kernel,
+quota/CAS and touched rollback remain sole authority. Rooted batches count Move
+twice within4096operations/64MiB; SQLite signed epoch exhaustion refuses before
+integer-to-REAL promotion. Intent-audited publication derives same-root attribution
+only after its existing original-intent fence. Anonymous guards and legacy
+unindexed/unowned/audit-only/deny behavior stay intact.
+
+Manager independently verifies21worker Git paths,102static receipts,29commands,
+33137original input occurrences,17final Rust inputs,109 distinct owning tests
+(92root including31new,17audited),99frozen authorities and32d8 dependency objects.
+Historical failed fixtures/overflow and their repaired-owning snapshots remain
+separate. Main runs affected root/audit, installed PUT/GET and shared-driver
+regressions with mandatory policy/API/module/consumer/documentation gates.
+Store fixtures are not installed/native/SAF/crash evidence; empty rustdoc tests
+grant no credit. No IBM language/subsystem semantics or source pins change.
+
+This is step1 only. Server retained-original writer wiring, effect-free live-actor
+lifecycle publication and strict successor-aware complete overlap/history closure
+remain required. No terminal scope is recycled or historical actor reauthorized.
+The existing physical logical-clock floor is not a decision-time JES lease clock
+after writer-lock wait. Scheduled Work/Job fencing and terminal policy remain
+separate prerequisites. No new schema/table/journal/audit/terminal decision,
+retention release or outbox restriction. Onlylicensed human skip0/26; fullv0.15,
+recovery/participants/full26/CardDemo and other nonlicensed acceptance stay open.
+
 ## Shared finite conformance driver and explicit pending obligations
 
 `MQ-1506.shared-conformance-driver` integrates the repaired cumulative worker
