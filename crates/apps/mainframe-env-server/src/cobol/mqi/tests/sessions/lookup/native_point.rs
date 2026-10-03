@@ -83,6 +83,51 @@ impl MqMqiNativePoint for Legacy {
 }
 
 #[test]
+fn qualified_get_getters_keep_before_after_revocation_and_unknown_panic() {
+    // Transport containment only. Genuine selected object/profile ownership is
+    // proved by the separately compiled configured GET tests.
+    for mode in 0..4 {
+        let (original, connection, _) = fixture();
+        let signals = Arc::new(Signals::default());
+        let (mut guard, events, aborts) = session_for(Arc::new(NativeFrame {
+            original: original.clone(),
+            signals: signals.clone(),
+        }));
+        let point = guard
+            .frame(&original)
+            .unwrap()
+            .native_structure(&original, MqMqiCall::Get, connection)
+            .unwrap()
+            .point(&target())
+            .unwrap();
+        assert_eq!(point.descriptor_version(), Ok(2));
+        assert_eq!(point.max_message_bytes(), Ok(2048));
+        if mode == 0 {
+            guard.finish(&ExecutionOutcome::Cancelled).unwrap();
+        }
+        if mode == 1 {
+            assert_eq!(guard.abort(HostProblem::Malformed), HostProblem::Malformed);
+        }
+        if mode == 2 {
+            drop(guard);
+        } else if mode == 3 {
+            signals.panic.store(true, Ordering::SeqCst);
+            assert_eq!(point.max_message_bytes(), Err(HostProblem::UnknownOutcome));
+            drop(guard);
+        }
+        let before = signals.calls.lock().unwrap().clone();
+        assert_eq!(point.descriptor_version(), Err(HostProblem::Unauthorized));
+        assert_eq!(point.max_message_bytes(), Err(HostProblem::Unauthorized));
+        assert_eq!(point.recheck(), Err(HostProblem::Unauthorized));
+        assert_eq!(*signals.calls.lock().unwrap(), before);
+        if mode >= 2 {
+            assert!(events.lock().unwrap().is_empty());
+            assert!(aborts.lock().unwrap().is_empty());
+        }
+    }
+}
+
+#[test]
 fn older_native_embedding_keeps_default_unsupported_complete_put_getters() {
     let (original, connection, _) = fixture();
     let signals = Arc::new(Signals::default());

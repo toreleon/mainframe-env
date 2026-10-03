@@ -407,6 +407,36 @@ supplemental `q098655_` explicit syncpoint, NoContext and synchronous response.
 Offline hash-verified sources and generated empty setup fixtures carry zero
 execution or licensed credit.
 
+The same configured native-point plane also captures complete qualified GET
+before MD/GMO decoding. It reuses the retained object's opaque profile and the
+independent descriptor/body getters; both configured and revocable wrappers
+preserve the original frame, current local unit, physical service and final
+comparison. The nine-reference MD1/MD2/GMO1 profile admits finite unformatted,
+unselected removal with represented syncpoint and truncation policy. Exact
+request-bound results preserve complete OK, accepted WARNING2079, rejected
+WARNING2080 and absent FAILED2033 observations; absent MD/GMO/body fields are
+not synthesized. Old Unsupported embeddings and ProductServer defaults remain.
+
+The installed proof produces each message through an actual separately compiled
+same-task PUT/PUT1 child and explicit local MQCMIT, then performs GET under the
+surviving root or another genuinely admitted child sharing its one ABI Arc.
+Normal terminal completion commits removal; genuine CEE3ABD restores the whole
+message with the reviewed BackoutCount increment. Explicit compiled BACK followed
+by another original GET observes that increment without restoring aliases or
+recycling root scope. Completed root scope claims remain retained; a fresh root
+over those claimed MQ namespaces is refused until an owning handoff exists.
+No scope reclamation, second journal or terminal policy is introduced here.
+
+This source review uses original row0015 `q101830_`, row0001 `q101690_`,
+row0007 `q101750_`, row0012 `q101800_`, supplemental GMO `q096715_` and MD
+`q097395_` (BackoutCount lines1498–1508), plus the separately pinned recovery
+topic `q103230_` HardenGetBackout. A persisted live backout and an owned SQLite
+reopen do not establish failure-between-GET-and-BACK accuracy. The explicit z/OS
+queue attribute/default and owning crash recovery remain separate requirements;
+no multiplatform always-hardened policy is inferred. Source review and empty
+setup fixtures carry zero execution/licensed credit. Broader forms, defaults,
+participants, recovery/retention and full native/full26 acceptance remain pending.
+
 ProductServer still opens and registers the previous MQ profile. It does not
 automatically configure this factory. The explicit configured factory bridges
 the genuinely admitted installed CHILD topology to the selected directory;

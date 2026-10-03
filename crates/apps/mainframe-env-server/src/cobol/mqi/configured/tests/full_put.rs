@@ -10,7 +10,7 @@ use mainframe_env_store_api::*;
 
 mod refusals;
 
-fn source(version: i32, one: bool, abnormal: bool) -> String {
+pub(super) fn source(version: i32, one: bool, abnormal: bool) -> String {
     let mut text = if version == 1 {
         include_str!("full_put/put1.cbl")
     } else {
@@ -34,7 +34,7 @@ fn source(version: i32, one: bool, abnormal: bool) -> String {
     text
 }
 
-fn expected_md(version: i32, stored: bool) -> MqMdValue {
+pub(super) fn expected_md(version: i32, stored: bool) -> MqMdValue {
     let fields = MqMdFields {
         struc_id: *b"MD  ",
         report: 0,

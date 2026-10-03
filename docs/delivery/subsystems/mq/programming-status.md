@@ -1868,6 +1868,38 @@ checkpoint/retention, participants/IR/full26/CardDemo/public selection and all
 other nonlicensed acceptance remain required. Only licensed oracle skipped0/26;
 full native-root and v0.15 completion are not claimed.
 
+## Installed qualified complete GET host
+
+`MQ-1503.installed-qualified-get-host` integrates reviewed sealed `d85a9220`.
+Only GET capture is added to the existing configured native plane; same opaque
+object/descriptor/body/current-unit getters, revocable sessions and pure guarded
+joined nine-reference MD1/2/GMO1 writeback remain owning authorities. Actual
+compiled PUT/PUT1 child plus explicit local MQCMIT creates each message, then
+original GET under the surviving root or compiled sibling verifies complete0/0,
+accepted1/2079, rejected1/2080 and absent2/2033 with exact field-definedness.
+Normal terminal commits pending removal; real CEE3ABD restores the whole message
+and BackoutCount1. Explicit BACK then another original GET observes count1.
+Original core/CALL/actor/digests/rootABI/both effect-audit layers and terminal
+core/events/outbox/two audits/claim/closure/UOW remain exact. Failure/cancel/CAS/
+quota/SAF/panic/retirement/expiry retain uncertainty without guessed settlement.
+
+Independent review binds12 worker paths,561 functional inputs,66 final host tests
+and separate11 original compiler prerequisites,154 frozen external files,44
+report identities,32 unchanged oldd8 inputs and same-HEAD seal/cleanup. One
+collector's absolute Git-blob path mapping was repaired as metadata only without
+suite reruns. Seven retained-first SHA/byte/parser pins and19 actual manager
+offline commands cover baseline2026-08-31 GET0015/q101830, BACK0001/q101690,
+CMIT0007/q101750, DISC0012/q101800; supplements2026-09-12 GMOq096715/MDq097395
+and recoveryq103230 HardenGetBackout. Source credit0; owned reopen is not crash.
+
+Retained insert-only provider scopes still refuse a fresh root over the same MQ
+namespaces. The surviving-root positive is not the originally required independent
+producer-root normal commit -> fresh GET root proof. Owning scope succession,
+HardenGetBackout crash accuracy/default, source-known commit-impossible fallback,
+DefaultContext/JES/GMT/IDs, recovery/retention/participants/IR/full26/CardDemo and
+public/default selection remain mandatory. Only licensed oracle skipped0/26;
+full native-root/v0.15 completion is not claimed.
+
 ## Finite complete PUT queue defaults
 
 `MQ-1503.full-put-queue-defaults` integrates reviewed sealed `e23c1f1c`.

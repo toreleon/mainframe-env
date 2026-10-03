@@ -18,7 +18,7 @@ use mainframe_env_mq::{
 use std::sync::OnceLock;
 
 impl ConfiguredInstalledMqHost {
-    /// PRIVILEGED configured compiled-root OPEN/CLOSE and complete PUT/PUT1 setup,
+    /// PRIVILEGED configured compiled-root OPEN/CLOSE and complete PUT/PUT1/GET setup,
     /// not application
     /// attestation or public readiness. Requires existing complete native rich
     /// rows and genuine eager compiled root admission. SAME TASK children share
@@ -236,7 +236,11 @@ pub(super) fn capture(
     if frame.abi.is_none()
         || !matches!(
             call,
-            MqMqiCall::Open | MqMqiCall::Close | MqMqiCall::Put | MqMqiCall::PutOne
+            MqMqiCall::Open
+                | MqMqiCall::Close
+                | MqMqiCall::Put
+                | MqMqiCall::PutOne
+                | MqMqiCall::Get
         )
     {
         return Err(HostProblem::Unsupported);

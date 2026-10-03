@@ -28,6 +28,7 @@ pub(super) struct Saf {
     pub hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     pub terminal_hook: Mutex<Option<Box<dyn FnMut() + Send>>>,
     pub queue_hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    pub queue_observer: Mutex<Option<Box<dyn FnMut() + Send>>>,
 }
 impl EnterpriseAuthorizer for Saf {
     fn authorize(&self, _: &PrincipalId, resource: &EnterpriseResource) -> Result<(), HostProblem> {
@@ -37,6 +38,9 @@ impl EnterpriseAuthorizer for Saf {
         }
         if resource.class == EnterpriseResourceClass::MqQueue {
             if let Some(hook) = self.queue_hook.lock().unwrap().take() {
+                hook();
+            }
+            if let Some(hook) = self.queue_observer.lock().unwrap().as_mut() {
                 hook();
             }
         }

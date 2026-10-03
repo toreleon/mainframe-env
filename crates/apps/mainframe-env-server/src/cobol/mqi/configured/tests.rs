@@ -2,6 +2,7 @@
 use super::*;
 mod bounds;
 mod flows;
+mod full_get;
 mod full_put;
 mod lifecycle;
 mod native_point;

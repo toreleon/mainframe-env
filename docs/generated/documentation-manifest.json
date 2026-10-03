@@ -1049,7 +1049,7 @@
       "path": "docs/decisions/0032-mq-program-machine-frame.md",
       "relative_links": 0,
       "scope": "explicit typed installed-batch handoff, not MQ public readiness",
-      "sha256": "sha256:48a96113fe39ead647efdd21da7b9aa568d2b01d697df8a04bfe89577bc5570f",
+      "sha256": "sha256:e43bf03f7d3671c363d5b37c5896140db22f56fd398101e379efdfda36ad74a4",
       "status": "Proposed",
       "title": "MQ program-to-machine frame handoff",
       "xtask_commands": 0
@@ -1622,7 +1622,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:ea3b4f845732c3e87f69db405ec6155de1fec0e336fa0c7f10924720d58c55a2",
+      "sha256": "sha256:75a5ed881e55e5e863d64dd06b45d77d550a99758680be4e1cc4530f26018e41",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
