@@ -603,11 +603,50 @@ class CacheTests(unittest.TestCase):
                          "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
         registry = json.loads((docs_api.REPOSITORY /
                                "conformance/0.15/manifests/index.json").read_text())
-        self.assertEqual(len(registry["manifests"]), 7)
+        current_scopes = {
+            "mq-programming-supplements", "mq-point-layout-sources", "mq-property-sources",
+            "mq-recovery-policy-sources", "mq-producer-attribute-sources", "mq-rfh2-sources",
+            "mq-message-handle-sources", "mq-inquiry-attribute-sources",
+        }
+        self.assertEqual(len(registry["manifests"]), 8)
+        self.assertEqual({row["scope_id"] for row in registry["manifests"]}, current_scopes)
+        historical = [row for row in registry["manifests"]
+                      if row["scope_id"] != "mq-inquiry-attribute-sources"]
+        self.assertEqual(len(historical), 7)
+        self.assertEqual({row["scope_id"] for row in historical},
+                         current_scopes - {"mq-inquiry-attribute-sources"})
+        inquiry, inquiry_tocs = ibm_docs.select(
+            pins, tocs, "mq-inquiry-attribute-sources", None
+        )
+        self.assertEqual(sorted((pin.topic, pin.sha256, pin.size) for pin in inquiry), [
+            ("SSFKSJ_9.4.0/refdev/q092480_.html",
+             "ac5de9d74f62635456e566bfcbba7706699686cef14580ab30aa22166b2fb1ba", 4661),
+            ("SSFKSJ_9.4.0/refdev/q102690_.html",
+             "d488b1433fe1fe6b5051459af841e02801df4d62d43bbfc3f9f0954575b411b4", 1247),
+            ("SSFKSJ_9.4.0/refdev/q103420_.html",
+             "27228d1ae3bf316c77949becc2ed9b26fe9bb4aad97f974a4d31b95caccc3861", 2105),
+            ("SSFKSJ_9.4.0/refdev/q103490_.html",
+             "93bd55632f95b85f9790e3cba75c623bff93c1a679983115546edf32ce527639", 2267),
+        ])
+        self.assertTrue(all(pin.baseline == "ibm-mq-9.4-inquiry-attribute-sources-2026-09-12"
+                            for pin in inquiry))
+        self.assertEqual(len(inquiry_tocs), 1)
+        self.assertEqual(inquiry_tocs[0].sha256,
+                         "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
+        inquiry_row = next(row for row in registry["manifests"]
+                           if row["scope_id"] == "mq-inquiry-attribute-sources")
+        self.assertFalse(inquiry_row["semantic_authority"])
+        self.assertEqual(inquiry_row["coverage_credit"], 0)
+        self.assertEqual(inquiry_row["topic_count"], 4)
+        self.assertEqual(inquiry_row["manifest_sha256"],
+                         "sha256:1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949")
+        self.assertEqual(inquiry_row["topic_manifest_sha256"],
+                         "sha256:463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527")
         old_rows = [row for row in registry["manifests"]
                     if row["scope_id"] not in {
                         "mq-recovery-policy-sources", "mq-producer-attribute-sources",
-                        "mq-rfh2-sources", "mq-message-handle-sources"}]
+                        "mq-rfh2-sources", "mq-message-handle-sources",
+                        "mq-inquiry-attribute-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old_rows, sort_keys=True, separators=(",", ":")).encode()),
             "d21d08a6548a9088640374f8ebfa6fcd5344104c3748678b8002406bd9985033")
@@ -670,7 +709,8 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(row["coverage_credit"], 0)
         old = [row for row in registry["manifests"]
                if row["scope_id"] not in {"mq-producer-attribute-sources", "mq-rfh2-sources",
-                                           "mq-message-handle-sources"}]
+                                           "mq-message-handle-sources",
+                                           "mq-inquiry-attribute-sources"}]
         self.assertEqual([row["topic_count"] for row in old], [80, 12, 12, 1])
         for prior in old:
             self.assertEqual(prior["manifest_sha256"], "sha256:" + docs_api.digest(
@@ -749,7 +789,8 @@ class CacheTests(unittest.TestCase):
         registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
         old = [r for r in registry["manifests"]
                if r["scope_id"] not in {"mq-rfh2-sources", "mq-producer-attribute-sources",
-                                       "mq-message-handle-sources"}]
+                                       "mq-message-handle-sources",
+                                       "mq-inquiry-attribute-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old, sort_keys=True, separators=(",", ":")).encode()),
             fixture["old_registry_rows_sha256"])
@@ -853,7 +894,8 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(selected[0].baseline, fixture["baseline_id"])
         root = docs_api.REPOSITORY
         registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
-        old = [r for r in registry["manifests"] if r["scope_id"] != fixture["scope_id"]]
+        old = [r for r in registry["manifests"]
+               if r["scope_id"] not in {fixture["scope_id"], "mq-inquiry-attribute-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old, sort_keys=True, separators=(",", ":")).encode()),
             fixture["old_registry_rows_sha256"])

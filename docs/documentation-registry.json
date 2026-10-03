@@ -91,7 +91,8 @@
     "docs/decisions/0030-gsam-application-record-formats.md",
     "docs/decisions/0032-selected-secondary-checkpoint-position.md",
     "docs/decisions/0036-null-ssa-command-slots.md",
-    "docs/decisions/0037-running-step-program-transport.md"
+    "docs/decisions/0037-running-step-program-transport.md",
+    "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
   ],
   "navigation": [
     {
@@ -144,6 +145,10 @@
         {
           "label": "IBM MQ programming surface",
           "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
+        },
+        {
+          "label": "MQ inquiry attribute source boundary",
+          "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
         },
         {
           "label": "Application packages",

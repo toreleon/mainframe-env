@@ -484,7 +484,24 @@ mod tests {
         check_later_registry(&root, config_015()).expect("shipped independent scopes");
         let registry = json(&root.join(config_015().registry_path)).unwrap();
         let entries = registry["manifests"].as_array().unwrap();
-        assert_eq!(entries.len(), 7);
+        let scopes = entries
+            .iter()
+            .map(|entry| entry["scope_id"].as_str().unwrap())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(entries.len(), 8);
+        assert_eq!(
+            scopes,
+            BTreeSet::from([
+                "mq-programming-supplements",
+                "mq-point-layout-sources",
+                "mq-property-sources",
+                "mq-recovery-policy-sources",
+                "mq-producer-attribute-sources",
+                "mq-rfh2-sources",
+                "mq-message-handle-sources",
+                "mq-inquiry-attribute-sources",
+            ])
+        );
         for (scope, count) in [
             ("mq-programming-supplements", 80),
             ("mq-point-layout-sources", 12),
@@ -493,6 +510,7 @@ mod tests {
             ("mq-producer-attribute-sources", 9),
             ("mq-rfh2-sources", 15),
             ("mq-message-handle-sources", 1),
+            ("mq-inquiry-attribute-sources", 4),
         ] {
             let entry = entries
                 .iter()
@@ -502,6 +520,60 @@ mod tests {
             assert_eq!(entry["semantic_authority"], false);
             assert_eq!(entry["coverage_credit"], 0);
         }
+        let inquiry = entries
+            .iter()
+            .find(|entry| entry["scope_id"] == "mq-inquiry-attribute-sources")
+            .unwrap();
+        assert_eq!(
+            inquiry["manifest_sha256"],
+            "sha256:1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949"
+        );
+        assert_eq!(
+            inquiry["topic_manifest_sha256"],
+            "sha256:463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527"
+        );
+        let manifest = json(&root.join(inquiry["manifest"].as_str().unwrap())).unwrap();
+        assert_eq!(
+            manifest["baseline_id"],
+            "ibm-mq-9.4-inquiry-attribute-sources-2026-09-12"
+        );
+        let topics = manifest["topics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|topic| {
+                (
+                    topic["topic_path"].as_str().unwrap(),
+                    topic["sha256"].as_str().unwrap(),
+                    topic["bytes"].as_u64().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            topics,
+            vec![
+                (
+                    "SSFKSJ_9.4.0/refdev/q092480_.html",
+                    "ac5de9d74f62635456e566bfcbba7706699686cef14580ab30aa22166b2fb1ba",
+                    4661
+                ),
+                (
+                    "SSFKSJ_9.4.0/refdev/q102690_.html",
+                    "d488b1433fe1fe6b5051459af841e02801df4d62d43bbfc3f9f0954575b411b4",
+                    1247
+                ),
+                (
+                    "SSFKSJ_9.4.0/refdev/q103420_.html",
+                    "27228d1ae3bf316c77949becc2ed9b26fe9bb4aad97f974a4d31b95caccc3861",
+                    2105
+                ),
+                (
+                    "SSFKSJ_9.4.0/refdev/q103490_.html",
+                    "93bd55632f95b85f9790e3cba75c623bff93c1a679983115546edf32ce527639",
+                    2267
+                ),
+            ]
+        );
     }
 
     #[test]

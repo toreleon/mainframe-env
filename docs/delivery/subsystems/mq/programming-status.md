@@ -6,6 +6,39 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Separately pinned inquiry attribute source prerequisite
+
+`MQ-1501.inquiry-attribute-source-pins` integrates reviewed sealed worker
+`234ade91`: four external MQ9.4 sources in `mq-inquiry-attribute-sources`,
+baseline `ibm-mq-9.4-inquiry-attribute-sources-2026-09-12`. The bounded
+[source note](inquiry-source-boundary.md) records queue-type values, applicability
+and name-field declarations with exact hashes, parser locators and remaining
+gaps. Manifest SHA1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949;
+topic-set SHA463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527.
+Retained topic paths were checked first; absent files resolved to exact verified
+raw shards and deterministic metadata/old pinned TOC. Publication last-modified
+dates come from the verified HTML, not fetch times. In-progress archive grants
+no freshness, browser-reproduction or same-snapshot assertion; no bodies in Git.
+
+The registry appends one zero-authority/zero-credit scope without changing its
+seven prior rows. Four historical Python test bodies and one Rust cfg(test) body
+exclude only the new scope from old projections while preserving exact old
+hashes/counts and checking all eight current named scopes plus the exact four
+pins. Production checker/parser/schema/MQ/canonical/call26/sourcepositions27/
+pending obligations are unchanged. Independent review verifies nine Git paths,
+57commands/six original snapshots/16777input versions, seven source topics and
+11anchors,368frozen authorities,32d8 dependency objects and recomputed seal.
+Failed snapshots remain historical; main runs affected36reader/16topic/9source
+tests and required policy/documentation gates over its composed current inputs.
+
+Original MQINQ remains baseline2026-08-31 catalog row0016/sourceposition16,
+q101840_ SHA03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b.
+Output CCSID, empty/unset values, numeric sentinel/length joins, exact short-warning
+definedness and selector-validation ordering remain source gaps. Source presence
+does not grant numeric MQINQ/MQSET forwarding, real SAF/current-frame/core/store
+permission or native/installed/full26 credit. Only licensed oracle human-skipped0/26;
+all other fullv0.15 obligations remain required and unfinished.
+
 ## Genuine Running-step neutral Program transport
 
 `MQ-1503.running-step-program-transport` integrates reviewed sealed worker

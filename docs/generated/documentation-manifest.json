@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 254,
+    "markdown_documents": 255,
     "navigation_groups": 6,
-    "normative_documents": 84,
+    "normative_documents": 85,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 140,
-      "sha256": "sha256:2597bc6cb592e4805e16fc296c5081997e056e16ed72ae63e671352f53eae39b",
+      "relative_links": 141,
+      "sha256": "sha256:e213cd4b5b089bb21e944cc163425c96cf585b9bed125115151c43ca8b73d6fa",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1807,6 +1807,18 @@
       "xtask_commands": 4
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ source-review maintainers",
+      "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
+      "relative_links": 2,
+      "scope": "four retained inquiry attribute sources and remaining semantic gaps",
+      "sha256": "sha256:73a8d0b7e682826d6333ff78757d10512b29d0ad6628ec93bf6103651632e2af",
+      "status": "Normative source boundary; zero execution credit",
+      "title": "MQ inquiry attribute source boundary",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-plan.md",
       "relative_links": 3,
@@ -1817,8 +1829,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:001065ffc9842e4ef3b07dccb142532267621823b4da3fea86171283228584e2",
+      "relative_links": 1,
+      "sha256": "sha256:2f3095fdc144363b1d58ae8bf8a1bcd8afc3be2f7e35c9b64245199dcf3fc501",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2427,6 +2439,10 @@
           "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
         },
         {
+          "label": "MQ inquiry attribute source boundary",
+          "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
+        },
+        {
           "label": "Application packages",
           "path": "docs/architecture/APPLICATION-PACKAGES.md"
         },
@@ -2948,7 +2964,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:db6fc3759d328c13709d1ab259de3cad8da60c8ebf4e5db02bc6d24501d1863d",
+  "registry_sha256": "sha256:b336ef93f554b0eb6a67ee3c8206fc32240295054907a826e7d3c136e0781470",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
