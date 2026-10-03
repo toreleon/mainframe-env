@@ -3626,3 +3626,77 @@ of the exact two already-passed attempt3 test files. Preserve all original
 failure/handoff/validation receipts; no code or expectation edit and no repeated
 Cargo tests. This worker checkpoint is unsealed and grants no acceptance credit.
 Actual integrated repaired candidate review/gates/sealer remain manager-owned.
+
+### Scoped consumption integration and next private PROGRAM prerequisites
+
+SPI-1001.syncpoint-consumption-ledger is sealed as bounded private consumption
+preparation at 4a264ff4726e9edc45f11e35fc0e6d2870767e45. Actual integrated six
+tests passed with zero failure/ignore, thirty scoped local verdicts bind the
+producing content digest d6c0584760722cde775bf691a690fcb25c635238a030747a2331cfe4fa77c4fd,
+catalog f6932f72 and spec 0054f394. Independent LEDGER-REV-01 and SETUP-R1 are
+resolved; mandatory checks and generated child seal/check passed, cargo clean0.
+Manager disposition permits only bounded private named PROGRAM preparation to
+consume this scoped application proof. It does not accept all260 application
+rows or establish trusted issuer/namespace, SAF, receiver or selected SPI route.
+Full application/start acceptance and all269 SPI/39 FEPI gates remain Pending0.
+Deferred application0027/0093/0114 and licensed Pending0 remain intact.
+
+SPI-1001.program-status-sqlite-reopen exact two-file candidate independently
+reviewed with no actionable finding; full old nine-test parent is preserved.
+Manager imports its five physical owner/file reopen tests and owns unique fragment,
+status and derived documentation. Actual integrated focused five-test execution,
+mandatory checks and exact generated child seal remain required before acceptance.
+Memory artifacts stay retained separately; orderly in-process SQLite closure
+grants no process/crash/warm-restart, PostgreSQL, namespace or command credit.
+Source authority remains row0155 dfha8_inquireprogram.html e3d8ed4c,
+baseline ibm-cics-ts-6x-spi-command-bodies-2026-09-12, no-load35-56,
+namespace65-103, STATUS566-572 and conditions605-619.
+
+Pre-dispatch SPI-1001.program-inquiry-security-preparation: exact row0155 named
+PROGRAM STATUS, configured active command/resource checks only, private non-routing.
+Inventory gap: the existing inquiry uses a FACILITY Execute check and no distinct
+configured SPI command/resource decision; public mapping is forbidden until
+CICS-NAMED-PROGRAM-STATUS-V1 prerequisites pass. New isolated CLI author owns only
+NEW handlers/program_control/administrative_status/security.rs and one minimal
+module registration in existing administrative_status.rs. Preserve old helper
+and all observations/tests; no overlap with imported SQLite test paths. Manager
+alone owns service/facade/runtime admission, policy binding, shared schema/IR/
+registry/generator/CI/status/fragment/docs and serial integration. Dependencies
+are sealed existing State/nested host/typed SecurityRequest/ResourceName owner,
+Proposed named PROGRAM boundary and scoped consumption child73. No public config
+API, wire tag, route, issuer/namespace classifier, new SAF engine or shadow store.
+Implement a bounded explicit host-configured private check plan: require actual
+active command/resource configuration, exact resolved class/profile/intent, no
+implicit defaults or caller bindings. Use existing nested typed SAF path; map
+only actual SecurityDecision::Deny to source NOTAUTH70/100 command or70/101
+resource. Capability-denial HostProblem::Unauthorized, provider errors and other
+unexpected decisions retain product failures; never invent source denial from
+infrastructure. Preserve transaction admission for future owner binding, without
+claiming an executed public route. A deterministic private plan sequence is a
+product cohort choice, not IBM priority of simultaneous failures. Missing/invalid
+config, malformed bounds, both positive decisions, each verified deny, wrong
+result/decision, absent host grant, provider failure, deadline/cancellation and
+unchanged installed/load/UOW state require focused meaningful tests. No production
+repair outside owned files. Pinned source search/read before expectations: own
+INQUIRE PROGRAM e3d8ed4c and command-security-resource-reference.html57539dc4
+sources-b baseline, exact PROGRAM row306-310, identifier/prefix3-16 and access
+examples503-523. Deployment classes/access/prefix policy remain explicitly
+configured and unaccepted; no RACF default inferred from examples. Matching
+retained/cache/archive only, no refresh/repin/network/license. CLI current account
+gpt-6.1-sol/high/default, fastOFF, multi_agentfalse, danger-full-access/never;
+no nested workers. Pinned host --locked --offline jobs2, narrow new module
+selector, cargo clean intended checkout, receipts outside targets. Coherent
+owned checkpoint, whole diff/source/test/preservation handoff, different-thread
+review and manager integrated mandatory/sealer checks required. All runtime/
+issuer/namespace/receiver/recovery/full-app/SPI/FEPI/license/parent Pending0.
+
+Manager-owned SQLite integration prerequisite repair: actual focused five tests
+pass0fail0ignore and cleanup0. Module gate identifies the new reviewed test file
+as absent from the frozen CICS layout inventory. Manager owns one bounded addition
+to conformance/0.9/inventory/module-budgets.json handler_modules: only the exact
+new administrative_status/tests/sqlite_reopen.rs path, preserving every budget,
+exemption, existing path and test-only policy. Different-thread delta review is
+required. No production/test source or authority change, skip, widened ceiling or
+new semantic credit. Reuse the actual five-test receipt only after exact complete
+Rust/dependency input equality; inventory/status/derived metadata receive fresh
+mandatory checks, without relabelling the earlier test producer as a new candidate.

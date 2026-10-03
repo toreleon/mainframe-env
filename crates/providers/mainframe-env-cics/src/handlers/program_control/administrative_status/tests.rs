@@ -533,3 +533,5 @@ fn observation_needs_no_host_authority_store_access_load_or_uow_change() {
         before
     );
 }
+
+mod sqlite_reopen;

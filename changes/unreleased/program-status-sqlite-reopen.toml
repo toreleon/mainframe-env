@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add private named PROGRAM definition SQLite close/reopen and fail-closed corruption proofs; runtime and restart acceptance remain pending."
