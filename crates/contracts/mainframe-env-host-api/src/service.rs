@@ -95,7 +95,14 @@ impl ScopedHostService {
         cancellation_requested: bool,
         request: EffectRequest,
     ) -> AuditedEffectResult {
-        self.invoke_inner(invocation, now_tick, cancellation_requested, request, None)
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            None,
+            None,
+        )
     }
 
     /// Dispatch only an original Program request with borrowed Rust context.
@@ -116,6 +123,33 @@ impl ScopedHostService {
             cancellation_requested,
             request,
             Some(context),
+            None,
+        )
+    }
+
+    /// Invoke ONLY replay transport under the ordinary scoped host checks.
+    /// The local-type wrapper checks zero/duplicates/capacity/char0 representation,
+    /// not object origin, INQUIRE access or permission. Successful output must
+    /// match that wrapper and the original full canonical result digest. Any
+    /// changed reply becomes actual Unknown before this method creates its audit.
+    /// No provider activation or ordinary invoke fallback is performed here.
+    #[allow(clippy::too_many_arguments)]
+    pub fn replay_retained(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        expected_result_digest: [u8; 32],
+        context: &(dyn std::any::Any + Send + Sync),
+    ) -> AuditedEffectResult {
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            None,
+            Some((expected_result_digest, context)),
         )
     }
 
@@ -126,6 +160,7 @@ impl ScopedHostService {
         cancellation_requested: bool,
         request: EffectRequest,
         context: Option<&(dyn std::any::Any + Send + Sync)>,
+        replay: Option<([u8; 32], &(dyn std::any::Any + Send + Sync))>,
     ) -> AuditedEffectResult {
         let capability = request
             .request
@@ -133,9 +168,26 @@ impl ScopedHostService {
         let resource = canonical_audit_resource_digest(&request.request);
         let sequence = request.sequence;
         let mut mutation_dispatched = false;
-        let result = if context.is_some()
-            && !matches!(&request.request, crate::HostRequest::Program(_))
-        {
+        let checked_limits = match &request.request {
+            crate::HostRequest::MqMqi(host) if replay.is_some() => Some(host.envelope.limits),
+            _ => None,
+        };
+        let checked_inquiry = replay.and_then(|_| match &request.request {
+            crate::HostRequest::MqMqi(host) => match &host.envelope.request {
+                crate::mq_mqi::MqMqiRequest::Inquire(inquiry) if inquiry.selectors.len() <= 256 => {
+                    crate::mq_mqi::MqMqiLocalTypeInquiry::from_inquiry(
+                        inquiry.clone(),
+                        host.envelope.limits,
+                    )
+                    .ok()
+                }
+                _ => None,
+            },
+            _ => None,
+        });
+        let result = if replay.is_some() && checked_inquiry.is_none() {
+            Err(HostProblem::Unsupported)
+        } else if context.is_some() && !matches!(&request.request, crate::HostRequest::Program(_)) {
             Err(HostProblem::Unsupported)
         } else if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)
@@ -171,12 +223,15 @@ impl ScopedHostService {
                 }
                 Ok(provider) => {
                     let mutating = request.request.is_mutating();
-                    mutation_dispatched = mutating;
-                    match catch_unwind(AssertUnwindSafe(|| match context {
-                        Some(context) => {
+                    mutation_dispatched = mutating && replay.is_none();
+                    match catch_unwind(AssertUnwindSafe(|| match (context, replay) {
+                        (_, Some((digest, context))) => {
+                            provider.replay_retained(invocation, request, digest, now_tick, context)
+                        }
+                        (Some(context), None) => {
                             provider.invoke_program_context(invocation, request, context)
                         }
-                        None => provider.invoke(invocation, request),
+                        (None, None) => provider.invoke(invocation, request),
                     })) {
                         // Uncertainty is a control outcome, not an oversized success payload.
                         // Never erase it, even when an untrusted provider also corrupts the envelope.
@@ -198,7 +253,29 @@ impl ScopedHostService {
                                     .map(|_| ())
                                 });
                             match validation {
+                                Ok(()) if replay.is_some() && effect.outcome.is_ok() => {
+                                    let exact = match (&effect.outcome, &checked_inquiry) {
+                                        (Ok(crate::HostResult::MqMqi(host)), Some(profile)) => {
+                                            Some(host.limits) == checked_limits
+                                                && profile
+                                                    .validate_result(&host.result, host.limits)
+                                                    .is_ok()
+                                        }
+                                        _ => false,
+                                    };
+                                    if exact
+                                        && crate::canonical_result_digest(&effect.outcome).ok()
+                                            == replay.map(|r| r.0)
+                                    {
+                                        effect.outcome
+                                    } else {
+                                        Err(HostProblem::UnknownOutcome)
+                                    }
+                                }
                                 Ok(()) => effect.outcome,
+                                // An unusable replay envelope cannot attest a
+                                // known refusal of this original occurrence.
+                                Err(_) if replay.is_some() => Err(HostProblem::UnknownOutcome),
                                 // The provider has reported a committed success. Losing its
                                 // usable reply is not a known rejection that permits retry.
                                 Err(_) if mutating && effect.outcome.is_ok() => {
@@ -269,6 +346,7 @@ impl AuditedEffectResult {
 #[cfg(test)]
 mod tests {
     mod program_context;
+    mod retained_replay;
     use super::*;
     use crate::{CapabilityDescriptor, HostProvider, HostRequest, RegistrySnapshot, StateRequest};
     use mainframe_env_execution_api::{

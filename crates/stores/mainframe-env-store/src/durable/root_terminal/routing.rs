@@ -12,6 +12,12 @@ pub(crate) fn audit_storage_key(execution_id: &ExecutionId, suffix: &str) -> Str
 
 macro_rules! root_journal_methods {
     (SqliteStateStore) => {
+        fn commit_checked_replay_refusal(
+            &self,
+            request: mainframe_env_store_api::CheckedReplayRefusalStep,
+        ) -> Result<ExecutionRecord, StoreError> {
+            self.settle_checked_replay_refusal(request)
+        }
         fn mutate_root_preparation_states(
             &self,
             request: mainframe_env_store_api::RootPreparationPublication,

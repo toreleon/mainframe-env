@@ -116,6 +116,23 @@ where
                     Err(outcome) => return Err(outcome),
                 };
                 let effect_sequence = effect.sequence;
+                if coordinator.checked_inquiry_replay && super::checked_replay::eligible(&effect) {
+                    let cursor = journal
+                        .as_mut()
+                        .ok_or_else(|| infrastructure_failure("checked replay requires journal"))?;
+                    let result = super::checked_replay::dispatch(
+                        coordinator,
+                        invocation,
+                        cursor,
+                        effect,
+                        existing,
+                        control,
+                    );
+                    if result.is_ok() {
+                        *control_slot = control;
+                    }
+                    return result;
+                }
                 let audited = host.invoke(
                     invocation,
                     control.now_tick,

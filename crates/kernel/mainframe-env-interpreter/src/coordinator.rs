@@ -19,7 +19,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+mod checked_replay;
 mod original_dispatch;
+pub use checked_replay::{CheckedReplayAuditCapture, CheckedReplayObservations};
 mod root_terminal;
 use root_terminal::NativeProgress;
 pub use root_terminal::{
@@ -65,6 +67,8 @@ pub struct ExecutionCoordinator {
     store: Option<Arc<dyn PlatformStore>>,
     audit_sink: Option<Arc<dyn AuditSink>>,
     limits: CoordinatorLimits,
+    checked_inquiry_replay: bool,
+    checked_replay_pending: std::sync::Mutex<Option<Arc<CheckedReplayAuditCapture>>>,
 }
 
 struct PlatformAuditSink(Arc<dyn PlatformStore>);
@@ -93,6 +97,8 @@ impl ExecutionCoordinator {
             store: None,
             audit_sink: None,
             limits,
+            checked_inquiry_replay: false,
+            checked_replay_pending: std::sync::Mutex::new(None),
         }
     }
 
@@ -107,6 +113,8 @@ impl ExecutionCoordinator {
             store: None,
             audit_sink: Some(audit_sink),
             limits,
+            checked_inquiry_replay: false,
+            checked_replay_pending: std::sync::Mutex::new(None),
         }
     }
 
@@ -133,6 +141,8 @@ impl ExecutionCoordinator {
             store: Some(store),
             audit_sink: None,
             limits,
+            checked_inquiry_replay: false,
+            checked_replay_pending: std::sync::Mutex::new(None),
         }
     }
 
@@ -248,6 +258,17 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
+        if self.checked_inquiry_replay
+            && !self
+                .checked_replay_pending
+                .lock()
+                .is_ok_and(|s| s.is_none())
+        {
+            return failed_outcome(problem(
+                FailureCategory::UnknownOutcome,
+                "retained checked replay attempt requires owning reconciliation",
+            ));
+        }
         if resumable && self.store.is_none() {
             return infrastructure_failure("durable resume requires an execution store");
         }

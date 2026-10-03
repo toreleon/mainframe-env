@@ -56,6 +56,26 @@ pub trait HostProvider: Send + Sync {
     /// Handle the original request under the supplied invocation, retaining its sequence and exact failure/uncertainty result; this interface grants no permission by itself.
     fn invoke(&self, invocation: &Invocation, request: EffectRequest) -> EffectResult;
 
+    /// Replay-only synchronous transport for the finite checked inquiry shape.
+    /// Expectations/context are structural, not store/frame/SAF permission.
+    /// The receiver must return the original retained result after current live
+    /// checks; default refusal NEVER calls ordinary invoke or recomputes output.
+    /// A future closed receiver must validate the concrete privately minted
+    /// capture, same physical store and original frame independently.
+    fn replay_retained(
+        &self,
+        _invocation: &Invocation,
+        request: EffectRequest,
+        _expected_result_digest: [u8; 32],
+        _observed_tick: u64,
+        _context: &(dyn std::any::Any + Send + Sync),
+    ) -> EffectResult {
+        EffectResult {
+            sequence: request.sequence,
+            outcome: Err(HostProblem::Unsupported),
+        }
+    }
+
     /// Transport a borrowed Rust-only context for an original Program request.
     /// Type erasure conveys no admission, JES, lifecycle, SAF or core authority;
     /// an implementing receiver must independently validate its closed owner type.

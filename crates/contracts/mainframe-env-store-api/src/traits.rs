@@ -251,6 +251,16 @@ pub trait RetentionStore: Send + Sync {
 
 /// Atomic execution, event, effect, checkpoint, and outbox transactions.
 pub trait JournalStore: Send + Sync {
+    /// Atomically settle one actual non-Success Completed replay observation.
+    /// Full current original/execution/read/root/lease fences and event/outbox/audit
+    /// publication share one lock/TX. Completed bytes remain exact. Unsupported
+    /// adapters refuse without AuditSink, version-only CAS or sequential fallback.
+    fn commit_checked_replay_refusal(
+        &self,
+        _request: crate::CheckedReplayRefusalStep,
+    ) -> Result<ExecutionRecord, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Publish only already registered initial-root preparation rows. The actual
     /// root must remain Admitted version1, Open, root-only and effect/work/checkpoint
     /// free inside the same physical transaction. Structural observations are not

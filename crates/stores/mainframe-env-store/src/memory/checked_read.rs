@@ -1,5 +1,7 @@
 //! Read assertions and the existing audited kernel share this sole State lock.
 use super::*;
+#[path = "replay_refusal.rs"]
+mod replay_refusal;
 use crate::checked_read::{self as shared, Budget};
 use crate::root_terminal::{
     ACTOR_NAMESPACE, Document, ROW_SCOPE_NAMESPACE, RUN_NAMESPACE, SCOPE_NAMESPACE, row_scope_key,
@@ -78,7 +80,7 @@ fn get<'a>(
     }
     Ok(row)
 }
-fn check(
+pub(super) fn check(
     state: &State,
     e: &EffectRecord,
     x: &ExecutionRecord,

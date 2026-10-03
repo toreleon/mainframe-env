@@ -10,9 +10,9 @@ pub mod storage64;
 mod value;
 
 pub use coordinator::{
-    CoordinatorLimits, ExecutionControl, ExecutionControlError, ExecutionCoordinator,
-    NativeChildEnrollment, NativeRootAdmission, NativeRootConfiguration, NativeRootHooks,
-    NativeRootTermination, WinningRootTerminal,
+    CheckedReplayAuditCapture, CheckedReplayObservations, CoordinatorLimits, ExecutionControl,
+    ExecutionControlError, ExecutionCoordinator, NativeChildEnrollment, NativeRootAdmission,
+    NativeRootConfiguration, NativeRootHooks, NativeRootTermination, WinningRootTerminal,
 };
 pub use machine::typed_mq::{MqMqiNativePoint, MqMqiNativePointTarget, MqMqiNativeStructure};
 pub use machine::{

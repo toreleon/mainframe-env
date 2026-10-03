@@ -102,7 +102,11 @@ impl ProviderReplayAssertion {
     }
 }
 
-fn core_bytes(e: &EffectRecord, x: &ExecutionRecord, max: usize) -> Result<usize, StoreError> {
+pub(crate) fn core_bytes(
+    e: &EffectRecord,
+    x: &ExecutionRecord,
+    max: usize,
+) -> Result<usize, StoreError> {
     let mut bytes = 0;
     for size in [
         e.execution_id.as_str().len(),
@@ -133,7 +137,7 @@ fn core_bytes(e: &EffectRecord, x: &ExecutionRecord, max: usize) -> Result<usize
     Ok(bytes)
 }
 
-fn dependencies(
+pub(crate) fn dependencies(
     ds: &[TerminalRowDependency],
     extra_operations: usize,
     max: usize,
@@ -180,7 +184,7 @@ fn identity(n: &str, k: &str) -> Result<(), StoreError> {
         Ok(())
     }
 }
-fn add(bytes: &mut usize, size: usize) -> Result<(), StoreError> {
+pub(crate) fn add(bytes: &mut usize, size: usize) -> Result<(), StoreError> {
     *bytes = bytes
         .checked_add(size)
         .ok_or(StoreError::CapacityExceeded)?;

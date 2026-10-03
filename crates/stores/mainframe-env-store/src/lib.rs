@@ -10,6 +10,7 @@ mod memory;
 mod postgres;
 mod postgres_artifact;
 mod publication;
+mod replay_refusal;
 mod retention;
 mod root_terminal;
 mod runtime;

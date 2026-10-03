@@ -1,5 +1,7 @@
 //! Bounded observations under SQLite's existing physical writer transaction.
 use super::*;
+#[path = "replay_refusal.rs"]
+mod replay_refusal;
 use crate::checked_read::{self as shared, Budget};
 use crate::root_terminal::{
     ACTOR_NAMESPACE, Document, ROW_SCOPE_NAMESPACE, RUN_NAMESPACE, SCOPE_NAMESPACE, row_scope_key,
@@ -96,7 +98,7 @@ impl SqliteStateStore {
         })?
     }
 
-    async fn checked_row_in(
+    pub(super) async fn checked_row_in(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         n: &str,
@@ -126,7 +128,7 @@ impl SqliteStateStore {
         self.root_optional_row(tx, n, k).await
     }
 
-    async fn check_reads_in(
+    pub(super) async fn check_reads_in(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         e: &EffectRecord,

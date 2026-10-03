@@ -4,6 +4,8 @@ use super::*;
 mod checked_read;
 #[path = "attributed_physical.rs"]
 mod physical;
+#[path = "replay_refusal.rs"]
+mod replay_refusal;
 
 fn start(
     store: &dyn PlatformStore,

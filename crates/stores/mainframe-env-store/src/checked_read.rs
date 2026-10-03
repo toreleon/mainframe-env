@@ -38,7 +38,11 @@ pub(crate) fn replay_validate(
     max: usize,
 ) -> Result<Budget, StoreError> {
     let bytes = r.validate_bounds(max)?;
-    let e = &r.effect;
+    validate_effect_observation(&r.effect, r.observed_tick)?;
+    Ok(Budget::new(bytes))
+}
+
+pub(crate) fn validate_effect_observation(e: &EffectRecord, tick: u64) -> Result<(), StoreError> {
     validation::effect(e)?;
     if e.digest_format != EffectDigestFormat::CanonicalHostV1
         || e.intent.capability.is_none()
@@ -47,30 +51,30 @@ pub(crate) fn replay_validate(
         || e.intent.recovery_lease.is_some()
         || e.intent.created_tick == 0
         || e.intent.recovery_after_tick > i64::MAX as u64
-        || r.observed_tick == 0
-        || r.observed_tick > i64::MAX as u64
-        || r.observed_tick < e.intent.created_tick
+        || tick == 0
+        || tick > i64::MAX as u64
+        || tick < e.intent.created_tick
     {
         return Err(StoreError::LeaseConflict);
     }
     match e.state {
         EffectState::Intent => {
             validation::new_intent(e)?;
-            if r.observed_tick >= e.intent.recovery_after_tick {
+            if tick >= e.intent.recovery_after_tick {
                 return Err(StoreError::LeaseConflict);
             }
         }
         EffectState::Completed => {
             validation::terminal(&e.key, e)?;
             if e.resolved_tick
-                .is_none_or(|tick| tick > r.observed_tick || tick > i64::MAX as u64)
+                .is_none_or(|resolved| resolved > tick || resolved > i64::MAX as u64)
             {
                 return Err(StoreError::InvalidTransition);
             }
         }
         _ => return Err(StoreError::InvalidTransition),
     }
-    Ok(Budget::new(bytes))
+    Ok(())
 }
 
 pub(crate) fn fence(

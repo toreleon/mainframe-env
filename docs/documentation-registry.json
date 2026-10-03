@@ -88,6 +88,7 @@
     "docs/decisions/0041-first-direct-child-ssa-selection.md",
     "docs/decisions/0042-ims-tm-output-identity-local-order.md",
     "docs/decisions/0043-inquiry-checked-read-publication.md",
+    "docs/decisions/0044-checked-inquiry-replay-refusal.md",
     "docs/decisions/0033-cobol-dli-call-boundary.md",
     "docs/decisions/0030-gsam-application-record-formats.md",
     "docs/decisions/0032-selected-secondary-checkpoint-position.md",
@@ -415,6 +416,10 @@
         {
           "label": "ADR-0043: Checked provider read publication",
           "path": "docs/decisions/0043-inquiry-checked-read-publication.md"
+        },
+        {
+          "label": "ADR-0044: Checked inquiry replay refusal settlement",
+          "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md"
         },
         {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",

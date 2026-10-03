@@ -184,7 +184,7 @@ impl SqliteStateStore {
         })?
     }
 
-    async fn apply_mutations_in(
+    pub(super) async fn apply_mutations_in(
         &self,
         transaction: &mut Transaction<'_, Sqlite>,
         mutations: Vec<ProviderStateMutation>,

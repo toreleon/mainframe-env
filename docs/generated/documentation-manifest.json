@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 260,
+    "markdown_documents": 261,
     "navigation_groups": 6,
-    "normative_documents": 90,
+    "normative_documents": 91,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 146,
-      "sha256": "sha256:bac3604f2ceec2d0bbc5b3599c8006e4dc2b6cd7e19c8130e1fe628e6a9f3220",
+      "relative_links": 147,
+      "sha256": "sha256:f935366ac4cc2e2eac66df5032def7ed5b0721d6ac0321fa3280495aa9a28b55",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1331,6 +1331,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "host transport, interpreter original dispatch and physical store maintainers.",
+      "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md",
+      "relative_links": 0,
+      "scope": "replay-only transport, bounded capture and atomic Completed refusal settlement.",
+      "sha256": "sha256:c3bcbdfe9033752c46e1e7f7e822fe5f396dd33e69211d823e2ef21bd5bcae36",
+      "status": "Implemented infrastructure prerequisite; configured inquiry activation remains unsupported.",
+      "title": "ADR 0044: Checked inquiry replay refusal settlement",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.15.0 development",
       "normative": true,
       "owner": "Batch maintainers",
@@ -1890,7 +1902,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:5d2c16b5ff0bd1c418c6175193efe968f365ab3500f72a79edba8163739dc5b8",
+      "sha256": "sha256:da453bbeb85712eb672a9497000160ad33eed964b425483b5947add36f9771a8",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2764,6 +2776,10 @@
           "path": "docs/decisions/0043-inquiry-checked-read-publication.md"
         },
         {
+          "label": "ADR-0044: Checked inquiry replay refusal settlement",
+          "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
         },
@@ -3044,7 +3060,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:f08f57c76188d96812c7ae0f1b960c3ee9e4983ca17dff4ac2047c6d03e4a937",
+  "registry_sha256": "sha256:903bbfa505662fc3f63e142ab54b533fbcf2dda7250efe40bd7a12d52da815a1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

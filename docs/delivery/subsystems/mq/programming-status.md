@@ -6,6 +6,45 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Retained checked replay and refusal prerequisite
+
+`MQ-1503.checked-inquiry-replay-refusal` integrates reviewed sealed worker
+`73c2eb48`. Default-refusing Host replay transport preserves ordinary invocation.
+The real private OriginalDispatch opt-in binds a non-Serde once-only capture to
+the same physical adapter, exact original Completed effect/current Running
+execution and actual scoped replay audit. A retained success only asserts current
+dependencies and its original digest, without replay provider/audit/event writes.
+An actual refusal atomically publishes its existing audit plus literal next
+EffectResult lifecycle/outbox while leaving Completed and receipt unchanged.
+Memory uses one lock; SQLite uses one writer transaction and bounded byte/key
+preflights. Invalid output/sequence, panic, stale observations and scope loss
+retain actual Unknown as required; rollback and read/publication bounds remain.
+
+The nonwriting assertion retains4096 dependency capacity. Refusal reserves ten
+physical/accounting operations, admitting at most4086 dependencies within the
+existing64MiB cap. No clock, root index/schema or dependency migration is added.
+Namespace plus row overlap remains refused even for one @1 root. Private capture
+is not provider/frame/SAF authority or an atomic whole-graph capture. A retained
+failure prevents another opt-in callback; it cannot be cleared through a public
+retry/consume token. An in-memory audit is not relabeled as persisted.
+
+Independent review closes32paths/95commands/314artifacts and exact worker seal,
+32unchanged historical dependency inputs and final owning source snapshots.
+Worker checks cover12Store/root,20Host,30canonical,18coordinator,17legacy and42
+root-attribution regressions,13policy/fouractualmutants and mandatory gates.
+External driver's two tests retain their actual historical inputs; a separately
+sealed committed coordinator regression is reviewed for subsequent integration,
+not yet part of this feature. Earlier failed compile/fixture/metadata/driver-lock
+attempts remain preserved. Main runs current composed focused gates and consumers.
+
+Configured MQINQ remains disabled: genuine provider origin, selected frame and
+actual supervised late-failure consumption are still required. No append into an
+old terminal root, successor audit with old identity, lost-ACK retry or public
+Ready observation grants authority. Fixture scalars/tokens and orderly owned
+SQLite are not installed/native/JES/SAF/crash evidence. Source credit0; all26
+full-call gates stay Pending and fullv0.15 incomplete. Only licensed oracle is
+human-skipped0/26; all other parent acceptance requirements remain unwaived.
+
 ## Private prepared Batch selection prerequisite
 
 `MQ-1503.batch-prepared-selection-plan` integrates reviewed sealed worker
