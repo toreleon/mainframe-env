@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 mod bounds;
 mod identities;
+mod inquiry;
 mod mutations;
 mod results;
 mod reviewed_output;

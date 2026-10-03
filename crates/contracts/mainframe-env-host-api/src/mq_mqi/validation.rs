@@ -190,6 +190,9 @@ impl MqMqiRequestEnvelope {
                 Some(*connection)
             }
             R::Inquire(value) => {
+                if super::inquiry::is_reviewed(value) {
+                    super::inquiry::validate(value, limits)?;
+                }
                 if value.selectors.len() > limits.selectors {
                     return Err(MqMqiProblem::SelectorCount);
                 }
@@ -203,6 +206,10 @@ impl MqMqiRequestEnvelope {
                 Some(value.connection)
             }
             R::Set(value) => {
+                if value.selectors.contains(&MqMqiSelector::ReviewedQueueType) {
+                    // Reviewed inquiry identity never admits MQSET semantics.
+                    return Err(MqMqiProblem::InquiryProfile);
+                }
                 if value.selectors.len() > limits.selectors {
                     return Err(MqMqiProblem::SelectorCount);
                 }

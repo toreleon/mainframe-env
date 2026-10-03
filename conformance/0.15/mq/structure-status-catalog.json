@@ -6766,5 +6766,114 @@
     "vendor_copybook_equivalence": "unresolved",
     "short_name_policy": "owned-copied-prefix",
     "type_string_policy": "captured-retained-for-standard-types-no-synthesis"
+  },
+  "inquiry_local_type": {
+    "schema_version": "mainframe-env.mq-inquiry-local-type-projection@1",
+    "profile": "NormalLocalIntegerAdequateV1",
+    "semantic_execution_credit": 0,
+    "historical_catalog_sha256": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448",
+    "official_row": "0016",
+    "source_positions": [
+      16
+    ],
+    "sources": [
+      {
+        "scope_id": "ibm-mq-9.4-mqi-2026-08-31",
+        "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
+        "topic_manifest": {
+          "path": "conformance/0.2/manifests/mq-topics.json",
+          "sha256": "f5d2fbc4d05cfc8b461b94e72048fffe34d04bafffbd1e711ca2fb8175d65562"
+        }
+      },
+      {
+        "scope_id": "mq-programming-supplements",
+        "baseline_id": "ibm-mq-9.4-programming-supplements-2026-09-12",
+        "topic_manifest": {
+          "path": "conformance/0.15/manifests/mq-programming-supplements-topics.json",
+          "sha256": "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a"
+        }
+      },
+      {
+        "scope_id": "mq-inquiry-attribute-sources",
+        "baseline_id": "ibm-mq-9.4-inquiry-attribute-sources-2026-09-12",
+        "topic_manifest": {
+          "path": "conformance/0.15/manifests/mq-inquiry-attribute-sources-topics.json",
+          "sha256": "1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949"
+        }
+      }
+    ],
+    "facts": [
+      {
+        "symbol": "MQIA_Q_TYPE",
+        "decimal": 20,
+        "hexadecimal": "00000014",
+        "source": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q091590_.html",
+          "topic_sha256": "33468f1a42a59c46286c019ac8d8023970f65f90685cb7836dc77ffc3d630e2e",
+          "first_line": 451,
+          "last_line": 453,
+          "fragment_sha256": "bfe2a189daf01bc45ed1b95b48e0edbe78635c13f594bb444753aa78bf9e8253"
+        }
+      },
+      {
+        "symbol": "MQQT_LOCAL",
+        "decimal": 1,
+        "hexadecimal": "00000001",
+        "source": {
+          "topic_path": "SSFKSJ_9.4.0/refdev/q092480_.html",
+          "topic_sha256": "ac5de9d74f62635456e566bfcbba7706699686cef14580ab30aa22166b2fb1ba",
+          "first_line": 11,
+          "last_line": 13,
+          "fragment_sha256": "cf702e5eb7ed34f9ee4ed438adb5349d8e935d294200b86b390d5e5edac98138"
+        }
+      }
+    ],
+    "semantics": {
+      "selector_input": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html",
+        "topic_sha256": "03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b",
+        "first_line": 19,
+        "last_line": 48,
+        "fragment_sha256": "15b63698f4dc357cb0a44ec5c6dfff800d41514aca273bfad6037df6ec743bd0"
+      },
+      "integer_output": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html",
+        "topic_sha256": "03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b",
+        "first_line": 706,
+        "last_line": 715,
+        "fragment_sha256": "855eca9ea44f638514d1ecd5f76c8fdaf16bcdb72bb4216f874b44a55e065ea1"
+      },
+      "character_output": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html",
+        "topic_sha256": "03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b",
+        "first_line": 716,
+        "last_line": 725,
+        "fragment_sha256": "bb11f6d06cb5bf7d17685bb2e139cd21b2cf321ba462298be0092cc4f00acd55"
+      },
+      "qtype": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q103490_.html",
+        "topic_sha256": "93bd55632f95b85f9790e3cba75c623bff93c1a679983115546edf32ce527639",
+        "first_line": 19,
+        "last_line": 28,
+        "fragment_sha256": "7401afb27589b8d5999131bdbe2575fa2345c10719524e8912f10f731bc299df"
+      },
+      "local_queue": {
+        "topic_path": "SSFKSJ_9.4.0/refdev/q102970_.html",
+        "topic_sha256": "9acb6b5d2a83bd0ac738ffaf72a73f2f1b6baa90b8d4359916b72e53084f29c9",
+        "first_line": 25,
+        "last_line": 28,
+        "fragment_sha256": "e50d7052a75f4b9955d153afb17846690bbd85a098366ca03a0a1e59d9b6417c"
+      }
+    },
+    "owned_limits": {
+      "integer_slots": 256
+    },
+    "pending": [
+      "other-selectors",
+      "other-object-kinds",
+      "character-attributes",
+      "short-buffers-and-warnings",
+      "selected-and-native-dispatch"
+    ]
   }
 }

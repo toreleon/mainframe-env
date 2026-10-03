@@ -40,6 +40,7 @@
     "property_profile": {"$ref": "#/$defs/property-profile"},
     "rfh2_profile": {"$ref": "#/$defs/rfh2-profile"},
     "raw_property": {"$ref": "#/$defs/raw-property"},
+    "inquiry_local_type": {"$ref": "#/$defs/inquiry-local-type"},
     "calls": {
       "type": "array",
       "minItems": 26,
@@ -48,6 +49,31 @@
     }
   },
   "$defs": {
+    "inquiry-local-type": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "profile", "semantic_execution_credit", "historical_catalog_sha256", "official_row", "source_positions", "sources", "facts", "semantics", "owned_limits", "pending"],
+      "properties": {
+        "schema_version": {"const": "mainframe-env.mq-inquiry-local-type-projection@1"},
+        "profile": {"const": "NormalLocalIntegerAdequateV1"},
+        "semantic_execution_credit": {"const": 0},
+        "historical_catalog_sha256": {"const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"},
+        "official_row": {"const": "0016"},
+        "source_positions": {"const": [16]},
+        "sources": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "object", "additionalProperties": false, "required": ["scope_id", "baseline_id", "topic_manifest"], "properties": {"scope_id": {"type": "string", "maxLength": 128}, "baseline_id": {"type": "string", "maxLength": 128}, "topic_manifest": {"$ref": "#/$defs/file-binding"}}}},
+        "facts": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"$ref": "#/$defs/inquiry-selector-fact"}, {"$ref": "#/$defs/inquiry-local-fact"}], "items": false},
+        "semantics": {"type": "object", "additionalProperties": false, "required": ["selector_input", "integer_output", "character_output", "qtype", "local_queue"], "properties": {"selector_input": {"$ref": "#/$defs/property-locator"}, "integer_output": {"$ref": "#/$defs/property-locator"}, "character_output": {"$ref": "#/$defs/property-locator"}, "qtype": {"$ref": "#/$defs/property-locator"}, "local_queue": {"$ref": "#/$defs/property-locator"}}},
+        "owned_limits": {"type": "object", "additionalProperties": false, "required": ["integer_slots"], "properties": {"integer_slots": {"const": 256}}},
+        "pending": {"const": ["other-selectors", "other-object-kinds", "character-attributes", "short-buffers-and-warnings", "selected-and-native-dispatch"]}
+      }
+    },
+    "inquiry-selector-fact": {
+      "type": "object", "additionalProperties": false, "required": ["symbol", "decimal", "hexadecimal", "source"],
+      "properties": {"symbol": {"const": "MQIA_Q_TYPE"}, "decimal": {"const": 20}, "hexadecimal": {"const": "00000014"}, "source": {"$ref": "#/$defs/property-locator"}}
+    },
+    "inquiry-local-fact": {
+      "type": "object", "additionalProperties": false, "required": ["symbol", "decimal", "hexadecimal", "source"],
+      "properties": {"symbol": {"const": "MQQT_LOCAL"}, "decimal": {"const": 1}, "hexadecimal": {"const": "00000001"}, "source": {"$ref": "#/$defs/property-locator"}}
+    },
     "raw-property": {
       "type": "object",
       "additionalProperties": false,

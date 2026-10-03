@@ -8,6 +8,43 @@ Scope: MQI denominator, source provenance, host context and semantic authority
 
 Applies from: mainframe-env 0.15.0
 
+## Finite local-type inquiry contract
+
+`MqMqiSelector::ReviewedQueueType` has a distinct zero-field canonical tag;
+`PendingInteger(20)` and every historical pending tag/byte remain pending and
+unchanged. The one structure/status catalog holds an independent frozen
+`mainframe-env.mq-inquiry-local-type-projection@1`, generated through the existing
+registry tool. Catalog@2 framing and old@1/wire/raw/property/RFH2/status projection
+identities remain exact; the containing catalog file gains the new section and
+therefore a new file hash. Historical catalogs without this section cannot
+generate the new artifact.
+Unknown projection versions, missing facts and changed pins fail closed. There
+is no new persisted DTO/replay schema or automatic historical receipt rewrite.
+Older readers must refuse the additive selector rather than infer admission;
+downgrade requires stopping its use and retaining original canonical identities.
+
+The private-field `MqMqiLocalTypeInquiry` checks ordered reviewed occurrences,
+0..256 selectors, adequate integer slots within the selected product limit and
+zero character bytes. Its complete result check requires exact OK/NONE and one
+observed MQQT_LOCAL per occurrence. Excess caller slots are outside the returned
+prefix and remain untouched. Zero selectors retain the old empty inquiry shape;
+the explicit checked wrapper validates empty results without granting a handle,
+permission or dispatch shortcut. Old pending-only and short-buffer shapes retain
+their broader validators. Mixed profiles and use of the reviewed selector for
+MQSET refuse. No constant answer is produced: actual scalar origin must later
+be an independently held normal-local catalog object opened for INQUIRE.
+
+Reviewed sources are MQ9.4 baseline2026-08-31 row0016/position16 q101840 issue337
+pin, lines19–48 and706–725; programming-supplements baseline2026-09-12 q091590
+451–453 (MQIA_Q_TYPE20/hex14) and q10297025–28; inquiry-attribute-sources
+baseline2026-09-12 q09248011–13 (MQQT_LOCAL1) and q10349019–28. Exact pins and
+fragment hashes live in that single catalog projection. Source review grants
+zero execution credit. Other selectors/kinds, characters, warnings and partial
+output rules remain pending in this profile. Selected/public/native MQINQ, actual
+INQUIRE-open, ten-reference compiled table ABI, original core/SAF/physical audit
+and replay integration remain unsupported follow-ons; full26 acceptance is not
+advanced by contract fixtures. No queue engine or authorization boundary changes.
+
 ## Denominator and provenance
 
 The immutable 0.2 official catalog defines 26 unique IBM MQ 9.4 MQI calls.

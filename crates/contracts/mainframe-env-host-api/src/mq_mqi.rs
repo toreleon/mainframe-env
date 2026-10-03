@@ -13,6 +13,8 @@
 
 mod encoding;
 mod full_message;
+mod inquiry;
+pub use inquiry::MqMqiLocalTypeInquiry;
 mod qualified_get;
 pub use qualified_get::MqMqiQualifiedGot;
 pub(crate) mod producer;
@@ -151,12 +153,15 @@ pub struct MqMqiPut {
     pub unit: MqMqiUnitOfWork,
 }
 
-/// Numeric identities are preserved as requests for later review, never
-/// accepted selector constants. The inquiry kernel/adapter owns their mapping.
+/// Pending numbers retain their unreviewed identities even when they equal a
+/// reviewed number. A reviewed identity grants no object or dispatch authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqMqiSelector {
     PendingInteger(i32),
     PendingCharacter(i32),
+    /// Source-reviewed MQIA_Q_TYPE for the finite normal-local inquiry profile.
+    /// Other object kinds, MQSET and selected/native dispatch remain pending.
+    ReviewedQueueType,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -597,6 +602,9 @@ pub struct MqMqiResult {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqMqiProblem {
+    /// Unreviewed selector, mixed inquiry profile or unrepresented operation;
+    /// this product refusal is not an MQCC/MQRC return.
+    InquiryProfile,
     /// Checked property profile/observation failure; grants no operation permission.
     Property(MqPropertyProblem),
     /// Exact full descriptor representation failure, not numeric policy admission.

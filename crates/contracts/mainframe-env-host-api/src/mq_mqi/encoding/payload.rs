@@ -148,9 +148,13 @@ impl Canonical for MqMqiCall {
 }
 impl Canonical for MqMqiSelector {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
+        if *self == Self::ReviewedQueueType {
+            return out.variant("MqMqiSelector", "ReviewedQueueType", 0);
+        }
         let (variant, value) = match self {
             Self::PendingInteger(v) => ("PendingInteger", v),
             Self::PendingCharacter(v) => ("PendingCharacter", v),
+            Self::ReviewedQueueType => unreachable!("reviewed selector encoded above"),
         };
         out.variant("MqMqiSelector", variant, 1)?;
         out.text("0")?;

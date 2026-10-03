@@ -178,6 +178,13 @@ impl MqMqiResult {
         if self.call != request.call() {
             return Err(MqMqiProblem::OutputCallMismatch);
         }
+        if let MqMqiRequest::Inquire(inquiry) = request
+            && super::inquiry::is_reviewed(inquiry)
+        {
+            // Direct enum assembly receives the same complete-profile checks.
+            super::inquiry::validate(inquiry, MqMqiLimits::default())?;
+            super::inquiry::complete(inquiry, self)?;
+        }
         if matches!(request, MqMqiRequest::Rfh2(_))
             && matches!(self.outcome, MqMqiOutcome::ReviewedStatus { .. })
         {

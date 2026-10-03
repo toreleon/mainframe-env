@@ -6,6 +6,44 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Checked numeric local-type inquiry prerequisite
+
+`MQ-1503.inquiry-local-type-contract` integrates reviewed sealed worker
+`b4e683f4`. One existing catalog@2 carries an independent source projection@1
+for MQIA_Q_TYPE20 and MQQT_LOCAL1. The additive ReviewedQueueType canonical
+tag stays distinct from PendingInteger(20); older canonical bytes and all
+historical catalog/status/wire/property/RFH2 projections remain exact. The
+nonSerde checked wrapper preserves ordered0..256occurrences/duplicates,
+adequate bounded integer capacity and zero character capacity. It validates
+only actual complete OK/NONE Attributes with one LOCAL scalar per occurrence;
+no scalar is generated and extra caller slots are not extra output values.
+Zero selectors preserve historical empty request identity and require explicit
+wrapper result checking. Pending-only old request/result behavior is unchanged.
+Historical@2 without the section stays valid but cannot generate the new
+artifact; future versions, altered facts/pins and reviewed MQSET refuse.
+
+Independent review binds18Git paths,153artifacts,60closed receipts,11snapshots,
+2852unique input versions,169715occurrences,218frozen authorities,5verified
+topics/13worker search-read commands,32historical d8dependency inputs and
+same-HEAD seal. Initial78MQI/13canonical receipts retain their original test
+files; unchanged final production is byte-bound to them, while final8inquiry
+owns the final test file. Final28Python/13policy/fourmutants/schema/generator/
+source reproduction/API ceilings70/386/0/743/72 and cleanup are independently
+verified. Manager runs affected composed contracts/consumers and required gates.
+The retained21historical command classification is externally corrected to
+18actual IBM-reader commands (16search/read+2import/status), originals untouched.
+
+Source baseline2026-08-31 row0016/position16 q101840 input19–48/output706–725;
+supplements2026-09-12 q091590451–453/q10297025–28; inquiry-attribute-sources
+2026-09-12 q09248011–13/q10349019–28. Exactpins/fragments live in the catalog;
+retained-first SHA-verified offline reads, no network/bodyGit/freshness credit.
+Actual normal-local catalog origin, live INQUIRE-open HCONN/HOBJ/current frame,
+SAF/original core/physical read+receipt/audit+replay and compiled ten-reference
+table ABI remain required separate work. Otherselectors/kinds/characters/
+warnings/short-buffer rules remain pending. No selected/native/installed/full26
+activation or credit. All26 full-call gates stay Pending; onlylicensed oracle
+human-skipped0/26. Fullv0.15 and allother nonlicensed gates remain unfinished.
+
 ## Private coordinator original-dispatch prerequisite
 
 `MQ-1503.coordinator-original-dispatch-extraction` integrates reviewed sealed
