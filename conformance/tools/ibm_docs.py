@@ -30,6 +30,7 @@ INDEX = docs_api.REPOSITORY / "conformance/0.2/catalogs/index.json"
 REGISTRY = docs_api.REPOSITORY / "conformance/0.9/manifests/index.json"
 ADDITIONAL_REGISTRIES = (
     docs_api.REPOSITORY / "conformance/0.14/manifests/index.json",
+    docs_api.REPOSITORY / "conformance/0.15/manifests/index.json",
 )
 CONTENT_TEMPLATE = docs_api.CONTENT_URL
 MAX_FILE = 64 * 1024 * 1024

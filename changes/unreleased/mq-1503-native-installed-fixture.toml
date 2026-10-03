@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added test-only complete native MQ MD1/MD2 setup emitters reusing the existing physical fixture and quiescent provider import planner; no runtime normalization or native execution credit is granted."

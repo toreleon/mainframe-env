@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a private strict MQ stored-authority reader selecting normalized legacy or imported rich state from one bounded physical snapshot, preserving replay records and validating trusted catalog/generation/fence identity; public runtime selection remains pending."

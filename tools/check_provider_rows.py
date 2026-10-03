@@ -70,9 +70,15 @@ def check(root: Path) -> None:
     }
     for label, (path, specific) in targets.items():
         source = production_source(path)
-        if label in ("MQ", "IMS"):
-            # The bounded facade imports these unchanged persistence helpers.
-            require(source, ("mod rows;", "use rows::*;"), label)
+        if label == "MQ":
+            require(
+                source,
+                ('#[path = "service_rows.rs"]', "mod rows;", "use rows::{"),
+                "MQ linked row module",
+            )
+            source += "\n" + production_source(path.with_name("service_rows.rs"))
+        if label == "IMS":
+            require(source, ("mod rows;", "use rows::*;"), "IMS linked row module")
             source += "\n" + production_source(path.with_suffix("") / "rows.rs")
         require(
             source,

@@ -1,4 +1,5 @@
-//! Existing state and metadata validation, shared by every IMS publication route.
+//! Existing IMS definition and retained-state validation.
+
 use super::*;
 
 pub(super) fn validate_definition(

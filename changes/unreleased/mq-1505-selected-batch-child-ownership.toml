@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added checked private same-task installed-batch child lifecycle and retained logical MQ UOW owner access, preserving original child core-effect/audit/receipt identity and root owner bytes, with same-store atomic publication and explicit nonfinal CALL-return cleanup; actual host producer, final task-end recovery and public participant readiness remain pending."

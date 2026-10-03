@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a private frozen explicit ordinary-batch host-context plane for exact unbound original Invocations and checked same-task children, retaining binding-only route refusals, original core/effect/audit identity and atomic local MQ publication/replay; actual installed producer and public participant readiness remain pending."

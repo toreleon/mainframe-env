@@ -49,9 +49,12 @@ mod eib;
 mod floating_insertion_tests;
 mod layout_admission;
 mod layout_resolution;
+mod legacy_mq;
 mod observability;
 mod snapshot_codec;
 mod typed_cics;
+pub(crate) mod typed_mq;
+pub use typed_mq::{MqMqiAbiScope, MqMqiConnxProfile, MqMqiProgramFrame, MqMqiProgramProfile};
 mod typed_decimal;
 use condition_literals::{condition_matches, condition_true_value_bytes};
 use decimal_capacity::decimal_exceeds_picture;
@@ -363,6 +366,7 @@ enum PendingKind {
         completion_code: Option<String>,
         reason_code: Option<String>,
     },
+    MqMqi(typed_mq::Targets),
     Cics {
         operation: CicsOperation,
         storage64_intent: Option<typed_cics::Storage64Intent>,
@@ -410,6 +414,7 @@ struct Pending {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MachineSnapshot {
+    /// Zero marks a diagnostic-only typed MQ frame snapshot, never accepted by restore.
     pub schema_version: u32,
     pub program_counter: usize,
     pub effect_sequence: u64,
@@ -453,6 +458,7 @@ pub enum MachineSnapshotValue {
 }
 pub struct ReferenceMachine {
     invocation: Invocation,
+    mqi: Option<typed_mq::State>,
     operations: Vec<Operation>,
     arithmetic_mode: CobolArithmeticMode,
     display_sign_separate: bool,
@@ -800,6 +806,7 @@ impl ReferenceMachine {
             .collect();
         let mut machine = Self {
             invocation,
+            mqi: None,
             operations,
             arithmetic_mode,
             display_sign_separate,
@@ -904,9 +911,11 @@ impl ReferenceMachine {
     }
 
     #[must_use]
+    /// Typed MQ frames export diagnostic schema zero because their live authority is not
+    /// represented here. This is not a checkpoint version; legacy snapshots remain schema 12.
     pub fn snapshot(&self) -> MachineSnapshot {
         MachineSnapshot {
-            schema_version: 12,
+            schema_version: if self.mqi.is_some() { 0 } else { 12 },
             program_counter: self.pc,
             effect_sequence: self.effect_sequence,
             executed_steps: self.executed_steps,
@@ -986,6 +995,11 @@ impl ReferenceMachine {
     }
 
     pub fn restore(&mut self, snapshot: MachineSnapshot) -> Result<(), MachineProblem> {
+        // The old schema has no opaque MQI alias/lifecycle references. Never
+        // restore it under a new typed frame and silently mint replacement access.
+        if self.mqi.is_some() || snapshot.schema_version == 0 {
+            return Err(MachineProblem::IncompatibleSnapshot);
+        }
         if !matches!(snapshot.schema_version, 1..=12)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
@@ -1596,9 +1610,7 @@ impl ReferenceMachine {
             .pending
             .take()
             .ok_or(MachineProblem::UnexpectedResume)?;
-        result
-            .validate(pending.sequence, HostLimits::default())
-            .map_err(MachineProblem::Host)?;
+        typed_mq::validate_reply(&pending, &result)?;
         // An in-doubt effect is not a language-level exception. CALL/ACCEPT
         // handlers, declaratives and subsystem error translation must not
         // turn uncertainty about committed work into ordinary control flow.
@@ -1930,6 +1942,13 @@ impl ReferenceMachine {
                         self.write_value(target, &CobolValue::Bytes(value.clone()))?;
                     }
                 }
+            }
+            (PendingKind::MqMqi(targets), HostResult::MqMqi(result)) => {
+                self.finish_typed_mq(targets, result)
+                    .map_err(|_| MachineProblem::Host(HostProblem::UnknownOutcome))?;
+            }
+            (PendingKind::MqMqi(_), _) => {
+                return Err(MachineProblem::Host(HostProblem::UnknownOutcome));
             }
             (PendingKind::Ims { target }, HostResult::Ims(result)) => {
                 self.write("DIBSTAT", result.status.as_bytes())?;
@@ -3252,6 +3271,14 @@ impl ReferenceMachine {
         args: &[String],
     ) -> Result<Step, MachineProblem> {
         if name == "call"
+            && self.mqi.is_some()
+            && args
+                .first()
+                .is_some_and(|program| typed_mq::is_call(program))
+        {
+            return self.typed_mq_effect(args);
+        }
+        if name == "call"
             && args.first().is_some_and(|program| {
                 matches!(
                     normalize(program.trim_matches(['\'', '"'])).as_str(),
@@ -3412,163 +3439,6 @@ impl ReferenceMachine {
             name,
             abi_version,
         }))
-    }
-    fn mq_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
-        let operation = match normalize(
-            args.first()
-                .ok_or(MachineProblem::InvalidOperation)?
-                .trim_matches(['\'', '"']),
-        )
-        .as_str()
-        {
-            "MQOPEN" => MqOperation::Open,
-            "MQGET" => MqOperation::Get,
-            "MQPUT" => MqOperation::Put,
-            "MQPUT1" => MqOperation::PutOne,
-            "MQCLOSE" => MqOperation::Close,
-            _ => return Err(MachineProblem::UnsupportedForm),
-        };
-        let using = position(args, "USING").ok_or(MachineProblem::InvalidOperation)?;
-        let parameters = args[using + 1..]
-            .iter()
-            .filter(|argument| {
-                !matches!(
-                    argument.as_str(),
-                    "BY" | "REFERENCE" | "CONTENT" | "VALUE" | "END-CALL"
-                )
-            })
-            .map(|argument| normalize(argument))
-            .collect::<Vec<_>>();
-        let parameter = |index: usize| {
-            parameters
-                .get(index)
-                .cloned()
-                .ok_or(MachineProblem::InvalidOperation)
-        };
-        let read_i32 = |machine: &Self, target: &str| -> Result<i32, MachineProblem> {
-            let value = machine.decimal(target)?;
-            if value.scale != 0 {
-                return Err(MachineProblem::DataException);
-            }
-            i32::try_from(value.coefficient).map_err(|_| MachineProblem::DataException)
-        };
-        let read_handle = |machine: &Self, target: &str| -> Result<u32, MachineProblem> {
-            let value = read_i32(machine, target)?;
-            u32::try_from(value).map_err(|_| MachineProblem::DataException)
-        };
-
-        let mut request = MqRequest {
-            operation,
-            queue: None,
-            handle: None,
-            options: 0,
-            message: Vec::new(),
-            message_id: None,
-            correlation_id: None,
-            wait_ticks: 0,
-            max_message_bytes: 1,
-            mutation: Some(self.mutation()?),
-        };
-        let mut descriptor = None;
-        let mut handle_target = None;
-        let mut buffer = None;
-        let mut data_length = None;
-        let (completion_code, reason_code) = match operation {
-            MqOperation::Open => {
-                let object_descriptor = parameter(1)?;
-                request.queue = Some(self.mq_queue_name(&object_descriptor)?);
-                request.options = read_i32(self, &parameter(2)?)?;
-                handle_target = Some(parameter(3)?);
-                (Some(parameter(4)?), Some(parameter(5)?))
-            }
-            MqOperation::Get => {
-                let target = parameter(1)?;
-                request.handle = Some(read_handle(self, &target)?);
-                let message_descriptor = parameter(2)?;
-                let get_options = parameter(3)?;
-                request.options = self
-                    .mq_descriptor_decimal(&get_options, "MQGMO-OPTIONS")
-                    .unwrap_or_else(|| read_i32(self, &get_options))?;
-                request.wait_ticks = self
-                    .mq_descriptor_decimal(&get_options, "MQGMO-WAITINTERVAL")
-                    .transpose()?
-                    .unwrap_or_default()
-                    .max(0) as u64;
-                let maximum = read_i32(self, &parameter(4)?)?.max(0);
-                request.max_message_bytes =
-                    u32::try_from(maximum).map_err(|_| MachineProblem::ResourceExhausted)?;
-                request.message_id = self.mq_descriptor_bytes(&message_descriptor, "MQMD-MSGID")?;
-                request.correlation_id =
-                    self.mq_descriptor_bytes(&message_descriptor, "MQMD-CORRELID")?;
-                descriptor = Some(message_descriptor);
-                buffer = Some(parameter(5)?);
-                data_length = Some(parameter(6)?);
-                (Some(parameter(7)?), Some(parameter(8)?))
-            }
-            MqOperation::Put => {
-                let target = parameter(1)?;
-                request.handle = Some(read_handle(self, &target)?);
-                let message_descriptor = parameter(2)?;
-                let put_options = parameter(3)?;
-                request.options = self
-                    .mq_descriptor_decimal(&put_options, "MQPMO-OPTIONS")
-                    .unwrap_or_else(|| read_i32(self, &put_options))?;
-                let length = read_i32(self, &parameter(4)?)?.max(0) as usize;
-                let target = parameter(5)?;
-                let mut message = self.read(&target)?;
-                message.truncate(length);
-                request.max_message_bytes =
-                    u32::try_from(length).map_err(|_| MachineProblem::ResourceExhausted)?;
-                request.message = message;
-                request.message_id = self.mq_descriptor_bytes(&message_descriptor, "MQMD-MSGID")?;
-                request.correlation_id =
-                    self.mq_descriptor_bytes(&message_descriptor, "MQMD-CORRELID")?;
-                descriptor = Some(message_descriptor);
-                (Some(parameter(6)?), Some(parameter(7)?))
-            }
-            MqOperation::PutOne => {
-                let object_descriptor = parameter(1)?;
-                request.queue = Some(self.mq_queue_name(&object_descriptor)?);
-                let message_descriptor = parameter(2)?;
-                let put_options = parameter(3)?;
-                request.options = self
-                    .mq_descriptor_decimal(&put_options, "MQPMO-OPTIONS")
-                    .unwrap_or_else(|| read_i32(self, &put_options))?;
-                let length = read_i32(self, &parameter(4)?)?.max(0) as usize;
-                let target = parameter(5)?;
-                let mut message = self.read(&target)?;
-                message.truncate(length);
-                request.max_message_bytes =
-                    u32::try_from(length).map_err(|_| MachineProblem::ResourceExhausted)?;
-                request.message = message;
-                request.message_id = self.mq_descriptor_bytes(&message_descriptor, "MQMD-MSGID")?;
-                request.correlation_id =
-                    self.mq_descriptor_bytes(&message_descriptor, "MQMD-CORRELID")?;
-                descriptor = Some(message_descriptor);
-                (Some(parameter(6)?), Some(parameter(7)?))
-            }
-            MqOperation::Close => {
-                let target = parameter(1)?;
-                request.handle = Some(read_handle(self, &target)?);
-                request.options = read_i32(self, &parameter(2)?)?;
-                handle_target = Some(target);
-                (Some(parameter(3)?), Some(parameter(4)?))
-            }
-            MqOperation::Commit | MqOperation::Rollback => {
-                return Err(MachineProblem::UnsupportedForm);
-            }
-        };
-        self.effect(
-            HostRequest::Mq(request),
-            PendingKind::Mq {
-                handle: handle_target,
-                descriptor,
-                buffer,
-                data_length,
-                completion_code,
-                reason_code,
-            },
-        )
     }
 
     fn sort_effect(&mut self, name: &str, args: &[String]) -> Result<Step, MachineProblem> {
@@ -8691,7 +8561,7 @@ impl Machine for ReferenceMachine {
     }
 
     fn checkpoint(&self) -> Option<BoundedPayload> {
-        if self.pending.is_some() {
+        if self.pending.is_some() || self.mqi.is_some() {
             return None;
         }
         let bytes = snapshot_codec::encode_snapshot(&self.snapshot())?;

@@ -31,12 +31,30 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0025](0025-licence-and-provenance-policy.md) | licence and provenance policy for IBM oracle evidence | Proposed |
 | [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 | [0027](0027-cics-logical-program-frames.md) | shared CICS task ownership and bounded logical program frames | Proposed |
+| [0028 (Db2)](0028-db2-typed-catalog-evolution.md) | typed Db2 catalog evolution through signed packages, existing generations and versioned persistence | Proposed |
+| [0028 (MQ)](0028-mq-shared-handle-kernel.md) | one volatile MQ handle authority across properties and pub/sub | Proposed |
+| [0029 (publication)](0029-audited-provider-publication.md) | audited provider publication under one retained core intent | Proposed |
+| [0029 (Db2)](0029-db2-core-participant-evolution.md) | versioned local Db2 core participant binding before mutating integration, preserving frozen CICS v1 | Proposed |
+| [0030](0030-mq-host-lifecycle-directory.md) | private volatile MQ lifecycle directory with explicit persisted restart fencing prerequisite | Proposed |
+| [0031](0031-mq-selected-service-authority.md) | one selected legacy/rich MQ service authority and strict same-store opener | Proposed |
+| [0032](0032-mq-program-machine-frame.md) | explicit installed-batch MQI frame and original machine connection effects | Proposed |
+| [0033](0033-mq-full-md-value.md) | complete lossless MQMD1/2 value and bounded separate canonical value codec | Proposed |
+| [0033](0033-mq-historical-handle-observation.md) | historical MQ canonical handle identity without live registry authority | Proposed |
+| [0035](0035-mq-root-scoped-abi-aliases.md) | explicit volatile SAME TASK connection aliases and atomic machine writeback | Proposed |
+| [0036 (conformance)](0036-conformance-pending-obligations.md) | explicit mandatory pending obligations and bounded selected MQ evidence | Proposed |
+| [0037](0037-running-step-program-transport.md) | opaque revocable Running-step observation and neutral Program context transport; activation pending | Accepted (bounded transport) |
+| [0038](0038-coordinator-original-dispatch-extraction.md) | one private original HostCall implementation borrowed by the real coordinator drive; controller activation pending | Accepted (bounded extraction) |
+| [0040](0040-batch-run-stop-containment.md) | genuine opt-in Batch run owner, opaque exit and irrevocable next-action stop; host activation pending | Accepted (bounded prerequisite) |
+| [0043](0043-batch-contained-all-effect-loan.md) | explicit contained all-effect occurrence transport with external audit ownership; enclosing controller activation pending | Accepted (bounded transport) |
+| [0045](0045-batch-prepared-selection-plan.md) | private bounded exact selection observation with complete Job/configuration revalidation; atomic joined admission pending | Accepted (bounded prerequisite) |
+
+Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
+Their distinct full filenames and subsystem-qualified labels identify each
+proposal; no historical decision body or reference has been replaced.
 | [0034](0034-gsam-logical-address.md) | bounded public GSAM logical addresses using existing engine, PCB and row authorities | Proposed |
 | [0031](0031-ims-tm-recovery-publication.md) | shared work/effect-fenced IMS TM recovery publication and settlement | Proposed |
 | [0035](0035-selected-pcb-feedback.md) | versioned owned selected PCB feedback retained in the existing proposal and receipt | Proposed |
 | [0033](0033-cobol-dli-call-boundary.md) | owned raw COBOL DL/I CALL frame, PCB entry binding and feedback contract proposal | Proposed |
-| [0028](0028-db2-typed-catalog-evolution.md) | typed Db2 catalog evolution through signed packages, existing generations and versioned persistence | Proposed |
-| [0029](0029-db2-core-participant-evolution.md) | versioned local Db2 core participant binding before mutating integration, preserving frozen CICS v1 | Proposed |
 | [0030](0030-gsam-application-record-formats.md) | explicit GSAM application formats, owned U length and checkpoint format identity | Proposed |
 | [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
 

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Isolated private MQ callback controls and dispatch by CICS default-connection task scope while preserving issued shared-connection controls; public MQI execution and CICS MQOP_START applicability remain unchanged."

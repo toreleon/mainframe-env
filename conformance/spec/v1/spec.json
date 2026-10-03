@@ -23886,6 +23886,276 @@
       "test_id": "cobol.statement.xml-parse.valid"
     },
     {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqback.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqback.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqclose.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqclose.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqcmit.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqcmit.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqconn.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqconn.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqdisc.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqdisc.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "conditioned",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqget.memory.conditioned"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqget.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "conditioned",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqget.sqlite.conditioned"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqget.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqopen.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqopen.sqlite.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.memory.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.memory.local-v1",
+      "obligation_id": "selected-local-v1-memory",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqput.memory.executed"
+    },
+    {
+      "driver": "mq.selected.product",
+      "expected": [
+        "mq.selected.sqlite.exact"
+      ],
+      "gate": "executed",
+      "input": "mq.sqlite.local-v1",
+      "obligation_id": "selected-local-v1-sqlite",
+      "oracle": null,
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020",
+      "spec_version": "mainframe-env.conformance-ir@1",
+      "test_id": "mq.mqput.sqlite.executed"
+    },
+    {
       "driver": "dataset.organization.driver",
       "expected": [
         "observe.dataset.esds.invalid"
@@ -54347,6 +54617,458 @@
     },
     {
       "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0002"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0003"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0004"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0005"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0010"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0011"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0013"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0014"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015"
+    },
+    {
+      "applicable_gates": [
+        "executed",
+        "conditioned"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0016"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0017"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0018"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-memory",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020"
+    },
+    {
+      "applicable_gates": [
+        "executed"
+      ],
+      "obligation_id": "selected-local-v1-sqlite",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0021"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0022"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0023"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0024"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0025"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "obligation_id": "complete-applicable-profile",
+      "pending_reason": "owned-full-profile-and-installed-security-recovery-evidence-pending",
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0026"
+    },
+    {
+      "applicable_gates": [
         "validated",
         "conditioned"
       ],
@@ -60799,6 +61521,7 @@
       "cobol.statement.driver",
       "dataset.organization.driver",
       "jcl.driver.convert",
+      "mq.selected.product",
       "racf.command.driver",
       "racf.racroute.driver"
     ],
@@ -65301,6 +66024,14 @@
         "id": "jcl.fixture.output-parameters.0076.valid"
       },
       {
+        "digest": "sha256:5192745771cc2b8cf242a57e01fdf0aadeda1c00f44794f603b1c368e2b21c8b",
+        "id": "mq.memory.local-v1"
+      },
+      {
+        "digest": "sha256:5192745771cc2b8cf242a57e01fdf0aadeda1c00f44794f603b1c368e2b21c8b",
+        "id": "mq.sqlite.local-v1"
+      },
+      {
         "digest": "sha256:670d9a933e776251120705e21262399289eb9733845fc7d750c264a6f9a35735",
         "id": "racf.command.0001.atomic-retry.recovered.fixture"
       },
@@ -67232,6 +67963,7 @@
       "cobol.statement.source-bundle",
       "dataset.organization.fixture",
       "jcl.input.bundle",
+      "mq.selected.typed",
       "racf.command.text",
       "racf.racroute.typed"
     ],
@@ -67261,6 +67993,8 @@
       "jcl.observation.target-error",
       "jcl.observation.target-recognized",
       "jcl.observation.target-validated",
+      "mq.selected.memory.exact",
+      "mq.selected.sqlite.exact",
       "observe.dataset.esds.invalid",
       "observe.dataset.esds.valid",
       "observe.dataset.ksds.invalid",
@@ -67289,6 +68023,7 @@
       "jcl.convert.jes2-jecl-statements",
       "jcl.convert.job-parameters",
       "jcl.convert.output-parameters",
+      "mq.selected.original",
       "racf.command",
       "racf.racroute"
     ],
@@ -67334,6 +68069,7 @@
       "cobol.statement.compile-and-execute",
       "dataset.organization.transition",
       "jcl.transition.convert",
+      "mq.selected.audited",
       "racf.command.transition",
       "racf.racroute.transition"
     ]
@@ -75144,6 +75880,672 @@
       "recovery": null,
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
       "transition": "cobol.statement.compile-and-execute"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0001",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0002",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0003",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0004",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0005",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0006",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0007",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0008",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0010",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0011",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0012",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0013",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0014",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0015",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0016",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0017",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0018",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0019",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile",
+        "selected-local-v1-memory",
+        "selected-local-v1-sqlite"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0020",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0021",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0022",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0023",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0024",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0025",
+      "transition": "mq.selected.audited"
+    },
+    {
+      "applicable_gates": [
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential"
+      ],
+      "conditions": [],
+      "input": "mq.selected.typed",
+      "obligations": [
+        "complete-applicable-profile"
+      ],
+      "operation": "mq.selected.original",
+      "oracle": null,
+      "postconditions": [
+        "mq.selected.memory.exact",
+        "mq.selected.sqlite.exact"
+      ],
+      "preconditions": [],
+      "recovery": null,
+      "row_id": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0026",
+      "transition": "mq.selected.audited"
     },
     {
       "applicable_gates": [

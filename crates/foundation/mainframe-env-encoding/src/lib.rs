@@ -1,10 +1,12 @@
-//! Checked EBCDIC, collation, decimal, and binary byte primitives.
+//! Checked ASCII identity, EBCDIC, collation, decimal, and binary byte primitives.
 
 #![forbid(unsafe_code)]
 
+mod ascii;
 mod codepage;
 mod decimal;
 
+pub use ascii::{AsciiEncodingProblem, encode_ascii};
 pub use codepage::{CodePage, EncodingProblem, compare_ebcdic};
 pub use decimal::{
     DecimalValue, Sign, decode_binary, decode_packed, decode_zoned, encode_binary, encode_packed,

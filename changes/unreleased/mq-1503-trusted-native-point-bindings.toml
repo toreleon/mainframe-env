@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added opaque read-only same-service native structure and exact point observations with live frame, registry, current-unit and final physical snapshot checks, contained nonreentrant clock callbacks, plus privileged preactivation producer-source setup. Observations grant no SAF or installed-host authority; native writeback, real JES context and remaining MQ acceptance stay pending."

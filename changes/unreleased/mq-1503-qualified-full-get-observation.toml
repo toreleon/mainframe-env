@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added opt-in qualified full GET observations with exact configured-structure ResolvedQName, original selected core/SAF/UOW publication and sole strict result storage@6. Historical GET variants and storage@1–@5 remain unchanged; unestablished error QName fields retain absence and native writeback remains separate."

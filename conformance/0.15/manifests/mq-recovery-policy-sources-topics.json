@@ -1,0 +1,27 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.15.0",
+  "baseline_id": "ibm-mq-9.4-recovery-policy-sources-2026-09-12",
+  "subsystem": "mq",
+  "product": "SSFKSJ_9.4.0",
+  "book_label": "IBM MQ 9.4 HardenGetBackout recovery-policy source-review scope",
+  "book_href": "SSFKSJ_9.4.0/refdev/q103230_.html",
+  "snapshot_date": "2026-09-12",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 1,
+  "total_bytes": 3691,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "414608491fdbefa8ec0b8b2b1adf8742a4dbc5553cd488344db649ef945bba11",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103230_.html",
+      "sha256": "22ee650c2f0fb23bc181d928ff70d401f0b4e288a0039d47110a012b9702a8a1",
+      "bytes": 3691,
+      "last_modified": "2026-05-18"
+    }
+  ]
+}

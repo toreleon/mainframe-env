@@ -185,6 +185,12 @@ fn terminal_execution_candidates(
             continue;
         };
         if execution.state.terminal()
+            && store
+                .get_provider_state(
+                    crate::root_terminal::ACTOR_NAMESPACE,
+                    execution.execution_id.as_str(),
+                )?
+                .is_none()
             && window_open
             && terminal_tick <= watermark
             && !dependencies.blocked.contains(&execution.execution_id)
@@ -457,6 +463,14 @@ pub(super) fn execution_is_prunable(
     store: &dyn ProviderStateStore,
     execution_id: &str,
 ) -> Result<bool, StoreError> {
+    if store
+        .get_provider_state(crate::root_terminal::ACTOR_NAMESPACE, execution_id)?
+        .is_some()
+    {
+        // A terminal row alone cannot release native root history. The future
+        // shared root age/recovery authority must release this membership.
+        return Ok(false);
+    }
     let Some(row) = store.get_provider_state("durable-execution", execution_id)? else {
         return Err(StoreError::IncompatibleVersion);
     };

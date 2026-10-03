@@ -1,3 +1,4 @@
+mod installed_call;
 mod runtime_calls;
 use mainframe_env_batch::{
     Program, ProgramInput, ProgramOutput, ProgramRouter, ProgramTermination, SystemServiceProgram,
@@ -38,10 +39,15 @@ use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod artifact;
+mod mqi;
 mod runtime;
 mod selected_link;
 mod staged_invocation;
 use artifact::{AdmittedProgram, admit_published_artifact};
+pub use mqi::{
+    ConfiguredInstalledMqHost, InstalledBatchAdmission, InstalledMqFrameSession,
+    InstalledMqHostBounds, ProgramMqHostAdmission,
+};
 pub(crate) use runtime::bind_compatible_runtime_services;
 pub use runtime::compatible_system_services;
 use runtime::with_compatible_runtime_services;
@@ -86,6 +92,15 @@ impl DefaultProgramRouter {
         &self,
         source: Arc<dyn ProgramExecutionControl>,
     ) -> Result<(), HostProblem> {
+        let _setup = self
+            .cobol
+            .setup
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        // Preserve legacy setup after construction; typed setup freezes at runtime publication.
+        if self.cobol.mqi_host.get().is_some() && self.cobol.host.get().is_some() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         self.cobol
             .control
             .set(source)
@@ -105,18 +120,13 @@ impl DefaultProgramRouter {
         store: Arc<dyn PlatformStore>,
         artifacts: Arc<dyn ArtifactStore>,
     ) -> Result<(), HostProblem> {
+        let setup = self
+            .cobol
+            .setup
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
         self.cobol
-            .host
-            .set(host)
-            .map_err(|_| HostProblem::IdempotencyConflict)?;
-        self.cobol
-            .store
-            .set(store)
-            .map_err(|_| HostProblem::IdempotencyConflict)?;
-        self.cobol
-            .artifacts
-            .set(artifacts)
-            .map_err(|_| HostProblem::IdempotencyConflict)
+            .bind_runtime_locked(&setup, host, store, artifacts)
     }
 }
 impl HostProvider for DefaultProgramRouter {
@@ -227,12 +237,16 @@ fn persist_batch_file_cursors(
 }
 
 struct CobolProgram {
+    setup: std::sync::Mutex<()>,
     host: OnceLock<Arc<ScopedHostService>>,
     store: OnceLock<Arc<dyn PlatformStore>>,
     artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     sequence: AtomicU64,
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
     transfer_owner: OnceLock<std::sync::Weak<mainframe_env_cics::CicsService>>,
+    mqi_host: OnceLock<Arc<dyn ProgramMqHostAdmission>>,
+    native_mq_host: OnceLock<std::sync::Weak<ConfiguredInstalledMqHost>>,
+    native_root_program: OnceLock<std::sync::Weak<dyn HostProvider>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -240,12 +254,16 @@ struct CobolProgram {
 impl CobolProgram {
     fn new() -> Self {
         Self {
+            setup: std::sync::Mutex::new(()),
             host: OnceLock::new(),
             store: OnceLock::new(),
             artifacts: OnceLock::new(),
             sequence: AtomicU64::new(1),
             control: OnceLock::new(),
             transfer_owner: OnceLock::new(),
+            mqi_host: OnceLock::new(),
+            native_mq_host: OnceLock::new(),
+            native_root_program: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -292,181 +310,6 @@ impl CobolProgram {
         Ok(observation)
     }
 
-    fn execute_admitted(
-        &self,
-        parent: &Invocation,
-        program: &str,
-        admitted: AdmittedProgram,
-        payload: &BoundedPayload,
-        identity: &str,
-        writes: &mut Vec<ProviderStateWrite>,
-    ) -> Result<BoundedPayload, HostProblem> {
-        let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
-        let AdmittedProgram {
-            artifact,
-            executable,
-            name,
-        } = admitted;
-        let call_values = decode_cobol_call_values(payload)?;
-        let limits = InvocationLimits::default();
-        let sequence = identity;
-        let mut bindings = parent.bindings.clone();
-        replay::bind_protocol_owner(parent, &mut bindings)?;
-        bindings.insert("cobol.call.arguments".into(), payload.clone());
-        let invocation = Invocation::new(
-            RequestId::new(format!("online-call-request-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ExecutionId::new(format!("online-call-execution-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            parent.run_unit_id.clone(),
-            Some(parent.execution_id.clone()),
-            Selector::new(format!("program:{}", program.to_ascii_uppercase()), limits)
-                .map_err(|_| HostProblem::Malformed)?,
-            artifact,
-            Principal::new(
-                parent.principal.id().clone(),
-                parent.principal.grants().clone(),
-                limits,
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?,
-            parent.service_class,
-            parent.priority,
-            parent.deadline_tick,
-            TraceId::new(format!("online-call-trace-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            IdempotencyKey::new(format!("online-call-effect-{sequence}"), limits)
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-            parent.attempt,
-            parent.limits,
-            bindings,
-            limits,
-        )
-        .and_then(|invocation| {
-            invocation.with_provider_generations(parent.provider_generations.clone(), limits)
-        })
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut invocation = with_compatible_runtime_services(invocation)?;
-        invocation.cancellation = parent.cancellation.clone();
-        invocation.cancellation_probe = parent.cancellation_probe.clone();
-        let mut machine = ReferenceMachine::from_binary(
-            executable.payload(),
-            invocation.clone(),
-            CodecLimits::default(),
-        )
-        .map_err(|_| HostProblem::ProviderFailure)?;
-        let cursor_key = format!("{}:{name}", parent.run_unit_id.as_str());
-        let cursor_record = store
-            .get_provider_state("batch-file-cursor", &cursor_key)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let cursor_version = cursor_record.as_ref().map(|record| record.version);
-        let loaded_cursors = cursor_record
-            .map(|record| {
-                serde_json::from_slice(&record.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)
-            })
-            .transpose()?
-            .unwrap_or_default();
-        machine
-            .install_dataset_cursors(loaded_cursors)
-            .map_err(|_| HostProblem::ResourceExhausted)?;
-        let lease = instance::Lease::acquire(store.as_ref(), &invocation, &name, &mut machine)?;
-        let coordinator = ExecutionCoordinator::durable(
-            Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
-            Arc::clone(store),
-            CoordinatorLimits::default(),
-        );
-        let outcome = coordinator.execute_with_control(&mut machine, &invocation, || {
-            self.observe_execution_control(&invocation)
-        });
-        let cursor_result = persist_batch_file_cursors(
-            store.as_ref(),
-            &cursor_key,
-            machine.dataset_cursors(),
-            cursor_version,
-        );
-        // A secondary persistence failure must not erase an in-doubt effect.
-        if matches!(&outcome, ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome())
-        {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        cursor_result
-            .map_err(|problem| replay::preserve_control_cursor_failure(&outcome, problem))?;
-        match outcome {
-            ExecutionOutcome::Completed(_) => {
-                let mut values = machine
-                    .linkage_values()
-                    .map_err(|_| HostProblem::ProviderFailure)?;
-                values.truncate(call_values.len());
-                let result =
-                    encode_cobol_call_result(&values).map_err(|_| HostProblem::UnknownOutcome)?;
-                writes.extend(lease.completed(store.as_ref(), &machine)?);
-                Ok(result)
-            }
-            ExecutionOutcome::Condition(condition) => Err(HostProblem::Condition {
-                name: condition.name,
-                response: condition.response,
-                response2: condition.response2,
-            }),
-            ExecutionOutcome::Cancelled => Err(HostProblem::Cancelled),
-            ExecutionOutcome::TimedOut => Err(HostProblem::TimedOut),
-            ExecutionOutcome::ResourceExhausted(_) => Err(HostProblem::ResourceExhausted),
-            ExecutionOutcome::ProviderFailure(problem) if problem.has_unknown_outcome() => {
-                Err(HostProblem::UnknownOutcome)
-            }
-            ExecutionOutcome::ProviderFailure(problem) => Err(HostProblem::Condition {
-                name: format!("BATCH-PROVIDER:{}", problem.public_message),
-                response: -6,
-                response2: 0,
-            }),
-            ExecutionOutcome::InfrastructureFailure(_) => Err(HostProblem::InfrastructureFailure),
-            ExecutionOutcome::Abend(_) => {
-                lease
-                    .abended(store.as_ref(), &invocation, &machine)
-                    .map_err(|_| HostProblem::UnknownOutcome)?;
-                Err(HostProblem::Condition {
-                    name: "INSTALLED-CALL-ABEND".into(),
-                    response: -1,
-                    response2: 0,
-                })
-            }
-            ExecutionOutcome::Rejected(problem) => Err(HostProblem::Condition {
-                name: format!("INSTALLED-CALL-REJECTED:{}", problem.public_message),
-                response: -2,
-                response2: 0,
-            }),
-            ExecutionOutcome::Transfer(transfer) => {
-                replay::persist_transfer_intent(
-                    store.as_ref(),
-                    &invocation,
-                    identity,
-                    &machine,
-                    &transfer,
-                )?;
-                self.stage_transfer_target(&invocation, identity, &machine, &transfer)?;
-                Err(HostProblem::UnknownOutcome)
-            }
-            // The durable child is suspended and its CALL/instance are still
-            // unresolved. Without an owned continuation/replacement protocol,
-            // this cannot be a known condition a caller may handle as a return.
-            ExecutionOutcome::Suspended(_) | ExecutionOutcome::Invoke(_) => {
-                Err(HostProblem::UnknownOutcome)
-            }
-        }
-    }
-
-    #[cfg(test)]
-    fn execute_installed(
-        &self,
-        parent: &Invocation,
-        program: &str,
-        payload: &BoundedPayload,
-        identity: &str,
-        writes: &mut Vec<ProviderStateWrite>,
-    ) -> Result<BoundedPayload, HostProblem> {
-        let admitted = self.preflight_installed_program(program, false)?;
-        self.execute_admitted(parent, program, admitted, payload, identity, writes)
-    }
-
     fn execute_runtime_service(
         &self,
         selector: &RuntimeServiceSelector,
@@ -483,6 +326,7 @@ impl CobolProgram {
         }
     }
 
+    #[cfg(test)]
     fn execute_installed_batch(
         &self,
         parent: &Invocation,
@@ -491,13 +335,20 @@ impl CobolProgram {
         payload: &BoundedPayload,
         identity: &str,
     ) -> Result<ProgramOutput, HostProblem> {
+        self.execute_installed_batch_from_call(parent, program, admitted, payload, identity, None)
+    }
+
+    fn execute_installed_batch_from_call(
+        &self,
+        parent: &Invocation,
+        program: &str,
+        admitted: AdmittedProgram,
+        payload: &BoundedPayload,
+        identity: &str,
+        original_call: Option<&replay::WinningInstalledCall<'_>>,
+    ) -> Result<ProgramOutput, HostProblem> {
         let input: ProgramInput =
             serde_json::from_slice(payload.bytes()).map_err(|_| HostProblem::Malformed)?;
-        let AdmittedProgram {
-            artifact,
-            executable,
-            ..
-        } = admitted;
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
@@ -550,7 +401,7 @@ impl CobolProgram {
             Some(parent.execution_id.clone()),
             Selector::new(format!("program:{}", program.to_ascii_uppercase()), limits)
                 .map_err(|_| HostProblem::Malformed)?,
-            artifact,
+            admitted.artifact.clone(),
             Principal::new(
                 parent.principal.id().clone(),
                 parent.principal.grants().clone(),
@@ -575,21 +426,64 @@ impl CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
-        let mut machine = ReferenceMachine::from_binary(
-            executable.payload(),
-            invocation.clone(),
-            CodecLimits::default(),
-        )
-        .map_err(|_| HostProblem::ProviderFailure)?;
-        install_batch_environment(&mut machine, &input)?;
+        invocation.cancellation_probe = parent.cancellation_probe.clone();
+        let mut session = self.admit_batch_mqi(&mut invocation, Some(&admitted), original_call)?;
+        let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut machine = ReferenceMachine::from_binary(
+                admitted.executable.payload(),
+                invocation.clone(),
+                CodecLimits::default(),
+            )
+            .map_err(|_| HostProblem::ProviderFailure)?;
+            if let Some(session) = &session {
+                machine
+                    .bind_mqi_program_frame(session.frame(&invocation)?)
+                    .map_err(|problem| match problem {
+                        mainframe_env_interpreter::MachineProblem::Host(problem) => problem,
+                        _ => HostProblem::ProviderFailure,
+                    })?;
+            }
+            install_batch_environment(&mut machine, &input)?;
+            Ok(machine)
+        }))
+        .unwrap_or(Err(HostProblem::UnknownOutcome));
+        let mut machine = match prepared {
+            Ok(machine) => machine,
+            Err(problem) => {
+                return Err(session
+                    .as_mut()
+                    .map_or(problem.clone(), |session| session.abort(problem)));
+            }
+        };
         let coordinator = ExecutionCoordinator::durable(
             Arc::clone(self.host.get().ok_or(HostProblem::InfrastructureFailure)?),
             Arc::clone(self.store.get().ok_or(HostProblem::InfrastructureFailure)?),
             CoordinatorLimits::default(),
         );
-        match coordinator.execute_with_control(&mut machine, &invocation, || {
-            self.observe_execution_control(&invocation)
-        }) {
+        let mut parent_tick = session.as_ref().map_or(0, |session| session.observed_tick);
+        let outcome = coordinator.execute_with_control(&mut machine, &invocation, || {
+            let control = self.observe_execution_control(&invocation)?;
+            if let Some(call) = original_call
+                && session.is_some()
+            {
+                mqi::recheck_driving_parent(
+                    self,
+                    call,
+                    control,
+                    &mut parent_tick,
+                    session
+                        .as_ref()
+                        .and_then(|session| session.original_core.as_ref())
+                        .ok_or(ExecutionControlError::Unavailable)?,
+                )
+                .map_err(|_| ExecutionControlError::Unavailable)?;
+            }
+            Ok(control)
+        });
+        if let Some(session) = &mut session {
+            session.finish(&outcome)?;
+        }
+        match outcome {
             ExecutionOutcome::Completed(completion) => Ok(ProgramOutput {
                 return_code: completion.return_code,
                 records: completion

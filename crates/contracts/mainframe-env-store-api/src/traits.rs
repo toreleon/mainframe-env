@@ -13,6 +13,15 @@ use mainframe_env_execution_api::{
 
 /// Mandatory persistence boundary for typed security-relevant host decisions.
 pub trait AuditSink: Send + Sync {
+    /// Read additive effect/terminal audit subjects using the same stored ordering.
+    /// Unsupported backends refuse rather than silently omit terminal decisions.
+    fn audit_subject_records(
+        &self,
+        _execution_id: &ExecutionId,
+        _max: usize,
+    ) -> Result<Vec<mainframe_env_execution_api::AuditSubjectRecord>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Persist one security-relevant authorization decision.
     fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError>;
     /// Read a bounded ordered range of audit records for one execution.
@@ -242,6 +251,85 @@ pub trait RetentionStore: Send + Sync {
 
 /// Atomic execution, event, effect, checkpoint, and outbox transactions.
 pub trait JournalStore: Send + Sync {
+    /// Atomically settle one actual non-Success Completed replay observation.
+    /// Full current original/execution/read/root/lease fences and event/outbox/audit
+    /// publication share one lock/TX. Completed bytes remain exact. Unsupported
+    /// adapters refuse without AuditSink, version-only CAS or sequential fallback.
+    fn commit_checked_replay_refusal(
+        &self,
+        _request: crate::CheckedReplayRefusalStep,
+    ) -> Result<ExecutionRecord, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Publish only already registered initial-root preparation rows. The actual
+    /// root must remain Admitted version1, Open, root-only and effect/work/checkpoint
+    /// free inside the same physical transaction. Structural observations are not
+    /// host permission. Unsupported adapters refuse without sequential fallback.
+    fn mutate_root_preparation_states(
+        &self,
+        _request: crate::RootPreparationPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Mutate only already registered scopes of this exact Open root/actor/original
+    /// canonical intent. All observations and both Move endpoints are checked inside
+    /// one physical lock/transaction. No audit, intent completion or fallback is minted.
+    /// Unsupported adapters refuse without writes; this is not host admission.
+    fn mutate_root_provider_states(
+        &self,
+        _request: crate::RootProviderPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Admit one genuine configured root and its core ownership atomically.
+    /// Structural data does not attest host admission; other backends refuse.
+    fn admit_root_driver(
+        &self,
+        _admission: crate::RootDriverAdmission,
+    ) -> Result<crate::RootDriverClaim, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Atomically enroll/admit the original compiled child under an Open root.
+    fn admit_root_child(&self, _admission: crate::RootChildAdmission) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Register the exact original CALL/lifecycle row under its existing core
+    /// intent before mutation. It grants no dispatch or host admission permission.
+    fn register_root_provider_row(
+        &self,
+        _admission: crate::RootProviderRowAdmission,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Protect an uncertain original root without selecting a UOW or terminal
+    /// decision. No EffectRecord, known completion, retry or recovery is minted.
+    /// Default Unsupported behavior is explicit and has no sequential fallback.
+    fn fence_root_driver(
+        &self,
+        _claim: &crate::RootDriverClaim,
+        _execution: &ExecutionRecord,
+        _observed_tick: u64,
+    ) -> Result<ProviderStateRecord, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Gate new enrolled writes and capture one complete bounded Closing graph.
+    /// This method decides no queue work and cannot settle an Unknown root.
+    fn close_root_driver(
+        &self,
+        _claim: &crate::RootDriverClaim,
+        _execution: &ExecutionRecord,
+        _observed_tick: u64,
+    ) -> Result<crate::RootClosureSnapshot, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Publish all core terminal/outbox/provider/audit changes under one lock/TX.
+    /// There is no sequential fallback and no synthetic effect permission.
+    fn commit_root_terminal_step(
+        &self,
+        _request: crate::RootTerminalPublication,
+    ) -> Result<crate::RootTerminalCommit, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Atomically admit an execution with its first event and notification.
     fn admit_execution(
         &self,
@@ -381,6 +469,38 @@ pub trait IdempotencyStore: Send + Sync {
 
 /// Versioned per-object provider state and atomic mutation batches.
 pub trait ProviderStateStore: AuditSink + Send + Sync {
+    /// Assert exact provider reads, full current execution and original Intent
+    /// under one physical lock/transaction, then insert one receipt and its audit.
+    /// Audit-only Deny is allowed; exact dependencies are never mutated.
+    /// Unsupported adapters refuse without sequential read/write/audit fallback.
+    fn publish_provider_read_audited(
+        &self,
+        _request: crate::CheckedProviderReadPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Assert current exact read/receipt/root/original occurrence observations
+    /// without any row, audit, clock or epoch writes. Returns no dispatch permit.
+    /// Completed uses its real completion metadata, never Intent publication.
+    /// Unsupported adapters refuse; callers must not recompute or redispatch.
+    fn assert_provider_replay(
+        &self,
+        _request: crate::ProviderReplayAssertion,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Atomically assert an exact live canonical coordinator intent and publish
+    /// bounded provider rows plus their typed audit. Core completion remains
+    /// coordinator-owned. No transaction may span provider/SAF dispatch.
+    ///
+    /// Empty mutations permit an audit-only decision; denial cannot mutate rows.
+    /// Unsupported adapters fail without a sequential rows/audit fallback.
+    fn publish_provider_states_audited(
+        &self,
+        _request: crate::AuditedProviderPublication,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Return a positive durable tick no lower than `observed_floor` or any
     /// previously observed floor.
     ///

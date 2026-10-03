@@ -541,15 +541,30 @@ def check_provider_codecs(root: Path) -> None:
         if fragment not in descriptor:
             raise ValueError(f"COBOL live-instance protection drifted: {fragment}")
     finish = normalized(rust_block(instance, "pub(super) fn finish_run_unit"))
+    for fragment in ("terminal::plan_end(", "mutate_provider_states_atomic(mutations)"):
+        if fragment not in finish:
+            raise ValueError(f"COBOL terminal instance cleanup drifted: {fragment}")
+    if "mod terminal;" not in instance:
+        raise ValueError("COBOL terminal instance cleanup owner is disconnected")
+    terminal = read(
+        root / "crates/apps/mainframe-env-server/src/cobol/instance/terminal.rs",
+        production=True,
+    )
+    plan = normalized(rust_block(terminal, "pub(super) fn plan_end"))
     for fragment in (
         "ProviderStateMutation::Delete",
         "state.ended = true",
         "state.ended_tick = Some(ended_tick)",
         "state.programs.clear()",
-        "mutate_provider_states_atomic(mutations)",
     ):
-        if fragment not in finish:
+        if fragment not in plan:
             raise ValueError(f"COBOL terminal instance cleanup drifted: {fragment}")
+    native = normalized(rust_block(terminal, "pub(in super::super) fn prepare_native_run_end"))
+    for fragment in ("plan_end(", "RootClosureSnapshot", "verify_captured_cleanup("):
+        if fragment not in native:
+            raise ValueError(f"COBOL captured terminal cleanup drifted: {fragment}")
+    if "mutate_provider_states_atomic" in terminal:
+        raise ValueError("COBOL captured terminal planner must not publish sequentially")
     require(
         root / "crates/apps/mainframe-env-server/src/console_retention.rs",
         (

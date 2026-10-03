@@ -90,6 +90,7 @@ impl Canonical for HostRequest {
                 v0.encode(out)?;
                 Ok(())
             }
+            Self::MqMqi(v0) => super::mq_mqi::encode_request(v0, out),
         }
     }
 }
@@ -180,6 +181,7 @@ impl Canonical for HostResult {
                 v0.encode(out)?;
                 Ok(())
             }
+            Self::MqMqi(v0) => super::mq_mqi::encode_result(v0, out),
         }
     }
 }

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a Foundation-owned checked ASCII identity encoder with caller byte bounds, fallible exact reservation and distinct non-ASCII, limit and allocation errors. Control bytes and all ASCII values remain exact. CP037, numeric primitives, code-page selection and encoding@1 remain unchanged."

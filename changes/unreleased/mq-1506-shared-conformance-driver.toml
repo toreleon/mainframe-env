@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Bind all 26 MQ calls to shared mandatory pending obligations and execute finite selected Memory/SQLite MQ originals through the shared conformance runner with independent byte, SAF, receipt and replay observations."

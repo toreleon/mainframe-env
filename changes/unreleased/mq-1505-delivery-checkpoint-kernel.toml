@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a strict bounded MQ live delivery checkpoint preserving pending puts/gets, finalized outcomes and cursor epochs, with atomic explicit backout recovery; the persistent-only cold restart codec remains separate and service/store integration remains pending."

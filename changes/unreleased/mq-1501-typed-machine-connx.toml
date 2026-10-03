@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added checked compiled COBOL MQCONNX VERSION1 default/nonshared dispatch through an independently supplied fail-closed trusted frame profile, with original typed effects, opaque-token aliases, captured compiled storage preflight and atomic observed status/handle writeback."

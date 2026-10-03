@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Registered twelve separately pinned zero-credit offline MQ property name, descriptor, string and option-constant sources without changing frozen call, supplemental or layout manifests."

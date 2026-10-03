@@ -1,10 +1,13 @@
 //! Pure, bounded queue-manager pub/sub state. The selected host route is pending.
 
 mod codec;
+mod lifecycle;
+use lifecycle::handle_kernel_problem;
+pub use lifecycle::{MqMessageHandleAccess, MqRegistryAccess};
 
 use crate::{
-    MqObjectCapability, MqObjectCatalog, MqObjectDefinition, MqObjectError, MqObjectLookup,
-    MqObjectName, MqSubscriptionDestination,
+    MqHandleKernel, MqHandleKernelProblem, MqObjectCapability, MqObjectCatalog, MqObjectDefinition,
+    MqObjectError, MqObjectLookup, MqObjectName, MqSubscriptionDestination,
 };
 use mainframe_env_host_api::{
     MqDeliveryOutcome, MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHconn,
@@ -203,6 +206,7 @@ struct State {
 
 #[derive(Clone, Copy, Debug)]
 struct Binding {
+    owner: MqHandleOwner,
     hconn: MqHconn,
     handles: MqSubscriptionHandles,
 }
@@ -217,8 +221,24 @@ struct Callback {
 
 #[derive(Clone, Copy, Debug)]
 struct ConnectionControl {
+    owner: MqHandleOwner,
     hconn: MqHconn,
     state: MqCallbackState,
+}
+
+impl ConnectionControl {
+    /// Callers validate the connection through the registry before matching.
+    /// Default resolves by the frozen CICS processing unit (host/process/task),
+    /// ignoring thread and syncpoint epoch. Issued tokens already identify one
+    /// connection, including when the registry permits sharing across threads.
+    fn matches(&self, owner: MqHandleOwner, hconn: MqHconn) -> bool {
+        self.hconn == hconn
+            && (hconn != MqHconn::Default
+                || (self.owner.environment == owner.environment
+                    && self.owner.host_id == owner.host_id
+                    && self.owner.process_id == owner.process_id
+                    && self.owner.task_id == owner.task_id))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -238,7 +258,7 @@ enum Mutation {
 pub struct MqPubsubKernel {
     catalog: MqObjectCatalog,
     limits: MqPubsubLimits,
-    handles: MqHandleRegistry,
+    handles: MqHandleKernel,
     state: State,
     bindings: Vec<(MqObjectName, Binding)>,
     callbacks: Vec<Callback>,
@@ -247,6 +267,12 @@ pub struct MqPubsubKernel {
 }
 
 impl MqPubsubKernel {
+    /// Observe the sole registry without reclamation, staging, allocation or
+    /// token minting. This grants no dispatch, SAF or original-core authority.
+    pub(crate) fn registry(&self) -> &MqHandleRegistry {
+        &self.handles.registry
+    }
+
     pub fn new(
         catalog: MqObjectCatalog,
         limits: MqPubsubLimits,
@@ -257,7 +283,8 @@ impl MqPubsubKernel {
         Ok(Self {
             catalog,
             limits,
-            handles: MqHandleRegistry::new(epoch, max_handles)?,
+            handles: MqHandleKernel::new(epoch, max_handles, limits.message)
+                .map_err(handle_kernel_problem)?,
             state: State {
                 subscriptions: BTreeMap::new(),
                 retained: BTreeMap::new(),
@@ -268,11 +295,6 @@ impl MqPubsubKernel {
             controls: Vec::new(),
             staged: Vec::new(),
         })
-    }
-
-    /// Connections are still minted and validated by the frozen handle registry.
-    pub fn handles_mut(&mut self) -> &mut MqHandleRegistry {
-        &mut self.handles
     }
 
     pub fn describe_publish(
@@ -353,7 +375,7 @@ impl MqPubsubKernel {
         authorization: MqPubsubAuthorization,
     ) -> Result<MqSubscriptionHandles, MqPubsubError> {
         authorization.require()?;
-        self.handles.validate_connection(owner, hconn)?;
+        self.handles.registry.validate_connection(owner, hconn)?;
         self.describe_subscribe(name)?;
         let (topic, destination, durable) = self.definition(name)?;
         match mode {
@@ -395,12 +417,16 @@ impl MqPubsubKernel {
             }
             MqSubscriptionMode::Resume => None,
         };
-        let hsub = self.handles.create_subscription(owner, hconn)?;
-        let hobj = match self.handles.create_object(owner, hconn) {
+        let hsub = self.handles.registry.create_subscription(owner, hconn)?;
+        let hobj = match self.handles.registry.create_object(owner, hconn) {
             Ok(value) => value,
             Err(error) => {
-                self.handles
-                    .release(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
+                self.handles.registry.release(
+                    owner,
+                    hconn,
+                    hsub.into(),
+                    MqHandleKind::Subscription,
+                )?;
                 return Err(error.into());
             }
         };
@@ -408,8 +434,14 @@ impl MqPubsubKernel {
         if let Some(entry) = created {
             self.state.subscriptions.insert(name.clone(), entry);
         }
-        self.bindings
-            .push((name.clone(), Binding { hconn, handles }));
+        self.bindings.push((
+            name.clone(),
+            Binding {
+                owner,
+                hconn,
+                handles,
+            },
+        ));
         Ok(handles)
     }
 
@@ -420,6 +452,7 @@ impl MqPubsubKernel {
         hsub: MqHsub,
     ) -> Result<(), MqPubsubError> {
         self.handles
+            .registry
             .validate(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
         let index = self
             .bindings
@@ -427,7 +460,7 @@ impl MqPubsubKernel {
             .position(|(_, binding)| binding.hconn == hconn && binding.handles.hsub == hsub)
             .ok_or(MqPubsubError::NoSubscription)?;
         let (name, binding) = &self.bindings[index];
-        self.handles.validate(
+        self.handles.registry.validate(
             owner,
             hconn,
             binding.handles.hobj.into(),
@@ -436,8 +469,10 @@ impl MqPubsubKernel {
         let name = name.clone();
         let hobj = binding.handles.hobj;
         self.handles
+            .registry
             .release(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
         self.handles
+            .registry
             .release(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         self.bindings.remove(index);
         self.callbacks.retain(|callback| callback.hobj != hobj);
@@ -463,6 +498,7 @@ impl MqPubsubKernel {
     ) -> Result<(), MqPubsubError> {
         authorization.require()?;
         self.handles
+            .registry
             .validate(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         if !self
             .bindings
@@ -500,6 +536,7 @@ impl MqPubsubKernel {
         hobj: MqHobj,
     ) -> Result<(), MqPubsubError> {
         self.handles
+            .registry
             .validate(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         let index = self
             .callbacks
@@ -518,6 +555,7 @@ impl MqPubsubKernel {
         suspended: bool,
     ) -> Result<(), MqPubsubError> {
         self.handles
+            .registry
             .validate(owner, hconn, hobj.into(), MqHandleKind::Object)?;
         let callback = self
             .callbacks
@@ -534,16 +572,23 @@ impl MqPubsubKernel {
         hconn: MqHconn,
         operation: MqCallbackControl,
     ) -> Result<MqCallbackState, MqPubsubError> {
-        self.handles.validate_connection(owner, hconn)?;
-        let index = self.controls.iter().position(|item| item.hconn == hconn);
+        self.handles.registry.validate_connection(owner, hconn)?;
+        let index = self
+            .controls
+            .iter()
+            .position(|item| item.matches(owner, hconn));
         let old = index.map_or(MqCallbackState::Stopped, |i| self.controls[i].state);
         let next = match operation {
             MqCallbackControl::Start if old == MqCallbackState::Stopped => {
-                if !self
-                    .callbacks
-                    .iter()
-                    .any(|item| item.hconn == hconn && !item.suspended)
-                {
+                if !self.callbacks.iter().any(|item| {
+                    item.hconn == hconn
+                        && !item.suspended
+                        && self
+                            .handles
+                            .registry
+                            .validate(owner, hconn, item.hobj.into(), MqHandleKind::Object)
+                            .is_ok()
+                }) {
                     return Err(MqPubsubError::NoCallbacksActive);
                 }
                 MqCallbackState::Started
@@ -575,17 +620,27 @@ impl MqPubsubKernel {
             if self.controls.len() >= self.limits.max_callbacks {
                 return Err(MqPubsubError::ResourceExhausted);
             }
-            self.controls.push(ConnectionControl { hconn, state: next });
+            self.controls.push(ConnectionControl {
+                owner,
+                hconn,
+                state: next,
+            });
         }
         Ok(next)
     }
 
-    #[must_use]
-    pub fn callback_state(&self, hconn: MqHconn) -> MqCallbackState {
-        self.controls
+    /// Observe private callback control under the registry's connection scope.
+    pub fn callback_state(
+        &self,
+        owner: MqHandleOwner,
+        hconn: MqHconn,
+    ) -> Result<MqCallbackState, MqPubsubError> {
+        self.handles.registry.validate_connection(owner, hconn)?;
+        Ok(self
+            .controls
             .iter()
-            .find(|item| item.hconn == hconn)
-            .map_or(MqCallbackState::Stopped, |item| item.state)
+            .find(|item| item.matches(owner, hconn))
+            .map_or(MqCallbackState::Stopped, |item| item.state))
     }
 
     /// Stage by caller-owned UOW id, or apply now. Staging remains invisible until commit.
@@ -621,6 +676,7 @@ impl MqPubsubKernel {
     ) -> Result<(), MqPubsubError> {
         authorization.require()?;
         self.handles
+            .registry
             .validate(owner, hconn, hsub.into(), MqHandleKind::Subscription)?;
         let name = self
             .bindings
@@ -782,6 +838,9 @@ impl MqPubsubKernel {
     /// Returns the earliest ready event and marks it unknown until an explicit settlement.
     /// The caller must never infer that an unacknowledged dispatch did not occur.
     pub fn next_event(&mut self) -> Result<Option<MqPubsubEvent>, MqPubsubError> {
+        // Drop is not guaranteed (e.g. a caller may forget an access guard).
+        // Never dispatch a callback whose registry lifetime has ended.
+        self.reclaim_retired_handles();
         enum Ready {
             Trigger(MqObjectName, MqObjectName),
             Publication(MqObjectName, u64),
@@ -811,7 +870,8 @@ impl MqPubsubKernel {
                             callback.hconn == binding.hconn
                                 && callback.hobj == binding.handles.hobj
                                 && !callback.suspended
-                                && self.callback_state(callback.hconn) == MqCallbackState::Started
+                                && self.callback_state(binding.owner, callback.hconn)
+                                    == Ok(MqCallbackState::Started)
                         })
                     })
                 else {
@@ -1303,6 +1363,68 @@ mod tests {
             .settle_event(&retry, MqDeliveryOutcome::Accepted)
             .unwrap();
         assert!(kernel.pending(&name("SUB.D")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn immutable_registry_observation_preserves_bindings_and_mutable_cleanup() {
+        let (mut kernel, hconn) = connected(MqPubsubLimits::default(), 1);
+        let pair = kernel
+            .subscribe(
+                owner(),
+                hconn,
+                &name("SUB.D"),
+                MqSubscriptionMode::Create {
+                    publications_on_request: false,
+                },
+                MqPubsubAuthorization::Permit,
+            )
+            .unwrap();
+        kernel
+            .register_callback(owner(), hconn, pair.hobj, 42, MqPubsubAuthorization::Permit)
+            .unwrap();
+        kernel
+            .control(owner(), hconn, MqCallbackControl::Start)
+            .unwrap();
+        let snapshot = kernel.snapshot().unwrap();
+        let active = kernel.registry().active_handles();
+        let bindings = kernel.bindings.len();
+        for _ in 0..3 {
+            assert!(
+                kernel
+                    .registry()
+                    .validate_connection(owner(), hconn)
+                    .is_ok()
+            );
+            assert!(
+                kernel
+                    .registry()
+                    .validate(owner(), hconn, pair.hobj.into(), MqHandleKind::Object)
+                    .is_ok()
+            );
+            assert_eq!(kernel.registry().active_handles(), active);
+            assert_eq!(kernel.snapshot().unwrap(), snapshot);
+            assert_eq!(kernel.bindings.len(), bindings);
+            assert_eq!(kernel.callbacks.len(), 1);
+            assert_eq!(kernel.controls.len(), 1);
+        }
+        // Simulate retirement below the composed cleanup boundary. A pure read
+        // must leave the stale volatile bindings for the existing mutable path.
+        kernel.handles.registry.disconnect(owner(), hconn).unwrap();
+        assert!(
+            kernel
+                .registry()
+                .validate_connection(owner(), hconn)
+                .is_err()
+        );
+        assert_eq!(kernel.registry().active_handles(), 0);
+        assert_eq!(kernel.bindings.len(), bindings);
+        assert_eq!(kernel.callbacks.len(), 1);
+        assert_eq!(kernel.snapshot().unwrap(), snapshot);
+        drop(kernel.handles_mut());
+        assert!(kernel.bindings.is_empty());
+        assert!(kernel.callbacks.is_empty());
+        assert!(kernel.controls.is_empty());
+        assert_eq!(kernel.snapshot().unwrap(), snapshot);
     }
 
     #[test]

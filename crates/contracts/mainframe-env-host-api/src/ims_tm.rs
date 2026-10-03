@@ -8,25 +8,25 @@ use std::collections::BTreeSet;
 /// Bounds shared by the IMS TM contract validator and durable runtime.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TmLimits {
-    /// Maximum definitions installed in one transaction set; default 256.
+    /// Maximum transaction definitions in one installed set.
     pub max_transactions: usize,
-    /// Maximum alternate PCBs per transaction; default 64.
+    /// Maximum alternate PCBs per transaction definition.
     pub max_alternate_pcbs: usize,
-    /// Maximum retained input-message count; default 65,536.
+    /// Maximum retained inbound messages for the runtime.
     pub max_queued_messages: usize,
-    /// Maximum retained outbound-message count; default 65,536.
+    /// Maximum retained outbound messages for the runtime.
     pub max_outbound_messages: usize,
-    /// Maximum segments per message; default 256.
+    /// Maximum segments in one runtime message.
     pub max_segments_per_message: usize,
-    /// Maximum message-segment length in bytes; default 32 KiB.
+    /// Maximum bytes per runtime message segment.
     pub max_segment_bytes: usize,
-    /// Maximum conversation scratchpad length in bytes; default 32 KiB.
+    /// Maximum conversational scratchpad bytes.
     pub max_spa_bytes: usize,
-    /// Maximum retained replay-receipt count; default 65,536.
+    /// Maximum retained replay entries for the runtime.
     pub max_replays: usize,
-    /// Maximum serialized runtime-state length in bytes; default 64 MiB.
+    /// Maximum serialized runtime state bytes.
     pub max_state_bytes: usize,
-    /// Maximum positive timeout in host logical ticks; default 86,400,000.
+    /// Maximum positive transaction timeout in the runtime tick domain.
     pub max_timeout_ticks: u64,
 }
 
@@ -51,13 +51,13 @@ impl Default for TmLimits {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TmExecutionContext {
-    /// Message-processing context identity.
+    /// Message-processing transaction environment.
     MessageProcessing,
-    /// Message-driven batch context identity.
+    /// Message-driven batch environment.
     MessageDrivenBatch,
-    /// CPI communications context identity, subject to explicit call restrictions.
+    /// CPI communications environment.
     CpiCommunications,
-    /// Fast Path context identity, subject to explicit call restrictions.
+    /// Fast Path environment.
     FastPath,
 }
 
@@ -65,9 +65,9 @@ pub enum TmExecutionContext {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TmDestination {
-    /// Initial fixed destination name validated by the transaction contract.
+    /// Retain a validated fixed terminal destination.
     Fixed(String),
-    /// Destination is supplied or changed through an admitted runtime call.
+    /// Destination is selected later through the modeled runtime.
     Modifiable,
 }
 
@@ -75,11 +75,11 @@ pub enum TmDestination {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TmAlternatePcbDefinition {
-    /// PCB identity unique within the transaction definition.
+    /// Unique valid 1-8 byte uppercase/digit/@#$ PCB identity within the transaction.
     pub name: String,
-    /// Fixed or modifiable initial destination rule.
+    /// Fixed bounded destination or explicit modifiable routing.
     pub destination: TmDestination,
-    /// Declared express-message flag consumed by the TM runtime.
+    /// Retained express-output selection; it is not a delivered-message receipt.
     pub express: bool,
 }
 
@@ -87,32 +87,32 @@ pub struct TmAlternatePcbDefinition {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TmTransactionDefinition {
-    /// Validated uppercase transaction resource identity, at most eight bytes.
+    /// Valid 1-8 byte uppercase/digit/@#$ transaction identity.
     pub code: String,
-    /// Validated PSB resource identity selected by this transaction.
+    /// Valid 1-8 byte uppercase/digit/@#$ PSB selection.
     pub psb: String,
-    /// Bounded execution selector for the scheduled program.
+    /// Bounded execution Selector identity for program routing.
     pub program_selector: String,
-    /// Bounded artifact reference consumed by package/runtime selection.
+    /// Bounded immutable ArtifactRef spelling for program selection.
     pub artifact: String,
-    /// Nonempty bounded generation identity fencing the selected package.
+    /// Nonempty bounded control-free generation identity; validation does not install it.
     pub required_generation: String,
-    /// Declared TM context whose calls require separate applicability checks.
+    /// Explicit message-processing environment for applicability checks.
     pub context: TmExecutionContext,
-    /// Scheduling priority value retained by the shared runtime.
+    /// Retained scheduling priority; this validator imposes no additional numeric range.
     pub priority: u8,
-    /// Positive relative timeout in host logical ticks, bounded by max_timeout_ticks.
+    /// Positive timeout duration bounded by max_timeout_ticks.
     pub timeout_ticks: u64,
-    /// Whether a nonzero scratchpad is required by this definition.
+    /// True exactly when spa_size is nonzero.
     pub conversational: bool,
-    /// Scratchpad size in bytes; zero exactly for nonconversational definitions.
+    /// Conversational scratchpad byte count bounded by max_spa_bytes.
     pub spa_size: usize,
-    /// Bounded alternate PCB definitions with distinct names.
+    /// Bounded alternate definitions with unique names and valid fixed destinations.
     pub alternate_pcbs: Vec<TmAlternatePcbDefinition>,
 }
 
 impl TmTransactionDefinition {
-    /// Validate names, execution identities, timeout, scratchpad and alternate PCB bounds.
+    /// Check names, execution identities, positive bounded timeout, conversational scratchpad agreement and alternate uniqueness; no program is installed or dispatched.
     pub fn validate(&self, limits: TmLimits) -> Result<(), HostProblem> {
         if !valid_tm_name(&self.code) || !valid_tm_name(&self.psb) {
             return Err(HostProblem::Malformed);
@@ -154,7 +154,7 @@ impl TmTransactionDefinition {
         Ok(())
     }
 
-    /// Look up an exact alternate PCB name; return None when absent.
+    /// Borrow the alternate definition by exact case-sensitive name; unknown names return None.
     pub fn alternate(&self, name: &str) -> Option<&TmAlternatePcbDefinition> {
         self.alternate_pcbs.iter().find(|pcb| pcb.name == name)
     }
@@ -164,12 +164,12 @@ impl TmTransactionDefinition {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TmDefinitionSet {
-    /// Nonempty bounded transaction definitions with unique transaction codes.
+    /// Nonempty bounded transaction set with unique codes, validated before generation installation.
     pub transactions: Vec<TmTransactionDefinition>,
 }
 
 impl TmDefinitionSet {
-    /// Validate every definition and reject empty, oversized or duplicate-code sets.
+    /// Require a nonempty bounded set of individually valid definitions with unique transaction codes.
     pub fn validate(&self, limits: TmLimits) -> Result<(), HostProblem> {
         if self.transactions.is_empty() {
             return Err(HostProblem::Malformed);

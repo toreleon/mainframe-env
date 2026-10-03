@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Compiled full MQPUT/MQPUT1 now accepts exact supplied correlation bytes, including MQCI_NONE, without requesting generation. Supplied nonzero MsgId, unsupported new-ID flags, source profiles, original effects, opaque aliases and atomic request-bound writeback guards remain unchanged."

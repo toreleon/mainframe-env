@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added checked compiled MQOPEN/MQCLOSE forwarding for predefined local OD1 queues through privileged default-Unsupported point ports, with one root-shared bounded connection/object ABI table and atomic known-result writeback. Historical canonical/replay/checkpoint bytes remain unchanged; complete compiled PUT/PUT1, installed selected-service forwarding and remaining MQ acceptance stay pending."

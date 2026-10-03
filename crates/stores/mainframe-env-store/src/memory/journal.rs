@@ -19,6 +19,8 @@
 //! `memory.rs` since it is one method of that file's much larger
 //! `ProviderStateStore` impl.
 use super::*;
+mod step;
+pub(super) use step::commit_step_locked;
 
 enum Entry {
     Execution(ExecutionId, Option<ExecutionRecord>),
@@ -31,6 +33,7 @@ enum Entry {
     BlobBytes(usize),
     ProviderEpoch(u64),
     NextAuditOrdinal(u64),
+    LogicalTick(u64),
 }
 
 /// Records the prior value of every `State` entry a hot-path method is
@@ -53,6 +56,9 @@ fn set_or_remove<K: Ord, V>(map: &mut std::collections::BTreeMap<K, V>, key: K, 
 }
 
 impl Journal {
+    pub(super) fn touch_logical_tick(&mut self, state: &State) {
+        self.entries.push(Entry::LogicalTick(state.logical_tick));
+    }
     pub(super) fn touch_execution(&mut self, state: &State, id: &ExecutionId) {
         self.entries.push(Entry::Execution(
             id.clone(),
@@ -147,6 +153,7 @@ impl Journal {
                 Entry::BlobBytes(prior) => state.blob_bytes = prior,
                 Entry::ProviderEpoch(prior) => state.provider_epoch = prior,
                 Entry::NextAuditOrdinal(prior) => state.next_audit_ordinal = prior,
+                Entry::LogicalTick(prior) => state.logical_tick = prior,
             }
         }
     }
@@ -171,6 +178,64 @@ pub(super) fn journaled<T>(
 }
 
 impl JournalStore for MemoryStore {
+    fn commit_checked_replay_refusal(
+        &self,
+        request: mainframe_env_store_api::CheckedReplayRefusalStep,
+    ) -> Result<ExecutionRecord, StoreError> {
+        self.settle_checked_replay_refusal(request)
+    }
+    fn mutate_root_preparation_states(
+        &self,
+        request: mainframe_env_store_api::RootPreparationPublication,
+    ) -> Result<(), StoreError> {
+        self.root_mutate_preparation(request)
+    }
+    fn mutate_root_provider_states(
+        &self,
+        request: mainframe_env_store_api::RootProviderPublication,
+    ) -> Result<(), StoreError> {
+        self.root_mutate_provider(request)
+    }
+    fn fence_root_driver(
+        &self,
+        claim: &mainframe_env_store_api::RootDriverClaim,
+        execution: &ExecutionRecord,
+        tick: u64,
+    ) -> Result<ProviderStateRecord, StoreError> {
+        self.root_fence(claim, execution, tick)
+    }
+    fn register_root_provider_row(
+        &self,
+        admission: mainframe_env_store_api::RootProviderRowAdmission,
+    ) -> Result<(), StoreError> {
+        self.root_register_row(admission)
+    }
+    fn admit_root_driver(
+        &self,
+        admission: mainframe_env_store_api::RootDriverAdmission,
+    ) -> Result<mainframe_env_store_api::RootDriverClaim, StoreError> {
+        self.root_admit(admission)
+    }
+    fn admit_root_child(
+        &self,
+        admission: mainframe_env_store_api::RootChildAdmission,
+    ) -> Result<(), StoreError> {
+        self.root_admit_child(admission)
+    }
+    fn close_root_driver(
+        &self,
+        claim: &mainframe_env_store_api::RootDriverClaim,
+        execution: &ExecutionRecord,
+        tick: u64,
+    ) -> Result<mainframe_env_store_api::RootClosureSnapshot, StoreError> {
+        self.root_close(claim, execution, tick)
+    }
+    fn commit_root_terminal_step(
+        &self,
+        request: mainframe_env_store_api::RootTerminalPublication,
+    ) -> Result<mainframe_env_store_api::RootTerminalCommit, StoreError> {
+        self.root_commit(request)
+    }
     fn admit_execution(
         &self,
         execution: ExecutionRecord,
@@ -182,6 +247,7 @@ impl JournalStore for MemoryStore {
         let mut state = self.lock()?;
         let limits = self.limits;
         journaled(&mut state, |state, journal| {
+            super::root_terminal::guard_unenrolled(state, &execution)?;
             if state.executions.contains_key(&execution.execution_id) {
                 return Err(StoreError::AlreadyExists);
             }
@@ -218,107 +284,17 @@ impl JournalStore for MemoryStore {
         notification: OutboxRecord,
     ) -> Result<ExecutionRecord, StoreError> {
         let mut state = self.lock()?;
-        let limits = self.limits;
-        journaled(&mut state, |state, journal| {
-            let current = state
-                .executions
-                .get(execution_id)
-                .cloned()
-                .ok_or(StoreError::NotFound)?;
-            validation::execution_step(execution_id, &current, &event, &notification)?;
-            if current.version != expected_version {
-                return Err(StoreError::Conflict);
-            }
-            if next_state.is_some_and(|next| !current.state.can_transition_to(next)) {
-                return Err(StoreError::InvalidTransition);
-            }
-            validation::audit_event(&current, &event, effect.as_ref(), audit.as_ref())?;
-            let mut updated = current.clone();
-            if let Some(next) = next_state {
-                updated.state = next;
-                updated.terminal_tick = next
-                    .terminal()
-                    .then_some(event.tick)
-                    .filter(|tick| *tick != 0);
-            }
-            updated.version = updated.version.checked_add(1).ok_or(StoreError::Conflict)?;
-            Self::validate_encoded_size(encode_execution(&updated)?, limits)?;
-            journal.touch_execution(state, execution_id);
-            state
-                .executions
-                .insert(execution_id.clone(), updated.clone());
-            if let Some(mut effect) = effect {
-                if matches!(effect.state, EffectState::Completed | EffectState::Failed)
-                    && effect.digest_format
-                        == mainframe_env_store_api::EffectDigestFormat::CanonicalHostV1
-                    && effect.resolved_tick.is_none()
-                    && event.tick != 0
-                {
-                    effect.resolved_tick = Some(event.tick);
-                }
-                validation::effect(&effect)?;
-                Self::validate_encoded_size(encode_effect(&effect)?, limits)?;
-                validation::effect_execution(&current, &effect)?;
-                match effect.state {
-                    EffectState::Intent => {
-                        validation::new_intent(&effect)?;
-                        validation::effect_event(&event, &effect)?;
-                        if state.effects.contains_key(&effect.key) {
-                            return Err(StoreError::Conflict);
-                        }
-                        if state.effects.len() >= limits.max_effects {
-                            return Err(StoreError::CapacityExceeded);
-                        }
-                        journal.touch_effect(state, &effect.key);
-                        state.effects.insert(effect.key.clone(), effect);
-                    }
-                    EffectState::Completed | EffectState::Failed | EffectState::UnknownOutcome => {
-                        let intent = state.effects.get(&effect.key).ok_or(StoreError::NotFound)?;
-                        validation::result(&effect.key, intent, &effect)?;
-                        validation::effect_event(&event, &effect)?;
-                        journal.touch_effect(state, &effect.key);
-                        state.effects.insert(effect.key.clone(), effect);
-                    }
-                }
-            }
-            if let Some(audit) = audit {
-                let audit_execution_id = audit.execution_id.clone();
-                journal.touch_next_audit_ordinal(state);
-                journal.touch_provider_epoch(state);
-                if let Some(ordinal) = state.next_audit_ordinal.checked_add(1) {
-                    journal.record_new_audit_key(crate::durable::audit_storage_key(
-                        &audit_execution_id,
-                        &format!("memory:{ordinal:020}"),
-                    ));
-                }
-                Self::append_audit_locked(state, audit, limits)?;
-            }
-            if let Some(checkpoint) = checkpoint {
-                validation::checkpoint(&checkpoint)?;
-                Self::validate_encoded_size(encode_checkpoint(&checkpoint)?, limits)?;
-                validation::checkpoint_execution(&current, &checkpoint)?;
-                let old = state
-                    .checkpoints
-                    .get(execution_id)
-                    .map_or(0, |record| record.payload.len());
-                if old == 0 && state.checkpoints.len() >= limits.max_checkpoints {
-                    return Err(StoreError::CapacityExceeded);
-                }
-                journal.touch_blob_bytes(state);
-                Self::reserve_blob(state, old, checkpoint.payload.len(), limits)?;
-                journal.touch_checkpoint(state, execution_id);
-                state.checkpoints.insert(execution_id.clone(), checkpoint);
-            }
-            journal.touch_events(state, &event.execution_id);
-            journal.touch_provider_epoch(state);
-            Self::append_event_locked(state, event, limits)?;
-            journal.touch_outbox(state, &notification.notification_id);
-            journal.touch_blob_bytes(state);
-            journal.touch_provider_epoch(state);
-            Self::append_outbox_locked(state, notification, limits)?;
-            journal.touch_provider_epoch(state);
-            Self::bump_retention_epoch(state)?;
-            Ok(updated)
-        })
+        commit_step_locked(
+            &mut state,
+            self.limits,
+            execution_id,
+            expected_version,
+            next_state,
+            event,
+            effect,
+            audit,
+            checkpoint,
+            notification,
+        )
     }
 }

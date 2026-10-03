@@ -30,49 +30,49 @@ const REQUIRED_OBLIGATIONS: &[&str] = &[
 /// Whether a provider's owned participant binding is ready for integration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParticipantStatus {
-    /// The descriptor carries validated capabilities admitted at this shared boundary.
+    /// The frozen contract admits this binding; runtime evidence remains separately owned.
     Accepted,
-    /// Integration guarantees remain unaccepted; preparation does not admit the provider.
+    /// No capabilities are admitted yet; the provider name grants no participation permission.
     Pending,
 }
 
 /// Execution context in which a provider may be asked to participate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ParticipantMode {
-    /// Participation in a locally owned unit of work.
+    /// One provider owns the local recoverable work and its syncpoint.
     Local,
-    /// Distributed context in which this participant owns its syncpoint.
+    /// The participant owns the distributed operation's decision in the declared context.
     DistributedOwned,
-    /// Distributed context in which an upstream owner controls completion.
+    /// An upstream authority owns the decision; local explicit syncpoints may be forbidden.
     DistributedSubordinate,
 }
 
 /// Authority that owns the current syncpoint decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SyncpointOwner {
-    /// The participant decides the current syncpoint.
+    /// The admitted participant context can decide its recoverable work.
     Participant,
-    /// An upstream host controls the current syncpoint decision.
+    /// The embedding host retains the decision; the provider cannot substitute its own.
     UpstreamHost,
 }
 
 /// Applicability of an explicit syncpoint command in one execution context.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExplicitSyncpoint {
-    /// The context admits an explicit participant syncpoint.
+    /// The context admits an explicit command, subject to its ordinary controls and authorization.
     Supported,
-    /// The context rejects explicit syncpoint with its declared rejection response.
+    /// The command returns the declared rejection before changing the unit of work.
     Rejected,
 }
 
 /// Prepare support is distinct from a durable pre-dispatch intent.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrepareCapability {
-    /// The context has no applicable provider prepare phase.
+    /// This binding has no prepare phase.
     NotApplicable,
-    /// A durable pre-dispatch intent exists without provider prepare support.
+    /// A durable dispatch intent exists, but is neither a prepare vote nor two-phase commit.
     DurableIntentOnly,
-    /// The descriptor declares an explicit provider prepare capability.
+    /// The provider exposes an actual prepare operation requiring its own acceptance evidence.
     ProviderPrepare,
 }
 
@@ -80,26 +80,26 @@ pub enum PrepareCapability {
 /// capability limits and may not be collapsed into success.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ParticipantOutcome {
-    /// The participant reports committed work.
+    /// The participant authoritatively reports its work committed.
     Committed,
-    /// The participant reports rolled-back work.
+    /// Uncommitted recoverable work was rolled back; this is not post-commit compensation.
     RolledBack,
-    /// The participant reports failure without asserting a successful completion.
+    /// A known failure was reported, distinct from uncertainty about mutation.
     Failed,
-    /// A heuristic decision committed work.
+    /// A heuristic decision committed work outside the ordinary decision protocol.
     HeuristicCommit,
-    /// A heuristic decision rolled work back.
+    /// A heuristic decision rolled work back outside the ordinary decision protocol.
     HeuristicRollback,
-    /// Heuristic decisions produced a mixture of committed and rolled-back work.
+    /// Heuristic decisions produced both committed and rolled-back portions.
     HeuristicMixed,
-    /// Completion awaits an authoritative decision.
+    /// The participant reports an unresolved transaction decision.
     InDoubt,
-    /// Dispatch may have taken effect; the durable outcome cannot yet be established.
+    /// Dispatch may have mutated state; only fenced authoritative reconciliation can resolve it.
     UnknownOutcome,
 }
 
 impl ParticipantOutcome {
-    /// Complete ordered outcome vocabulary used to validate descriptor partitions.
+    /// Exhaustive vocabulary to partition into reported and explicitly unproduced outcomes.
     pub const ALL: [Self; 8] = [
         Self::Committed,
         Self::RolledBack,
@@ -115,32 +115,32 @@ impl ParticipantOutcome {
 /// Shared coordinator/participant effect ordering.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParticipantEffectStep {
-    /// Observe finite deadline and live cancellation before dispatch.
+    /// Observe live controls before proceeding toward dispatch.
     ObserveDeadlineAndCancellation,
-    /// Validate operands, capability and execution context.
+    /// Check bounded shape, selected capability and context applicability.
     ValidateRequestCapabilityAndContext,
-    /// Persist the canonical intent before invoking the participant.
+    /// Retain the original canonical intent before invoking a mutating provider.
     PersistCanonicalEffectIntent,
-    /// Authorize the typed protected resource and access intent.
+    /// Obtain the resource-specific authorization decision before mutation.
     AuthorizeTypedResourceAndIntent,
-    /// Apply mutation only after validation and authorization.
+    /// Invoke the participant's sole semantic authority for the admitted occurrence.
     ApplyParticipantMutation,
-    /// Publish audit and result, preserving unresolved outcomes explicitly.
+    /// Retain audit and result, preserving explicit unknown when completion is uncertain.
     PersistAuditAndResultOrUnknown,
 }
 
 /// Logical lock/CAS order. No store transaction is held across provider dispatch.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParticipantLockStep {
-    /// Fence the coordinator intent through compare-and-swap.
+    /// Fence ownership of the original retained coordinator intent.
     CoordinatorIntentCas,
-    /// Establish the participant's state ownership fence.
+    /// Validate participant state under its live owner/epoch fence.
     ParticipantStateFence,
-    /// Acquire locks in canonical resource identity order.
+    /// Acquire provider/resource locks in deterministic identity order.
     CanonicalResourceLocks,
-    /// Publish participant UOW state and replay together.
+    /// Publish the participant's UOW and replay changes together.
     ParticipantUowReplayPublication,
-    /// Fence the coordinator's final result publication.
+    /// The coordinator, not the participant, finalizes the retained effect result.
     CoordinatorResultCas,
 }
 
@@ -162,168 +162,171 @@ const REQUIRED_LOCK_ORDER: &[ParticipantLockStep] = &[
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Context-specific condition and numeric responses for rejected syncpoints.
+/// Source-mapped rejection for an explicit syncpoint in a subordinate context.
 pub struct ParticipantRejection {
-    /// Stable condition name returned by the rejected context.
+    /// Application condition identity; it is not a store or infrastructure error.
     pub condition: &'static str,
-    /// Primary numeric response paired with the condition.
+    /// Primary application response in the declared provider's response domain.
     pub response: i32,
-    /// Secondary numeric response refining the condition.
+    /// Secondary response detail, interpreted only with the primary response and context.
     pub response2: i32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Named execution context and its explicit syncpoint ownership rule.
+/// Applicability declaration for one named context, not a minted runtime permit.
 pub struct ParticipantContextCapability {
-    /// Stable context identity within the provider's descriptor.
+    /// Stable context key selected by trusted admission, not inferred from request text.
     pub context_id: &'static str,
-    /// Transaction mode classified by this context.
+    /// Transaction topology admitted for this context.
     pub mode: ParticipantMode,
-    /// Authority permitted to decide completion in this context.
+    /// Authority that retains the syncpoint decision.
     pub syncpoint_owner: SyncpointOwner,
-    /// Whether the context accepts an explicit syncpoint.
+    /// Whether an application may issue an explicit syncpoint here.
     pub explicit_syncpoint: ExplicitSyncpoint,
-    /// Required response when syncpoint is rejected; absent for supported contexts.
+    /// Required rejection when explicit syncpoint is forbidden; absent for supported contexts.
     pub rejection: Option<ParticipantRejection>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Declared protections against stale effect and participant owners.
+/// Required stale-owner protections, declared separately from runtime fence values.
 pub struct ParticipantFencing {
-    /// Whether effect ownership is fenced by a lease epoch.
+    /// Effect completion checks the coordinator's current lease epoch.
     pub effect_lease_epoch: bool,
-    /// Whether participant publication compares its observed row version.
+    /// Participant publication compares exact durable row versions.
     pub participant_row_cas: bool,
-    /// Whether an obsolete owner is rejected before publication.
+    /// A displaced owner cannot publish over a newer owner.
     pub stale_owner_rejected: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Declared pre-dispatch controls and post-dispatch uncertainty handling.
+/// Live control obligations at the provider dispatch boundary.
 pub struct ParticipantDeadlineCancellation {
-    /// Whether every effect carries a finite deadline.
+    /// Every admitted operation has a finite deadline in its caller's logical clock domain.
     pub finite_deadline: bool,
-    /// Whether execution observes live cancellation requests.
+    /// Dispatch observes a shared live probe, not only a copied cancellation snapshot.
     pub live_cancellation_probe: bool,
-    /// Whether cancellation or timeout can stop work before dispatch.
+    /// A control that wins before dispatch prevents the operation.
     pub pre_dispatch_stop: bool,
-    /// Whether unresolved post-dispatch completion remains unknown.
+    /// A control observed after uncertain dispatch does not prove mutation absent.
     pub post_dispatch_unknown: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Declared propagation, authorization and atomic audit guarantees.
+/// Security and audit obligations; these flags themselves authorize no resource.
 pub struct ParticipantSecurityAudit {
-    /// Whether principal and delegation reach the participant boundary.
+    /// Original principal and delegation remain attributable across admitted boundaries.
     pub principal_and_delegation_propagated: bool,
-    /// Whether typed resource authorization precedes mutation.
+    /// The resource/intent decision precedes the participant mutation.
     pub typed_resource_authorization_before_mutation: bool,
-    /// Whether denial and failure decisions receive audit records.
+    /// Denials and failures remain durable security observations.
     pub deny_and_failure_audited: bool,
-    /// Whether results and audit sharing store authority publish atomically.
+    /// State and audit sharing a store authority publish in one physical transaction.
     pub shared_store_atomic_publication: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Writer/reader identities and namespaces owned by the participant.
+/// Provider-owned schema and namespace identifiers used for compatible recovery.
 pub struct ParticipantSchemas {
-    /// Versioned owned request contract identity.
+    /// Versioned typed request contract retained by the binding.
     pub request: &'static str,
-    /// Canonical encoding contract used for effect identity.
+    /// Shared effect encoding domain; provider-local digests cannot replace it.
     pub canonical_effect: &'static str,
-    /// Shared-store namespace retaining participant unit-of-work state.
+    /// Durable namespace for the provider's unit-of-work rows.
     pub uow_namespace: &'static str,
-    /// Unit-of-work format emitted by the current writer.
+    /// Schema emitted by the current UOW writer.
     pub uow_write: &'static str,
-    /// Retained unit-of-work formats accepted by the reader.
+    /// Exhaustive older/current UOW schemas accepted by the binding's readers.
     pub uow_read: &'static [&'static str],
-    /// Shared-store namespace retaining undo state.
+    /// Durable namespace holding the participant's rollback data.
     pub undo_namespace: &'static str,
-    /// Undo format shared by the declared reader and writer.
+    /// Undo schema understood by both reader and writer.
     pub undo_read_write: &'static str,
-    /// Shared-store namespace retaining replay receipts.
+    /// Namespace retaining authoritative participant replay results.
     pub replay_namespace: &'static str,
-    /// Replay format emitted by this participant.
+    /// Replay schema emitted by the current writer.
     pub replay_write: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Declared guarantees of an accepted participant; presence requires contract validation.
+/// Frozen capability limits and obligations of an accepted binding.
+///
+/// These are declarations checked by the contract validator, not evidence that
+/// an arbitrary runtime or provider instance has satisfied them.
 pub struct ParticipantCapabilities {
-    /// Named authority owning transaction state.
+    /// Named authority responsible for transaction decisions.
     pub transaction_owner: &'static str,
-    /// Modes admitted by this descriptor.
+    /// Modes admitted by the accepted binding.
     pub supported_modes: &'static [ParticipantMode],
-    /// Modes explicitly excluded from participation.
+    /// Modes deliberately refused, disjoint from the supported set.
     pub rejected_modes: &'static [ParticipantMode],
-    /// Per-context syncpoint ownership and rejection rules.
+    /// Context-specific decision ownership and explicit-syncpoint rules.
     pub contexts: &'static [ParticipantContextCapability],
-    /// Applicability of prepare independently of durable intent.
+    /// Prepare applicability, distinct from recording a dispatch intent.
     pub prepare: PrepareCapability,
-    /// Whether the provider implements an explicit prepare phase.
+    /// Whether this binding supplies a real provider prepare operation.
     pub provider_prepare: bool,
-    /// Whether the participant supports commit.
+    /// Commit is supported only in the declared applicable contexts.
     pub commit: bool,
-    /// Whether the participant supports rollback within its declared scope.
+    /// Rollback is supported only for the declared recoverable work.
     pub rollback: bool,
-    /// Whether compensation is performed automatically.
+    /// Whether compensation is automatic; the frozen v1 binding requires false.
     pub automatic_compensation: bool,
-    /// Whether committed effects can be compensated by this boundary.
+    /// Whether committed work may be compensated; v1 admits no such capability.
     pub compensation_after_commit: bool,
-    /// Named boundary of permitted compensation.
+    /// Named boundary of any compensation, separate from ordinary rollback.
     pub compensation_scope: &'static str,
-    /// Outcomes the participant may emit; disjoint from not-produced outcomes.
+    /// Outcomes the participant may actually report, without normalization to success.
     pub reported_outcomes: &'static [ParticipantOutcome],
-    /// Outcomes excluded by this capability set, completing the closed vocabulary.
+    /// Remaining outcomes it explicitly does not produce; together the sets exhaust the vocabulary.
     pub not_produced_outcomes: &'static [ParticipantOutcome],
-    /// Whether distinct outcomes are collapsed; version one requires false.
+    /// Whether distinctions may be erased; the validator requires false.
     pub collapse_outcomes_to_success: bool,
-    /// Named domain in which an idempotency identity is unique.
+    /// Identity domain within which an occurrence's replay is scoped.
     pub idempotency_scope: &'static str,
-    /// Declared duration or retention rule protecting replay identity.
+    /// Declared durable retention lifetime for idempotent observations.
     pub idempotency_lifetime: &'static str,
-    /// Definition of the canonical identity used for replay matching.
+    /// Canonical identity compared on replay; unrelated or metadata-only identities cannot replace it.
     pub replay_identity: &'static str,
-    /// Declared rule for identities after replay receipt pruning.
+    /// Policy for reuse after safe pruning, which is not an exactly-once guarantee.
     pub reuse_after_prune: &'static str,
-    /// Exactly-once claim flag; version one does not admit that claim.
+    /// Exactly-once claim; the frozen contract requires false.
     pub exactly_once: bool,
-    /// Required lease, row-version and stale-owner protections.
+    /// Required lease, row and displaced-owner protections.
     pub fencing: ParticipantFencing,
-    /// Declared live controls and uncertainty handling.
+    /// Required live-control checks and post-dispatch uncertainty handling.
     pub deadline_cancellation: ParticipantDeadlineCancellation,
-    /// Declared principal, authorization and audit publication guarantees.
+    /// Required principal, resource decision and audit-publication protections.
     pub security_audit: ParticipantSecurityAudit,
-    /// Authority reconciling coordinator state.
+    /// Authority that owns effect intent/result reconciliation.
     pub coordinator_recovery_owner: &'static str,
-    /// Authority reconciling participant state.
+    /// Authority that interprets the participant's UOW/replay recovery state.
     pub participant_recovery_owner: &'static str,
-    /// Declared procedure for authoritative outcome observation.
+    /// Fenced observation procedure for resolving uncertain effects without redispatch.
     pub reconciliation: &'static str,
-    /// Whether ambiguous mutation is redispatched; version one requires false.
+    /// Whether uncertain mutations are retried automatically; v1 requires false.
     pub automatic_redispatch: bool,
-    /// Owned retained formats and their shared-store namespaces.
+    /// Durable namespaces and admitted reader/writer versions.
     pub schemas: ParticipantSchemas,
-    /// Named retention authority for participant state.
+    /// Retention family used to age the participant's retained observations.
     pub retention_target: &'static str,
-    /// Declared rule bounding safely prunable state.
+    /// Named age authority; it does not override live recovery dependencies.
     pub retention_watermark: &'static str,
-    /// Whether live checkpoint, audit and replay references prevent pruning.
+    /// Retention must preserve every live checkpoint, audit and replay reference.
     pub protect_live_checkpoint_audit_replay: bool,
-    /// Whether the effect deadline sets a minimum retention boundary.
+    /// The original invocation deadline is a conservative lower bound on retention age.
     pub deadline_is_retention_lower_bound: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Provider readiness and optional accepted capabilities; local preparation is not admission.
+/// One provider's admission status in the frozen participant inventory.
 pub struct TransactionParticipantDescriptor {
-    /// Provider identity selected by the shared participant registry.
+    /// Stable provider identity used for lookup, not runtime dispatch authority.
     pub provider_id: &'static str,
-    /// Accepted or pending integration disposition.
+    /// Whether a binding is accepted or remains capability-pending.
     pub status: ParticipantStatus,
-    /// Declared prerequisite work-package identity.
+    /// Named prerequisite whose separate evidence is needed for integration.
     pub dependency: &'static str,
-    /// Accepted guarantees; pending providers carry no accepted capability value.
+    /// Present for accepted bindings and absent for pending ones.
     pub capabilities: Option<ParticipantCapabilities>,
     /// Optional local preparation is descriptive only; it never admits a participant.
     pub preparation_scope: Option<&'static str>,
@@ -334,54 +337,54 @@ pub struct TransactionParticipantDescriptor {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Versioned shared authority for participant admission, ordering and retained schema compatibility.
+/// Versioned description consumed by the existing coordinator, not another transaction manager.
 pub struct TransactionParticipantContract {
-    /// Stable participant contract identity checked by the reader.
+    /// Stable contract domain, equal to [`TRANSACTION_PARTICIPANT_CONTRACT`] in v1.
     pub contract_id: &'static str,
-    /// Descriptor generation accepted by validation.
+    /// Contract vocabulary version, distinct from provider storage schema versions.
     pub version: u16,
-    /// Existing coordinator contract owning syncpoint decisions.
+    /// Sole shared execution coordinator identity.
     pub coordinator: &'static str,
-    /// Shared canonical effect identity contract.
+    /// Frozen shared host-effect encoding domain.
     pub canonical_effect: &'static str,
-    /// Shared durable-store contract used by participants.
+    /// Shared store contract required for publication and recovery.
     pub store: &'static str,
-    /// Whether one coordinator authority owns this boundary; required true.
+    /// Declares one execution authority rather than competing provider coordinators.
     pub single_authority: bool,
-    /// Whether this descriptor introduces public runtime behavior; required false.
+    /// Whether this descriptor itself changes public runtime dispatch; v1 requires false.
     pub public_runtime_change: bool,
-    /// Universal two-phase-commit claim; version one requires false.
+    /// Universal two-phase-commit claim; v1 requires false.
     pub universal_two_phase_commit: bool,
-    /// Exactly-once claim; version one requires false.
+    /// Universal exactly-once claim; v1 requires false.
     pub exactly_once: bool,
-    /// Required validation, intent, authorization, mutation and result ordering.
+    /// Exhaustive required order from live controls through durable audit/result.
     pub effect_order: &'static [ParticipantEffectStep],
-    /// Required coordinator, participant and resource lock/CAS ordering.
+    /// Logical fence/lock/CAS order, not one physical transaction across dispatch.
     pub lock_order: &'static [ParticipantLockStep],
-    /// Whether a store transaction spans dispatch; required false.
+    /// Whether a store transaction spans provider dispatch; the validator requires false.
     pub store_transaction_across_dispatch: bool,
-    /// Canonical provider/resource identity recipe used for lock ordering.
+    /// Canonical provider/resource identity order for resource locks.
     pub resource_lock_key: &'static str,
-    /// Whether a late owner is fenced from publication; required true.
+    /// Completion cannot overwrite a newer recovery/lease owner.
     pub late_owner_fenced: bool,
-    /// Exact mandatory obligation identities for this contract generation.
+    /// Required acceptance obligation identities, independent of execution verdicts.
     pub obligations: &'static [&'static str],
-    /// Current descriptor writer generation.
+    /// Version emitted by the contract writer.
     pub writer_version: u16,
-    /// Explicit accepted reader generations; unknown versions fail closed.
+    /// Exhaustive compatible reader versions; v1 accepts only one.
     pub read_versions: &'static [u16],
-    /// Ordered provider descriptors, including honest pending dispositions.
+    /// Fixed provider inventory with accepted/pending bindings.
     pub participants: &'static [TransactionParticipantDescriptor],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Failure to read or validate the shared participant authority.
+/// Fail-closed reader, invariant or provider-lookup rejection.
 pub enum ParticipantContractProblem {
-    /// The requested reader generation is unsupported.
+    /// The requested version is not in the retained contract's reader set.
     IncompatibleVersion,
-    /// The descriptor violates the frozen admission or compatibility invariants.
+    /// The descriptor violates the frozen authority, ordering or capability invariants.
     InvalidContract,
-    /// No provider has the requested exact identity.
+    /// No entry exists for the exact supplied provider identity.
     UnknownParticipant,
 }
 
@@ -406,7 +409,10 @@ pub fn read_transaction_participant_contract(
 }
 
 impl TransactionParticipantContract {
-    /// Look up an exact provider identity; unknown providers return an explicit error.
+    /// Borrow the exact provider entry, including its pending status.
+    ///
+    /// Returns [`ParticipantContractProblem::UnknownParticipant`] for an absent name;
+    /// lookup neither validates the entire contract nor accepts a pending binding.
     pub fn participant(
         &self,
         provider_id: &str,

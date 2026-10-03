@@ -61,6 +61,23 @@
     "docs/decisions/0025-licence-and-provenance-policy.md",
     "docs/decisions/0026-run-bundle.md",
     "docs/decisions/0027-cics-logical-program-frames.md",
+    "docs/decisions/0028-db2-typed-catalog-evolution.md",
+    "docs/decisions/0028-mq-shared-handle-kernel.md",
+    "docs/decisions/0029-audited-provider-publication.md",
+    "docs/decisions/0029-db2-core-participant-evolution.md",
+    "docs/decisions/0030-mq-host-lifecycle-directory.md",
+    "docs/decisions/0031-mq-selected-service-authority.md",
+    "docs/decisions/0032-mq-program-machine-frame.md",
+    "docs/decisions/0033-mq-full-md-value.md",
+    "docs/decisions/0033-mq-historical-handle-observation.md",
+    "docs/decisions/0034-mq-root-terminal-publication.md",
+    "docs/decisions/0035-mq-root-scoped-abi-aliases.md",
+    "docs/decisions/0036-conformance-pending-obligations.md",
+    "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
+    "docs/delivery/IMPLEMENTATION-ROADMAP.md",
+    "docs/delivery/VERIFICATION-STRATEGY.md",
+    "docs/delivery/VERSIONING-AND-RELEASES.md",
+    "docs/delivery/ZOSMF-API.md",
     "docs/decisions/0034-gsam-logical-address.md",
     "docs/decisions/0031-ims-tm-recovery-publication.md",
     "docs/decisions/0035-selected-pcb-feedback.md",
@@ -70,17 +87,18 @@
     "docs/decisions/0040-primary-level-position-search-boundary.md",
     "docs/decisions/0041-first-direct-child-ssa-selection.md",
     "docs/decisions/0042-ims-tm-output-identity-local-order.md",
+    "docs/decisions/0043-inquiry-checked-read-publication.md",
+    "docs/decisions/0044-checked-inquiry-replay-refusal.md",
     "docs/decisions/0033-cobol-dli-call-boundary.md",
-    "docs/decisions/0028-db2-typed-catalog-evolution.md",
-    "docs/decisions/0029-db2-core-participant-evolution.md",
     "docs/decisions/0030-gsam-application-record-formats.md",
     "docs/decisions/0032-selected-secondary-checkpoint-position.md",
     "docs/decisions/0036-null-ssa-command-slots.md",
-    "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
-    "docs/delivery/IMPLEMENTATION-ROADMAP.md",
-    "docs/delivery/VERIFICATION-STRATEGY.md",
-    "docs/delivery/VERSIONING-AND-RELEASES.md",
-    "docs/delivery/ZOSMF-API.md"
+    "docs/decisions/0037-running-step-program-transport.md",
+    "docs/decisions/0038-coordinator-original-dispatch-extraction.md",
+    "docs/decisions/0040-batch-run-stop-containment.md",
+    "docs/decisions/0043-batch-contained-all-effect-loan.md",
+    "docs/decisions/0045-batch-prepared-selection-plan.md",
+    "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
   ],
   "navigation": [
     {
@@ -133,6 +151,10 @@
         {
           "label": "IBM MQ programming surface",
           "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
+        },
+        {
+          "label": "MQ inquiry attribute source boundary",
+          "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
         },
         {
           "label": "Application packages",
@@ -304,6 +326,58 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0028: Shared MQ handle-family kernel",
+          "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
+        },
+        {
+          "label": "ADR-0029: Audited provider publication under a retained intent",
+          "path": "docs/decisions/0029-audited-provider-publication.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
+        },
+        {
+          "label": "ADR-0030: Private MQ host lifecycle directory",
+          "path": "docs/decisions/0030-mq-host-lifecycle-directory.md"
+        },
+        {
+          "label": "ADR-0031: One selected MQ service authority",
+          "path": "docs/decisions/0031-mq-selected-service-authority.md"
+        },
+        {
+          "label": "ADR-0032: MQ program-to-machine frame handoff",
+          "path": "docs/decisions/0032-mq-program-machine-frame.md"
+        },
+        {
+          "label": "ADR-0033: Complete MQMD value primitive",
+          "path": "docs/decisions/0033-mq-full-md-value.md"
+        },
+        {
+          "label": "ADR-0033: MQ historical handle observation",
+          "path": "docs/decisions/0033-mq-historical-handle-observation.md"
+        },
+        {
+          "label": "ADR-0034: MQ root publication framework",
+          "path": "docs/decisions/0034-mq-root-terminal-publication.md"
+        },
+        {
+          "label": "ADR-0035: Volatile task-root MQI ABI aliases",
+          "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
+        },
+        {
+          "label": "ADR-0036: Explicit pending Conformance IR obligations",
+          "path": "docs/decisions/0036-conformance-pending-obligations.md"
+        },
+        {
+          "label": "Decision index and template",
+          "path": "docs/decisions/README.md"
+        },
+        {
           "label": "ADR-0034: Bounded GSAM logical record addresses",
           "path": "docs/decisions/0034-gsam-logical-address.md"
         },
@@ -340,16 +414,16 @@
           "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
         },
         {
+          "label": "ADR-0043: Checked provider read publication",
+          "path": "docs/decisions/0043-inquiry-checked-read-publication.md"
+        },
+        {
+          "label": "ADR-0044: Checked inquiry replay refusal settlement",
+          "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
-        },
-        {
-          "label": "ADR-0028: Db2 typed catalog evolution",
-          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
-        },
-        {
-          "label": "ADR-0029: Db2 core participant evolution",
-          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
           "label": "ADR-0030: GSAM application record formats and owned length",
@@ -364,8 +438,24 @@
           "path": "docs/decisions/0036-null-ssa-command-slots.md"
         },
         {
-          "label": "Decision index and template",
-          "path": "docs/decisions/README.md"
+          "label": "ADR-0037: Running-step Program context transport",
+          "path": "docs/decisions/0037-running-step-program-transport.md"
+        },
+        {
+          "label": "ADR-0038: Private coordinator original dispatch extraction",
+          "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md"
+        },
+        {
+          "label": "ADR-0040: Batch run stop containment",
+          "path": "docs/decisions/0040-batch-run-stop-containment.md"
+        },
+        {
+          "label": "ADR-0043: Batch contained all-effect loan",
+          "path": "docs/decisions/0043-batch-contained-all-effect-loan.md"
+        },
+        {
+          "label": "ADR-0045: Batch prepared-selection observation",
+          "path": "docs/decisions/0045-batch-prepared-selection-plan.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

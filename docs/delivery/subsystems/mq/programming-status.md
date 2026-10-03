@@ -6,8 +6,1137 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
-- Completion branch: `codex/v015-completion`
-- Completion-wave base: `2f5191be0ddd6a5aae32ce5f92aa94846b2f2c37`
+## Retained checked replay and refusal prerequisite
+
+`MQ-1503.checked-inquiry-replay-refusal` integrates reviewed sealed worker
+`73c2eb48`. Default-refusing Host replay transport preserves ordinary invocation.
+The real private OriginalDispatch opt-in binds a non-Serde once-only capture to
+the same physical adapter, exact original Completed effect/current Running
+execution and actual scoped replay audit. A retained success only asserts current
+dependencies and its original digest, without replay provider/audit/event writes.
+An actual refusal atomically publishes its existing audit plus literal next
+EffectResult lifecycle/outbox while leaving Completed and receipt unchanged.
+Memory uses one lock; SQLite uses one writer transaction and bounded byte/key
+preflights. Invalid output/sequence, stale observations and scope loss retain
+actual Unknown. A replay callback panic after valid observations may settle as
+the existing InfrastructureFailure with its actual scoped audit; missing
+observations or failed settlement retain Unknown. Rollback and bounds remain.
+
+The nonwriting assertion retains4096 dependency capacity. Refusal reserves ten
+physical/accounting operations, admitting at most4086 dependencies within the
+existing64MiB cap. No clock, root index/schema or dependency migration is added.
+Namespace plus row overlap remains refused even for one @1 root. Private capture
+is not provider/frame/SAF authority or an atomic whole-graph capture. A retained
+failure prevents another opt-in callback; it cannot be cleared through a public
+retry/consume token. An in-memory audit is not relabeled as persisted.
+
+Independent review closes32paths/95commands/314artifacts and exact worker seal,
+32unchanged historical dependency inputs and final owning source snapshots.
+Worker checks cover12Store/root,20Host,30canonical,18coordinator,17legacy and42
+root-attribution regressions,13policy/fouractualmutants and mandatory gates.
+External driver's two tests retain their actual historical inputs; a separately
+sealed committed coordinator regression is reviewed for subsequent integration,
+not yet part of this feature. Earlier failed compile/fixture/metadata/driver-lock
+attempts remain preserved. Main runs current composed focused gates and consumers.
+
+Configured MQINQ remains disabled: genuine provider origin, selected frame and
+actual supervised late-failure consumption are still required. No append into an
+old terminal root, successor audit with old identity, lost-ACK retry or public
+Ready observation grants authority. Fixture scalars/tokens and orderly owned
+SQLite are not installed/native/JES/SAF/crash evidence. Source credit0; all26
+full-call gates stay Pending and fullv0.15 incomplete. Only licensed oracle is
+human-skipped0/26; all other parent acceptance requirements remain unwaived.
+
+## Private prepared Batch selection prerequisite
+
+`MQ-1503.batch-prepared-selection-plan` integrates reviewed sealed worker
+`95b06366`. A private non-Clone/non-Serde observation borrows the actual Batch
+service and exact original Invocation. It captures the bounded complete Job
+namespace, physical/cache equality, semantic configuration and its physical
+rows where present, plus literal expected Selected/Running writes. The sole
+existing selection-edge builders remain authoritative. Fresh contained runs
+revalidate after real JESJOBS preflight and the last control callback, before
+the existing sequential CAS publications. Callbacks stay outside Batch locks.
+
+The finite profile reserves two configuration observations within4096 records,
+uses max-plus-one scans and checked64MiB accounting before selected Job cloning,
+and refuses drift, stale versions, absent registration, overflow or malformed
+membership. Actual version-zero semantic configuration is not a fabricated CAS
+row. Planning creates no run owner, Core record, checkpoint or admission token.
+Old ordinary and Program-only behavior and preflight audit order remain exact.
+
+Independent review closes12paths/40commands/147stable artifacts,2816input
+versions/111658occurrences,248unit/11compile-fail,13policy/fouractualmutants,
+32unchanged historical dependency inputs and the identical worker HEAD seal.
+Earlier failed fixture, epoch and metadata attempts retain their actual inputs.
+Memory/owned SQLite exercise literal Job transitions, namespace/configuration
+drift and callback reentry. Main checks composed Batch, consumers, rustdoc and
+mandatory gates; the service ratchet lowers7212 to7210 without raising allowances.
+
+This observation is not atomic whole-graph capture, a phantom/configuration
+freeze, current Work lease/backend decision time, Core-original cursor or JES
+admission. Preflight's existing standalone audit is not physically claim-fenced.
+Those future joins and actual private controller ownership remain required.
+Fixture transport and orderly reopen grant no installed/native/JES/crash or
+official acceptance. All26 full-call gates remain Pending; fullv0.15 unfinished.
+Only the licensed IBM oracle is human-skipped0/26; other parent gates remain.
+
+## Contained Batch all-effect transport prerequisite
+
+`MQ-1503.batch-contained-all-effect-loan` integrates reviewed sealed worker
+`a3b8afe2`. The explicit privileged callback receives every actual Batch-built
+host occurrence with exact original PRE Invocation/request/sequence/key/deadline.
+Program alone also borrows the genuine RunningStepAdmission and actual POST
+jes.work-id view. Private construction, no Clone/Serde/row factory and before/
+after scope checks preserve actual transport observations, not Core/JES authority.
+The sole existing DD/security/catalog/dataset/spool/internal-reader and Program
+builders are reused. Old plain and Program-only paths retain their behavior.
+
+The external callback owns real scoped preflight/result/audit/journal settlement;
+this explicit route performs no ordinary fallback or second Batch audit. Missing
+callback refuses before observation/selection/writes. Raw sequence fault/panic
+retains Unknown, and Malformed/control/CAS/uncertainty stop every later action.
+Try-borrow reentry refuses; callbacks run outside Batch locks. Genuine Program
+step views revoke before decoding/next action; known success may retire, while
+Drop never dispatches cleanup. Existing Selected/Running remain sequential and
+old sequences are not claimed to form one coordinator cursor.
+
+Independent review binds16paths/36commands/120stable6historical artifacts,
+2805input versions/100362occurrences,11frozen trees and32exact d8dependency inputs.
+Final235unit/11compile-fail,13policy/fouractualmutants and sameHEAD seal are
+verified; earlier failed compile,6/8fixture assertions,233/11run and metadata-only
+ADR/doc repair remain tied to their actual inputs. Memory/owned SQLite exercise
+actual scoped fixture transport, literal Program identities, real normalized
+Malformed audit, view lifetime, full retained physical rows/checkpoints/counters/
+trace, DD and internal reader coverage, missing owner and no double Batch audit.
+Main verifies the composed Batch/consumers/rustdoc and mandatory gates. Service
+ratchet lowers7250→7212; no API/module allowance is raised.
+
+This infrastructure activates no coordinator/JES claim/physical clock/native
+producer, atomic selection/core join, root/UOW terminal or DefaultContext policy.
+Fixture delegates and orderly SQLite reopen earn no installed/native/JES/crash
+or official acceptance. Actual owner/cursor/sequence allocator, physical claim
+fences and all nonlicensed parent gates remain required. All26 full-call gates
+stay Pending; fullv0.15 unfinished. Only licensed oracle human-skipped0/26.
+
+## Actual Batch run-owner stop prerequisite
+
+`MQ-1503.batch-run-stop-containment` integrates reviewed worker `b929da52` with
+separately sealed `ccf18d77` malformed-reply repair. The explicit opt-in uses the
+same scheduler, selected/Running CAS, physical checkpoint and registration to
+mint one private run owner. Non-Clone/non-Serde exit and retained step views
+observe that actual owner; they grant no controller, host, core or JES permission.
+Run/step revocation precedes cleanup/retirement, error and unwind; Drop only
+revokes. The finite fresh queued ProgramService-only profile refuses recovered
+attempts and legacy spool migration. Plain/older Program-only paths stay exact.
+
+One private context follows existing Program, security, dataset, spool, DD/DCB,
+disposition and output helpers; no TLS, public ID factory or second engine.
+Callbacks run outside Batch locks. Internal reader reserves the existing job
+number, unlocks actual spool calls and rechecks replay/absence/quotas before
+publication, retaining known history on refusal. Original PRE-binding and real
+post-jes.work-id Program invocation/request identities remain distinct and exact.
+Unknown/panic/cancellation/deadline/control failure stop all subsequent actions.
+Contained-only Malformed fencing also stops normalized readonly wrong-sequence
+and known malformed replies after their actual shared Rejected audit. It adds
+no IBM reason or UOW decision; modeled Condition/ABEND and old known-error
+disposition stay unchanged. No rollback/retry/opposite cleanup masks uncertainty.
+
+Independent reviews bind16original paths/62commands and8follow-up paths/32commands,
+113stable follow-up artifacts,13frozen authority trees and32exact historical d8
+dependency inputs. Final222unit/7compile-fail,13policy/fouractualmutants and sameHEAD
+seals pass; original212/7 remain tied to their actual inputs. Memory/owned SQLite
+tests join real delegated faults, one failure audit/epoch increment, retained
+earlier successful step and exact rows/checkpoint/trace. Failed fixture/compile/
+module/audit-order attempts remain separate. Main checks composed Batch/consumers/
+rustdoc and mandatory gates. Service ratchet lowers7314→7250; no cap is raised.
+
+Fixture callbacks/security and orderly SQLite reopen are not genuine compiled,
+native/JES/SAF/core-original or process-crash acceptance. Enclosing actual sole
+coordinator/controller ownership, closed JesClaimRun, after-lock physical Work/Job
+expiry, scheduled root/recovery/terminal policy and DefaultContext remain required.
+Source credit0; all26 full-call gates Pending and fullv0.15 unfinished. Only the
+licensed oracle is human-skipped0/26; every other acceptance obligation remains.
+
+## Atomic checked-read store prerequisite
+
+`MQ-1503.inquiry-checked-read-publication` integrates reviewed worker `59ded33c`
+with separately sealed `d29d2a4b` operation-budget repair. Non-Serde structural
+observations recheck full original effect, current Running execution and unique
+Exact/Absent dependencies under one Memory lock or SQLite writer transaction.
+Success inserts one version1 receipt and the existing typed provider audit;
+audit-only Deny has no receipt. Observed queue/catalog/control bytes and versions
+are not changed to simulate a read fence. Separate Intent/Completed replay
+assertion returns only `()` and writes no provider/audit/ordinal/epoch/clock state.
+Neither operation grants host, frame, SAF, root or JES permission.
+
+Physical attribution requires actual Open/live root membership and registered
+endpoints. This new API conservatively refuses simultaneous namespace/row indexes
+even for the same root; older root contracts are unchanged. Unindexed legacy
+actors cannot borrow indexed scopes. The 4096 combined requested-read, mutation
+and emitted-audit limit permits success4094 dependencies, Deny4095 and replay4096.
+Checked arithmetic, the existing64MiB/blob limits, SQLite byte-length preflights,
+audit-key bounds and existing touched-row/transaction rollback remain mandatory.
+No new table, codec/index/control migration, callback fallback or history release.
+The actual durable adapter is `SqliteStateStore`; PostgreSQL defaults to refusal.
+
+Independent reviews bind23original paths/75commands plus7follow-up paths/29commands,
+105follow-up frozen authorities,215historical artifacts and32exact historical d8
+dependency inputs. Final20unit/9root,13policy/fouractualmutants and sameHEAD seals
+are verified. Earlier18unit/9root,17audit/31attribution retain their actual inputs;
+failed compile, fixture, module, documentation and premature rustdoc cleanup
+receipts stay separate. Main verifies the composed affected contracts/consumers
+and mandatory gates. Owned SQLite orderly reopen is not process-crash evidence.
+
+Infrastructure-only work adds no IBM source or official execution credit. Actual
+MQINQ INQUIRE-open/normal-local definition origin, current frame/handles/SAF,
+original replay failure/denial audit ownership and compiled table ABI remain
+separate required work. No provider/native/installed/JES/full26 activation follows.
+All26 full-call gates remain Pending; only licensed oracle human-skipped0/26.
+Fullv0.15 and every other nonlicensed acceptance gate remain unfinished.
+
+## Checked numeric local-type inquiry prerequisite
+
+`MQ-1503.inquiry-local-type-contract` integrates reviewed sealed worker
+`b4e683f4`. One existing catalog@2 carries an independent source projection@1
+for MQIA_Q_TYPE20 and MQQT_LOCAL1. The additive ReviewedQueueType canonical
+tag stays distinct from PendingInteger(20); older canonical bytes and all
+historical catalog/status/wire/property/RFH2 projections remain exact. The
+nonSerde checked wrapper preserves ordered0..256occurrences/duplicates,
+adequate bounded integer capacity and zero character capacity. It validates
+only actual complete OK/NONE Attributes with one LOCAL scalar per occurrence;
+no scalar is generated and extra caller slots are not extra output values.
+Zero selectors preserve historical empty request identity and require explicit
+wrapper result checking. Pending-only old request/result behavior is unchanged.
+Historical@2 without the section stays valid but cannot generate the new
+artifact; future versions, altered facts/pins and reviewed MQSET refuse.
+
+Independent review binds18Git paths,153artifacts,60closed receipts,11snapshots,
+2852unique input versions,169715occurrences,218frozen authorities,5verified
+topics/13worker search-read commands,32historical d8dependency inputs and
+same-HEAD seal. Initial78MQI/13canonical receipts retain their original test
+files; unchanged final production is byte-bound to them, while final8inquiry
+owns the final test file. Final28Python/13policy/fourmutants/schema/generator/
+source reproduction/API ceilings70/386/0/743/72 and cleanup are independently
+verified. Manager runs affected composed contracts/consumers and required gates.
+The retained21historical command classification is externally corrected to
+18actual IBM-reader commands (16search/read+2import/status), originals untouched.
+
+Source baseline2026-08-31 row0016/position16 q101840 input19–48/output706–725;
+supplements2026-09-12 q091590451–453/q10297025–28; inquiry-attribute-sources
+2026-09-12 q09248011–13/q10349019–28. Exactpins/fragments live in the catalog;
+retained-first SHA-verified offline reads, no network/bodyGit/freshness credit.
+Actual normal-local catalog origin, live INQUIRE-open HCONN/HOBJ/current frame,
+SAF/original core/physical read+receipt/audit+replay and compiled ten-reference
+table ABI remain required separate work. Otherselectors/kinds/characters/
+warnings/short-buffer rules remain pending. No selected/native/installed/full26
+activation or credit. All26 full-call gates stay Pending; onlylicensed oracle
+human-skipped0/26. Fullv0.15 and allother nonlicensed gates remain unfinished.
+
+## Private coordinator original-dispatch prerequisite
+
+`MQ-1503.coordinator-original-dispatch-extraction` integrates reviewed sealed
+worker`1f93bc24`. The actual machine drive delegates its existing HostCall branch
+to one private child borrowing the same Invocation, optional JournalCursor,
+control and observer. Only the machine sets resume after known success; stop
+branches return directly without duplicate terminal/audit publication. Original
+admission/Running, canonical/core metadata, intent/result/event/outbox ownership,
+observer order, native restrictions, explicit reconciled Completed replay and
+ordinary panic limitations remain unchanged. No public Running facade, controller,
+Program-context selector, synthetic effect/Machine, new journal or lease exists.
+
+The manager-approved guard repair requires the actual child and separate request,
+replay-result and new-result digest controls while preserving mandatory parent
+module/construction/callsite/lifecycle controls. Comment/string decoys and missing
+child cannot supply them; the global persisted-Debug scan remains unchanged.
+Independent review binds11Git paths,74closed receipts,2772unique input versions,
+204260input occurrences,1468exact Rust/build/fixture inputs per retained runtime
+command,249retained Rust tests (227interpreter,17server,5MQ consumer),14fresh
+guard tests,21frozen authorities,32historical d8 dependency objects and same-HEAD
+seal. Static reverse projection preserves1388original branch tokens; actual loop
+inspection confirms no extra work after the match on replay success. Historical
+failures remain separate; Python-only guard changes did not repeat Rust suites.
+Main checks the composed current interpreter/consumers and mandatory gates.
+
+Genuine enclosing controller ownership/ControllerExit/stop latch, private server
+JesClaimRun, physical Work/Job decision-time expiry, scheduled compiled/root
+terminal policy and DefaultContext/JES/GMT remain required separate work. Fixture
+ports are not installed/native/JES/SAF/crash or full26 evidence. Source credit0;
+only licensed oracle human-skipped0/26. All nonlicensed v0.15 acceptance remains
+required and unfinished.
+
+## Initial-root preparation store prerequisite
+
+`MQ-1505.root-preparation-publication` integrates reviewed sealed worker
+`e94ee811`. The default-refusing nonSerde operation rechecks the exact original
+Admitted version1 execution, original Open/root-only membership, single original
+Admitted event and every initial index in one Memory lock or SQLite writer TX.
+Any actor/run effect, work, checkpoint, acquired lease or advanced phase refuses.
+Registered anchor and both Move endpoints require same-root ownership; phantom
+memberships and overlapping foreign indexes refuse. Existing bounded mutation
+kernel and rollback publish rows and logical clock atomically. SQLite accounts
+retained root length before owned payload capture; no callback runs under the
+physical lock. Existing wire/schema/index/anonymous/audited/terminal behavior
+remains unchanged. Durable routes SQLite; other adapters refuse.
+
+Independent review binds22worker paths,99external artifacts,28commands and
+36186original input versions,18final Rust input equivalences,133distinct owning
+tests (113root,3Memory adversarial,17audit), a later12SQLite-test snapshot,
+2store-api rustdoc tests,135frozen authorities,32historical d8 dependency objects
+and same-HEAD seal. Failed compile and empty-anchor candidates remain separate;
+the final SQLite length preflight is not relabeled as the earlier113-test run.
+Main checks its composed root/audit/native-root consumers and mandatory gates.
+Store fixtures and owned orderly reopen are not installed/native/crash credit.
+
+Genuine admitted server schema3 setup, retained original CALL writer wiring,
+strict successor-aware full overlap/history closure and scheduled Work/Job
+decision-time fencing remain separate work. Logical freshness is not physical
+JES expiry after writer-lock wait. No dynamic enrollment, fabricated intent,
+RunningLifecycle bypass, terminal decision, history release or deployed migration
+is supplied. Source credit0; only licensed oracle human-skipped0/26. Native-root,
+recovery/participants/full26/CardDemo and all other nonlicensed v0.15 gates remain
+required and unfinished.
+
+## Separately pinned inquiry attribute source prerequisite
+
+`MQ-1501.inquiry-attribute-source-pins` integrates reviewed sealed worker
+`234ade91`: four external MQ9.4 sources in `mq-inquiry-attribute-sources`,
+baseline `ibm-mq-9.4-inquiry-attribute-sources-2026-09-12`. The bounded
+[source note](inquiry-source-boundary.md) records queue-type values, applicability
+and name-field declarations with exact hashes, parser locators and remaining
+gaps. Manifest SHA1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949;
+topic-set SHA463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527.
+Retained topic paths were checked first; absent files resolved to exact verified
+raw shards and deterministic metadata/old pinned TOC. Publication last-modified
+dates come from the verified HTML, not fetch times. In-progress archive grants
+no freshness, browser-reproduction or same-snapshot assertion; no bodies in Git.
+
+The registry appends one zero-authority/zero-credit scope without changing its
+seven prior rows. Four historical Python test bodies and one Rust cfg(test) body
+exclude only the new scope from old projections while preserving exact old
+hashes/counts and checking all eight current named scopes plus the exact four
+pins. Production checker/parser/schema/MQ/canonical/call26/sourcepositions27/
+pending obligations are unchanged. Independent review verifies nine Git paths,
+57commands/six original snapshots/16777input versions, seven source topics and
+11anchors,368frozen authorities,32d8 dependency objects and recomputed seal.
+Failed snapshots remain historical; main runs affected36reader/16topic/9source
+tests and required policy/documentation gates over its composed current inputs.
+
+Original MQINQ remains baseline2026-08-31 catalog row0016/sourceposition16,
+q101840_ SHA03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b.
+Output CCSID, empty/unset values, numeric sentinel/length joins, exact short-warning
+definedness and selector-validation ordering remain source gaps. Source presence
+does not grant numeric MQINQ/MQSET forwarding, real SAF/current-frame/core/store
+permission or native/installed/full26 credit. Only licensed oracle human-skipped0/26;
+all other fullv0.15 obligations remain required and unfinished.
+
+## Genuine Running-step neutral Program transport
+
+`MQ-1503.running-step-program-transport` integrates reviewed sealed worker
+`d34f28b2`. The existing Batch Running job/step CAS, checkpoint and actual
+ProgramService registration mint a private irrevocably revocable owner. An
+opt-in synchronous borrowed callback and non-Clone/non-Serde retained view
+observe that same owner and physical store. Callback return/error/panic revokes
+before existing retirement/cleanup; Drop only revokes. Ordinary scheduling and
+original Program payload, sequence/key, parent, grants and generation remain
+unchanged. The observed original precedes the existing `jes.work-id` compatibility
+binding added to the actual dispatched request; those are not interchangeable
+ownership proofs. `check_live` is an observation, not a physical publication fence.
+
+Program-only borrowed Any transport shares the existing scoped host controls,
+frozen provider selection, request/result bounds, uncertainty and typed audit.
+Provider default refuses without ordinary invoke fallback; Any grants no admission
+or permission. The extracted owning Batch child lowers its exact service ratchet
+7350 to7314 without raising any API/module ceiling. Current shared IR and all
+upstream IMS hooks remain intact. Main narrows one observation Rustdoc sentence
+to avoid an allocation-free claim; executable worker bytes remain exact.
+
+Independent review binds14worker paths,165receipts/48commands/131130 input
+occurrences, final8Rust inputs,31unit and4compile-fail tests,11frozen authorities,
+all32historical d8 dependency inputs and same-HEAD seal. Seven failed attempts
+remain separate. Main reruns those affected contracts, owning consumers/rustdoc
+and required policy/documentation gates. Neutral fake Any tests prove transport
+only; retained SQLite close/reopen is not process-crash evidence.
+
+Real coordinator original Intent/Running ownership, private server claim join,
+decision-time physical Work/Job fences, scheduled compiled-step/root terminal
+policy and genuine JES user/accounting/GMT/DefaultContext remain prerequisites.
+No native/installed/Core/SAF/full26 activation or credit follows. Source credit0;
+only licensed oracle human-skipped0/26. Fullv0.15 remains unfinished.
+
+## Attributed Open-root provider writer prerequisite
+
+MQ-1505.attributed-root-provider-writers integrates reviewed sealed workerdd2b756a.
+The default-refusing nonSerde JournalStore operation physically rechecks exact
+current execution, original canonical unresolved intent/metadata, root claim,
+actor/run/index membership and every registered Put/Delete/Move endpoint under
+the same Memory lock or SQLite writer transaction. Existing mutation kernel,
+quota/CAS and touched rollback remain sole authority. Rooted batches count Move
+twice within4096operations/64MiB; SQLite signed epoch exhaustion refuses before
+integer-to-REAL promotion. Intent-audited publication derives same-root attribution
+only after its existing original-intent fence. Anonymous guards and legacy
+unindexed/unowned/audit-only/deny behavior stay intact.
+
+Manager independently verifies21worker Git paths,102static receipts,29commands,
+33137original input occurrences,17final Rust inputs,109 distinct owning tests
+(92root including31new,17audited),99frozen authorities and32d8 dependency objects.
+Historical failed fixtures/overflow and their repaired-owning snapshots remain
+separate. Main runs affected root/audit, installed PUT/GET and shared-driver
+regressions with mandatory policy/API/module/consumer/documentation gates.
+Store fixtures are not installed/native/SAF/crash evidence; empty rustdoc tests
+grant no credit. No IBM language/subsystem semantics or source pins change.
+
+This is step1 only. Server retained-original writer wiring, effect-free live-actor
+lifecycle publication and strict successor-aware complete overlap/history closure
+remain required. No terminal scope is recycled or historical actor reauthorized.
+The existing physical logical-clock floor is not a decision-time JES lease clock
+after writer-lock wait. Scheduled Work/Job fencing and terminal policy remain
+separate prerequisites. No new schema/table/journal/audit/terminal decision,
+retention release or outbox restriction. Onlylicensed human skip0/26; fullv0.15,
+recovery/participants/full26/CardDemo and other nonlicensed acceptance stay open.
+
+## Shared finite conformance driver and explicit pending obligations
+
+`MQ-1506.shared-conformance-driver` integrates the repaired cumulative worker
+`7d125ead` after independent review of 3,317 identity/binding checks, its 12 final
+seal paths and original prerequisite history. Two feature fragments retain the
+driver and its evidence-binding repair. Already integrated Foundation ASCII and
+upstream IMS registries/hooks remain intact; historical failing candidates and
+their receipts are not imported as passing evidence.
+
+One shared IR now represents all 26 unique MQ calls and 27 source positions.
+Mandatory missing profiles use bounded pending identifiers, never fake cases or
+Unsupported passes. Finite selected Memory/SQLite originals exercise the product
+runtime/coordinator with separate actual emission-source, independent expectation
+and empty physical setup digests, ordered attributed SAF, exact bytes, denied
+PUT nonmutation and original/replay core identities. Eighteen local verdicts
+comprise 16 executions and two conditioned reuses of two physical transcripts.
+All 26 calls remain Pending across their six mandatory complete-profile gates;
+full26 and recovered requests must refuse missing evidence.
+
+Receipt counts plus matching attributed success audits do not independently
+decode each canonical receipt, prove atomic receipt/audit linkage or both audit
+layers. SQLite orderly close/reopen checks MQ rows, not a complete core graph,
+cold restore or process-crash recovery. Typed Consumer fixtures are not compiled,
+installed/native/JES or deployed RACF evidence. PUT1 is a reference, not an
+executed case. No production MQ/provider/store/canonical semantics are changed.
+
+Fourteen frozen MQ9.4 source pins retain reviewed offline SHA/bytes: original
+baseline2026-08-31 BACK0001, CLOSE0006, CMIT0007, CONN0008, DISC0012, GET0015,
+OPEN0019, PUT0020, reference PUT10021 and call-list q101650_; supplement
+baseline2026-09-12 MD q097390_/q097395_, GMO q096715_ and PMO q098655_.
+Source credit0; no refresh or publication bodies in Git. Historical d8 dependency
+policy is reused only for all32 unchanged inputs. Only the licensed oracle is
+human-skipped0/26; full v0.15 and other nonlicensed acceptance remain unfinished.
+
+## Installed supplied zero and binary correlation IDs
+
+`MQ-1503.installed-supplied-correlation-id` integrates reviewed sealed worker
+`adbb24c2` as tests only over the unchanged compiled supplied-ID profile.
+Actual compiler/catalog-published MD1/MD2 PUT/PUT1 artifacts supply24-byte
+LOW-VALUES or an independently checked binary X-literal. Memory and owned
+SQLite prove the original complete request/Produced descriptor and stored MD,
+pending normal commit versus genuine CEE3ABD discard, whole terminal originals,
+sameTASK parentSome CALL/core digest and shared ABI retirement. Caller suffixes,
+body padding, ignored BackoutCount and undefined counts remain exact.
+NEW_MSG_ID/NEW_CORREL_ID and zero MsgId refuse before PUT publication; preceding
+genuine CONN/OPEN writes are expected, not erased or called whole-store absence.
+
+Independent review verifies seven worker Git paths, four final Rust/CBL owning
+inputs,1321 frozen authorities,123 receipts, six passing Rust tests and72 new
+bounded cases. Historical failed attempts remain preserved. The recording SAF
+port is not deployed RACF/JES authentication; a new SQLite connection is not cold
+restore or process-crash evidence. Main reruns changed installed tests and old
+PUT compatibility with mandatory policy/API/module/consumer/documentation gates.
+
+Five sources retain exact manifest SHA/bytes and ten offline search/read receipts:
+original MQ9.4 baseline2026-08-31 PUT0020/q101880_ and PUT10021/q101890_;
+supplement baseline2026-09-12 MDq097395_1336–1497, PMOq098655_115–157 and
+constantsq092190_. Retained topic_path is checked first, then exact archive
+fallback through the repository parser; source credit0, no network refresh.
+No production/compiler/provider/store/schema/default policy changes. Historical
+d8 deny reuse requires all32 unchanged inputs, not fresh deny/CI. Generated IDs,
+genuine JES/DefaultContext, fresh-root succession, recovery/participants/retention,
+shared IR/full26/CardDemo and other nonlicensed acceptance remain mandatory.
+Only the licensed oracle is human-skipped0/26; full v0.15 remains unfinished.
+
+## Compiled supplied correlation IDs
+
+`MQ-1503.compiled-supplied-correlation-id` composes reviewed sealed worker
+`a36bc8b5e` without copying its duplicated historical architecture block.
+The compiled full PUT/PUT1 bridge now accepts exact supplied 24-byte CorrelId,
+including binary-zero MQCI_NONE. Supplied nonzero MsgId and the existing refusal
+of NEW_MSG_ID/NEW_CORREL_ID remain; no ID is generated. Original context, opaque
+profile, live aliases/unit, complete raw capture and request-bound atomic joined
+writeback stay unchanged. A correlation mismatch, unsupported outcome or late
+input drift still fences Unknown without partial writes.
+
+Manager review verifies all six worker Git paths, three final tested engine
+inputs,454 frozen authority files,95 external receipt identities and32 unchanged
+dependency inputs. Worker218 unit/one layout/two compile-fail and27 canonical
+tests retain their original separate candidates; main runs diff-focused typed
+MQ regressions and mandatory policy/consumer/API/module/documentation gates.
+Private compiled frame/reply fixtures earn engine credit only, not installed,
+native/RACF/JES/root-terminal or official-call acceptance. Existing installed
+PUT/GET and root proofs are retained, not relabeled for this change.
+
+Five source identities and ten actual manager offline search/read commands use
+retained topic_path first, manifest SHA/bytes, exact archive fallback and the
+sole plain-text parser. MQ9.4 supplemental baseline2026-09-12 MD `q097395_`
+1336–1497 distinguishes supplied CorrelId from zero MsgId generation; PMO
+`q098655_`115–157/`q092190_`40–69 bind the unsupported generation flags.
+Original baseline2026-08-31 PUT0020/`q101880_` and PUT10021/`q101890_`
+remain unchanged. Source review credit0; no refresh or publication body in Git.
+Historical d8 dependency policy is reused only for all32 exact inputs, not
+fresh deny/CI. Generated IDs, broader profiles, fresh-root succession,
+installed DefaultContext/JES/GMT, recovery/participants/shared IR/full26 and
+CardDemo acceptance remain required. Only the licensed oracle is human-skipped
+0/26; full v0.15 remains unfinished.
+
+## Current composed finite RFH2 prerequisite
+
+`MQ-1503.selected-rfh2-conversion` consumes sealed worker4c1602f1 after full
+production, test, source, schema, generator and normative review. Independent
+49path/blob,50frozen authority,119receipt snapshot,16artifact,32source pin,
+48locator and32dependency identities verify. The earlier identity-only proof
+keeps its original incomplete-review flag; manager review is separately recorded.
+
+BUFMH/MHBUF now use the same selected connection/current unit and sole issued
+message registry. A privileged immutable actual LE/DLL CODESET source captures
+1208 once for new original CONN/CONNX; warning reuse/replay never resample.
+Known publication alone adopts the profile. The finite ASCII/native785 MQMD1,
+default full MQPD, flat custom folder/leaf and Null/bytes/signed integers/printable
+ASCII strings preserve opaque tails and null/empty distinctions. BUFMH retain
+replaces only associated MD/properties; MHBUF emits an owned aligned RFH2 and
+changes only application Encoding/CCSID/Format. Short2469 publishes required
+length with no copy/delete; missing2471 reports zero; malformed2334 leaves
+undefined length absent. Unsupported forms fail before mutation. SAF/CAS/quota/
+control failure aborts the touched-entry stage; Unknown retains/fences rather
+than adopts, redelivers or decides a unit. Cold receipts cannot revive volatile
+handles, properties or CODESET attestation. Fixtures are not installed LE proof.
+
+The single strict result codec now admits RFH2 only under@4 and Produced only
+under@5, rejecting cross-class relabeling and preserving old@1/@2/@3 bytes.
+Both pre-expiry preparation paths, independent producer sources and callback
+reentry fences compose. Port callbacks must be bounded/nonblocking and must not
+wait for another thread to enter the same locked service. Generated projection,
+historical catalogs/statuses,26unique calls/27positions and raw offsets stay exact.
+Reader/downgrade boundaries are documented without permitting receipt relabeling
+or payload migration. Earlier PUT-only@4-reserved statements below are historical.
+
+Fresh composed main passes261host,128selected-operation,35replay,34admission,
+11message-handle and21trusted-embedding tests:490Rust, zero failed/ignored.
+All28Python policy/registry/RFH2 tests, guards/fourmutants/module990/34/4/1,
+server compilation/provider docs, genuine combinedAPI70/386/0/931/72 ceilings,
+registry freshness/schema/fmt/normaldocs/check/changelog/whitespace pass.
+An optional manager Python JSON-Schema helper found no installed jsonschema;
+its failed receipt is retained, and the existing project-native registry gate
+validates the actual combined catalog against Draft202012 without installing it.
+Ledger-only checks and source-cache reproduction are separate from execution.
+Every sequence and exact seal/HEADcheck cleans its own target; sequencing waits
+for terminal success before staging. Originald8/all32 dependency inputs are
+reused, not fresh cargo-deny/CI acceptance. No passing tests are relabeled.
+
+Offline retained-first actual search/read covers original baseline2026-08-31
+BUFMHrow0003/q101710_ and MHBUFrow0018/q101860_ (positions18/25), programming/
+property supplements, and RFH2 baseline2026-09-12 manifest
+117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a.
+BMHO initializer, MHBO reason spelling, RFH structure-ID spelling and i8-limit
+source conflicts remain explicitly pending. Source review earns zero execution
+or licensed credit; no browser/network refresh or source bodies enter Git.
+Installed point/property forwarding and sources, generated IDs/defaults/priority/
+expiry, broader RFH2 profiles, genuine compiled pending-PUT root terminal,
+recovery/participants/IR/full26/CardDemo remain required. Parent ACTIVE;
+ONLY the unavailable licensed oracle is human-skipped0/26 with zero credit.
+
+`MQ-1503.selected-full-put-producer` consumes sealed worker7b9cd2782 after
+independent44path/blob,219stable receipt,54command snapshot,379historical input
+version/339current passing input,10frozen authority,16source pin and32dependency
+checks. Original selected PUT/PUT1 now produces complete MD1/2 through the SAME
+delivery/UOW and one audited physical publication, with explicit synchronous
+PMO1, DefaultContext/NoContext, supplied nonzero IDs, priority0/unlimited expiry,
+explicit persistence0/1, body CCSID37/819, FormatNONE opaque body/empty properties,
+and exact configured structure characters. Caller duplicate IDs are legal.
+Stored BackoutCount starts0 for every signed ignored input; returned MD preserves
+it with an explicit no-writeback disposition. Exact fixed48 resolved names and
+undefined z/OS destination counters are retained. One sole strict storage codec
+selects@5 only for Produced; old@1/@2/@3 bytes remain exact and@4 stays reserved.
+The SAME strict catalog@2 has explicit native attributes and no inferred default
+CCSID37; old catalog@1 remains exact. Active/populated replacement, operator
+permission and silent migration are not supplied.
+
+Physical GMT/calendar/context sources are crate-private, unique preactivation
+and SAME Arc store. NoContext clears context without time/batch sampling;
+exact replay rechecks live original frame/connection/object/unit/controls/SAF
+without resampling. Known publication alone adopts; Unknown retains/fences.
+Private Memory/ownedSQLite fixture ports and store-seeded original core intents
+are not installed/JES/RACF or compiled-root proof. Source baseline
+`ibm-mq-9.4-mqi-2026-08-31` PUTrow0020/q101880_ and PUT1row0021/q101890_,
+supplemental PMO/MD/declaration/persistence/priority and nine producer-attribute
+topics are retained-first hash-verified and actually searched/read offline;
+reference credit0, archive freshness/reproduction caveats unchanged.
+
+Fresh composed main checks pass254host,113selected-operation,33replay,
+34admission,2native-catalog,47delivery and11legacy object tests:494 Rust, zero
+failed/ignored, with filtered cases earning no credit. All13 mandatory Python
+policy tests, actual effect/provider guards/four namespace mutants, module979/
+34/4/1, server consumer compilation/provider docs, source reproduction/schema,
+fmt/normaldocs+check/changelog/whitespace pass. Genuine combined public API passes
+unchanged compiler70/coverage386/execution0/host931/store72 ceilings. The first
+sequence stopped after passing library suites at a manager-misnamed integration
+target; corrected `object_service_integration` and remaining checks pass without
+repeating the unchanged library tests. Original failed receipt stays retained.
+Generated documentation is regenerated normally to reconcile its sole conflict;
+ledger-only documentation checks remain separate. Every sequence and exact seal/
+HEADcheck cleans its intended target. Originald8/all32 unchanged dependency input
+proof is reused, not fresh deny/CI. Native point/source setup, compiled forwarding,
+actual installed/JES sources, generated IDs/defaults/priority/expiry, root terminal,
+recovery/participants/full26/CardDemo remain required. Parent remains ACTIVE;
+licensed IBM oracle ONLY human-skipped0/26, with zero credit.
+
+Manager staging preceded completion of the ledger-only documentation sequence,
+so sealed featurec5f731625 retained the previous generated ledger digest while
+the source ledger was current. A separate documentation-only correction preserves
+that commit and its494-test evidence; normal docs generation/check, changelog,
+whitespace and an exact two-path seal cover this changed ledger/manifest. The
+overlapping manager sequence and its receipts are retained, not relabeled as
+serial verification. No Rust/source/contract inputs or acceptance claims change.
+
+`MQ-1503.put-context-md-writeback` adds the atomic descriptor context writer
+needed by later compiled PUT/PUT1 forwarding. Eight actual default/no-context
+output fields use the same generated widths/kinds/offsets and prefix copier;
+the generic historical writeback policy stays unchanged. The complete returned
+MD must preserve every other captured field, including ignored signed input
+BackoutCount, supplied IDs and MD2 extension. No source/default/status generation,
+new codec/numeric projection, semantic permission or installed execution credit
+follows. Original PUTrows0020/0021 and supplements baseline2026-09-12
+`q098655_194–227`, `q097395_1498–1508/1571–1605/1634–1715/1739–1955` are
+retained-first hash-verified and read through actual offline scoped search/read.
+Seven new writer tests plus34 raw regressions pass (41 Rust, zero ignored;
+208 filtered and the empty binary fixture earn no credit). All19 Python tests
+pass:13 mandatory policy regressions and6 raw-layout/source projection tests.
+Actual guards/four mutants/module970/34/4/1, generated-registry reproduction,
+fmt/normaldocs+check/changelog/whitespace pass. The fresh combined public API
+gate passes compiler70/coverage386/execution0/host931/store72, without raising
+ceilings. Diagnostic fixtures cover both MD versions, both numeric orders,
+ASCII/CP037, both PUT calls, null/padding and explicit no-context output, including
+an unchanged ignored signed counter outside PIC output range. All failed
+preflight cases preserve every destination byte; generic PUT context observations
+still reject. Ledger-only docs checks are separate. Every sequence and exact
+feature seal/HEADcheck cleans the intended target. Originald8 dependency policy
+and all32 unchanged Cargo/lock/policy/toolchain inputs are reused, not fresh deny.
+Compiled OPEN/PUT, actual physical point bindings, all-argument writeback and
+M's genuine pending-PUT root-terminal proof remain required. Parent remains
+ACTIVE; licensed oracle alone is human-skipped0/26, with zero credit.
+
+`MQ-1501.rfh2-source-pins` consumes sealed workerd317512d3 after independent
+eight-path/blob,124historical binding,61command receipt,17external artifact,
+15source pin,five pre-run snapshot and32dependency checks. The independent scope
+`mq-rfh2-sources`, baseline `ibm-mq-9.4-rfh2-sources-2026-09-12`, pins15topics/
+478640bytes; manifest SHA
+`117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a`.
+Original BUFMHrow0003/MHBUFrow0018 sourcepositions3/18/25 remain26unique/27total;
+original27/supplement80/layout12/property12/recovery1 and new producer9 manifests,
+1030statuses/10pending reasons and old runtime/codec/projection bytes stay exact.
+Hash-verified retained-first metadata/TOC/publication headings and actual offline
+shared-reader search/read pass. Registration is reference identity only; source
+semantic/execution/official/licensed credit0, with archive reproduction/freshness
+caveats unchanged. No network/browser refresh or publication body in Git.
+Manager composes both append-only scopes, retains both reader/registry test
+families and frozen preexisting row digests; only shared merge points conflict.
+Derived documentation is regenerated normally. Fresh main33reader+13policy=
+46Python and15Rust topic-registry tests pass, zero ignored; empty fixtures0credit.
+Actual guards/four mutants/module968/34/4/1/generator reproduction/fmt/normaldocs/
+check/changelog/whitespace pass. Ledger-only docs checks are separate; every
+sequence and seal/HEADcheck cleans the intended target. Worker repaired external
+cache-key/inventory-path helpers retain original failures; manager initial date
+regex failed, corrected HTMLParser verification passes unchanged worker bytes.
+Unchanged API retains exact9e1a combined global pass; dependency policy reuses
+originald8/all32inputs, not fresh deny/CI. Actual RFH2 conversion now has its own
+isolated implementation assignment, not acceptance from source pins. All
+nonlicensed parent gates remain required; licensed oracle ONLY skipped0/26.
+
+`MQ-1503.complete-get-md-writeback` supplies the complete returned descriptor
+writer for later compiled forwarding. It maps every actual MQMD1/2 output field
+through the existing generated raw policy and one atomic prefix copy, with exact
+version/structure-character checks. Input-only StrucId/Version and caller suffix
+remain unchanged; numeric order is the original capture, never body Encoding/
+CCSID. Late scalar, stale prefix, capacity, foreign profile/version/identifier
+or non-GET errors change no destination bytes. No partial projection, new codec,
+status inference, field defaulting, conversion or execution authority is added.
+Original MQGETrow0015 and supplemental baseline2026-09-12 MQMD declaration/
+field topics are hash-verified retained-first and searched/read offline.
+Six new writer tests and28 existing raw regressions pass (34 Rust, zero ignored;
+filtered208 and empty integration0 earn no credit), plus13 mandatory policy tests,
+actual guards/four mutants/module968/34/4/1. Changed public contract requires the
+genuine combined API gate; it passes compiler70/coverage386/execution0/host931/
+store72 without raising ceilings. First docs generation rejected an incorrect
+change-fragment format; the failed receipt remains preserved. Corrected fragment
+passes normaldocs/check/changelog/whitespace without repeating unchanged Rust,
+policy or API checks. Final ledger-only docs generation/check is separate.
+All sequences and exact feature seal/HEADcheck clean the intended target.
+Diagnostic signed/opaque-byte fixtures prove complete value fidelity, not native
+MQMD legality. Compiled OPEN/GET, trusted catalog/profile facts and all-argument
+final reply writeback still must compose actual selected execution. All other
+nonlicensed parent gates remain required; licensed oracle ONLY skipped0/26.
+Originald8 dependency receipt/all32unchangedinputs reused, not fresh deny/CI.
+
+`MQ-1501.producer-attribute-source-pins` consumes sealed worker4243880b3 after
+independent seven-path/blob, seven frozen binding, 87 finalized receipt,
+nine source-pin, 22 pre-run snapshot and 32 dependency-input verification.
+The shared independent registry now includes nine exact retained topics under
+`mq-producer-attribute-sources`, baseline
+`ibm-mq-9.4-producer-attribute-sources-2026-09-12`; manifest SHA
+`8e6ee63586f57c7ee8fb872cb8f8dec0b1c81d66a8f1d2bc4991df32d5a924b0`.
+Original MQPUT/MQPUT1 rows0020/0021, original27/supplement80/layout12/property12/
+recovery1 bindings and the26/27 denominator remain exact. Actual retained-first
+SHA/bytes/metadata/TOC and offline repository search/read checks pass, with no
+network/browser refresh or publication body in Git. MQAT_MVS and MQAT_ZOS both
+have value2 (`q090310_19–21/25–27`), a declaration rather than admission.
+Queue-manager CCSID is explicit configuration; the pinned z/OS startup default
+is500 (`q102230_`), not an inferred CP037 default. The archive remains
+in-progress without independent browser reproduction or freshness claims.
+Fresh composed checks pass31 reader plus13 mandatory policy Python tests and
+14 actual Rust topic-registry tests, zero ignored. Actual guards/four mutants,
+module966/34/4/1, fmt/normaldocs+check/changelog/whitespace pass; zero-test binary
+fixtures earn no credit. Ledger-only docs regeneration does not repeat these
+passing checks. Each sequence and feature seal cleans the intended target.
+Unchanged API inputs retain the exact028c combined global-documentation pass;
+dependency evidence reuses only originald8 and its32 unchanged inputs, not a
+fresh deny/CI run. Early worker snapshots retain their original candidate
+identities; fresh composed checks cover the final registered files.
+This is zero source/execution/official/licensed credit, not native producer
+semantics. Complete PUT/PUT1, trusted physical GMT/JES context, generated IDs,
+defaults/priority/expiry and every other nonlicensed parent gate remain required.
+Only the licensed oracle is human-skipped0/26; the parent remains ACTIVE.
+
+`MQ-1503.selected-property-family` consumes sealed worker927e8c4ac after full
+production/tests/schema/generator/source review and independent46path/blob/
+77frozenreceipt/21pin/106locator/32dependency checks. The existing selected
+runtime executes CRTMH/SETMP/INQMP/DLTMP/DLTMH with complete associated MQMD1,
+exact partial inquiry MQPD/type/Encoding/string-only CCSID/returned name/
+VSLength/DataLength/copied prefixes and reviewed status. Same-registry exclusive
+staging holds across the original core/SAF/physical audited publication;
+provisional handles remain historical, known commit alone adopts live state.
+Strict storage@3 extends the sole result codec; old@1/@2 bytes remain exact.
+Unknown retains/fences; cold receipt replay cannot revive properties/handles.
+Manager composition preserves selected fullGET/backout/CCSID admission and
+both pre-publication error audit branches. Only shared facade conflicts are
+reconciled; generated documentation is normally regenerated. Public contracts
+changed, so a fresh composed global API gate is required, not reuse of54bc.
+That genuine composed gate now passes exact compiler70/coverage386/execution0/
+host931/store72 ceilings. Main232 host unit+9 integration,100 selected-service,
+34 admission,32 replay,11 property-kernel and11 shared-handle integration tests
+pass (429 Rust tests, zero ignored; empty doctests0 credit). Forty-one tooling
+tests, actual guards/four mutants, module965/34/4/1, offline source reproduction,
+fmt/normaldocs+check/changelog/whitespace pass. Worker working-candidate receipts
+keep their original identities, not relabeled as this composed execution.
+Original rows0010/0013/0014/0017/0023, property baseline2026-09-12 and pinned
+supplemental sources define this finite ordinary ZosBatch version1/default
+ASCII-name/explicitUTF8/native785 signed-integer profile. MQPD initializer
+table conflict stays recorded; explicit support1/copy22 symbols define values.
+No broader RFH2/conversion/cursor/context/MD2/nativeinstalled/public/full26
+acceptance is inferred. Participant/recovery/CardDemo and every nonlicensed
+parent gate remain required; licensed oracle ONLY skipped0/26.
+
+`MQ-1503.selected-get-ccsid-boundary` distinguishes lossless full-storage
+observations from executable selected GET output. The finite unformatted profile
+now requires a stored explicit positive body CCSID, refusing Q_MGR/INHERIT and
+other nonpositive observations before candidate adoption or physical publication.
+Pinned supplemental `q097395_946–962` forbids successful GET returning the two
+sentinels; broader negative CCSID formats remain outside this finite profile.
+This is not input-MQMD validation, PUT/default resolution or conversion. Stored
+diagnostics, old canonical/replay/cold bytes and the source denominator stay exact.
+Memory/owned SQLite MD1/2 ASCII/CP037 negative cases check queue, current unit,
+live checkpoint, every physical row and audits remain unchanged. Parent full26,
+native full delivery, root/taskend/recovery/participant/CardDemo stay required;
+only the licensed oracle is skipped0/26.
+
+`MQ-1503.selected-full-get` consumes source-repaired sealed worker `b52553af6`
+on top of the live backout prerequisite. The private ordinary ZosBatch selected
+service now composes complete MD1/2, copied prefix, DataLength and exact reviewed
+GET status with actual held input object, current local unit, original core,
+mandatory SAF and the single physical audited receipt publication. Removed
+local GETs followed by original BACK increment stored counts once up to255;
+cached identical BACK does not recount. Invalid stored counts or nonempty
+structured properties refuse before adoption; the input GET counter remains
+ignored/output-only. CMIT/partial payloads and old storage/cold policies stay
+exact. The finite profile is unformatted, ungrouped Remove/NoWait; broader
+GMO/RFH2/property/conversion/wait/browse semantics are not inferred.
+Manager source review also corrects seeded stored GET CCSIDs to explicit37/819:
+`q097395_946–951` forbids returning the queue-manager sentinel zero. These are
+opaque input fixtures, not a PUT/context/default/CCSID-conversion producer.
+Independent checks bind14 worker paths,120 final tested inputs,57 frozen
+receipts and seven unique source pins. Worker131 focused passes retain exact
+worker/input identities. After the manager fixture correction, fresh composed
+checks pass 86 selected-service and 34 admission tests (120 total, zero ignored),
+13 policy tests, actual guards/four mutants, module953, fmt/docs/changelog and
+whitespace. Unchanged contract and dependency inputs reuse their exact earlier
+passes; no new global API, dependency-policy or CI run is claimed.
+Original baseline MQBACK/MQGET rows0001/0015 and supplemental MD/GMO topics
+define the source boundary, with zero official/source execution credit.
+Only known physical success adopts; late CAS/controls/quota errors preserve
+pending authority and postpersist Unknown retains/fences without redispatch.
+SQLite committed-counter reopen proves persistence, not HardenGetBackout crash
+accuracy or handle resurrection. Full PUT/PUT1, native/installed complete
+delivery, root/task-end/recovery, participant, CardDemo and all26 remain required.
+
+`MQ-1501.recovery-source-pins` consumes sealed worker `95ad8e9d4` and registers
+exactly one independent zero-credit source: HardenGetBackout `q103230_`, baseline
+`ibm-mq-9.4-recovery-policy-sources-2026-09-12`. Exact archive metadata, pinned
+TOC, retained-first SHA/bytes, publication date and incoming verified
+`q097395_ -> q102970_ -> q103230_` links bind the source. The original 27-call,
+80-supplemental, 12-layout and 12-property manifest bytes and prior registry rows
+are unchanged, as is the 26-call/27-position denominator. The shared offline
+reader/registry supplies the new scope without a production authority change.
+Manager verification independently binds seven worker paths, 2,272 matching
+final tested inputs plus one normally regenerated docs manifest, 51 finalized
+receipts, one source pin, six frozen prior files and 32 dependency-policy inputs.
+The source archive remains in-progress, without independent browser reproduction
+or freshness/snapshot-equivalence claims. This closes a reference-source gap,
+not crash-accurate BackoutCount, queue defaults, root/task-end/recovery,
+participant, CardDemo or all26 acceptance. Only the licensed oracle is skipped;
+all other parent requirements remain active.
+
+`MQ-1503.zos-backout-policy` adds an explicit private live delivery candidate for
+the reviewed MQ9.4 BackoutCount rule (`q097395_` lines1498–1508, supplemental
+baseline2026-09-12; original MQBACK/MQGET rows0001/0015). Complete messages
+actually removed into a syncpoint unit increment once and saturate at255.
+Invalid signed counters refuse the whole unit; browse/rejected truncation,
+staged puts and other units do not count. Every other MD/body/property byte and
+the legacy partial/storage-only backout/cold projection remain exact. Existing
+candidate quota checks precede adoption. This is a deterministic policy primitive,
+not selected semantic admission, physical publication, HardenGetBackout crash
+accuracy, a task-end producer, native MQMD initialization or new call acceptance.
+Selected GET/BACK and final recovery must compose this rule before their native
+backout observations can earn credit. All parent requirements remain active.
+Five new policy and six unchanged full-storage regressions pass (11 focused
+tests, zero ignored), including MD1/2, ASCII/owned CP037, persistent/nonpersistent,
+exact repeated decision, invalid-counter mixed-unit rollback and finalization
+quota refusal. Thirteen policy tests, actual guards/four mutants, module952/34/4/1,
+fmt/docs/changelog pass. Diagnostic surrounding fields are preservation tests,
+not native-valid MQI execution fixtures. Unchanged contract/dependency inputs
+reuse exact earlier passes rather than new global/deny/CI claims.
+
+`MQ-1506.selected-retention-dependencies` now protects selected recovery graphs
+in the existing epoch-fenced core inventory. The owning full rich snapshot reader
+validates marker/catalog/delivery/control/unit/receipt together, delegating old
+and full storage outputs to the sole lossless result codec. Every retained
+receipt execution/effect and unit logical execution/original CONNECT key stays
+blocked, including empty/final units; malformed/unknown/orphaned state sets the
+conservative unowned fence. No runtime, age, archival permit or new target is
+created. Four provider and three server regressions plus 13 rich-reader, three
+existing safety and one coordinator retention regressions pass (24 total, zero
+ignored), with owned SQLite reopen, real core-row protection, stale epoch refusal
+and actual guards/four row mutants/module937/fmt/docs/changelog. Original failed
+compile/test receipts remain failed; their repaired inputs pass separately.
+Dependency policy reuses only original d8 and all 32 unchanged inputs; unchanged
+contract inputs retain the genuine global API-doc pass from `54bcfeae`, not a
+new gate run. Selected retirement/post-persistence age, root task end, recovery,
+actual full delivery, participant/IR/CardDemo/all26 still require implementation.
+
+`MQ-1506.host-api-doc-repair` composes sealed worker `d3c7b274` with the
+execution/store repair below. The genuine global API-documentation gate now
+passes at exact counts compiler 70, coverage 386, execution 0, host 931 and
+store 72. No limit increases, suppressions or new exemptions are introduced.
+Three request-family groups move behind unchanged public reexports; independent
+reconstruction preserves declaration/implementation tokens and literal bytes.
+The actual request-module allowance decreases 2268 to 1701; all new children
+stay below 1200. The combined checkout passes 233 host tests, zero ignored,
+and required policy/row/module/fmt/docs gates. Historical failed receipts keep
+their original candidate identities; this fresh repair is not a release waiver.
+
+`MQ-1503.full-message-boundary` adds complete FullPut/FullPutOne/FullGet requests
+and FullPut/FullGot observations to the existing 26-call authority, composing
+every MQMD1/2 field and ordered properties in the sole canonical encoder.
+GET binds actual copied prefix, DataLength, original capacity/truncation and
+reviewed status, including returned MD on rejected truncation. The same replay
+codec preserves exact old storage@1 and uses strict storage@2 only for full
+outputs; historical reconstruction grants no live authority. Sealed worker
+`f4bccf48`, ADR0033 and original rows `0015/0020/0021` define this value boundary.
+Full requests remain explicitly pending/Unsupported before selected mutation;
+source-bound per-call policy, delivery/checkpoint/receipt evolution and actual
+PUT/GET/PUT1 execution remain required. This is not new executable call credit.
+
+`MQ-1501.typed-connection-warning` now preserves the exact reviewed warning
+`1/2002` and defined nonhistorical issued HCONN for compiled CONN/CONNX, reusing
+the same ABI alias or recording a child's first observation without minting a
+provider handle/UOW. Both calls capture bounded compiled ranges and recheck
+original frame/profile/layout/bytes before one atomic output batch. Undefined
+failed HCONN is retained; unusable/pending/historical/uncertain replies cannot
+partially write or install an alias. Sealed worker `a3bca54f` and integrated
+`e139bfd8`, original MQ9.4 rows `0008/0009` under
+`ibm-mq-9.4-mqi-2026-08-31`, define this machine slice, not actual provider reuse
+or installed-service/SAF acceptance.
+
+`MQ-1505.selected-provider-identity`, sealed `78cdde60`, adds only a read-only
+physical-Arc identity observation through the existing frozen host registry.
+Equal descriptor/generation values cannot substitute another selected provider;
+existing ready/missing refusals and independent invocation admission remain.
+This necessary bridge composition check grants no lifecycle, SAF or UOW permit.
+
+`MQ-1505.selected-connection-warning`, integrated `e85d389b`, now reuses the
+actual unique live issued connection for ordinary nonshared CONN/CONNX under
+the same logical owner, original CONNECT key, current unit and closed directory.
+Mandatory original core/SAF/control checks and atomic receipt/audit/CAS remain;
+exact reviewed `1/2002` performs no new allocation, delivery-clock advance or
+pending-work change. Cached replay must still match the actual issued reply and
+live authority. Manager composition passes 193 focused tests, zero ignored,
+including Memory/SQLite late-CAS, audit rollback, uncertainty and incarnation
+fences. Original baseline rows `0008/0009` distinguish a task from its subtasks.
+Private provider fixtures do not prove the configured installed/public route.
+
+`MQ-1506.execution-store-api-docs`, integrated `47e35251`, documents the
+execution/participant and audited publication/CAS boundaries without changing
+executable code. Exact missing-documentation ratchets decrease from execution
+303/176 and store 98/95 to execution 0 and store 72; no ceiling increases or
+exemptions are introduced. The original host failure 2546/1128 retains its
+historical candidate identity; the separate host repair above supplies a fresh
+passing combined global gate. Documentation still grants no licensed evidence
+or release acceptance.
+
+`MQ-1505.configured-installed-bridge` consumes sealed worker `b16013ecd`.
+Deliberate privileged Rust setup opens only existing strict rich state and binds
+the SAME physical provider/store/clock/control to genuine original compiled
+artifact/core/winning CALL admission. Bounded root/frame maps retain original
+same-task lineage. Ordinary `cobol.call@1` forwards its existing winning proof
+through the same guarded session as batch input; preparation abort is once-only
+and finish observes the untouched raw outcome before cursor/linkage mapping.
+Real compiled nested/successive CALLs use the actual selected provider on Memory
+and owned SQLite with mandatory recording/denying SAF, original core/receipts,
+both provider and coordinator audits and actual lifecycle/outbox records.
+Normal nonfinal returns retain prior connection/work; late CAS/audit/control
+failure and cold incarnation fence without redispatch. Drop revokes transport
+only, never deciding a durable UOW. ProductServer defaults remain legacy; no
+startup normalization, operator permission, installed RACF/shared-participant,
+typed checkpoint/task-end/recovery, CardDemo or all26 completion is claimed.
+The strict fixture is reproducibly generated by the existing quiescent import
+planner and grants setup credit only. Independent manager checks bind all22
+worker paths,479 tested source inputs,125 receipts and five original source pins.
+The composed candidate passes 56 MQ session/configured, three affected legacy
+CALL and 12 replay regressions (71 focused tests, zero ignored); one separate
+setup-only generator reproduces the exact fixture bytes. Thirteen policy tests,
+canonical/provider guards, four actual row mutants, module950/34/4/1, fmt,
+normal docs generation/check and changelog pass. Unchanged contract and32
+dependency inputs reuse exact earlier passing receipts, not new global/deny/CI
+runs. Historical worker failures remain attached to their original candidates.
+
+`MQ-1501.installed-connx-observation` forwards the additive trusted CONNX profile
+through the same exact-original Invocation and pre/post revocation guard as
+profile/current-unit lookup. Encoding/profile observations are unchanged; older
+embeddings remain Unsupported. Finish/abort/Drop suppress escaped observations,
+including a concurrent late return; callback panic irreversibly revokes transport
+as protected Unknown without cleanup/retry. This transport-only composition uses
+the already reviewed row `0009`/CNO source boundary and selects no ABI, queue
+manager, handle, SAF or UOW authority. The real configured producer remains the
+next installed integration obligation.
+
+The deliberately privileged Rust `MqTrustedBatchRuntime/Root/Frame` facet now
+opens only existing strict rich state and retains one selected service, physical
+store, mandatory SAF/clock and frozen limits. It preserves exact unbound original
+roots and checked opaque same-task child lineage; it cannot attest application
+bindings or fabricate an installed host proof. Original dispatch reuses core,
+SAF/audit/UOW/CAS/receipt/replay authority. Preparation abort and normal nonfinal
+child return are explicit and once-only; uncertainty fences/retains, and Drop
+makes no durable decision. Worker `f80e9a12`, ADR0032 and original rows
+`0001/0007/0008/0009/0012` define this provider slice. Its inherited batch-module
+failure is not relabeled; the manager composes the separately committed downward
+ratchet repair. Actual installed producer, deliberate normalization/selection,
+final task-end/checkpoint/retention/participant/full26/CardDemo remain pending.
+
+The complete MQMD VALUE primitive now retains every version-one/two signed
+MQLONG and fixed character/byte field, with a separate explicit structure
+character profile and no invented v2 fields. Projection uses the one generated
+raw catalog; the new bounded strict value codec reuses existing canonical
+primitives. Original effect/result/replay/storage/checkpoint bytes and the old
+partial descriptor remain unchanged; partial projection still refuses pending.
+Worker `71d66481`, ADR0033 and original rows `0015/0020/0021`, supplemental MQMD
+`q097390_/q097395_/q091870_` and the point-layout scalar/encoding pins define this
+slice. Full-message request/result/replay value composition is integrated above;
+actual PUT/GET, context/SAF, delivery and durable evolution remain pending.
+The worker's original global API-doc failure retains its candidate identity;
+the separate repairs above pass a fresh combined gate without waiving or
+relabeling that failure.
+
+The compiled typed adapter now recognizes original MQCONNX VERSION1 calls through
+an additive, default-Unsupported trusted profile/encoding port. It checks real
+compiled direct/COPY-wrapper CNO group layouts, all five reference ranges and
+unchanged input bytes; only independently selected ordinary nonshared big-endian
+ASCII-compatible storage is admitted. Exact issued-token aliases and bounded
+atomic CONNX writeback reuse the existing machine authority. Original row `0009`
+(`q101770_` signature and COBOL lines 220–228), row `0008` (`q101760_` name rules)
+and supplemental `q091060_/q095410_/q095415_` define the source review. The worker
+is sealed as `8fdbcd93`; its compiler fixtures are not installed-provider/SAF
+acceptance. Guarded server forwarding and compiled warning handle writeback are
+now separately integrated; actual selected service production, conditional
+Options output and accepted typed checkpoints remain
+separate composition work. Legacy canonical and checkpoint identities stay exact.
+
+The existing reviewed-output contract now retains MQCONN/MQCONNX's exact
+`MQCC_WARNING/MQRC_ALREADY_CONNECTED` pairing with its defined connection output.
+Other warning/failure output pairings remain closed. The existing strict replay
+codec preserves its full canonical identity but reconstructs only historical
+non-executable handles; registry lifetime/owner checks remain independent.
+Original MQ 9.4 rows `0008/0009`, MQCONN usage line 271 and MQCONNX return lines
+76–78 define this source review. Selected provider reuse of its actual prior
+connection and compiled warning writeback are separately integrated above.
+The genuine configured installed route remains pending. No token,
+duplicate connection, SAF permit or additional execution credit is fabricated.
+
+Installed executable frames now forward read-only profile and current-unit
+observations through one exact-Invocation, pre/post-callback revocation guard.
+Panic revokes transport and returns protected Unknown without retry or cleanup;
+finish, abort and Drop suppress escaped observations. Present inherited ordinary
+batch MQ bindings are retained exactly; malformed or conflicting MQ contexts
+reject before factory/dispatch, and only missing child context receives trusted
+setup. Original parent/core/CALL provenance is never rewritten. Compiled-child
+and genuine coordinator Memory/SQLite regressions cover CONNECT/CMIT/BACK/DISC,
+but use fixture MQ/frame transport rather than an actual selected service/SAF.
+Source baseline `ibm-mq-9.4-mqi-2026-08-31`, rows `0001/0007/0008/0009/0012`,
+does not make these observations durable UOW or task-end authority.
+
+An explicit private trusted-host context plane now admits an unchanged original
+ordinary batch parent even when its MQ binding is absent. The opaque directory
+freezes binding-only versus explicit mode; old routes never fall back. Present
+malformed/conflicting MQ or CICS contexts, foreign/stale parent/probe and widened
+child controls still fail closed. One bounded directory proof carries the exact
+original Invocation and owner to strict effect admission, without rewriting
+core/CALL, envelope, SAF, audit, UOW or replay identities. Same-task child-first
+CONNECT, parent CMIT/BACK and cold-incarnation fences are covered on Memory and
+SQLite private fixtures. Original MQ 9.4 rows `0001/0007/0008/0009/0012` remain
+the source boundary. The actual installed same-service producer, public trusted
+embedding bridge and shared participant acceptance remain separate obligations.
+
+The checked raw-layout contract now includes MQCNO version 1's twelve-byte
+StrucId/Version/Options prefix. Exact options zero or 32 decode only with a
+separately supplied ordinary owned nonshared profile; options cannot select
+host, sharing, security or binding authority. Conditional IBM Options output
+remains pending, and writeback preserves omitted, undefined and suffix bytes.
+The additive raw projection preserves the prior five-layout identity and all
+original canonical/status/call identities. Original row `0009` and supplemental
+`q091060_/q095410_/q095415_` under the pinned MQ 9.4 baselines define this
+bounded source review. This is not executable CONNX or licensed call credit.
+Installed memory/profile/alias routing and broader CNO versions remain required.
+
+The installed server now supplies a private-constructor, non-Clone/non-Serde
+admission observation only after validated artifact/catalog selection and winning
+the original durable CALL reservation. It preserves the actual parent and
+parentSome child, original core intent/running parent/CALL identity and frozen
+physical store/control/host/artifact adapters. One explicit frame-session guard
+invalidates transport before once-only abort/finish, observes every untouched raw
+coordinator outcome before output mapping, and makes no durable decision on Drop.
+Factory callbacks run outside setup locks; foreign physical store/control,
+late provenance/control changes and uncertain notifications fail closed.
+Fixtures prove actual compiled child/core/CALL dispatch, not an owned selected
+MQ service or independent root/topology. The actual same-service host bridge
+remains a composition obligation before public registration. Source baseline
+`ibm-mq-9.4-mqi-2026-08-31`, rows `0008/0009/0012`, distinguishes actual task
+end from child return; raw outcomes are not invented task-end authority.
+
+Checked raw COBOL prefixes now retain every MQOD1/MQMD1/MQMD2/GMO1/PMO1
+field byte and actual capacity, with explicit trusted integer/character encoding.
+The independent raw-layout projection is generated from the existing single
+structure/status catalog and hash-bound supplemental/layout sources, preserving
+the original call, status, wire-option and canonical identities. Observed-field
+writeback checks complete preflight before one bounded copy, preserving omitted,
+undefined and suffix bytes; numeric aliases and Signal1 remain observations,
+not executable handles or pointers. No defaults, names, counts or descriptors
+are fabricated. Original rows `0006/0015/0019/0020/0021` and the
+`ibm-mq-9.4-programming-supplements-2026-09-12` /
+`ibm-mq-9.4-point-layout-sources-2026-09-12` pinned declarations are the source
+boundary. Full typed MQMD representation, installed memory/alias routing and
+real provider execution still require composition; this contract earns no
+additional call or licensed execution credit.
+
+The typed machine now emits MQCMIT/MQBACK for an independently admitted ordinary
+batch/local-MQ frame. Its live-token UOW lookup is a read-only assertion, not
+authority reconstructed from bindings or an application integer. Original
+sequence/key/actor and the selected provider's logical-owner/control/CAS checks
+remain unchanged. Reviewed status observations are copied exactly without local
+durable decisions; mismatched units, changed frames and unusable post-dispatch
+typed envelopes are protected Unknown before writeback. Legacy validation and
+checkpoint bytes remain unchanged. Selected service wiring, shared participants
+and typed recovery remain required.
+
+Private same-task batch-child ownership now consumes an opaque admitted parent
+lease and explicit host-supplied SAME TASK relationship. It retains the frozen
+logical processing-unit origin across child references and validates existing
+durable UOW ownership against that proof without changing `UnitOwner@1` bytes.
+Child effects, retained core intent, SAF, audit and receipts keep the actual
+child actor; return/abort retire only the appropriate volatile frame. Same
+physical control/CAS, audited transaction and incarnation fences remain required.
+Fixture provider tests are not an installed/public host producer. A checked
+same-task child can now create the task's first default/nonshared connection.
+Its original CONNECT key remains durable provenance while the admitted logical
+root owns the UOW; its actual child actor still owns the effect, SAF, audit and
+receipt. Normal nonfinal child return retains that connection, objects and work
+for surviving admitted frames, without implicit disconnect or UOW decision.
+Already-connected warning/output composition is integrated above; final task
+end, configured abnormal/Unknown recovery, checkpoints, participants and full
+26-call acceptance remain separate obligations. The source boundary is original baseline
+`ibm-mq-9.4-mqi-2026-08-31`, rows `0008/0009/0012`; task excludes subtasks.
+
+The additive `mq-point-layout-sources` scope now registers twelve hash-verified
+retained MQ 9.4 layout/scalar/encoding topics independently of the frozen
+80-topic programming supplements and original 27 call positions. Its baseline
+is `ibm-mq-9.4-point-layout-sources-2026-09-12`; manifest SHA-256 is
+`128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa`.
+The shared reader and registry keep separate scope closure and zero credit.
+This supplies sources for subsequent reviewed layout projections, not numeric
+admission, wire execution, a new browser capture or licensed certification.
+
+The complete-payload delivery storage feature is integrated in the existing
+kernel: homogeneous partial/complete queue profiles, strict additive cold/live/
+row @2 projections and a private pre-activation quiescent upgrade plan under the
+unchanged rich marker/catalog/metadata fences. Old @1 partial bytes remain exact;
+wrong profiles refuse before adoption. Actual selected full GET/PUT/PUT1, trusted
+context/IDs/GMT/expiry policy, activated-service retirement and authorized operator
+deployment/backup/rollback remain pending. No automatic rewrite or public-ready
+claim is added. The composed candidate passes90 focused delivery/rich/import/
+selected-retention/server/coordinator tests, zero ignored,13 tooling policy tests,
+required guards/four actual namespace mutants, module945/34/4/1, fmt/docs/changelog.
+Worker path/test-input/source and corrected stable-receipt identities were
+independently verified; its original self-stdout inventory failure is preserved.
+Only source registration/storage/private tests are credited to their boundaries;
+full26/participant/CardDemo acceptance remains required and licensed0/26 skipped.
+
+The independent `mq-property-sources` scope now registers twelve retained topics
+for property names/restrictions, descriptor mapping, variable strings and property
+option/structure/copy constants, baseline
+`ibm-mq-9.4-property-sources-2026-09-12`, manifest SHA-256
+`f1537d0ab7feba5c7260e5dced3e9878b5bf999b274e0254f888fc1d78d96ba7`.
+Frozen original27/supplemental80/layout12 bindings remain unchanged. Hash-verified
+archive metadata and retained bytes are not refreshed browser capture, semantic
+admission or execution evidence; the in-progress archive's reproduction/freshness
+caveats remain. Source and licensed execution credit stay zero. Actual selected
+property transitions, associated-descriptor mapping and full26 gates remain.
+
+The continuation's module-budget composition repair passes the global module
+guard after unchanged validation, input-projection and conversation helpers are
+split from the inherited server/application/IMS/CardDemo modules. IMS generic
+tests move into the existing test-only directory; the MQ status generator's
+comment header now matches the generator-owned-header policy. All inventory
+changes lower exact counts or remove a no-longer-oversized MQ exemption; no
+ceiling increases or new exemptions are introduced. The focused composed
+regressions pass 53 tests with zero ignored. This is policy-gate repair, not
+additional MQ call, participant, CardDemo-full or licensed execution credit.
+
+Current user-directed acceptance exception (2026-10-02): the user explicitly
+requested skipping the licensed IBM MQ differential gate after the missing
+authorized oracle environment/receipt was reported. Do not request or run that
+external gate for this continuation. Licensed execution remains **skipped, 0/26**,
+not passed or certified. The original release contract and historical required
+gate descriptions below are retained as provenance; this exception does not
+waive owned execution, source, security, persistence, participant or CardDemo
+checks, and no other acceptance requirement is reduced.
+
+- Completion branch: `codex/mq-v015-continuation`
+- Continuation-wave base: `213ed878` (current main after PR #381 merged)
+- Subsequent base integration: `f0727cf8` (accepted Db2 PR #385); MQ production
+  inputs remain unchanged. Documentation registry/navigation preserve both
+  subsystems' distinct proposed ADR filenames, including shared numeric prefixes.
+  Fresh dependency policy is required for the imported Db2 manifest/lock edges;
+  unchanged MQ execution receipts retain their original candidate identities.
 
 This recovery ports lost commits `afe2b893`, `6026c4b9`, `2b7968e3`,
 `01eb5ebb`, `83223a6f`, and `972fab3a` onto current main. The first adds the identity-only registry for all 26 unique IBM MQ
@@ -197,3 +1326,1284 @@ checks passed. The licensed verifier remains `pending-external-licensed-receipt`
 at 0/26 because the required external IBM MQ 9.4 receipt and exact external pins
 are absent. The next implementation step is one manager-owned additive public
 request/result boundary before service integration.
+
+## Integrated continuation wave
+
+The manager uses Codex CLI directly, with at most three isolated workers plus
+the manager. This wave uses `gpt-6.1-sol`, high reasoning, goal mode, approval
+bypass and fast mode disabled. Previous wave settings above are historical.
+Workers read digest-verified retained HTML from the owner's raw archive through
+the repository offline reader; they do not refresh sources or spawn workers.
+
+| Lane | Declared slice | Exclusive implementation ownership |
+|---|---|---|
+| J | `MQ-1501.mqi-request-boundary` | Additive typed MQI request/result vocabulary and canonical encoding in host API new modules, with minimal facade/encoder hooks and crate-private opaque-handle identity projection; all 26 identities stay source-bound, unsupported wire/status details explicit. Shared `HostRequest` dispatch and providers remain manager-owned. |
+| K | `MQ-1502.object-inquiry-kernel` | New bounded provider object-inquiry module, exact catalog-backed attributes supported by pinned MQINQ, with minimal facade export; unsupported selectors and MQSET remain explicit pending, no second catalog. |
+| L | `MQ-1505.delivery-checkpoint-kernel` | Delivery module and child codec modules only: strict live checkpoint preserving pending operations versus existing restart/backout snapshot policy, bounds, recovery and atomic malformed-input rejection. No private durable journal or provider service. |
+
+Each lane owns a unique change fragment, focused regression tests and a sealed
+feature commit. Facade-only overlaps are reconciled and re-sealed by the manager.
+Service, shared dispatch enums, documentation, evidence and public capability
+registration remain manager-owned. These prerequisites do not grant licensed
+credit or imply that all 26 calls are publicly executable.
+
+J binds all 26 catalog identities and requires bounded, distinct typed inputs,
+deterministic canonical identities, malformed/capacity rejection, and explicit
+pending wire/result forms. K binds rows `0016` MQINQ, `0019` MQOPEN and `0022`
+MQSET: catalog identity versus resolved identity, selector order/duplicates,
+access applicability, output capacities and rejection without mutation. L binds
+rows `0001` MQBACK, `0007` MQCMIT, `0015` MQGET, `0020` MQPUT and `0021` MQPUT1:
+pending-operation retention, explicit resume versus cold recovery, monotonic
+identities, no duplicate commit/backout, expiry and atomic bounds/corrupt-state
+rejection. All are internal contracts/kernels, with backend/public-route and
+licensed gates pending, not excluded.
+
+The manager also owns `MQ-1501.shared-handle-kernel`, limited to message-handle
+and pub/sub provider modules, new focused tests and a unique change fragment.
+Rows `0008` MQCONN, `0010` MQCRTMH, `0012` MQDISC and `0025` MQSUB require one
+connection/handle authority across both kernels: property and subscription
+tokens share a registry, disconnect/unit/epoch retirement is coherent, and stale
+or foreign tokens fail without mutation. No numeric/wire or public-route claims
+are added. Shared lifecycle semantics remain those of the frozen registry.
+
+The manager declares the review repair `MQ-1501.handle-access-guard`: scoped
+registry/message-kernel access, lifetime-only registry observation, and bounded
+reclamation of properties, bindings and callbacks after low-level retirement.
+Owned paths are host-API `mq_handles.rs`, provider `message_handle.rs`,
+`pubsub.rs`, `pubsub/lifecycle.rs`, facade exports, focused shared-handle tests,
+the existing shared-kernel ADR and a unique fragment. Row `0012` MQDISC and
+`0010` MQCRTMH retain the same source pins and special-handle semantics.
+Generated documentation is manager-owned. No provider route or licensed claim
+is introduced by this repair.
+
+A separate review repair `MQ-1504.cics-callback-scope` owns pub/sub callback
+control/dispatch matching, focused task-isolation regressions and a unique
+fragment. Special default connections must retain registry-defined CICS task
+identity, rather than sharing control state because their symbolic Hconn values
+are equal. This is private-kernel isolation, not acceptance of CICS MQOP_START.
+
+### Integrated commits and review outcome
+
+| Slice | Integrated feature commit | Outcome |
+|---|---|---|
+| `MQ-1501.shared-handle-kernel` | `acc3ad11` | One connection/slot authority for message properties and subscriptions. |
+| J: `MQ-1501.mqi-request-boundary` | `8a6f4f9e` | All 26 typed call identities, distinct canonical request/result domains and exact issued-token identities; dispatch remains pending. |
+| K: `MQ-1502.object-inquiry-kernel` | `6076f9bc` | Catalog-backed bounded inquiry; unreviewed selectors and MQSET remain pending. |
+| L: `MQ-1505.delivery-checkpoint-kernel` | `298e1040` | Live resume retains pending work/cursors/final decisions; cold restart retains its separate policy. |
+| `MQ-1501.handle-access-guard` | `50dd6a92` | Direct registry/kernel retirement cannot leave a dispatchable stale callback; live unassociated/in-use properties are preserved. |
+| `MQ-1504.cics-callback-scope` | `532159c4` | Default-connection controls isolate host/process/task units; issued shared connections retain one control. |
+
+The independent read-only CLI review found no actionable inquiry/checkpoint
+defects and identified the inherited CICS default-Hconn scope leak. Three
+baseline regressions reproduced that leak before repair. Manager review also
+closed direct-accessor retirement cleanup. Callback-state observation now takes
+an owner, validates the connection and reports stale/cross-owner errors instead
+of silently presenting stopped state; scoped accessors return dereference
+guards rather than naked mutable references. See ADR 0028 for compatibility.
+
+Verification selected from this diff passed: 124 host-API unit and nine
+integration tests after canonical/handle integration; the final MQ suite's 83
+unit, ten CICS scope, four object-lifecycle, six object-service and eleven shared
+handle tests (114 total); and 13 licensed-verifier mutant tests. Formatting,
+changelog, docs freshness, MQI registry, licensed-contract structure,
+effect-encoding and exact-path feature-seal checks passed. Dependency policy
+passed with unchanged dependencies. Each sequence cleaned its checkout target;
+receipts remain outside disposable targets and Git.
+
+The broader architecture-fast attempt stopped at the missing pinned CICS
+`SSJL4D_6.x/applications/designing/dfhp37p.html` in its configured cache; the
+expected retained topic-path file is also absent. No architecture-fast pass is
+claimed. Optional global module-budget verification found an unchanged batch
+baseline of 7,404 production lines against its 7,402 ceiling; new production
+modules meet the 1,200-line limit. Supplemental strict Clippy found unchanged
+MQ warnings; a strict-Clippy pass is not claimed. Unavailable unrelated evidence
+was not refreshed or repeatedly retried.
+
+### Remaining parent acceptance
+
+These feature commits are bounded prerequisites, not completed parent work
+packages or release acceptance. Public MQI dispatch/ABI registration, trusted
+context and SAF/audit, Memory/SQLite durable service wiring, shared participant
+acceptance, full structure/options/status/selector mappings and CardDemo exact
+execution remain required. Unsupported forms stay explicit rather than generic
+success. Licensed MQ 9.4 verification remains
+`pending-external-licensed-receipt` at **0/26** without the external receipt and
+exact external pins. Harness structure and mutant tests are not licensed runs.
+The next manager-owned step is trusted public dispatch and service composition
+through existing provider-row/effect/UOW authorities, without a private journal.
+
+## Active service-integration wave
+
+The next three CLI lanes start from `070e45e8` and retain `gpt-6.1-sol`, high
+effort, goal mode, bypass and fast mode off. They must not advertise the new
+MQI surface before dependency identities, participant binding and integrated
+service proofs pass. The existing public legacy service remains unchanged
+until its queue authority and the rich delivery authority are reconciled.
+
+| Lane / parent slice | Exclusive ownership | Source rows / required proof |
+|---|---|---|
+| M / `MQ-1501.mqi-effect-admission` | New provider `mqi_admission.rs` and child tests, private facade hook, unique fragment; reuse existing trusted host-context decoder via a minimal crate-private hook only. No HostRequest variant or provider registration. | `0001`, `0002`, `0007`, `0008`, `0009`, `0004`, `0005`, `0011`: invocation/run/principal/grant, trusted owner/context, mutation sequence/key, finite deadlines/live cancellation and exact forbidden syncpoint disposition before state access. Caller assertions cannot mint trusted identity. |
+| N / `MQ-1505.delivery-provider-rows` | Delivery checkpoint/row codec child modules and minimal delivery hooks, focused Memory/SQLite backend tests, unique fragment. No legacy service edits or new dispatcher/journal. | `0001`, `0007`, `0015`, `0020`, `0021`: bounded per-queue/UOW/final-decision metadata projections, strict restore, atomic row CAS/delta failure, restart/backout and fencing. The existing provider-state store is the physical adapter; a private whole-manager blob is forbidden. |
+| O / `MQ-1501.completion-reason-catalog` | Normative completion/reason catalog, focused generator/schema/verifier/tests and generated host status modules with minimal facade hook, unique fragment. No service/state/context edits. | All `0001`–`0026`, preserving callback-function status non-applicability and 27 source positions: exact source-reviewed call-specific completion/reason pairs, numeric/symbolic consistency, strict unknown rejection and deterministic generation. Source projection is not execution credit. |
+
+The manager owns dependency-consumption audit, shared HostRequest/canonical
+integration, service composition/migration, early participant acceptance,
+documentation/ADR and public route advertisement. These lanes build the actual
+admission, status and durable boundaries needed for that integration; they do
+not replace the required 26-call final outcome with private-kernel completion.
+Existing replay, audit, canonical effect and transaction authorities must be
+reused. Parent work packages and all official execution/differential gates
+remain in progress.
+
+The manager additionally owns `MQ-1505.row-envelope-reuse`, a mechanical
+crate-private visibility hook for the existing MQ `ObjectRow<T>` envelope and
+encoder in `service.rs`, plus a unique fragment. No payload, schema, namespace,
+decoder, state transition or public API changes. Lane N consumes that single
+codec instead of copying it; the hook is integrated before its worker resumes.
+
+The hook's verification exposed a fixture allocation race: two parallel SQLite
+tests can observe the same nanosecond clock value within one process and collide
+on their temporary directory. `MQ-1502.sqlite-fixture-isolation` owns only the
+object-service integration fixture/helper and a unique fragment; atomic bounded
+directory allocation must preserve existing paths rather than deleting them.
+This repair changes no product semantics or licensed/official coverage.
+
+Lane M may make the existing retention `origin_for` function and its minimal
+returned origin view crate-private, without changing that parser or its rules.
+This scoped read-only hook reuses exact nested/outer CICS attestation checks;
+application MQI admission must not gain coordinator authority merely because
+bindings are present. No participant capability is advertised by this helper.
+
+The affected MQ service's size audit found 1,477 baseline production lines
+against its registered 1,331 non-growing ceiling (1,480 after the visibility
+hook). `MQ-1505.service-row-codec-module` therefore owns a mechanical extraction
+of existing row persistence/projection helpers into one child module, preserving
+their bytes, CAS behavior and service facade. It must bring the affected service
+below its existing ceiling, without raising exemptions or changing schemas.
+The same slice updates `tools/check_provider_rows.py` and focused guard mutants
+to inspect the linked MQ row child as well as the service, preserving both
+required atomic-write checks and whole-state-serialization rejection.
+
+### Consumed dependency identities
+
+The accepted COBOL execution integration is merged PR #6, merge
+`c7a07a93d0980173338cb26b85224e65d26e945e`, accepted candidate
+`ba0694b12409b190acfae62fc50c01b289b7cdbc`, tree
+`a0d6d6334db66f3392db44c3bb2e82ce0c590e66`. The accepted RACF/SAF integration is
+merged PR #4, merge `b4f8fc70d320c52576667a7887312c16f9b22e68`, accepted candidate
+`aa6debaf4952f31c15d83668c7b210834caa847d`, tree
+`6b5975fdc7920d1664ec28674b5f66a7d6bb6f72`. Both merged authorities are ancestors
+of this continuation; each accepted candidate has the same tree as its merge.
+The scoped approvals recorded in COBOL execution status (2026-09-02, licensed
+0/153 pending) and RACF security status (2026-09-01, licensed 0/48 pending)
+remain historical dependency dispositions, not an MQ licensed waiver.
+
+On clean continuation candidate `23c6200144c7416ee05e091409dd058d9f31ddf3`, the
+consumed contracts passed `cargo xtask cobol-exit --check`,
+`cargo xtask racf-catalog --check`, and focused RACF/SAF local conformance:
+48/48 for each recognized, validated, executed, conditioned and recovered gate.
+The COBOL exit checks structural closure and owned malformed/limit/recovery and
+prior-artifact compatibility; it is not a fresh licensed execution campaign.
+Receipts retain their actual candidate outside Git, and the target was cleaned.
+
+### Next shared effect boundary
+
+The manager declares `MQ-1501.host-effect-contract`: additive typed MQI
+`HostRequest`/`HostResult` framing through the existing canonical streaming
+authority, exact mutation/effect occurrence binding and bounded validation.
+It covers existing catalog rows `0001`–`0026` as a non-executable contract only,
+preserving callback notification's non-application-call role and every existing
+legacy golden byte. Owned paths are host request/MQ child records, canonical MQ
+child/framing, facade, focused host contract/golden tests, the canonical contract
+document and one unique fragment. Existing oversized request and canonical
+modules must be reduced within their registered ceilings, not granted new
+exemptions. No provider advertisement, accepted participant or official
+execution credit is introduced. Public service composition remains separately
+required with trusted identity, SAF/audit and durable backend proof.
+
+### Integrated service-boundary prerequisites
+
+| Slice | Integrated feature | Bounded outcome |
+|---|---|---|
+| `MQ-1502.sqlite-fixture-isolation` | `2ed0dca6` | Exclusive fixture allocation remains unique at one clock tick; existing directories are never removed to claim ownership. |
+| `MQ-1505.row-envelope-reuse` | `aabc91fc` | One existing object-row codec is reusable within the crate, with unchanged bytes. |
+| `MQ-1505.service-row-codec-module` | `23c62001` | Mechanical helper extraction reduces service production lines to 1,092, below its unchanged 1,331 ceiling; linked-row guard mutants preserve the atomic/serialization checks. |
+| M: `MQ-1501.mqi-effect-admission` | `a979b828` | Borrowed invocation/effect identity, trusted-owner comparison and live controls precede service validation; origin decoding does not select a coordinator. |
+| O: `MQ-1501.completion-reason-catalog` | `cfde0373` | All 26 calls/27 source positions retain 1,020 source-consistent pairs and ten pending declarations; callback notification has no ordinary return table. |
+| N: `MQ-1505.delivery-provider-rows` | `157f84a9` | Queue/UOW/decision/cursor rows, finite metadata and exact catalog/generation/fence identities use one existing checkpoint validator and object-row codec. |
+
+Verification on the actual integration identities is separate: `a979b828`
+passed all 130 MQ tests (98 unit, ten CICS scope, four object lifecycle, seven
+object service and eleven shared handle); `cfde0373` passed 127 host-API unit
+and nine integration tests, tooling mutants and the compiled status schema;
+`157f84a9` passed all 34 affected delivery tests, including real Memory/SQLite
+atomic failure and reopen. Each feature's HEAD seal, formatting, changelog and
+documentation freshness passed. Provider-row and canonical-effect guards
+passed; unchanged dependency-policy results are retained rather than repeated.
+Each sequence cleaned its intended Cargo target and kept receipts outside Git.
+
+The status table reproduces the pinned offline return sections, not execution
+outcomes or independently licensed observations. Conflicting decimal/hex,
+missing numbers, conflicting symbol numbers and malformed source spelling
+remain pending. Numeric completion-code mapping remains pending because these
+call pages name completion classes without declaring their numeric values.
+No publication body is committed, no network refresh occurred, and no official
+row or licensed numerator is increased by these contract/kernel proofs.
+
+### Next isolated service-composition lanes
+
+`MQ-1501.host-effect-contract` is integrated as `7ed1ed79`, re-sealed after
+reconciling the reviewed-status result arm. The integration passed 142 host-API
+unit and nine integration tests, documentation/changelog/formatting and the
+canonical-effect guard. Original-effect extraction is immutable; all typed
+occurrences retain exact replay identity. Request/canonical parents now meet
+their unchanged line ceilings. No public handler or licensed credit is added.
+
+The retained M lane next owns `MQ-1501.mqi-original-effect-binding`: the private
+admission module/children, focused tests, narrow canonical contract prose and
+one fragment. Replace metadata-only projections and independently supplied
+envelope/mutation inputs with the actual validated typed host occurrence; bind
+the full canonical host request identity and result call/limits/capacities to
+that original borrow. Trusted lifecycle owner minting, SAF, durable dispatch,
+returned-handle authority and public registration remain manager-owned. No
+standalone MQI digest may replace the shared journal identity.
+
+The manager owns `MQ-1501.trusted-lifecycle-directory`: a new private volatile
+host lifecycle directory and tests, one facade hook, the handle registry's
+process-termination primitive, ADR 0030 and one fragment. Opaque host-minted
+process/frame leases map already-admitted invocations to non-reused numeric
+owners; application envelopes cannot select them. Explicit CICS child admission
+preserves the parent task, IMS syncpoint retirement advances its owner epoch,
+and process termination retires shared handles. This is not host attestation,
+durable UOW identity, a SAF permit, public dispatch or a new lifecycle journal.
+
+After its sealed quiescent import, lane N next owns
+`MQ-1505.rich-service-state-reader`: a private strict v1/v2 stored-authority
+union and reader child, minimal service/row-codec hooks, affected Memory/SQLite
+tests, narrow provider-row documentation and one fragment. A single bounded
+physical MQ-prefix snapshot must select either legacy or rich authority, never
+merge competing queues or use missing/corrupt state as an empty fallback.
+Retained replay rows keep their existing bytes/versions and retention authority.
+Public selection, runtime/UOW owner maps and audit/effect composition stay with
+the manager. Normalized legacy reads must reuse the existing row authority;
+rich decoding reuses the frozen delivery validator, not another runtime codec.
+
+The manager-owned lifecycle directory is sealed as `de16ca03`: nine provider
+lifecycle regressions and eight affected host registry tests passed, with
+unchanged module ceilings, canonical guard, formatting/changelog and repaired
+ADR navigation/docs freshness. The mandatory docs check initially identified
+the absent navigation entry; that exact registration was repaired before seal.
+No public caller, durable UOW or licensed evidence is supplied by the directory.
+
+Lane N's quiescent import is sealed at `1c6a8fc6` before manager integration.
+Its 77 focused Memory/SQLite service/delivery/object-service tests and four row
+guard mutants passed. All legacy logical publications now advance the small
+manifest CAS dependency, preventing either migration/writer race ordering from
+publishing stale state. The import preserves exact legacy replay bytes/versions;
+non-quiescent migration, actual v2 service selection and audit/effect composition
+remain required. Disjoint stale legacy writers conservatively conflict; no
+whole-state blob or automatic mutation redispatch is introduced.
+
+The manager delegates the declared `MQ-1501.host-effect-contract` to retained
+lane M. Lanes N and O receive the following disjoint next slices, keeping three
+CLI workers plus manager, `gpt-6.1-sol`, high effort, goal mode/bypass and fast off.
+
+`MQ-1505.audited-provider-publication` (lane O) owns a minimal additive shared
+store boundary, Memory/SQLite implementations and focused tests, linked child
+modules/extraction hooks, ADR 0029, `DURABLE-STORAGE-PROFILE.md` and one fragment.
+Lane N exclusively owns the narrow `PROVIDER-ROW-PERSISTENCE-V1.md` edits.
+The publication boundary must assert the exact existing live canonical
+coordinator intent inside the same physical transaction as provider object,
+UOW/replay-result rows and their typed audit. It must use existing audit/effect
+codecs and touched-row rollback, never a private MQ audit/journal or whole-store
+clone. Core result/lifecycle/outbox completion remains coordinator-owned. All
+CAS, stale/recovered intent, audit capacity/identity and payload/row failures
+must roll back the whole publication. PostgreSQL execution remains pending if
+no disposable environment is configured; no new participant is accepted here.
+This is infrastructure for the same source-bound MQ mutations, not new IBM
+language semantics or a reason to review unrelated publications.
+
+`MQ-1505.legacy-delivery-import` (lane N) owns a private linked legacy import
+planner, minimal service hook and manifest-CAS dependency, focused Memory/SQLite
+tests, narrow row-compatibility documentation and one fragment. Source rows
+`0001`, `0007`, `0015`, `0020`, `0021` retain their pinned MQ baseline. The first
+bounded import accepts only validated quiescent legacy state; live handles/UOWs
+are rejected unchanged, never discarded or implicitly backed out. It must
+preserve exact queue order/body/IDs, catalog/trigger identity and retained replay
+bytes/versions/references through the existing delivery/checkpoint authority.
+The composable batch CAS-fences the legacy manifest/catalog/queue identities,
+initializes the existing rich row family and retires the legacy queue authority
+with an explicit versioned marker. Every old writer must CAS the small manifest
+dependency so a concurrent new pending-row insertion cannot evade migration's
+fence. Both race orderings must have one winner with no partial state/audit.
+This plan is not automatically applied during open and does not advertise a
+public upgrade before the manager supplies the v2 reader and single service
+selection. Non-quiescent conversion remains explicit pending work. The manager
+retains status/ADR coordination, trusted owner/UOW minting, service selection,
+SAF/audit composition, participant acceptance and public route proof.
+
+### Integrated host and storage composition boundaries
+
+| Slice | Integrated feature | Exact bounded proof |
+|---|---|---|
+| `MQ-1501.host-effect-contract` | `7ed1ed79` | 142 host unit plus nine integration tests; full typed host framing, immutable occurrence extraction and original sequence/key. Reviewed-status result arm reconciled and re-sealed. |
+| `MQ-1501.trusted-lifecycle-directory` | `de16ca03` | Nine private lifecycle plus eight host registry tests; non-reused leases/owners, explicit CICS inheritance, IMS epoch and exact process retirement. No host attestation or durable UOW owner is supplied. |
+| `MQ-1505.legacy-delivery-import` | `cb7d9eb5` | 36 service plus seven object-service tests and four row-guard mutants on integration; worker's separate 34 delivery regressions retain their original candidate. Small manifest CAS fences every legacy publication. |
+| `MQ-1505.audited-provider-publication` | `8e8d02da` | 17 publication, five affected Memory/SQLite mutation and eight store-API checks on integration; exact retained live canonical intent and running execution fence rows plus typed audit in one physical transaction. |
+| `MQ-1501.mqi-original-effect-binding` | `de24f3cc` | 30 admission/result regressions on integration; one original host occurrence, full shared canonical request/result identity and original call/limits/copied-capacity checks. |
+
+All feature HEAD seals and required affected formatting, changelog and docs
+freshness checks passed. Canonical/provider-row guards passed where applicable.
+The manager reconciled the ADR 0029/0030 registry/navigation overlap and
+regenerated derived documentation; no worker prose or source pin was discarded.
+Every sequence cleaned its own checkout target, preserving external receipts.
+No dependency input changed; prior policy passes are explicitly reused.
+
+Audited publication deliberately does not finalize core results/outbox or
+deduplicate disjoint batches under one unchanged intent. The actual service
+must supply its CAS-protected UOW/replay dependency and remove sequential old
+writers before atomic claims. PostgreSQL publication remains default-unsupported
+and has no execution credit. Result preflight alone cannot validate returned
+handles/UOW state or erase uncertainty after dispatch; the actual service must
+map uncertainty through the existing shared effect authority. Missing additional
+property/conversion required-length output forms remain pending, not invented.
+
+### Single-snapshot reader and independent composition review
+
+The manager integrates lane N's sealed `311e0511` reader without changing its
+production bytes. It captures one bounded physical `mq-` snapshot and returns
+exactly one legacy or rich authority. Public legacy opening is unchanged; no
+automatic migration or public MQI selection occurs. Rich identity must match
+both the import marker and delivery metadata, with historical source versions
+remaining lower bounds. Replay records retain exact bytes/versions and existing
+retention validation; numeric replay handles are not issued opaque tokens.
+Separate 64 MiB legacy/replay and rich-row budgets plus a 128 MiB aggregate
+accept valid imported combined footprints, including an exact-ceiling source
+whose replacement marker is larger. The manager's 49 service regressions pass;
+affected object-service, row guards, formatting, docs/changelog and exact seal
+receipts accompany the integrated candidate rather than relabeling worker logs.
+
+Lane M's read-only review found no actionable defect in the other authors'
+lifecycle/import/audited-publication boundaries through clean `ef02809d`.
+Incoming reader integration was explicitly excluded. It ran no new diagnostics
+or tests and did not independently approve its own original-effect feature.
+The external report binds exact path hashes and remaining service/participant
+proof obligations. Root's restart clarification records that process-local
+directory counters require a separate durably retained registry epoch advance.
+
+Lane O completed a bounded offline inventory of 80 retained supplemental topic
+candidates, all matching metadata hashes/byte counts and pinned TOC headings.
+There are 31 priority prerequisites, 40 additional structure/constant topics,
+and nine reason topics covering ten unchanged pending declarations. All remain
+unreviewed for semantics; no independent browser-reproduction or freshness claim
+is made. This inventory changes neither official source pins nor execution credit.
+
+The current three retained CLI lanes use `gpt-6.1-sol`, high effort, fast off,
+goal mode/bypass and no nested workers or orchestration skill:
+
+- N owns `MQ-1505.rich-state-publication-fence`: the same rich authority's bounded
+  ordinary delta and explicit checked persisted fence plan, exact marker/meta/
+  catalog CAS, no automatic recovery decision or adoption before full commit.
+- O owns `MQ-1501.supplemental-source-pins`: a separate zero-credit 0.15 manifest
+  and shared-reader registry extension for the exact 80 inventory topics. The
+  immutable 0.2 call baseline and pending semantic states remain unchanged.
+- M owns `MQ-1505.original-effect-core-intent-binding`: original service admission
+  bound to a real retained coordinator intent and the same physical PlatformStore
+  audited transaction. No fabricated intent, private journal, SAF permission,
+  UOW minting, public selection or core completion is supplied by this boundary.
+
+O sealed source registration at `86d2b18d` (80 topics, manifest SHA-256
+`7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a`);
+the manager integrates the same source/reader/registry bytes after selected
+service commit `830f0164`. Fresh integration runs cover the 27 reader and ten
+xtask topic-manifest tests, plus exact offline selected-scope reproduction and
+formatting/docs/changelog/seal gates. Worker receipts remain separately bound.
+Registration grants no semantic or execution credit. O now owns
+`MQ-1501.completion-wire-mapping`: explicit semantic
+review of the three MQCC numeric values from supplemental topic `q090560_`,
+baseline `ibm-mq-9.4-programming-supplements-2026-09-12`, supporting original
+call rows `0001`–`0026`. It extends the existing normative status catalog/schema,
+generator/verifier and typed status API, with narrow status tooling/tests/docs.
+Existing symbolic canonical bytes, call-page reason provenance, all ten pending
+reason declarations, callback notification role and 26/27 denominator remain
+unchanged. Source reproduction, negative mutation/schema checks, admitted and
+pending pair conversions plus canonical goldens are required before sealing.
+This mapping does not calculate outcomes or advertise handlers/ABI readiness.
+
+N exclusively owns the rich-state/delivery-row helpers and provider-row contract;
+O owns supplemental manifests/shared reader/xtask registry and cache runbook;
+M owns the new private intent-binding module and narrow effect-replay note.
+Minimal facade hooks and generated-doc overlaps are reconciled by the manager.
+
+The manager's next `MQ-1505.selected-service-authority` slice replaces the
+service's legacy-only mutex with one discriminated legacy/rich authority and
+adds a private strict selected opener. It derives provider/core views from the
+same PlatformStore Arc, requires an authorizer and trusted clock, and blocks
+legacy sequential service operations on a selected instance. Existing public
+legacy constructors/bytes/migration stay unchanged. Rows `0001`, `0007`, `0008`,
+`0009`, `0015`, `0020`, `0021` retain their pinned context/lifecycle/delivery
+authorities; the state selection adds no IBM status or wire constants. Memory
+and SQLite strict v1/v2 selection, physical reopen, corruption/mixed-state and
+wrong-fence refusal without writes, mandatory policy dependencies, same-store
+views, rejected legacy bypasses and affected legacy regressions are required.
+The manager owns service.rs, new service_selection.rs/tests, ADR 0031 and its
+registry/navigation, one fragment and freshness. Other lanes must not edit this
+union. No automatic conversion, result/replay publication, UOW owner, host
+attestation, accepted participant or public MQI readiness is claimed by selection.
+
+This selected-authority implementation passed 55 service regressions (six new
+selection tests) and seven affected object-service integration tests on the
+manager candidate. Memory and SQLite exercise v1/v2, populated/empty queues,
+exact records/replay preservation and physical reopen. Selected legacy calls and
+legacy provider registration are blocked; old constructors/registrations retain
+their previous behavior. Initial empty-install test input was invalid and hit
+the existing capacity guard; the repaired test uses a valid definition and proves
+the selected route refusal. Row guard/four mutants, formatting, docs/changelog
+and affected module ceilings (service 1120/1331, selection 115/1200) passed.
+No dependencies, schema or canonical bytes changed. The strict opener stores one
+authority and grants no connection, UOW, mutation, recovery or SAF permission.
+
+The manager integrates N's sealed `720d0b21` bounded publication/fence plans
+against this selected service union. Marker, metadata and catalog CAS are one
+composed audited batch; fence-only changes preserve live member and replay bytes.
+The ordinary/fence race has one winner in both orders. Fresh integration covers
+the affected service (including selection), delivery and object-service tests,
+row guard/mutants and required freshness/seal gates. Audited-store production
+bytes are unchanged; its 17 worker regressions retain their separate candidate.
+The plan is not a UOW decision, recovery permit or automatic adoption authority.
+
+N next owns `MQ-1505.typed-result-replay-codec`: a private bounded strict storage
+projection for actual typed non-handle MQI outputs and their full shared canonical
+result identity. It preserves pending/unknown/duplicate outcomes and refuses
+opaque handle outputs without live/historical authority. No public token
+reconstruction, new journal/pruner, reader namespace allowance or readiness is
+introduced. Minimal pure delivery-codec reuse must retain existing cold/live
+bytes. Actual receipt/CAS/core-reference/retention and historical handle replay
+remain manager obligations, not omitted v0.15 scope.
+
+The manager integrates M's final sealed `af2e56bc` original-effect/core-intent
+binding. It recomputes digest, capability and origin from the immutable original,
+observes the real retained intent/execution on the same borrowed PlatformStore,
+and retains monotonic observation time even after an expired boundary. Exact
+audit identity and bounded MQ-owned mutations pass to the existing audited
+transaction; its core completion/outbox remains coordinator-owned. Fifteen
+final worker boundary tests and 30 admission regressions retain their original
+candidate; fresh manager integration runs those affected tests and exact gates.
+Earlier unpublished 27698b56 was superseded by the summary-substitution repair.
+Nested CICS composition, actual SAF/queue/UOW validation and receipt deduplication
+remain pending. No fabricated intent or replacement store can enter the binding.
+
+O's sealed `6f28c25a` completion wire mapping is integrated separately. The
+supplemental `q090560_` table binds MQCC_OK/WARNING/FAILED to 0/1/2; UNKNOWN -1
+is not an ordinary call return. The original call catalog is reconstructed
+exactly so its canonical status digest and all golden bytes stay unchanged.
+Fourteen tooling tests, the host API suite and two schema/freshness checks are
+fresh integration gates; selected source reproduction uses only the reviewed
+MQCC/context fragments. The worker's independent full call/source reproduction
+retains its actual candidate. All ten reason declarations remain pending.
+
+O next performs read-only independent selected/publication/intent composition
+review, excluding its own status/pin work. It binds committed path identities and
+locates actual production host/coordinator call sites for the executable critical
+path; no unchanged suite is rerun merely for a review. The next implementation
+units must compose the existing service rather than mint parallel queue authority.
+
+The manager owns actual selected service/ABI/host admission, separately durable
+UOW ownership, SAF/security context and audit/replay composition, participant
+minimum acceptance and public capability proof. All owned 26-call gates and
+CardDemo remain required. Licensed differentials are explicitly user-skipped
+for this continuation, with zero licensed credit. The clean `eb9483bc` licensed gate
+reported missing external receipt/pins and pending 0/26; that older candidate
+receipt is not relabeled as evidence for these newer commits. No release or
+parent work package is complete.
+
+## Selected-flow composition wave
+
+All lanes start from the committed `adc911f0` integration candidate, except N's
+already active non-handle codec on its recorded `576e236f` plus rich-publication
+prerequisite. Direct CLI workers use `gpt-6.1-sol`, high effort, default service
+tier and fast mode off. At most three workers run beside the manager; no nested
+workers or orchestration skill are used. The licensed-only user exception above
+applies to every lane.
+
+| Slice / owner | Scope and contract ownership | Required focused acceptance |
+|---|---|---|
+| `MQ-1505.selected-operation-publication` / M | Actual private selected service flow and independently durable UOW/operation ownership under the existing sole mutex; reuse catalog, registry, lifecycle, delivery, original core intent and audited store publication. Own new service operation/UOW/receipt modules and narrow selected reader/authority integration, not host result encoding or machine/server routing. | Source-reviewed ordinary batch CONNECT/OPEN/PUT/PUT1/GET/CMIT/BACK/CLOSE/DISC first-flow composition, actual HCONN and resolved SAF checks, Memory/SQLite operation collision/replay and late CAS/audit/quota rollback, pending-work preservation and physical reopen; trusted host and handle-replay dependencies remain explicit until integrated. |
+| `MQ-1505.lossless-reviewed-output` / O | Additive reviewed completion plus exact typed output in the existing host result contract and original-request preflight. Preserve every old encoding and status inventory. Own host result definition/validation/encoding and narrow admission-result preflight, not the service or N's storage codec. | Exact warning/failure GET descriptor/buffer/required-length observations, request/call/status/output coherence, copied-capacity bounds, pending/unknown separation, old canonical goldens and focused host/admission regressions. |
+| `MQ-1505.typed-result-replay-codec` / N | Previously declared non-handle strict codec; refuse reconstruction of opaque authority. No concurrent result enum changes are consumed from another worker's dirty checkout. | Exact full-host canonical identity and storage round trip; malformed/duplicate/missing/unknown fields and bounds; existing delivery snapshot bytes unchanged. The manager must extend the codec deliberately for O's additive result after both features seal. |
+
+These units compose the first real selected flow; they do not reduce the final
+26-call denominator. The manager owns the actual trusted program host/ABI route
+and shared handoff integration. Production `ProductServer` still opens the legacy
+service, and selected legacy provider registration is deliberately empty. Do not
+switch it merely because these private primitives compile. The host must issue
+context/lifecycle provenance before constructing the original typed effect;
+equal application bindings are not that provenance. PUT1 still requires a live
+HCONN. Durable UOW ownership is not a caller's integer or volatile lease ID.
+
+The read-only composition review bound exact selected/rich/core commits and found
+no actionable defect within their stated primitive guarantees. It did not execute
+a combined public route. The next composed route must prove one audited physical
+publication, adoption after success, coordinator-owned completion, exact Completed
+receipt replay and fenced Unknown resolution. Warning/error output, opaque handle
+replay, nested CICS/IMS ownership and all remaining applicable contexts are not
+waived by a successful first ordinary batch flow. Public readiness, participant
+acceptance and full v0.15 completion remain unclaimed.
+
+The manager's `MQ-1501.typed-machine-connection-route` owns the first original
+typed machine effects for source rows `0008` MQCONN and `0012` MQDISC and an
+explicit installed-batch host-admission hook. A trusted configured factory, not
+application binding bytes, supplies frame ownership before effect construction.
+The ABI map translates only already-issued opaque connection tokens and never
+mints registry authority. Required checks cover exact original canonical effect,
+signature/storage/writeback validation, foreign/stale wire numbers, changed
+frame identity, uncertainty and old-route compatibility. Unsupported contexts
+and durable checkpoint/handle replay remain pending; the old snapshot schema
+must not silently lose this new volatile mapping. This prepares the actual host
+route without switching ProductServer registration or claiming MQ execution.
+
+This bounded handoff is implemented with nine focused interpreter regressions
+and five installed-batch admission regressions passing on the current candidate,
+with no failures or ignored tests. The compiled installed-program test uses real
+Memory/SQLite core journals and checks retained original Intent identity before
+test-provider dispatch; its fake MQ provider is not owned service/SAF evidence.
+Explicit BY REFERENCE is accepted; BY VALUE/CONTENT and other known unimplemented
+MQI signatures fail before effect construction. Unusable post-dispatch replies
+remain UnknownOutcome without application writeback. Legacy MQ method bytes are
+unchanged apart from child-module visibility, and the changed interpreter stays
+below its existing 11,940-production-line ceiling. Canonical/provider-row guards,
+four provider-row guard mutants, formatting, documentation and changelog checks
+pass. The previously diagnosed unrelated batch-service module ratchet violation
+(7,404 versus 7,402) is not waived or represented as a passing global module gate.
+Dependency policy reuses the d8a026ab receipt only after verifying its receipt
+hash and all 32 unchanged manifest/toolchain/policy input identities.
+
+## Strict typed-result storage integration
+
+`MQ-1505.typed-result-replay-codec` is integrated from sealed worker `0c6426e1`.
+It preserves complete non-handle typed results, descriptors, buffers, exact
+required/copied lengths, properties and outcome distinctions using the existing
+message projection. Storage binds the full shared HostResult digest and original
+MQI limits; duplicate, missing, unknown, malformed and over-budget input fails
+closed before typed allocation. Callback notification storage cannot admit a
+public callback effect. Opaque handle outputs remain explicitly unsupported in
+this slice; no registry token is deserialized or reconstructed. Old delivery
+restart/checkpoint bytes and default policies remain unchanged.
+
+On this composed manager candidate, 15 codec, 34 delivery and five installed-batch
+handoff regressions pass, with no failures or ignored tests. The worker's other
+host-contract receipts remain separately bound to its original candidate.
+Dependency policy is reused only under the same verified 32-input identity
+proof described above. No provider receipt row, service mutation, journal,
+public route or full-v0.15 acceptance is implied by this pure storage feature.
+
+The next declared isolated CLI slices are `MQ-1505.historical-handle-result-replay`
+(N: strict historical identity plus all-entry registry rejection and checked
+lookup of existing live entries, existing codec and ADR0033) and
+`MQ-1501.point-to-point-wire-options` (O: source-pinned numeric option/version
+projection inside the existing normative catalog and checked constructors to
+existing typed requests). Neither owns M's selected service/UOW publication or
+the manager's machine/server route. Historical reconstruction cannot mint live
+authority; caller option bits cannot mint UOW/SAF or erase unsupported modes.
+Only sealed commits will be consumed, with generated/facade overlaps reconciled
+and final composed checks retained under their actual candidate identity.
+
+## Historical handle storage integration
+
+`MQ-1505.historical-handle-result-replay` is integrated from sealed `8023d2cb`.
+Issued CONNECT/OPEN/dynamic/message/subscription outputs preserve their original
+canonical identity and metadata as historical observations. All registry entry
+and mutation paths refuse historical tokens before lookup, including coincident
+live slot identities. Checked resolution is read-only lookup of an exact existing
+owner/role/connection/epoch entry, never allocation or resurrection. The machine
+also refuses historical CONNECT output before any live ABI alias or writeback.
+The caller must independently attest retained receipt/core occurrence and current
+host frame before resolving; observation or canonical equality is not permission.
+Historical symbolic Default/Unassociated results remain explicitly unsupported.
+
+The composed candidate passes 13 handle, 21 codec, 11 shared-handle, ten CICS
+callback-scope, ten typed-machine and five installed-batch tests (70 total, zero
+failures/ignored). Worker89-test receipts retain their own candidate identity.
+Documentation conflicts preserve both manager ADR0032 and worker ADR0033 plus
+accepted Db2 decision paths; normal generation reconciles their manifest. No
+source refresh or licensed execution is performed. Reviewed baseline/catalog
+rows are `0008/0009/0010/0012/0019/0025` under
+`ibm-mq-9.4-mqi-2026-08-31`, with exact pins in ADR0033 and the worker handoff.
+Durable cold registry incarnation, actual receipt authority and selected route
+acceptance remain required; this identity-only feature supplies none of them.
+
+N's next isolated section is a read-only installed-batch trusted-producer design
+review against sealed `1da5490c`. It owns external design/identity receipts only,
+not M's service/UOW publication, O's numeric options or the manager's production
+host bridge. Actual parentSome topology, real artifact provenance, same-store
+admission, cancellation/probe, frame cleanup and durable recovery must compose;
+the review cannot turn binding parsing or a test provider into attestation.
+
+## Lossless reviewed output integration
+
+`MQ-1505.lossless-reviewed-output` integrates sealed worker `4b7f5582` and
+deliberately extends the existing strict codec, not a second result codec or
+status inventory. An additive canonical tag preserves reviewed completion/reason
+plus the exact output. GET OK/NONE, both reviewed truncation warnings and
+no-message/wait-expiry failure observations retain descriptors, copied bytes,
+required lengths and properties. Original request/mode/capacity must still pass
+provider preflight. Unrepresented conversion/property/per-destination and other
+status forms stay pending; the all-26 scope is not reduced.
+
+The composed candidate passes 155 host unit plus nine integration, 33 original
+admission/result, 23 codec, 11 typed-machine and five installed-batch tests
+(236 total, no failures/ignored). New codec regressions cover required fields,
+extra data, corrupted and coherent-invalid digests, warning/failure payloads,
+SQL cursor bounds and historical/special connection handling. The machine may
+copy validated reviewed OK/NONE connection/disconnection outputs, but cannot
+turn a historical token into a live alias. Full original result tags/digests
+remain unchanged in the core journal; local writeback is not receipt rewriting.
+Old canonical goldens and old storage bytes are preserved.
+
+Source review uses original baseline rows `0015/0020/0021` and supplemental
+MQGMO `SSFKSJ_9.4.0/refdev/q096715_.html` (pinned programming-supplements baseline),
+with exact four pins in the worker's source receipt and reviewed architecture.
+All offline source credit remains zero. Actual selected-service publication,
+host attestation, cold incarnation/checkpoint/retention, participant and CardDemo
+acceptance remain required; only the licensed oracle is human-skipped.
+
+## Trusted producer review and next guard repairs
+
+N's read-only `MQ-1501.installed-batch-host-producer-design` is complete against
+sealed `1da5490c`, with external identity/source/design receipts and no new
+execution claims. It found two concrete safety gaps: factory installation can
+race runtime publication, and an exported typed-source MachineSnapshot can
+restore into a fresh unbound destination while silently dropping admission and
+aliases. Existing same-instance refusal and coordinator checkpoint=None do not
+cover that direct cross-instance API. Both findings are repaired by the bounded
+state-guard integration below; real producer and typed recovery remain required.
+
+The next isolated N feature is `MQ-1501.typed-frame-state-guards`, based on sealed
+manager `3f758db2`. It owns narrow server setup serialization/typed control freeze
+and interpreter source-snapshot refusal plus focused legacy compatibility tests.
+It must preserve existing legacy behavior and bytes, cannot invent an accepted
+typed checkpoint schema or serialize executable handles, and does not own M's
+selected publication/UOW/receipt or O's numeric options. The manager retains
+actual admitted parent/artifact/original-call proof, same-store service bundle,
+processing-unit topology, explicit frame-session cleanup and public integration.
+
+M now has the sealed historical and reviewed-output prerequisites and manager's
+bounded existing-codec compatibility delta. Only committed sources are consumed;
+its earlier service receipts keep their actual pre-integration identity. Fresh
+composed service publication/replay checks are required before sealing that lane.
+All 26-call, security, persistence, recovery, participant and CardDemo gates stay
+active; the sole licensed oracle skip remains zero-credit.
+
+## Checked point-to-point numeric options
+
+`MQ-1501.point-to-point-wire-options` integrates sealed worker `736e5cda`.
+Checked signed MQLONG options and reviewed MQOD1/GMO1/PMO1 plus ungrouped MQMD1/2
+construct existing OPEN/CLOSE/GET/PUT/PUT1 requests without granting registry,
+SAF, cursor or UOW authority. Unknown bits and illegal combinations fail;
+recognized unrepresented versions, context, property and asynchronous modes
+remain pending. Trusted bindings must attest queue defaults even for CLOSE zero,
+supply independently admitted UOW/cursor state and explicitly convert finite
+milliseconds to clock ticks. GET defaults follow the queue-manager platform.
+PUT1 retains its actual opaque HCONN. This pure adapter is not service execution.
+
+The existing normative structure/status catalog adds a private version-two
+wire-options projection (102 facts, ten corroborating locators), retaining the
+exact reconstructed version-one hash and all original call/status canonical
+identities. Reviewed sources are original rows `0006/0015/0019/0020/0021` and
+the pinned programming-supplements baseline's MQOO/MQCO/MQGMO/MQPMO, MQOD/MQMD
+and field-detail topics; exact pins are recorded in the architecture and worker
+handoff. Missing unpinned MQOD/MQMO constant tables are not guessed or refreshed.
+Raw structure layouts, further descriptor fields and all-26 option coverage
+remain required.
+
+The composed candidate passes 114 Rust MQ host tests and 33 tooling tests with
+no failures/ignored. The manager discovered its shell previously selected
+system Python 3.9.6; fresh tooling, source reproduction, canonical/provider-row
+guards, four row tests, schemas and registry checks now run with the pinned
+Python 3.12.13. Documentation generation/checks and changelog validation use the
+same corrected PATH. Older Python receipts retain their actual interpreter and
+candidate identities; they are not relabeled. Rust 1.98 results are unchanged.
+Dependency policy reuse verifies the original receipt and all 32 unchanged
+inputs. The unrelated batch module overage remains unwaived. Only the licensed
+oracle is skipped with zero credit; full v0.15 acceptance remains incomplete.
+
+## Typed frame setup and source-snapshot guards
+
+### Complete descriptor numeric GET prerequisite
+
+The additive complete `MqWireFullGet`/`get_full` constructor preserves every
+MQMD1/2 signed/fixed-byte field and explicit structure character profile without
+partial descriptor projection. It delegates to the sole existing numeric GMO1
+control decoder, independently observed queue defaults and actual local-unit
+port. First profile is remove/no-wait with optional accepted truncation; binary
+zero MsgId/CorrelId are wildcards, both nonzero fields match by default, and MD2
+group/sequence/offset do not become additional selectors. Representation success
+does not legalize diagnostic descriptor values for the selected native profile.
+No effect dispatch, handle minting, outcome generation or queue mutation is added.
+
+Fresh focused24 wire-constructor Rust tests (four new) and20 Python tooling/policy
+tests pass, zero ignored. Actual guards/four namespace mutants/module966/34/4/1,
+fresh combined global API docs70/386/0/931/72, fmt/normaldocs/check/changelog pass.
+An initial external input verifier used a different receipt-schema key and stopped
+before tests; the corrected exact32input d8 dependency proof passes separately.
+It remains a reused dependency receipt, not fresh cargo-deny/CI acceptance. Actual
+pre-run input identities and failed receipt are external; Cargo target is cleaned.
+Offline retained-first search/read verifies original MQGETrow0015/q101830_ and
+supplemental q096715_/q097395_/q097390_, baseline2026-09-12, zero source credit.
+Compiled OPEN/GET forwarding, exact complete writeback and all other nonlicensed
+parent acceptance remain required; licensed oracle alone skipped0/26.
+
+`MQ-1501.typed-frame-state-guards` integrates sealed worker `7f7f9b04`.
+A common setup mutex serializes factory/control/runtime publication, prechecks
+all runtime fields and freezes typed setup. It preserves the legacy first
+control installation after runtime construction. External factory callbacks run
+after the mutex is released. A typed source's direct snapshot exports diagnostic
+schema zero, rejected before restore can mutate any destination, including a
+fresh unbound machine and the manual binary projection. No accepted typed
+checkpoint schema or executable-token serialization is introduced. Legacy
+schema 12 and checkpoint codec bytes are unchanged.
+
+The composed candidate passes 13 typed-machine, two legacy checkpoint, ten
+server admission/setup and four legacy control tests (29 total, no failures or
+ignored tests). Fresh guards, four provider-row tests, formatting, docs and
+changelog checks use pinned Python/Rust. Original baseline rows `0008/0012`
+remain the reviewed source boundary; source review gives zero execution credit.
+Worker receipts retain their original candidate identity. The actual admitted
+parent/artifact/call proof, same-service host bridge, lifecycle disposition,
+selected SAF/UOW/replay composition and full typed recovery remain required.
+
+## Private selected operation and durable-owner composition
+
+`MQ-1505.selected-operation-publication` integrates sealed worker `55de3f87`.
+Ordinary batch CONNECT/OPEN/PUT/PUT1/GET/CMIT/BACK/CLOSE/DISC compose under the
+existing sole service mutex and same physical PlatformStore. Original core
+intent/running execution, live opaque frame, resolved SAF resources, durable
+current-owner/control CAS, delivery/catalog/marker state, insert-only exact
+occurrence receipt and typed audit publish atomically. Candidate adoption follows
+the entire transaction; late CAS/audit/quota failure preserves pending work.
+Unknown publication/reply fences the runtime. Core completion/outbox remains
+coordinator-owned, and shared transactions remain explicitly unsupported here.
+
+Durable UOW IDs are allocated from bounded retained control, not caller integers
+or volatile directory leases. Every empty/final owner is retained; the reader
+checks the complete finite allocated prefix. Cold activation advances durable
+incarnation before exposing any new connection. Replay rechecks the exact
+physical control record, original receipt/core identity, current frame and SAF
+before resolving an exact existing live entry; it never resurrects a handle.
+The repaired stale-runtime regression proves a newer incarnation fences old
+cached connection replay on both Memory and SQLite.
+
+NoWait GET preserves source-reviewed OK/NONE, warning 2079/2080 and failed 2033
+outputs through the existing lossless codec. True wait scheduling, generated PUT
+descriptor fields, broader options/versions and remaining calls stay pending.
+The composed candidate passes 25 selected-operation, 21 rich-state, six selection,
+33 admission, 23 codec and 15 core-binding regressions (123 total, no failures or
+ignored tests). Worker prior 277/52 receipts retain their own source candidates.
+Reviewed original rows are `0001/0006/0007/0008/0009/0012/0015/0019/0020/0021`,
+plus pinned supplemental MQGMO field details; source review earns zero credit.
+
+The private root-only host entry still rejects the actual installed parentSome
+child. A real admitted parent/artifact/call proof and same-service topology/session
+bridge must compose before public registration. Pending owners survive cold
+restart without reassignment; no retention deletion or participant protocol is
+invented. Full security/recovery/participant/CardDemo/all-26 acceptance remains
+required, with only the licensed oracle human-skipped at zero credit.
+
+## Inherited module-ratchet repair
+
+The manager extracted three unchanged batch terminal-problem projection helpers
+into a bounded child module. Their production bodies are byte-identical apart
+from child visibility; no IBM semantic behavior changes. Batch service production
+size falls from 7,404 to 7,360, and its exact reviewed inventory ratchets downward
+from 7,402 to 7,360 rather than raising the ceiling. The child has 51 production
+lines. Earlier overage findings retain their actual pre-repair candidates.
+
+A bounded inventory comparison also exposed other existing mismatches: product
+assembly, package-v2, IMS service and CardDemo conformance exceed their recorded
+counts; several previously extracted modules need lower-count inventory refresh.
+Those untouched inputs are not waived, and this batch repair is not a passing
+global module gate or full-release acceptance. They require distinct scoped
+repairs with verification before the final v0.15 candidate can pass that gate.
+
+## Explicit native point and source facets
+
+`MQ-1503.trusted-native-point-bindings` composes sealed `5669842a` with the
+existing finite producer and RFH2 authorities. Structure-before-decode and exact
+lookup/held-object observations use the same selected service, physical Arc
+store, original Running core/frame, sole immutable registry, catalog@2,
+native attributes and current owning local unit. The finite calls are OPEN
+OUTPUT/INPUT_SHARED, complete PUT/PUT1 with explicit synchronous PMO1, and
+predefined CLOSE NONE. CP037 observations are truthful but do not grant the
+first ASCII/big-endian compiled adapter permission. Default queue behavior is
+call-specific; a LocalQueue label alone is not admission. Known row versions
+may advance independently of stable ABI facts. CLOSE output preflight checks
+captured queue facts without reviving the retired object.
+
+Manager review reproduced a stale observation on Memory when the final clock
+callback advanced a physical control row after its comparison. The final
+physical snapshot now follows every host callback and fresh frame/core checks;
+clock panic is contained, and selected-service reentry refuses without poisoning
+the selected mutex. Memory and owned SQLite regressions cover that mutation,
+panic/reentry, read-only state, original pending full PUT and old source behavior.
+Historical failing receipts retain their candidate identities, not success credit.
+Privileged producer-source setup is unique, once-only, preactivation and same-store;
+default GMT/context methods refuse, and NoContext does not sample them. The actual
+installed Foundation encoder/JES/GMT and native forwarding remain separate work.
+
+Source scope is `ibm-mq-9.4-mqi-2026-08-31` OPEN0019/q101870,
+CLOSE0006/q101740, PUT0020/q101880 and PUT10021/q101890, programming supplements
+OD q098100/q098105 and PMO q098655, and producer-attribute baseline2026-09-12.
+The manager reproduced all sixteen hash/byte-verified offline selected pins
+after retained-topic checks. Cluster/read-ahead, explicit access/response and
+undefined CLOSE output applicability are recorded, not guessed. No source bodies,
+browser/network refresh or source/execution/native/licensed credit is introduced.
+
+This facet does not install a host or manufacture original effects, SAF,
+capability/root/handle/UOW permission. The separately sealed root ABI scope is
+volatile connection alias storage, not forwarding. HOBJ/HMSG alias families,
+compiled original OPEN/PUT/GET/property writeback, genuine pending-PUT normal/
+native-Abend root terminal, recovery/participants/IR/CardDemo and all applicable
+nonlicensed full26 acceptance remain required. Only the licensed oracle is
+human-skipped0/26 with zero credit; the parent v0.15 goal stays active.
+
+## Complete GET read-only native binding
+
+`MQ-1503.trusted-native-get-bindings` composes sealed `eb407075` with the
+manager's final-clock containment and physical-snapshot fix. The opaque
+structure-before-decode observation now admits complete GET MD1/MD2 and GMO1
+on the actual held normal-local INPUT_SHARED object. Exact live frame, original
+Running core, ordinary batch connection, same physical provider, catalog@2 and
+current owned Local unit remain mandatory. Cursor and wait-conversion ports
+remain unavailable. The sole existing full adapter separately restricts options
+to Remove/NoWait, explicit or reviewed z/OS local syncpoint, accepted/rejected
+truncation and binary MsgId/CorrelId matching. No generic PropertyControl,
+RFH2/header/group/segment, conversion, index/WLM or zero-modifier permission is
+inferred from these facts.
+
+The known selected GET may advance physical versions without changing stable
+ABI facts; GET always requires its object still live. CLOSE's no-resurrection
+special case is not used for GET. Read-only observation samples neither context
+nor GMT and performs no delivery reservation, unit allocation, audit or cleanup.
+The manager's physical-version mutation, panic/reentry and initial/final zero
+clock regressions now exercise GET as well as OPEN, on Memory and owned SQLite.
+Private selected tests use actual FullPUT-produced messages, not seeded payloads;
+their core/source fixture setup still earns no compiled installed/JES/LE/RACF,
+root-terminal, official or licensed execution credit.
+
+Source references are original baseline `ibm-mq-9.4-mqi-2026-08-31`
+MQGET0015/q101830 and MQOPEN0019/q101870, supplemental baseline2026-09-12
+GMO q096715 and MD q097395, and producer-attribute baseline2026-09-12
+QM/queue CCSID, maxima and delivery sequence. All eight pins were reproduced
+offline after retained-topic SHA/byte checks; source review earns zero credit.
+GMO q096715 lines1260–1268 defines the actual ResolvedQName output, but the
+existing FullGot result does not contain it. This feature does not synthesize
+that output from cached queue facts, alter canonical/replay bytes or claim
+native GET writeback readiness. The additive result and installed ABI forwarding
+remain required, alongside full nonlicensed v0.15 acceptance. Only the licensed
+oracle is human-skipped0/26; no other gate is waived.
+
+## Owned reconciled raw property structures
+
+`MQ-1503.raw-property-structures` integrates sealed `b4c2585f`: a distinct
+generator-owned projection in the ONE structure/status catalog, not another
+canonical MQ or replay authority. The explicitly owned NullSlot4/ASCII/normal
+big-endian profile captures a complete 60-byte IMPO1 or standalone 20-byte
+CHARV, plus its actual containing-group capacity and suffix. Reserved1 retains
+four raw characters, the full CHARV retains four null replacement bytes and
+four signed longs, and TypeString retains eight raw characters. These reconcile
+the pinned declaration disagreements; vendor CMQIMPOV equivalence, universal
+pointer width and CURRENT_LENGTH remain unresolved, not waived.
+
+Positive explicit offsets resolve from the enclosing structure start, wholly
+inside its fixed containing group and beyond the complete prefix. Nonzero
+pointer slots, other encodings, negative/sentinel input forms and unsupported
+versions fail closed. No pointer is dereferenced, handle created or option
+admitted. The raw signed32 observation remains distinct from the compiled
+PIC S9(9) input/output domain. Only source-defined standard inquiry observations
+and exact call/status pairing prepare ReturnedEncoding, string-only defined
+ReturnedCCSID, actual returned-name prefix and VSLength/VSCCSID. Requested,
+reserved, pointer, offset, capacity, TypeString and uncopied suffix bytes remain
+exact. Unavailable properties prepare no writes. Short-name prefix copying is
+an owned policy rather than an IBM byte-equivalence assertion.
+
+Every original byte, capacity, encoding and cross-plan prefix/output overlap
+is checked before a single callback/allocation-free touched-range batch. This
+pure representation does not join separate PD/Type/Value/DataLength/status
+arguments or establish actual compiler/frame/core/SAF/current-unit authority;
+those belong to genuine native all-argument composition. IMPO and standalone
+CHARV only are implemented here; other option/descriptor structures remain work.
+Historical catalog, numeric/raw/property/RFH2/status and canonical/replay
+identities are frozen; no durable schema or handle restoration is introduced.
+
+Pinned sources are original MQ9.4 baseline2026-08-31 INQMP0017/q101850,
+programming-supplements baseline2026-09-12 q097210/q097215,
+property-sources baseline2026-09-12 q094690/q094695/q091730, and point-layout
+baseline2026-09-12 q093580/q093600. The manager reproduced all eight selected
+topics and forty exact fragment locators with retained-first SHA/byte checks.
+Declaration/short-name/z/OS availability disagreements remain explicit, and
+source review/raw fixtures earn zero installed native, official or licensed
+execution credit. All nonlicensed parent v0.15 gates remain required; only the
+licensed oracle is human-skipped0/26.
+
+## Root publication failure contracts
+
+`MQ-1505.root-publication-failure-contract` integrates reviewed sealed `2f95b897`
+as test-only verification of the existing Memory and owned SQLite root writer.
+Exact typed execution, events, outbox, audits, checkpoints, provider rows, epoch
+and clock footprints cover Put/Delete/Move settlement, contradictory dependencies,
+late final CAS, quotas, the second audit/outbox/clock failures and rollback.
+Actual committed winners refuse duplicate, opposite, old-claim, re-admission and
+generic deletion attempts without a second publication. Closing and Uncertain
+retain their fences; exact existing outbox delivery supplies no settlement authority.
+
+Owned SQLite reopen and a deliberately discarded returned acknowledgement are
+logical recovery simulations, not subprocess crash, MQ recovery or installed
+execution evidence. Eleven new failure tests and 28 focused compatibility tests
+retain their actual candidate identities and failed fixture attempts. There is
+no production, schema, API or IBM semantic change and no new source lookup is
+required. Installed pending PUT/normal/CEE3ABD/removed GET, actual crash/recovery,
+participants, IR, full26, CardDemo and other nonlicensed gates remain required.
+Only the licensed oracle is human-skipped0/26; this feature earns zero such credit.
+
+## Compiled qualified complete GET forwarding
+
+`MQ-1503.compiled-qualified-get-bridge` integrates reviewed sealed `98ccbfa2c`.
+Nine actual references retain complete MD1/2/GMO1/COPY/member/suffix/body/storage
+identities and genuine root-shared aliases. Independent same-point structure,
+descriptor version and queue/QM/product maxima precede decode. Original
+QualifiedFullGet/Got and the sole raw writers join MD/GMO/body prefix/DataLength/
+CC/RC only after all final callbacks, pure complete storage/cancellation checks
+and a held parent/object-use guard. No callbacks, allocations or fallible lookup
+follow. Generated Signal1 is opaque; SET_SIGNAL remains unsupported.
+
+Complete OK/0, accepted WARNING/2079, rejected WARNING/2080 and NoMessage
+FAILED/2033 stay exact. Rejected truncation carries represented MD/prefix/length
+but no QName; NoMessage preserves all absent caller outputs. Private actual
+compiler/frame/reply fixtures are engine-only evidence, not installed selected
+Memory/SQLite/core/SAF/JES/LE/native pending-work acceptance. Six retained-first
+pins from baseline2026-08-31 GET0015/q101830 and supplements2026-09-12 GMO/MD/
+constants were independently reproduced offline. Source credit0. Broader GET
+forms, genuine wrappers/source, removed GET/pending PUT normal/CEE3ABD, owning
+recovery/participants/IR/full26/CardDemo remain required. Only licensed oracle
+is human-skipped0/26; all other acceptance remains open.
+
+## Installed finite native OPEN/CLOSE host
+
+`MQ-1503.installed-native-point-host` integrates reviewed sealed `1ba108807`.
+Deliberate Rust setup retains strict existing complete state, SAME physical
+store/mandatory SAF/control, and a once-installed inactive NoContext source.
+Genuine eager compiled parentNone roots charge compiled metadata and preallocate
+one ABI table; original separately compiled SAME TASK children inherit that exact
+Arc. Existing lazy/default ProductServer behavior is unchanged. Native structure
+precedes decode, and selected point observations remain actual tuple-bound
+authority. Compiled ASCII/normal big-endian only; no JES/default context/GMT.
+
+Original SessionGuard transports ABI/structure observations with revocation,
+panic containment and before/after active checks. Topology is released before
+callbacks; source never reacquires frame/service mutexes. All callbacks precede
+final physical comparison, with pure storage/atomic checks afterward. Finish,
+abort, Drop and Unknown never decide UOW, task end, retry or cleanup.
+
+Genuine installed MD1/2 OUTPUT/INPUT_SHARED OPEN/CLOSE/DISC and separately compiled
+child-first/parent-object-close flows run on Memory/owned SQLite with original
+core/CALL/actor/digests and both effect audit layers. SAF, cancellation, CAS, audit
+saturation, late source mutation/panic/expiry, retired/foreign aliases, admission
+Drop, topology contention and actual cold CONNECT fencing are distinct negatives.
+Generated fixture4ea7 supplies only exact setup data, not pending work or authority.
+Two retained-first pinned baseline2026-08-31 OPEN0019/q101870 and CLOSE0006/q101740
+were independently reproduced offline; source credit0. PUT1 is explicitly refused
+at this composed prerequisite until its separate host feature is approved.
+Pending PUT normal/CEE3ABD, removed GET, DefaultContext/JES/GMT, broader forms,
+owning recovery/participants/IR/full26/CardDemo remain required. Only licensed
+oracle is human-skipped0/26; no full native-terminal or official credit is claimed.
+
+## Installed complete PUT and finite pending-work terminal composition
+
+`MQ-1503.installed-full-put-host` integrates reviewed sealed `d2817242` as a
+separate feature. The existing configured structure admits PUT/PUT1 and delegates
+predefined lookup, descriptor version and body maximum through the same retained
+opaque point. Session wrappers forward independent getters with pre/post active
+checks and panic containment. This supersedes the temporary PUT1 refusal of the
+OPEN/CLOSE prerequisite above; older embeddings retain Unsupported defaults.
+There is no new queue engine, schema, encoder, replay or UOW policy.
+
+Actual compiled MD1/2, PMO1, supplied nonzero IDs, explicit finite policy and
+NoContext produce genuine pending syncpoint PUT/PUT1 on Memory and owned SQLite.
+Known normal root completion commits; actual LE CEE3ABD backs out. Independently
+compiled SAME TASK children retain the original invocation, CALL/core identity
+and preallocated root ABI. Whole message/MD/body/properties, original canonical
+request/result digests, both effect audit layers, terminal audits/core/events/
+outbox/claim and closure are checked. Replay refusal and source/control/CAS/SAF/
+quota/cancellation/panic/retirement/late-epoch failures do not guess task settlement.
+Owned reopen is persistence evidence, not a subprocess crash or recovery proof.
+
+Worker final56 host tests retain their exact final snapshot; separate original
+61 store and12 compiler prerequisites are not relabelled as a combined run.
+Independent review verifies13 Git paths,552 owning inputs,133 frozen external
+files, final report identities, exact same-HEAD seal/cleanup and32 unchanged old
+dependency inputs. One manager collector confused host-only56 with union129;
+metadata only was corrected without suite reruns. Earlier worker failures remain
+bound to their original candidates. Empty generated setup stages0/3/4/4 alone
+grant no installed execution credit.
+
+Six retained-first hash/byte/parser-verified topics and13 actual manager offline
+search/read commands cover baseline2026-08-31 PUT0020/q101880, PUT10021/q101890,
+BACK0001/q101690, CMIT0007/q101750, DISC0012/q101800 and supplements2026-09-12
+PMO q098655. Source/native IBM/official/licensed credit0. Removed GET,
+DefaultContext/JES/GMT/generated IDs/defaults, broad forms, owning recovery/
+checkpoint/retention, participants/IR/full26/CardDemo/public selection and all
+other nonlicensed acceptance remain required. Only licensed oracle skipped0/26;
+full native-root and v0.15 completion are not claimed.
+
+## Installed qualified complete GET host
+
+`MQ-1503.installed-qualified-get-host` integrates reviewed sealed `d85a9220`.
+Only GET capture is added to the existing configured native plane; same opaque
+object/descriptor/body/current-unit getters, revocable sessions and pure guarded
+joined nine-reference MD1/2/GMO1 writeback remain owning authorities. Actual
+compiled PUT/PUT1 child plus explicit local MQCMIT creates each message, then
+original GET under the surviving root or compiled sibling verifies complete0/0,
+accepted1/2079, rejected1/2080 and absent2/2033 with exact field-definedness.
+Normal terminal commits pending removal; real CEE3ABD restores the whole message
+and BackoutCount1. Explicit BACK then another original GET observes count1.
+Original core/CALL/actor/digests/rootABI/both effect-audit layers and terminal
+core/events/outbox/two audits/claim/closure/UOW remain exact. Failure/cancel/CAS/
+quota/SAF/panic/retirement/expiry retain uncertainty without guessed settlement.
+
+Independent review binds12 worker paths,561 functional inputs,66 final host tests
+and separate11 original compiler prerequisites,154 frozen external files,44
+report identities,32 unchanged oldd8 inputs and same-HEAD seal/cleanup. One
+collector's absolute Git-blob path mapping was repaired as metadata only without
+suite reruns. Seven retained-first SHA/byte/parser pins and19 actual manager
+offline commands cover baseline2026-08-31 GET0015/q101830, BACK0001/q101690,
+CMIT0007/q101750, DISC0012/q101800; supplements2026-09-12 GMOq096715/MDq097395
+and recoveryq103230 HardenGetBackout. Source credit0; owned reopen is not crash.
+
+Retained insert-only provider scopes still refuse a fresh root over the same MQ
+namespaces. The surviving-root positive is not the originally required independent
+producer-root normal commit -> fresh GET root proof. Owning scope succession,
+HardenGetBackout crash accuracy/default, source-known commit-impossible fallback,
+DefaultContext/JES/GMT/IDs, recovery/retention/participants/IR/full26/CardDemo and
+public/default selection remain mandatory. Only licensed oracle skipped0/26;
+full native-root/v0.15 completion is not claimed.
+
+## Finite complete PUT queue defaults
+
+`MQ-1503.full-put-queue-defaults` integrates reviewed sealed `e23c1f1c`.
+The sole explicit catalog adds strict@3 producer defaults while absent defaults
+preserve exact historical@1/@2 bytes. Existing quiescent installation only;
+typed Rust construction adds optional producer_defaults, and old readers refuse@3.
+Stored Priority/Persistence resolve at PUT; returned caller input fields remain
+unchanged. FIFO arrival is independent of effective priority. The target-aware
+constructor and existing opaque same-point query admit actual synchronous default
+response or explicit sync override, without copied configuration authority.
+Implicit async, PUT1 default response under Syncpoint and above-MaxPriority
+warning/capped placement remain Unsupported before mutation. No schema/status/
+canonical/replay/UOW/journal or queue engine changes beyond additive catalog@3.
+
+Independent review verifies24 worker Git paths,306 distinct passing Rust tests
+across actual separately bound snapshots,170 frozen authority files,273 external
+identity occurrences, same-HEAD seal/cleanup and32 unchanged oldd8 dependency
+inputs. One manager count assertion303 was corrected to actual306 without any
+product/test change or rerun. New opaque query -> constructor -> original selected
+PUT/PUT1 -> replay -> GET checks are separately executed, not attached to older
+point receipts. Private selected/compiled fixtures earn zero installed/JES/native/
+root-terminal/official-call credit; SQLite reopen is not subprocess-crash proof.
+
+Fourteen retained-first manifest/SHA/byte/parser identities and33 actual manager
+offline search/read commands cover original baseline2026-08-31 PUT0020/q101880,
+PUT10021/q101890, supplements2026-09-12 MDq097395/PMOq098655/constantsq092190
+and all9 producer-attribute topics baseline2026-09-12. Source execution credit0.
+Async/warning/ordering/generated-ID/expiry/general forms, DefaultContext/JES/GMT,
+cross-root succession, crash/recovery/retention/participants/shared IR/full26/
+CardDemo remain mandatory. Only licensed oracle skipped0/26; parent unfinished.
+
+## Qualified complete GET result
+
+`MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through
+the same selected complete GET owner. The additive QualifiedFullGet and
+QualifiedFullGot leave old FullGet/FullGot literals, canonical bytes and replay
+versions unchanged. The actual held predefined normal-local INPUT_SHARED queue,
+catalog@2 structure characters and privileged existing encoder supply exact48
+ResolvedQName only for complete or accepted removal. Rejected truncation,
+no-message and unknown outputs retain absence, preserving caller GMO bytes for
+the unestablished field; defined MD, prefix and DataLength remain represented.
+There is no alias/model inference, GMT/context sample, new queue engine or
+parallel receipt authority. Original core, SAF, current unit, physical store,
+audited publication and uncertainty fences remain the owners.
+
+Distinct additive canonical tags and sole replay storage@6 preserve old versions
+and reject request/result class, structure profile, status, shape and byte-limit
+mismatches. Fresh composed checks cover host values, admission, replay, selected
+full-message operations and trusted native observations. Private full PUT-to-GET
+fixtures on Memory and owned SQLite are not installed compiled, JES, native LE,
+RACF, root-terminal, official-call or licensed execution evidence.
+
+Offline sources are original baseline `ibm-mq-9.4-mqi-2026-08-31`
+MQGET0015/q101830 and MQOPEN0019/q101870, supplemental baseline2026-09-12
+GMO q096715 and MD q097395, and producer-attribute baseline2026-09-12
+QM/queue CCSID, maxima and delivery sequence. All eight pins were independently
+reproduced after retained-first hash/byte checks; source review earns zero credit.
+Native GMO writeback and the all-argument MD/GMO/body/length/status join remain
+separate work, as do installed forwarding, root/recovery/participants, IR,
+CardDemo and full nonlicensed v0.15 acceptance. Only the licensed oracle is
+human-skipped0/26; the parent goal remains active.
+
+## Compiled OPEN/CLOSE and root-shared object aliases
+
+`MQ-1503.compiled-native-point-bridge` composes sealed `5324cf98` as the
+permitted first coherent OPEN/CLOSE slice. The actual compiled CALL emits the
+original typed effect, preserving invocation, sequence, mutation and identity.
+The privileged default-Unsupported structure port precedes OD1 decoding and
+delegates exact target facts to the existing selected opaque point authority.
+Only ASCII/normal big-endian complete fixed OD1 declarations, including one
+checked COPY wrapper, explicit OUTPUT/INPUT_SHARED and predefined CLOSE NONE
+are admitted. Ignored DynamicQName and undefined z/OS CLOSE HOBJ bytes remain
+exact. No copied caller CCSID/default facts select ABI or supply permission.
+
+One preallocated root table distinguishes connection/object families, binds
+HOBJ to its actual live parent HCONN and burns nonreused positive PIC aliases.
+OPEN reserves before dispatch and adopts only a known nonhistorical issued
+object; CLOSE retires only that object, DISC its parent-associated objects.
+All argument/member bytes, layouts, capacity, suffix and live profile rechecks
+precede one held-table callback-free write/adoption. Unknown, late drift, panic,
+cancellation and abandoned dispatched calls fence the scope without provider
+cleanup, UOW or root-terminal decisions. Cold/historical/foreign/wrong-family/
+parent aliases refuse. No new canonical/replay/storage/checkpoint is introduced.
+
+Source review reproduces twelve retained-first verified topic entries: original
+MQ9.4 baseline2026-08-31 CLOSE0006/q101740, OPEN0019/q101870, PUT0020/q101880,
+PUT10021/q101890; programming-supplements baseline2026-09-12 ODq098100/q098105,
+MDq097390/PMOq098650 and numeric option q091070/q092100; point-layout q092060/
+q093600. Actual parser fragments, hashes and search/read receipts remain outside
+Git. Source/engine fixture evidence earns zero installed selected Memory/SQLite,
+JES/SAF/RACF/root-terminal, official-call or licensed credit. The earlier failed
+compiler/test/module attempts retain their original identities; successful
+focused composition does not relabel those receipts.
+
+PUT/PUT1 still require the complete Produced observation and existing descriptor
+context/PMO all-argument writer, with actual configured Foundation encoder.
+Genuine installed root-shared allocation and same-service profile wrappers,
+compiled pendingPUT normal/CEE3ABD and removedGET terminal proofs, recovery,
+participants, IR/full26/CardDemo remain required. Parent v0.15 stays active;
+only the unavailable licensed oracle is human-skipped0/26 with zero credit.
+
+## Qualified GMO1 result staging
+
+`MQ-1503.qualified-gmo-writeback` integrates sealed `7ed3f940` as a pure
+additive method on the existing raw capture. The generated GMO1 layout and GET
+field policy remain sole authorities. The complete original captured group,
+capacity, suffix, scratch bytes, trusted structure characters, original qualified
+request and known result/status/shape/bounds are checked before staging exact48
+QName. Complete/accepted Some is lossless; known rejected/no-message None
+preserves original QName. Unknown, pending, status-only, old class and malformed
+or foreign observations refuse without writes. Input, ignored Signal1/Signal2,
+reserved and suffix bytes remain exact; no pointer is interpreted.
+
+The writer uses owned scratch and the existing bounded allocation/callback-free
+final prefix copy. It does not join separate MD, body, DataLength, completion and
+reason, establish live handles/core/SAF/UOW/replay authority, or install a native
+bridge. Ordinary ZosBatch/QueueManager/single-queue/non-dynamic representation
+is explicit; raw CP037 and signed32 observations grant no compiler CP037 or PIC
+range permission. The old full MD writer differs only by its two-line child hook;
+DTO/canonical/replay@1–6, provider, interpreter, schemas and generated identities
+are unchanged by this feature.
+
+All three sources were independently reproduced offline after retained-first
+SHA/byte checks: original baseline2026-08-31 MQGET0015/q101830, programming-
+supplements baseline2026-09-12 GMO fields q096715 and declaration q096710.
+The initial wrong declaration scope, fixture misuse of symbolic Default and
+metadata collector error retain their actual failed identities; no source or
+production validation was weakened. Source/pure-value fixtures earn zero
+installed native/JES/LE/RACF/root-terminal/official/licensed execution credit.
+Joined compiled GET, actual installed source and native point/root forwarding,
+pendingPUT normal/CEE3ABD/removedGET terminal, recovery/participants/IR/full26/
+CardDemo remain mandatory. Parent active; licensed oracle alone human-skipped0/26.
+
+## Compiled complete PUT/PUT1 forwarding
+
+`MQ-1503.compiled-full-put-bridge` integrates independently reviewed sealed
+`14739c4e` over the approved compiled OPEN/CLOSE authority. The actual eight
+references retain generated complete MD1/2 and PMO1 groups, COPY wrappers,
+members and suffixes. Independent opaque structure observations precede decode;
+descriptor version and body maxima default to Unsupported and must delegate to
+the same selected profile. Actual root HCONN/HOBJ aliases and predefined PUT1
+lookup enter only the existing full-PUT constructor and original typed effect.
+The body uses a separate queue/QM/product bound; the CNO/group cap stays1024.
+
+Known success requires request-bound Produced. Existing writers copy only the
+eight already encoded context fields and actual PMO resolved names, retaining
+IDs, BackoutCount, MD2 tail, ignored/reserved fields and suffix. Exact reviewed
+FAILED status-only writes only CC/RC; warning, legacy/partial success, malformed,
+unknown, late drift, panic, cancellation and Drop fence without UOW cleanup or
+retry. All writes are staged before final callbacks, exact storage checks and a
+held pure parent/object guard; joined copy has no callback, allocation or
+fallible work after that guard. No canonical, replay or durable schema changes.
+
+Actual engine evidence remains private compiled frame/reply fixtures, not
+installed selected Memory/SQLite, core/SAF/JES/LE/native root pending work or
+official26 acceptance. Source baseline2026-08-31 PUT0020/q101880 and
+PUT10021/q101890 plus eight programming-supplements baseline2026-09-12 topics
+were independently verified retained-first and reproduced by offline search/read;
+all source review earns zero execution credit. Worker snapshots and failed
+attempts retain their actual identities, not new post-commit test labels.
+Genuine installed opaque wrappers/source, pendingPUT normal/CEE3ABD and removedGET,
+joined compiled GET, DefaultContext, recovery/participants/IR/full26/CardDemo
+remain required. Parent active; licensed oracle alone human-skipped0/26.
+
+## Finite synchronous root publication framework
+
+`MQ-1505.root-publication-framework` integrates reviewed sealed `42b524f58`
+as a prerequisite, not native pending-work acceptance. Original compiled root
+setup, genuine child enrollment and complete pre-terminal core/CALL/effect
+closure bind the existing coordinator and selected MQ authority. Memory's
+single lock/journal and SQLite's existing writer transaction publish legal core
+steps, provider settlement, lifecycle outbox, two typed terminal audit subjects
+and one winner after whole graph/epoch/Exact-or-Absent dependency checks. Other
+backends refuse. No application effect or completed row becomes root authority.
+
+Open/Closing/Terminal/Uncertain ownership is core-managed; cancellation, unknown,
+panic or lost authority fence without guessed commit/backout or Drop cleanup.
+Actual classified normal completion and LE CEE3ABD are distinct from unsupported
+outcomes. Existing canonical request/result bytes remain unchanged; root setup
+and resource use separate bounded streaming domains. Indexed root history stays
+retention-protected without an age or release permit. Cold restore, transfer,
+checkpoint recovery, participant coordination and general scheduling are not
+introduced by this finite synchronous framework.
+
+The source review is the original MQ9.4 baseline2026-08-31 BACK0001/q101690,
+CMIT0007/q101750 and DISC0012/q101800 with supplementary baseline2026-09-12
+BackoutCount/HardenGetBackout. Retained-first identities and actual offline
+search/read receipts remain bound to their original candidates; source credit0.
+Physical store contracts and actual compiled connection-only/root-child fixtures
+do not prove pending PUT/removed GET, DefaultContext, JES, native MQ or licensed
+execution. Six additional ordinary-writer gaps reproduced by the separate
+reviewed `MQ-1505.root-writer-guards` feature are addressed separately below;
+this prerequisite is not advertised as a complete root delivery contract.
+Genuine installed point/PUT/GET, pendingPUT normal/CEE3ABD/removedGET, failure/
+restart, participants/IR/full26/CardDemo and other nonlicensed gates remain
+required. Parent active; only licensed oracle human-skipped0/26.
+
+## Root ordinary-writer guard parity
+
+`MQ-1505.root-writer-guards` integrates reviewed sealed `f72d4a1f` as a
+separate feature over the root framework. Actual regressions exposed six gaps:
+Memory direct/journal checkpoints and root-terminal event insertion; SQLite
+Uncertain new outbox and audit-only publication; standalone Closing denial
+audit on both adapters; and copied actual terminal audit subjects inserted by
+generic provider-row writers on both adapters. Existing physical guards and
+effect-audit decoding now refuse each before publication. The private composed
+root writer remains the sole producer of terminal subjects. No API, codec,
+schema, membership constructor or new transaction engine is introduced.
+
+The initial failures remain bound to their actual candidates. An overbroad
+SQLite repair also refused existing delivery and was corrected: exact unchanged
+outbox delivery remains permitted outside Closing, including Terminal and
+Uncertain, without execution or settlement authority. Genuine child normal
+completion/ABEND and nonnative checkpoint behavior remain compatible. Indexed
+root history has no age/release permit. This infrastructure repair needs no new
+IBM semantic lookup and supplies zero compiled/native/installed/SAF/JES/LE/
+pendingwork/official/licensed credit. Original pendingPUT normal/CEE3ABD and
+removedGET, installed source, restart/crash/recovery, participants/IR/full26/
+CardDemo and other nonlicensed gates remain required. Parent active; only the
+licensed oracle is human-skipped0/26.

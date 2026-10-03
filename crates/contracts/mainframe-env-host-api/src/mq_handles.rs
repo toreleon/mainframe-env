@@ -7,6 +7,11 @@
 use crate::MqHostEnvironment;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod observation;
+pub use observation::MqHandleObservation;
+mod message_candidate;
+pub use message_candidate::{MqMessageAdoption, MqMessageCandidate};
+
 static NEXT_REGISTRY_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Upper bound on live and reusable handle slots in one registry.
@@ -18,6 +23,9 @@ struct HandleId {
     slot: u32,
     generation: u64,
     epoch: u64,
+    // Canonical identity is observation, not execution permission. Only the
+    // observation factory creates this disposition; no public clearing API.
+    historical: bool,
 }
 
 /// An MQHCONN identity, including the two distinct IBM special values.
@@ -51,6 +59,27 @@ pub struct MqHsub(HandleId);
 /// Message-property identity returned by MQCRTMH.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqHmsg(HandleId);
+
+macro_rules! canonical_identity {
+    ($($token:ident),+ $(,)?) => {$(
+        impl $token {
+            /// Read-only host canonical identity: registry, slot, generation,
+            /// epoch. These are not MQ wire values. No reconstruction API is
+            /// exposed for live authority; lifetime validation remains registry-owned.
+            pub(crate) const fn canonical_parts(self) -> (u64, u32, u64, u64) {
+                let HandleId { registry, slot, generation, epoch, .. } = self.0;
+                (registry, slot, generation, epoch)
+            }
+
+            /// A replay identity that every registry access refuses. Canonical
+            /// equality with a live token does not confer authority equality.
+            pub const fn is_historical(self) -> bool {
+                self.0.historical
+            }
+        }
+    )+};
+}
+canonical_identity!(MqConnectionId, MqHobj, MqHsub, MqHmsg);
 
 /// Runtime handle tag for an MQI parameter whose expected role is catalogued.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -182,6 +211,8 @@ pub enum MqHandleProblem {
     AlreadyConnected,
     InUse,
     EpochNotAdvanced,
+    /// A stored identity is never directly executable, even for a live slot.
+    Historical,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -244,6 +275,21 @@ impl MqHandleRegistry {
     #[must_use]
     pub fn active_handles(&self) -> usize {
         self.active
+    }
+
+    /// Lifetime-only observation for reclaiming provider data after retirement.
+    /// This does not check caller ownership, connection applicability or in-use
+    /// state and must never substitute for operation authorization/validation.
+    #[must_use]
+    pub fn is_live(&self, handle: MqHandle) -> bool {
+        self.entry(handle.id()).is_ok_and(|entry| {
+            matches!(
+                (entry.kind, handle.kind()),
+                (EntryKind::Object, MqHandleKind::Object)
+                    | (EntryKind::Subscription, MqHandleKind::Subscription)
+                    | (EntryKind::Message, MqHandleKind::Message)
+            )
+        })
     }
 
     /// A new runtime epoch invalidates every old token, including default and
@@ -528,6 +574,7 @@ impl MqHandleRegistry {
                     slot: slot as u32,
                     generation: item.generation,
                     epoch: self.epoch,
+                    historical: false,
                 })
             })
             .collect();
@@ -548,12 +595,34 @@ impl MqHandleRegistry {
                     slot: slot as u32,
                     generation: item.generation,
                     epoch: self.epoch,
+                    historical: false,
                 })
             })
             .collect();
         for id in messages {
             self.retire(id);
         }
+        Ok(())
+    }
+
+    /// Host-owned process termination, not MQDISC or application authorization.
+    /// Retires shared connections and every volatile child/unassociated handle
+    /// in this exact environment/host/process, including in-flight handles.
+    /// The service's existing UOW coordinator must resolve durable work separately.
+    pub fn end_process(&mut self, owner: MqHandleOwner) -> Result<(), MqHandleProblem> {
+        Self::check_owner(owner)?;
+        let belongs = |candidate: MqHandleOwner| {
+            candidate.environment == owner.environment
+                && candidate.host_id == owner.host_id
+                && candidate.process_id == owner.process_id
+        };
+        for slot in &mut self.slots {
+            if slot.entry.is_some_and(|entry| belongs(entry.owner)) {
+                Self::retire_slot(slot);
+                self.active -= 1;
+            }
+        }
+        self.defaults.retain(|(candidate, _)| !belongs(*candidate));
         Ok(())
     }
 
@@ -661,6 +730,9 @@ impl MqHandleRegistry {
     }
 
     fn entry(&self, id: HandleId) -> Result<&Entry, MqHandleProblem> {
+        if id.historical {
+            return Err(MqHandleProblem::Historical);
+        }
         if id.registry != self.registry_id || id.epoch != self.epoch {
             return Err(MqHandleProblem::Stale);
         }
@@ -675,6 +747,9 @@ impl MqHandleRegistry {
     }
 
     fn entry_mut(&mut self, id: HandleId) -> Result<&mut Entry, MqHandleProblem> {
+        if id.historical {
+            return Err(MqHandleProblem::Historical);
+        }
         if id.registry != self.registry_id || id.epoch != self.epoch {
             return Err(MqHandleProblem::Stale);
         }
@@ -716,6 +791,7 @@ impl MqHandleRegistry {
             slot: index as u32,
             generation: slot.generation,
             epoch: self.epoch,
+            historical: false,
         })
     }
 
@@ -744,6 +820,7 @@ impl MqHandleRegistry {
                         slot: slot as u32,
                         generation: item.generation,
                         epoch: self.epoch,
+                        historical: false,
                     })
             })
             .collect();
@@ -773,6 +850,33 @@ mod tests {
 
     fn registry(max: usize) -> MqHandleRegistry {
         MqHandleRegistry::new(7, max).unwrap()
+    }
+
+    #[test]
+    fn lifetime_observation_is_not_operation_permission() {
+        let mut registry = registry(8);
+        let who = owner(MqHostEnvironment::ZosBatch);
+        let conn = registry.connect(who, MqHandleSharing::NonShared).unwrap();
+        let associated = registry.create_message(who, conn).unwrap();
+        let unassociated = registry.create_message(who, MqHconn::Unassociated).unwrap();
+        registry.begin_message_io(who, conn, associated).unwrap();
+        assert!(registry.is_live(associated.into()));
+        assert_eq!(
+            registry.validate_message_property(who, conn, associated.into()),
+            Err(MqHandleProblem::InUse)
+        );
+        registry.end_message_io(who, conn, associated).unwrap();
+        registry.disconnect(who, conn).unwrap();
+        assert!(!registry.is_live(associated.into()));
+        assert!(registry.is_live(unassociated.into()));
+        assert_eq!(
+            registry.validate_message_property(who, MqHconn::Unassociated, unassociated.into()),
+            Err(MqHandleProblem::MissingConnection)
+        );
+        let other = MqHandleRegistry::new(7, 8).unwrap();
+        assert!(!other.is_live(unassociated.into()));
+        registry.advance_epoch(8).unwrap();
+        assert!(!registry.is_live(unassociated.into()));
     }
 
     #[test]

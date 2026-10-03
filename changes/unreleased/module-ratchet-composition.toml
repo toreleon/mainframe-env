@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Split unchanged product input projections, application/IMS validation, IMS TM conversation helpers and CardDemo counter bounds; separate generic IMS tests, normalize generated MQ headers and reconcile downward-only module budgets."

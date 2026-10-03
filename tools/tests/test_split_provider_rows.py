@@ -13,7 +13,8 @@ class SplitProviderRowTests(unittest.TestCase):
         guard.check(guard.ROOT)
         original = Path.read_text
         for family in ("ims", "mq"):
-            owner = guard.ROOT / f"crates/providers/mainframe-env-{family}/src/service/rows.rs"
+            child = "service_rows.rs" if family == "mq" else "service/rows.rs"
+            owner = guard.ROOT / f"crates/providers/mainframe-env-{family}/src/{child}"
             for mutation in ("remove_atomic", "add_whole_state"):
                 with self.subTest(family=family, mutation=mutation):
                     def altered(path, *args, **kwargs):

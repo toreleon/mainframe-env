@@ -4,11 +4,11 @@ use crate::{HostLimits, HostProblem, ImsCallSyntax, ImsExecutionContext};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Typed INIT/ACCEPT group identity consumed by the existing system-call contract.
+/// Explicit ACCEPT status-group operand; selection alone is not a successful ACCEPT.
 pub enum ImsStatusGroup {
-    /// Group A selector identity.
+    /// Status-group A operand.
     A,
-    /// Group B selector identity.
+    /// Status-group B operand.
     B,
 }
 
@@ -16,63 +16,63 @@ pub enum ImsStatusGroup {
 /// This identity is used only for applicability validation, never for dispatch.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImsAcceptRow {
-    /// Initial INIT/ACCEPT catalog row identity.
+    /// First catalog ACCEPT applicability row.
     Initial,
-    /// Availability INIT/ACCEPT catalog row identity with the same call spelling.
+    /// Availability catalog ACCEPT applicability row.
     Availability,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-/// Local owned Q-class byte; serde consumers still validate the admitted A-through-J range.
+/// Validated ASCII Q/LOCKCLASS letter A through J; deserialized values still require validity checks.
 pub struct ImsQClass(u8);
 
 impl ImsQClass {
     #[must_use]
-    /// Construct only uppercase ASCII classes A through J; otherwise return None.
+    /// Admit exactly ASCII A through J; all other bytes return None.
     pub fn new(value: u8) -> Option<Self> {
         (b'A'..=b'J').contains(&value).then_some(Self(value))
     }
 
     #[must_use]
-    /// Return the stored class byte without changing its identity.
+    /// Return the retained ASCII class byte without numeric reinterpretation.
     pub const fn byte(self) -> u8 {
         self.0
     }
 
     #[must_use]
-    /// Check the admitted class range, including values obtained through deserialization.
+    /// Recheck the A-J domain, including values created by deserialization.
     pub fn is_valid(self) -> bool {
         (b'A'..=b'J').contains(&self.0)
     }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Typed POS keyword identity; validation separately constrains its SSA combination.
+/// POS observation selector; SSA presence is checked against permitted keyword forms.
 pub enum ImsPositionKeyword {
-    /// Default POS projection selector.
+    /// Default POS selection, with optional SSA.
     Default,
-    /// V5 segment-relative-byte-address keyword identity.
+    /// Select the V5 segment-RBA observation without SSA.
     V5SegmentRba,
-    /// PC segment RTS keyword identity.
+    /// Select PC segment RTS observation without SSA.
     PcSegmentRts,
-    /// PC segment high-water-mark keyword identity.
+    /// Select PC segment high-water observation without SSA.
     PcSegmentHighWaterMark,
-    /// PC highest-segment TS keyword identity.
+    /// Select highest-segment timestamp observation without SSA.
     PcHighestSegmentTs,
-    /// PC logical-begin TS keyword identity.
+    /// Select logical-begin timestamp observation without SSA.
     PcLogicalBeginTs,
-    /// PC segment TS keyword identity, requiring an SSA in this validator.
+    /// Select segment timestamp; an SSA is required.
     PcSegmentTs,
 }
 
 /// Exactly one POS SSA; an absent predicate is an unqualified SSA.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImsPositionSsa {
-    /// Uppercase segment name, at most eight bytes.
+    /// Uppercase/digit segment identity, 1-8 bytes.
     pub segment: String,
-    /// Optional uppercase predicate field name; presence must match value.
+    /// Optional uppercase/digit field name, present exactly with value.
     pub field: Option<String>,
-    /// Optional nonempty comparative bytes bounded by max_record_bytes.
+    /// Optional nonempty exact comparison bytes bounded by max_record_bytes.
     pub value: Option<Vec<u8>>,
 }
 
@@ -123,39 +123,39 @@ pub struct ImsStatisticsFunction {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Owned system-call operands; applicability, admission and runtime observations remain separate checks.
+/// Typed system-call operands; admission does not imply availability in every execution context.
 pub enum ImsSystemCall {
-    /// Request a row-qualified INIT/ACCEPT group.
+    /// Select source-qualified ACCEPT status group.
     Accept {
-        /// Catalog row disambiguating identical INIT/ACCEPT spellings.
+        /// Distinguish the two source ACCEPT applicability rows without inventing dispatch differences.
         row: ImsAcceptRow,
-        /// Requested typed status group.
+        /// Explicit ACCEPT status-group selector.
         group: ImsStatusGroup,
     },
-    /// Request availability for one numbered PCB.
+    /// Observe a positive target PCB ordinal.
     Query {
-        /// Positive PCB number in the selected PSB.
+        /// Positive one-based PCB ordinal queried by the call.
         target_pcb: u16,
     },
-    /// Request refreshed PCB availability through the admitted system route.
+    /// Request availability refresh of modeled PCBs.
     Refresh,
-    /// Request release of modeled Q reservations.
+    /// Request release of modeled Q-class reservations.
     Dequeue {
-        /// Optional Q class filter; None requests the route's unfiltered release.
+        /// Optional validated A-J Q class whose reservations are to be released.
         class: Option<ImsQClass>,
     },
-    /// Request the installed local directory projection.
+    /// Observe modeled SCD/PST addresses.
     Gscd,
-    /// Request the modeled DEDB area-position projection.
+    /// Observe modeled area positioning under checked keyword/SSA selection.
     Position {
-        /// Optional single POS SSA constrained by the selected keyword.
+        /// Optional checked POS selector; presence constrains the keyword.
         ssa: Option<ImsPositionSsa>,
-        /// Typed POS selector whose combination is validated before execution.
+        /// POS observation selection, validated with SSA presence.
         keyword: ImsPositionKeyword,
     },
-    /// Request the legacy bounded pool-statistics projection.
+    /// Observe modeled pool statistics under checked function selection.
     Statistics {
-        /// STAT selector; support and capacity are checked separately from its identity.
+        /// Validated STAT family/format/extension selection.
         function: ImsStatisticsFunction,
     },
     /// Bounded host projection, not IBM print records or binary fullword layout.
@@ -168,58 +168,58 @@ pub enum ImsSystemCall {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Typed system-call context and syntax attached to the existing IMS request route.
+/// Explicit execution context, syntax and system operands; structural validation is separate from call-site applicability.
 pub struct ImsSystemRequest {
-    /// Execution-context identity checked by the applicability owner.
+    /// Explicit trusted execution context, not inferred from call spelling.
     pub context: ImsExecutionContext,
-    /// CALL or command form used to validate the row spelling.
+    /// Explicit CALL/command syntax retained for applicability.
     pub syntax: ImsCallSyntax,
-    /// Owned operands for one system family.
+    /// Typed operands; call-site applicability requires its separate validator.
     pub call: ImsSystemCall,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Numbered PCB availability observation from the local installed metadata projection.
+/// Positive PCB ordinal, two-byte status and organization observation, not a PCB ownership token.
 pub struct ImsPcbAvailability {
-    /// Positive PCB number in the selected PSB.
+    /// Positive one-based observed PCB ordinal.
     pub pcb: u16,
-    /// Exact two-byte status text.
+    /// Exactly two bytes of observed PCB status.
     pub status: String,
-    /// Nonempty organization label bounded by host name limits.
+    /// Nonempty bounded observed organization label.
     pub organization: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Local DEDB area observation; opaque position bytes are not a general physical-address authority.
+/// Modeled area position and capacity observations; undefined observations are not synthesized by this DTO.
 pub struct ImsPositionArea {
-    /// Area resource identity bounded by host name limits.
+    /// Nonempty bounded modeled area name.
     pub name: String,
     /// Cycle count followed by relative byte address in the modeled DEDB area.
     pub position: [u8; 8],
-    /// Count of modeled unused SDEP control intervals.
+    /// Observed unused sequential dependent control-interval count.
     pub unused_sdep_cis: u32,
-    /// Count of modeled unused IOV control intervals.
+    /// Observed unused independent overflow control-interval count.
     pub unused_iov_cis: u32,
-    /// Optional timestamp projection; absence asserts no timestamp value or clock conversion.
+    /// Optional modeled timestamp observation; no implicit wall-clock conversion occurs.
     pub timestamp: Option<u64>,
-    /// Optional subsystem identity; absence does not synthesize an identity.
+    /// Optional bounded IMS identity associated with the observation.
     pub ims_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Explicit local buffer geometry and published counters, without physical buffer-handler parity.
+/// Positive pool geometry and read/write counters observed from the modeled provider.
 pub struct ImsBufferStatistics {
-    /// Pool resource identity bounded by host name limits.
+    /// Nonempty bounded modeled pool name.
     pub pool: String,
-    /// OSAM or VSAM category of this pool.
+    /// OSAM/VSAM pool classification.
     pub kind: ImsBufferPoolKind,
-    /// Positive byte capacity per modeled buffer.
+    /// Positive bytes per buffer.
     pub buffer_bytes: u32,
-    /// Positive modeled buffer count.
+    /// Positive buffer count.
     pub buffers: u32,
-    /// Published read counter in the existing local observation contract.
+    /// Observed modeled read counter.
     pub reads: u64,
-    /// Published write counter in the existing local observation contract.
+    /// Observed modeled write counter.
     pub writes: u64,
 }
 
@@ -327,39 +327,39 @@ pub struct ImsSystemDirectory {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Installed modeled DEDB area geometry for bounded system observations.
+/// Named modeled DEDB area capacities used by the existing provider state.
 pub struct ImsDedbAreaDefinition {
-    /// Database resource owning the area definition.
+    /// Database label to which the modeled area belongs.
     pub database: String,
-    /// Area resource identity.
+    /// Modeled area identity.
     pub name: String,
-    /// Modeled SDEP capacity in control intervals.
+    /// Sequential dependent control-interval capacity, in interval counts.
     pub sdep_capacity_cis: u32,
-    /// Modeled IOV capacity in control intervals.
+    /// Independent overflow control-interval capacity, in interval counts.
     pub iov_capacity_cis: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Installed modeled buffer-pool geometry; published counters are maintained separately.
+/// Named modeled pool with byte size and count; no native buffer allocation is performed by this DTO.
 pub struct ImsBufferPoolDefinition {
-    /// Pool resource identity.
+    /// Modeled pool identity.
     pub name: String,
-    /// OSAM or VSAM pool category.
+    /// OSAM/VSAM pool selection.
     pub kind: ImsBufferPoolKind,
-    /// Modeled capacity in bytes per buffer.
+    /// Declared bytes per modeled buffer.
     pub buffer_bytes: u32,
-    /// Modeled number of buffers.
+    /// Declared modeled buffer count.
     pub buffers: u32,
 }
 
 /// Runtime resources are installed into the existing IMS provider row store.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImsSystemRuntimeDefinition {
-    /// Optional installed local directory; absence supplies no directory values.
+    /// Optional modeled directory addresses.
     pub directory: Option<ImsSystemDirectory>,
-    /// Installed modeled DEDB areas, bounded by the consuming runtime.
+    /// Modeled area definitions installed through existing provider storage.
     pub dedb_areas: Vec<ImsDedbAreaDefinition>,
-    /// Installed modeled buffer-pool definitions.
+    /// Modeled pool definitions installed through existing provider storage.
     pub buffer_pools: Vec<ImsBufferPoolDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Optional ordered VSAM subpool metadata; absent historical fields default to an empty list.
@@ -418,7 +418,7 @@ impl ImsStatisticsFunction {
 }
 
 impl ImsSystemRequest {
-    /// Validate operand combinations and local bounds; context admission is checked separately.
+    /// Check positive query ordinal, POS SSA/keyword shape and admitted STAT combinations; no provider or context policy is executed.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match &self.call {
             ImsSystemCall::Query { target_pcb } if *target_pcb == 0 => Err(HostProblem::Malformed),
@@ -472,7 +472,7 @@ impl ImsSystemRequest {
 }
 
 impl ImsSystemResult {
-    /// Check result bounds and selector/observation consistency, rejecting unsupported enhanced results.
+    /// Check represented observation lengths/counts and positive pool geometry; do not fabricate missing observations.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         let valid_name = |name: &str| !name.is_empty() && name.len() <= limits.max_name_bytes;
         match self {

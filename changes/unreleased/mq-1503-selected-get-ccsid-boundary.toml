@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Refused nonpositive stored body CCSID observations before the finite private unformatted selected full GET candidate can publish or remove a message; preserve lossless diagnostic storage and input descriptor semantics without inferring queue defaults or conversion."

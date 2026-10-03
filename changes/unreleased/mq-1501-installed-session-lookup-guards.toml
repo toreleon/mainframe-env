@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Forwarded installed MQ frame local-UOW observations through exact Invocation and synchronous revocation guards, contained profile/lookup panics as protected unknown outcomes, and rejected contradictory inherited MQ host contexts while preserving matching bindings; real selected service and lifecycle integration remain required."

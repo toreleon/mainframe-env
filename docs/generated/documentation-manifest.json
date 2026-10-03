@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 242,
+    "markdown_documents": 261,
     "navigation_groups": 6,
-    "normative_documents": 73,
-    "xtask_commands": 233
+    "normative_documents": 91,
+    "xtask_commands": 237
   },
   "documents": [
     {
@@ -98,9 +98,9 @@
       "normative": false,
       "path": "conformance/spec/README.md",
       "relative_links": 0,
-      "sha256": "sha256:0edccc95419c94af0caeeab6776bb89c765b719abb3c37dd7a5e148489dfea73",
+      "sha256": "sha256:b9c8b2ea1272a51a174b8b54366351ca211ef3caf578576b7e6991d6ca1ea424",
       "title": "Shared Conformance IR v1",
-      "xtask_commands": 2
+      "xtask_commands": 3
     },
     {
       "normative": false,
@@ -132,6 +132,14 @@
       "relative_links": 0,
       "sha256": "sha256:89c26c9b8e3310ff1fd43e1e42881da0f6e852b8f101a10d8eb9d7944d0d9874",
       "title": "mainframe-env-server",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "crates/apps/mainframe-env-server/src/retention_maintenance/provider/selected_mq_fixture.md",
+      "relative_links": 0,
+      "sha256": "sha256:238939f6c82bd1975c531f38d6954a4a6d52b6ca62a360623dd81f4551cdfd00",
+      "title": "Selected MQ retention fixture",
       "xtask_commands": 0
     },
     {
@@ -325,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 129,
-      "sha256": "sha256:619a60375d174015089a01930a66cdb9283ebb483456c85523fd78f1eb12920f",
+      "relative_links": 147,
+      "sha256": "sha256:f935366ac4cc2e2eac66df5032def7ed5b0721d6ac0321fa3280495aa9a28b55",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -409,10 +417,10 @@
       "path": "docs/architecture/CONFORMANCE-IR.md",
       "relative_links": 0,
       "scope": "conformance catalog, binding, execution, and evidence authority",
-      "sha256": "sha256:73101bdc6bf80443b29e3c632718d80972988d6efe35180a791044f12664842c",
+      "sha256": "sha256:0d557c80284f87b6c16a9daa60988cd9f709e06945529ae88ea8a49d836e60b0",
       "status": "Normative from 0.3.0",
       "title": "Conformance IR and executable coverage",
-      "xtask_commands": 3
+      "xtask_commands": 4
     },
     {
       "applies_from": "mainframe-env 0.2.0",
@@ -491,9 +499,9 @@
       "normative": true,
       "owner": "`mainframe-env-host-api` contracts and `mainframe-env-mq` provider",
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
-      "relative_links": 0,
+      "relative_links": 3,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:9aa7934ab60d4c55b6cb9f623b3dc10ebbb5027b07b0f06672a462ab4c0e1e94",
+      "sha256": "sha256:d8cc91cbd714e3b60354c673229d96f24a06d3edfc014f4bdde81450bf8720f4",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -517,7 +525,7 @@
       "path": "docs/architecture/PACKAGE-MAP.md",
       "relative_links": 3,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:699022f46d6e8f52d862653a63ff16d98eda0cc144e5cd628bf32a63028e9476",
+      "sha256": "sha256:f3f5394172b2e0f5cd33cc539396ce3397f8658790b1841bcfa85f5161adbbfe",
       "status": "Accepted; current topology governed by ADR-0009",
       "title": "0.1 Package Map",
       "xtask_commands": 0
@@ -571,9 +579,9 @@
       "normative": true,
       "owner": "store adapters and core-server composition",
       "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md",
-      "relative_links": 0,
+      "relative_links": 2,
       "scope": "PostgreSQL quotas, shared immutable artifacts, and local publication durability",
-      "sha256": "sha256:0604bb711feefd94c4440780f88fe8cf8fa03d95bbbd02285ca9fd6ac1f683f0",
+      "sha256": "sha256:4c87206f23c07318a16b2db362bc6ea77c9c0563f0c0b2baf361ca9c12a04a0b",
       "status": "Implemented",
       "title": "Durable storage profile",
       "xtask_commands": 0
@@ -583,9 +591,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 5,
+      "relative_links": 7,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:67982fb914099cd0511c295dc915ef3aade9c69ecf57f006528d1cb1afed0670",
+      "sha256": "sha256:21f143276a080c6bc3a3b3e00828c8651ebfed62742a6b7cfa696ad2057682c0",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -595,9 +603,9 @@
       "normative": true,
       "owner": "Db2, IMS, MQ, and store-contract maintainers",
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
-      "relative_links": 1,
+      "relative_links": 3,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:b00e3ce2a2c9545fcfbf12a1d8fad075b6b392e9b639e3e067301fdf59c4852c",
+      "sha256": "sha256:7363d65cdf10ba0a3d3f170600f7742f7694e6f8d2a6a8e0c857af3d1774e4a5",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -619,9 +627,9 @@
       "normative": true,
       "owner": "store-contract, provider, and core-server maintainers",
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
-      "relative_links": 4,
+      "relative_links": 5,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:3d84c39f07834b79772a50d18dcde7d20ea698854c57e62a6d11a313bd5f5fa3",
+      "sha256": "sha256:99d051dfe0ccadcb88ce0f84a87b3910f9bb616e0007731974b60b1a53a125c4",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -975,6 +983,30 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0028-mq-shared-handle-kernel.md",
+      "relative_links": 0,
+      "scope": "private v0.15 MQ kernel composition, not public route acceptance",
+      "sha256": "sha256:7f84e5e85307fde1a45f1a1b7ce32b6a618fd2499ae4a66df101ab6a295f8173",
+      "status": "Proposed",
+      "title": "Shared MQ handle-family kernel",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "store-contract and adapter maintainers",
+      "path": "docs/decisions/0029-audited-provider-publication.md",
+      "relative_links": 0,
+      "scope": "additive Memory/SQLite publication primitive for v0.15 integration",
+      "sha256": "sha256:cda624eea2e595d5c899e57f8051704afc5e592cd2262aaa4fd7fb24ee81d7ba",
+      "status": "Proposed",
+      "title": "Audited provider publication under a retained intent",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.12.0 development; implementation remains pending",
       "normative": true,
       "owner": "execution-contract, coordinator and Db2 maintainers",
@@ -999,6 +1031,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0030-mq-host-lifecycle-directory.md",
+      "relative_links": 0,
+      "scope": "volatile trusted-service composition, not public route acceptance",
+      "sha256": "sha256:0ca2fd1212ac74001aeefb02102870192a3e8c9d4273a94a94f61d518ae9cfb8",
+      "status": "Proposed",
+      "title": "Private MQ host lifecycle directory",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 investigation; implementation pending owner decision",
       "normative": true,
       "owner": "store/execution contracts and coordinator maintainers, with host and IMS owners",
@@ -1008,6 +1052,30 @@
       "sha256": "sha256:c4d8476ef89497c096ee28a79dd316b3c75d08c80a8292601f7ad340244ad9da",
       "status": "Proposed; shared contract-owner decision required",
       "title": "ADR-0031: IMS TM recovery publication and work settlement",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ provider and execution/store maintainers",
+      "path": "docs/decisions/0031-mq-selected-service-authority.md",
+      "relative_links": 0,
+      "scope": "private service composition, not public MQI acceptance",
+      "sha256": "sha256:eb6ab3d65da9084f3449418665983a2ce63ed308a8dd35464e0f383f03b8c312",
+      "status": "Proposed",
+      "title": "One selected MQ service authority",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "program/execution and MQ maintainers",
+      "path": "docs/decisions/0032-mq-program-machine-frame.md",
+      "relative_links": 0,
+      "scope": "explicit typed installed-batch handoff, not MQ public readiness",
+      "sha256": "sha256:420764036e3239e3b6dfca0c7a77b563d1b299212b6e31e182e5f72a70c7f1ab",
+      "status": "Proposed",
+      "title": "MQ program-to-machine frame handoff",
       "xtask_commands": 0
     },
     {
@@ -1035,6 +1103,30 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ host contract maintainers",
+      "path": "docs/decisions/0033-mq-full-md-value.md",
+      "relative_links": 0,
+      "scope": "complete descriptor/message values and codecs, not executable message policy",
+      "sha256": "sha256:7ee7ffa20cea147a8e93039607f2fb35ad6373246f8490347dee2258305124a1",
+      "status": "Proposed",
+      "title": "Complete MQMD value primitive",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ contract and provider maintainers",
+      "path": "docs/decisions/0033-mq-historical-handle-observation.md",
+      "relative_links": 2,
+      "scope": "typed result storage and readonly existing-handle lookup, not service acceptance",
+      "sha256": "sha256:79cd0b0cc58466676e59d752d9fd932efe4d46f32a8668655ccf10619922f583",
+      "status": "Proposed",
+      "title": "MQ historical handle observation",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "host-contract and IMS maintainers",
@@ -1047,6 +1139,30 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "execution coordinator, store adapters, configured COBOL host and MQ provider",
+      "path": "docs/decisions/0034-mq-root-terminal-publication.md",
+      "relative_links": 0,
+      "scope": "the explicitly configured synchronous ordinary z/OS batch root",
+      "sha256": "sha256:ca3e55ae6db1321faba75e95ed4183a0eee3ed7736eb679d53fdf8126fba4270",
+      "status": "Proposed (implemented framework prerequisite; native acceptance remains pending)",
+      "title": "MQ root publication framework",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ host/interpreter maintainers",
+      "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md",
+      "relative_links": 0,
+      "scope": "connection alias translation, not executable handle or terminal authority",
+      "sha256": "sha256:05adff591f3e5f07d3d4a78a83891f76b37f9479e8b60663047baf451d2950a2",
+      "status": "Proposed",
+      "title": "Volatile task-root MQI ABI aliases",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "host-contract and IMS provider maintainers",
@@ -1056,6 +1172,18 @@
       "sha256": "sha256:ddf22e63e542d796857580176bcb3147fbd3592fd8c51a4fb4c268de01c5201a",
       "status": "Proposed",
       "title": "ADR-0035: Versioned selected database PCB feedback",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "Conformance and MQ maintainers",
+      "path": "docs/decisions/0036-conformance-pending-obligations.md",
+      "relative_links": 0,
+      "scope": "existing shared Conformance IR v1 only",
+      "sha256": "sha256:608f6ffb4c49677dd528e44dbc0f34c4a140e419df81681d1590145dba6773fa",
+      "status": "Proposed (bounded driver foundation)",
+      "title": "ADR 0036: explicit pending Conformance IR obligations",
       "xtask_commands": 0
     },
     {
@@ -1083,6 +1211,30 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch and host-contract maintainers",
+      "path": "docs/decisions/0037-running-step-program-transport.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.running-step-program-transport, target 0.15.0",
+      "sha256": "sha256:f5c2770a680a8ec3d92f311f7d78fdc52e002711bcd423b5d81455160c8ac4ef",
+      "status": "Accepted bounded transport prerequisite; host activation remains pending.",
+      "title": "ADR-0037: Running-step Program context transport",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Interpreter and execution-coordinator maintainers",
+      "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md",
+      "relative_links": 1,
+      "scope": "MQ-1503.coordinator-original-dispatch-extraction, target 0.15.0",
+      "sha256": "sha256:3ebbf864af69043162ae45890c9b07e4374d10d747f76b4cb1eb5fd8c616e496",
+      "status": "Accepted bounded internal extraction; controller activation pending.",
+      "title": "ADR-0038: Private coordinator original dispatch extraction",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "IMS provider maintainers",
@@ -1104,6 +1256,18 @@
       "sha256": "sha256:2ae1bd4e55b90690e9756dccc9b1023e3a309f6a67ce9706d5c26c98ddbb33eb",
       "status": "Proposed",
       "title": "ADR-0039: Last remaining direct child SSA selection",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0040-batch-run-stop-containment.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-run-stop-containment, target 0.15.0",
+      "sha256": "sha256:2c787e0e294b38c88562826bffd000227baf2aa8add8f979beb762dc2f350354",
+      "status": "Accepted bounded opt-in prerequisite; enclosing host activation pending.",
+      "title": "ADR-0040: Batch run stop containment",
       "xtask_commands": 0
     },
     {
@@ -1143,10 +1307,58 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0043-batch-contained-all-effect-loan.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-contained-all-effect-loan, target 0.15.0",
+      "sha256": "sha256:53872b1d2621d3f4900485e91210726acb3a557f4e59c270230b00ab49481b53",
+      "status": "Accepted bounded transport prerequisite; enclosing owner activation pending.",
+      "title": "ADR-0043: Batch contained all-effect loan",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "store contract and Memory/SQLite adapter maintainers.",
+      "path": "docs/decisions/0043-inquiry-checked-read-publication.md",
+      "relative_links": 0,
+      "scope": "atomic provider read assertions, receipt/audit publication and replay fences.",
+      "sha256": "sha256:e007e9cdce34e55e2ff5c27639b3ebb60b8d63950358f29c3ceaa70baa500c87",
+      "status": "Implemented store prerequisite; provider/native inquiry remains pending.",
+      "title": "ADR 0043: Checked provider read publication",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "host transport, interpreter original dispatch and physical store maintainers.",
+      "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md",
+      "relative_links": 0,
+      "scope": "replay-only transport, bounded capture and atomic Completed refusal settlement.",
+      "sha256": "sha256:c3bcbdfe9033752c46e1e7f7e822fe5f396dd33e69211d823e2ef21bd5bcae36",
+      "status": "Implemented infrastructure prerequisite; configured inquiry activation remains unsupported.",
+      "title": "ADR 0044: Checked inquiry replay refusal settlement",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0045-batch-prepared-selection-plan.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-prepared-selection-plan, target 0.15.0",
+      "sha256": "sha256:4f134f8fd02ddcc772e75068cd807720393ba08ab6fa8d6ac853db017261578e",
+      "status": "Accepted bounded prerequisite; atomic joined admission remains pending.",
+      "title": "ADR-0045: Batch prepared-selection observation",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 35,
-      "sha256": "sha256:0f3ca59b8e0f4a1faf35b85c3dd1a9775dba1d1924f6011dffe1ab27b7ff6c24",
+      "relative_links": 49,
+      "sha256": "sha256:c54d61579055cdaeb5fadb9082862166ab27eaa1eb4555ac8735af120c3ac6bf",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1667,6 +1879,18 @@
       "xtask_commands": 4
     },
     {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "MQ source-review maintainers",
+      "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
+      "relative_links": 2,
+      "scope": "four retained inquiry attribute sources and remaining semantic gaps",
+      "sha256": "sha256:73a8d0b7e682826d6333ff78757d10512b29d0ad6628ec93bf6103651632e2af",
+      "status": "Normative source boundary; zero execution credit",
+      "title": "MQ inquiry attribute source boundary",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-plan.md",
       "relative_links": 3,
@@ -1677,10 +1901,10 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:d9ea2faff266248eaaf3637b7c2ea0118679abca1625473f3122062607c9a708",
+      "relative_links": 1,
+      "sha256": "sha256:2c321220f89c311ad892121721dbe6e499c7f2e4f3d1483dd3ee03491f8a4e29",
       "title": "IBM MQ — MQI programming surface progress",
-      "xtask_commands": 0
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -2038,7 +2262,7 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:d69951b6da34cfbfc3f23bff27ddc5a470ff50a189d9bf8985a9edc467f0fb92",
+      "sha256": "sha256:fd3b96428324543adbd69063d24886e76b9a2c467f40042874753a25e674960e",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
@@ -2287,6 +2511,10 @@
           "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md"
         },
         {
+          "label": "MQ inquiry attribute source boundary",
+          "path": "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
+        },
+        {
           "label": "Application packages",
           "path": "docs/architecture/APPLICATION-PACKAGES.md"
         },
@@ -2456,6 +2684,58 @@
           "path": "docs/decisions/0027-cics-logical-program-frames.md"
         },
         {
+          "label": "ADR-0028: Db2 typed catalog evolution",
+          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
+        },
+        {
+          "label": "ADR-0028: Shared MQ handle-family kernel",
+          "path": "docs/decisions/0028-mq-shared-handle-kernel.md"
+        },
+        {
+          "label": "ADR-0029: Audited provider publication under a retained intent",
+          "path": "docs/decisions/0029-audited-provider-publication.md"
+        },
+        {
+          "label": "ADR-0029: Db2 core participant evolution",
+          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
+        },
+        {
+          "label": "ADR-0030: Private MQ host lifecycle directory",
+          "path": "docs/decisions/0030-mq-host-lifecycle-directory.md"
+        },
+        {
+          "label": "ADR-0031: One selected MQ service authority",
+          "path": "docs/decisions/0031-mq-selected-service-authority.md"
+        },
+        {
+          "label": "ADR-0032: MQ program-to-machine frame handoff",
+          "path": "docs/decisions/0032-mq-program-machine-frame.md"
+        },
+        {
+          "label": "ADR-0033: Complete MQMD value primitive",
+          "path": "docs/decisions/0033-mq-full-md-value.md"
+        },
+        {
+          "label": "ADR-0033: MQ historical handle observation",
+          "path": "docs/decisions/0033-mq-historical-handle-observation.md"
+        },
+        {
+          "label": "ADR-0034: MQ root publication framework",
+          "path": "docs/decisions/0034-mq-root-terminal-publication.md"
+        },
+        {
+          "label": "ADR-0035: Volatile task-root MQI ABI aliases",
+          "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
+        },
+        {
+          "label": "ADR-0036: Explicit pending Conformance IR obligations",
+          "path": "docs/decisions/0036-conformance-pending-obligations.md"
+        },
+        {
+          "label": "Decision index and template",
+          "path": "docs/decisions/README.md"
+        },
+        {
           "label": "ADR-0034: Bounded GSAM logical record addresses",
           "path": "docs/decisions/0034-gsam-logical-address.md"
         },
@@ -2492,16 +2772,16 @@
           "path": "docs/decisions/0042-ims-tm-output-identity-local-order.md"
         },
         {
+          "label": "ADR-0043: Checked provider read publication",
+          "path": "docs/decisions/0043-inquiry-checked-read-publication.md"
+        },
+        {
+          "label": "ADR-0044: Checked inquiry replay refusal settlement",
+          "path": "docs/decisions/0044-checked-inquiry-replay-refusal.md"
+        },
+        {
           "label": "ADR-0033: Raw COBOL DL/I CALL and PCB binding contract",
           "path": "docs/decisions/0033-cobol-dli-call-boundary.md"
-        },
-        {
-          "label": "ADR-0028: Db2 typed catalog evolution",
-          "path": "docs/decisions/0028-db2-typed-catalog-evolution.md"
-        },
-        {
-          "label": "ADR-0029: Db2 core participant evolution",
-          "path": "docs/decisions/0029-db2-core-participant-evolution.md"
         },
         {
           "label": "ADR-0030: GSAM application record formats and owned length",
@@ -2516,8 +2796,24 @@
           "path": "docs/decisions/0036-null-ssa-command-slots.md"
         },
         {
-          "label": "Decision index and template",
-          "path": "docs/decisions/README.md"
+          "label": "ADR-0037: Running-step Program context transport",
+          "path": "docs/decisions/0037-running-step-program-transport.md"
+        },
+        {
+          "label": "ADR-0038: Private coordinator original dispatch extraction",
+          "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md"
+        },
+        {
+          "label": "ADR-0040: Batch run stop containment",
+          "path": "docs/decisions/0040-batch-run-stop-containment.md"
+        },
+        {
+          "label": "ADR-0043: Batch contained all-effect loan",
+          "path": "docs/decisions/0043-batch-contained-all-effect-loan.md"
+        },
+        {
+          "label": "ADR-0045: Batch prepared-selection observation",
+          "path": "docs/decisions/0045-batch-prepared-selection-plan.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2764,7 +3060,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:47e4edf60ef55f0ae0e67e9a6e77ff2081ed20a1a515642ce94291b97c149ac5",
+  "registry_sha256": "sha256:903bbfa505662fc3f63e142ab54b533fbcf2dda7250efe40bd7a12d52da815a1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

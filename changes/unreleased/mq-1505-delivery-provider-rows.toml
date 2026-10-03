@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added bounded per-object MQ delivery live rows with strict checkpoint restore, catalog generation and recovery fencing, atomic provider-state deltas, and Memory/SQLite restart proof; public service migration and participant acceptance remain pending."

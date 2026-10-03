@@ -1,28 +1,40 @@
 use mainframe_env_execution_api::InvocationLimits;
 
+/// Stable generated semantic-identity descriptor contract, without execution credit.
 pub const GENERATED_IDENTITY_CONTRACT: &str = "mainframe-env.generated-semantic-identity@1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Generated source identity locator and display metadata; descriptor presence earns no execution credit.
 pub struct SemanticIdentityDescriptor {
+    /// Exact generated official operation identity.
     pub id: &'static str,
+    /// Pinned publication baseline identity.
     pub baseline: &'static str,
+    /// Owning subsystem label used by handler validation.
     pub subsystem: &'static str,
+    /// Catalog source unit identity.
     pub unit: &'static str,
+    /// Human-readable catalog label, not a dispatch alias.
     pub label: &'static str,
 }
 
 include!("generated/official_semantic_identities.rs");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Separation between exact generated IBM identities and explicitly prefixed custom operations.
 pub enum SemanticNamespace {
+    /// Exact generated ibm- identity vocabulary.
     Official,
+    /// Explicit custom: namespace without official-source credit.
     Custom,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Bounded control-free semantic identity; official names require generated membership, custom names require a nonempty custom suffix.
 pub struct SemanticOperationId(String);
 
 impl SemanticOperationId {
+    /// Reject empty/over-limit/control-containing values, unknown ibm- identities and missing custom: suffixes; retain exact spelling without normalization.
     pub fn new(
         value: impl Into<String>,
         limits: InvocationLimits,
@@ -45,11 +57,13 @@ impl SemanticOperationId {
     }
 
     #[must_use]
+    /// Borrow exact admitted identity spelling.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     #[must_use]
+    /// Return the official or custom namespace established during construction.
     pub fn namespace(&self) -> SemanticNamespace {
         if self.0.starts_with("ibm-") {
             SemanticNamespace::Official
@@ -59,17 +73,20 @@ impl SemanticOperationId {
     }
 
     #[must_use]
+    /// Return the exact generated descriptor for an official identity; custom identities have none.
     pub fn official_descriptor(&self) -> Option<&'static SemanticIdentityDescriptor> {
         official_semantic_identity(&self.0)
     }
 }
 
 #[must_use]
+/// Borrow the complete sorted generated identity registry; it does not enumerate installed handlers.
 pub fn official_semantic_identities() -> &'static [SemanticIdentityDescriptor] {
     OFFICIAL_SEMANTIC_IDENTITIES
 }
 
 #[must_use]
+/// Look up an exact case-sensitive generated identity; unknown spellings return None.
 pub fn official_semantic_identity(id: &str) -> Option<&'static SemanticIdentityDescriptor> {
     OFFICIAL_SEMANTIC_IDENTITIES
         .binary_search_by_key(&id, |descriptor| descriptor.id)
@@ -78,9 +95,13 @@ pub fn official_semantic_identity(id: &str) -> Option<&'static SemanticIdentityD
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Semantic identity admission failure, preserving malformed, namespace and unknown official cases.
 pub enum SemanticIdentityProblem {
+    /// Identity is empty, over limit or contains a control character.
     InvalidIdentity,
+    /// Identity lacks an admitted official/custom namespace or custom suffix.
     InvalidNamespace,
+    /// An ibm- spelling is absent from the generated registry.
     UnknownOfficialIdentity,
 }
 

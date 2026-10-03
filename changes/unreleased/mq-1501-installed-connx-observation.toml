@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Forward explicit trusted CONNX profile observations through installed session exact-invocation and pre/post revocation guards, preserving default refusal and protected callback uncertainty."

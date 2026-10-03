@@ -11,6 +11,24 @@ SPEC.loader.exec_module(retention)
 
 
 class RetentionProviderDeletionGuardTests(unittest.TestCase):
+    def test_both_terminal_routes_retain_the_one_pure_cleanup_owner(self):
+        retention.check_provider_codecs(retention.ROOT)
+        original = Path.read_text
+        instance = retention.ROOT / "crates/apps/mainframe-env-server/src/cobol/instance.rs"
+        terminal = instance.parent / "instance/terminal.rs"
+        for owner, marker in ((instance, "terminal::plan_end("),
+                              (instance, "mutate_provider_states_atomic(mutations)"),
+                              (terminal, "ProviderStateMutation::Delete"),
+                              (terminal, "state.ended_tick = Some(ended_tick)"),
+                              (terminal, "abend::verify_captured_cleanup(")):
+            with self.subTest(marker=marker):
+                def altered(path, *args, **kwargs):
+                    source = original(path, *args, **kwargs)
+                    return source.replace(marker, "removed_cleanup") if path == owner else source
+                with patch.object(Path, "read_text", altered):
+                    with self.assertRaisesRegex(ValueError, "COBOL"):
+                        retention.check_provider_codecs(retention.ROOT)
+
     def test_ims_selected_output_and_backout_remain_before_publication(self):
         original = Path.read_text
         execution_path = retention.ROOT / "crates/providers/mainframe-env-ims/src/service/execution.rs"
