@@ -385,6 +385,28 @@ Their signatures use Hconn input and CompCode/Reason output; the reviewed usage
 requires queue-manager coordination and the same connection's UOW. CICS, IMS
 transaction-manager and RRS/shared resource work are not admitted by this port.
 
+The deliberate native-point setup also forwards complete PUT/PUT1 through the
+same retained opaque structure and exact object or predefined lookup. Descriptor
+version and body maximum are independent getters of that tuple, not copied
+attestation. Configured and revocable session wrappers finish every observation
+before the existing final physical comparison; the approved compiler then joins
+pure MD/PMO/status writeback under its retained alias guard. Old embeddings keep
+Unsupported getter defaults. This finite ASCII/big-endian NoContext profile
+requires nonzero supplied IDs and explicit descriptor policy; it supplies neither
+DefaultContext, JES/GMT nor generated IDs/defaults. Genuine compiled pending PUT
+normal completion and CEE3ABD backout compose the existing native-root publication
+framework on Memory and owned SQLite. Reopen is logical persistence evidence,
+not a process-crash proof. Removed GET, source-known commit-impossible fallback,
+shared participants, recovery/retention and broader native/full26 acceptance remain
+independent requirements; ProductServer defaults are unchanged.
+
+Source review for this forwarding uses the original baseline PUT row0020
+`q101880_`, PUT1 row0021 `q101890_`, BACK row0001 `q101690_`, CMIT row0007
+`q101750_` and DISC row0012 `q101800_` (normal/abnormal z/OS termination), plus
+supplemental `q098655_` explicit syncpoint, NoContext and synchronous response.
+Offline hash-verified sources and generated empty setup fixtures carry zero
+execution or licensed credit.
+
 ProductServer still opens and registers the previous MQ profile. It does not
 automatically configure this factory. The explicit configured factory bridges
 the genuinely admitted installed CHILD topology to the selected directory;

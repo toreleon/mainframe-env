@@ -78,6 +78,12 @@ struct Point {
     platform: MqWireQueueManagerPlatform,
 }
 impl MqMqiNativePoint for Point {
+    fn descriptor_version(&self) -> Result<i32, HostProblem> {
+        observe(&self.active, || self.inner.descriptor_version())
+    }
+    fn max_message_bytes(&self) -> Result<usize, HostProblem> {
+        observe(&self.active, || self.inner.max_message_bytes())
+    }
     fn recheck(&self) -> Result<(), HostProblem> {
         observe(&self.active, || self.inner.recheck())
     }

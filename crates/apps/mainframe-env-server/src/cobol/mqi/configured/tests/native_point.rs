@@ -8,7 +8,7 @@ use mainframe_env_store_api::{EffectState, ExecutionState, ExecutionStore, Provi
 use std::sync::atomic::Ordering;
 mod refusals;
 
-fn native(sqlite: bool, version: i32) -> Fixture {
+pub(super) fn native(sqlite: bool, version: i32) -> Fixture {
     Fixture::native_points(
         sqlite,
         if version == 1 {
@@ -19,7 +19,7 @@ fn native(sqlite: bool, version: i32) -> Fixture {
     )
 }
 
-fn assert_receipts(f: &Fixture, actor: &Invocation, expected: usize) {
+pub(super) fn assert_receipts(f: &Fixture, actor: &Invocation, expected: usize) {
     let rows = f
         .store
         .list_provider_state("mq-selected-v1-occurrence", 128)

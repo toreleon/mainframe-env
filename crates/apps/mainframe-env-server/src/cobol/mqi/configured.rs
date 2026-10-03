@@ -86,6 +86,9 @@ pub struct ConfiguredInstalledMqHost {
     topology: Mutex<Topology>,
     this: Weak<Self>,
     native_points: bool,
+    // Read-only test observation of the real route, never a replacement provider.
+    #[cfg(test)]
+    originals: Mutex<Vec<(Invocation, EffectRequest, EffectResult)>>,
 }
 impl ConfiguredInstalledMqHost {
     /// Strict selected open with one store, mandatory SAF and one replay/control
@@ -173,6 +176,8 @@ impl ConfiguredInstalledMqHost {
             topology: Mutex::new(Topology::default()),
             this: this.clone(),
             native_points,
+            #[cfg(test)]
+            originals: Mutex::new(Vec::new()),
         });
         if let Some(source) = source {
             source.bind(&host)?;
@@ -402,13 +407,20 @@ impl HostProvider for ConfiguredInstalledMqHost {
             };
             frame.dispatch(original, occurrence)
         })();
-        match outcome {
+        let reply = match outcome {
             Ok(reply) => reply,
             Err(problem) => EffectResult {
                 sequence: effect.sequence,
                 outcome: Err(problem),
             },
+        };
+        #[cfg(test)]
+        {
+            let mut originals = self.originals.lock().unwrap();
+            assert!(originals.len() < 4096, "bounded test observation");
+            originals.push((original.clone(), effect.clone(), reply.clone()));
         }
+        reply
     }
 }
 #[cfg(test)]

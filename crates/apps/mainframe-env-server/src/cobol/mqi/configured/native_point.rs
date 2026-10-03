@@ -18,7 +18,8 @@ use mainframe_env_mq::{
 use std::sync::OnceLock;
 
 impl ConfiguredInstalledMqHost {
-    /// PRIVILEGED configured compiled-root OPEN/CLOSE setup, not application
+    /// PRIVILEGED configured compiled-root OPEN/CLOSE and complete PUT/PUT1 setup,
+    /// not application
     /// attestation or public readiness. Requires existing complete native rich
     /// rows and genuine eager compiled root admission. SAME TASK children share
     /// that root's preallocated volatile ABI; no cold alias restoration exists.
@@ -232,7 +233,12 @@ pub(super) fn capture(
     call: MqMqiCall,
     connection: MqHconn,
 ) -> Result<Arc<dyn MqMqiNativeStructure>, HostProblem> {
-    if frame.abi.is_none() || !matches!(call, MqMqiCall::Open | MqMqiCall::Close) {
+    if frame.abi.is_none()
+        || !matches!(
+            call,
+            MqMqiCall::Open | MqMqiCall::Close | MqMqiCall::Put | MqMqiCall::PutOne
+        )
+    {
         return Err(HostProblem::Unsupported);
     }
     let profile = frame.with_final_profile(
@@ -272,8 +278,9 @@ impl MqMqiNativeStructure for Structure {
                 access: *access,
             },
             MqMqiNativePointTarget::Object(object) => MqTrustedBatchPointTarget::Object(*object),
-            // This feature admits OPEN/CLOSE only; full PUT delegation is separate.
-            MqMqiNativePointTarget::PutOne { .. } => return Err(HostProblem::Unsupported),
+            MqMqiNativePointTarget::PutOne { lookup } => MqTrustedBatchPointTarget::PutOne {
+                lookup: lookup.clone(),
+            },
         };
         let profile = self.frame.with_final_profile(
             self.frame.original(),
@@ -291,6 +298,20 @@ struct Point {
     profile: MqTrustedBatchPointProfile,
 }
 impl MqMqiNativePoint for Point {
+    fn descriptor_version(&self) -> Result<i32, HostProblem> {
+        self.frame.with_final_profile(
+            self.frame.original(),
+            |_| Ok(self.profile.descriptor_version()),
+            |state, _| state.facet.recheck_point_profile(&self.profile),
+        )
+    }
+    fn max_message_bytes(&self) -> Result<usize, HostProblem> {
+        self.frame.with_final_profile(
+            self.frame.original(),
+            |_| Ok(self.profile.max_message_bytes()),
+            |state, _| state.facet.recheck_point_profile(&self.profile),
+        )
+    }
     fn recheck(&self) -> Result<(), HostProblem> {
         self.frame.with_final_profile(
             self.frame.original(),

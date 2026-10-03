@@ -14,6 +14,7 @@ struct Signals {
     calls: Mutex<Vec<&'static str>>,
     panic: AtomicBool,
     barriers: Mutex<Option<(Arc<Barrier>, Arc<Barrier>)>>,
+    legacy: AtomicBool,
 }
 impl Signals {
     fn record(&self, name: &'static str) {
@@ -46,10 +47,104 @@ impl MqMqiNativeStructure for Observation {
     }
     fn point(&self, _: &MqMqiNativePointTarget) -> Result<Arc<dyn MqMqiNativePoint>, HostProblem> {
         self.0.record("point");
+        if self.0.legacy.load(Ordering::Acquire) {
+            return Ok(Arc::new(Legacy));
+        }
         Ok(Arc::new(Observation(self.0.clone())))
     }
 }
+struct Legacy;
+impl MqWireBindings for Legacy {
+    fn queue_defaults_are_represented(
+        &self,
+        _: MqHconn,
+        _: Option<mainframe_env_host_api::MqHobj>,
+        _: Option<&MqRouteLookup>,
+    ) -> bool {
+        false
+    }
+    fn queue_manager_platform(&self) -> MqWireQueueManagerPlatform {
+        MqWireQueueManagerPlatform::Zos
+    }
+    fn admitted_unit(&self, _: MqHconn) -> Option<MqMqiUnitOfWork> {
+        None
+    }
+    fn existing_cursor(&self, _: MqHconn, _: mainframe_env_host_api::MqHobj) -> Option<u64> {
+        None
+    }
+    fn milliseconds_to_ticks(&self, _: u32) -> Option<u64> {
+        None
+    }
+}
+impl MqMqiNativePoint for Legacy {
+    fn recheck(&self) -> Result<(), HostProblem> {
+        Ok(())
+    }
+}
+
+#[test]
+fn older_native_embedding_keeps_default_unsupported_complete_put_getters() {
+    let (original, connection, _) = fixture();
+    let signals = Arc::new(Signals::default());
+    signals.legacy.store(true, Ordering::Release);
+    let (guard, _, _) = session_for(Arc::new(NativeFrame {
+        original: original.clone(),
+        signals,
+    }));
+    let point = guard
+        .frame(&original)
+        .unwrap()
+        .native_structure(&original, MqMqiCall::Put, connection)
+        .unwrap()
+        .point(&target())
+        .unwrap();
+    assert_eq!(point.descriptor_version(), Err(HostProblem::Unsupported));
+    assert_eq!(point.max_message_bytes(), Err(HostProblem::Unsupported));
+}
+
+#[test]
+fn in_flight_complete_put_getter_cannot_escape_concurrent_transport_drop() {
+    for descriptor in [false, true] {
+        let (original, connection, _) = fixture();
+        let signals = Arc::new(Signals::default());
+        let (guard, events, aborts) = session_for(Arc::new(NativeFrame {
+            original: original.clone(),
+            signals: signals.clone(),
+        }));
+        let point = guard
+            .frame(&original)
+            .unwrap()
+            .native_structure(&original, MqMqiCall::Put, connection)
+            .unwrap()
+            .point(&target())
+            .unwrap();
+        let entered = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        *signals.barriers.lock().unwrap() = Some((entered.clone(), release.clone()));
+        let worker = std::thread::spawn(move || {
+            if descriptor {
+                point.descriptor_version().map(|_| ())
+            } else {
+                point.max_message_bytes().map(|_| ())
+            }
+        });
+        entered.wait();
+        drop(guard);
+        release.wait();
+        assert_eq!(worker.join().unwrap(), Err(HostProblem::Unauthorized));
+        assert!(events.lock().unwrap().is_empty());
+        assert!(aborts.lock().unwrap().is_empty());
+    }
+}
 impl MqMqiNativePoint for Observation {
+    fn descriptor_version(&self) -> Result<i32, HostProblem> {
+        self.0.check("descriptor-version")?;
+        Ok(2)
+    }
+    fn max_message_bytes(&self) -> Result<usize, HostProblem> {
+        self.0.check("max-message-bytes")?;
+        Ok(2048)
+    }
     fn recheck(&self) -> Result<(), HostProblem> {
         self.0.check("point-check")
     }
@@ -160,6 +255,8 @@ fn escaped_native_profiles_revoke_on_finish_abort_and_drop_without_callbacks() {
         );
         assert_eq!(structure.recheck(), Err(HostProblem::Unauthorized));
         assert_eq!(point.recheck(), Err(HostProblem::Unauthorized));
+        assert_eq!(point.descriptor_version(), Err(HostProblem::Unauthorized));
+        assert_eq!(point.max_message_bytes(), Err(HostProblem::Unauthorized));
         assert!(!point.queue_defaults_are_represented(connection, None, None));
         assert!(point.admitted_unit(connection).is_none());
         assert!(point.milliseconds_to_ticks(1).is_none());
@@ -170,6 +267,48 @@ fn escaped_native_profiles_revoke_on_finish_abort_and_drop_without_callbacks() {
         assert_eq!(*signals.calls.lock().unwrap(), before);
         assert_eq!(events.lock().unwrap().len(), usize::from(mode == 0));
         assert_eq!(aborts.lock().unwrap().len(), usize::from(mode == 1));
+    }
+}
+
+#[test]
+fn complete_put_getters_delegate_independently_then_final_check_and_revoke_panics() {
+    for descriptor in [false, true] {
+        let (original, connection, _) = fixture();
+        let signals = Arc::new(Signals::default());
+        let (guard, _, _) = session_for(Arc::new(NativeFrame {
+            original: original.clone(),
+            signals: signals.clone(),
+        }));
+        let point = guard
+            .frame(&original)
+            .unwrap()
+            .native_structure(&original, MqMqiCall::PutOne, connection)
+            .unwrap()
+            .point(&target())
+            .unwrap();
+        signals.calls.lock().unwrap().clear();
+        assert_eq!(point.descriptor_version(), Ok(2));
+        assert_eq!(point.max_message_bytes(), Ok(2048));
+        point.recheck().unwrap();
+        assert_eq!(
+            signals.calls.lock().unwrap().as_slice(),
+            &["descriptor-version", "max-message-bytes", "point-check"]
+        );
+        signals.panic.store(true, Ordering::Release);
+        assert_eq!(
+            if descriptor {
+                point.descriptor_version().map(|_| ())
+            } else {
+                point.max_message_bytes().map(|_| ())
+            },
+            Err(HostProblem::UnknownOutcome)
+        );
+        let before = signals.calls.lock().unwrap().clone();
+        assert_eq!(point.descriptor_version(), Err(HostProblem::Unauthorized));
+        assert_eq!(point.max_message_bytes(), Err(HostProblem::Unauthorized));
+        assert_eq!(point.recheck(), Err(HostProblem::Unauthorized));
+        drop(guard);
+        assert_eq!(*signals.calls.lock().unwrap(), before);
     }
 }
 

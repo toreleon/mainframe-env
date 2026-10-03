@@ -1830,6 +1830,44 @@ Pending PUT normal/CEE3ABD, removed GET, DefaultContext/JES/GMT, broader forms,
 owning recovery/participants/IR/full26/CardDemo remain required. Only licensed
 oracle is human-skipped0/26; no full native-terminal or official credit is claimed.
 
+## Installed complete PUT and finite pending-work terminal composition
+
+`MQ-1503.installed-full-put-host` integrates reviewed sealed `d2817242` as a
+separate feature. The existing configured structure admits PUT/PUT1 and delegates
+predefined lookup, descriptor version and body maximum through the same retained
+opaque point. Session wrappers forward independent getters with pre/post active
+checks and panic containment. This supersedes the temporary PUT1 refusal of the
+OPEN/CLOSE prerequisite above; older embeddings retain Unsupported defaults.
+There is no new queue engine, schema, encoder, replay or UOW policy.
+
+Actual compiled MD1/2, PMO1, supplied nonzero IDs, explicit finite policy and
+NoContext produce genuine pending syncpoint PUT/PUT1 on Memory and owned SQLite.
+Known normal root completion commits; actual LE CEE3ABD backs out. Independently
+compiled SAME TASK children retain the original invocation, CALL/core identity
+and preallocated root ABI. Whole message/MD/body/properties, original canonical
+request/result digests, both effect audit layers, terminal audits/core/events/
+outbox/claim and closure are checked. Replay refusal and source/control/CAS/SAF/
+quota/cancellation/panic/retirement/late-epoch failures do not guess task settlement.
+Owned reopen is persistence evidence, not a subprocess crash or recovery proof.
+
+Worker final56 host tests retain their exact final snapshot; separate original
+61 store and12 compiler prerequisites are not relabelled as a combined run.
+Independent review verifies13 Git paths,552 owning inputs,133 frozen external
+files, final report identities, exact same-HEAD seal/cleanup and32 unchanged old
+dependency inputs. One manager collector confused host-only56 with union129;
+metadata only was corrected without suite reruns. Earlier worker failures remain
+bound to their original candidates. Empty generated setup stages0/3/4/4 alone
+grant no installed execution credit.
+
+Six retained-first hash/byte/parser-verified topics and13 actual manager offline
+search/read commands cover baseline2026-08-31 PUT0020/q101880, PUT10021/q101890,
+BACK0001/q101690, CMIT0007/q101750, DISC0012/q101800 and supplements2026-09-12
+PMO q098655. Source/native IBM/official/licensed credit0. Removed GET,
+DefaultContext/JES/GMT/generated IDs/defaults, broad forms, owning recovery/
+checkpoint/retention, participants/IR/full26/CardDemo/public selection and all
+other nonlicensed acceptance remain required. Only licensed oracle skipped0/26;
+full native-root and v0.15 completion are not claimed.
+
 ## Qualified complete GET result
 
 `MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through
