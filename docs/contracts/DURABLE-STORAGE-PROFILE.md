@@ -7,6 +7,18 @@
 
 ## Audited provider publication
 
+The deliberately configured synchronous root-publication framework additionally
+uses JournalStore's bounded core-owned admission/enrollment/Closing and one
+atomic terminal publication. Memory and SQLite compose original legal core
+steps, exact lifecycle outbox, provider settlement and two typed terminal audit
+subjects under their existing single lock/transaction, with whole graph/epoch/
+Exact-or-Absent dependency checks. Other backends refuse without fallback.
+This prerequisite does not confer pending-PUT/removed-GET native root,
+recovery or participant acceptance.
+Versioned ownership/audit subjects, drain/backup/downgrade requirements and
+remaining proof boundaries are specified in
+[ADR 0034](../decisions/0034-mq-root-terminal-publication.md).
+
 Memory and SQLite implement the additive
 `ProviderStateStore::publish_provider_states_audited` boundary described in
 [ADR 0029](../decisions/0029-audited-provider-publication.md). Its request carries

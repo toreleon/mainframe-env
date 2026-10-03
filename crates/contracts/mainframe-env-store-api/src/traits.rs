@@ -13,6 +13,15 @@ use mainframe_env_execution_api::{
 
 /// Mandatory persistence boundary for typed security-relevant host decisions.
 pub trait AuditSink: Send + Sync {
+    /// Read additive effect/terminal audit subjects using the same stored ordering.
+    /// Unsupported backends refuse rather than silently omit terminal decisions.
+    fn audit_subject_records(
+        &self,
+        _execution_id: &ExecutionId,
+        _max: usize,
+    ) -> Result<Vec<mainframe_env_execution_api::AuditSubjectRecord>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Persist one security-relevant authorization decision.
     fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError>;
     /// Read a bounded ordered range of audit records for one execution.
@@ -242,6 +251,55 @@ pub trait RetentionStore: Send + Sync {
 
 /// Atomic execution, event, effect, checkpoint, and outbox transactions.
 pub trait JournalStore: Send + Sync {
+    /// Admit one genuine configured root and its core ownership atomically.
+    /// Structural data does not attest host admission; other backends refuse.
+    fn admit_root_driver(
+        &self,
+        _admission: crate::RootDriverAdmission,
+    ) -> Result<crate::RootDriverClaim, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Atomically enroll/admit the original compiled child under an Open root.
+    fn admit_root_child(&self, _admission: crate::RootChildAdmission) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Register the exact original CALL/lifecycle row under its existing core
+    /// intent before mutation. It grants no dispatch or host admission permission.
+    fn register_root_provider_row(
+        &self,
+        _admission: crate::RootProviderRowAdmission,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Protect an uncertain original root without selecting a UOW or terminal
+    /// decision. No EffectRecord, known completion, retry or recovery is minted.
+    /// Default Unsupported behavior is explicit and has no sequential fallback.
+    fn fence_root_driver(
+        &self,
+        _claim: &crate::RootDriverClaim,
+        _execution: &ExecutionRecord,
+        _observed_tick: u64,
+    ) -> Result<ProviderStateRecord, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Gate new enrolled writes and capture one complete bounded Closing graph.
+    /// This method decides no queue work and cannot settle an Unknown root.
+    fn close_root_driver(
+        &self,
+        _claim: &crate::RootDriverClaim,
+        _execution: &ExecutionRecord,
+        _observed_tick: u64,
+    ) -> Result<crate::RootClosureSnapshot, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Publish all core terminal/outbox/provider/audit changes under one lock/TX.
+    /// There is no sequential fallback and no synthetic effect permission.
+    fn commit_root_terminal_step(
+        &self,
+        _request: crate::RootTerminalPublication,
+    ) -> Result<crate::RootTerminalCommit, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Atomically admit an execution with its first event and notification.
     fn admit_execution(
         &self,

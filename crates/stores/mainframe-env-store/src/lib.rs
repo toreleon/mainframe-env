@@ -10,6 +10,7 @@ mod postgres;
 mod postgres_artifact;
 mod publication;
 mod retention;
+mod root_terminal;
 mod runtime;
 mod sqlite;
 mod validation;

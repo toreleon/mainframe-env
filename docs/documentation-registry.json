@@ -70,6 +70,7 @@
     "docs/decisions/0032-mq-program-machine-frame.md",
     "docs/decisions/0033-mq-full-md-value.md",
     "docs/decisions/0033-mq-historical-handle-observation.md",
+    "docs/decisions/0034-mq-root-terminal-publication.md",
     "docs/decisions/0035-mq-root-scoped-abi-aliases.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
@@ -333,6 +334,10 @@
         {
           "label": "ADR-0033: MQ historical handle observation",
           "path": "docs/decisions/0033-mq-historical-handle-observation.md"
+        },
+        {
+          "label": "ADR-0034: MQ root publication framework",
+          "path": "docs/decisions/0034-mq-root-terminal-publication.md"
         },
         {
           "label": "ADR-0035: Volatile task-root MQI ABI aliases",

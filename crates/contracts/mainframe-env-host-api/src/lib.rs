@@ -5,9 +5,12 @@
 mod canonical;
 pub use canonical::{
     AUDIT_RESOURCE_DIGEST_DOMAIN, EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES,
-    PROVIDER_REPLAY_DIGEST_FORMAT, canonical_audit_resource_digest, canonical_db2_request_digest,
-    canonical_ims_request_digest, canonical_mq_request_digest, canonical_request_digest,
-    canonical_request_size, canonical_result_digest, canonical_result_size,
+    PROVIDER_REPLAY_DIGEST_FORMAT, RootTerminalMachineObservation, RootTerminalResource,
+    RootTerminalResourceRow, RootTerminalSetup, canonical_audit_resource_digest,
+    canonical_db2_request_digest, canonical_ims_request_digest, canonical_mq_request_digest,
+    canonical_request_digest, canonical_request_size, canonical_result_digest,
+    canonical_result_size, canonical_root_terminal_resource_digest,
+    canonical_root_terminal_resource_size, canonical_root_terminal_setup_digest,
 };
 
 mod cics_catalog;

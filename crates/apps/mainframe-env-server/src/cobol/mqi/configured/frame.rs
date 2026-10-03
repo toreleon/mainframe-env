@@ -16,11 +16,38 @@ pub(super) struct State {
 }
 pub(super) struct ClosedFrame {
     original: Invocation,
+    root_execution: ExecutionId,
     control: Arc<dyn ProgramExecutionControl>,
     active: AtomicBool,
     state: Mutex<State>,
+    compiled: Option<CompiledFrame>,
+}
+/// Frozen genuine published/catalog admission, retained after normal child return.
+/// This read-only observation grants no executable/lifecycle authority.
+pub(super) struct CompiledFrame {
+    pub(super) catalog: mainframe_env_store_api::ProviderStateRecord,
+    pub(super) metadata: mainframe_env_store_api::ExecutableArtifactMetadata,
+    pub(super) content: [u8; 32],
 }
 impl ClosedFrame {
+    pub(super) fn compiled(&self) -> Option<&CompiledFrame> {
+        self.compiled.as_ref()
+    }
+    pub(super) fn new_compiled(
+        facet: MqTrustedBatchFrame,
+        control: Arc<dyn ProgramExecutionControl>,
+        floor: u64,
+        compiled: Option<CompiledFrame>,
+    ) -> Self {
+        let mut value = Self::new(facet, control, floor);
+        value.compiled = compiled;
+        value
+    }
+    pub(super) fn native_root_execution(&self) -> ExecutionId {
+        // Frozen from the retained opaque facet; no mutex or poison fallback
+        // supplies an invented root identity while a topology map is held.
+        self.root_execution.clone()
+    }
     pub(super) fn new(
         facet: MqTrustedBatchFrame,
         control: Arc<dyn ProgramExecutionControl>,
@@ -28,8 +55,10 @@ impl ClosedFrame {
     ) -> Self {
         Self {
             original: facet.original().clone(),
+            root_execution: facet.root_execution().clone(),
             control,
             active: AtomicBool::new(true),
+            compiled: None,
             state: Mutex::new(State {
                 facet,
                 dispatched: false,
@@ -152,6 +181,48 @@ impl ClosedFrame {
     #[cfg(test)]
     pub(super) fn test_active(&self) -> bool {
         self.active.load(Ordering::SeqCst)
+    }
+}
+impl CompiledFrame {
+    pub(super) fn charge(
+        proof: &InstalledBatchAdmission<'_>,
+        ceiling: usize,
+    ) -> Result<usize, HostProblem> {
+        let catalog = proof.catalog_record().ok_or(HostProblem::Unsupported)?;
+        let metadata = proof.artifact_metadata();
+        if !metadata.validate()
+            || catalog.payload.len() > 128
+            || catalog.namespace != "batch-program"
+            || catalog.payload != proof.child().artifact.as_str().as_bytes()
+        {
+            return Err(HostProblem::Unauthorized);
+        }
+        let mut bytes = 4096_usize;
+        for (key, value) in &metadata.options {
+            bytes = bytes
+                .checked_add(key.len() + value.len() + 128)
+                .ok_or(HostProblem::ResourceExhausted)?;
+        }
+        for value in metadata
+            .host_interfaces
+            .iter()
+            .chain(metadata.dialect_contracts.iter().flatten())
+        {
+            bytes = bytes
+                .checked_add(value.len() + 128)
+                .ok_or(HostProblem::ResourceExhausted)?;
+        }
+        if bytes > ceiling {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        Ok(bytes)
+    }
+    pub(super) fn from_checked(proof: &InstalledBatchAdmission<'_>) -> Option<Self> {
+        Some(Self {
+            catalog: proof.catalog_record()?.clone(),
+            metadata: proof.artifact_metadata().clone(),
+            content: proof.content_digest(),
+        })
     }
 }
 pub(super) struct Observation(pub(super) Arc<ClosedFrame>);

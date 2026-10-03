@@ -176,6 +176,46 @@ pub(super) fn journaled<T>(
 }
 
 impl JournalStore for MemoryStore {
+    fn fence_root_driver(
+        &self,
+        claim: &mainframe_env_store_api::RootDriverClaim,
+        execution: &ExecutionRecord,
+        tick: u64,
+    ) -> Result<ProviderStateRecord, StoreError> {
+        self.root_fence(claim, execution, tick)
+    }
+    fn register_root_provider_row(
+        &self,
+        admission: mainframe_env_store_api::RootProviderRowAdmission,
+    ) -> Result<(), StoreError> {
+        self.root_register_row(admission)
+    }
+    fn admit_root_driver(
+        &self,
+        admission: mainframe_env_store_api::RootDriverAdmission,
+    ) -> Result<mainframe_env_store_api::RootDriverClaim, StoreError> {
+        self.root_admit(admission)
+    }
+    fn admit_root_child(
+        &self,
+        admission: mainframe_env_store_api::RootChildAdmission,
+    ) -> Result<(), StoreError> {
+        self.root_admit_child(admission)
+    }
+    fn close_root_driver(
+        &self,
+        claim: &mainframe_env_store_api::RootDriverClaim,
+        execution: &ExecutionRecord,
+        tick: u64,
+    ) -> Result<mainframe_env_store_api::RootClosureSnapshot, StoreError> {
+        self.root_close(claim, execution, tick)
+    }
+    fn commit_root_terminal_step(
+        &self,
+        request: mainframe_env_store_api::RootTerminalPublication,
+    ) -> Result<mainframe_env_store_api::RootTerminalCommit, StoreError> {
+        self.root_commit(request)
+    }
     fn admit_execution(
         &self,
         execution: ExecutionRecord,
@@ -187,6 +227,7 @@ impl JournalStore for MemoryStore {
         let mut state = self.lock()?;
         let limits = self.limits;
         journaled(&mut state, |state, journal| {
+            super::root_terminal::guard_unenrolled(state, &execution)?;
             if state.executions.contains_key(&execution.execution_id) {
                 return Err(StoreError::AlreadyExists);
             }
@@ -223,6 +264,7 @@ impl JournalStore for MemoryStore {
         notification: OutboxRecord,
     ) -> Result<ExecutionRecord, StoreError> {
         let mut state = self.lock()?;
+        super::root_terminal::guard_actor(&state, execution_id, next_state)?;
         let limits = self.limits;
         journaled(&mut state, |state, journal| {
             let current = state

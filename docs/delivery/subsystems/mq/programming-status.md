@@ -1890,3 +1890,36 @@ attempts retain their actual identities, not new post-commit test labels.
 Genuine installed opaque wrappers/source, pendingPUT normal/CEE3ABD and removedGET,
 joined compiled GET, DefaultContext, recovery/participants/IR/full26/CardDemo
 remain required. Parent active; licensed oracle alone human-skipped0/26.
+
+## Finite synchronous root publication framework
+
+`MQ-1505.root-publication-framework` integrates reviewed sealed `42b524f58`
+as a prerequisite, not native pending-work acceptance. Original compiled root
+setup, genuine child enrollment and complete pre-terminal core/CALL/effect
+closure bind the existing coordinator and selected MQ authority. Memory's
+single lock/journal and SQLite's existing writer transaction publish legal core
+steps, provider settlement, lifecycle outbox, two typed terminal audit subjects
+and one winner after whole graph/epoch/Exact-or-Absent dependency checks. Other
+backends refuse. No application effect or completed row becomes root authority.
+
+Open/Closing/Terminal/Uncertain ownership is core-managed; cancellation, unknown,
+panic or lost authority fence without guessed commit/backout or Drop cleanup.
+Actual classified normal completion and LE CEE3ABD are distinct from unsupported
+outcomes. Existing canonical request/result bytes remain unchanged; root setup
+and resource use separate bounded streaming domains. Indexed root history stays
+retention-protected without an age or release permit. Cold restore, transfer,
+checkpoint recovery, participant coordination and general scheduling are not
+introduced by this finite synchronous framework.
+
+The source review is the original MQ9.4 baseline2026-08-31 BACK0001/q101690,
+CMIT0007/q101750 and DISC0012/q101800 with supplementary baseline2026-09-12
+BackoutCount/HardenGetBackout. Retained-first identities and actual offline
+search/read receipts remain bound to their original candidates; source credit0.
+Physical store contracts and actual compiled connection-only/root-child fixtures
+do not prove pending PUT/removed GET, DefaultContext, JES, native MQ or licensed
+execution. Six additional ordinary-writer gaps reproduced by the separate
+reviewed `MQ-1505.root-writer-guards` feature still require their own integration;
+this prerequisite is not advertised as a complete root delivery contract.
+Genuine installed point/PUT/GET, pendingPUT normal/CEE3ABD/removedGET, failure/
+restart, participants/IR/full26/CardDemo and other nonlicensed gates remain
+required. Parent active; only licensed oracle human-skipped0/26.

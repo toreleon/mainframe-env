@@ -58,6 +58,24 @@ pub(crate) use retention_selected::selected_retention_dependencies;
 #[path = "service_selection.rs"]
 mod selection;
 use selection::LegacyAccess;
+pub(crate) use selection::operations::native_terminal::SelectedTerminalPreparation;
+
+pub(crate) fn selected_terminal_namespaces() -> Vec<String> {
+    [
+        STATE_NAMESPACE,
+        QUEUE_NAMESPACE,
+        CATALOG_NAMESPACE,
+        HANDLE_NAMESPACE,
+        PENDING_NAMESPACE,
+        REPLAY_NAMESPACE,
+        selection::operations::receipt::NAMESPACE,
+    ]
+    .into_iter()
+    .chain(selection::operations::terminal_ownership_namespaces())
+    .chain(crate::delivery::checkpoint::rows::TERMINAL_NAMESPACES)
+    .map(str::to_owned)
+    .collect()
+}
 
 #[path = "service_object_integration.rs"]
 mod object_integration;

@@ -27,6 +27,9 @@ pub struct InstalledBatchAdmission<'a> {
 }
 
 impl InstalledBatchAdmission<'_> {
+    pub(super) fn native_root_owned(&self) -> bool {
+        self.call.is_native()
+    }
     pub fn parent(&self) -> &Invocation {
         self.parent
     }

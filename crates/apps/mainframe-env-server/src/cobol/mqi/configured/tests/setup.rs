@@ -26,12 +26,20 @@ pub(super) struct Saf {
     pub deny: AtomicBool,
     pub resources: Mutex<Vec<EnterpriseResource>>,
     pub hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    pub terminal_hook: Mutex<Option<Box<dyn FnMut() + Send>>>,
 }
 impl EnterpriseAuthorizer for Saf {
     fn authorize(&self, _: &PrincipalId, resource: &EnterpriseResource) -> Result<(), HostProblem> {
         self.resources.lock().unwrap().push(resource.clone());
         if let Some(hook) = self.hook.lock().unwrap().take() {
             hook();
+        }
+        if resource.class == EnterpriseResourceClass::MqUnitOfWork
+            && resource.name.as_str() == "CURRENT"
+        {
+            if let Some(hook) = self.terminal_hook.lock().unwrap().as_mut() {
+                hook();
+            }
         }
         if self.deny.load(Ordering::SeqCst) {
             Err(HostProblem::Unauthorized)
@@ -178,6 +186,7 @@ pub(super) struct Fixture {
     pub parent: Invocation,
     pub clock: Arc<Clock>,
     pub saf: Arc<Saf>,
+    _program_provider: Arc<dyn HostProvider>,
     pub url: String,
 }
 impl Fixture {
@@ -211,10 +220,22 @@ impl Fixture {
             }))
         };
         normalize_fixture(&*store);
-        Self::from_normalized(root, store, url, frames, wrapped, foreign_control)
+        Self::from_normalized(root, store, url, frames, wrapped, foreign_control, false)
     }
     pub fn same_store(store: Arc<dyn PlatformStore>, url: String) -> Self {
-        Self::from_normalized(hardening::TestRoot::new(), store, url, 16, false, false)
+        Self::from_normalized(
+            hardening::TestRoot::new(),
+            store,
+            url,
+            16,
+            false,
+            false,
+            false,
+        )
+    }
+    pub fn foreign_program(sqlite: bool) -> Self {
+        let prior = Self::new(sqlite);
+        Self::from_normalized(prior.root, prior.store, prior.url, 16, false, false, true)
     }
     fn from_normalized(
         root: hardening::TestRoot,
@@ -223,6 +244,7 @@ impl Fixture {
         frames: usize,
         wrapped: bool,
         foreign_control: bool,
+        foreign_program: bool,
     ) -> Self {
         let saf = Arc::new(Saf::default());
         let clock = Arc::new(Clock(AtomicU64::new(20), Mutex::new(None)));
@@ -260,6 +282,18 @@ impl Fixture {
         };
         router.bind_execution_control(control).unwrap();
         router.bind_mqi_program_host(factory.clone()).unwrap();
+        let program_provider = router.native_root_program_provider().unwrap();
+        let registered_program: Arc<dyn HostProvider> = if foreign_program {
+            Arc::new(WeakRouter {
+                router: Arc::downgrade(&router),
+                descriptor: router.descriptor().clone(),
+            })
+        } else {
+            program_provider.clone()
+        };
+        if !foreign_control {
+            router.bind_native_mq_root_host(&mq).unwrap();
+        }
         let selected: Arc<dyn HostProvider> = if wrapped {
             Arc::new(Forwarder(mq.clone()))
         } else {
@@ -267,18 +301,8 @@ impl Fixture {
         };
         let host = Arc::new(ScopedHostService::new(
             Arc::new(
-                RegistrySnapshot::new(
-                    1,
-                    vec![
-                        selected,
-                        Arc::new(WeakRouter {
-                            router: Arc::downgrade(&router),
-                            descriptor: router.descriptor().clone(),
-                        }),
-                    ],
-                    Default::default(),
-                )
-                .unwrap(),
+                RegistrySnapshot::new(1, vec![selected, registered_program], Default::default())
+                    .unwrap(),
             ),
             Default::default(),
         ));
@@ -304,6 +328,7 @@ impl Fixture {
             parent,
             clock,
             saf,
+            _program_provider: program_provider,
             url,
         }
     }

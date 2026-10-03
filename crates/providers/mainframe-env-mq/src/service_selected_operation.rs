@@ -29,6 +29,12 @@ mod batch_child;
 mod explicit_context;
 #[path = "service_selected_operation/ownership.rs"]
 mod ownership;
+
+pub(in crate::service) fn terminal_ownership_namespaces() -> [&'static str; 2] {
+    [ownership::CONTROL_NAMESPACE, ownership::UOW_NAMESPACE]
+}
+#[path = "service_selected_operation/native_terminal.rs"]
+pub(in crate::service) mod native_terminal;
 #[path = "service_selected_operation/producer.rs"]
 pub(in crate::service) mod producer;
 #[path = "service_selected_operation/property.rs"]

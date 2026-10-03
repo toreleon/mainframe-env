@@ -361,7 +361,13 @@ mod generated;
 mod ims_system;
 mod mq;
 pub(crate) mod mq_mqi;
+mod root_terminal;
 mod security_request;
+pub use root_terminal::{
+    RootTerminalMachineObservation, RootTerminalResource, RootTerminalResourceRow,
+    RootTerminalSetup, canonical_root_terminal_resource_digest,
+    canonical_root_terminal_resource_size, canonical_root_terminal_setup_digest,
+};
 use security_request::encode_principal_validation;
 
 #[cfg(test)]

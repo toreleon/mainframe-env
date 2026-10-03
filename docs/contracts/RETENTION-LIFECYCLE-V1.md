@@ -243,6 +243,14 @@ separate owning protocols. No new target or selected archival permit is added.
 
 ## Legacy age observations
 
+Native root membership protects every indexed actor and its existing core
+references regardless of a terminal execution row. The framework root terminal
+transaction supplies no retention age or release permit. Retention must not
+recycle uncertain root history, scope indexes, effects, CALLs or checkpoints
+using transport revocation or a completed row alone. Shared owning recovery/age
+closure and exact release remain pending; see
+[ADR 0034](../decisions/0034-mq-root-terminal-publication.md).
+
 Absence of a trustworthy intrinsic tick protects a structurally valid legacy
 row; it never makes the row old. Partial new metadata is corruption, not a
 legacy encoding. The explicit reconciliation path records a

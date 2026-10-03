@@ -23,9 +23,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 mod batch_child;
 mod context;
+mod native_terminal;
 pub(crate) use batch_child::{BatchChildBinding, InstalledBatchRelationship, LogicalBatchOwner};
 use context::ContextMode;
 pub(crate) use context::DirectoryHostContext;
+pub(crate) use native_terminal::TerminalRoot;
 
 static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
 const MAX_PROCESSES: usize = 256;

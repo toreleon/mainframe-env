@@ -68,6 +68,24 @@ fn delivery_error(error: crate::MqDeliveryError) -> HostProblem {
     }
 }
 
+pub(super) fn prior_terminal_connection(
+    state: &rich_state::RichStoredState,
+    runtime: &mut SelectedRuntime,
+    logical: &LogicalBatchOwner,
+    owner: MqHandleOwner,
+) -> Result<Option<ConnectionBinding>, HostProblem> {
+    connection_warning::prior(state, runtime, logical, owner)
+}
+
+pub(super) fn remove_retired_bindings(runtime: &mut SelectedRuntime, connection: MqHconn) {
+    runtime
+        .connections
+        .retain(|binding| binding.connection != connection);
+    runtime
+        .objects
+        .retain(|binding| binding.connection != connection);
+}
+
 pub(super) fn prepare(
     state: &rich_state::RichStoredState,
     runtime: &mut SelectedRuntime,

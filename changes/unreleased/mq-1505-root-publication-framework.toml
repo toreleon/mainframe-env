@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added the root-publication framework prerequisite: bounded core Closing ownership, genuine configured compiled root routing and atomic core/MQ/COBOL/outbox/terminal audits; compiled pending-PUT and removed-GET native acceptance remain required."

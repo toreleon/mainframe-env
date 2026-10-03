@@ -32,7 +32,9 @@ use std::sync::{Mutex, MutexGuard};
 
 mod container_retention;
 mod journal;
+mod lifecycle;
 mod publication;
+mod root_terminal;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StoreLimits {
@@ -265,7 +267,7 @@ impl MemoryStore {
     ) -> Result<(), StoreError> {
         validation::audit(&record)?;
         Self::validate_encoded_size(encode_audit(&record)?, limits)?;
-        if state.audits.len() >= limits.max_audits {
+        if state.audits.len() + root_terminal::terminal_audit_count(state) >= limits.max_audits {
             return Err(StoreError::CapacityExceeded);
         }
         state.next_audit_ordinal = state
@@ -283,6 +285,13 @@ impl MemoryStore {
 }
 
 impl AuditSink for MemoryStore {
+    fn audit_subject_records(
+        &self,
+        execution_id: &ExecutionId,
+        max: usize,
+    ) -> Result<Vec<mainframe_env_execution_api::AuditSubjectRecord>, StoreError> {
+        self.root_audit_subjects(execution_id, max)
+    }
     fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
         let mut state = self.lock()?;
         Self::append_audit_locked(&mut state, record, self.limits)
@@ -297,8 +306,17 @@ impl AuditSink for MemoryStore {
         if max == 0 || max > self.limits.max_audits {
             return Err(StoreError::CapacityExceeded);
         }
-        let mut records = self
-            .lock()?
+        let state = self.lock()?;
+        let prefix = crate::durable::audit_storage_key(execution_id, "");
+        if state
+            .provider_state
+            .keys()
+            .any(|(namespace, key)| namespace == AUDIT_NAMESPACE && key.starts_with(&prefix))
+        {
+            // Old readers cannot reinterpret or silently drop the new subject.
+            return Err(StoreError::IncompatibleVersion);
+        }
+        let mut records = state
             .audits
             .values()
             .filter(|record| {
@@ -316,82 +334,6 @@ impl AuditSink for MemoryStore {
         });
         records.truncate(max);
         Ok(records)
-    }
-}
-
-impl ExecutionStore for MemoryStore {
-    fn create_execution(&self, record: ExecutionRecord) -> Result<(), StoreError> {
-        validation::new_execution(&record)?;
-        Self::validate_encoded_size(encode_execution(&record)?, self.limits)?;
-        let mut state = self.lock()?;
-        if state.executions.contains_key(&record.execution_id) {
-            return Err(StoreError::AlreadyExists);
-        }
-        if state.executions.len() >= self.limits.max_executions {
-            return Err(StoreError::CapacityExceeded);
-        }
-        state.executions.insert(record.execution_id.clone(), record);
-        Self::bump_retention_epoch(&mut state)?;
-        Ok(())
-    }
-
-    fn get_execution(&self, id: &ExecutionId) -> Result<Option<ExecutionRecord>, StoreError> {
-        Ok(self.lock()?.executions.get(id).cloned())
-    }
-
-    fn transition_execution(
-        &self,
-        id: &ExecutionId,
-        expected_version: u64,
-        next: ExecutionState,
-        now_tick: u64,
-    ) -> Result<ExecutionRecord, StoreError> {
-        let mut state = self.lock()?;
-        let record = state.executions.get_mut(id).ok_or(StoreError::NotFound)?;
-        if record.version != expected_version {
-            return Err(StoreError::Conflict);
-        }
-        if !record.state.can_transition_to(next) {
-            return Err(StoreError::InvalidTransition);
-        }
-        record.state = next;
-        record.terminal_tick = next
-            .terminal()
-            .then_some(now_tick)
-            .filter(|tick| *tick != 0);
-        record.version = record.version.checked_add(1).ok_or(StoreError::Conflict)?;
-        Self::validate_encoded_size(encode_execution(record)?, self.limits)?;
-        let updated = record.clone();
-        Self::bump_retention_epoch(&mut state)?;
-        Ok(updated)
-    }
-}
-
-impl EventStore for MemoryStore {
-    fn append_event(&self, event: LifecycleEvent) -> Result<(), StoreError> {
-        let mut state = self.lock()?;
-        Self::append_event_locked(&mut state, event, self.limits)
-    }
-
-    fn events(
-        &self,
-        id: &ExecutionId,
-        start_sequence: u64,
-        max: usize,
-    ) -> Result<Vec<LifecycleEvent>, StoreError> {
-        if max == 0 || max > self.limits.max_events_per_execution {
-            return Err(StoreError::CapacityExceeded);
-        }
-        Ok(self
-            .lock()?
-            .events
-            .get(id)
-            .into_iter()
-            .flatten()
-            .filter(|event| event.sequence >= start_sequence)
-            .take(max)
-            .cloned()
-            .collect())
     }
 }
 
@@ -422,6 +364,7 @@ impl WorkStore for MemoryStore {
         }
         Self::validate_encoded_size(encode_work(&work)?, self.limits)?;
         let mut state = self.lock()?;
+        root_terminal::guard_work(&state, &work.execution_id)?;
         if state.work.contains_key(&work.work_id) {
             return Err(StoreError::AlreadyExists);
         }
@@ -676,6 +619,7 @@ impl CheckpointStore for MemoryStore {
         validation::checkpoint(&record)?;
         Self::validate_encoded_size(encode_checkpoint(&record)?, self.limits)?;
         let mut state = self.lock()?;
+        root_terminal::guard_actor(&state, &record.execution_id, None)?;
         let old = state
             .checkpoints
             .get(&record.execution_id)
@@ -696,6 +640,7 @@ impl CheckpointStore for MemoryStore {
 
     fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError> {
         let mut state = self.lock()?;
+        root_terminal::guard_actor(&state, id, None)?;
         let checkpoint = state.checkpoints.remove(id).ok_or(StoreError::NotFound)?;
         state.blob_bytes = state
             .blob_bytes
@@ -807,6 +752,7 @@ impl IdempotencyStore for MemoryStore {
         validation::new_intent(&record)?;
         Self::validate_encoded_size(encode_effect(&record)?, self.limits)?;
         let mut state = self.lock()?;
+        root_terminal::guard_effect(&state, &record)?;
         if let Some(existing) = state.effects.get(&record.key) {
             return if existing == &record {
                 Ok(())
@@ -826,6 +772,7 @@ impl IdempotencyStore for MemoryStore {
         validation::terminal(key, &record)?;
         Self::validate_encoded_size(encode_effect(&record)?, self.limits)?;
         let mut state = self.lock()?;
+        root_terminal::guard_effect(&state, &record)?;
         let intent = state.effects.get(key).ok_or(StoreError::NotFound)?;
         validation::result(key, intent, &record)?;
         state.effects.insert(key.clone(), record);
@@ -906,6 +853,13 @@ impl IdempotencyStore for MemoryStore {
         lease_ticks: u64,
     ) -> Result<EffectRecord, StoreError> {
         let mut state = self.lock()?;
+        let execution_id = state
+            .effects
+            .get(key)
+            .ok_or(StoreError::NotFound)?
+            .execution_id
+            .clone();
+        root_terminal::guard_actor(&state, &execution_id, None)?;
         let record = state.effects.get_mut(key).ok_or(StoreError::NotFound)?;
         validation::stale_claim(
             record,
@@ -957,6 +911,13 @@ impl IdempotencyStore for MemoryStore {
         result_digest: [u8; 32],
     ) -> Result<EffectRecord, StoreError> {
         let mut state = self.lock()?;
+        let execution_id = state
+            .effects
+            .get(key)
+            .ok_or(StoreError::NotFound)?
+            .execution_id
+            .clone();
+        root_terminal::guard_actor(&state, &execution_id, None)?;
         let mut staged = self.snapshot(&state);
         let record = staged.effects.get_mut(key).ok_or(StoreError::NotFound)?;
         validation::stale_reconciliation(
@@ -998,6 +959,13 @@ impl IdempotencyStore for MemoryStore {
             return Err(StoreError::InvalidTransition);
         }
         let mut state = self.lock()?;
+        let execution_id = state
+            .effects
+            .get(key)
+            .ok_or(StoreError::NotFound)?
+            .execution_id
+            .clone();
+        root_terminal::guard_actor(&state, &execution_id, None)?;
         let record = state.effects.get_mut(key).ok_or(StoreError::NotFound)?;
         if record.state != EffectState::UnknownOutcome {
             return Err(StoreError::InvalidTransition);
@@ -1005,51 +973,6 @@ impl IdempotencyStore for MemoryStore {
         record.state = final_state;
         record.result_digest = Some(result_digest);
         Self::validate_encoded_size(encode_effect(record)?, self.limits)?;
-        let updated = record.clone();
-        Self::bump_retention_epoch(&mut state)?;
-        Ok(updated)
-    }
-}
-
-impl OutboxStore for MemoryStore {
-    fn append_notification(&self, record: OutboxRecord) -> Result<(), StoreError> {
-        let mut state = self.lock()?;
-        Self::append_outbox_locked(&mut state, record, self.limits)
-    }
-
-    fn pending_notifications(&self, max: usize) -> Result<Vec<OutboxRecord>, StoreError> {
-        if max == 0 || max > self.limits.max_outbox {
-            return Err(StoreError::CapacityExceeded);
-        }
-        Ok(self
-            .lock()?
-            .outbox
-            .values()
-            .filter(|record| !record.delivered)
-            .take(max)
-            .cloned()
-            .collect())
-    }
-
-    fn mark_notification_delivered(
-        &self,
-        notification_id: &str,
-        expected_version: u64,
-        delivered_tick: u64,
-    ) -> Result<OutboxRecord, StoreError> {
-        let mut state = self.lock()?;
-        let record = state
-            .outbox
-            .get_mut(notification_id)
-            .ok_or(StoreError::NotFound)?;
-        if delivered_tick == 0 || record.version != expected_version || record.delivered {
-            return Err(StoreError::Conflict);
-        }
-        record.delivered = true;
-        record.delivered_tick = Some(delivered_tick);
-        record.attempt = record.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
-        record.version = record.version.checked_add(1).ok_or(StoreError::Conflict)?;
-        Self::validate_encoded_size(encode_outbox(record)?, self.limits)?;
         let updated = record.clone();
         Self::bump_retention_epoch(&mut state)?;
         Ok(updated)
@@ -1150,6 +1073,12 @@ impl ProviderStateStore for MemoryStore {
         expected_version: Option<u64>,
     ) -> Result<(), StoreError> {
         let mut state = self.lock()?;
+        root_terminal::guard_provider(
+            &state,
+            &record.namespace,
+            &record.key,
+            Some(&record.payload),
+        )?;
         Self::put_provider_state_locked(&mut state, record, expected_version, self.limits)
     }
 
@@ -1160,6 +1089,7 @@ impl ProviderStateStore for MemoryStore {
         expected_version: u64,
     ) -> Result<(), StoreError> {
         let mut state = self.lock()?;
+        root_terminal::guard_provider(&state, namespace, key, None)?;
         let map_key = (namespace.to_string(), key.to_string());
         let current = state
             .provider_state
@@ -1187,6 +1117,13 @@ impl ProviderStateStore for MemoryStore {
     ) -> Result<(), StoreError> {
         record.validate_move(old_key, expected_version, self.limits.max_blob_bytes)?;
         let mut state = self.lock()?;
+        root_terminal::guard_provider(&state, &record.namespace, old_key, None)?;
+        root_terminal::guard_provider(
+            &state,
+            &record.namespace,
+            &record.key,
+            Some(&record.payload),
+        )?;
         let old_map_key = (record.namespace.clone(), old_key.to_string());
         let new_map_key = (record.namespace.clone(), record.key.clone());
         let old = state
@@ -3107,7 +3044,7 @@ fn memory_candidates(
                     ));
                 }
             }
-            state.audits.len()
+            state.audits.len() + root_terminal::terminal_audit_count(state)
         }
         RetentionTarget::RacfEvidence
         | RetentionTarget::DatasetReplay
@@ -3116,6 +3053,16 @@ fn memory_candidates(
         | RetentionTarget::SpoolJobs
         | RetentionTarget::ConsoleLog => return Err(StoreError::InvalidTransition),
     };
+    // No root age/closure release authority has been accepted yet. Indexed
+    // membership protects native history in every phase, including Terminal.
+    rows.retain(|(_, row)| {
+        !row.owner_execution.as_ref().is_some_and(|id| {
+            state.provider_state.contains_key(&(
+                crate::root_terminal::ACTOR_NAMESPACE.into(),
+                id.as_str().into(),
+            ))
+        })
+    });
     rows.sort_by(|left, right| {
         left.0
             .cmp(&right.0)
@@ -3143,7 +3090,10 @@ fn memory_observed_age<'a>(
 }
 
 fn memory_execution_prunable(state: &State, execution_id: &ExecutionId) -> bool {
-    state
+    !state.provider_state.contains_key(&(
+        crate::root_terminal::ACTOR_NAMESPACE.into(),
+        execution_id.as_str().into(),
+    )) && state
         .executions
         .get(execution_id)
         .is_some_and(|execution| execution.state.terminal())

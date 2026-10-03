@@ -11,6 +11,18 @@ JSON text, a COBOL data layout, or a licensed mainframe representation.
 
 ## Bytes and hashing
 
+Native root lifecycle subjects use independent bounded streaming domains
+`mainframe-env.root-terminal-setup@1` and
+`mainframe-env.root-terminal-resource@1`. They encode the frozen original
+compiled setup and actual pre-terminal machine observation/complete closure,
+respectively, through the same Encoder authority. They are neither application
+HostRequest effects nor replacements for HostCanonicalV1. Matching their digest
+does not attest physical host/store/control/provider identity or finality. See
+[ADR 0034](../decisions/0034-mq-root-terminal-publication.md). Every existing
+request/result golden byte and original effect identity remains unchanged.
+These domains belong to the root-publication framework prerequisite; they do
+not establish compiled pending-PUT or removed-GET terminal acceptance.
+
 The request preimage begins with the ASCII bytes `mainframe-env.effect-request@1`
 followed by a zero byte; the result preimage uses `mainframe-env.effect-result@1`
 and a zero byte. SHA-256 hashes that domain prefix and the canonical value.

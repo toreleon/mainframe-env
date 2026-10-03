@@ -169,7 +169,28 @@ impl SqliteStateStore {
         transaction: &mut Transaction<'_, Sqlite>,
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError> {
+        self.root_lock(transaction).await?;
+        self.root_guard_mutations(transaction, &mutations).await?;
+        self.apply_root_mutations_in(transaction, mutations).await
+    }
+
+    // Reuses the sole row mutation primitive after the root transaction has
+    // established complete Closing ownership. Never called by an external writer.
+    pub(in crate::sqlite) async fn apply_root_mutations_in(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+        mutations: Vec<ProviderStateMutation>,
+    ) -> Result<(), StoreError> {
         for mutation in mutations {
+            match &mutation {
+                ProviderStateMutation::Put(w) => w.record.validate_write(self.max_payload_bytes)?,
+                ProviderStateMutation::Move {
+                    record,
+                    old_key,
+                    expected_version,
+                } => record.validate_move(old_key, *expected_version, self.max_payload_bytes)?,
+                ProviderStateMutation::Delete { .. } => {}
+            }
             let affected = match mutation {
                 ProviderStateMutation::Put(write) => {
                     let record = write.record;

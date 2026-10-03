@@ -45,9 +45,16 @@
 
 mod audited_publication;
 mod model;
+mod root_terminal;
 mod traits;
 
 pub use audited_publication::{AuditedProviderPublication, MAX_AUDITED_PROVIDER_MUTATIONS};
+pub use root_terminal::{
+    MAX_ROOT_ACTORS, MAX_ROOT_OPERATIONS, MAX_ROOT_PAYLOAD_BYTES, ROOT_DRIVER_NAMESPACE,
+    RootActorSnapshot, RootCallBinding, RootChildAdmission, RootClosureSnapshot,
+    RootDriverAdmission, RootDriverClaim, RootProviderRowAdmission, RootTerminalCommit,
+    RootTerminalPublication, RootTerminalStep, TerminalRowDependency,
+};
 
 pub use model::{
     ArchivedRetentionRow, ArtifactRecord, ArtifactStoreHealth, CheckpointRecord,

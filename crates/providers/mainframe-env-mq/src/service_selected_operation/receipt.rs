@@ -50,6 +50,66 @@ pub(in crate::service) struct OccurrenceReceipt {
 }
 
 impl OccurrenceReceipt {
+    /// Same-store closure proof for the original issued connection. It is not
+    /// historical-handle resolution or a replacement for live directory/registry
+    /// authority. No new reply, effect identity or token is constructed here.
+    pub(super) fn require_terminal_connection(
+        &self,
+        key: &str,
+        logical: &LogicalBatchOwner,
+        control: &Control,
+        closure: &mainframe_env_store_api::RootClosureSnapshot,
+    ) -> Result<(), HostProblem> {
+        self.validate(key, control)?;
+        if self.registry_epoch != control.registry_epoch
+            || self.run != logical.run()
+            || self.principal != logical.principal()
+            || !matches!(self.call.as_str(), "MQCONN" | "MQCONNX")
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let actor = closure
+            .actors
+            .iter()
+            .find(|actor| actor.execution.execution_id.as_str() == self.execution)
+            .ok_or(HostProblem::UnknownOutcome)?;
+        let effect = actor
+            .effects
+            .iter()
+            .find(|effect| effect.key.as_str() == key)
+            .ok_or(HostProblem::UnknownOutcome)?;
+        if actor.execution.run_unit_id.as_str() != self.run
+            || actor.execution.principal.as_str() != self.principal
+            || actor.execution.attempt != self.attempt
+            || effect.sequence != self.sequence
+            || effect.request_digest != self.request_digest
+            || effect.result_digest != Some(self.result_digest)
+            || effect.state != EffectState::Completed
+            || effect.digest_format != EffectDigestFormat::CanonicalHostV1
+            || effect.intent.owner != actor.execution.execution_id
+            || effect.intent.attempt != self.attempt
+            || effect
+                .intent
+                .audit_invocation_key
+                .as_ref()
+                .map(|key| key.as_str())
+                != Some(self.invocation_key.as_str())
+            || effect.run_unit_id.as_str() != self.run
+            || effect.intent.capability.as_ref().map(|cap| cap.as_str()) != Some("host.mq.write")
+            || effect.intent.audit_resource.is_none()
+            || effect.intent.epoch == 0
+            || effect.intent.created_tick == 0
+            || effect.intent.created_tick > self.observed_tick
+            || effect
+                .resolved_tick
+                .is_none_or(|tick| tick < self.observed_tick || tick > closure.observed_tick)
+            || effect.intent.recovery_after_tick != self.deadline
+            || effect.intent.recovery_lease.is_some()
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        Ok(())
+    }
     /// Attribution for conservative retention protection after full restore.
     /// This supplies neither an execution permit nor a terminal age.
     pub(in crate::service) fn retained_dependency(&self) -> (&str, &str) {

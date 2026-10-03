@@ -162,13 +162,13 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/durable.rs",
-      "max_production_lines": 2285,
+      "max_production_lines": 2282,
       "responsibility": "Shared durable SQL helpers implement effect, event, work, checkpoint, session, replay, and provider-state domains.",
       "split_boundary": "Partition SQL repositories by execution journal, work/session, replay/provider state, and maintenance/retention domains."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3311,
+      "max_production_lines": 3261,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -180,7 +180,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 1675,
+      "max_production_lines": 1513,
       "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
       "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },

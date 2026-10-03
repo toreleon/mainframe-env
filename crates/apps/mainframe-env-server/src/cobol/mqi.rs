@@ -2,7 +2,7 @@
 
 use super::*;
 use mainframe_env_interpreter::MqMqiProgramFrame;
-mod configured;
+pub(super) mod configured;
 mod proof;
 mod session;
 pub use configured::{ConfiguredInstalledMqHost, InstalledMqHostBounds};

@@ -245,6 +245,8 @@ struct CobolProgram {
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
     transfer_owner: OnceLock<std::sync::Weak<mainframe_env_cics::CicsService>>,
     mqi_host: OnceLock<Arc<dyn ProgramMqHostAdmission>>,
+    native_mq_host: OnceLock<std::sync::Weak<ConfiguredInstalledMqHost>>,
+    native_root_program: OnceLock<std::sync::Weak<dyn HostProvider>>,
     clock_start: Instant,
     clock_epoch: Option<u64>,
 }
@@ -260,6 +262,8 @@ impl CobolProgram {
             control: OnceLock::new(),
             transfer_owner: OnceLock::new(),
             mqi_host: OnceLock::new(),
+            native_mq_host: OnceLock::new(),
+            native_root_program: OnceLock::new(),
             clock_start: Instant::now(),
             clock_epoch: SystemTime::now()
                 .duration_since(UNIX_EPOCH)

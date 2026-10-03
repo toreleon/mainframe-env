@@ -23,6 +23,8 @@ const CURSOR: &str = "mq-delivery-live-v1-cursor";
 const META_KEY: &str = "state";
 const SCHEMA: &str = "mainframe-env.mq-delivery-rows@1";
 const SCHEMA_TWO: &str = "mainframe-env.mq-delivery-rows@2";
+/// Exact existing modeled row families; not a prefix mutation permission.
+pub(crate) const TERMINAL_NAMESPACES: [&str; 5] = [META, QUEUE, PENDING, FINAL, CURSOR];
 mod upgrade;
 type Key = (String, String);
 type Records = BTreeMap<Key, ProviderStateRecord>;

@@ -16,6 +16,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
 mod budget;
 mod frame;
+pub(in crate::cobol) mod native_call;
+mod native_root;
 use frame::{ClosedFrame, Session};
 
 /// Finite retained topology bounds. Revoked entries consume slots until a
@@ -30,6 +32,7 @@ enum RootEntry {
     Retained {
         root: Arc<MqTrustedBatchRoot>,
         frame: Arc<ClosedFrame>,
+        native: Option<mainframe_env_store_api::RootDriverClaim>,
     },
 }
 enum FrameEntry {
@@ -75,6 +78,10 @@ pub struct ConfiguredInstalledMqHost {
     descriptor: CapabilityDescriptor,
     host_limits: HostLimits,
     bounds: InstalledMqHostBounds,
+    mq_limits: MqLimits,
+    mqi_limits: MqMqiLimits,
+    generation: u64,
+    fence: u64,
     topology: Mutex<Topology>,
     this: Weak<Self>,
 }
@@ -120,6 +127,10 @@ impl ConfiguredInstalledMqHost {
             descriptor,
             host_limits,
             bounds,
+            mq_limits,
+            mqi_limits,
+            generation,
+            fence,
             topology: Mutex::new(Topology::default()),
             this: this.clone(),
         }))
@@ -151,7 +162,7 @@ impl ConfiguredInstalledMqHost {
                 .lock()
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
             match map.roots.get(&original.execution_id) {
-                Some(RootEntry::Retained { root, frame }) => {
+                Some(RootEntry::Retained { root, frame, .. }) => {
                     if root.original() != original {
                         return Err(HostProblem::Unauthorized);
                     }
@@ -184,6 +195,7 @@ impl ConfiguredInstalledMqHost {
                     RootEntry::Retained {
                         root,
                         frame: frame.clone(),
+                        native: None,
                     },
                 );
                 Ok(frame)
@@ -200,7 +212,18 @@ impl ConfiguredInstalledMqHost {
         proof: &InstalledBatchAdmission<'_>,
     ) -> Result<Arc<ClosedFrame>, HostProblem> {
         let child = proof.child();
-        let charge = budget::charge(child, self.host_limits.max_state_bytes)?;
+        let mut charge = budget::charge(child, self.host_limits.max_state_bytes)?;
+        if proof.native_root_owned() {
+            charge = charge
+                .checked_add(frame::CompiledFrame::charge(
+                    proof,
+                    self.host_limits.max_state_bytes,
+                )?)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            if charge > self.host_limits.max_state_bytes {
+                return Err(HostProblem::ResourceExhausted);
+            }
+        }
         {
             let mut map = self
                 .topology
@@ -225,10 +248,16 @@ impl ConfiguredInstalledMqHost {
                     child.clone(),
                     MqTrustedBatchRelationship::SameTaskCall,
                 )?;
-                let frame = Arc::new(ClosedFrame::new(
+                let compiled = if proof.native_root_owned() {
+                    frame::CompiledFrame::from_checked(proof)
+                } else {
+                    None
+                };
+                let frame = Arc::new(ClosedFrame::new_compiled(
                     facet,
                     self.control.clone(),
                     proof.observed_control().now_tick,
+                    compiled,
                 ));
                 created = Some(frame.clone());
                 Ok(frame)
@@ -309,7 +338,14 @@ impl HostProvider for ConfiguredInstalledMqHost {
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
                 match map.frames.get(&original.execution_id) {
                     Some(FrameEntry::Retained(frame)) => frame.clone(),
-                    _ => return Err(HostProblem::Unauthorized),
+                    _ => match map.roots.get(&original.execution_id) {
+                        Some(RootEntry::Retained {
+                            frame,
+                            native: Some(_),
+                            ..
+                        }) if original.parent_execution_id.is_none() => frame.clone(),
+                        _ => return Err(HostProblem::Unauthorized),
+                    },
                 }
             };
             frame.dispatch(original, occurrence)

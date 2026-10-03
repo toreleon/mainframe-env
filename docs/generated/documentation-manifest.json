@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 236,
+    "markdown_documents": 237,
     "navigation_groups": 6,
-    "normative_documents": 68,
+    "normative_documents": 69,
     "xtask_commands": 213
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 124,
-      "sha256": "sha256:0681b34deb31d2eb592d79e0a7868b2566059f82caf999321d88e9a0e81d886f",
+      "relative_links": 125,
+      "sha256": "sha256:ed7258ddd2fdde01bb342bdada1bd5e32bd607919ef26a13b785814e6a731e7f",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -579,9 +579,9 @@
       "normative": true,
       "owner": "store adapters and core-server composition",
       "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md",
-      "relative_links": 1,
+      "relative_links": 2,
       "scope": "PostgreSQL quotas, shared immutable artifacts, and local publication durability",
-      "sha256": "sha256:79584cb43df7850e120d602d510d44c32dee0eac000840b16f9f77088b74560c",
+      "sha256": "sha256:4c87206f23c07318a16b2db362bc6ea77c9c0563f0c0b2baf361ca9c12a04a0b",
       "status": "Implemented",
       "title": "Durable storage profile",
       "xtask_commands": 0
@@ -591,9 +591,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 2,
+      "relative_links": 3,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:a26e442604a1a1b482ae3bfd221c244e37bf0ffff17a5c982f9796e581daff78",
+      "sha256": "sha256:923062eac599fa2de06b07ed2a3ea51754b0c0deeff9a07e5f67d9991b9d91e2",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -627,9 +627,9 @@
       "normative": true,
       "owner": "store-contract, provider, and core-server maintainers",
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
-      "relative_links": 3,
+      "relative_links": 4,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:6749650f4cb3c37b2948b4a4bb5210b1403fa35f584e410f034f43fea5a855a7",
+      "sha256": "sha256:ec4f5f311628ffe9f6aea6eb16f6bae3c6844dfeb761c0d7ae1b45ea493149a9",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -1076,6 +1076,18 @@
       "sha256": "sha256:79cd0b0cc58466676e59d752d9fd932efe4d46f32a8668655ccf10619922f583",
       "status": "Proposed",
       "title": "MQ historical handle observation",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.15.0",
+      "normative": true,
+      "owner": "execution coordinator, store adapters, configured COBOL host and MQ provider",
+      "path": "docs/decisions/0034-mq-root-terminal-publication.md",
+      "relative_links": 0,
+      "scope": "the explicitly configured synchronous ordinary z/OS batch root",
+      "sha256": "sha256:1d9bc1b20f6cb3e03e4e3550bda6a3d5adff9dc7e513eaea646bc16d0d84321f",
+      "status": "Proposed (implemented framework prerequisite; native acceptance remains pending)",
+      "title": "MQ root publication framework",
       "xtask_commands": 0
     },
     {
@@ -1610,7 +1622,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:80b6cf990da41b86535c6358abdff1151ed3f05bab042c22e6f239dbe4d81732",
+      "sha256": "sha256:95e8a8f61cdd201f1ebd86da4391a4c0897e25553d5989274728953d988d8018",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2424,6 +2436,10 @@
           "path": "docs/decisions/0033-mq-historical-handle-observation.md"
         },
         {
+          "label": "ADR-0034: MQ root publication framework",
+          "path": "docs/decisions/0034-mq-root-terminal-publication.md"
+        },
+        {
           "label": "ADR-0035: Volatile task-root MQI ABI aliases",
           "path": "docs/decisions/0035-mq-root-scoped-abi-aliases.md"
         },
@@ -2676,7 +2692,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:a1fd0ce26c35c42c902d6cd4bd5876024ff3593db8566cc396a88660af94c2c7",
+  "registry_sha256": "sha256:6b3a60a5a83b4bf27899f7ef36bf6fc5e694a6ebe4d54d45d2447a4e08ffb5b6",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

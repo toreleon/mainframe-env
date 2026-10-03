@@ -76,6 +76,11 @@ impl CobolProgram {
                 .get_provider_state("batch-file-cursor", &cursor_key)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
             let cursor_version = cursor_record.as_ref().map(|record| record.version);
+            if original_call.is_some_and(replay::WinningInstalledCall::is_native)
+                && cursor_record.is_some()
+            {
+                return Err(HostProblem::Unsupported);
+            }
             let loaded_cursors = cursor_record
                 .map(|record| {
                     serde_json::from_slice(&record.payload)
@@ -104,7 +109,7 @@ impl CobolProgram {
             }
         };
         let mut parent_tick = session.as_ref().map_or(0, |session| session.observed_tick);
-        let outcome = coordinator.execute_with_control(&mut machine, &invocation, || {
+        let observe = || {
             let control = self.observe_execution_control(&invocation)?;
             if let Some(call) = original_call
                 && session.is_some()
@@ -122,7 +127,17 @@ impl CobolProgram {
                 .map_err(|_| ExecutionControlError::Unavailable)?;
             }
             Ok(control)
-        });
+        };
+        let outcome = match original_call.and_then(replay::WinningInstalledCall::native_enrollment)
+        {
+            Some(enrollment) => coordinator.execute_enrolled_child_with_control(
+                &mut machine,
+                &invocation,
+                enrollment,
+                observe,
+            ),
+            None => coordinator.execute_with_control(&mut machine, &invocation, observe),
+        };
         if let Some(session) = &mut session {
             // Observe untouched raw outcome before cursor/linkage/CALL mapping.
             session.finish(&outcome)?;

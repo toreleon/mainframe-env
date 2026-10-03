@@ -63,10 +63,23 @@ def check(root: Path) -> None:
             "canonical_request_digest(&effect.request)",
             "canonical_result_digest(&result.outcome)",
             'LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1"',
-            'b"mainframe-env.execution-lifecycle@1\\0"',
+            "mainframe_env_execution_api::lifecycle_notification_payload(kind)",
             "payload: lifecycle_payload(&event.kind)",
         ),
         "coordinator",
+    )
+    require(
+        production_source(
+            root / "crates/contracts/mainframe-env-execution-api/src/lifecycle_notification.rs"
+        ),
+        (
+            'b"mainframe-env.execution-lifecycle@1\\0"',
+            "pub fn lifecycle_notification_payload(kind: &LifecycleEventKind)",
+            "payload.extend_from_slice(DOMAIN)",
+            "payload.extend_from_slice(&sequence.to_be_bytes())",
+            "payload.extend_from_slice(&return_code.to_be_bytes())",
+        ),
+        "shared frozen lifecycle outbox encoder",
     )
     require(
         service,

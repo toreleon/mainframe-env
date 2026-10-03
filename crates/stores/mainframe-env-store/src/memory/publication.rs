@@ -11,6 +11,31 @@ impl MemoryStore {
     ) -> Result<(), StoreError> {
         crate::publication::validate(&request, self.limits.max_blob_bytes)?;
         let mut state = self.lock()?;
+        super::root_terminal::guard_actor(&state, &request.intent.execution_id, None)?;
+        for mutation in &request.mutations {
+            match mutation {
+                ProviderStateMutation::Put(write) => super::root_terminal::guard_provider(
+                    &state,
+                    &write.record.namespace,
+                    &write.record.key,
+                    Some(&write.record.payload),
+                )?,
+                ProviderStateMutation::Delete { namespace, key, .. } => {
+                    super::root_terminal::guard_provider(&state, namespace, key, None)?
+                }
+                ProviderStateMutation::Move {
+                    record, old_key, ..
+                } => {
+                    super::root_terminal::guard_provider(&state, &record.namespace, old_key, None)?;
+                    super::root_terminal::guard_provider(
+                        &state,
+                        &record.namespace,
+                        &record.key,
+                        Some(&record.payload),
+                    )?;
+                }
+            }
+        }
         let retained = state
             .effects
             .get(&request.intent.key)
@@ -60,13 +85,37 @@ impl MemoryStore {
             return Err(StoreError::InvalidTransition);
         }
         let mut state = self.lock()?;
+        for mutation in &mutations {
+            match mutation {
+                ProviderStateMutation::Put(w) => super::root_terminal::guard_provider(
+                    &state,
+                    &w.record.namespace,
+                    &w.record.key,
+                    Some(&w.record.payload),
+                )?,
+                ProviderStateMutation::Delete { namespace, key, .. } => {
+                    super::root_terminal::guard_provider(&state, namespace, key, None)?
+                }
+                ProviderStateMutation::Move {
+                    record, old_key, ..
+                } => {
+                    super::root_terminal::guard_provider(&state, &record.namespace, old_key, None)?;
+                    super::root_terminal::guard_provider(
+                        &state,
+                        &record.namespace,
+                        &record.key,
+                        Some(&record.payload),
+                    )?;
+                }
+            }
+        }
         let limits = self.limits;
         journal::journaled(&mut state, |state, journal| {
             Self::apply_mutations_locked(state, journal, mutations, limits)
         })
     }
 
-    fn apply_mutations_locked(
+    pub(super) fn apply_mutations_locked(
         state: &mut State,
         journal: &mut journal::Journal,
         mutations: Vec<ProviderStateMutation>,

@@ -11,6 +11,9 @@ use mainframe_env_host_api::{
 };
 use mainframe_env_store_api::PlatformStore;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
+mod native_terminal;
+pub use native_terminal::MqPreparedRootTerminal;
 mod rfh2_source;
 pub use rfh2_source::MqBatchLeDllCodesetSource;
 pub(crate) use rfh2_source::capturing as rfh2_source_capturing;
@@ -44,6 +47,7 @@ struct Root {
     runtime: Arc<Runtime>,
     original: Invocation,
     frame: FrameLease,
+    terminal: AtomicU8,
 }
 
 /// Opaque original task root. No public/Serde lease constructor or task-end hook.
@@ -165,6 +169,7 @@ impl MqTrustedBatchRuntime {
                 runtime: self.inner.clone(),
                 original,
                 frame,
+                terminal: AtomicU8::new(0),
             }),
         })
     }
@@ -226,8 +231,13 @@ impl MqTrustedBatchRoot {
 }
 
 impl MqTrustedBatchFrame {
+    /// Read-only original logical root from this retained opaque lineage.
+    /// Equal application IDs never establish that relationship.
+    pub fn root_execution(&self) -> &mainframe_env_execution_api::ExecutionId {
+        &self.root.original.execution_id
+    }
     fn require_active(&self) -> Result<(), HostProblem> {
-        if self.active {
+        if self.active && self.root.terminal.load(Ordering::SeqCst) == 0 {
             Ok(())
         } else {
             Err(HostProblem::Unauthorized)

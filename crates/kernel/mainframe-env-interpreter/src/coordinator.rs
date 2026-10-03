@@ -19,8 +19,14 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+mod root_terminal;
+use root_terminal::NativeProgress;
+pub use root_terminal::{
+    NativeChildEnrollment, NativeRootAdmission, NativeRootConfiguration, NativeRootHooks,
+    NativeRootTermination, WinningRootTerminal,
+};
+
 const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
-const LIFECYCLE_OUTBOX_DOMAIN: &[u8] = b"mainframe-env.execution-lifecycle@1\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CoordinatorLimits {
@@ -173,7 +179,7 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
-        self.execute_inner(machine, invocation, observe, false)
+        self.execute_inner(machine, invocation, observe, false, None, None, None)
     }
 
     /// Resume a durably journaled execution after a process boundary.
@@ -192,7 +198,7 @@ impl ExecutionCoordinator {
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
-        self.execute_inner(machine, invocation, observe, true)
+        self.execute_inner(machine, invocation, observe, true, None, None, None)
     }
 
     /// Close a suspended execution after its checkpoint has been durably
@@ -209,7 +215,8 @@ impl ExecutionCoordinator {
         let store = self.store.as_ref().ok_or_else(|| {
             StoreError::Infrastructure("handoff completion requires an execution store".into())
         })?;
-        let (mut journal, state) = JournalCursor::open(Arc::clone(store), invocation, tick, true)?;
+        let (mut journal, state) =
+            JournalCursor::open(Arc::clone(store), invocation, tick, true, None, None)?;
         if state != Some(ExecutionState::Suspended) {
             return Err(StoreError::InvalidTransition);
         }
@@ -232,6 +239,9 @@ impl ExecutionCoordinator {
         invocation: &Invocation,
         mut observe: F,
         resumable: bool,
+        native: Option<&mut NativeProgress<'_>>,
+        prepare_native: Option<&mut dyn FnMut(&mut M) -> Result<(), HostProblem>>,
+        child: Option<&root_terminal::NativeChildEnrollment>,
     ) -> ExecutionOutcome
     where
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
@@ -248,7 +258,14 @@ impl ExecutionCoordinator {
             .store
             .as_ref()
             .map(|store| {
-                JournalCursor::open(Arc::clone(store), invocation, control.now_tick, resumable)
+                JournalCursor::open(
+                    Arc::clone(store),
+                    invocation,
+                    control.now_tick,
+                    resumable,
+                    native,
+                    child,
+                )
             })
             .transpose()
         {
@@ -256,6 +273,26 @@ impl ExecutionCoordinator {
             Ok(None) => (None, None),
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
+        if let Some(prepare) = prepare_native {
+            if !journal.as_ref().is_some_and(|j| j.native.is_some()) || prepare(machine).is_err() {
+                return failed_outcome(problem(
+                    FailureCategory::UnknownOutcome,
+                    "native compiled machine preparation refused",
+                ));
+            }
+        }
+        if journal.as_ref().is_some_and(|j| j.native.is_some()) {
+            control = match observe_checked(
+                &mut observe,
+                control,
+                invocation,
+                invocation.deadline_tick,
+                &mut journal,
+            ) {
+                Ok(control) => control,
+                Err(outcome) => return outcome,
+            };
+        }
         if let Err(outcome) = check_control(
             control,
             None,
@@ -318,6 +355,26 @@ impl ExecutionCoordinator {
             match drive {
                 MachineDrive::Continue => resume = MachineResume::Start,
                 MachineDrive::HostCall(effect) => {
+                    if child.is_some()
+                        && (!root_terminal::local_effect(&effect)
+                            || effect.idempotency_key.is_none())
+                    {
+                        return failed_outcome(problem(
+                            FailureCategory::UnknownOutcome,
+                            "native child effect outside local profile",
+                        ));
+                    }
+                    if let Some(cursor) = journal.as_mut()
+                        && let Some(progress) = cursor.native.as_deref_mut()
+                        && progress
+                            .require_effect(&cursor.store, cursor.tick, &effect)
+                            .is_err()
+                    {
+                        return failed_outcome(problem(
+                            FailureCategory::UnknownOutcome,
+                            "native root effect outside the selected local profile",
+                        ));
+                    }
                     let Some(host) = &self.host else {
                         let outcome = ExecutionOutcome::ProviderFailure(problem(
                             FailureCategory::ProviderFailure,
@@ -608,6 +665,9 @@ impl ExecutionCoordinator {
                     return ExecutionOutcome::Suspended(suspension);
                 }
                 MachineDrive::Completed(completion) => {
+                    if let Some(progress) = journal.as_mut().and_then(|j| j.native.as_deref_mut()) {
+                        progress.completed(&completion);
+                    }
                     if record_step(
                         &mut journal,
                         Some(ExecutionState::Completing),
@@ -647,6 +707,9 @@ impl ExecutionCoordinator {
                     return ExecutionOutcome::Condition(condition);
                 }
                 MachineDrive::Abend(abend) => {
+                    if let Some(progress) = journal.as_mut().and_then(|j| j.native.as_deref_mut()) {
+                        progress.abended(&abend);
+                    }
                     if record_step(
                         &mut journal,
                         Some(ExecutionState::Failed),
@@ -767,7 +830,7 @@ fn check_control(
     Ok(())
 }
 
-struct JournalCursor {
+struct JournalCursor<'n, 'h> {
     store: Arc<dyn PlatformStore>,
     execution_id: mainframe_env_execution_api::ExecutionId,
     run_unit_id: mainframe_env_execution_api::RunUnitId,
@@ -775,14 +838,17 @@ struct JournalCursor {
     tick: u64,
     version: u64,
     sequence: u64,
+    native: Option<&'n mut NativeProgress<'h>>,
 }
 
-impl JournalCursor {
+impl<'n, 'h> JournalCursor<'n, 'h> {
     fn open(
         store: Arc<dyn PlatformStore>,
         invocation: &Invocation,
         tick: u64,
         resumable: bool,
+        mut native: Option<&'n mut NativeProgress<'h>>,
+        child: Option<&root_terminal::NativeChildEnrollment>,
     ) -> Result<(Self, Option<ExecutionState>), StoreError> {
         if let Some(execution) = store.get_execution(&invocation.execution_id)? {
             if !resumable
@@ -814,6 +880,7 @@ impl JournalCursor {
                     tick,
                     version: execution.version,
                     sequence: last.sequence,
+                    native,
                 },
                 Some(state),
             ));
@@ -827,23 +894,26 @@ impl JournalCursor {
             kind: LifecycleEventKind::Admitted,
         };
         let notification = notification(&event);
-        store.admit_execution(
-            ExecutionRecord {
-                execution_id: invocation.execution_id.clone(),
-                run_unit_id: invocation.run_unit_id.clone(),
-                selector: invocation.selector.clone(),
-                artifact: invocation.artifact.clone(),
-                principal: invocation.principal.id().clone(),
-                state: ExecutionState::Admitted,
-                attempt: invocation.attempt,
-                version: 1,
-                owner_lease: None,
-                lease_expiry_tick: None,
-                terminal_tick: None,
-            },
-            event,
-            notification,
-        )?;
+        let execution = ExecutionRecord {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            selector: invocation.selector.clone(),
+            artifact: invocation.artifact.clone(),
+            principal: invocation.principal.id().clone(),
+            state: ExecutionState::Admitted,
+            attempt: invocation.attempt,
+            version: 1,
+            owner_lease: None,
+            lease_expiry_tick: None,
+            terminal_tick: None,
+        };
+        if let Some(child) = child {
+            child.admit(&store, invocation, execution, event, notification)?;
+        } else if let Some(progress) = native.as_deref_mut() {
+            progress.admit(&store, execution, event, notification)?;
+        } else {
+            store.admit_execution(execution, event, notification)?;
+        }
         Ok((
             Self {
                 store,
@@ -853,6 +923,7 @@ impl JournalCursor {
                 tick,
                 version: 1,
                 sequence: 1,
+                native,
             },
             None,
         ))
@@ -866,6 +937,19 @@ impl JournalCursor {
         checkpoint: Option<CheckpointRecord>,
         audit: Option<AuditRecord>,
     ) -> Result<(), StoreError> {
+        if self.native.is_some()
+            && (checkpoint.is_some()
+                || next_state.is_some_and(|s| {
+                    s.terminal()
+                        || s == ExecutionState::Completing
+                        || s == ExecutionState::Suspended
+                }))
+        {
+            let progress = self.native.take().ok_or(StoreError::InvalidTransition)?;
+            let result = progress.intercept(self, &kind);
+            self.native = Some(progress);
+            return result;
+        }
         self.sequence = self
             .sequence
             .checked_add(1)
@@ -909,37 +993,7 @@ fn notification(event: &LifecycleEvent) -> OutboxRecord {
 }
 
 fn lifecycle_payload(kind: &LifecycleEventKind) -> Vec<u8> {
-    let mut payload = Vec::with_capacity(LIFECYCLE_OUTBOX_DOMAIN.len() + 9);
-    payload.extend_from_slice(LIFECYCLE_OUTBOX_DOMAIN);
-    match kind {
-        LifecycleEventKind::Admitted => payload.push(1),
-        LifecycleEventKind::Queued => payload.push(2),
-        LifecycleEventKind::Claimed => payload.push(3),
-        LifecycleEventKind::Started => payload.push(4),
-        LifecycleEventKind::Completing => payload.push(5),
-        LifecycleEventKind::EffectIntent { sequence } => {
-            payload.push(6);
-            payload.extend_from_slice(&sequence.to_be_bytes());
-        }
-        LifecycleEventKind::EffectResult { sequence } => {
-            payload.push(7);
-            payload.extend_from_slice(&sequence.to_be_bytes());
-        }
-        LifecycleEventKind::Suspended => payload.push(8),
-        LifecycleEventKind::HandoffCompleted => payload.push(17),
-        LifecycleEventKind::Resumed => payload.push(9),
-        LifecycleEventKind::CancellationRequested => payload.push(10),
-        LifecycleEventKind::Cancelled => payload.push(11),
-        LifecycleEventKind::TimedOut => payload.push(12),
-        LifecycleEventKind::Completed { return_code } => {
-            payload.push(13);
-            payload.extend_from_slice(&return_code.to_be_bytes());
-        }
-        LifecycleEventKind::Condition => payload.push(14),
-        LifecycleEventKind::Abend => payload.push(15),
-        LifecycleEventKind::Failed => payload.push(16),
-    }
-    payload
+    mainframe_env_execution_api::lifecycle_notification_payload(kind)
 }
 
 fn record_step(
