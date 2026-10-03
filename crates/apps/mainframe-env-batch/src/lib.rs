@@ -21,7 +21,7 @@ mod jes_children;
 mod program;
 mod service;
 
-pub use service::{RunningStepAdmission, RunningStepView};
+pub use service::{BatchRunControl, BatchRunExit, RunningStepAdmission, RunningStepView};
 
 pub use controller::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,

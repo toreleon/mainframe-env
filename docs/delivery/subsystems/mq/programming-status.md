@@ -6,6 +6,45 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Actual Batch run-owner stop prerequisite
+
+`MQ-1503.batch-run-stop-containment` integrates reviewed worker `b929da52` with
+separately sealed `ccf18d77` malformed-reply repair. The explicit opt-in uses the
+same scheduler, selected/Running CAS, physical checkpoint and registration to
+mint one private run owner. Non-Clone/non-Serde exit and retained step views
+observe that actual owner; they grant no controller, host, core or JES permission.
+Run/step revocation precedes cleanup/retirement, error and unwind; Drop only
+revokes. The finite fresh queued ProgramService-only profile refuses recovered
+attempts and legacy spool migration. Plain/older Program-only paths stay exact.
+
+One private context follows existing Program, security, dataset, spool, DD/DCB,
+disposition and output helpers; no TLS, public ID factory or second engine.
+Callbacks run outside Batch locks. Internal reader reserves the existing job
+number, unlocks actual spool calls and rechecks replay/absence/quotas before
+publication, retaining known history on refusal. Original PRE-binding and real
+post-jes.work-id Program invocation/request identities remain distinct and exact.
+Unknown/panic/cancellation/deadline/control failure stop all subsequent actions.
+Contained-only Malformed fencing also stops normalized readonly wrong-sequence
+and known malformed replies after their actual shared Rejected audit. It adds
+no IBM reason or UOW decision; modeled Condition/ABEND and old known-error
+disposition stay unchanged. No rollback/retry/opposite cleanup masks uncertainty.
+
+Independent reviews bind16original paths/62commands and8follow-up paths/32commands,
+113stable follow-up artifacts,13frozen authority trees and32exact historical d8
+dependency inputs. Final222unit/7compile-fail,13policy/fouractualmutants and sameHEAD
+seals pass; original212/7 remain tied to their actual inputs. Memory/owned SQLite
+tests join real delegated faults, one failure audit/epoch increment, retained
+earlier successful step and exact rows/checkpoint/trace. Failed fixture/compile/
+module/audit-order attempts remain separate. Main checks composed Batch/consumers/
+rustdoc and mandatory gates. Service ratchet lowers7314→7250; no cap is raised.
+
+Fixture callbacks/security and orderly SQLite reopen are not genuine compiled,
+native/JES/SAF/core-original or process-crash acceptance. Enclosing actual sole
+coordinator/controller ownership, closed JesClaimRun, after-lock physical Work/Job
+expiry, scheduled root/recovery/terminal policy and DefaultContext remain required.
+Source credit0; all26 full-call gates Pending and fullv0.15 unfinished. Only the
+licensed oracle is human-skipped0/26; every other acceptance obligation remains.
+
 ## Atomic checked-read store prerequisite
 
 `MQ-1503.inquiry-checked-read-publication` integrates reviewed worker `59ded33c`

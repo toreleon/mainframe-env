@@ -94,6 +94,7 @@
     "docs/decisions/0036-null-ssa-command-slots.md",
     "docs/decisions/0037-running-step-program-transport.md",
     "docs/decisions/0038-coordinator-original-dispatch-extraction.md",
+    "docs/decisions/0040-batch-run-stop-containment.md",
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md"
   ],
   "navigation": [
@@ -436,6 +437,10 @@
         {
           "label": "ADR-0038: Private coordinator original dispatch extraction",
           "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md"
+        },
+        {
+          "label": "ADR-0040: Batch run stop containment",
+          "path": "docs/decisions/0040-batch-run-stop-containment.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

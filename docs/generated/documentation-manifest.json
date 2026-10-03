@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 257,
+    "markdown_documents": 258,
     "navigation_groups": 6,
-    "normative_documents": 87,
+    "normative_documents": 88,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 143,
-      "sha256": "sha256:d3076bef4a245fdecaf7dc0e6750c897f63e027de841a1f758facc60ce6b93cb",
+      "relative_links": 144,
+      "sha256": "sha256:5ed6695fc016ca3766afab9bbda724a680fa7ba8073275a3167a5ea98abb1e47",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1259,6 +1259,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch maintainers",
+      "path": "docs/decisions/0040-batch-run-stop-containment.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.batch-run-stop-containment, target 0.15.0",
+      "sha256": "sha256:2c787e0e294b38c88562826bffd000227baf2aa8add8f979beb762dc2f350354",
+      "status": "Accepted bounded opt-in prerequisite; enclosing host activation pending.",
+      "title": "ADR-0040: Batch run stop containment",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "IMS provider maintainers",
@@ -1309,8 +1321,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 46,
-      "sha256": "sha256:1eb3c13985ae1f2fdd89e235b219d251517ef7717d2165172cd53117e5236cf0",
+      "relative_links": 47,
+      "sha256": "sha256:893f0b1965d982c2187ed1f280f1b789bde388bfa71a2ffd608bedcd163f0f3a",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1854,7 +1866,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:aacea42e7c45fbd42fc77dceb7e7eac65fb1225f005a8919aa9e9b751d67ab29",
+      "sha256": "sha256:49136eeea3d1f944f5d4ab6584c0e1b7a15465bdde9f17fc15c8290d9b755d0d",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2750,6 +2762,10 @@
         {
           "label": "ADR-0038: Private coordinator original dispatch extraction",
           "path": "docs/decisions/0038-coordinator-original-dispatch-extraction.md"
+        },
+        {
+          "label": "ADR-0040: Batch run stop containment",
+          "path": "docs/decisions/0040-batch-run-stop-containment.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2996,7 +3012,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:c05c57e9fef03fc310100e5c28d82f6b64b90459f77f45b3657a4203ae6626d1",
+  "registry_sha256": "sha256:8bc5ed36e1364c307e576a261098f2e38821765cce696725a45a37b6dda93d8e",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

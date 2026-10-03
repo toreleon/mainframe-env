@@ -15,6 +15,7 @@ struct Observation {
     job_attempt: u32,
     step_attempt: u32,
     program: String,
+    run: Option<Arc<run_stop::RunLifetime>>,
 }
 
 /// Borrowed only from the genuine runner callback; not a JES/core/MQ permit.
@@ -107,14 +108,34 @@ impl RunningStepView {
 
 impl Observation {
     fn check_live(&self) -> Result<(), HostProblem> {
-        if !self.active.load(Ordering::SeqCst) {
+        if !self.active.load(Ordering::SeqCst) || self.run.as_ref().is_some_and(|run| !run.active())
+        {
             return Err(HostProblem::Unauthorized);
         }
         let current = self
             .store
             .get_provider_state(&self.row.namespace, &self.row.key)
-            .map_err(store_error)?;
-        if current.as_ref() != Some(&self.row) || !self.active.load(Ordering::SeqCst) {
+            .map_err(store_error);
+        let current = match current {
+            Ok(current) => current,
+            Err(problem) => {
+                if self.active.load(Ordering::SeqCst) {
+                    if let Some(run) = &self.run {
+                        return Err(run.poison(problem));
+                    }
+                }
+                return Err(problem);
+            }
+        };
+        if current.as_ref() != Some(&self.row)
+            || !self.active.load(Ordering::SeqCst)
+            || self.run.as_ref().is_some_and(|run| !run.active())
+        {
+            if self.active.load(Ordering::SeqCst) && current.as_ref() != Some(&self.row) {
+                if let Some(run) = &self.run {
+                    return Err(run.poison(HostProblem::Unauthorized));
+                }
+            }
             return Err(HostProblem::Unauthorized);
         }
         Ok(())
@@ -129,11 +150,13 @@ impl StepOwner {
     // successful Running step/checkpoint publication and registration validation.
     pub(super) fn admit(
         service: &BatchService,
-        original: &Invocation,
+        scope: &(impl RunInput + ?Sized),
         job: &Job,
         step: &StepPlan,
         program: &str,
     ) -> Result<Self, HostProblem> {
+        scope.check()?;
+        let original = scope.original();
         let execution = job
             .steps
             .iter()
@@ -166,6 +189,19 @@ impl StepOwner {
         {
             return Err(HostProblem::IdempotencyConflict);
         }
+        if scope.contained() {
+            let checkpoint = service
+                .checkpoint(&job.id)?
+                .ok_or(HostProblem::UnknownOutcome)?;
+            if checkpoint.job_version != job.version
+                || checkpoint.attempt != job.attempt
+                || checkpoint.active_step != job.active_step
+                || checkpoint.effect_sequence != job.effect_sequence
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
+        }
+        let run = scope.admit_run(service, &row)?;
         Ok(Self {
             observation: Arc::new(Observation {
                 active: AtomicBool::new(true),
@@ -177,6 +213,7 @@ impl StepOwner {
                 job_attempt: job.attempt,
                 step_attempt: execution.attempt,
                 program: program.into(),
+                run,
             }),
         })
     }

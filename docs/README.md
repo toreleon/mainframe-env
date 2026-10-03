@@ -123,6 +123,7 @@ explicitly names that authority as superseded.
 - [ADR-0036: Literal null SSA command slots](decisions/0036-null-ssa-command-slots.md)
 - [ADR-0037: Running-step Program context transport](decisions/0037-running-step-program-transport.md)
 - [ADR-0038: Private coordinator original dispatch extraction](decisions/0038-coordinator-original-dispatch-extraction.md)
+- [ADR-0040: Batch run stop containment](decisions/0040-batch-run-stop-containment.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

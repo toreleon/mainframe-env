@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add a genuine Batch opt-in run owner and opaque exit with irrevocable stop checks across Program, DD and output actions, without activating coordinator, JES or physical lease authority."
