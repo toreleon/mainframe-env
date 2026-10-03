@@ -11,6 +11,8 @@ use std::sync::Weak;
 
 #[path = "native_point/get.rs"]
 mod get;
+#[path = "native_point/installed_fixture.rs"]
+mod installed_fixture;
 
 #[derive(Default)]
 struct Source {
@@ -128,6 +130,15 @@ impl NativeFixture {
         cp: bool,
         selected_clock: Option<Arc<dyn MqReplayClock>>,
     ) -> Self {
+        Self::with_setup_capture(sqlite, version, cp, selected_clock, |_| {})
+    }
+    fn with_setup_capture(
+        sqlite: bool,
+        version: i32,
+        cp: bool,
+        selected_clock: Option<Arc<dyn MqReplayClock>>,
+        mut capture: impl FnMut(&Arc<dyn PlatformStore>),
+    ) -> Self {
         let db = sqlite.then(Database::new);
         let store = db.as_ref().map_or_else(|| backend(false), Database::open);
         let queue = MqObjectName::new("Q").unwrap();
@@ -161,13 +172,16 @@ impl NativeFixture {
         })
         .unwrap();
         let legacy = MqService::open(store.clone(), Default::default()).unwrap();
+        capture(&store);
         legacy.install_object_catalog(catalog).unwrap();
+        capture(&store);
         let plan = legacy
             .plan_legacy_delivery_import(3, 5, Default::default())
             .unwrap();
         store
             .mutate_provider_states_atomic(plan.into_parts().0)
             .unwrap();
+        capture(&store);
         drop(legacy);
         let service = MqService::open_selected_mqi(
             store.clone(),
@@ -187,6 +201,7 @@ impl NativeFixture {
                 MqMdCharacterEncoding::AsciiCompatible
             },
         );
+        capture(&store);
         drop(service);
         // Reuse only the bounded original Invocation fixture; its temporary
         // Memory service is dropped and supplies no authority to this store.
