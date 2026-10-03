@@ -16,6 +16,7 @@ import mq_wire_options as wire
 import mq_raw_layout as raw_layout
 import mq_property_profile as property_profile
 import mq_rfh2_profile as rfh2_profile
+import mq_raw_property as raw_property
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -648,6 +649,7 @@ def check(root: Path = ROOT) -> None:
         (raw_layout.OUTPUT, raw_layout.render(root)),
         (property_profile.OUTPUT, property_profile.render(root)),
         (rfh2_profile.OUTPUT, rfh2_profile.render(root)),
+        (raw_property.OUTPUT, raw_property.render(root)),
     ]:
         output = root / output_path
         if not output.is_file() or output.read_text() != expected:
@@ -662,7 +664,10 @@ def main() -> int:
     parser.add_argument("--original-cache", type=Path, help="offline original MQ call corroboration")
     parser.add_argument("--property-cache", type=Path, help="offline property source reproduction")
     parser.add_argument("--rfh2-cache", type=Path, help="offline RFH2 fact reproduction")
+    parser.add_argument("--raw-property-cache", type=Path, help="offline selected reconciled IMPO/CHARV reproduction")
     args = parser.parse_args()
+    if args.raw_property_cache:
+        raw_property.verify_source(ROOT, args.raw_property_cache)
     if args.rfh2_cache:
         if not args.cache or not args.original_cache or not args.property_cache:
             parser.error("--rfh2-cache requires --cache, --original-cache and --property-cache")
@@ -700,6 +705,7 @@ def main() -> int:
             (raw_layout.OUTPUT, raw_layout.render(ROOT)),
             (property_profile.OUTPUT, property_profile.render(ROOT)),
             (rfh2_profile.OUTPUT, rfh2_profile.render(ROOT)),
+            (raw_property.OUTPUT, raw_property.render(ROOT)),
         ]:
             output = ROOT / output_path
             output.parent.mkdir(parents=True, exist_ok=True)

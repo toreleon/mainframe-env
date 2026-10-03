@@ -784,6 +784,47 @@ grant no installed-host execution credit.
 
 ### Coverage identity
 
+The ONE structure/status catalog also owns a distinct private
+`mq-raw-property-projection@1`: `OwnedReconciledNullSlot4AsciiNormalV1`.
+MQIMPO1 is a complete 60-byte prefix with four Reserved1 characters, full
+20-byte MQCHARV with a four-byte null replacement, and eight TypeString bytes.
+Standalone MQCHARV is 20 bytes. This explicitly reconciles q097210's incomplete
+COBOL/PL/I/assembler members and conflicting Reserved1/TypeString declarations
+with q097215 field descriptions and q094690's complete CHARV declarations.
+It is not exact vendor CMQIMPOV, CURRENT_LENGTH or a universal pointer ABI.
+Vendor copybook equivalence remains unresolved. The existing raw, wire, property,
+RFH2, status, canonical and replay projections retain their historical identities.
+
+Non-Serde captures retain the entire fixed containing group, bounded to 64 KiB,
+including prefix, actual capacity and suffix. Trusted embedding selects ASCII
+and normal big-endian storage independently of requested/returned value encoding
+or CCSID. A four-zero-byte replacement cannot be dereferenced. Positive offsets
+resolve from the enclosing IMPO or standalone CHARV start; explicit positive
+buffer capacity, containing-group bounds and protected ranges are checked.
+Options, sentinels and diagnostic signed observations remain raw, not admitted
+operations or live aliases. Compiler group validation belongs to the bridge.
+
+Pure inquiry plans accept only existing reviewed standard-type observations and
+exact call/status pairing. They preencode ReturnedEncoding, defined string-only
+ReturnedCCSID, returned-name VSLength/VSCCSID and the actual name prefix. Separate
+MQPD/Type/Value/DataLength arguments are outside this substrate. Requested,
+reserved, pointer, offset, capacity and all TypeString bytes remain unchanged;
+unknown-type/conversion warnings need broader output representation. Unavailable
+properties have no defined writes. Short-name prefix copying is the owned policy,
+not IBM byte equivalence: q094695 lines21–30 and q097215 lines289–295 differ.
+All captured bytes/encoding/capacity and cross-plan overlaps are checked before
+one bounded callback-free batch; failure writes nothing. No raw capture confers
+handle, source-profile, SAF, core or UOW authority.
+
+Sources are original `ibm-mq-9.4-mqi-2026-08-31` row0017/q101850,
+`ibm-mq-9.4-programming-supplements-2026-09-12` q097210/q097215,
+`ibm-mq-9.4-property-sources-2026-09-12` q094690/q094695/q091730, and
+`ibm-mq-9.4-point-layout-sources-2026-09-12` q093580/q093600.
+q094690 lines81–89 supplies the deliberate null replacement; generic pointer
+alignment is a different ABI. Source review and raw fixtures earn zero native,
+execution, licensed or official-call credit. Native compiled forwarding and all
+remaining parent acceptance remain required.
+
 The MQ-1506 licensed adapter at
 `conformance/0.15/oracles/mq-licensed-differential.json` binds the 26-call
 denominator to independent fixture identities and a bounded external receipt.

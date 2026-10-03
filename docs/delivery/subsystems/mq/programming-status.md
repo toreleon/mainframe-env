@@ -1714,3 +1714,46 @@ that output from cached queue facts, alter canonical/replay bytes or claim
 native GET writeback readiness. The additive result and installed ABI forwarding
 remain required, alongside full nonlicensed v0.15 acceptance. Only the licensed
 oracle is human-skipped0/26; no other gate is waived.
+
+## Owned reconciled raw property structures
+
+`MQ-1503.raw-property-structures` integrates sealed `b4c2585f`: a distinct
+generator-owned projection in the ONE structure/status catalog, not another
+canonical MQ or replay authority. The explicitly owned NullSlot4/ASCII/normal
+big-endian profile captures a complete 60-byte IMPO1 or standalone 20-byte
+CHARV, plus its actual containing-group capacity and suffix. Reserved1 retains
+four raw characters, the full CHARV retains four null replacement bytes and
+four signed longs, and TypeString retains eight raw characters. These reconcile
+the pinned declaration disagreements; vendor CMQIMPOV equivalence, universal
+pointer width and CURRENT_LENGTH remain unresolved, not waived.
+
+Positive explicit offsets resolve from the enclosing structure start, wholly
+inside its fixed containing group and beyond the complete prefix. Nonzero
+pointer slots, other encodings, negative/sentinel input forms and unsupported
+versions fail closed. No pointer is dereferenced, handle created or option
+admitted. The raw signed32 observation remains distinct from the compiled
+PIC S9(9) input/output domain. Only source-defined standard inquiry observations
+and exact call/status pairing prepare ReturnedEncoding, string-only defined
+ReturnedCCSID, actual returned-name prefix and VSLength/VSCCSID. Requested,
+reserved, pointer, offset, capacity, TypeString and uncopied suffix bytes remain
+exact. Unavailable properties prepare no writes. Short-name prefix copying is
+an owned policy rather than an IBM byte-equivalence assertion.
+
+Every original byte, capacity, encoding and cross-plan prefix/output overlap
+is checked before a single callback/allocation-free touched-range batch. This
+pure representation does not join separate PD/Type/Value/DataLength/status
+arguments or establish actual compiler/frame/core/SAF/current-unit authority;
+those belong to genuine native all-argument composition. IMPO and standalone
+CHARV only are implemented here; other option/descriptor structures remain work.
+Historical catalog, numeric/raw/property/RFH2/status and canonical/replay
+identities are frozen; no durable schema or handle restoration is introduced.
+
+Pinned sources are original MQ9.4 baseline2026-08-31 INQMP0017/q101850,
+programming-supplements baseline2026-09-12 q097210/q097215,
+property-sources baseline2026-09-12 q094690/q094695/q091730, and point-layout
+baseline2026-09-12 q093580/q093600. The manager reproduced all eight selected
+topics and forty exact fragment locators with retained-first SHA/byte checks.
+Declaration/short-name/z/OS availability disagreements remain explicit, and
+source review/raw fixtures earn zero installed native, official or licensed
+execution credit. All nonlicensed parent v0.15 gates remain required; only the
+licensed oracle is human-skipped0/26.
