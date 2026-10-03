@@ -968,3 +968,24 @@ complete compiled PUT/PUT1 continuation needs actual Produced feedback and the
 configured Foundation descriptor encoder; it cannot use the partial PUT shape.
 Installed forwarding, root recovery, participants, all applicable26 and CardDemo
 remain required parent work.
+
+### Qualified GMO1 value staging
+
+The raw capture's `stage_qualified_full_get_gmo` prepares GMO1 scratch from an
+actual qualified result using the sole generated ResolvedQName field policy.
+It checks the complete original group snapshot, capacity, trusted structure
+characters, original request and existing result/status/limit validators before
+writing only Some(exact48). None preserves caller QName; StrucId, Version,
+Options, WaitInterval, ignored Signal1/Signal2 and all suffix bytes remain exact.
+Pending/unknown and mismatched observations refuse without writes. Pinned GMO
+q096710_146–184 and q096715_1205–1268 supply declaration and input/output facts;
+this adds no later-version GMO policy, offset inventory or numeric decoder.
+
+This value writer operates in owned scratch and grants no handle, SAF, admission
+or replay authority. Its final prefix copy is allocation/callback/failure-free,
+but it does not join MD, body, DataLength, completion and reason into one commit.
+The genuine installed bridge must preflight all those arguments and perform the
+final full storage comparisons and joined copy without fallible work. Supported
+owned CP037 raw observations do not establish compiler CP037 support. Native
+installed GET forwarding, trusted foundation encoder/JES/GMT, root pending-work,
+recovery/participants/IR/full26/CardDemo acceptance remain independently required.

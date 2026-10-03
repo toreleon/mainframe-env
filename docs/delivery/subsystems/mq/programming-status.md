@@ -1827,3 +1827,35 @@ Genuine installed root-shared allocation and same-service profile wrappers,
 compiled pendingPUT normal/CEE3ABD and removedGET terminal proofs, recovery,
 participants, IR/full26/CardDemo remain required. Parent v0.15 stays active;
 only the unavailable licensed oracle is human-skipped0/26 with zero credit.
+
+## Qualified GMO1 result staging
+
+`MQ-1503.qualified-gmo-writeback` integrates sealed `7ed3f940` as a pure
+additive method on the existing raw capture. The generated GMO1 layout and GET
+field policy remain sole authorities. The complete original captured group,
+capacity, suffix, scratch bytes, trusted structure characters, original qualified
+request and known result/status/shape/bounds are checked before staging exact48
+QName. Complete/accepted Some is lossless; known rejected/no-message None
+preserves original QName. Unknown, pending, status-only, old class and malformed
+or foreign observations refuse without writes. Input, ignored Signal1/Signal2,
+reserved and suffix bytes remain exact; no pointer is interpreted.
+
+The writer uses owned scratch and the existing bounded allocation/callback-free
+final prefix copy. It does not join separate MD, body, DataLength, completion and
+reason, establish live handles/core/SAF/UOW/replay authority, or install a native
+bridge. Ordinary ZosBatch/QueueManager/single-queue/non-dynamic representation
+is explicit; raw CP037 and signed32 observations grant no compiler CP037 or PIC
+range permission. The old full MD writer differs only by its two-line child hook;
+DTO/canonical/replay@1–6, provider, interpreter, schemas and generated identities
+are unchanged by this feature.
+
+All three sources were independently reproduced offline after retained-first
+SHA/byte checks: original baseline2026-08-31 MQGET0015/q101830, programming-
+supplements baseline2026-09-12 GMO fields q096715 and declaration q096710.
+The initial wrong declaration scope, fixture misuse of symbolic Default and
+metadata collector error retain their actual failed identities; no source or
+production validation was weakened. Source/pure-value fixtures earn zero
+installed native/JES/LE/RACF/root-terminal/official/licensed execution credit.
+Joined compiled GET, actual installed source and native point/root forwarding,
+pendingPUT normal/CEE3ABD/removedGET terminal, recovery/participants/IR/full26/
+CardDemo remain mandatory. Parent active; licensed oracle alone human-skipped0/26.

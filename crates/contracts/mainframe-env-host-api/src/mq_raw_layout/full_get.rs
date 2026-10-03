@@ -2,6 +2,8 @@
 use super::*;
 use crate::mq_md_value::{MqMdCharacterEncoding, MqMdValue};
 
+mod qualified_gmo;
+
 impl MqRawCapture {
     /// Copy every observed MQMD1/2 output field atomically into its captured prefix.
     /// The caller supplies an actual returned descriptor, never a status-derived
