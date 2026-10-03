@@ -542,6 +542,7 @@ class CacheTests(unittest.TestCase):
         self.assertIn("mq-recovery-policy-sources", scopes)
         self.assertIn("mq-producer-attribute-sources", scopes)
         self.assertIn("mq-rfh2-sources", scopes)
+        self.assertIn("mq-message-handle-sources", scopes)
         supplemental, _ = ibm_docs.select(pins, tocs, "mq-programming-supplements", None)
         self.assertEqual(len(supplemental), 80)
         self.assertTrue(all(pin.baseline == "ibm-mq-9.4-programming-supplements-2026-09-12"
@@ -602,11 +603,11 @@ class CacheTests(unittest.TestCase):
                          "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
         registry = json.loads((docs_api.REPOSITORY /
                                "conformance/0.15/manifests/index.json").read_text())
-        self.assertEqual(len(registry["manifests"]), 6)
+        self.assertEqual(len(registry["manifests"]), 7)
         old_rows = [row for row in registry["manifests"]
                     if row["scope_id"] not in {
                         "mq-recovery-policy-sources", "mq-producer-attribute-sources",
-                        "mq-rfh2-sources"}]
+                        "mq-rfh2-sources", "mq-message-handle-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old_rows, sort_keys=True, separators=(",", ":")).encode()),
             "d21d08a6548a9088640374f8ebfa6fcd5344104c3748678b8002406bd9985033")
@@ -668,7 +669,8 @@ class CacheTests(unittest.TestCase):
         self.assertFalse(row["semantic_authority"])
         self.assertEqual(row["coverage_credit"], 0)
         old = [row for row in registry["manifests"]
-               if row["scope_id"] not in {"mq-producer-attribute-sources", "mq-rfh2-sources"}]
+               if row["scope_id"] not in {"mq-producer-attribute-sources", "mq-rfh2-sources",
+                                           "mq-message-handle-sources"}]
         self.assertEqual([row["topic_count"] for row in old], [80, 12, 12, 1])
         for prior in old:
             self.assertEqual(prior["manifest_sha256"], "sha256:" + docs_api.digest(
@@ -746,7 +748,8 @@ class CacheTests(unittest.TestCase):
         root = docs_api.REPOSITORY
         registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
         old = [r for r in registry["manifests"]
-               if r["scope_id"] not in {"mq-rfh2-sources", "mq-producer-attribute-sources"}]
+               if r["scope_id"] not in {"mq-rfh2-sources", "mq-producer-attribute-sources",
+                                       "mq-message-handle-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old, sort_keys=True, separators=(",", ":")).encode()),
             fixture["old_registry_rows_sha256"])
@@ -761,22 +764,28 @@ class CacheTests(unittest.TestCase):
         self.assertFalse(self.cache.exists())  # No unrelated external HTML is required.
 
     def test_rfh2_registered_artifact_mutants_fail_before_cache_access(self):
-        root = Path(self.directory.name) / "rfh2-registry"
+        self.registered_scope_mutants("mq-rfh2-sources", 14)
+
+    def test_message_handle_registered_artifact_mutants_fail_before_cache_access(self):
+        self.registered_scope_mutants("mq-message-handle-sources", 2)
+
+    def registered_scope_mutants(self, scope_id, wrong_count):
+        root = Path(self.directory.name) / (scope_id + "-registry")
         directory = root / "conformance/0.15/manifests"
         directory.mkdir(parents=True)
         source = docs_api.REPOSITORY / "conformance/0.15/manifests"
         for path in source.glob("*.json"):
             shutil.copyfile(path, directory / path.name)
         registry_path = directory / "index.json"
-        manifest_path = directory / "mq-rfh2-sources-topics.json"
+        manifest_path = directory / (scope_id + "-topics.json")
         original_registry = json.loads(registry_path.read_text())
         original_manifest = json.loads(manifest_path.read_text())
         scope = next(i for i, row in enumerate(original_registry["manifests"])
-                     if row["scope_id"] == "mq-rfh2-sources")
+                     if row["scope_id"] == scope_id)
         with patch.object(docs_api, "REPOSITORY", root):
             for field, value in [("manifest_sha256", "sha256:" + "0" * 64),
                                  ("topic_manifest_sha256", "sha256:" + "0" * 64),
-                                 ("topic_count", 14), ("subsystem", "ims"),
+                                 ("topic_count", wrong_count), ("subsystem", "ims"),
                                  ("semantic_authority", True), ("coverage_credit", 1)]:
                 with self.subTest(registry_field=field):
                     registry = deepcopy(original_registry)
@@ -818,10 +827,78 @@ class CacheTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ibm_docs.registered_sources(registry_path)
             registry_path.write_text(json.dumps(registry))
+            unregistered = deepcopy(registry)
+            unregistered["manifests"].pop(scope)
+            registry_path.write_text(json.dumps(unregistered))
+            with self.assertRaises(ValueError):
+                ibm_docs.registered_sources(registry_path)
+            registry_path.write_text(json.dumps(registry))
             manifest_path.unlink()
             with self.assertRaises(OSError):
                 ibm_docs.registered_sources(registry_path)
         self.assertFalse(self.cache.exists())
+
+    def test_message_handle_scope_matches_fixed_pins_and_preserves_prior_registry(self):
+        fixture = json.loads((Path(__file__).parent /
+                              "fixtures/mq-message-handle-source-pins.json").read_text())
+        pins, tocs = ibm_docs.load_pins()
+        selected, selected_tocs = ibm_docs.select(pins, tocs, fixture["scope_id"], None)
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(len(selected_tocs), 1)
+        self.assertEqual(selected_tocs[0].sha256, fixture["toc_sha256"])
+        self.assertEqual((selected[0].topic, selected[0].sha256, selected[0].size),
+                         ("SSFKSJ_9.4.0/refdev/q091560_.html",
+                          "72f96585920e26aeab0f567a42a3959cdb58e4016d907600ef820d077db80baa",
+                          2409))
+        self.assertEqual(selected[0].baseline, fixture["baseline_id"])
+        root = docs_api.REPOSITORY
+        registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
+        old = [r for r in registry["manifests"] if r["scope_id"] != fixture["scope_id"]]
+        self.assertEqual(docs_api.digest(json.dumps(
+            old, sort_keys=True, separators=(",", ":")).encode()),
+            fixture["old_registry_rows_sha256"])
+        row = next(r for r in registry["manifests"] if r["scope_id"] == fixture["scope_id"])
+        self.assertFalse(row["semantic_authority"])
+        self.assertEqual(row["coverage_credit"], 0)
+        self.assertEqual(row["manifest_sha256"], fixture["manifest_sha256"])
+        self.assertEqual(row["topic_manifest_sha256"], "sha256:" + fixture["topic_manifest_digest"])
+        manifest = json.loads((root / row["manifest"]).read_text())
+        self.assertEqual(manifest["topics"], fixture["topics"])
+        self.assertEqual(manifest["product"], fixture["product"])
+        self.assertFalse({p.topic for p in selected} &
+                         {p.topic for p in pins if p not in selected})
+        self.assertFalse(self.cache.exists())
+
+    def test_message_handle_single_topic_reader_fixture_is_hash_and_scope_bound(self):
+        # This authored text exercises the shared reader; it is not IBM content.
+        root, index, registry, _, document, _ = self.registry_015()
+        scope = document["manifests"][0]["scope_id"]
+        with patch.object(docs_api, "REPOSITORY", root):
+            pins, tocs = ibm_docs.load_pins(index, registry)
+            selected, selected_tocs = ibm_docs.select(pins, tocs, scope, None)
+            self.assertEqual(len(selected), 1)
+            pin = selected[0]
+            counts = ibm_docs.import_cache(self.archive([
+                (pin.legacy_key, self.body, None),
+                (selected_tocs[0].legacy_key, self.toc_body, None),
+            ]), self.cache, selected, selected_tocs)
+            self.assertEqual(counts["imported"], 2)
+            with patch.object(ibm_docs, "load_pins", return_value=(pins, tocs)):
+                with redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(ibm_docs.main([
+                        "--cache", str(self.cache), "search", "Example operation",
+                        "--scope", scope]), 0)
+                    self.assertIn(pin.sha256, output.getvalue())
+                with redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(ibm_docs.main([
+                        "--cache", str(self.cache), "read", pin.topic,
+                        "--scope", scope, "--sha256", pin.sha256, "--lines", "2"]), 0)
+                    self.assertIn("Example operation", output.getvalue())
+                with self.assertRaises(ValueError):
+                    ibm_docs.select(pins, tocs, "unregistered-message-handle", None)
+            (self.cache / pin.key).write_bytes(b"x" * pin.size)
+            with self.assertRaises(ValueError):
+                ibm_docs.cached_body(self.cache, pin)
 
     def registry_015(self):
         root, index, old_registry = self.source_repository()

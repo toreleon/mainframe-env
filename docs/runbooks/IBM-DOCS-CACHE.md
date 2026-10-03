@@ -133,6 +133,19 @@ registration establishes neither freshness nor snapshot equivalence. Read
 and review sources before a separate admitted producer implementation; source
 presence and a numeric declaration are not execution permission.
 
+The independent 0.15 `mq-message-handle-sources` scope registers only
+`SSFKSJ_9.4.0/refdev/q091560_.html` (MQHM message-handle constants) under
+`ibm-mq-9.4-message-handle-sources-2026-09-12`. Use the shared offline reader
+with this exact scope and SHA selection. The manifest binds 2409 retained bytes
+and the existing pinned MQ 9.4 TOC. Publication `last_modified` comes from the
+hash-verified HTML `lastModifiedDate` element, not archive fetch time. Original
+call and later source manifests remain unchanged. Registration grants zero
+semantic authority, coverage, execution, native or licensed credit; numeric
+projection and message-handle disposition implementation require later review.
+The archive remains in-progress, predates the MQINQ re-pin and has no independent
+browser reproduction, freshness or same-snapshot claim. Complete IMPO
+corroboration is outside this one-topic scope.
+
 For a new CICS source corpus:
 
 1. derive the exact topic set from its accepted mapping and explicit context

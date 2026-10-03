@@ -69,6 +69,17 @@
       "topic_manifest_sha256": "sha256:b0a9b4656c10ea8ec8a23999935d47cf559f5164a707a0aa3e078d3d2266afdc",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-message-handle-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-message-handle-sources-2026-09-12",
+      "manifest": "conformance/0.15/manifests/mq-message-handle-sources-topics.json",
+      "manifest_sha256": "sha256:2669da246c3bab2ebddfb9be46a26a03a88a39a9745c57a6031295a4fe0e88be",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:22bf0aaec21fc919bd5e53713d3cbeffc3e3c4673bad42b444e9d22f27e6091b",
+      "semantic_authority": false,
+      "coverage_credit": 0
     }
   ]
 }

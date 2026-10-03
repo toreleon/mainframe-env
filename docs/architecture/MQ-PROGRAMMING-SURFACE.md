@@ -515,6 +515,22 @@ credit are zero. The archive remains in-progress, predates the MQINQ issue337
 re-pin and has no independent browser reproduction, freshness or same-snapshot
 claim. No publication bodies or refreshed sources are retained in Git.
 
+### Additive message-handle constants source scope
+
+The independent `mq-message-handle-sources` scope binds only
+`SSFKSJ_9.4.0/refdev/q091560_.html` (MQHM message-handle constants), baseline
+`ibm-mq-9.4-message-handle-sources-2026-09-12`, through the shared manifest and
+registry. Its exact bytes, publication date and pinned TOC locator are verified
+offline after checking the retained topic path first. This closes source
+availability for later DLTMH disposition review (original row `0013`, source
+position `13`); it does not add numeric admission or native writeback behavior.
+All existing call/source pins, canonical and numeric projections, 26-call/
+27-position denominator, 1030 status declarations and ten pending reasons remain
+unchanged. Complete IMPO corroboration remains unresolved. Source registration
+has zero semantic authority and zero execution, native, licensed or coverage
+credit. The archive remains in-progress without independent browser reproduction,
+predates MQINQ re-pin and establishes no freshness or snapshot equivalence.
+
 ### Historical handle observation
 
 The strict private typed-result storage codec can preserve issued handle outputs
