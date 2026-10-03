@@ -1,6 +1,6 @@
 //! Negative protocol tests; compiled backend route proofs live in product tests.
 #[cfg(test)]
-mod tests {
+mod protocol {
     use super::super::*;
     use crate::cobol::hardening::{Fixture, TestRoot, parent};
     use mainframe_env_execution_api::{MachineDrive, MachineResume, Quantum};

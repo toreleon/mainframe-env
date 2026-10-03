@@ -17,7 +17,9 @@ mod enterprise;
 mod ims;
 mod ims_applicability;
 mod ims_metadata;
+mod ims_navigation;
 mod ims_pcb;
+mod ims_recovery;
 mod ims_status;
 mod ims_system;
 mod ims_tm;
@@ -76,11 +78,26 @@ pub use ims_metadata::{
     ImsSecondaryIndexMetadata, ImsSegmentMetadata, ImsSensitiveSegmentMetadata,
     ImsTerminalPcbMetadata, validate_ims_metadata,
 };
+pub use ims_navigation::ImsNavigationRequest;
+mod ims_feedback;
+pub use ims_feedback::{
+    ImsPcbFeedbackRequestV1, ImsPcbFeedbackResultV1, ImsPcbFeedbackUnsupportedV1, ImsPcbFeedbackV1,
+    ImsPcbKeyFeedbackV1,
+};
+mod ims_gsam;
+mod ims_gsam_format;
+pub use ims_gsam::{ImsGsamAddress, ImsGsamRequest, ImsGsamResult, ImsGsamSearchArgument};
+pub use ims_gsam_format::{
+    ImsGsamAccessMethod, ImsGsamControl, ImsGsamFormat, ImsGsamRecordFormat,
+};
 pub use ims_pcb::{
     IMS_PCB_MASK_COUNT, IMS_PCB_MASKS, IMS_PCB_STATUS_RULES_SHA256,
     IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256, ImsExecutionContext, ImsPcbField, ImsPcbFieldDescriptor,
     ImsPcbFieldWidth, ImsPcbKind, ImsPcbLayout, ImsPcbLimits, ImsPcbMaskDescriptor, ImsPcbProblem,
     ImsPcbSemanticValue, ims_pcb_layout, ims_pcb_mask, ims_pcb_masks,
+};
+pub use ims_recovery::{
+    ImsRecoveryCall, ImsRecoveryRequest, ImsRecoveryResult, ImsRestartSelection,
 };
 pub use ims_status::{
     IMS_STATUS_CONTEXT_MEMBERSHIPS, IMS_STATUS_CONTEXTS, IMS_STATUS_DISTINCT_CODE_COUNT,
@@ -91,9 +108,10 @@ pub use ims_status::{
 pub use ims_system::{
     ImsAcceptRow, ImsBufferPoolDefinition, ImsBufferPoolKind, ImsBufferStatistics,
     ImsDedbAreaDefinition, ImsPcbAvailability, ImsPositionArea, ImsPositionKeyword, ImsPositionSsa,
-    ImsQClass, ImsStatisticsFamily, ImsStatisticsFormat, ImsStatisticsFunction, ImsStatusGroup,
-    ImsSystemCall, ImsSystemDirectory, ImsSystemRequest, ImsSystemResult,
-    ImsSystemRuntimeDefinition,
+    ImsQClass, ImsStatisticsFamily, ImsStatisticsFormat, ImsStatisticsFunction,
+    ImsStatisticsObservationV2, ImsStatusGroup, ImsSystemCall, ImsSystemDirectory,
+    ImsSystemRequest, ImsSystemResult, ImsSystemRuntimeDefinition, ImsVsamSubpoolMetadata,
+    ImsVsamSubpoolType,
 };
 pub use ims_tm::{
     TmAlternatePcbDefinition, TmDefinitionSet, TmDestination, TmExecutionContext, TmLimits,

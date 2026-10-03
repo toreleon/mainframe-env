@@ -6,11 +6,166 @@ use crate::service::{
 use mainframe_env_execution_api::{
     ExecutionId, IdempotencyKey, Invocation, InvocationLimits, RunUnitId,
 };
-use mainframe_env_host_api::{HostLimits, HostProblem, HostResult};
-use mainframe_env_store_api::{EffectDigestFormat, EffectRecord, EffectState, ProviderStateRecord};
+use mainframe_env_host_api::{HostLimits, HostProblem};
+use mainframe_env_store_api::{
+    EffectDigestFormat, EffectRecord, EffectState, ProviderStateRecord, ProviderStateStore,
+    StoreError,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
+
+/// Whether any private IMS recovery row requires the unowned core retention fence.
+///
+/// Presence in the reserved `ims-recovery-v1-` family is sufficient, including malformed
+/// payloads and unknown subnamespaces. These rows have no accepted owner/expiry proof.
+/// One result proves presence; an empty successful prefix query proves absence. Errors
+/// propagate rather than certifying absence. The caller must bind this query to the
+/// existing provider mutation epoch and recheck that epoch before applying retention.
+pub fn ims_private_recovery_retention_required(
+    store: &dyn ProviderStateStore,
+) -> Result<bool, StoreError> {
+    Ok(!store
+        .list_provider_state_prefix("ims-recovery-v1-", 1)?
+        .is_empty())
+}
+
+#[cfg(test)]
+mod private_recovery_tests {
+    use super::*;
+    use mainframe_env_execution_api::AuditRecord;
+    use mainframe_env_store::{MemoryStore, StoreLimits};
+    use mainframe_env_store_api::{AuditSink, ProviderStateMutation, ProviderStateWrite};
+
+    #[test]
+    fn ims_private_recovery_retention_reserved_presence_is_bounded_and_opaque() {
+        let store = MemoryStore::new(StoreLimits::default());
+        for namespace in [
+            "ims-v1-session",
+            "ims-v1-checkpoint",
+            "ims-v1-session-index",
+            "ims-v1-undo",
+            "ims-state",
+            "ims-recovery-v1",
+            "ims-recovery-v10-session",
+        ] {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: namespace.into(),
+                        key: "legacy".into(),
+                        version: 1,
+                        payload: vec![255],
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        assert!(!ims_private_recovery_retention_required(&store).unwrap());
+        // Many unknown/malformed rows are presence, never an exhaustive graph-scan overflow.
+        for index in 0..100 {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "ims-recovery-v1-future".into(),
+                        key: format!("row-{index}"),
+                        version: 1,
+                        payload: vec![255],
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        let epoch = store.provider_state_retention_epoch().unwrap();
+        assert!(ims_private_recovery_retention_required(&store).unwrap());
+        assert_eq!(store.provider_state_retention_epoch().unwrap(), epoch);
+        assert_eq!(
+            store
+                .list_provider_state("ims-recovery-v1-future", 101)
+                .unwrap()
+                .len(),
+            100
+        );
+    }
+
+    struct Unavailable;
+    impl AuditSink for Unavailable {
+        fn record_audit(&self, _: AuditRecord) -> Result<(), StoreError> {
+            unreachable!()
+        }
+        fn audit_records(
+            &self,
+            _: &ExecutionId,
+            _: u64,
+            _: usize,
+        ) -> Result<Vec<AuditRecord>, StoreError> {
+            unreachable!()
+        }
+    }
+    impl ProviderStateStore for Unavailable {
+        fn list_provider_state_prefix(
+            &self,
+            prefix: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            assert_eq!((prefix, max), ("ims-recovery-v1-", 1));
+            Err(StoreError::Infrastructure(
+                "prefix inventory unavailable".into(),
+            ))
+        }
+        fn get_provider_state(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<ProviderStateRecord>, StoreError> {
+            unreachable!()
+        }
+        fn list_provider_state(
+            &self,
+            _: &str,
+            _: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            unreachable!()
+        }
+        fn put_provider_state(
+            &self,
+            _: ProviderStateRecord,
+            _: Option<u64>,
+        ) -> Result<(), StoreError> {
+            unreachable!()
+        }
+        fn delete_provider_state(&self, _: &str, _: &str, _: u64) -> Result<(), StoreError> {
+            unreachable!()
+        }
+        fn move_provider_state(
+            &self,
+            _: ProviderStateRecord,
+            _: &str,
+            _: u64,
+        ) -> Result<(), StoreError> {
+            unreachable!()
+        }
+        fn put_provider_states_atomic(&self, _: Vec<ProviderStateWrite>) -> Result<(), StoreError> {
+            unreachable!()
+        }
+        fn mutate_provider_states_atomic(
+            &self,
+            _: Vec<ProviderStateMutation>,
+        ) -> Result<(), StoreError> {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn ims_private_recovery_retention_prefix_failure_propagates() {
+        assert_eq!(
+            ims_private_recovery_retention_required(&Unavailable),
+            Err(StoreError::Infrastructure(
+                "prefix inventory unavailable".into()
+            ))
+        );
+    }
+}
 
 /// Reserved invocation binding which attests an internally dispatched CICS nested effect.
 pub const CICS_NESTED_EFFECT_ORIGIN_BINDING: &str = "cics.nested-effect-origin";
@@ -380,8 +535,11 @@ fn result_digest(
     recorded: &RecordedResult,
     limits: ImsLimits,
 ) -> Result<[u8; 32], ImsReplayRetentionError> {
-    let result = recorded.result();
-    HostResult::Ims(result.clone())
+    if recorded.gsam.is_some() && recorded.pcb_feedback_v1.is_some() {
+        return Err(ImsReplayRetentionError::CorruptPayload);
+    }
+    let result = recorded.host_result();
+    result
         .validate(HostLimits {
             max_name_bytes: 128,
             max_record_bytes: limits.max_segment_bytes,
@@ -391,7 +549,7 @@ fn result_digest(
             max_state_bytes: limits.max_state_bytes,
         })
         .map_err(|_| ImsReplayRetentionError::CorruptPayload)?;
-    mainframe_env_host_api::canonical_result_digest(&Ok(HostResult::Ims(result)))
+    mainframe_env_host_api::canonical_result_digest(&Ok(result))
         .map_err(|_| ImsReplayRetentionError::CorruptPayload)
 }
 
@@ -685,6 +843,8 @@ mod tests {
             checkpoint_id: None,
             affected_segments: 1,
             system: None,
+            gsam: None,
+            pcb_feedback_v1: None,
         }
     }
 

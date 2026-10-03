@@ -302,7 +302,7 @@ fn frame_uow_planner_preserves_both_owners_and_root_recovery_fences() {
             else {
                 panic!("missing root proof");
             };
-            assert_eq!(required_executions, &[root.clone()]);
+            assert_eq!(required_executions, std::slice::from_ref(&root));
         }
         // The nested provider replay shares the same additional-root safety boundary.
         let rows = planner

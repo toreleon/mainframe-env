@@ -545,10 +545,10 @@ impl<'a> Reader<'a> {
     }
 }
 
-fn decode<'a>(
-    buffer: &'a [u8],
+fn decode(
+    buffer: &[u8],
     limits: MqMessageLimits,
-) -> Result<(Vec<MqMessageProperty>, &'a [u8]), MqHandleKernelProblem> {
+) -> Result<(Vec<MqMessageProperty>, &[u8]), MqHandleKernelProblem> {
     let mut reader = Reader {
         input: buffer,
         offset: 0,

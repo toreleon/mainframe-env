@@ -3,24 +3,39 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Owned catalog schema identity required by the metadata validator.
 pub const IMS_METADATA_SCHEMA_V1: &str = "mainframe-env.ims-metadata@1";
 const DIGEST_DOMAIN: &[u8] = b"mainframe-env.ims-metadata@1\0";
 const MAX_DATABASE_VERSION: u32 = i32::MAX as u32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Local ceilings enforced on metadata collections, hierarchy and segment bytes.
 pub struct ImsMetadataLimits {
+    /// Maximum database definitions in a catalog; default 64.
     pub max_databases: usize,
+    /// Maximum PSB definitions in a catalog; default 256.
     pub max_psbs: usize,
+    /// Maximum segments for general organizations; default 255.
     pub max_segments_per_database: usize,
+    /// Maximum DEDB segment definitions; default 127.
     pub max_dedb_segments: usize,
+    /// Maximum parent-chain depth; default 15.
     pub max_hierarchy_depth: usize,
+    /// Maximum fields, including target index names where checked; default 255.
     pub max_fields_per_segment: usize,
+    /// Maximum combined database field/index count; default 20,000.
     pub max_fields_per_database: usize,
+    /// Maximum combined named fields and index identities; default 1,000.
     pub max_named_fields_and_indexes: usize,
+    /// Maximum secondary indexes per target segment; default 32.
     pub max_secondary_indexes_per_segment: usize,
+    /// Maximum logical relationship definitions; default 255.
     pub max_relationships_per_database: usize,
+    /// Maximum ordered PCB definitions per PSB; default 2,500.
     pub max_pcbs_per_psb: usize,
+    /// Maximum aggregate SENSEG entries across a PSB; default 30,000.
     pub max_sensitive_segments_per_psb: usize,
+    /// Maximum segment length in bytes; default 32 KiB.
     pub max_segment_bytes: usize,
 }
 
@@ -45,32 +60,46 @@ impl Default for ImsMetadataLimits {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Metadata organization identity; recognition alone does not establish executable or physical parity.
 pub enum ImsDatabaseOrganization {
     #[serde(rename = "DEDB")]
+    /// DEDB metadata identity, subject to organization-specific validation and route admission.
     Dedb,
     #[serde(rename = "GSAM")]
+    /// GSAM metadata identity, subject to organization-specific validation and route admission.
     Gsam,
     #[serde(rename = "HDAM")]
+    /// HDAM metadata identity, subject to organization-specific validation and route admission.
     Hdam,
     #[serde(rename = "HIDAM")]
+    /// HIDAM metadata identity, subject to organization-specific validation and route admission.
     Hidam,
     #[serde(rename = "HISAM")]
+    /// HISAM metadata identity, subject to organization-specific validation and route admission.
     Hisam,
     #[serde(rename = "HSAM")]
+    /// HSAM metadata identity, subject to organization-specific validation and route admission.
     Hsam,
     #[serde(rename = "INDEX")]
+    /// INDEX metadata identity, subject to organization-specific validation and route admission.
     Index,
     #[serde(rename = "MSDB")]
+    /// MSDB metadata identity, subject to organization-specific validation and route admission.
     Msdb,
     #[serde(rename = "PHDAM")]
+    /// PHDAM metadata identity, subject to organization-specific validation and route admission.
     Phdam,
     #[serde(rename = "PHIDAM")]
+    /// PHIDAM metadata identity, subject to organization-specific validation and route admission.
     Phidam,
     #[serde(rename = "PSINDEX")]
+    /// PSINDEX metadata identity, subject to organization-specific validation and route admission.
     Psindex,
     #[serde(rename = "SHISAM")]
+    /// SHISAM metadata identity, subject to organization-specific validation and route admission.
     Shisam,
     #[serde(rename = "SHSAM")]
+    /// SHSAM metadata identity, subject to organization-specific validation and route admission.
     Shsam,
 }
 
@@ -78,7 +107,7 @@ impl ImsDatabaseOrganization {
     fn segment_limit(self, limits: ImsMetadataLimits) -> usize {
         match self {
             Self::Dedb => limits.max_dedb_segments,
-            Self::Gsam | Self::Msdb => 1,
+            Self::Gsam | Self::Msdb | Self::Shsam | Self::Shisam => 1,
             _ => limits.max_segments_per_database,
         }
     }
@@ -113,87 +142,144 @@ impl ImsDatabaseOrganization {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Named or anonymous byte range within a segment, with optional sequence-key role.
 pub struct ImsFieldMetadata {
+    /// Optional field identity; sequence fields require a name.
     pub name: Option<String>,
+    /// Zero-based byte offset within segment data.
     pub offset: usize,
+    /// Positive field length in bytes, bounded by the segment's maximum length.
     pub length: usize,
+    /// Whether this is the segment's single sequence field, present at minimum length.
     pub sequence: bool,
+    /// Whether the declared sequence value is unique.
     pub unique: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Segment identity, parent link and bounded byte-layout definitions.
 pub struct ImsSegmentMetadata {
+    /// Segment name unique within the database after normalization.
     pub name: String,
+    /// Parent segment identity; None denotes the single root.
     pub parent: Option<String>,
+    /// Positive minimum segment length in bytes.
     pub min_length: usize,
+    /// Maximum segment length in bytes, no smaller than min_length.
     pub max_length: usize,
+    /// Field byte ranges and sequence metadata for this segment.
     pub fields: Vec<ImsFieldMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Declared source-field concatenation and self/ancestor target reference; route support is checked separately.
 pub struct ImsSecondaryIndexMetadata {
+    /// Index identity, unique in the database and distinct from target field names.
     pub name: String,
+    /// Target segment that is the source itself or a declared ancestor.
     pub target_segment: String,
+    /// Segment whose field bytes form the search value.
     pub source_segment: String,
+    /// Ordered distinct named fields; one to five fields totaling at most 240 bytes.
     pub source_fields: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Cross-database parent/child reference validated against the catalog.
 pub struct ImsLogicalRelationshipMetadata {
+    /// Database containing the referenced logical parent.
     pub parent_database: String,
+    /// Logical parent segment identity in that database.
     pub parent_segment: String,
+    /// Database containing the referenced logical child.
     pub child_database: String,
+    /// Logical child segment identity in that database.
     pub child_segment: String,
+    /// Declared paired relationship flag consumed by the admitted relationship route.
     pub paired: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Versioned database definition consumed by packages and providers after shared validation.
 pub struct ImsDatabaseMetadata {
+    /// Explicit GSAM application format; absence retains historical fixed-only admission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gsam_format: Option<crate::ImsGsamFormat>,
+    /// Database resource identity unique after normalization.
     pub name: String,
+    /// Definition version bounded by signed 32-bit range.
     pub version: u32,
+    /// Declared organization used for validation and route applicability.
     pub organization: ImsDatabaseOrganization,
+    /// Nonempty hierarchy with exactly one root.
     pub segments: Vec<ImsSegmentMetadata>,
+    /// Declared indexes whose references and search lengths must validate.
     pub secondary_indexes: Vec<ImsSecondaryIndexMetadata>,
+    /// Declared logical parent/child links to catalog resources.
     pub logical_relationships: Vec<ImsLogicalRelationshipMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// One ordered SENSEG entry defining visibility and optional processing-option override.
 pub struct ImsSensitiveSegmentMetadata {
+    /// Segment identity visible through this PCB.
     pub name: String,
+    /// Declared parent matching metadata and preceding this entry; None for a root.
     pub parent: Option<String>,
+    /// Optional validated SENSEG override; absent leaves PCB options in authority.
     pub processing_options: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Named database PCB binding with ordered sensitivity and optional version selection.
 pub struct ImsDatabasePcbMetadata {
+    /// PCB identity unique within the PSB.
     pub name: String,
+    /// Referenced database resource identity.
     pub database: String,
+    /// Optional exact version; present values must match the referenced definition.
     pub database_version: Option<u32>,
+    /// XDFLD identity selecting the secondary processing sequence. Historical
+    /// descriptors omit this field and retain the primary processing sequence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary_index: Option<String>,
+    /// Validated uppercase PCB PROCOPT text, not an unchecked permission flag.
     pub processing_options: String,
+    /// Nonempty ordered sensitivity path; parents must precede children.
     pub sensitive_segments: Vec<ImsSensitiveSegmentMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Alternate-terminal PCB routing flags; metadata presence does not admit every TM context.
 pub struct ImsTerminalPcbMetadata {
+    /// Alternate PCB identity unique within the PSB.
     pub name: String,
+    /// Initial destination; may be absent only for a modifiable PCB.
     pub destination: Option<String>,
+    /// Whether the destination can be changed by an admitted route.
     pub modifiable: bool,
+    /// Declared express-message flag.
     pub express: bool,
+    /// Declared same-terminal routing flag.
     pub same_terminal: bool,
+    /// Declared response-mode flag.
     pub response_mode: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
+/// Owned tagged PCB definition; host-kind conversion does not inspect database organization.
 pub enum ImsPcbMetadata {
+    /// Database binding, including references later classified as GSAM by the consuming route.
     Database(ImsDatabasePcbMetadata),
+    /// Alternate-terminal routing definition.
     AlternateTerminal(ImsTerminalPcbMetadata),
 }
 
@@ -209,53 +295,85 @@ impl ImsPcbMetadata {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
+/// PSB database-level selector retained in the metadata contract.
 pub enum ImsDbLevel {
+    /// Select the current database-level identity.
     Current,
+    /// Select the base database-level identity.
     Base,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// PSB identity and ordered PCB definitions; order supplies PCB numbering to consumers.
 pub struct ImsPsbMetadata {
+    /// PSB identity unique across PSBs and database names after normalization.
     pub name: String,
+    /// Declared current/base database level.
     pub database_level: ImsDbLevel,
+    /// Ordered PCB definitions bounded by the PSB limit.
     pub pcbs: Vec<ImsPcbMetadata>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Single shared metadata authority serialized and hashed only after bounded cross-reference validation.
 pub struct ImsMetadataCatalog {
+    /// Must equal the supported owned metadata schema identity.
     pub schema_version: String,
+    /// Nonempty bounded database definitions.
     pub databases: Vec<ImsDatabaseMetadata>,
+    /// Bounded PSB definitions referencing catalog databases.
     pub psbs: Vec<ImsPsbMetadata>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Validated collection counts and domain-separated catalog digest, without conformance credit.
 pub struct ImsMetadataIdentity {
+    /// Number of validated database definitions.
     pub databases: usize,
+    /// Aggregate segment-definition count.
     pub segments: usize,
+    /// Aggregate physical field-definition count.
     pub fields: usize,
+    /// Aggregate secondary-index definition count.
     pub secondary_indexes: usize,
+    /// Aggregate logical-relationship definition count.
     pub logical_relationships: usize,
+    /// Number of validated PSB definitions.
     pub psbs: usize,
+    /// Aggregate PCB-definition count.
     pub pcbs: usize,
+    /// SHA-256 identity of domain-separated serialized catalog bytes, including their order.
     pub digest: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Explicit metadata validation or encoding failure before publication.
 pub enum ImsMetadataProblem {
+    /// The catalog schema identity is not supported.
     UnsupportedSchema,
+    /// A required collection, size or numeric bound is violated.
     LimitExceeded,
+    /// A resource name is empty, too long or outside the admitted character set.
     InvalidName,
+    /// Normalized identities or a required unique reference repeat.
     DuplicateName,
+    /// A required named resource or parent cannot be resolved.
     MissingReference,
+    /// The segment parent graph contains a cycle.
     Cycle,
+    /// PROCOPT text is malformed or an unadmitted combination.
     InvalidOption,
+    /// A field range or sequence-field placement is invalid.
     InvalidOffset,
+    /// Resolved resources have incompatible organization, hierarchy, version or options.
     IncompatibleReference,
+    /// Owned catalog serialization failed while producing its identity.
     Encoding,
 }
 
+/// Validate bounds, hierarchy, options and references, then return counts and the catalog digest.
 pub fn validate_ims_metadata(
     catalog: &ImsMetadataCatalog,
     limits: ImsMetadataLimits,
@@ -343,6 +461,21 @@ fn validate_database(
     database: &ImsDatabaseMetadata,
     limits: ImsMetadataLimits,
 ) -> Result<(), ImsMetadataProblem> {
+    if let Some(format) = &database.gsam_format {
+        let record = database
+            .segments
+            .first()
+            .ok_or(ImsMetadataProblem::MissingReference)?;
+        if database.organization != ImsDatabaseOrganization::Gsam
+            || database.segments.len() != 1
+            || !record.fields.is_empty()
+            || format
+                .validate(record.min_length, record.max_length)
+                .is_err()
+        {
+            return Err(ImsMetadataProblem::IncompatibleReference);
+        }
+    }
     if database.segments.is_empty()
         || database.segments.len() > database.organization.segment_limit(limits)
         || database.secondary_indexes.len() > limits.max_named_fields_and_indexes
@@ -366,6 +499,15 @@ fn validate_database(
             || segment.fields.len() > limits.max_fields_per_segment
         {
             return Err(ImsMetadataProblem::LimitExceeded);
+        }
+        if matches!(
+            database.organization,
+            ImsDatabaseOrganization::Hsam
+                | ImsDatabaseOrganization::Shsam
+                | ImsDatabaseOrganization::Shisam
+        ) && segment.min_length != segment.max_length
+        {
+            return Err(ImsMetadataProblem::IncompatibleReference);
         }
         if let Some(parent) = &segment.parent
             && (!segments.contains_key(&normalize(parent))
@@ -439,7 +581,7 @@ fn validate_database(
         *count += 1;
         if *count > limits.max_secondary_indexes_per_segment
             || index.source_fields.is_empty()
-            || index.source_fields.len() > limits.max_fields_per_segment
+            || index.source_fields.len() > limits.max_fields_per_segment.min(5)
         {
             return Err(ImsMetadataProblem::LimitExceeded);
         }
@@ -448,6 +590,22 @@ fn validate_database(
             .iter()
             .filter_map(|field| field.name.as_ref().map(|name| (normalize(name), field)))
             .collect::<BTreeMap<_, _>>();
+        let mut ancestor = Some(*source);
+        while ancestor.is_some_and(|segment| normalize(&segment.name) != normalize(&target.name)) {
+            ancestor = ancestor
+                .and_then(|segment| segment.parent.as_deref())
+                .and_then(|parent| segments.get(&normalize(parent)).copied());
+        }
+        if ancestor.is_none()
+            || target.fields.iter().any(|field| {
+                field
+                    .name
+                    .as_deref()
+                    .is_some_and(|name| normalize(name) == normalize(&index.name))
+            })
+        {
+            return Err(ImsMetadataProblem::IncompatibleReference);
+        }
         let mut length = 0usize;
         let mut selected = BTreeSet::new();
         for field in &index.source_fields {
@@ -625,6 +783,20 @@ fn validate_psb(
                 if pcb.sensitive_segments.is_empty() {
                     return Err(ImsMetadataProblem::MissingReference);
                 }
+                if let Some(name) = &pcb.secondary_index {
+                    validate_name(name)?;
+                    let index = database
+                        .secondary_indexes
+                        .iter()
+                        .find(|index| normalize(&index.name) == normalize(name))
+                        .ok_or(ImsMetadataProblem::MissingReference)?;
+                    if pcb.processing_options.contains('L')
+                        || normalize(&pcb.sensitive_segments[0].name)
+                            != normalize(&index.target_segment)
+                    {
+                        return Err(ImsMetadataProblem::IncompatibleReference);
+                    }
+                }
                 sensitive_count = sensitive_count
                     .checked_add(pcb.sensitive_segments.len())
                     .ok_or(ImsMetadataProblem::LimitExceeded)?;
@@ -721,6 +893,199 @@ fn normalize(value: &str) -> String {
 mod tests {
     use super::*;
 
+    fn seq_layout_host_catalog(
+        organization: ImsDatabaseOrganization,
+        two: bool,
+    ) -> ImsMetadataCatalog {
+        let mut value = shisam_fixed_catalog(organization);
+        if two {
+            let mut child = value.databases[0].segments[0].clone();
+            child.name = "SEQCHILD".into();
+            child.parent = Some(value.databases[0].segments[0].name.clone());
+            value.databases[0].segments.push(child);
+            let ImsPcbMetadata::Database(pcb) = &mut value.psbs[0].pcbs[0] else {
+                unreachable!()
+            };
+            pcb.sensitive_segments.push(ImsSensitiveSegmentMetadata {
+                name: "SEQCHILD".into(),
+                parent: Some(pcb.sensitive_segments[0].name.clone()),
+                processing_options: None,
+            });
+        }
+        value
+    }
+
+    fn seq_layout_host_observe(
+        value: &ImsMetadataCatalog,
+    ) -> Result<ImsMetadataIdentity, ImsMetadataProblem> {
+        let actual = validate_ims_metadata(value, ImsMetadataLimits::default());
+        eprintln!(
+            "SEQ_LAYOUT_HOST_METADATA={}; ACTUAL={actual:?}",
+            serde_json::to_string(value).unwrap()
+        );
+        actual
+    }
+
+    #[test]
+    fn seq_layout_host_shisam_multiple_types() {
+        assert_eq!(
+            seq_layout_host_observe(&seq_layout_host_catalog(
+                ImsDatabaseOrganization::Shisam,
+                true
+            )),
+            Err(ImsMetadataProblem::LimitExceeded)
+        );
+    }
+    #[test]
+    fn seq_layout_host_shsam_multiple_types() {
+        assert_eq!(
+            seq_layout_host_observe(&seq_layout_host_catalog(
+                ImsDatabaseOrganization::Shsam,
+                true
+            )),
+            Err(ImsMetadataProblem::LimitExceeded)
+        );
+    }
+    fn seq_layout_host_variable(organization: ImsDatabaseOrganization, index: usize) {
+        let mut value =
+            seq_layout_host_catalog(organization, organization == ImsDatabaseOrganization::Hsam);
+        validate_ims_metadata(&value, ImsMetadataLimits::default()).unwrap();
+        value.databases[0].segments[index].max_length = 4;
+        assert_eq!(
+            seq_layout_host_observe(&value),
+            Err(ImsMetadataProblem::IncompatibleReference)
+        );
+    }
+    #[test]
+    fn seq_layout_host_hsam_variable_root() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Hsam, 0);
+    }
+    #[test]
+    fn seq_layout_host_hsam_variable_dependent() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Hsam, 1);
+    }
+    #[test]
+    fn seq_layout_host_shsam_variable() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Shsam, 0);
+    }
+    #[test]
+    fn seq_layout_host_shisam_variable_control() {
+        seq_layout_host_variable(ImsDatabaseOrganization::Shisam, 0);
+    }
+    #[test]
+    fn seq_layout_host_fixed_and_ranged_controls() {
+        for organization in [
+            ImsDatabaseOrganization::Hsam,
+            ImsDatabaseOrganization::Shsam,
+            ImsDatabaseOrganization::Shisam,
+            ImsDatabaseOrganization::Hisam,
+            ImsDatabaseOrganization::Hidam,
+        ] {
+            let mut value = seq_layout_host_catalog(
+                organization,
+                organization == ImsDatabaseOrganization::Hsam,
+            );
+            if matches!(
+                organization,
+                ImsDatabaseOrganization::Hisam | ImsDatabaseOrganization::Hidam
+            ) {
+                value.databases[0].segments[0].max_length = 4;
+            }
+            assert!(seq_layout_host_observe(&value).is_ok());
+        }
+    }
+
+    fn shisam_fixed_catalog(organization: ImsDatabaseOrganization) -> ImsMetadataCatalog {
+        let mut value = catalog();
+        let db = &mut value.databases[0];
+        db.organization = organization;
+        db.segments.truncate(1);
+        db.segments[0].min_length = 3;
+        db.segments[0].max_length = 3;
+        db.segments[0].fields[0].length = 2;
+        db.secondary_indexes.clear();
+        db.logical_relationships.clear();
+        let ImsPcbMetadata::Database(pcb) = &mut value.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.sensitive_segments.truncate(1);
+        value
+    }
+
+    #[test]
+    fn shisam_fixed_layout_host_rejects_variable_root() {
+        let good = shisam_fixed_catalog(ImsDatabaseOrganization::Shisam);
+        validate_ims_metadata(&good, ImsMetadataLimits::default()).unwrap();
+        let mut invalid = good;
+        invalid.databases[0].segments[0].max_length = 4;
+        let actual = validate_ims_metadata(&invalid, ImsMetadataLimits::default());
+        eprintln!("SHISAM_HOST_VARIABLE_ACTUAL={actual:?}");
+        assert_eq!(actual, Err(ImsMetadataProblem::IncompatibleReference));
+    }
+
+    #[test]
+    fn shisam_fixed_layout_host_fixed_and_other_organization_controls() {
+        for organization in [
+            ImsDatabaseOrganization::Shisam,
+            ImsDatabaseOrganization::Hisam,
+            ImsDatabaseOrganization::Shsam,
+            ImsDatabaseOrganization::Hidam,
+        ] {
+            let good = shisam_fixed_catalog(organization);
+            let bytes = serde_json::to_vec(&good).unwrap();
+            let identity = validate_ims_metadata(&good, ImsMetadataLimits::default()).unwrap();
+            let decoded = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(serde_json::to_vec(&decoded).unwrap(), bytes);
+            assert_eq!(
+                validate_ims_metadata(&decoded, ImsMetadataLimits::default()),
+                Ok(identity)
+            );
+        }
+        for organization in [
+            ImsDatabaseOrganization::Hisam,
+            ImsDatabaseOrganization::Hidam,
+        ] {
+            let mut ranged = shisam_fixed_catalog(organization);
+            ranged.databases[0].segments[0].max_length = 4;
+            assert!(validate_ims_metadata(&ranged, ImsMetadataLimits::default()).is_ok());
+        }
+    }
+
+    #[test]
+    fn gsam_absent_format_keeps_historical_metadata_bytes_and_explicit_format_binds_identity() {
+        let literal = br#"{"name":"GENDB","version":1,"organization":"GSAM","segments":[{"name":"RECORD","parent":null,"min_length":16,"max_length":16,"fields":[]}],"secondary_indexes":[],"logical_relationships":[]}"#;
+        let mut db: ImsDatabaseMetadata = serde_json::from_slice(literal).unwrap();
+        assert_eq!(db.gsam_format, None);
+        assert_eq!(serde_json::to_vec(&db).unwrap(), literal);
+        let catalog = |db| ImsMetadataCatalog {
+            schema_version: IMS_METADATA_SCHEMA_V1.into(),
+            databases: vec![db],
+            psbs: vec![],
+        };
+        let old =
+            validate_ims_metadata(&catalog(db.clone()), ImsMetadataLimits::default()).unwrap();
+        db.segments[0].min_length = 12;
+        db.gsam_format = Some(crate::ImsGsamFormat {
+            version: 1,
+            record_format: crate::ImsGsamRecordFormat::U,
+            access_method: crate::ImsGsamAccessMethod::Bsam,
+            block_size: 16,
+            control: crate::ImsGsamControl::None,
+        });
+        let identity =
+            validate_ims_metadata(&catalog(db.clone()), ImsMetadataLimits::default()).unwrap();
+        assert_ne!(old.digest, identity.digest);
+        db.gsam_format.as_mut().unwrap().control = crate::ImsGsamControl::Asa;
+        assert_ne!(
+            identity.digest,
+            validate_ims_metadata(&catalog(db.clone()), ImsMetadataLimits::default())
+                .unwrap()
+                .digest
+        );
+        db.organization = ImsDatabaseOrganization::Hsam;
+        assert!(validate_ims_metadata(&catalog(db), ImsMetadataLimits::default()).is_err());
+    }
+
     fn field(name: &str, offset: usize, length: usize, sequence: bool) -> ImsFieldMetadata {
         ImsFieldMetadata {
             name: Some(name.into()),
@@ -745,6 +1110,7 @@ mod tests {
         ImsMetadataCatalog {
             schema_version: IMS_METADATA_SCHEMA_V1.into(),
             databases: vec![ImsDatabaseMetadata {
+                gsam_format: None,
                 name: "AUTHDB".into(),
                 version: 7,
                 organization: ImsDatabaseOrganization::Hidam,
@@ -773,6 +1139,7 @@ mod tests {
                     name: "AUTHPCB".into(),
                     database: "AUTHDB".into(),
                     database_version: Some(7),
+                    secondary_index: None,
                     processing_options: "AP".into(),
                     sensitive_segments: vec![
                         ImsSensitiveSegmentMetadata {
@@ -810,6 +1177,53 @@ mod tests {
         assert_eq!(
             validate_ims_metadata(&decoded, ImsMetadataLimits::default()).unwrap(),
             identity
+        );
+    }
+
+    #[test]
+    fn secondary_selector_absence_preserves_historical_metadata_bytes_and_identity() {
+        let catalog = catalog();
+        let old_pcb = r#"{"kind":"database","name":"AUTHPCB","database":"AUTHDB","database_version":7,"processing_options":"AP","sensitive_segments":[{"name":"ROOT","parent":null,"processing_options":null},{"name":"CHILD","parent":"ROOT","processing_options":"G"}]}"#;
+        assert_eq!(
+            serde_json::to_string(&catalog.psbs[0].pcbs[0]).unwrap(),
+            old_pcb
+        );
+        let encoded = serde_json::to_vec(&catalog).unwrap();
+        let identity = validate_ims_metadata(&catalog, ImsMetadataLimits::default()).unwrap();
+        let mut value = serde_json::to_value(&catalog).unwrap();
+        value["psbs"][0]["pcbs"][0]["secondary_index"] = serde_json::Value::Null;
+        let decoded = serde_json::from_value(value).unwrap();
+        assert_eq!(serde_json::to_vec(&decoded).unwrap(), encoded);
+        assert_eq!(
+            validate_ims_metadata(&decoded, ImsMetadataLimits::default()).unwrap(),
+            identity
+        );
+    }
+
+    #[test]
+    fn secondary_selector_references_and_source_target_ancestry_are_validated() {
+        let mut metadata = catalog();
+        metadata.databases[0].secondary_indexes[0].target_segment = "ROOT".into();
+        let ImsPcbMetadata::Database(pcb) = &mut metadata.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.secondary_index = Some("AUTHX".into());
+        assert!(validate_ims_metadata(&metadata, ImsMetadataLimits::default()).is_ok());
+        let mut invalid = metadata.clone();
+        let ImsPcbMetadata::Database(pcb) = &mut invalid.psbs[0].pcbs[0] else {
+            unreachable!()
+        };
+        pcb.secondary_index = Some("MISSING".into());
+        assert_eq!(
+            validate_ims_metadata(&invalid, ImsMetadataLimits::default()),
+            Err(ImsMetadataProblem::MissingReference)
+        );
+        let mut invalid = metadata;
+        invalid.databases[0].secondary_indexes[0].source_segment = "ROOT".into();
+        invalid.databases[0].secondary_indexes[0].target_segment = "CHILD".into();
+        assert_eq!(
+            validate_ims_metadata(&invalid, ImsMetadataLimits::default()),
+            Err(ImsMetadataProblem::IncompatibleReference)
         );
     }
 

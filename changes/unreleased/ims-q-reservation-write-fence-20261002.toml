@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fence IMS ordinary writes and logical cascades against Q reservations through refreshed SystemState and shared database-row CAS; protect root records and dependent segments, retain legacy reservation readers and modified/PCB tracking, and reject reserved bulk or utility image replacement without claiming full read isolation."

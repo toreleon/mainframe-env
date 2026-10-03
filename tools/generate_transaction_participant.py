@@ -209,6 +209,31 @@ def validate_contract(contract: dict[str, Any]) -> None:
         )
 
 
+    for participant in participants:
+        preparation = participant.get("preparation")
+        if "preparation" in participant:
+            require(
+                participant["provider_id"] == "ims"
+                and participant["status"] == "pending"
+                and participant["capabilities"] is None
+                and preparation == {
+                    "scope": "ims-local-database-provider-route",
+                    "contract_test": "crates/providers/mainframe-env-ims/tests/participant_contract.rs",
+                    "blocked_obligations": [
+                        "INT-1601.owner",
+                        "INT-1601.modes",
+                        "INT-1601.ordering",
+                        "INT-1601.fencing",
+                        "INT-1601.deadline-cancellation",
+                        "INT-1601.security-audit",
+                        "INT-1601.retention",
+                        "INT-1601.compatibility",
+                    ],
+                },
+                "IMS preparation must retain all admission blockers and pending/null capabilities",
+            )
+
+
 def validate_cics_capabilities(capabilities: dict[str, Any]) -> None:
     require(
         capabilities.get("transaction_owner") == "cics-task-or-dpl-mirror"
@@ -541,12 +566,19 @@ def render_participant(value: dict[str, Any]) -> str:
         if value["capabilities"] is not None
         else "None"
     )
+    preparation = value.get("preparation")
+    scope = f"Some({rust_string(preparation['scope'])})" if preparation else "None"
+    test = f"Some({rust_string(preparation['contract_test'])})" if preparation else "None"
+    blockers = rust_slice(preparation["blocked_obligations"], rust_string) if preparation else "&[]"
     return (
         "TransactionParticipantDescriptor {\n"
         f"        provider_id: {rust_string(value['provider_id'])},\n"
         f"        status: {status},\n"
         f"        dependency: {rust_string(value['dependency'])},\n"
         f"        capabilities: {capabilities},\n"
+        f"        preparation_scope: {scope},\n"
+        f"        preparation_contract_test: {test},\n"
+        f"        blocked_obligations: {blockers},\n"
         "    }"
     )
 

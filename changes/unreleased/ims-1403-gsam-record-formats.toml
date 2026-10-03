@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add explicit versioned GSAM application record formats and owned undefined lengths through public dispatch, canonical replay and symbolic checkpoint/restart, preserving absent-format fixed contracts."

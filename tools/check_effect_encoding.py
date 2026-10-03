@@ -101,8 +101,11 @@ def check(root: Path) -> None:
         ),
     }
     for name, (path, encoder) in providers.items():
+        source = production_source(path)
+        if name == "IMS":
+            source += "\n" + production_source(path.parent / "service/execution.rs")
         require(
-            production_source(path),
+            source,
             (
                 encoder,
                 "request_digest_format",

@@ -3,25 +3,38 @@
 use crate::ImsPcbKind;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Status membership namespace; a recognized code is not valid in every namespace.
 pub enum ImsStatusContext {
+    /// Generated database-call status membership set.
     Database,
+    /// Generated system-service status membership set.
     SystemService,
+    /// Generated message-call status membership set.
     Message,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Generated classification of a status; category membership does not execute a call.
 pub enum ImsStatusCategory {
+    /// Descriptor classification for an exceptional but completed valid call.
     ExceptionalValidCompleted,
+    /// Descriptor classification for completion with warning and data.
     WarningWithDataCompleted,
+    /// Descriptor classification for completion with warning and no data.
     WarningNoDataCompleted,
+    /// Descriptor classification for improper caller specification.
     ImproperUserSpecification,
+    /// Descriptor classification for system, I/O or security error.
     SystemIoSecurityError,
+    /// Descriptor classification for unavailable data.
     UnavailableData,
+    /// Descriptor classification for a lock-timeout condition.
     LockTimeout,
 }
 
 impl ImsStatusCategory {
     #[must_use]
+    /// Return whether this category is one of the three completed-call classifications.
     pub const fn call_completed(self) -> bool {
         matches!(
             self,
@@ -33,35 +46,48 @@ impl ImsStatusCategory {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Exact two-byte code and its generated classifications.
 pub struct ImsStatusDescriptor {
+    /// Exact display-code status bytes, including two blanks for success.
     pub code: [u8; 2],
+    /// All generated category memberships associated with this status.
     pub categories: &'static [ImsStatusCategory],
 }
 
 impl ImsStatusDescriptor {
     #[must_use]
+    /// Return whether both status bytes are blank.
     pub fn is_blank_success(self) -> bool {
         self.code == *b"  "
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Pinned-source status inventory and allowed PCB kinds for one context.
 pub struct ImsStatusContextDescriptor {
+    /// Namespace whose status memberships are described.
     pub context: ImsStatusContext,
+    /// Pinned topic locator supporting the membership set.
     pub source_topic: &'static str,
+    /// Expected source-body SHA-256 identity.
     pub source_sha256: &'static str,
+    /// PCB categories admitted in this status namespace.
     pub pcb_kinds: &'static [ImsPcbKind],
+    /// Sorted exact-code descriptors used by bounded lookup.
     pub statuses: &'static [ImsStatusDescriptor],
 }
 
 include!("generated/ims_status_codes.rs");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Syntactically validated two-byte status; registry membership requires a separate lookup.
 pub struct ImsStatusCode([u8; 2]);
 
 impl ImsStatusCode {
+    /// Exact two-blank success representation.
     pub const BLANK_SUCCESS: Self = Self(*b"  ");
 
+    /// Accept two blanks or two uppercase ASCII letters/digits; reject other lengths and bytes.
     pub fn parse(input: &[u8]) -> Result<Self, ImsStatusProblem> {
         let [left, right] = input else {
             return Err(ImsStatusProblem::MalformedCode);
@@ -79,25 +105,33 @@ impl ImsStatusCode {
     }
 
     #[must_use]
+    /// Return the exact pair of stored status bytes.
     pub const fn bytes(self) -> [u8; 2] {
         self.0
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Malformed or inapplicable code rejected by status lookup.
 pub enum ImsStatusProblem {
+    /// Input is not an admitted two-byte status spelling.
     MalformedCode,
+    /// No generated context contains the code.
     UnknownCode,
+    /// The code exists but not in the requested context.
     ForbiddenStatusContext,
+    /// The selected status context does not admit the PCB kind.
     ForbiddenPcbKind,
 }
 
 #[must_use]
+/// Return all generated status-context descriptors.
 pub fn ims_status_contexts() -> &'static [ImsStatusContextDescriptor] {
     IMS_STATUS_CONTEXTS
 }
 
 #[must_use]
+/// Return the descriptor for a closed context; the generated inventory must be exhaustive.
 pub fn ims_status_context(context: ImsStatusContext) -> &'static ImsStatusContextDescriptor {
     IMS_STATUS_CONTEXTS
         .iter()
@@ -105,6 +139,7 @@ pub fn ims_status_context(context: ImsStatusContext) -> &'static ImsStatusContex
         .expect("generated IMS status registry must cover every closed context")
 }
 
+/// Resolve an exact code within one context, distinguishing unknown from forbidden membership.
 pub fn ims_status(
     input: &[u8],
     context: ImsStatusContext,
@@ -126,6 +161,7 @@ pub fn ims_status(
     }
 }
 
+/// Resolve context membership and reject a PCB kind outside that context.
 pub fn resolve_ims_status(
     input: &[u8],
     context: ImsStatusContext,

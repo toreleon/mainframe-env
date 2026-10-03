@@ -56,6 +56,18 @@ disposition are additive named variants: they do not alter the canonical bytes
 of any existing value, and their exact variant-name bytes are frozen by golden
 tests.
 
+`HostRequest::ImsNavigation` is an additive tuple variant containing
+`ImsNavigationRequest`, whose sorted fields are `context`, `request`, and `ssas`.
+The embedded `ImsRequest` uses its existing encoding; each SSA is an exact raw
+byte vector in an ordered sequence. The context, selected PCB, binary comparative
+values and mutation identity therefore participate in replay identity. The
+678-byte golden preimage has SHA-256
+`5041ceeecb7d1766c994d0bd120dea0c2dba666f4c9de86020be2eb5b4e88c0b`.
+The variant returns the existing `ImsResult` encoding and introduces no durable
+row schema. Older binaries cannot dispatch the new variant; stop new navigation
+calls before downgrading and retain completed canonical replay receipts without
+rewriting or redispatching them. Existing IMS request/result bytes remain fixed.
+
 `SecurityRequest::ValidatePrincipal` is likewise an additive named variant. It
 contains only the bounded `PrincipalId`, is non-mutating, and returns the
 existing `SecurityDecision` vocabulary. Its exact canonical variant, field, and
@@ -64,6 +76,30 @@ authorization, and audit request bytes are unchanged. The security request
 principal-field helper is isolated from the large generated encoder without
 changing its wire domain or version.
 
+`HostRequest::ImsGsam` and `HostResult::ImsGsam` are additive tuple variants.
+`ImsGsamRequest` sorts fields as `context`, `request`, `save_address`, `search`;
+`ImsGsamResult` sorts `address`, `result`. The embedded historical IMS objects
+retain their exact encodings. `ImsGsamAddress` sorts `database`, `token`, with
+the 32-byte token encoded as raw bytes. `ImsGsamSearchArgument` is Beginning
+(zero fields) or Record (tuple field `0`). Independent binary goldens freeze
+the 829-byte request at
+`ccc805d540fca887179e009db58f91780ea84c29921729688a36919698c9b980`
+and 502-byte result at
+`ee1eea1457dcca61a8318540879282c91e93d54a9bf5022583754b0095801821`.
+These are owned logical addresses, not IBM RSA bytes. Existing IMS preimages
+remain fixed. Replay output and downgrade rules are in
+[ADR-0034](../decisions/0034-gsam-logical-address.md); retention hashes the
+additive result variant without relabeling historical receipts.
+
+For owned U records, present `undefined_length` adds one sorted final field to
+either GSAM object (five request fields, three result fields). Its value is the
+canonical u32 primitive, tag `0x12` followed by four little-endian bytes. Absence
+omits both name and value and preserves the historical four/two-field preimages
+above. The explicit length is covered by request conflict and result integrity
+digests. Format metadata is bound by signed package/metadata identity and saved
+checkpoint format identity rather than embedded in each call. See
+[ADR-0029](../decisions/0030-gsam-application-record-formats.md).
+
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
 schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
 `suppressed`. The entry therefore participates in the ordinary canonical result
@@ -71,6 +107,21 @@ digest without changing the `CicsResponse` object shape. Historical retained
 responses that lack the entry remain readable and make no dump claim.
 
 ## Typed size budgets
+
+`HostRequest::ImsPcbFeedbackV1` and `HostResult::ImsPcbFeedbackV1` are additive
+tuple variants with separately named V1 objects. Request fields sort as
+`context`, `key_capacity`, `request`, `ssas`; result fields as `feedback`,
+`result`. Feedback fields sort as `database`, `key`, `pcb`,
+`processing_options`, `sensitive_segment_count`, `transferred_data_length`.
+Key `Valid` sorts `bytes`, `segment_level`, `segment_name`;
+`InvalidatedSecondaryReplace` has no fields and `Unsupported` has tuple field
+`0` naming a closed missing-authority variant. Existing embedded IMS objects
+keep their encodings. Independent vectors and exact availability classes are
+in the [class review](../delivery/subsystems/ims/selected-pcb-feedback.md).
+The optional retained output participates in the existing result hash and
+receipt authority; replay never reconstructs feedback from later cursor state.
+Downgrade requires a compatible receipt reader or coherent pre-feature restore
+as described in [ADR-0035](../decisions/0035-selected-pcb-feedback.md).
 
 `CapabilityDescriptor.max_request_bytes` and `.max_result_bytes` now count the
 canonical preimage, including domain prefix, tags, field identifiers and lengths.

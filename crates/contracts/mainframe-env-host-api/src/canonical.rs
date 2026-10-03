@@ -3,6 +3,7 @@ use crate::clock::ClockRequest;
 use crate::dataset::*;
 use crate::ims_applicability::ImsCallSyntax;
 use crate::ims_pcb::ImsExecutionContext;
+use crate::ims_recovery::*;
 use crate::ims_system::*;
 use crate::names::*;
 use crate::request::*;
@@ -13,7 +14,9 @@ use mainframe_env_execution_api::{
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
+/// Version identity for the explicit canonical host-effect encoding contract.
 pub const EFFECT_CANONICAL_SCHEMA: &str = "mainframe-env.effect-canonical@1";
+/// Version identity for domain-separated canonical provider replay digests.
 pub const PROVIDER_REPLAY_DIGEST_FORMAT: &str = "mainframe-env.provider-replay-canonical@1";
 pub const REQUEST_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-request@1\0";
 pub const RESULT_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-result@1\0";
@@ -350,7 +353,12 @@ pub fn canonical_result_size(
 
 mod browse;
 mod cics;
+mod dispatch;
 mod generated;
+mod ims_feedback;
+mod ims_gsam;
+mod ims_navigation;
+mod ims_recovery;
 mod ims_system;
 mod security_request;
 use security_request::encode_principal_validation;

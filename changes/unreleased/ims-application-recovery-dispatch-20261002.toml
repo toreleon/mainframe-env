@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a typed selected DB-batch LOG host route using the existing IMS recovery authority, canonical effect journal and atomic utility bridge, with Memory/SQLite replay, failure, real-position preservation and process-restart checks. Other recovery families and official/licensed closure remain pending."

@@ -28,3 +28,38 @@ Cross-subsystem cases use the separate bounded `ScenarioSpec` section. A
 scenario contains only typed participant drivers, ordered step references,
 failure-point references, and exact credits to already registered
 `(row, obligation, gate)` bindings; it is not a workflow or expression DSL.
+
+Publication-derived drafts live in `candidates/`, outside the accepted
+`v1/spec.json` registry. The shared typed candidate container embeds ordinary
+IR v1 and binds proposed rules to pinned source identities and anchors. Its
+compiler rejects approval fields, nonzero credit, accepted reviewed-rule
+references and licensed bindings. Preparation delegates to the existing
+compiler, runtime registry and runner, then exposes diagnostics only; draft
+events and ledger projections are not official evidence.
+
+`candidates/ims-db.json` proposes 22 rules and 42 bindings for catalog rows
+`ibm-ims-15.6-dli-2026-08-31:dli-call-families:0004`, `:0005`, `:0006` and
+`:0015`. The independent `fixtures/ims-db.json` contains 40 Memory/SQLite
+fixtures. The tooling driver invokes the existing public host provider and
+observes bounded real outputs, position, parentage, hold and database rows.
+Its finite recipes cover GU/GN/GNP, Get-Hold, REPL and DLET. A roots-only seed for GN
+avoids unresolved cross-type GA/GK status proposals. Injected SAF denial,
+canonical retry, fresh-connection reopen and local rollback are host-contract
+preparation, not full security-profile, process-death, XRST or ROLL evidence.
+
+Run `cargo xtask conformance --subsystem ims --prepare-candidates` for
+zero-credit preparation; ordinary IMS official conformance reports the human
+acceptance blocker. A HUMAN conformance maintainer must review every proposed
+source anchor, independently authored expected observation, applicability and
+missing class, including the separately pinned DA/DJ explanatory rules, and accept or
+reject the proposals through the reviewed-rule authority. No approval ID is
+provided here. Promotion requires separately accepted reviewed-rule artifacts,
+complete applicable obligations and genuine shared-runner official evidence.
+Successful preparation grants no partial row or gate credit. Official IMS and
+licensed differential remain 0/25; parent and release acceptance remain open.
+
+The zero-credit `ims-status-explanations` scope binds the exact archived DA/DJ
+bodies without changing any old baseline. Their expected hashes and byte counts
+were verified and read offline. Availability resolves the source-location gap,
+not human rule acceptance; the candidate's source validator rejects mismatched
+topic/hash/baseline identities. No publication body is retained in Git.

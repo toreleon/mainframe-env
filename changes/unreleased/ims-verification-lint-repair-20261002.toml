@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Removed three equivalent baseline lint failures blocking warnings-denied IMS host/conformance verification; MQ validation and licensed-harness behavior are unchanged."

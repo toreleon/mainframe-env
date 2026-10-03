@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Register four retained IMS 15.6 Q and DEQ reference topics as a separate zero-credit offline source scope without runtime or acceptance changes."

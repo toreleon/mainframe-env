@@ -1,28 +1,112 @@
 use super::*;
 use std::cmp::Ordering;
 
+/// Call-local start/selection choice in the sole traversal; never retained.
+pub(super) enum Selection {
+    First,
+    Last,
+    FirstInParent,
+}
+
+impl PcbPosition {
+    /// Check intrinsic retained PCB invariants without requiring a checkpoint's
+    /// historical occurrences to exist in the current live database image.
+    pub(crate) fn valid_retained_shape(&self) -> bool {
+        !self.current.is_some_and(|id| id.0 == 0)
+            && !self.parentage.is_some_and(|id| id.0 == 0)
+            && !self
+                .held
+                .is_some_and(|held| held.version == 0 || self.current != Some(held.id))
+            && (!self.after_end
+                || (self.current.is_none() && self.parentage.is_none() && self.held.is_none()))
+            && self.secondary.as_ref().is_none_or(|selected| {
+                selected.source.0 != 0
+                    && !selected.index.is_empty()
+                    && self.current.is_some()
+                    && !self.after_end
+            })
+            && self.secondary_restart.as_ref().is_none_or(|saved| {
+                saved
+                    .validate(crate::recovery::RecoveryLimits::default())
+                    .is_ok()
+                    && self.parentage.is_none()
+                    && self.held.is_none()
+                    && !self.after_end
+                    && self
+                        .secondary
+                        .as_ref()
+                        .is_none_or(|p| p.index == saved.index)
+            })
+            && (self.primary_search.is_none()
+                || (!self.after_end
+                    && self.secondary.is_none()
+                    && self.secondary_restart.is_none()))
+    }
+}
+
 impl DatabaseEngine {
     pub fn read(
         &self,
         position: &mut PcbPosition,
         request: &ReadRequest,
     ) -> Result<RecordView, EngineProblem> {
+        self.read_visible(position, request, |_| true)
+    }
+
+    /// The PCB adapter filters candidates before selection, preserving the same
+    /// navigation and failure-position authority as an unrestricted engine read.
+    pub(crate) fn read_visible(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        visible: impl Fn(&str) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
         if request.hold && self.definition.organization == DatabaseOrganization::Gsam {
             return Err(EngineProblem::Unsupported);
         }
         self.validate_read(request)?;
+        self.read_matching(position, request, |id| {
+            let target = request.target.as_deref().or_else(|| {
+                (request.kind == ReadKind::Unique)
+                    .then_some(self.definition.segments[0].name.as_str())
+            });
+            visible(&self.records[&id].segment) && self.matches(id, target, &request.path)
+        })
+    }
+
+    pub(super) fn read_matching(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        matches: impl Fn(RecordId) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
+        self.read_matching_selected(position, request, Selection::First, matches)
+    }
+
+    pub(super) fn read_matching_selected(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        selection: Selection,
+        matches: impl Fn(RecordId) -> bool,
+    ) -> Result<RecordView, EngineProblem> {
+        self.read_matching_progress(position, request, selection, matches, None)
+    }
+
+    pub(super) fn read_matching_progress(
+        &self,
+        position: &mut PcbPosition,
+        request: &ReadRequest,
+        selection: Selection,
+        matches: impl Fn(RecordId) -> bool,
+        plan: Option<&primary_position::PrimaryPlan>,
+    ) -> Result<RecordView, EngineProblem> {
         let mut next = position.clone();
         next.held = None;
+        next.primary_search = None;
         let order = self.hierarchy_order();
-        let selected = match request.kind {
-            ReadKind::Unique => {
-                let root = &self.definition.segments[0].name;
-                let target = request.target.as_deref().unwrap_or(root);
-                order
-                    .iter()
-                    .copied()
-                    .find(|id| self.matches(*id, Some(target), &request.path))
-            }
+        let (start, stop) = match request.kind {
+            ReadKind::Unique => (0, order.len()),
             ReadKind::Next => {
                 let start = if next.after_end {
                     0
@@ -31,10 +115,12 @@ impl DatabaseEngine {
                         .and_then(|current| order.iter().position(|id| *id == current))
                         .map_or(0, |index| index + 1)
                 };
-                order[start..]
-                    .iter()
-                    .copied()
-                    .find(|id| self.matches(*id, request.target.as_deref(), &request.path))
+                let start = plan
+                    .map(|plan| self.primary_start(position, plan, &order))
+                    .transpose()?
+                    .flatten()
+                    .unwrap_or(start);
+                (start, order.len())
             }
             ReadKind::NextInParent => {
                 let parent = next.parentage.ok_or(EngineProblem::ParentageRequired)?;
@@ -47,7 +133,7 @@ impl DatabaseEngine {
                     .iter()
                     .position(|id| !self.is_descendant(*id, parent))
                     .map_or(order.len(), |offset| parent_index + 1 + offset);
-                let start = next
+                let forward_start = next
                     .current
                     .and_then(|current| {
                         order[parent_index + 1..stop]
@@ -55,12 +141,44 @@ impl DatabaseEngine {
                             .position(|id| *id == current)
                     })
                     .map_or(parent_index + 1, |offset| parent_index + 2 + offset);
-                order[start..stop]
-                    .iter()
-                    .copied()
-                    .find(|id| self.matches(*id, request.target.as_deref(), &request.path))
+                let start = match selection {
+                    Selection::FirstInParent => parent_index + 1,
+                    Selection::First | Selection::Last => forward_start,
+                };
+                let start = plan
+                    .map(|plan| self.primary_start(position, plan, &order))
+                    .transpose()?
+                    .flatten()
+                    .unwrap_or(start)
+                    .clamp(parent_index + 1, stop);
+                (start, stop)
             }
         };
+        let mut progress = plan
+            .map(|plan| self.primary_progress(position, plan, request))
+            .transpose()?;
+        let mut selected = None;
+        for id in order[start..stop].iter().copied() {
+            if let Some(plan) = plan
+                && !self.primary_past_gap(position, plan, request, id)?
+            {
+                continue;
+            }
+            let matched = if let (Some(plan), Some(progress)) = (plan, &mut progress) {
+                self.primary_step(position, plan, progress, id)? && matches(id)
+            } else {
+                matches(id)
+            };
+            if progress.as_ref().is_some_and(|p| p.stopped) {
+                break;
+            }
+            if matched {
+                selected = Some(id);
+                if !matches!(selection, Selection::Last) {
+                    break;
+                }
+            }
+        }
         let Some(id) = selected else {
             match request.kind {
                 ReadKind::Unique => next.parentage = None,
@@ -70,6 +188,15 @@ impl DatabaseEngine {
                     next.after_end = true;
                 }
                 ReadKind::NextInParent => {}
+            }
+            if let Some(progress) = progress {
+                self.primary_finish(
+                    &mut next,
+                    progress,
+                    request,
+                    None,
+                    plan.expect("progress has a plan"),
+                );
             }
             *position = next;
             return Err(
@@ -94,24 +221,32 @@ impl DatabaseEngine {
                 version: self.records[&id].version,
             });
         }
+        if let Some(progress) = progress {
+            self.primary_finish(
+                &mut next,
+                progress,
+                request,
+                Some(id),
+                plan.expect("progress has a plan"),
+            );
+        }
         *position = next;
         Ok(self.view(id))
     }
 
-    /// Replace the current held occurrence. Primary keys cannot change and all
-    /// secondary index changes are validated before the image is modified.
+    /// Resolve pointer entries to target occurrences, preserving duplicate
+    /// pointers when distinct sources index the same target.
     pub fn lookup_index(&self, name: &str, value: &[u8]) -> Result<Vec<RecordView>, EngineProblem> {
         let entries = self
             .indexes
             .get(name)
             .ok_or(EngineProblem::InvalidRequest)?;
         let ids = entries.get(value).cloned().unwrap_or_default();
-        Ok(self
-            .hierarchy_order()
+        self.hierarchy_order()
             .into_iter()
             .filter(|id| ids.contains(id))
-            .map(|id| self.view(id))
-            .collect())
+            .map(|id| self.index_target(name, id).map(|target| self.view(target)))
+            .collect()
     }
 
     pub(super) fn validate_read(&self, request: &ReadRequest) -> Result<(), EngineProblem> {
@@ -314,7 +449,7 @@ pub(super) fn optional_field_value(
     Ok(data.get(field.offset..end).map(<[u8]>::to_vec))
 }
 
-fn compare(actual: &[u8], expected: &[u8], relation: Relation) -> bool {
+pub(super) fn compare(actual: &[u8], expected: &[u8], relation: Relation) -> bool {
     let ordering = actual.cmp(expected);
     match relation {
         Relation::Equal => ordering == Ordering::Equal,

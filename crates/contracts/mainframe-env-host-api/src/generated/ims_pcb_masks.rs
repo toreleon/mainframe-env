@@ -4,7 +4,7 @@
 pub const IMS_PCB_STATUS_RULES_SHA256: &str =
     "sha256:9ad82bb99ffacb11fef725c56d72708f866d99e40752206043ea46ca7da841a2";
 pub const IMS_PCB_STATUS_TOPIC_MANIFEST_SHA256: &str =
-    "sha256:a0ab40de8ec8c01a5cd43d4cab98f04c932f4b0b161e544da1d7d83aaac05594";
+    "sha256:119dd5e589399cb023f70c7a28fa9a1a937be1fa2c2393679ab65402ac735182";
 pub const IMS_PCB_MASK_COUNT: usize = 4;
 
 pub const IMS_PCB_MASKS: &[ImsPcbMaskDescriptor] = &[

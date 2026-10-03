@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fence fresh IMS Get/Get Hold navigation against foreign pending database/dependency undo and atomically CAS-publish observations; use trusted selected-PCB GO options for bounded read-without-integrity, preserve original canonical replay, and retain explicit record-lock, context and participant limitations."

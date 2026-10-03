@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Reject mixed dependent/independent IMS SSA Boolean connectors before publication instead of flattening them; record the exact pinned-source acceptance gaps for mixed evaluation with zero conformance credit."

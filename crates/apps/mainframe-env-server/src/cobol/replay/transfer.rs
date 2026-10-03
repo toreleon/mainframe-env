@@ -269,7 +269,7 @@ fn prepare_transfer_receipt(
         || checkpoint.payload_digest != <[u8; 32]>::from(Sha256::digest(&checkpoint.payload))
         || checkpoint.payload != current.bytes()
         || checkpoint.effect_sequence != machine.effect_sequence()
-        || checkpoint.effect_sequence > u64::from(invocation.limits.max_effects)
+        || checkpoint.effect_sequence > invocation.limits.max_effects
     {
         return Err(HostProblem::UnknownOutcome);
     }

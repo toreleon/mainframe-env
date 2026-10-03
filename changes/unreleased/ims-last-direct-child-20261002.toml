@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Admit bounded primary HIDAM DbBatch GNP/GHNP last-remaining direct-child SSA selection through the existing navigation, versioned hold, replay and recovery owners; exclude catalog-wide logical participation and retained links without changing shared or durable contracts."
