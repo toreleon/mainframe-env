@@ -1085,7 +1085,7 @@
       "path": "docs/decisions/0034-mq-root-terminal-publication.md",
       "relative_links": 0,
       "scope": "the explicitly configured synchronous ordinary z/OS batch root",
-      "sha256": "sha256:93dbb8a249a843ece13e8b05940959bf3269048d7dc98f496a08a6799a2243dc",
+      "sha256": "sha256:7b02dd31345566535a2c60dc25fea30974049457d6371f0473e297caf48e9230",
       "status": "Proposed (implemented framework prerequisite; native acceptance remains pending)",
       "title": "MQ root publication framework",
       "xtask_commands": 0
@@ -1622,7 +1622,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:ebf2823dd24064ebf126aa74acaa509135619c7d5012b6a537237c2c9c45586c",
+      "sha256": "sha256:5cc6e784fab36a3f821da1b4f810a3c8ea667e94b9a2f4e7981d85c25fb16de6",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

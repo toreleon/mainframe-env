@@ -1758,6 +1758,26 @@ source review/raw fixtures earn zero installed native, official or licensed
 execution credit. All nonlicensed parent v0.15 gates remain required; only the
 licensed oracle is human-skipped0/26.
 
+## Root publication failure contracts
+
+`MQ-1505.root-publication-failure-contract` integrates reviewed sealed `2f95b897`
+as test-only verification of the existing Memory and owned SQLite root writer.
+Exact typed execution, events, outbox, audits, checkpoints, provider rows, epoch
+and clock footprints cover Put/Delete/Move settlement, contradictory dependencies,
+late final CAS, quotas, the second audit/outbox/clock failures and rollback.
+Actual committed winners refuse duplicate, opposite, old-claim, re-admission and
+generic deletion attempts without a second publication. Closing and Uncertain
+retain their fences; exact existing outbox delivery supplies no settlement authority.
+
+Owned SQLite reopen and a deliberately discarded returned acknowledgement are
+logical recovery simulations, not subprocess crash, MQ recovery or installed
+execution evidence. Eleven new failure tests and 28 focused compatibility tests
+retain their actual candidate identities and failed fixture attempts. There is
+no production, schema, API or IBM semantic change and no new source lookup is
+required. Installed pending PUT/normal/CEE3ABD/removed GET, actual crash/recovery,
+participants, IR, full26, CardDemo and other nonlicensed gates remain required.
+Only the licensed oracle is human-skipped0/26; this feature earns zero such credit.
+
 ## Qualified complete GET result
 
 `MQ-1503.qualified-full-get-observation` integrates sealed `f9555580` through

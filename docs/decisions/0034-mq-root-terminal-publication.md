@@ -161,6 +161,18 @@ HardenGetBackout crash accuracy and queue profile, typed checkpoints, final
 retention/ownership release, deployment normalization, participant composition,
 all MQI forms and CardDemo remain required owning acceptance work.
 
+The physical publication failure contract additionally compares complete fixture
+observations and SQLite provider-table bytes, epoch and clock across known normal
+and abnormal commits, final CAS/dependency and quota failures, second-audit,
+final-outbox and clock-write SQL faults, and owned close/reopen. Discarding a
+successful return simulates a lost acknowledgement: duplicate and opposite
+publications refuse without changing the retained winner. An Uncertain root
+continues to refuse settlement and new writers after reopen while exact existing
+notification delivery remains allowed. These tests use structural store fixtures;
+they supply no provider settlement permission, volatile handle reconstruction,
+root retry, retention release or compiled/native acceptance. Close/reopen is
+logical restart simulation, not process-crash or mid-transaction kill evidence.
+
 Source review: original `ibm-mq-9.4-mqi-2026-08-31` MQDISC row 0012
 (`q101800_`), MQCMIT row 0007 (`q101750_`) and MQBACK row 0001 (`q101690_`);
 supplemental `q097395_` BackoutCount and one-topic recovery scope `q103230_`
