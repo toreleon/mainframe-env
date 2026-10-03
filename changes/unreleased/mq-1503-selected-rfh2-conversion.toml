@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a finite selected BUFMH/MHBUF RFH2 profile with connection-captured batch CODESET authority, complete associated MQMD1/default MQPD, exact required-length observations, same-registry candidate publication and strict additive result storage@4; old canonical/storage identities remain unchanged."

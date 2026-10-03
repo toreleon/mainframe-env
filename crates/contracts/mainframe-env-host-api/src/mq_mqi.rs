@@ -16,10 +16,14 @@ mod full_message;
 pub(crate) mod producer;
 pub use producer::{MqMqiDestinationCount, MqMqiIgnoredCounter, MqMqiProduced};
 pub mod property;
+pub mod rfh2;
 pub use full_message::{MqFullMessage, MqMqiFullGet, MqMqiFullPut};
 pub use property::{
     MqPropertyData, MqPropertyDescriptor, MqPropertyInquiryObservation, MqPropertyName,
     MqPropertyObservation, MqPropertyOptions, MqPropertyProblem, MqPropertyRequest,
+};
+pub use rfh2::{
+    MqMqiRfh2Request, MqRfh2BufferObservation, MqRfh2Observation, MqRfh2Options, MqRfh2Profile,
 };
 mod reviewed_output;
 #[cfg(test)]
@@ -326,6 +330,8 @@ pub enum MqMqiRequest {
     InquireProperty(MqMqiPropertyInquiry),
     /// Checked source-profile property request; older private property DTOs stay exact.
     Property(MqPropertyRequest),
+    /// Finite source-reviewed RFH2 conversion; live parent/source admission remains mandatory.
+    Rfh2(MqMqiRfh2Request),
     HandleToBuffer(MqMqiBuffer),
     Open(MqObjectOpenRequest),
     Put {
@@ -404,6 +410,7 @@ impl MqMqiRequest {
             Self::Inquire(_) => MqMqiCall::Inquire,
             Self::InquireProperty(_) => MqMqiCall::InquireProperty,
             Self::Property(value) => value.call(),
+            Self::Rfh2(value) => value.call(),
             Self::HandleToBuffer(_) => MqMqiCall::HandleToBuffer,
             Self::Open(_) => MqMqiCall::Open,
             Self::Put { .. } | Self::FullPut { .. } => MqMqiCall::Put,
@@ -522,6 +529,8 @@ pub enum MqMqiOutput {
     Property(MqMessageProperty),
     /// Lossless defined property observations, including size-failed copied prefixes.
     PropertyObservation(MqPropertyObservation),
+    /// Exact defined RFH2 length/descriptor/buffer observations, including no-write failures.
+    Rfh2Observation(MqRfh2Observation),
     Buffer {
         descriptor: MqMessageDescriptor,
         bytes: Vec<u8>,

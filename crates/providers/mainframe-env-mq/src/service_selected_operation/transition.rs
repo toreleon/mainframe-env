@@ -20,6 +20,7 @@ pub(super) struct ConnectionBinding {
     pub(super) connection: MqHconn,
     pub(super) key: String,
     pub(super) unit: u64,
+    pub(super) rfh2_profile: Option<MqRfh2Profile>,
 }
 #[derive(Clone)]
 pub(super) struct ObjectBinding {
@@ -48,6 +49,7 @@ pub(super) struct Candidate {
     pub(super) handle: HandleAction,
     pub(super) unit_dependencies: Vec<u64>,
     pub(super) property: Option<MqPropertyRequest>,
+    pub(super) rfh2: Option<MqMqiRfh2Request>,
 }
 
 fn handle_error(_: mainframe_env_host_api::MqHandleProblem) -> HostProblem {
@@ -78,6 +80,7 @@ pub(super) fn prepare(
     service: &MqService,
     frame: FrameLease,
     admitted: &crate::mqi_admission::MqMqiAdmitted<'_>,
+    capture_rfh2: &mut dyn FnMut() -> Result<Option<MqRfh2Profile>, HostProblem>,
 ) -> Result<Candidate, HostProblem> {
     if logical.owner() != owner {
         return Err(HostProblem::Unauthorized);
@@ -93,9 +96,11 @@ pub(super) fn prepare(
         handle: HandleAction::None,
         unit_dependencies: Vec::new(),
         property: None,
+        rfh2: None,
     };
     let connection = match request {
         MqMqiRequest::Property(request) => Some(request.connection()),
+        MqMqiRequest::Rfh2(request) => Some(request.connection()),
         MqMqiRequest::Open(open) => Some(open.connection()),
         MqMqiRequest::Put { connection, .. }
         | MqMqiRequest::PutOne { connection, .. }
@@ -168,6 +173,12 @@ pub(super) fn prepare(
         )?;
         return Ok(next);
     }
+    if let MqMqiRequest::Rfh2(request) = request {
+        // Conversion is application-space handle activity, not queue delivery
+        // or an implicit expiry observation. Retain delivery state exactly.
+        super::rfh2::prepare(runtime, invocation, owner, request, authorizer, &mut next)?;
+        return Ok(next);
+    }
     // Actual clock expiry changes only the candidate, never the current queues.
     next.delivery.advance_tick(now).map_err(delivery_error)?;
     match request {
@@ -191,6 +202,9 @@ pub(super) fn prepare(
             if next.units.len() >= limits.max_pending_units {
                 return Err(HostProblem::ResourceExhausted);
             }
+            // Source callback precedes registry allocation/borrow. Warning reuse
+            // and original replay return before this capture event.
+            let rfh2_profile = capture_rfh2()?;
             let unit = next.control.allocate(logical, key)?;
             let connection = runtime
                 .handles
@@ -201,6 +215,7 @@ pub(super) fn prepare(
                 connection,
                 key: key.into(),
                 unit: unit.unit,
+                rfh2_profile,
             });
             next.units.insert(unit.unit, unit);
             next.output = MqMqiOutput::Connected(connection);
@@ -726,6 +741,9 @@ pub(super) fn resolve_reply(
     };
     if let MqMqiRequest::Property(request) = request {
         return super::property::replay(state, runtime, logical, owner, request, reply);
+    }
+    if let MqMqiRequest::Rfh2(request) = request {
+        return super::rfh2::replay(state, runtime, logical, owner, request);
     }
     match (&mut reply.result.outcome, request) {
         (_, MqMqiRequest::FullPut { .. } | MqMqiRequest::FullPutOne { .. }) => {

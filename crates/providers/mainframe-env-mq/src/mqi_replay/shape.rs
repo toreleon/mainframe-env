@@ -168,6 +168,9 @@ pub(super) enum Output {
     Produced {
         value: super::producer::Produced,
     },
+    Rfh2Observation {
+        observation: super::rfh2::Observation,
+    },
     PropertyObservation {
         observation: super::property::Observation,
     },
@@ -238,6 +241,9 @@ impl Output {
         Ok(match value {
             MqMqiOutput::Produced(value) => Self::Produced {
                 value: super::producer::Produced::capture(value)?,
+            },
+            MqMqiOutput::Rfh2Observation(v) => Self::Rfh2Observation {
+                observation: super::rfh2::Observation::capture(v)?,
             },
             MqMqiOutput::PropertyObservation(v) => Self::PropertyObservation {
                 observation: super::property::Observation::capture(v),
@@ -338,6 +344,9 @@ impl Output {
     fn into_output(self) -> Result<MqMqiOutput, ReplayError> {
         Ok(match self {
             Self::Produced { value } => MqMqiOutput::Produced(value.restore()?),
+            Self::Rfh2Observation { observation } => {
+                MqMqiOutput::Rfh2Observation(observation.restore()?)
+            }
             Self::PropertyObservation { observation } => {
                 MqMqiOutput::PropertyObservation(observation.restore()?)
             }
@@ -456,6 +465,15 @@ impl StoredOutcome {
     pub(super) fn is_producer(&self) -> bool {
         matches!(self, Self::Completed { output, .. } | Self::StatusPending { output }
             | Self::ReviewedOutput { output, .. } if matches!(output, Output::Produced { .. }))
+    }
+    pub(super) fn is_rfh2(&self) -> bool {
+        matches!(
+            self,
+            Self::ReviewedOutput {
+                output: Output::Rfh2Observation { .. },
+                ..
+            }
+        )
     }
     pub(super) fn is_property(&self) -> bool {
         matches!(self,Self::Completed {output,..}|Self::StatusPending {output}|Self::ReviewedOutput {output,..}

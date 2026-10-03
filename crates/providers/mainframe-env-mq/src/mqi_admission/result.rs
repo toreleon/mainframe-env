@@ -87,6 +87,18 @@ fn copied_capacities(request: &MqMqiRequest, outcome: &MqMqiOutcome) -> Result<(
     use MqMqiRequest as R;
     match (request, output) {
         (R::FullPut { .. } | R::FullPutOne { .. }, O::Produced(_)) => Ok(()),
+        (R::Rfh2(request), O::Rfh2Observation(value)) => {
+            if let (
+                MqMqiRfh2Request::HandleToBuffer {
+                    buffer_capacity, ..
+                },
+                MqRfh2BufferObservation::WrittenPrefix(bytes),
+            ) = (request, &value.buffer)
+            {
+                bound(bytes.len(), *buffer_capacity)?;
+            }
+            Ok(()) // Shared original binding validates descriptor/length/profile.
+        }
         (R::FullGet(request), O::FullGot { message, .. }) => {
             if let Some(message) = message {
                 bound(message.body.len(), request.buffer_capacity)?;

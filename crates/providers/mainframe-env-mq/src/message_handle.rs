@@ -8,6 +8,7 @@ use mainframe_env_host_api::{
 };
 
 mod associated_descriptor;
+mod rfh2;
 
 const MAGIC: &[u8; 4] = b"MHK1";
 const MAX_KERNEL_PROPERTY_BYTES: usize = 16 * 1024 * 1024;

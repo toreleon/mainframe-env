@@ -6,6 +6,12 @@ fn payload_mutations_for_every_call_change_the_digest() {
     for base in f.requests() {
         let mut altered = base.clone();
         match &mut altered {
+            MqMqiRequest::Rfh2(value) => match value {
+                MqMqiRfh2Request::BufferToHandle { connection, .. }
+                | MqMqiRfh2Request::HandleToBuffer { connection, .. } => {
+                    *connection = Fixture::new(7).connection
+                }
+            },
             MqMqiRequest::Property(value) => match value {
                 MqPropertyRequest::Create { connection, .. }
                 | MqPropertyRequest::Set { connection, .. }

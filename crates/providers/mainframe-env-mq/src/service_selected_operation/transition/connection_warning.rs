@@ -32,10 +32,15 @@ pub(super) fn prior(
     }
     // This selected subset issues only indexed connections and objects. Missing
     // or duplicate indexes cannot silently become a new first connection.
+    let messages = runtime
+        .handles
+        .message_handles_mut()
+        .associated_message_count();
     let indexed = runtime
         .connections
         .len()
         .checked_add(runtime.objects.len())
+        .and_then(|n| n.checked_add(messages))
         .ok_or(HostProblem::ResourceExhausted)?;
     if runtime.handles.handles_mut().active_handles() != indexed {
         return Err(HostProblem::Malformed);

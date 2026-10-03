@@ -8,6 +8,7 @@ mod historical_handles;
 mod producer;
 mod property;
 mod reviewed_output;
+mod rfh2;
 
 const BYTES: usize = 8 << 20;
 fn host(value: &MqMqiResult, limits: MqMqiLimits) -> Result<HostResult, HostProblem> {

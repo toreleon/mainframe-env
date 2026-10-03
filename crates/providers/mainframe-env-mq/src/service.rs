@@ -260,6 +260,8 @@ pub struct MqService {
     replay_clock: Option<Arc<dyn MqReplayClock>>,
     producer_sources: Option<selection::operations::producer::ProducerSources>,
     producer_sampling: AtomicBool,
+    pub(crate) rfh2_source:
+        Option<Arc<dyn crate::trusted_batch_embedding::MqBatchLeDllCodesetSource>>,
 }
 
 impl MqService {
@@ -312,6 +314,7 @@ impl MqService {
                 state,
             })),
             selected_store: None,
+            rfh2_source: None,
             unknown_after_persist: AtomicBool::new(false),
             authorizer,
             replay_clock,
@@ -561,6 +564,9 @@ impl MqService {
     }
 
     fn lock(&self) -> Result<LegacyAccess<'_>, HostProblem> {
+        if crate::trusted_batch_embedding::rfh2_source_capturing() {
+            return Err(HostProblem::Unsupported);
+        }
         if self.selected_store.is_some() {
             return Err(HostProblem::Unsupported);
         }

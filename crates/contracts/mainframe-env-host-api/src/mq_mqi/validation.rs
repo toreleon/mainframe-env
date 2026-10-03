@@ -310,6 +310,17 @@ impl MqMqiRequestEnvelope {
                 unit(*value)?;
                 Some(*connection)
             }
+            R::Rfh2(value) => {
+                value
+                    .validate(self.limits)
+                    .map_err(MqMqiProblem::Property)?;
+                if owner.environment != crate::MqHostEnvironment::ZosBatch
+                    || self.context.syncpoint_owner != MqSyncpointOwner::QueueManager
+                {
+                    return Err(MqMqiProblem::Context);
+                }
+                Some(value.connection())
+            }
             R::Property(value) => {
                 value
                     .validate(self.limits)
@@ -430,6 +441,12 @@ pub(super) fn validate_output(
                     value.outcome,
                     MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
                 )
+        }
+        (_, O::Rfh2Observation(value)) => {
+            value
+                .validate(call, limits)
+                .map_err(MqMqiProblem::Property)?;
+            status.is_none()
         }
         (_, O::PropertyObservation(value)) => {
             value

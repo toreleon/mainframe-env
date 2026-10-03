@@ -1,4 +1,4 @@
-//! Producer class in the one result codec; @4 is deliberately reserved.
+//! Producer class in the one result codec; @4 exclusively belongs to RFH2.
 use super::*;
 use mainframe_env_host_api::mq_md_value::*;
 fn value(v2: bool, cp: bool) -> MqMqiResult {
@@ -33,7 +33,7 @@ fn value(v2: bool, cp: bool) -> MqMqiResult {
     )
 }
 #[test]
-fn producer_schema5_exact_shape_old_classes_reserved4_and_full_host_identity() {
+fn producer_schema5_exact_shape_old_classes_rfh2_4_and_full_host_identity() {
     for v2 in [false, true] {
         for cp in [false, true] {
             let r = value(v2, cp);

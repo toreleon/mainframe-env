@@ -56,5 +56,6 @@ pub use service::{
     MqInstallReceipt, MqLimits, MqQueueDefinition, MqReplayClock, MqService, mq_providers,
 };
 pub use trusted_batch_embedding::{
-    MqTrustedBatchFrame, MqTrustedBatchRelationship, MqTrustedBatchRoot, MqTrustedBatchRuntime,
+    MqBatchLeDllCodesetSource, MqTrustedBatchFrame, MqTrustedBatchRelationship, MqTrustedBatchRoot,
+    MqTrustedBatchRuntime,
 };

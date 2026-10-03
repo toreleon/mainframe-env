@@ -81,6 +81,7 @@ impl MqService {
             limits,
             durable: Mutex::new(authority),
             selected_store: Some(store),
+            rfh2_source: None,
             unknown_after_persist: AtomicBool::new(false),
             authorizer: Some(authorizer),
             replay_clock: Some(replay_clock),
@@ -94,6 +95,9 @@ impl MqService {
     pub(super) fn lock_selected(
         &self,
     ) -> Result<MutexGuard<'_, rich_state::StoredAuthority>, HostProblem> {
+        if crate::trusted_batch_embedding::rfh2_source_capturing() {
+            return Err(HostProblem::Unsupported);
+        }
         if self.selected_store.is_none() {
             return Err(HostProblem::Unsupported);
         }

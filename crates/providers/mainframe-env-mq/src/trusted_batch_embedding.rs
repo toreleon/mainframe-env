@@ -11,6 +11,9 @@ use mainframe_env_host_api::{
 };
 use mainframe_env_store_api::PlatformStore;
 use std::sync::Arc;
+mod rfh2_source;
+pub use rfh2_source::MqBatchLeDllCodesetSource;
+pub(crate) use rfh2_source::capturing as rfh2_source_capturing;
 
 /// Independently selected host topology; matching Invocation IDs are not proof.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

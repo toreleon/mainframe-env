@@ -7,6 +7,8 @@ mod capacity;
 mod failures;
 #[path = "property/restart.rs"]
 mod restart_properties;
+#[path = "property/rfh2.rs"]
+mod rfh2;
 
 #[derive(Default)]
 struct Policy {

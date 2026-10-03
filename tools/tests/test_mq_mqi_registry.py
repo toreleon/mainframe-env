@@ -26,6 +26,10 @@ class MqMqiRegistryTests(unittest.TestCase):
             mq_registry.wire.MANIFEST,
             mq_registry.wire.OUTPUT,
             mq_registry.raw_layout.OUTPUT,
+            mq_registry.property_profile.OUTPUT,
+            mq_registry.rfh2_profile.OUTPUT,
+            Path("conformance/0.15/manifests/mq-property-sources-topics.json"),
+            Path("conformance/0.15/manifests/mq-rfh2-sources-topics.json"),
             Path("conformance/0.15/manifests/mq-point-layout-sources-topics.json"),
             Path("crates/foundation/mainframe-env-encoding/src/codepage.rs"),
         ]:

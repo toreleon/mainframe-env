@@ -6,6 +6,62 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Current composed finite RFH2 prerequisite
+
+`MQ-1503.selected-rfh2-conversion` consumes sealed worker4c1602f1 after full
+production, test, source, schema, generator and normative review. Independent
+49path/blob,50frozen authority,119receipt snapshot,16artifact,32source pin,
+48locator and32dependency identities verify. The earlier identity-only proof
+keeps its original incomplete-review flag; manager review is separately recorded.
+
+BUFMH/MHBUF now use the same selected connection/current unit and sole issued
+message registry. A privileged immutable actual LE/DLL CODESET source captures
+1208 once for new original CONN/CONNX; warning reuse/replay never resample.
+Known publication alone adopts the profile. The finite ASCII/native785 MQMD1,
+default full MQPD, flat custom folder/leaf and Null/bytes/signed integers/printable
+ASCII strings preserve opaque tails and null/empty distinctions. BUFMH retain
+replaces only associated MD/properties; MHBUF emits an owned aligned RFH2 and
+changes only application Encoding/CCSID/Format. Short2469 publishes required
+length with no copy/delete; missing2471 reports zero; malformed2334 leaves
+undefined length absent. Unsupported forms fail before mutation. SAF/CAS/quota/
+control failure aborts the touched-entry stage; Unknown retains/fences rather
+than adopts, redelivers or decides a unit. Cold receipts cannot revive volatile
+handles, properties or CODESET attestation. Fixtures are not installed LE proof.
+
+The single strict result codec now admits RFH2 only under@4 and Produced only
+under@5, rejecting cross-class relabeling and preserving old@1/@2/@3 bytes.
+Both pre-expiry preparation paths, independent producer sources and callback
+reentry fences compose. Port callbacks must be bounded/nonblocking and must not
+wait for another thread to enter the same locked service. Generated projection,
+historical catalogs/statuses,26unique calls/27positions and raw offsets stay exact.
+Reader/downgrade boundaries are documented without permitting receipt relabeling
+or payload migration. Earlier PUT-only@4-reserved statements below are historical.
+
+Fresh composed main passes261host,128selected-operation,35replay,34admission,
+11message-handle and21trusted-embedding tests:490Rust, zero failed/ignored.
+All28Python policy/registry/RFH2 tests, guards/fourmutants/module990/34/4/1,
+server compilation/provider docs, genuine combinedAPI70/386/0/931/72 ceilings,
+registry freshness/schema/fmt/normaldocs/check/changelog/whitespace pass.
+An optional manager Python JSON-Schema helper found no installed jsonschema;
+its failed receipt is retained, and the existing project-native registry gate
+validates the actual combined catalog against Draft202012 without installing it.
+Ledger-only checks and source-cache reproduction are separate from execution.
+Every sequence and exact seal/HEADcheck cleans its own target; sequencing waits
+for terminal success before staging. Originald8/all32 dependency inputs are
+reused, not fresh cargo-deny/CI acceptance. No passing tests are relabeled.
+
+Offline retained-first actual search/read covers original baseline2026-08-31
+BUFMHrow0003/q101710_ and MHBUFrow0018/q101860_ (positions18/25), programming/
+property supplements, and RFH2 baseline2026-09-12 manifest
+117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a.
+BMHO initializer, MHBO reason spelling, RFH structure-ID spelling and i8-limit
+source conflicts remain explicitly pending. Source review earns zero execution
+or licensed credit; no browser/network refresh or source bodies enter Git.
+Installed point/property forwarding and sources, generated IDs/defaults/priority/
+expiry, broader RFH2 profiles, genuine compiled pending-PUT root terminal,
+recovery/participants/IR/full26/CardDemo remain required. Parent ACTIVE;
+ONLY the unavailable licensed oracle is human-skipped0/26 with zero credit.
+
 `MQ-1503.selected-full-put-producer` consumes sealed worker7b9cd2782 after
 independent44path/blob,219stable receipt,54command snapshot,379historical input
 version/339current passing input,10frozen authority,16source pin and32dependency

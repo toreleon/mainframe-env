@@ -605,7 +605,7 @@ handle or adopted cache proof and cannot revive properties or aliases. A
 postpublication UnknownOutcome fences the runtime and retains the receipt;
 it grants no redispatch/backout/adoption decision. Legacy KernelV1 conversion
 rejects these reviewed entries rather than discard MQPD/CCSID/descriptor fields.
-BUFMH/MHBUF RFH2 conversion, wildcard/cursor/conversion/context/special-connection
+Further BUFMH/MHBUF RFH2 profiles, wildcard/cursor/conversion/context/special-connection
 forms, durable payload integration and installed/compiler/participant/CardDemo
 acceptance remain required follow-up work; these private fixtures grant no
 official 26-call or public readiness credit.
@@ -687,6 +687,69 @@ zero execution or licensed credit and proves neither freshness nor snapshot
 equivalence. Generated IDs/defaults/effective priority/expiry, property/RFH2,
 actual installed/JES provenance, retirement/recovery/full26/participant/CardDemo
 remain required. Only the licensed oracle is human-skipped with zero credit.
+### Selected finite RFH2 conversion
+
+`MqRfh2Profile::ZosBatchUtf8NativeV1` adds actual selected BUFMH/MHBUF
+application-space transformations on the same ordinary ZosBatch connection,
+current unit and issued message registry. It does not enqueue or consume a
+message. An immutable privileged `MqBatchLeDllCodesetSource` is installed on
+the same frozen service/store. It captures the actual batch LE/DLL CODESET once
+during new original CONN/CONNX preparation; only known connection publication
+adopts UTF8/1208. Warning reuse and exact replay retain that original profile
+without calling the source. The port refuses reentry and converts callback panic
+to infrastructure failure. Private fixture implementations do not establish
+installed LE, stub, THLICCSID or queue-manager source acceptance; those actual
+producer constructors remain integration obligations.
+
+The finite input is complete source-valid MQMD1 with ASCII-compatible structure
+characters, native numeric encoding785, CCSID1208, default scalar fields and
+opaque message/correlation IDs. BUFMH admits BMHO1 explicit NONE/retain, an empty
+ordinary property set and zero bytes or one leading RFH2 with a flat custom
+folder/leaf and default full MQPD. Null, bytes, signed integers and printable
+ASCII strings preserve null/empty/blank distinctions and exact opaque body tail.
+The associated complete descriptor is replaced, while the application MD and
+buffer stay untouched. Unsupported merging, deletion, chains and descriptor
+profiles fail before mutation.
+
+MHBUF admits MHBO1 properties-in-RFH2, with optional delete of one exact ordinary
+property after known publication. The owned formatter emits big-endian RFH2
+version2, aligned UTF8 name/value folders and an empty-tail native785/inherited
+CCSID/NONE triple. This deterministic XML spelling is an owned choice, not an IBM
+byte-exact oracle claim. Only the caller MD's Encoding/CCSID/Format become
+785/attested1208/RFH2; every other field stays exact. Required length is counted
+before output allocation. Short capacity publishes exact FAILED/2469 with the
+required DataLength and no MD/buffer write or deletion; missing property publishes
+FAILED/2471 with DataLength0 and no writes. This explicit no-copy short-buffer
+policy is permitted, not claimed source-mandated. Malformed admitted RFH2 input
+publishes FAILED/2334 with undefined DataLength left absent.
+
+Touched-entry candidates hold the sole registry borrow through the original
+intent-fenced provider-row/receipt/audit transaction. Late CAS, clock, quota,
+SAF or control failures abort without adopting descriptor/property changes.
+Postpublication uncertainty fences and retains the receipt, never authorizing
+redispatch or a durable decision. Associated payload and live source profile
+remain volatile: cold historical receipts cannot revive either handle or data.
+
+Distinct `Rfh2` request and `Rfh2Observation` output tags retain the original
+BUFMH/MHBUF call identities. Result preflight binds even directly assembled
+enums to exact capacity, descriptor, length and reviewed call status. The sole
+codec uses strict storage@4 iff this observation is present; old storage@1/@2/@3,
+canonical DTOs and all old projection digests remain byte-exact. Older readers
+must refuse @4. Storage@5 exclusively records the produced-PUT class above;
+the composed codec rejects either class under the other's version.
+The one structure/status catalog owns an independent private RFH2 projection;
+it changes no call denominator, status membership or pending reason.
+
+Source scope is original `ibm-mq-9.4-mqi-2026-08-31` row0003/q101710 and
+row0018/q101860 (positions18/25), the programming/property supplements, and
+`ibm-mq-9.4-rfh2-sources-2026-09-12`. RFH2 q099240/q099245 establish layout and
+folder rules; q104140/q104200 establish lexical/default-PD interpretation;
+q104160 lines9–11 establish the batch LE/DLL capture event. Recorded BMHO
+initializer, MHBO reason, structure-ID spelling and i8-limit conflicts stay
+pending rather than guessed. Source reads earn zero execution credit. Full
+conversion/context/group/MDE profiles, installed forwarding, durable payload,
+recovery/participant/IR/CardDemo and remaining applicable 26-call acceptance
+remain parent work; only the licensed oracle is human-skipped0/26.
 
 ### Coverage identity
 

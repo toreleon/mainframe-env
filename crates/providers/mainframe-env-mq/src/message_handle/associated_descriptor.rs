@@ -10,14 +10,14 @@ use mainframe_env_host_api::{MqMessageAdoption, MqMessageCandidate};
 
 #[derive(Clone, Debug)]
 pub(super) struct AssociatedProperties {
-    descriptor: MqMdValue,
-    values: Vec<Property>,
+    pub(super) descriptor: MqMdValue,
+    pub(super) values: Vec<Property>,
 }
 #[derive(Clone, Debug)]
-struct Property {
-    name: MqPropertyName,
-    descriptor: MqPropertyDescriptor,
-    value: MqPropertyData,
+pub(super) struct Property {
+    pub(super) name: MqPropertyName,
+    pub(super) descriptor: MqPropertyDescriptor,
+    pub(super) value: MqPropertyData,
 }
 impl AssociatedProperties {
     fn initial() -> Self {
@@ -53,7 +53,10 @@ impl AssociatedProperties {
                 )
         })
     }
-    fn property(&self, name: &MqPropertyName) -> Result<Property, MqHandleKernelProblem> {
+    pub(super) fn property(
+        &self,
+        name: &MqPropertyName,
+    ) -> Result<Property, MqHandleKernelProblem> {
         if let Some(field) = name.descriptor_field() {
             let definition = mq_property_md_fields()
                 .iter()
@@ -80,7 +83,7 @@ impl AssociatedProperties {
                 .map_err(|_| MqHandleKernelProblem::NotFound)
         }
     }
-    fn set(
+    pub(super) fn set(
         &mut self,
         name: MqPropertyName,
         descriptor: MqPropertyDescriptor,
@@ -133,7 +136,7 @@ impl AssociatedProperties {
         }
         Ok(())
     }
-    fn delete(&mut self, name: &MqPropertyName) -> Result<bool, MqHandleKernelProblem> {
+    pub(super) fn delete(&mut self, name: &MqPropertyName) -> Result<bool, MqHandleKernelProblem> {
         if let Some(field) = name.descriptor_field() {
             let default = mq_property_descriptor_bytes(&mq_property_initial_descriptor(), field)
                 .ok_or(MqHandleKernelProblem::UnsupportedWire)?;
@@ -170,7 +173,7 @@ fn profile_ccsid() -> i32 {
     // of introducing a second numeric authority in the provider.
     mq_property_profile_ccsid()
 }
-enum Change {
+pub(super) enum Change {
     Create {
         owner: MqHandleOwner,
         connection: MqHconn,
@@ -182,9 +185,9 @@ enum Change {
 }
 
 pub(crate) struct PropertyStage<'a> {
-    registry: MqMessageCandidate<'a>,
-    entries: &'a mut Vec<Properties>,
-    change: Change,
+    pub(super) registry: MqMessageCandidate<'a>,
+    pub(super) entries: &'a mut Vec<Properties>,
+    pub(super) change: Change,
     pub(crate) output: MqMqiOutput,
     pub(crate) status: MqReviewedStatus,
 }
@@ -390,7 +393,7 @@ impl MqHandleKernel {
             status,
         })
     }
-    fn check_associated_total(
+    pub(super) fn check_associated_total(
         &self,
         replaced: Option<usize>,
         next: &AssociatedProperties,

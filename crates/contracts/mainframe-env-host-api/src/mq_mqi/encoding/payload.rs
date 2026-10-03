@@ -202,7 +202,7 @@ macro_rules! payload_enum {
 
 payload_enum!(MqMqiRequest {
     tuples { BufferToHandle, Close, Connect, ConnectExtended, Get, FullGet, Inquire, InquireProperty,
-        HandleToBuffer, Open, Set, Subscribe, Property }
+        HandleToBuffer, Open, Set, Subscribe, Property, Rfh2 }
     named {
         Back { connection, unit },
         Begin { connection, options, unit },
@@ -225,7 +225,7 @@ payload_enum!(MqMqiRequest {
     units {}
 });
 payload_enum!(MqMqiOutput {
-    tuples { Connected, MessageHandle, Property, Distribution, PropertyObservation, Produced }
+    tuples { Connected, MessageHandle, Property, Distribution, PropertyObservation, Produced, Rfh2Observation }
     named {
         Opened { dynamic, object },
         Subscribed { object, subscription },

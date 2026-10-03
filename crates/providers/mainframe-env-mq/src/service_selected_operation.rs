@@ -35,6 +35,8 @@ pub(in crate::service) mod producer;
 mod property;
 #[path = "service_selected_operation/receipt.rs"]
 pub(in crate::service) mod receipt;
+#[path = "service_selected_operation/rfh2.rs"]
+mod rfh2;
 #[path = "service_selected_operation/rows.rs"]
 pub(in crate::service) mod rows;
 #[path = "service_selected_operation/transition.rs"]
@@ -285,7 +287,10 @@ impl MqService {
                     return Err(HostProblem::UnknownOutcome);
                 }
                 if transition::has_handle_reply(&reply)
-                    || matches!(&admitted.envelope.request, MqMqiRequest::Property(_))
+                    || matches!(
+                        &admitted.envelope.request,
+                        MqMqiRequest::Property(_) | MqMqiRequest::Rfh2(_)
+                    )
                 {
                     // This runtime originally adopted the reply only after the
                     // exact atomic publication. A coherent substituted handle
@@ -335,6 +340,10 @@ impl MqService {
             let mut binding = bind_core_intent(&admission, &**store, now).map_err(intent_error)?;
             admitted.recheck_controls(clock.now_tick()?)?;
             let authorized = authorization::Capture::new(&**authorizer);
+            let source_original = admitted
+                .effect()
+                .mq_mqi_occurrence(host_limits)?
+                .ok_or(HostProblem::Malformed)?;
             let mut candidate = match transition::prepare(
                 state,
                 &mut runtime,
@@ -349,6 +358,7 @@ impl MqService {
                 self,
                 frame,
                 admitted,
+                &mut || self.capture_rfh2_source(invocation, &source_original),
             ) {
                 Ok(candidate) => candidate,
                 Err(HostProblem::Unauthorized) => {
@@ -372,7 +382,14 @@ impl MqService {
                         | MqMqiRequest::FullPut { .. }
                         | MqMqiRequest::FullPutOne { .. }
                 ) || (error == HostProblem::InfrastructureFailure
-                    && matches!(admitted.envelope.request, MqMqiRequest::Property(_))) =>
+                    && (matches!(
+                        admitted.envelope.request,
+                        MqMqiRequest::Property(_) | MqMqiRequest::Rfh2(_)
+                    ) || (self.rfh2_source.is_some()
+                        && matches!(
+                            admitted.envelope.request,
+                            MqMqiRequest::Connect(_) | MqMqiRequest::ConnectExtended(_)
+                        )))) =>
                 {
                     // This finite prepare error occurred before either complete
                     // delivery or property state could publish. Use the SAME bound
@@ -397,15 +414,23 @@ impl MqService {
                 Err(error) => return Err(error),
             };
             let attempt = (|| {
-                let mut access = if candidate.property.is_some() {
+                if let Some(request) = &candidate.rfh2 {
+                    rfh2::require_profile(&runtime, request)?;
+                }
+                let mut access = if candidate.property.is_some() || candidate.rfh2.is_some() {
                     Some(runtime.handles.message_handles_mut())
                 } else {
                     None
                 };
-                let stage = match (&mut access, &candidate.property) {
-                    (Some(access), Some(request)) => Some(
+                let stage = match (&mut access, &candidate.property, &candidate.rfh2) {
+                    (Some(access), Some(request), None) => Some(
                         access
                             .stage_property(owner, request, admitted.envelope.limits)
+                            .map_err(property::kernel_error)?,
+                    ),
+                    (Some(access), None, Some(request)) => Some(
+                        access
+                            .stage_rfh2(owner, request, admitted.envelope.limits)
                             .map_err(property::kernel_error)?,
                     ),
                     _ => None,
@@ -510,6 +535,9 @@ impl MqService {
                     )
                     .map_err(|_| HostProblem::Malformed)?;
                 let (mutations, next) = plan.into_parts();
+                if let Some(request) = &candidate.rfh2 {
+                    rfh2::require_binding_profile(&runtime.connections, request)?;
+                }
                 let publish = binding
                     .prepare(
                         // Known host publication succeeded, including a lossless
@@ -552,6 +580,10 @@ impl MqService {
                     }
                 }
                 drop(access);
+                if let Some(request) = &candidate.rfh2 {
+                    rfh2::require_profile(&runtime, request)
+                        .map_err(|_| HostProblem::UnknownOutcome)?;
+                }
                 transition::adopt(&mut runtime, owner, &mut candidate)?;
                 runtime.control = candidate.control.clone();
                 runtime.connections = candidate.connections.clone();

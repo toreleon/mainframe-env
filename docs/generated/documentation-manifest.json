@@ -501,7 +501,7 @@
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
       "relative_links": 2,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:6336974939874cdb99db30cd1daa2168aea8e8dc22b0a11e7e180342cc374ea3",
+      "sha256": "sha256:51f11a52c2d4e9fe9f1ed359780bf6cef502dd5f82f9204d4fcaece129a97fab",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -605,7 +605,7 @@
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
       "relative_links": 2,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:0abb4e7ba3e5b6d23ea6dff8f3747068e8d0abbe9e3842f4fa897c8f86b322de",
+      "sha256": "sha256:c8a223d3bba5cde4c98ad083248842e97254e348372aad4b9ee33dcb8da823ea",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -1598,7 +1598,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:765cdb28cd3aa2ff2807fddba02c0af3f0b55073ecee0fdefc86dde042e7fd2d",
+      "sha256": "sha256:b08f72794d6d6d8ee27c3d164de10422b27c12f461b144b67b72f996e427d001",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

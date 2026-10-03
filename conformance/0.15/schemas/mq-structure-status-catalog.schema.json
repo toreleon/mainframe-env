@@ -38,6 +38,7 @@
     "wire_options": {"$ref": "#/$defs/wire-options"},
     "raw_layout": {"$ref": "#/$defs/raw-layout"},
     "property_profile": {"$ref": "#/$defs/property-profile"},
+    "rfh2_profile": {"$ref": "#/$defs/rfh2-profile"},
     "calls": {
       "type": "array",
       "minItems": 26,
@@ -46,6 +47,316 @@
     }
   },
   "$defs": {
+    "rfh2-profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "semantic_execution_credit",
+        "property_projection_sha256",
+        "sources",
+        "facts",
+        "identifiers",
+        "fields",
+        "types",
+        "formatter",
+        "reserved_names",
+        "reserved_prefixes",
+        "semantics",
+        "pending_source_conflicts"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.mq-rfh2-profile@1"
+        },
+        "semantic_execution_credit": {
+          "const": 0
+        },
+        "property_projection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope_id",
+              "baseline_id",
+              "topic_manifest"
+            ],
+            "properties": {
+              "scope_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "baseline_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "topic_manifest": {
+                "$ref": "#/$defs/file-binding"
+              }
+            }
+          }
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "decimal",
+              "hexadecimal",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "decimal": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "hexadecimal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "identifiers": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "value",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "offset",
+              "width",
+              "kind",
+              "source"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "width": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "types": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "lexical",
+              "source"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "lexical": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "formatter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inherited_ccsid",
+            "name_value_ccsid"
+          ],
+          "properties": {
+            "inherited_ccsid": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "decimal",
+                "source"
+              ],
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "decimal": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "source": {
+                  "$ref": "#/$defs/property-locator"
+                }
+              }
+            },
+            "name_value_ccsid": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "decimal",
+                "source"
+              ],
+              "properties": {
+                "decimal": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "source": {
+                  "$ref": "#/$defs/property-locator"
+                }
+              }
+            }
+          }
+        },
+        "reserved_names": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "names",
+            "source"
+          ],
+          "properties": {
+            "names": {
+              "type": "array",
+              "minItems": 17,
+              "maxItems": 17,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "source": {
+              "$ref": "#/$defs/property-locator"
+            }
+          }
+        },
+        "reserved_prefixes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "names",
+            "source"
+          ],
+          "properties": {
+            "names": {
+              "type": "array",
+              "minItems": 13,
+              "maxItems": 13,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "source": {
+              "$ref": "#/$defs/property-locator"
+            }
+          }
+        },
+        "semantics": {
+          "type": "array",
+          "minItems": 15,
+          "maxItems": 15,
+          "items": {
+            "$ref": "#/$defs/property-locator"
+          }
+        },
+        "pending_source_conflicts": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
     "property-locator": {
       "type": "object",
       "additionalProperties": false,

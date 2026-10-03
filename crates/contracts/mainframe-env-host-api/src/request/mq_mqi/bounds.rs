@@ -157,6 +157,22 @@ fn put(value: &MqMqiPut, limits: HostLimits) -> Result<(), HostProblem> {
 pub(super) fn request(value: &MqMqiRequest, limits: HostLimits) -> Result<(), HostProblem> {
     use MqMqiRequest as R;
     match value {
+        R::Rfh2(value) => {
+            full_descriptor(limits)?;
+            match value {
+                crate::mq_mqi::MqMqiRfh2Request::BufferToHandle { buffer, .. } => {
+                    bound(buffer.len(), limits.max_record_bytes)
+                }
+                crate::mq_mqi::MqMqiRfh2Request::HandleToBuffer {
+                    name: property,
+                    buffer_capacity,
+                    ..
+                } => {
+                    name(property.as_str(), limits)?;
+                    bound(*buffer_capacity, limits.max_record_bytes)
+                }
+            }
+        }
         R::Property(value) => {
             if let Some(value) = value.name() {
                 name(value.as_str(), limits)?;
@@ -277,6 +293,21 @@ pub(super) fn result(value: &MqMqiResult, limits: HostLimits) -> Result<(), Host
         }
     };
     match output {
+        O::Rfh2Observation(value) => {
+            if value.descriptor.is_some() {
+                full_descriptor(limits)?;
+            }
+            if let Some(n) = value.data_length {
+                bound(
+                    usize::try_from(n).map_err(|_| HostProblem::Malformed)?,
+                    limits.max_record_bytes,
+                )?;
+            }
+            if let crate::mq_mqi::MqRfh2BufferObservation::WrittenPrefix(bytes) = &value.buffer {
+                bound(bytes.len(), limits.max_record_bytes)?;
+            }
+            Ok(())
+        }
         O::PropertyObservation(MqPropertyObservation::Inquired(value)) => {
             bound(value.returned_name.len(), limits.max_name_bytes)?;
             bound(

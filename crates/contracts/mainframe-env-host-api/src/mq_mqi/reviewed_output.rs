@@ -35,6 +35,13 @@ pub(super) fn validate(
     // Borrow the same exhaustive bounded shape authority used by old outcomes.
     // Its pending-mode shape check does not claim a reviewed completion.
     super::validation::validate_output(call, None, output, limits)?;
+    if let MqMqiOutput::Rfh2Observation(value) = output {
+        return if value.validate_status(status) {
+            Ok(())
+        } else {
+            Err(MqMqiProblem::StatusCallMismatch)
+        };
+    }
     if let MqMqiOutput::PropertyObservation(value) = output {
         return if value.validate_status(status) {
             Ok(())
@@ -145,12 +152,23 @@ impl MqMqiResult {
         if self.call != request.call() {
             return Err(MqMqiProblem::OutputCallMismatch);
         }
+        if matches!(request, MqMqiRequest::Rfh2(_))
+            && matches!(self.outcome, MqMqiOutcome::ReviewedStatus { .. })
+        {
+            return Err(MqMqiProblem::StatusCallMismatch);
+        }
         if let MqMqiOutcome::ReviewedOutput { output, .. }
         | MqMqiOutcome::Completed { output, .. }
         | MqMqiOutcome::StatusPending { output } = &self.outcome
         {
             super::full_message::bind(request, output)?;
             super::property::mq_property_bind(request, output).map_err(MqMqiProblem::Property)?;
+            super::rfh2::bind(request, output).map_err(MqMqiProblem::Property)?;
+            if matches!(request, MqMqiRequest::Rfh2(_))
+                && !matches!(self.outcome, MqMqiOutcome::ReviewedOutput { .. })
+            {
+                return Err(MqMqiProblem::StatusCallMismatch);
+            }
         }
         let MqMqiOutcome::ReviewedOutput { output, .. } = &self.outcome else {
             return Ok(());

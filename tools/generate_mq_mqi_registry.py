@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mq_wire_options as wire
 import mq_raw_layout as raw_layout
 import mq_property_profile as property_profile
+import mq_rfh2_profile as rfh2_profile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -646,6 +647,7 @@ def check(root: Path = ROOT) -> None:
         (wire.OUTPUT, wire.render(root)),
         (raw_layout.OUTPUT, raw_layout.render(root)),
         (property_profile.OUTPUT, property_profile.render(root)),
+        (rfh2_profile.OUTPUT, rfh2_profile.render(root)),
     ]:
         output = root / output_path
         if not output.is_file() or output.read_text() != expected:
@@ -659,7 +661,17 @@ def main() -> int:
     parser.add_argument("--layout-cache", type=Path, help="offline point-layout source cache")
     parser.add_argument("--original-cache", type=Path, help="offline original MQ call corroboration")
     parser.add_argument("--property-cache", type=Path, help="offline property source reproduction")
+    parser.add_argument("--rfh2-cache", type=Path, help="offline RFH2 fact reproduction")
     args = parser.parse_args()
+    if args.rfh2_cache:
+        if not args.cache or not args.original_cache or not args.property_cache:
+            parser.error("--rfh2-cache requires --cache, --original-cache and --property-cache")
+        rfh2_profile.verify_source(ROOT, {
+            "mq-rfh2-sources": args.rfh2_cache,
+            "mq-programming-supplements": args.cache,
+            "mq-property-sources": args.property_cache,
+            "ibm-mq-9.4-mqi-2026-08-31": args.original_cache,
+        })
     if args.property_cache:
         if not args.cache or not args.original_cache:
             parser.error("--property-cache requires --cache and --original-cache")
@@ -687,6 +699,7 @@ def main() -> int:
             (wire.OUTPUT, wire.render(ROOT)),
             (raw_layout.OUTPUT, raw_layout.render(ROOT)),
             (property_profile.OUTPUT, property_profile.render(ROOT)),
+            (rfh2_profile.OUTPUT, rfh2_profile.render(ROOT)),
         ]:
             output = ROOT / output_path
             output.parent.mkdir(parents=True, exist_ok=True)

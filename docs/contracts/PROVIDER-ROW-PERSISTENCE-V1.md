@@ -281,8 +281,9 @@ and resource legality; this storage schema is not IBM wire or a second public
 request encoding.
 
 The complete producer output selects `mainframe-env.mq-mqi-result-storage@5`
-iff its stored output class is `Produced`. Version4 is reserved for the separate
-RFH2 owner and is rejected here. Versions1/2/3 retain their exact bytes and output
+iff its stored output class is `Produced`. Version4 exclusively records reviewed
+RFH2 observations in the same strict codec; neither class admits the other's
+version. Versions1/2/3 retain their exact bytes and output
 classification; readers reject a producer relabeled as any older class, or an
 older output relabeled as5. The sole strict codec includes full MD bytes through
 the owned value encoder, exact fixed48 resolved names, delivery disposition,
@@ -290,6 +291,16 @@ explicit undefined z/OS destination counters and preserved ignored-input counter
 disposition under the FULL original host result digest. Required fields, width,
 schema/output disagreement, duplicates, unknowns, malformed tags, quotas and
 digest changes fail closed. Receipt namespace/provenance/retention are unchanged.
+
+RFH2 storage@4 retains required nullable descriptor and DataLength observations,
+exact written-prefix bytes or explicit unchanged-buffer disposition, and the
+complete reviewed call status. Unknown, duplicate, missing, over-limit or
+schema/class-mismatched fields fail closed under the original host digest.
+Associated message properties and connection CODESET attestation remain volatile;
+cold receipt decoding cannot recreate executable handles or their source profile.
+Readers without the corresponding additive class must refuse @4 or @5. Rollback
+requires a compatible reader or a verified pre-feature backup, not relabeling or
+discarding retained receipts. No durable payload migration is authorized here.
 
 The same catalog's native attribute version2 is an explicit additive deployment
 profile; version1 stays byte-exact and contains no guessed defaults. In this
