@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 253,
+    "markdown_documents": 254,
     "navigation_groups": 6,
-    "normative_documents": 83,
+    "normative_documents": 84,
     "xtask_commands": 237
   },
   "documents": [
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 139,
-      "sha256": "sha256:36f230d9c0ffabb915aa1de6894344f68d12d3f72c7ad1e250ff0908d0f567f7",
+      "relative_links": 140,
+      "sha256": "sha256:2597bc6cb592e4805e16fc296c5081997e056e16ed72ae63e671352f53eae39b",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -1211,6 +1211,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env 0.15.0 development",
+      "normative": true,
+      "owner": "Batch and host-contract maintainers",
+      "path": "docs/decisions/0037-running-step-program-transport.md",
+      "relative_links": 0,
+      "scope": "MQ-1503.running-step-program-transport, target 0.15.0",
+      "sha256": "sha256:f5c2770a680a8ec3d92f311f7d78fdc52e002711bcd423b5d81455160c8ac4ef",
+      "status": "Accepted bounded transport prerequisite; host activation remains pending.",
+      "title": "ADR-0037: Running-step Program context transport",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env 0.14.0 development",
       "normative": true,
       "owner": "IMS provider maintainers",
@@ -1273,8 +1285,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 44,
-      "sha256": "sha256:90cef4cbb2a01525f11960660a6f36686af66b9e84a5c697d8a90767e3905d67",
+      "relative_links": 45,
+      "sha256": "sha256:29c6061afe8b5532862879ee52cb41cbb3418268461e17bebf993ce691ba787e",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1806,7 +1818,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:a3574480e8cec1bfb0860b23820ae82c43859a80e97456ddb5e613e792dd9257",
+      "sha256": "sha256:001065ffc9842e4ef3b07dccb142532267621823b4da3fea86171283228584e2",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -2686,6 +2698,10 @@
         {
           "label": "ADR-0036: Literal null SSA command slots",
           "path": "docs/decisions/0036-null-ssa-command-slots.md"
+        },
+        {
+          "label": "ADR-0037: Running-step Program context transport",
+          "path": "docs/decisions/0037-running-step-program-transport.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2932,7 +2948,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:7c94e169ce769a15c3804f767ffbee5934474a4d00f7730993836c498d19fe87",
+  "registry_sha256": "sha256:db6fc3759d328c13709d1ab259de3cad8da60c8ebf4e5db02bc6d24501d1863d",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

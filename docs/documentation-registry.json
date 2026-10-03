@@ -90,7 +90,8 @@
     "docs/decisions/0033-cobol-dli-call-boundary.md",
     "docs/decisions/0030-gsam-application-record-formats.md",
     "docs/decisions/0032-selected-secondary-checkpoint-position.md",
-    "docs/decisions/0036-null-ssa-command-slots.md"
+    "docs/decisions/0036-null-ssa-command-slots.md",
+    "docs/decisions/0037-running-step-program-transport.md"
   ],
   "navigation": [
     {
@@ -416,6 +417,10 @@
         {
           "label": "ADR-0036: Literal null SSA command slots",
           "path": "docs/decisions/0036-null-ssa-command-slots.md"
+        },
+        {
+          "label": "ADR-0037: Running-step Program context transport",
+          "path": "docs/decisions/0037-running-step-program-transport.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

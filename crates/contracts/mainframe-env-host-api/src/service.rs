@@ -95,13 +95,49 @@ impl ScopedHostService {
         cancellation_requested: bool,
         request: EffectRequest,
     ) -> AuditedEffectResult {
+        self.invoke_inner(invocation, now_tick, cancellation_requested, request, None)
+    }
+
+    /// Dispatch only an original Program request with borrowed Rust context.
+    /// Shares every ordinary scoped admission, result and audit check. `Any`
+    /// grants no permission: a future closed receiver must validate its genuine
+    /// owner; providers default to Unsupported without ordinary dispatch.
+    pub fn invoke_program_context(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        context: &(dyn std::any::Any + Send + Sync),
+    ) -> AuditedEffectResult {
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            Some(context),
+        )
+    }
+
+    fn invoke_inner(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        context: Option<&(dyn std::any::Any + Send + Sync)>,
+    ) -> AuditedEffectResult {
         let capability = request
             .request
             .required_capability(mainframe_env_execution_api::InvocationLimits::default());
         let resource = canonical_audit_resource_digest(&request.request);
         let sequence = request.sequence;
         let mut mutation_dispatched = false;
-        let result = if request.run_unit != invocation.run_unit_id {
+        let result = if context.is_some()
+            && !matches!(&request.request, crate::HostRequest::Program(_))
+        {
+            Err(HostProblem::Unsupported)
+        } else if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)
         } else if cancellation_requested || invocation.cancellation_requested() {
             Err(HostProblem::Cancelled)
@@ -136,7 +172,12 @@ impl ScopedHostService {
                 Ok(provider) => {
                     let mutating = request.request.is_mutating();
                     mutation_dispatched = mutating;
-                    match catch_unwind(AssertUnwindSafe(|| provider.invoke(invocation, request))) {
+                    match catch_unwind(AssertUnwindSafe(|| match context {
+                        Some(context) => {
+                            provider.invoke_program_context(invocation, request, context)
+                        }
+                        None => provider.invoke(invocation, request),
+                    })) {
                         // Uncertainty is a control outcome, not an oversized success payload.
                         // Never erase it, even when an untrusted provider also corrupts the envelope.
                         Ok(effect)
@@ -227,6 +268,7 @@ impl AuditedEffectResult {
 
 #[cfg(test)]
 mod tests {
+    mod program_context;
     use super::*;
     use crate::{CapabilityDescriptor, HostProvider, HostRequest, RegistrySnapshot, StateRequest};
     use mainframe_env_execution_api::{

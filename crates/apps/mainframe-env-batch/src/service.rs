@@ -1,5 +1,10 @@
 mod dd_allocation;
 mod problem;
+mod program_dispatch;
+mod running_step;
+
+use running_step::ProgramDispatch;
+pub use running_step::{RunningStepAdmission, RunningStepView};
 
 use problem::{abend_code, ams_condition_code, problem_category};
 
@@ -1157,7 +1162,7 @@ impl BatchService {
         initiator: &str,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
-        self.run_on_member(invocation, member, initiator, cancelled, None)
+        self.run_on_member(invocation, member, initiator, cancelled, None, None)
     }
 
     pub fn run_claimed(
@@ -1182,7 +1187,7 @@ impl BatchService {
         }
         for member in members {
             if let Some(job) =
-                self.run_on_member(invocation, &member, initiator, cancelled, Some(id))?
+                self.run_on_member(invocation, &member, initiator, cancelled, Some(id), None)?
             {
                 return Ok(Some(job));
             }
@@ -1197,6 +1202,7 @@ impl BatchService {
         initiator: &str,
         cancelled: bool,
         requested_id: Option<&str>,
+        dispatch: Option<&mut ProgramDispatch<'_>>,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
         if self.limits.max_active == 0 {
             return Err(HostProblem::ResourceExhausted);
@@ -1318,7 +1324,7 @@ impl BatchService {
             state.jobs.insert(id.clone(), running.clone());
             running
         };
-        let outcome = self.execute(invocation, &mut job);
+        let outcome = self.execute(invocation, &mut job, dispatch);
         if outcome == Err(HostProblem::UnknownOutcome) {
             return Err(HostProblem::UnknownOutcome);
         }
@@ -1469,7 +1475,12 @@ impl BatchService {
         }
     }
 
-    fn execute(&self, invocation: &Invocation, job: &mut Job) -> Result<i32, HostProblem> {
+    fn execute(
+        &self,
+        invocation: &Invocation,
+        job: &mut Job,
+        mut dispatch: Option<&mut ProgramDispatch<'_>>,
+    ) -> Result<i32, HostProblem> {
         let mut max_rc = 0;
         let mut abended = false;
         let mut first_abend = None::<String>;
@@ -1636,6 +1647,16 @@ impl BatchService {
                         &input,
                         &mut effect_sequence,
                     )?,
+                    RegisteredProgramHandler::ProgramService if dispatch.is_some() => self
+                        .execute_program_controller_admitted(
+                            invocation,
+                            job,
+                            step,
+                            &input,
+                            &mut effect_sequence,
+                            &registration.program,
+                            &mut **dispatch.as_mut().expect("checked callback"),
+                        )?,
                     RegisteredProgramHandler::ProgramService
                     | RegisteredProgramHandler::Utility(_) => self.execute_program_controller(
                         invocation,
@@ -2449,63 +2470,6 @@ impl BatchService {
             return Err(HostProblem::IdempotencyConflict);
         }
         Ok(name)
-    }
-
-    fn execute_program_controller(
-        &self,
-        invocation: &Invocation,
-        job: &Job,
-        step: &StepPlan,
-        input: &ProgramInput,
-        effect_sequence: &mut u64,
-        program: &str,
-    ) -> Result<crate::ProgramOutput, HostProblem> {
-        let payload = BoundedPayload::new(
-            "mainframe-env.program.input@1",
-            serde_json::to_vec(input).map_err(|_| HostProblem::ProviderFailure)?,
-            InvocationLimits::default(),
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-        let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let key = effect_key(job, step, sequence)?;
-        let mut program_invocation = invocation.clone();
-        let limits = InvocationLimits::default();
-        let binding = BoundedPayload::new(
-            "mainframe-env.jes-work@1",
-            format!("jes:{}", job.id).into_bytes(),
-            limits,
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?;
-        if let Some(existing) = program_invocation.bindings.get("jes.work-id") {
-            if existing != &binding {
-                return Err(HostProblem::Malformed);
-            }
-        } else if program_invocation.bindings.len() >= limits.max_bindings {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        program_invocation
-            .bindings
-            .insert("jes.work-id".into(), binding);
-        let result = self.invoke_host(
-            &program_invocation,
-            invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence,
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key: Some(key),
-                request: HostRequest::Program(ProgramRequest::Call {
-                    program: ProgramName::new(program, 128).map_err(|_| HostProblem::Malformed)?,
-                    payload,
-                    service: None,
-                }),
-            },
-        );
-        match result.outcome? {
-            HostResult::Program(payload) => decode_program_output(&payload),
-            _ => Err(HostProblem::ProviderFailure),
-        }
     }
 
     fn execute_ims_controller(
@@ -7350,6 +7314,7 @@ fn dcollect_catalog_names(
 
 #[cfg(test)]
 mod tests {
+    mod running_step;
     use super::*;
     use crate::{Program, ProgramOutput, ProgramRouter};
     use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};

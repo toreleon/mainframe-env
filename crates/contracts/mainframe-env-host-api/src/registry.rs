@@ -55,6 +55,22 @@ pub trait HostProvider: Send + Sync {
     fn descriptor(&self) -> &CapabilityDescriptor;
     /// Handle the original request under the supplied invocation, retaining its sequence and exact failure/uncertainty result; this interface grants no permission by itself.
     fn invoke(&self, invocation: &Invocation, request: EffectRequest) -> EffectResult;
+
+    /// Transport a borrowed Rust-only context for an original Program request.
+    /// Type erasure conveys no admission, JES, lifecycle, SAF or core authority;
+    /// an implementing receiver must independently validate its closed owner type.
+    /// The default refuses without calling `invoke`; old providers gain no route.
+    fn invoke_program_context(
+        &self,
+        _invocation: &Invocation,
+        request: EffectRequest,
+        _context: &(dyn std::any::Any + Send + Sync),
+    ) -> EffectResult {
+        EffectResult {
+            sequence: request.sequence,
+            outcome: Err(HostProblem::Unsupported),
+        }
+    }
 }
 
 #[derive(Clone)]

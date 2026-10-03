@@ -6,6 +6,40 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Genuine Running-step neutral Program transport
+
+`MQ-1503.running-step-program-transport` integrates reviewed sealed worker
+`d34f28b2`. The existing Batch Running job/step CAS, checkpoint and actual
+ProgramService registration mint a private irrevocably revocable owner. An
+opt-in synchronous borrowed callback and non-Clone/non-Serde retained view
+observe that same owner and physical store. Callback return/error/panic revokes
+before existing retirement/cleanup; Drop only revokes. Ordinary scheduling and
+original Program payload, sequence/key, parent, grants and generation remain
+unchanged. The observed original precedes the existing `jes.work-id` compatibility
+binding added to the actual dispatched request; those are not interchangeable
+ownership proofs. `check_live` is an observation, not a physical publication fence.
+
+Program-only borrowed Any transport shares the existing scoped host controls,
+frozen provider selection, request/result bounds, uncertainty and typed audit.
+Provider default refuses without ordinary invoke fallback; Any grants no admission
+or permission. The extracted owning Batch child lowers its exact service ratchet
+7350 to7314 without raising any API/module ceiling. Current shared IR and all
+upstream IMS hooks remain intact. Main narrows one observation Rustdoc sentence
+to avoid an allocation-free claim; executable worker bytes remain exact.
+
+Independent review binds14worker paths,165receipts/48commands/131130 input
+occurrences, final8Rust inputs,31unit and4compile-fail tests,11frozen authorities,
+all32historical d8 dependency inputs and same-HEAD seal. Seven failed attempts
+remain separate. Main reruns those affected contracts, owning consumers/rustdoc
+and required policy/documentation gates. Neutral fake Any tests prove transport
+only; retained SQLite close/reopen is not process-crash evidence.
+
+Real coordinator original Intent/Running ownership, private server claim join,
+decision-time physical Work/Job fences, scheduled compiled-step/root terminal
+policy and genuine JES user/accounting/GMT/DefaultContext remain prerequisites.
+No native/installed/Core/SAF/full26 activation or credit follows. Source credit0;
+only licensed oracle human-skipped0/26. Fullv0.15 remains unfinished.
+
 ## Attributed Open-root provider writer prerequisite
 
 MQ-1505.attributed-root-provider-writers integrates reviewed sealed workerdd2b756a.
