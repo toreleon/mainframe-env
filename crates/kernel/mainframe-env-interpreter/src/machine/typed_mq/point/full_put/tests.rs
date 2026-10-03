@@ -8,6 +8,8 @@ use mainframe_env_host_api::mq_mqi::{
 use mainframe_env_host_api::{MqDeliveryOutcome, MqHandleRegistry};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
+mod supplied_correlation;
+
 struct Signals {
     mode: AtomicUsize,
     checks: AtomicUsize,
@@ -515,7 +517,9 @@ fn invalid_complete_groups_controls_profiles_and_body_bounds_refuse_before_dispa
                 6 => m.write("MD-VERSION", &2_i32.to_be_bytes()).unwrap(),
                 7 => m.write("MD-STRUCID", b"BAD ").unwrap(),
                 8 => m.write("MD-MSGID", &[0; 24]).unwrap(),
-                9 => m.write("MD-CORRELID", &[0; 24]).unwrap(),
+                // Reviewed NEW_CORREL_ID128 remains unrepresented, even with
+                // otherwise supported synchronous/no-context/no-syncpoint bits.
+                9 => m.write("PMO-OPTIONS", &147588_i32.to_be_bytes()).unwrap(),
                 10 => m.write("MD-PRIORITY", &(-2_i32).to_be_bytes()).unwrap(),
                 11 => m.write("MD-EXPIRY", &1_i32.to_be_bytes()).unwrap(),
                 12 => m.write("MD-PERSISTENCE", &3_i32.to_be_bytes()).unwrap(),

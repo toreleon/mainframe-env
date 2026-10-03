@@ -1051,11 +1051,25 @@ maximum and frozen product message limit; only the checked BufferLength prefix
 enters the message. Structure/CNO capture retains its existing 1024-byte limit.
 The initial sealed `put_full` constructor admits explicit synchronous response,
 syncpoint/no-syncpoint and default/no-context, with an independently admitted
-local unit. It requires supplied nonzero message and correlation IDs, unlimited
+local unit. It requires a supplied nonzero message ID and supplied correlation
+bytes (including binary-zero MQCI_NONE), unlimited
 expiry, positive reviewed body CCSID37/819, Format NONE and no properties,
 header, groups or segments. The queue-default extension above broadens only
 priority, persistence and synchronous response through `put_full_for_target`;
 generated IDs and other modes remain unsupported.
+
+The compiled supplied-correlation extension follows MQ9.4 MD field details
+`q097395_` lines1336–1494 in the supplements baseline
+`ibm-mq-9.4-programming-supplements-2026-09-12`: CorrelId is arbitrary supplied
+24-byte input, including MQCI_NONE, without MQPMO_NEW_CORREL_ID. In contrast,
+binary-zero MsgId requests generation and remains unsupported by this finite
+bridge. PMO field details `q098655_` lines122–142 distinguish both generation
+flags, which remain unsupported. Original PUT/PUT1 rows0020/0021 (`q101880_`,
+`q101890_`, baseline `ibm-mq-9.4-mqi-2026-08-31`) and every canonical/replay
+identity remain unchanged. Exact supplied CorrelId enters the original complete
+request and is preserved by request-bound Produced writeback. Private compiled
+regressions establish engine capture and atomicity only, with zero installed,
+native, source-execution, licensed or official call-coverage credit.
 
 Known success requires the original-request-bound actual `Produced` observation;
 legacy partial PUT/FullPut, status-only success and unsupported warnings cannot

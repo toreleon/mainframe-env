@@ -501,7 +501,7 @@
       "path": "docs/architecture/MQ-PROGRAMMING-SURFACE.md",
       "relative_links": 3,
       "scope": "MQI denominator, source provenance, host context and semantic authority",
-      "sha256": "sha256:91259d4280c3bcf66ab5097eaaa6f0f36be792a7de6d52464039051c14d100d9",
+      "sha256": "sha256:7a48f1f9d1a20b3f310193742c1adcbd16215abb9c10980b26e540a276f5aea5",
       "status": "Normative identity boundary; semantics are implemented incrementally",
       "title": "IBM MQ programming-surface ownership",
       "xtask_commands": 0
@@ -1622,7 +1622,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 0,
-      "sha256": "sha256:75a5ed881e55e5e863d64dd06b45d77d550a99758680be4e1cc4530f26018e41",
+      "sha256": "sha256:070255fb225bc8b5798305fdc261caeb1969e2ce9c1e0fe2aeee2c4872f2eab2",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },

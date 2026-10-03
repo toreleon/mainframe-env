@@ -151,9 +151,10 @@ impl ReferenceMachine {
         let descriptor = md
             .to_full_md_value()
             .map_err(|_| MachineProblem::UnsupportedForm)?;
-        // Supplied identifiers remain mandatory; the selected producer alone
-        // resolves supported queue policy, never the interpreter's raw fields.
-        if descriptor.fields().msg_id == [0; 24] || descriptor.fields().correl_id == [0; 24] {
+        // A zero MsgId requests unsupported generation. CorrelId is supplied
+        // input (including binary zero) without NEW_CORREL_ID; the sole options
+        // constructor below rejects that generation flag independently.
+        if descriptor.fields().msg_id == [0; 24] {
             return Err(MachineProblem::Host(HostProblem::Unsupported));
         }
         let limit = maximum.min(state.profile.limits.message.body_bytes);

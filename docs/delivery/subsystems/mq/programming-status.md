@@ -6,6 +6,39 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Compiled supplied correlation IDs
+
+`MQ-1503.compiled-supplied-correlation-id` composes reviewed sealed worker
+`a36bc8b5e` without copying its duplicated historical architecture block.
+The compiled full PUT/PUT1 bridge now accepts exact supplied 24-byte CorrelId,
+including binary-zero MQCI_NONE. Supplied nonzero MsgId and the existing refusal
+of NEW_MSG_ID/NEW_CORREL_ID remain; no ID is generated. Original context, opaque
+profile, live aliases/unit, complete raw capture and request-bound atomic joined
+writeback stay unchanged. A correlation mismatch, unsupported outcome or late
+input drift still fences Unknown without partial writes.
+
+Manager review verifies all six worker Git paths, three final tested engine
+inputs,454 frozen authority files,95 external receipt identities and32 unchanged
+dependency inputs. Worker218 unit/one layout/two compile-fail and27 canonical
+tests retain their original separate candidates; main runs diff-focused typed
+MQ regressions and mandatory policy/consumer/API/module/documentation gates.
+Private compiled frame/reply fixtures earn engine credit only, not installed,
+native/RACF/JES/root-terminal or official-call acceptance. Existing installed
+PUT/GET and root proofs are retained, not relabeled for this change.
+
+Five source identities and ten actual manager offline search/read commands use
+retained topic_path first, manifest SHA/bytes, exact archive fallback and the
+sole plain-text parser. MQ9.4 supplemental baseline2026-09-12 MD `q097395_`
+1336–1497 distinguishes supplied CorrelId from zero MsgId generation; PMO
+`q098655_`115–157/`q092190_`40–69 bind the unsupported generation flags.
+Original baseline2026-08-31 PUT0020/`q101880_` and PUT10021/`q101890_`
+remain unchanged. Source review credit0; no refresh or publication body in Git.
+Historical d8 dependency policy is reused only for all32 exact inputs, not
+fresh deny/CI. Generated IDs, broader profiles, fresh-root succession,
+installed DefaultContext/JES/GMT, recovery/participants/shared IR/full26 and
+CardDemo acceptance remain required. Only the licensed oracle is human-skipped
+0/26; full v0.15 remains unfinished.
+
 ## Current composed finite RFH2 prerequisite
 
 `MQ-1503.selected-rfh2-conversion` consumes sealed worker4c1602f1 after full
