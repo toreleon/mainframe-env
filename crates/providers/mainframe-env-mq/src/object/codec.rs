@@ -2,6 +2,7 @@
 
 use super::*;
 use serde::{Deserialize, Serialize};
+mod preflight;
 
 impl MqObjectCatalog {
     pub fn encode(&self) -> Result<Vec<u8>, MqObjectError> {
@@ -12,7 +13,20 @@ impl MqObjectCatalog {
             model_instances: self.instances.values().cloned().collect(),
             next_dynamic_id: self.next_dynamic_id,
         };
-        let bytes = serde_json::to_vec(&envelope).map_err(|_| MqObjectError::CorruptSnapshot)?;
+        let bytes = if let Some(native_attributes) = &self.native_attributes {
+            self.validate_native_attributes(native_attributes)?;
+            serde_json::to_vec(&NativeCatalogEnvelope {
+                schema_version: MQ_OBJECT_NATIVE_CATALOG_SCHEMA.into(),
+                queue_manager: envelope.queue_manager,
+                objects: envelope.objects,
+                model_instances: envelope.model_instances,
+                next_dynamic_id: envelope.next_dynamic_id,
+                native_attributes: native_attributes.clone(),
+            })
+        } else {
+            serde_json::to_vec(&envelope)
+        }
+        .map_err(|_| MqObjectError::CorruptSnapshot)?;
         if bytes.len() > self.limits.max_persisted_bytes {
             return Err(MqObjectError::ResourceExhausted);
         }
@@ -24,15 +38,31 @@ impl MqObjectCatalog {
         if bytes.len() > limits.max_persisted_bytes {
             return Err(MqObjectError::ResourceExhausted);
         }
-        let identity: serde_json::Value =
+        let identity: Schema =
             serde_json::from_slice(bytes).map_err(|_| MqObjectError::CorruptSnapshot)?;
-        match identity.get("schema_version") {
-            Some(serde_json::Value::String(schema)) if schema == MQ_OBJECT_CATALOG_SCHEMA => {}
-            Some(serde_json::Value::String(_)) => return Err(MqObjectError::UnsupportedSchema),
-            _ => return Err(MqObjectError::CorruptSnapshot),
-        }
-        let envelope: CatalogEnvelope =
-            serde_json::from_slice(bytes).map_err(|_| MqObjectError::CorruptSnapshot)?;
+        let (envelope, native) = match identity.schema_version.as_str() {
+            MQ_OBJECT_CATALOG_SCHEMA => (
+                serde_json::from_slice::<CatalogEnvelope>(bytes)
+                    .map_err(|_| MqObjectError::CorruptSnapshot)?,
+                None,
+            ),
+            MQ_OBJECT_NATIVE_CATALOG_SCHEMA => {
+                preflight::check(bytes, limits)?;
+                let e: NativeCatalogEnvelope =
+                    serde_json::from_slice(bytes).map_err(|_| MqObjectError::CorruptSnapshot)?;
+                (
+                    CatalogEnvelope {
+                        schema_version: MQ_OBJECT_CATALOG_SCHEMA.into(),
+                        queue_manager: e.queue_manager,
+                        objects: e.objects,
+                        model_instances: e.model_instances,
+                        next_dynamic_id: e.next_dynamic_id,
+                    },
+                    Some(e.native_attributes),
+                )
+            }
+            _ => return Err(MqObjectError::UnsupportedSchema),
+        };
         if envelope.next_dynamic_id == 0
             || !strictly_sorted_by(&envelope.objects, definition_key)
             || !strictly_sorted_by(&envelope.model_instances, |instance| instance.name.clone())
@@ -66,8 +96,18 @@ impl MqObjectCatalog {
             catalog.instances.insert(instance.name.clone(), instance);
         }
         catalog.next_dynamic_id = envelope.next_dynamic_id;
+        if let Some(attrs) = native {
+            catalog.validate_native_attributes(&attrs)?;
+            catalog.native_attributes = Some(attrs);
+        }
         Ok(catalog)
     }
+}
+
+// Discriminator only: ignored fields are streamed, never a semantic Value tree.
+#[derive(Deserialize)]
+struct Schema {
+    schema_version: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -78,6 +118,16 @@ struct CatalogEnvelope {
     objects: Vec<MqObjectDefinition>,
     model_instances: Vec<MqModelInstance>,
     next_dynamic_id: u64,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct NativeCatalogEnvelope {
+    schema_version: String,
+    queue_manager: MqQueueManagerDefinition,
+    objects: Vec<MqObjectDefinition>,
+    model_instances: Vec<MqModelInstance>,
+    next_dynamic_id: u64,
+    native_attributes: MqNativeAttributes,
 }
 
 fn strictly_sorted_by<T, K: Ord>(values: &[T], key: impl Fn(&T) -> K) -> bool {

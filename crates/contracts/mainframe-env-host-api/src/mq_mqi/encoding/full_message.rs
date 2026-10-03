@@ -1,5 +1,19 @@
 //! Additive tags using the one streaming authority and the owned full MD encoder.
 use super::*;
+variants!(MqMqiDestinationCount { UndefinedZos });
+variants!(MqMqiIgnoredCounter {
+    PreservedIgnoredInput
+});
+object!(MqMqiProduced {
+    backout_count,
+    descriptor,
+    invalid_dest_count,
+    known_dest_count,
+    outcome,
+    resolved_manager,
+    resolved_queue,
+    unknown_dest_count
+});
 object!(MqFullMessage {
     body,
     descriptor,

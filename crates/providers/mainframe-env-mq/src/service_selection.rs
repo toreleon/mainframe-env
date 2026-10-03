@@ -84,6 +84,8 @@ impl MqService {
             unknown_after_persist: AtomicBool::new(false),
             authorizer: Some(authorizer),
             replay_clock: Some(replay_clock),
+            producer_sources: None,
+            producer_sampling: AtomicBool::new(false),
         }))
     }
 
@@ -93,6 +95,9 @@ impl MqService {
         &self,
     ) -> Result<MutexGuard<'_, rich_state::StoredAuthority>, HostProblem> {
         if self.selected_store.is_none() {
+            return Err(HostProblem::Unsupported);
+        }
+        if self.producer_sampling.load(Ordering::SeqCst) {
             return Err(HostProblem::Unsupported);
         }
         self.durable

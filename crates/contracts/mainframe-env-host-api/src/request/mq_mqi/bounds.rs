@@ -148,6 +148,7 @@ fn put(value: &MqMqiPut, limits: HostLimits) -> Result<(), HostProblem> {
         MqMqiMessageContext::SetIdentityPending { user }
         | MqMqiMessageContext::SetAllPending { user } => alternate(Some(user), limits),
         MqMqiMessageContext::Default
+        | MqMqiMessageContext::NoContext
         | MqMqiMessageContext::PassIdentityPending { .. }
         | MqMqiMessageContext::PassAllPending { .. } => Ok(()),
     }
@@ -290,6 +291,11 @@ pub(super) fn result(value: &MqMqiResult, limits: HostLimits) -> Result<(), Host
         }
         O::PropertyObservation(_) => Ok(()),
         O::FullPut { .. } => full_descriptor(limits),
+        O::Produced(value) => {
+            full_descriptor(limits)?;
+            bound(value.resolved_queue.len(), limits.max_name_bytes)?;
+            bound(value.resolved_manager.len(), limits.max_name_bytes)
+        }
         O::FullGot {
             message,
             data_length,

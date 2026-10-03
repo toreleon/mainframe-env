@@ -12,6 +12,8 @@ use mainframe_env_host_api::{
 mod connection_warning;
 #[path = "transition/full_get.rs"]
 mod full_get;
+#[path = "transition/full_put.rs"]
+mod full_put;
 
 #[derive(Clone)]
 pub(super) struct ConnectionBinding {
@@ -73,6 +75,9 @@ pub(super) fn prepare(
     now: u64,
     authorizer: &dyn EnterpriseAuthorizer,
     limits: MqLimits,
+    service: &MqService,
+    frame: FrameLease,
+    admitted: &crate::mqi_admission::MqMqiAdmitted<'_>,
 ) -> Result<Candidate, HostProblem> {
     if logical.owner() != owner {
         return Err(HostProblem::Unauthorized);
@@ -94,6 +99,8 @@ pub(super) fn prepare(
         MqMqiRequest::Open(open) => Some(open.connection()),
         MqMqiRequest::Put { connection, .. }
         | MqMqiRequest::PutOne { connection, .. }
+        | MqMqiRequest::FullPut { connection, .. }
+        | MqMqiRequest::FullPutOne { connection, .. }
         | MqMqiRequest::Commit { connection, .. }
         | MqMqiRequest::Back { connection, .. }
         | MqMqiRequest::Disconnect { connection } => Some(*connection),
@@ -147,6 +154,17 @@ pub(super) fn prepare(
         // cursor changes can become a publication candidate.
         full_get::prepare(
             state, runtime, invocation, logical, owner, get, now, authorizer, &mut next,
+        )?;
+        return Ok(next);
+    }
+    if matches!(
+        request,
+        MqMqiRequest::FullPut { .. } | MqMqiRequest::FullPutOne { .. }
+    ) {
+        // Complete producer/profile/source checks precede even candidate expiry.
+        full_put::prepare(
+            state, runtime, invocation, logical, owner, request, now, authorizer, &mut next,
+            service, frame, admitted,
         )?;
         return Ok(next);
     }
@@ -710,6 +728,11 @@ pub(super) fn resolve_reply(
         return super::property::replay(state, runtime, logical, owner, request, reply);
     }
     match (&mut reply.result.outcome, request) {
+        (_, MqMqiRequest::FullPut { .. } | MqMqiRequest::FullPutOne { .. }) => {
+            full_put::require_replay(
+                state, runtime, logical, owner, request, invocation, authorizer,
+            )
+        }
         (_, MqMqiRequest::FullGet(get)) => {
             full_get::require_replay(state, runtime, logical, owner, get, invocation, authorizer)
         }

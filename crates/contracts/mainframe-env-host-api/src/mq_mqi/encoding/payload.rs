@@ -92,9 +92,9 @@ impl Canonical for MqMqiRequestEnvelope {
     }
 }
 object!(MqMqiResult { call, outcome });
-variants!(MqMqiOptions { ContractDefault, PendingStructure { requested_version } });
+variants!(MqMqiOptions { ContractDefault, PutV1Synchronous, PendingStructure { requested_version } });
 variants!(MqMqiUnitOfWork { NoSyncpoint, Local { unit }, ExternalPending { unit } });
-variants!(MqMqiMessageContext { Default, PassIdentityPending { source }, PassAllPending { source },
+variants!(MqMqiMessageContext { Default, NoContext, PassIdentityPending { source }, PassAllPending { source },
     SetIdentityPending { user }, SetAllPending { user } });
 variants!(MqMqiBufferFormat {
     KernelV1,
@@ -225,7 +225,7 @@ payload_enum!(MqMqiRequest {
     units {}
 });
 payload_enum!(MqMqiOutput {
-    tuples { Connected, MessageHandle, Property, Distribution, PropertyObservation }
+    tuples { Connected, MessageHandle, Property, Distribution, PropertyObservation, Produced }
     named {
         Opened { dynamic, object },
         Subscribed { object, subscription },

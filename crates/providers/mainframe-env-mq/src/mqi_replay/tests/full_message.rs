@@ -2,7 +2,7 @@
 use super::*;
 use mainframe_env_host_api::mq_md_value::*;
 
-fn md(v2: bool, cp037: bool) -> MqMdValue {
+pub(super) fn md(v2: bool, cp037: bool) -> MqMdValue {
     let characters = if cp037 {
         MqMdCharacterEncoding::OwnedCp037
     } else {

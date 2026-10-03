@@ -335,7 +335,7 @@ fn pending_form(
     use MqMqiPending as P;
     use MqMqiRequest as R;
     let options = |value| {
-        if matches!(value, MqMqiOptions::PendingStructure { .. }) {
+        if value != MqMqiOptions::ContractDefault {
             Some(P::StructureAndWireMapping)
         } else {
             None
@@ -373,7 +373,18 @@ fn pending_form(
                     || value.mode != mainframe_env_host_api::MqGetMode::Remove)
                     .then_some(P::StructureAndWireMapping)
             }),
-        R::FullPut { .. } | R::FullPutOne { .. } => Some(P::StructureAndWireMapping),
+        R::FullPut { put, .. } | R::FullPutOne { put, .. } => (environment
+            != MqHostEnvironment::ZosBatch
+            || coordinator != MqSyncpointOwner::QueueManager
+            || put.validate_producer_profile().is_err()
+            || matches!(
+                request,
+                R::FullPutOne {
+                    alternate_user: Some(_),
+                    ..
+                }
+            ))
+        .then_some(P::StructureAndWireMapping),
         R::Connect(value) | R::ConnectExtended(value) => options(value.options),
         // MQBEGIN's source global-coordination semantics are not the private
         // delivery kernel's local begin. Its participant mapping stays pending.

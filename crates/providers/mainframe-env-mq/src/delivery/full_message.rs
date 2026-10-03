@@ -129,6 +129,15 @@ impl QueueProfile {
     }
 }
 impl MqDeliveryKernel {
+    pub(crate) fn full_queue_profile(
+        &self,
+        queue: &MqObjectName,
+    ) -> Result<QueueProfile, MqDeliveryError> {
+        self.queues
+            .get(queue)
+            .map(|s| s.profile)
+            .ok_or(MqDeliveryError::UnknownQueue)
+    }
     pub(super) fn check_profiles(&self) -> Result<(), MqDeliveryError> {
         for state in self.queues.values() {
             if !self.schema_two && state.profile != QueueProfile::Partial {

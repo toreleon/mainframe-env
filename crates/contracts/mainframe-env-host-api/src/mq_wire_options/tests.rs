@@ -3,6 +3,7 @@ use crate::mq_mqi::*;
 use crate::*;
 
 mod full_get;
+mod full_put;
 
 struct Bindings {
     zos: bool,

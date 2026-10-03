@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 mod budget;
 mod full_message;
 mod handles;
+mod producer;
 mod property;
 mod shape;
 use shape::{StoredOutcome, StoredResult};
@@ -22,6 +23,8 @@ pub(crate) const SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@1";
 // Same codec/authority, distinct admitted output vocabulary; old bytes stay @1.
 pub(crate) const FULL_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@2";
 pub(crate) const PROPERTY_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@3";
+// @4 is reserved for the separately owned RFH2 class; never selected here.
+pub(crate) const PRODUCER_SCHEMA: &str = "mainframe-env.mq-mqi-result-storage@5";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReplayPending {
@@ -63,7 +66,9 @@ pub(crate) fn encode(
     refuse_special_connections(result)?;
     let digest = validate_and_digest(result, host, mqi)?;
     let stored = StoredResult {
-        schema_version: if property_output(result) {
+        schema_version: if producer_output(result) {
+            PRODUCER_SCHEMA
+        } else if property_output(result) {
             PROPERTY_SCHEMA
         } else if full_output(result) {
             FULL_SCHEMA
@@ -100,9 +105,10 @@ pub(crate) fn decode(
     let stored: StoredResult = serde_json::from_slice(bytes).map_err(|_| ReplayError::Malformed)?;
     if !matches!(
         stored.schema_version.as_str(),
-        SCHEMA | FULL_SCHEMA | PROPERTY_SCHEMA
+        SCHEMA | FULL_SCHEMA | PROPERTY_SCHEMA | PRODUCER_SCHEMA
     ) || (stored.schema_version == FULL_SCHEMA) != stored.outcome.is_full()
         || (stored.schema_version == PROPERTY_SCHEMA) != stored.outcome.is_property()
+        || (stored.schema_version == PRODUCER_SCHEMA) != stored.outcome.is_producer()
     {
         return Err(ReplayError::UnsupportedSchema);
     }
@@ -123,6 +129,11 @@ pub(crate) fn decode(
 fn property_output(value: &MqMqiResult) -> bool {
     matches!(&value.outcome,MqMqiOutcome::Completed {output,..}|MqMqiOutcome::StatusPending {output}|MqMqiOutcome::ReviewedOutput {output,..}
         if matches!(output,MqMqiOutput::PropertyObservation(_)))
+}
+fn producer_output(value: &MqMqiResult) -> bool {
+    matches!(&value.outcome, MqMqiOutcome::Completed { output, .. }
+        | MqMqiOutcome::StatusPending { output } | MqMqiOutcome::ReviewedOutput { output, .. }
+        if matches!(output, MqMqiOutput::Produced(_)))
 }
 fn full_output(value: &MqMqiResult) -> bool {
     matches!(&value.outcome, MqMqiOutcome::Completed { output, .. }

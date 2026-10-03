@@ -6,6 +6,51 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+`MQ-1503.selected-full-put-producer` consumes sealed worker7b9cd2782 after
+independent44path/blob,219stable receipt,54command snapshot,379historical input
+version/339current passing input,10frozen authority,16source pin and32dependency
+checks. Original selected PUT/PUT1 now produces complete MD1/2 through the SAME
+delivery/UOW and one audited physical publication, with explicit synchronous
+PMO1, DefaultContext/NoContext, supplied nonzero IDs, priority0/unlimited expiry,
+explicit persistence0/1, body CCSID37/819, FormatNONE opaque body/empty properties,
+and exact configured structure characters. Caller duplicate IDs are legal.
+Stored BackoutCount starts0 for every signed ignored input; returned MD preserves
+it with an explicit no-writeback disposition. Exact fixed48 resolved names and
+undefined z/OS destination counters are retained. One sole strict storage codec
+selects@5 only for Produced; old@1/@2/@3 bytes remain exact and@4 stays reserved.
+The SAME strict catalog@2 has explicit native attributes and no inferred default
+CCSID37; old catalog@1 remains exact. Active/populated replacement, operator
+permission and silent migration are not supplied.
+
+Physical GMT/calendar/context sources are crate-private, unique preactivation
+and SAME Arc store. NoContext clears context without time/batch sampling;
+exact replay rechecks live original frame/connection/object/unit/controls/SAF
+without resampling. Known publication alone adopts; Unknown retains/fences.
+Private Memory/ownedSQLite fixture ports and store-seeded original core intents
+are not installed/JES/RACF or compiled-root proof. Source baseline
+`ibm-mq-9.4-mqi-2026-08-31` PUTrow0020/q101880_ and PUT1row0021/q101890_,
+supplemental PMO/MD/declaration/persistence/priority and nine producer-attribute
+topics are retained-first hash-verified and actually searched/read offline;
+reference credit0, archive freshness/reproduction caveats unchanged.
+
+Fresh composed main checks pass254host,113selected-operation,33replay,
+34admission,2native-catalog,47delivery and11legacy object tests:494 Rust, zero
+failed/ignored, with filtered cases earning no credit. All13 mandatory Python
+policy tests, actual effect/provider guards/four namespace mutants, module979/
+34/4/1, server consumer compilation/provider docs, source reproduction/schema,
+fmt/normaldocs+check/changelog/whitespace pass. Genuine combined public API passes
+unchanged compiler70/coverage386/execution0/host931/store72 ceilings. The first
+sequence stopped after passing library suites at a manager-misnamed integration
+target; corrected `object_service_integration` and remaining checks pass without
+repeating the unchanged library tests. Original failed receipt stays retained.
+Generated documentation is regenerated normally to reconcile its sole conflict;
+ledger-only documentation checks remain separate. Every sequence and exact seal/
+HEADcheck cleans its intended target. Originald8/all32 unchanged dependency input
+proof is reused, not fresh deny/CI. Native point/source setup, compiled forwarding,
+actual installed/JES sources, generated IDs/defaults/priority/expiry, root terminal,
+recovery/participants/full26/CardDemo remain required. Parent remains ACTIVE;
+licensed IBM oracle ONLY human-skipped0/26, with zero credit.
+
 `MQ-1503.put-context-md-writeback` adds the atomic descriptor context writer
 needed by later compiled PUT/PUT1 forwarding. Eight actual default/no-context
 output fields use the same generated widths/kinds/offsets and prefix copier;

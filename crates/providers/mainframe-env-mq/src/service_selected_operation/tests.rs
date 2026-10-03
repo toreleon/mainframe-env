@@ -14,6 +14,8 @@ mod connection_warning;
 mod failures;
 #[path = "tests/full_get.rs"]
 mod full_get;
+#[path = "tests/full_put.rs"]
+mod full_put;
 #[path = "tests/historical.rs"]
 mod historical;
 #[path = "tests/property.rs"]
@@ -32,16 +34,30 @@ impl MqReplayClock for Clock {
 #[derive(Default)]
 struct Saf {
     deny: AtomicBool,
+    error: std::sync::atomic::AtomicU8,
+    observations: Mutex<Vec<(PrincipalId, EnterpriseResource)>>,
     calls: std::sync::atomic::AtomicU64,
     hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 impl EnterpriseAuthorizer for Saf {
-    fn authorize(&self, _: &PrincipalId, _: &EnterpriseResource) -> Result<(), HostProblem> {
+    fn authorize(
+        &self,
+        principal: &PrincipalId,
+        resource: &EnterpriseResource,
+    ) -> Result<(), HostProblem> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        self.observations
+            .lock()
+            .unwrap()
+            .push((principal.clone(), resource.clone()));
         if let Some(hook) = self.hook.lock().unwrap().take() {
             hook();
         }
-        if self.deny.load(Ordering::SeqCst) {
+        if self.error.load(Ordering::SeqCst) == 1 {
+            Err(HostProblem::ProviderFailure)
+        } else if self.error.load(Ordering::SeqCst) == 2 {
+            Err(HostProblem::InfrastructureFailure)
+        } else if self.deny.load(Ordering::SeqCst) {
             Err(HostProblem::Unauthorized)
         } else {
             Ok(())
@@ -75,13 +91,28 @@ impl Fixture {
         Self::with_context(store, false)
     }
     fn with_context(store: Arc<dyn PlatformStore>, explicit: bool) -> Self {
+        Self::with_producer_setup(store, explicit, None)
+    }
+    fn with_producer_setup(
+        store: Arc<dyn PlatformStore>,
+        explicit: bool,
+        producer: Option<(
+            MqObjectCatalog,
+            i32,
+            Arc<dyn super::producer::ProducerSource>,
+        )>,
+    ) -> Self {
         let legacy = MqService::open(store.clone(), MqLimits::default()).unwrap();
-        legacy
-            .install(vec![MqQueueDefinition {
-                name: "Q".into(),
-                trigger_program: None,
-            }])
-            .unwrap();
+        if let Some((catalog, _, _)) = &producer {
+            legacy.install_object_catalog(catalog.clone()).unwrap();
+        } else {
+            legacy
+                .install(vec![MqQueueDefinition {
+                    name: "Q".into(),
+                    trigger_program: None,
+                }])
+                .unwrap();
+        }
         let plan = legacy
             .plan_legacy_delivery_import(3, 5, Default::default())
             .unwrap();
@@ -89,6 +120,26 @@ impl Fixture {
             .mutate_provider_states_atomic(plan.into_parts().0)
             .unwrap();
         drop(legacy);
+        if let Some((catalog, version, _)) = &producer {
+            let rich_state::StoredAuthority::Rich(state) =
+                rich_state::read(&*store, 3, 5, Default::default()).unwrap()
+            else {
+                panic!()
+            };
+            let profile = crate::delivery::full_message::QueueProfile::Complete {
+                version: *version,
+                characters: catalog.native_attributes().unwrap().characters.md(),
+            };
+            let plan = state
+                .plan_profile_upgrade(
+                    &BTreeMap::from([(crate::MqObjectName::new("Q").unwrap(), profile)]),
+                    Default::default(),
+                )
+                .unwrap();
+            store
+                .mutate_provider_states_atomic(plan.into_parts().0)
+                .unwrap();
+        }
         let l = InvocationLimits::default();
         let inv = Invocation::new(
             RequestId::new("request", l).unwrap(),
@@ -136,7 +187,7 @@ impl Fixture {
         .with_cancellation_probe(CancellationProbe::new());
         let clock = Arc::new(Clock(std::sync::atomic::AtomicU64::new(20)));
         let saf = Arc::new(Saf::default());
-        let service = MqService::open_selected_mqi(
+        let mut service = MqService::open_selected_mqi(
             store.clone(),
             MqLimits::default(),
             3,
@@ -145,6 +196,9 @@ impl Fixture {
             clock.clone(),
         )
         .unwrap();
+        if let Some((_, _, source)) = producer {
+            MqService::configure_producer_sources(&mut service, &store, source).unwrap();
+        }
         let (frame, owner) = if explicit {
             let process = service
                 .mint_selected_process_explicit(

@@ -280,6 +280,30 @@ uses a bounded writer. The original frozen validators still own public shape
 and resource legality; this storage schema is not IBM wire or a second public
 request encoding.
 
+The complete producer output selects `mainframe-env.mq-mqi-result-storage@5`
+iff its stored output class is `Produced`. Version4 is reserved for the separate
+RFH2 owner and is rejected here. Versions1/2/3 retain their exact bytes and output
+classification; readers reject a producer relabeled as any older class, or an
+older output relabeled as5. The sole strict codec includes full MD bytes through
+the owned value encoder, exact fixed48 resolved names, delivery disposition,
+explicit undefined z/OS destination counters and preserved ignored-input counter
+disposition under the FULL original host result digest. Required fields, width,
+schema/output disagreement, duplicates, unknowns, malformed tags, quotas and
+digest changes fail closed. Receipt namespace/provenance/retention are unchanged.
+
+The same catalog's native attribute version2 is an explicit additive deployment
+profile; version1 stays byte-exact and contains no guessed defaults. In this
+feature native metadata is installed through the existing explicit catalog
+installer before legacy rich import and the globally quiescent empty-queue
+complete-profile upgrade. It does not supply operator or core permission, replace
+an active catalog, rewrite populated partial queues, or migrate on startup.
+Deployed replacement still requires a separately admitted drain/backup/migration
+protocol covering all live owners, units, cursors and receipts. Older catalog
+readers reject2; downgrade requires stopping writers and restoring a verified
+pre-upgrade backup or retaining a compatible reader, never stripping attributes
+or relabeling schema. Rich marker, namespaces, catalog hash, row envelopes and
+ordinary exact catalog/meta/marker/control dependencies retain their owners.
+
 The historical-handle extension preserves issued Connected, Opened with exact
 nullable dynamic metadata, MessageHandle and both Subscribed roles in the SAME
 codec through host-owned `MqHandleObservation`. Non-handle bytes and schema stay

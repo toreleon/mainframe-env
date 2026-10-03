@@ -75,6 +75,7 @@ simple!(
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum Options {
     ContractDefault {},
+    PutV1Synchronous {},
     PendingStructure {
         #[serde(deserialize_with = "required_option")]
         requested_version: Option<i32>,
@@ -84,6 +85,7 @@ impl From<MqMqiOptions> for Options {
     fn from(value: MqMqiOptions) -> Self {
         match value {
             MqMqiOptions::ContractDefault => Self::ContractDefault {},
+            MqMqiOptions::PutV1Synchronous => Self::PutV1Synchronous {},
             MqMqiOptions::PendingStructure { requested_version } => {
                 Self::PendingStructure { requested_version }
             }
@@ -94,6 +96,7 @@ impl From<Options> for MqMqiOptions {
     fn from(value: Options) -> Self {
         match value {
             Options::ContractDefault {} => Self::ContractDefault,
+            Options::PutV1Synchronous {} => Self::PutV1Synchronous,
             Options::PendingStructure { requested_version } => {
                 Self::PendingStructure { requested_version }
             }
@@ -162,6 +165,9 @@ pub(super) struct Item {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(super) enum Output {
+    Produced {
+        value: super::producer::Produced,
+    },
     PropertyObservation {
         observation: super::property::Observation,
     },
@@ -230,6 +236,9 @@ pub(super) enum Output {
 impl Output {
     fn from_output(value: &MqMqiOutput) -> Result<Self, ReplayError> {
         Ok(match value {
+            MqMqiOutput::Produced(value) => Self::Produced {
+                value: super::producer::Produced::capture(value)?,
+            },
             MqMqiOutput::PropertyObservation(v) => Self::PropertyObservation {
                 observation: super::property::Observation::capture(v),
             },
@@ -328,6 +337,7 @@ impl Output {
     }
     fn into_output(self) -> Result<MqMqiOutput, ReplayError> {
         Ok(match self {
+            Self::Produced { value } => MqMqiOutput::Produced(value.restore()?),
             Self::PropertyObservation { observation } => {
                 MqMqiOutput::PropertyObservation(observation.restore()?)
             }
@@ -443,6 +453,10 @@ pub(super) enum StoredOutcome {
     DuplicatePossible {},
 }
 impl StoredOutcome {
+    pub(super) fn is_producer(&self) -> bool {
+        matches!(self, Self::Completed { output, .. } | Self::StatusPending { output }
+            | Self::ReviewedOutput { output, .. } if matches!(output, Output::Produced { .. }))
+    }
     pub(super) fn is_property(&self) -> bool {
         matches!(self,Self::Completed {output,..}|Self::StatusPending {output}|Self::ReviewedOutput {output,..}
             if matches!(output,Output::PropertyObservation {..}))

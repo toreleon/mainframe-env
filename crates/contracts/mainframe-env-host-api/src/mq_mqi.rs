@@ -13,6 +13,8 @@
 
 mod encoding;
 mod full_message;
+pub(crate) mod producer;
+pub use producer::{MqMqiDestinationCount, MqMqiIgnoredCounter, MqMqiProduced};
 pub mod property;
 pub use full_message::{MqFullMessage, MqMqiFullGet, MqMqiFullPut};
 pub use property::{
@@ -79,7 +81,11 @@ calls! {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqMqiOptions {
     ContractDefault,
-    PendingStructure { requested_version: Option<i32> },
+    /// Finite PMO version1 with explicit synchronous response; not a permit.
+    PutV1Synchronous,
+    PendingStructure {
+        requested_version: Option<i32>,
+    },
 }
 
 /// Unit identity mirrors existing kernel `Option<u64>` local staging. External
@@ -96,10 +102,20 @@ pub enum MqMqiUnitOfWork {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqMqiMessageContext {
     Default,
-    PassIdentityPending { source: MqHobj },
-    PassAllPending { source: MqHobj },
-    SetIdentityPending { user: MqRouteAlternateUser },
-    SetAllPending { user: MqRouteAlternateUser },
+    /// Source-defined clearing of identity/origin context, requiring admission.
+    NoContext,
+    PassIdentityPending {
+        source: MqHobj,
+    },
+    PassAllPending {
+        source: MqHobj,
+    },
+    SetIdentityPending {
+        user: MqRouteAlternateUser,
+    },
+    SetAllPending {
+        user: MqRouteAlternateUser,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -461,6 +477,8 @@ pub enum MqMqiStatus {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MqMqiOutput {
+    /// Complete finite producer feedback; original FullPut bytes are unchanged.
+    Produced(MqMqiProduced),
     /// Complete descriptor observation from MQPUT/MQPUT1, not queue mutation proof.
     FullPut {
         /// Exact returned MQMD1/2 observation.

@@ -41,6 +41,10 @@ pub(crate) const REPLAY_NAMESPACE: &str = "mq-v1-replay";
 mod rows;
 pub(crate) use rows::encode_object_row;
 use rows::{commit_row_changes, load_or_migrate, load_row_map, row_changes};
+// Closed Rust integration facade. This does not attest installed/JES provenance.
+pub(crate) use selection::operations::producer::{
+    ProducerBatchContext, ProducerGmt, ProducerSource,
+};
 
 #[path = "service_legacy_delivery_import.rs"]
 pub(crate) mod legacy_delivery_import;
@@ -254,6 +258,8 @@ pub struct MqService {
     unknown_after_persist: AtomicBool,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
     replay_clock: Option<Arc<dyn MqReplayClock>>,
+    producer_sources: Option<selection::operations::producer::ProducerSources>,
+    producer_sampling: AtomicBool,
 }
 
 impl MqService {
@@ -309,6 +315,8 @@ impl MqService {
             unknown_after_persist: AtomicBool::new(false),
             authorizer,
             replay_clock,
+            producer_sources: None,
+            producer_sampling: AtomicBool::new(false),
         }))
     }
 

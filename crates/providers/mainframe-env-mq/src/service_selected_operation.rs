@@ -29,6 +29,8 @@ mod batch_child;
 mod explicit_context;
 #[path = "service_selected_operation/ownership.rs"]
 mod ownership;
+#[path = "service_selected_operation/producer.rs"]
+pub(in crate::service) mod producer;
 #[path = "service_selected_operation/property.rs"]
 mod property;
 #[path = "service_selected_operation/receipt.rs"]
@@ -316,6 +318,15 @@ impl MqService {
                 if resolved.host_result_digest != stored.value.result_digest {
                     return Err(HostProblem::UnknownOutcome);
                 }
+                producer::recheck(
+                    self,
+                    frame,
+                    invocation,
+                    admitted,
+                    &runtime.directory,
+                    clock.now_tick()?,
+                )
+                .map_err(|_| HostProblem::UnknownOutcome)?;
                 return Ok(reply);
             }
             if state.receipts.contains_key(key) || runtime.replies.contains_key(key) {
@@ -335,6 +346,9 @@ impl MqService {
                 now,
                 &authorized,
                 self.limits,
+                self,
+                frame,
+                admitted,
             ) {
                 Ok(candidate) => candidate,
                 Err(HostProblem::Unauthorized) => {
@@ -352,9 +366,13 @@ impl MqService {
                 }
                 Err(
                     error @ (HostProblem::ProviderFailure | HostProblem::InfrastructureFailure),
-                ) if matches!(admitted.envelope.request, MqMqiRequest::FullGet(_))
-                    || (error == HostProblem::InfrastructureFailure
-                        && matches!(admitted.envelope.request, MqMqiRequest::Property(_))) =>
+                ) if matches!(
+                    admitted.envelope.request,
+                    MqMqiRequest::FullGet(_)
+                        | MqMqiRequest::FullPut { .. }
+                        | MqMqiRequest::FullPutOne { .. }
+                ) || (error == HostProblem::InfrastructureFailure
+                    && matches!(admitted.envelope.request, MqMqiRequest::Property(_))) =>
                 {
                     // This finite prepare error occurred before either complete
                     // delivery or property state could publish. Use the SAME bound
@@ -448,6 +466,14 @@ impl MqService {
                     })),
                 };
                 let decision_tick = clock.now_tick()?;
+                producer::recheck(
+                    self,
+                    frame,
+                    invocation,
+                    admitted,
+                    &runtime.directory,
+                    decision_tick,
+                )?;
                 let preflight = admitted.preflight_result(&reply, decision_tick)?;
                 let bytes = runtime
                     .reply_bytes
@@ -538,6 +564,15 @@ impl MqService {
                 admitted
                     .recheck_controls(clock.now_tick()?)
                     .map_err(|_| HostProblem::UnknownOutcome)?;
+                producer::recheck(
+                    self,
+                    frame,
+                    invocation,
+                    admitted,
+                    &runtime.directory,
+                    clock.now_tick()?,
+                )
+                .map_err(|_| HostProblem::UnknownOutcome)?;
                 Ok(reply)
             })();
             if attempt.is_err() {

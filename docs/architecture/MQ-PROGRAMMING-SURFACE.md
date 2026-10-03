@@ -622,6 +622,72 @@ changes none of the ten pending reason declarations and earns zero execution
 credit. Archive work remains in progress; no freshness or browser reproduction
 claim follows from these offline pinned reads.
 
+### Private complete producer
+
+`MQ-1503.selected-full-put-producer` adds `PutV1Synchronous` and `NoContext`
+through the existing MQI and numeric wire-option authorities. Their distinct
+named canonical tags and `MqMqiOutput::Produced(MqMqiProduced)` are additive;
+every older request/result tag, domain and partial DTO literal is unchanged.
+The producer output retains complete returned MD, exact resolved MQCHAR48 names,
+three `UndefinedZos` PMO destination counts, and `PreservedIgnoredInput` for
+BackoutCount. That disposition is an owned no-writeback policy: returned MD
+retains every signed ignored input, while newly queued data stores count zero.
+It is not evidence of IBM returned-counter bytes; a native writer must skip it.
+
+The finite private selected profile requires original Running canonical core
+intent, actual ordinary nonshared issued z/OS batch connection, output Hobj for
+PUT or independently resolved predefined normal local queue for PUT1, current
+owned local UOW or explicit NoSyncpoint, mandatory typed SAF Update, and the
+same catalog/control/frame/physical-store fences. MD1/MD2 and structure-character
+profile must match the homogeneous complete queue. PMO1 explicitly selects
+synchronous response and DefaultContext or NoContext. Only FormatNONE opaque
+body, datagram, no reports/feedback/reply/group/segment, empty properties/no HMSG,
+explicit persistence0/1, priority0, unlimited expiry, body CCSID37 or819 and
+caller nonzero MsgId are admitted. Duplicate caller IDs are legal. Unsupported
+forms refuse before context capture or delivery mutation; representable signed
+Encoding is retained without claiming it is a conversion permission.
+
+The same catalog's explicit strict version2 stores actual QM CCSID/character
+profile, QM maximum message length/priority and each normal local queue's
+maximum length/delivery sequence. Version1 encoding is exact and supplies no
+implicit native metadata. Explicit37/819 configuration is not z/OS startup
+default500. Maximum priority has no invented upper bound; the first execution
+profile requires FIFO and priority0. The lesser actual queue/QM body maximum and
+existing host/kernel/prospective row/result quotas all apply, including empty
+body on a zero-maximum queue.
+
+Private unique preactivation Rust setup attaches bounded synchronous physical
+Gregorian GMT/hundredths and trusted batch context ports to the SAME physical
+service/store. Seconds60 is refused without normalization. Actual8-character
+JOB origin is padded to28; absent optional user/accounting differs from errors.
+MQAT_MVS/MQAT_ZOS2, blank identity/origin data, dates and times are source-bound.
+NoContext clears identity/origin fields and samples no time/context. A trusted
+host structure-text adapter must reuse the owned character encoder; body CCSID
+cannot select structure encoding. Matching Invocation text or rows never attests
+provenance. Calls are panic-contained and synchronous service reentry refuses;
+ports must be finite/nonblocking and check exact current frame lifetime.
+The real installed/JES constructor and privileged runtime port composition
+remain explicit host integration obligations, not assertions made by fixtures.
+
+One existing candidate kernel/UOW and insert-only receipt publish through the
+original audited physical transaction. Only known commit adopts. Exact replay
+rechecks live connection/object/current unit/frame/incarnation and SAF without
+resampling context or GMT. Postpersist uncertainty retains/fences and never
+redispatches, refreshes context or decides UOW. Selected receipt/core-retention
+and cold historical-handle refusal keep their existing owners. Tests exercise
+actual selected producer/GET/CMIT/BACK on Memory and exclusively owned SQLite
+with explicitly test-owned provenance ports; they are not JES/RACF/installed
+or participant evidence.
+
+Reviewed sources are original MQPUT/MQPUT1 rows0020/0021 of
+`ibm-mq-9.4-mqi-2026-08-31`, supplements q098655_/q097395_/q097390_/
+q092170_/q092190_, and `mq-producer-attribute-sources` QM/queue maxima, CCSID,
+delivery sequence and MQAT q090310_ declarations. Source registration/read earns
+zero execution or licensed credit and proves neither freshness nor snapshot
+equivalence. Generated IDs/defaults/effective priority/expiry, property/RFH2,
+actual installed/JES provenance, retirement/recovery/full26/participant/CardDemo
+remain required. Only the licensed oracle is human-skipped with zero credit.
+
 ### Coverage identity
 
 The MQ-1506 licensed adapter at

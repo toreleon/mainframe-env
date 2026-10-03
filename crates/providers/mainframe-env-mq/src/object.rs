@@ -2,8 +2,10 @@
 
 mod codec;
 mod definition;
+mod native_attributes;
 
 pub use definition::*;
+pub use native_attributes::*;
 
 use crate::service::MqQueueDefinition;
 use mainframe_env_host_api::HostProblem;
@@ -84,6 +86,7 @@ pub struct MqObjectCatalog {
     instances: BTreeMap<MqObjectName, MqModelInstance>,
     next_dynamic_id: u64,
     limits: MqObjectLimits,
+    native_attributes: Option<MqNativeAttributes>,
 }
 
 impl MqObjectCatalog {
@@ -111,6 +114,7 @@ impl MqObjectCatalog {
             instances: BTreeMap::new(),
             next_dynamic_id: 1,
             limits,
+            native_attributes: None,
         };
         catalog.validate_references()?;
         Ok(catalog)

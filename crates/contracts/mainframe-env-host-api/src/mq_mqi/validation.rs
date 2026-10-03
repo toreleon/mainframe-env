@@ -423,6 +423,14 @@ pub(super) fn validate_output(
         return Ok(());
     }
     let matched = match (call, output) {
+        (C::Put | C::PutOne, O::Produced(value)) => {
+            value.validate(limits.message)?;
+            status.is_none()
+                || matches!(
+                    value.outcome,
+                    MqDeliveryOutcome::Accepted | MqDeliveryOutcome::Pending
+                )
+        }
         (_, O::PropertyObservation(value)) => {
             value
                 .validate(call, limits)

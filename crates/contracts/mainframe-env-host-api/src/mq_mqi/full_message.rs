@@ -164,6 +164,10 @@ pub(super) fn got(
 pub(super) fn bind(request: &MqMqiRequest, output: &MqMqiOutput) -> Result<(), MqMqiProblem> {
     match (request, output) {
         (
+            MqMqiRequest::FullPut { put, .. } | MqMqiRequest::FullPutOne { put, .. },
+            MqMqiOutput::Produced(value),
+        ) => value.bind(put)?,
+        (
             MqMqiRequest::FullGet(get),
             MqMqiOutput::FullGot {
                 disposition,
@@ -210,7 +214,10 @@ pub(super) fn bind(request: &MqMqiRequest, output: &MqMqiOutput) -> Result<(), M
             | MqMqiRequest::FullPutOne { .. },
             _,
         )
-        | (_, MqMqiOutput::FullPut { .. } | MqMqiOutput::FullGot { .. }) => {
+        | (
+            _,
+            MqMqiOutput::FullPut { .. } | MqMqiOutput::FullGot { .. } | MqMqiOutput::Produced(_),
+        ) => {
             return Err(MqMqiProblem::OutputCallMismatch);
         }
         _ => {}
