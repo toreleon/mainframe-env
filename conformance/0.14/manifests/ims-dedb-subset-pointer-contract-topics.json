@@ -1,0 +1,81 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_version": "0.14.0",
+  "baseline_id": "ibm-ims-15.6-dedb-subset-pointers-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 DEDB subset-pointer archive prerequisites for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_subsetptr.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 10,
+  "total_bytes": 43367,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "d49cecc6da4e3d322adf513508950af03330f1d352352a5d5bfeca25b0b3d144",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_dedbsubsetptrstatuscodes.htm",
+      "sha256": "276d6716f409330e82003d03d30bbd91057d23228a1c902d11d62c038c8d240e",
+      "bytes": 2785,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_designatingsubsetptrs.htm",
+      "sha256": "78a80286c362655570f9dd78e200cf536380058975b3bac6e0b0edda673cda03",
+      "bytes": 1781,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_preparingtousesubsetptrs.htm",
+      "sha256": "f026483baf50ffc4b4e3ea6224147004726097a3129f631918b8cf8c3436017e",
+      "bytes": 2286,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_processingdedbsubsetptrs.htm",
+      "sha256": "07c7dc935f3e0c109eb585ae8bac54cc5c3bb09b1521da98ea5248c90fdd3b37",
+      "bytes": 17793,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_dedbcmdcdodes.htm",
+      "sha256": "1c79d86f88c837e45e8c73cef3c0cf611cb093ab85c7c24eb53cc04df06c4019",
+      "bytes": 4983,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_mcmdcode.htm",
+      "sha256": "47bfb13a99526e1d7d78d08d01b2a97cfc676ad0c6317c4c36f3a88a7cfadc1d",
+      "bytes": 2308,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_rcmdcode.htm",
+      "sha256": "79787e1e3856f221521e191c034d27c50371da2aa65283d8d6cb397b4194feee",
+      "bytes": 3813,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_scmdcode.htm",
+      "sha256": "32ea6604e0fd4feb8ce052e2a8cf81d63691c7cebd24a8f9fe162c31d1317345",
+      "bytes": 2425,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_zcmdcode.htm",
+      "sha256": "80dfc7ef085efed8d5f63fd44feb278bad3d5c4d1e398123e5d88933a92e4ee1",
+      "bytes": 2245,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_subsetptr.htm",
+      "sha256": "3c389c52ff1da974cb59c47e3428e7e67ae9a1e744cbaf3c92e945acb510a8fa",
+      "bytes": 2948,
+      "last_modified": "not-recorded-in-retained-archive"
+    }
+  ]
+}

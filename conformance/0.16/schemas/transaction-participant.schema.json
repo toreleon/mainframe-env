@@ -252,7 +252,44 @@
         "provider_id": { "type": "string" },
         "status": { "enum": ["accepted", "pending"] },
         "dependency": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "capabilities": {}
+        "capabilities": {},
+        "preparation": { "$ref": "#/$defs/ims-preparation" }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["preparation"] },
+          "then": {
+            "properties": {
+              "provider_id": { "const": "ims" },
+              "status": { "const": "pending" },
+              "capabilities": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "ims-preparation": {
+      "description": "Optional non-admitting IMS local test preparation; never accepted capabilities or coverage evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "contract_test", "blocked_obligations"],
+      "properties": {
+        "scope": { "const": "ims-local-database-provider-route" },
+        "contract_test": {
+          "const": "crates/providers/mainframe-env-ims/tests/participant_contract.rs"
+        },
+        "blocked_obligations": {
+          "const": [
+            "INT-1601.owner",
+            "INT-1601.modes",
+            "INT-1601.ordering",
+            "INT-1601.fencing",
+            "INT-1601.deadline-cancellation",
+            "INT-1601.security-audit",
+            "INT-1601.retention",
+            "INT-1601.compatibility"
+          ]
+        }
       }
     },
     "pending-participant": {

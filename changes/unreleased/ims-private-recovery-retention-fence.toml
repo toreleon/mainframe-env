@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Preserve private IMS recovery canonical dependencies with an opaque reserved-prefix presence fence under the existing retention epoch; globally protect four core families without admitting private expiry or changing store targets."

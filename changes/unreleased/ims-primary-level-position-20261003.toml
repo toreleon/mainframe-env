@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add private per-level satisfied witnesses and search boundaries in the sole IMS primary traversal for finite three-level uniquely keyed fixed HIDAM DbBatch GN/GHN U/V, with fresh bounded GE key feedback and ordinary mutation/recovery consumers; strict retained readers require stop/drain and coherent restore for downgrade, ADR0040 remains Proposed, and broader IMS acceptance remains open."

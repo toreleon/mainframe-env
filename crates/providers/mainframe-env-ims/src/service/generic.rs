@@ -6,7 +6,14 @@ use crate::database::{
 };
 use crate::{ImsDatabaseMetadata, ImsDatabasePcbMetadata, ImsPcbMetadata};
 
+pub(super) mod gsam;
+pub(super) mod integrity;
+pub(super) mod isolation;
+mod load_image;
 mod logical;
+pub(super) mod pcb;
+mod secondary;
+pub(super) mod ssa;
 
 /// Ordered bulk image; each parent refers to an earlier record by zero-based index.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -81,19 +88,23 @@ pub(super) fn definition(
     }
     let mut secondary_indexes = Vec::new();
     for index in &database.secondary_indexes {
-        if index.source_fields.len() != 1
-            || normalize(&index.source_segment) != normalize(&index.target_segment)
-        {
-            return Err(HostProblem::Unsupported);
-        }
         secondary_indexes.push(SecondaryIndexDefinition {
             name: normalize(&index.name),
             source_segment: normalize(&index.source_segment),
-            field: normalize(&index.source_fields[0]),
+            field: normalize(index.source_fields.first().ok_or(HostProblem::Malformed)?),
+            additional_fields: index
+                .source_fields
+                .iter()
+                .skip(1)
+                .map(|field| normalize(field))
+                .collect(),
+            target_segment: (normalize(&index.target_segment) != normalize(&index.source_segment))
+                .then(|| normalize(&index.target_segment)),
             unique: false,
         });
     }
     Ok(DatabaseDefinition {
+        gsam_format: database.gsam_format.clone(),
         name: normalize(&database.name),
         organization,
         segments,
@@ -108,6 +119,7 @@ pub(super) fn install_metadata(
     let identity = validate_ims_metadata(&metadata, ImsMetadataLimits::default())
         .map_err(|_| HostProblem::Malformed)?
         .digest;
+    service.validate_secondary_metadata(&metadata)?;
     let mut images = BTreeMap::new();
     for database in &metadata.databases {
         let engine = DatabaseEngine::new(definition(database)?, engine_limits(service.limits))
@@ -169,22 +181,13 @@ pub(super) fn refresh_databases(
         .versions
         .retain(|(namespace, _), _| namespace != GENERIC_DATABASE_NAMESPACE);
     durable.versions.extend(versions);
-    let mut versions = RowVersions::new();
-    durable.state.generic_pending_undo = load_row_map(
-        store,
-        GENERIC_PENDING_NAMESPACE,
-        limits.max_sessions,
-        limits,
-        &mut versions,
-    )?;
-    durable
-        .versions
-        .retain(|(namespace, _), _| namespace != GENERIC_PENDING_NAMESPACE);
-    durable.versions.extend(versions);
+    isolation::refresh_sessions(store, limits, durable)?;
+    system::reservations::refresh(store, limits, durable)?;
+    isolation::refresh_undo(store, limits, durable)?;
     super::validate_state(&durable.state, limits)
 }
 
-fn scheduled_pcb<'a>(
+pub(in crate::service) fn scheduled_pcb<'a>(
     state: &'a State,
     psb_name: &str,
     pcb_number: u16,
@@ -208,16 +211,20 @@ fn scheduled_pcb<'a>(
     }
 }
 
-fn session_pcb<'a>(state: &'a State, run: &str) -> Result<&'a ImsDatabasePcbMetadata, HostProblem> {
+pub(in crate::service) fn session_pcb<'a>(
+    state: &'a State,
+    run: &str,
+    number: u16,
+) -> Result<&'a ImsDatabasePcbMetadata, HostProblem> {
     let session = state.sessions.get(run).ok_or(HostProblem::NotFound)?;
     if !session.generic {
         return Err(HostProblem::NotFound);
     }
-    scheduled_pcb(state, &session.psb, session.pcb).map(|(_, pcb)| pcb)
+    scheduled_pcb(state, &session.psb, number).map(|(_, pcb)| pcb)
 }
 
-fn session_database(state: &State, run: &str) -> Result<String, HostProblem> {
-    Ok(normalize(&session_pcb(state, run)?.database))
+fn session_database(state: &State, run: &str, number: u16) -> Result<String, HostProblem> {
+    Ok(normalize(&session_pcb(state, run, number)?.database))
 }
 
 pub(super) fn is_generic(state: &State, run: &str, request: &ImsRequest) -> bool {
@@ -230,13 +237,19 @@ pub(super) fn is_generic(state: &State, run: &str, request: &ImsRequest) -> bool
                     .any(|psb| normalize(&psb.name) == normalize(name))
             })
         }),
-        ImsOperation::Load => serde_json::from_slice::<ImsGenericLoadImage>(&request.data)
-            .ok()
-            .is_some_and(|image| {
-                state
-                    .generic_databases
-                    .contains_key(&normalize(&image.database))
-            }),
+        ImsOperation::Load => {
+            request
+                .psb
+                .as_deref()
+                .is_some_and(|name| state.generic_databases.contains_key(&normalize(name)))
+                || load_image::decode(state, &request.data)
+                    .ok()
+                    .is_some_and(|image| {
+                        state
+                            .generic_databases
+                            .contains_key(&normalize(&image.database))
+                    })
+        }
         ImsOperation::Unload => {
             request
                 .psb
@@ -291,8 +304,7 @@ pub(super) fn resources(
             databases.insert(normalize(&pcb.database));
         }
         ImsOperation::Load => {
-            let image: ImsGenericLoadImage =
-                serde_json::from_slice(&request.data).map_err(|_| HostProblem::Malformed)?;
+            let image = load_image::decode(state, &request.data)?;
             databases.insert(normalize(&image.database));
         }
         ImsOperation::Unload => {
@@ -301,11 +313,12 @@ pub(super) fn resources(
                     .psb
                     .as_deref()
                     .map(normalize)
-                    .or_else(|| session_database(state, run).ok())
+                    .or_else(|| session_database(state, run, request.pcb).ok())
                     .ok_or(HostProblem::NotFound)?,
             );
         }
         ImsOperation::Commit | ImsOperation::Rollback => {
+            databases.extend(system::reservations::owned_databases(state, run)?);
             if let Some(pending) = state.generic_pending_undo.get(run) {
                 databases.extend(pending.keys().cloned());
             }
@@ -314,12 +327,10 @@ pub(super) fn resources(
             }
         }
         ImsOperation::Terminate | ImsOperation::Checkpoint => {
-            if let Ok(name) = session_database(state, run) {
-                databases.insert(name);
-            }
+            databases.extend(pcb::session_databases(state, run)?);
         }
         _ => {
-            databases.insert(session_database(state, run)?);
+            databases.insert(session_database(state, run, request.pcb)?);
         }
     }
     if databases.is_empty()
@@ -368,10 +379,12 @@ pub(super) fn resources(
 
 pub(super) fn apply_request(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
+    witness: &mut Option<super::feedback::PrimaryCallWitness>,
 ) -> Result<ImsResult, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
     match request.operation {
         ImsOperation::Schedule => {
             if state.sessions.contains_key(run) {
@@ -396,7 +409,9 @@ pub(super) fn apply_request(
                     current_root: None,
                     last: None,
                     position: PcbPosition::default(),
+                    pcb_positions: BTreeMap::new(),
                     system: system::SystemSession::default(),
+                    recovery: application_recovery::ExecutionRecovery::default(),
                 }),
             );
             Ok(status("  "))
@@ -410,32 +425,35 @@ pub(super) fn apply_request(
         | ImsOperation::GetNextParent
         | ImsOperation::GetHoldUnique
         | ImsOperation::GetHoldNext
-        | ImsOperation::GetHoldNextParent => read(state, run, request, limits),
+        | ImsOperation::GetHoldNextParent => read(state, invocation, request, limits, witness),
         ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete => {
-            mutate(state, run, request, limits)
+            mutate(state, invocation, request, limits, witness)
         }
         ImsOperation::Checkpoint => checkpoint(state, run, request, limits),
-        ImsOperation::Load => load(state, run, request, limits),
+        ImsOperation::Load => load(state, invocation, request, limits),
         ImsOperation::Unload => unload(state, run, request, limits),
         ImsOperation::Commit => {
+            isolation::ensure_backout(state, run)?;
             state.pending_undo.remove(run);
             state.generic_pending_undo.remove(run);
             Ok(status("  "))
         }
         ImsOperation::Rollback => {
+            isolation::ensure_backout(state, run)?;
             if let Some(pending) = state.pending_undo.remove(run) {
                 for (name, image) in pending.iter() {
                     state.databases.insert(name.clone(), image.clone());
                 }
             }
-            if let Some(pending) = state.generic_pending_undo.remove(run) {
+            if let Some(pending) = state.generic_pending_undo.get(run).cloned() {
                 for (name, image) in pending.iter() {
-                    state.generic_databases.insert(name.clone(), image.clone());
+                    isolation::publish_backout_image(state, run, name, (**image).clone(), limits)?;
                     reset_positions(state, name, None);
                 }
             }
+            state.generic_pending_undo.remove(run);
             if let Some(session) = state.sessions.get_mut(run) {
-                Arc::make_mut(session).position = PcbPosition::default();
+                pcb::clear_positions(Arc::make_mut(session));
             }
             Ok(status("  "))
         }
@@ -443,7 +461,11 @@ pub(super) fn apply_request(
     }
 }
 
-fn restored(state: &State, name: &str, limits: ImsLimits) -> Result<DatabaseEngine, HostProblem> {
+pub(in crate::service) fn restored(
+    state: &State,
+    name: &str,
+    limits: ImsLimits,
+) -> Result<DatabaseEngine, HostProblem> {
     let image = state
         .generic_databases
         .get(name)
@@ -499,7 +521,19 @@ fn read_request(request: &ImsRequest, engine: &DatabaseEngine) -> Result<ReadReq
     })
 }
 
-fn allowed(pcb: &ImsDatabasePcbMetadata, segment: &str, operation: ImsOperation) -> bool {
+pub(in crate::service) fn allowed(
+    pcb: &ImsDatabasePcbMetadata,
+    segment: &str,
+    operation: ImsOperation,
+) -> bool {
+    if pcb.processing_options.contains('O')
+        && matches!(
+            operation,
+            ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
+        )
+    {
+        return false;
+    }
     let Some(sensitive) = pcb
         .sensitive_segments
         .iter()
@@ -552,20 +586,58 @@ fn segment_result(engine: &DatabaseEngine, view: RecordView) -> Result<ImsSegmen
 
 fn read(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
+    witness: &mut Option<super::feedback::PrimaryCallWitness>,
 ) -> Result<ImsResult, HostProblem> {
-    let pcb = session_pcb(state, run)?.clone();
+    let run = invocation.run_unit_id.as_str();
+    let pcb = session_pcb(state, run, request.pcb)?.clone();
     let engine = restored(state, &normalize(&pcb.database), limits)?;
     let read = read_request(request, &engine)?;
-    if let Some(target) = &read.target
-        && !allowed(&pcb, target, request.operation)
-    {
-        return Ok(status("AC"));
+    if let Some(code) = pcb::read_status(&pcb, request, &read) {
+        return Ok(status(code));
     }
-    let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
-    match engine.read(&mut session.position, &read) {
+    let mut position = pcb::position(
+        state.sessions.get(run).ok_or(HostProblem::NotFound)?,
+        request.pcb,
+    );
+    let plan = ssa::ordinary_plan(
+        state,
+        invocation,
+        request,
+        &pcb,
+        (&engine, &read),
+        &position,
+        limits,
+    )?;
+    let parent_qualification = pcb::gnp_target_below_parent(&engine, &position, &read);
+    let visible = |segment: &str| {
+        read.target.is_some()
+            || (allowed(&pcb, segment, request.operation) && !pcb::key_only(&pcb, segment))
+    };
+    let outcome = if let Some(index) = &pcb.secondary_index {
+        engine.read_secondary_visible(&normalize(index), &mut position, &read, visible)
+    } else if let Some(plan) = &plan {
+        engine.read_ssas_planned(&mut position, &read, &plan.ssas, None, visible, Some(plan))
+    } else {
+        engine.read_visible(&mut position, &read, visible)
+    };
+    *witness = ssa::fresh_witness(&position, plan.is_some(), &outcome);
+    pcb::set_position(
+        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+        request.pcb,
+        position,
+    );
+    match outcome {
+        Ok(_)
+            if read
+                .target
+                .as_deref()
+                .is_some_and(|target| pcb::key_only(&pcb, target)) =>
+        {
+            Ok(status("  "))
+        }
         Ok(view) => Ok(ImsResult {
             status: "  ".into(),
             segments: vec![logical::segment_result(state, limits, &engine, view)?],
@@ -573,6 +645,7 @@ fn read(
             affected_segments: 0,
             system: None,
         }),
+        Err(EngineProblem::PathMismatch) if parent_qualification => Ok(status("GE")),
         Err(problem) => Ok(status(engine_status(problem))),
     }
 }
@@ -592,48 +665,98 @@ fn engine_status(problem: EngineProblem) -> &'static str {
     }
 }
 
-fn begin_unit(state: &mut State, run: &str, name: &str) -> Result<(), HostProblem> {
-    let image = state
-        .generic_databases
-        .get(name)
-        .cloned()
-        .ok_or(HostProblem::NotFound)?;
-    Arc::make_mut(state.generic_pending_undo.entry(run.into()).or_default())
-        .entry(name.into())
-        .or_insert(image);
-    Ok(())
+pub(super) fn reset_positions(state: &mut State, database: &str, except: Option<&str>) {
+    pcb::reset_database_positions(state, database, except);
 }
 
-pub(super) fn reset_positions(state: &mut State, database: &str, except: Option<&str>) {
-    let runs = state
-        .sessions
-        .keys()
-        .filter(|run| except != Some(run.as_str()))
-        .filter(|run| session_database(state, run).as_deref() == Ok(database))
-        .cloned()
-        .collect::<Vec<_>>();
-    for run in runs {
-        if let Some(session) = state.sessions.get_mut(&run) {
-            Arc::make_mut(session).position = PcbPosition::default();
+/// Existing retained metadata is the only sequence-uniqueness authority. This
+/// finite default-LAST class does not change descriptors or infer a RULES value.
+fn hisam_nonunique_child(
+    state: &State,
+    name: &str,
+    engine: &DatabaseEngine,
+    limits: ImsLimits,
+) -> Result<Option<String>, HostProblem> {
+    let Some(catalog) = &state.metadata else {
+        return Ok(None);
+    };
+    let Some(database) = catalog
+        .databases
+        .iter()
+        .find(|db| normalize(&db.name) == name)
+    else {
+        return Ok(None);
+    };
+    if database.organization != crate::ImsDatabaseOrganization::Hisam
+        || database.segments.len() != 2
+        || !database.secondary_indexes.is_empty()
+        || !engine.logical_links().is_empty()
+        || catalog
+            .databases
+            .iter()
+            .flat_map(|db| &db.logical_relationships)
+            .any(|rel| {
+                normalize(&rel.parent_database) == name || normalize(&rel.child_database) == name
+            })
+        || definition(database)? != *engine.definition()
+    {
+        return Ok(None);
+    }
+    let Some(root) = database
+        .segments
+        .iter()
+        .find(|segment| segment.parent.is_none())
+    else {
+        return Ok(None);
+    };
+    let Some(child) = database.segments.iter().find(|segment| {
+        segment.parent.as_deref().map(normalize).as_deref() == Some(normalize(&root.name).as_str())
+    }) else {
+        return Ok(None);
+    };
+    for (segment, unique) in [(root, true), (child, false)] {
+        let mut keys = segment.fields.iter().filter(|field| field.sequence);
+        if segment.min_length != segment.max_length
+            || keys
+                .next()
+                .is_none_or(|key| key.name.is_none() || key.unique != unique)
+            || keys.next().is_some()
+        {
+            return Ok(None);
         }
     }
+    // Protect either endpoint even when a link is retained on another database.
+    for other in state
+        .generic_databases
+        .keys()
+        .filter(|other| other.as_str() != name)
+    {
+        if restored(state, other, limits)?
+            .logical_links()
+            .iter()
+            .any(|link| normalize(&link.parent_database) == name)
+        {
+            return Ok(None);
+        }
+    }
+    Ok(Some(normalize(&child.name)))
 }
 
 fn mutate(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
+    witness: &mut Option<super::feedback::PrimaryCallWitness>,
 ) -> Result<ImsResult, HostProblem> {
-    let pcb = session_pcb(state, run)?.clone();
+    let run = invocation.run_unit_id.as_str();
+    let pcb = session_pcb(state, run, request.pcb)?.clone();
     let name = normalize(&pcb.database);
     let mut engine = restored(state, &name, limits)?;
-    let mut position = state
-        .sessions
-        .get(run)
-        .ok_or(HostProblem::NotFound)?
-        .position
-        .clone();
+    let mut position = pcb::position(
+        state.sessions.get(run).ok_or(HostProblem::NotFound)?,
+        request.pcb,
+    );
     let target = if request.operation == ImsOperation::Insert {
         request
             .segments
@@ -653,27 +776,67 @@ fn mutate(
             .clone()
     };
     if !allowed(&pcb, &target, request.operation) {
-        return Ok(status("AC"));
+        return Ok(status("AM"));
+    }
+    if secondary::restricted_mutation(&engine, &pcb, &target, request.operation) {
+        return Ok(status("AM"));
+    }
+    isolation::ensure_writer(state, run, &name)?;
+    let primary = if invocation.service_class == ServiceClass::Batch {
+        ssa::primary_identity(
+            state,
+            &state.sessions[run].psb,
+            request.pcb,
+            &pcb,
+            &engine,
+            limits,
+        )?
+    } else {
+        None
+    };
+    if primary.is_none() {
+        position.clear_primary();
     }
     if request.operation == ImsOperation::Delete {
+        if primary.is_some() {
+            let (count, deletion) = match engine.delete_with_primary(&mut position) {
+                Ok(changed) => changed,
+                Err(problem) => return Ok(status(engine_status(problem))),
+            };
+            isolation::publish_image(state, run, &name, engine.image(), limits)?;
+            reset_positions(state, &name, Some(run));
+            if let Some(deletion) = &deletion {
+                pcb::consume_primary_deletion(state, run, request.pcb, &name, deletion)?;
+            }
+            pcb::set_position(
+                Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+                request.pcb,
+                position,
+            );
+            return Ok(affected(count as u64));
+        }
         let (count, images) = match logical::delete_cascade(state, limits, &name, &mut position) {
             Ok(changed) => changed,
             Err(logical::LogicalMutationError::Status(code)) => return Ok(status(code)),
             Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
         };
         for (database, image) in images {
-            begin_unit(state, run, &database)?;
-            state
-                .generic_databases
-                .insert(database.clone(), Arc::new(image.image()));
+            isolation::publish_image(state, run, &database, image.image(), limits)?;
             reset_positions(state, &database, Some(run));
+            pcb::reset_deleted_positions(state, run, request.pcb, &database, limits)?;
         }
-        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).position =
-            position;
+        pcb::set_position(
+            Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+            request.pcb,
+            position,
+        );
         return Ok(affected(count as u64));
     }
     let changed = match request.operation {
         ImsOperation::Insert => {
+            let old_parentage = position.parentage();
+            let certify = primary.is_some()
+                && (position.primary_feedback_path().is_some() || !request.qualifiers.is_empty());
             let segment = engine
                 .definition()
                 .segments
@@ -684,6 +847,12 @@ fn mutate(
             };
             let parent = match &segment.parent {
                 None => None,
+                Some(parent_name)
+                    if request.qualifiers.is_empty()
+                        && position.primary_feedback_path().is_some() =>
+                {
+                    position.primary_parent(parent_name)
+                }
                 Some(parent_name) if request.qualifiers.is_empty() => {
                     position.current().or(position.parentage()).and_then(|id| {
                         engine.path_to(id).ok().and_then(|path| {
@@ -693,6 +862,31 @@ fn mutate(
                                 .map(|view| view.id)
                         })
                     })
+                }
+                Some(parent_name) if primary.is_some() => {
+                    let (found, observed) = ssa::lookup_insert_parent(
+                        state,
+                        invocation,
+                        request,
+                        &pcb,
+                        (&engine, parent_name),
+                        &mut position,
+                        limits,
+                    )?;
+                    match found {
+                        Ok(view) => Some(view.id),
+                        Err(problem) => {
+                            *witness = observed;
+                            pcb::set_position(
+                                Arc::make_mut(
+                                    state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?,
+                                ),
+                                request.pcb,
+                                position,
+                            );
+                            return Ok(status(engine_status(problem)));
+                        }
+                    }
                 }
                 Some(parent_name) => {
                     let mut ancestry = BTreeSet::new();
@@ -713,7 +907,17 @@ fn mutate(
                         .qualifiers
                         .retain(|qualifier| ancestry.contains(&normalize(&qualifier.segment)));
                     let query = read_request(&lookup, &engine)?;
-                    match engine.read(&mut PcbPosition::default(), &query) {
+                    let found = if let Some(index) = &pcb.secondary_index {
+                        engine.read_secondary_visible(
+                            &normalize(index),
+                            &mut PcbPosition::default(),
+                            &query,
+                            |_| true,
+                        )
+                    } else {
+                        engine.read(&mut PcbPosition::default(), &query)
+                    };
+                    match found {
                         Ok(view) => Some(view.id),
                         Err(problem) => return Ok(status(engine_status(problem))),
                     }
@@ -722,11 +926,24 @@ fn mutate(
             if segment.parent.is_some() && parent.is_none() {
                 return Ok(status("GP"));
             }
-            let inserted = engine.insert(InsertRequest {
+            let nonunique = invocation.service_class == ServiceClass::Batch
+                && pcb.secondary_index.is_none()
+                && request.segments.len() == 1
+                && request.qualifiers.is_empty()
+                && position.current() == parent
+                && position.parentage() == parent
+                && hisam_nonunique_child(state, &name, &engine, limits)?.as_deref()
+                    == Some(target.as_str());
+            let insert = InsertRequest {
                 segment: target,
                 parent,
                 data: request.data.clone(),
-            });
+            };
+            let inserted = if nonunique {
+                engine.insert_nonunique_dependent_last(insert, false)
+            } else {
+                engine.insert(insert)
+            };
             match inserted {
                 Ok(view) => {
                     match logical::link_insert(state, limits, &name, &view, request, &mut engine) {
@@ -736,8 +953,38 @@ fn mutate(
                         }
                         Err(logical::LogicalMutationError::Host(problem)) => return Err(problem),
                     }
-                    position.set_current(view.id);
-                    Ok(1usize)
+                    if engine.primary_shape() {
+                        pcb::invalidate_primary_reinsertion(
+                            state,
+                            run,
+                            request.pcb,
+                            &name,
+                            &engine,
+                            view.id,
+                        )?;
+                    }
+                    if let Some(index) = &pcb.secondary_index {
+                        engine
+                            .position_after_secondary_insert(
+                                &normalize(index),
+                                &mut position,
+                                view.id,
+                            )
+                            .map(|()| 1usize)
+                    } else if nonunique {
+                        engine
+                            .position_after_nonunique_dependent_insert(&mut position, view.id)
+                            .map(|()| 1usize)
+                    } else if let Some(digest) = primary.filter(|_| certify || parent.is_none()) {
+                        engine
+                            .primary_inserted(&mut position, digest, view.id, old_parentage)
+                            .map_err(|_| HostProblem::InfrastructureFailure)?;
+                        *witness = ssa::fresh_witness(&position, true, &Ok(view.clone()));
+                        Ok(1usize)
+                    } else {
+                        position.set_current(view.id);
+                        Ok(1usize)
+                    }
                 }
                 Err(problem) => Err(problem),
             }
@@ -749,11 +996,12 @@ fn mutate(
         Ok(count) => count,
         Err(problem) => return Ok(status(engine_status(problem))),
     };
-    begin_unit(state, run, &name)?;
-    state
-        .generic_databases
-        .insert(name, Arc::new(engine.image()));
-    Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).position = position;
+    isolation::publish_image(state, run, &name, engine.image(), limits)?;
+    pcb::set_position(
+        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?),
+        request.pcb,
+        position,
+    );
     Ok(affected(count as u64))
 }
 
@@ -763,6 +1011,8 @@ fn checkpoint(
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
+    let psb = &state.sessions.get(run).ok_or(HostProblem::NotFound)?.psb;
+    super::application_recovery::gsam_checkpoint::reject_basic(state, psb)?;
     let id = request
         .checkpoint_id
         .clone()
@@ -770,12 +1020,14 @@ fn checkpoint(
     if state.checkpoints.len() >= limits.max_checkpoints && !state.checkpoints.contains_key(&id) {
         return Err(HostProblem::ResourceExhausted);
     }
-    let session = state
-        .sessions
-        .get(run)
-        .cloned()
-        .ok_or(HostProblem::NotFound)?;
-    state.checkpoints.insert(id.clone(), session);
+    state.pending_undo.remove(run);
+    state.generic_pending_undo.remove(run);
+    // Preserve the basic checkpoint boundary across all selected DB PCBs.
+    let session = Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?);
+    pcb::clear_positions(session);
+    state
+        .checkpoints
+        .insert(id.clone(), Arc::new(session.clone()));
     Ok(ImsResult {
         status: "  ".into(),
         segments: Vec::new(),
@@ -787,35 +1039,42 @@ fn checkpoint(
 
 fn load(
     state: &mut State,
-    run: &str,
+    invocation: &Invocation,
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
-    let image: ImsGenericLoadImage =
-        serde_json::from_slice(&request.data).map_err(|_| HostProblem::Malformed)?;
+    let run = invocation.run_unit_id.as_str();
+    let image = load_image::decode(state, &request.data)?;
     let name = normalize(&image.database);
     let prior = restored(state, &name, limits)?;
+    system::reservations::ensure_no_reservations(state, &name)?;
     let mut engine = DatabaseEngine::new(prior.definition().clone(), engine_limits(limits))
         .map_err(install_error)?;
     let mut ids = Vec::new();
+    let nonunique_child = if invocation.service_class == ServiceClass::Batch {
+        hisam_nonunique_child(state, &name, &prior, limits)?
+    } else {
+        None
+    };
     for record in &image.records {
         let parent = record
             .parent
             .map(|index| ids.get(index).copied().ok_or(HostProblem::Malformed))
             .transpose()?;
-        let view = engine
-            .insert_loaded(InsertRequest {
-                segment: normalize(&record.segment),
-                parent,
-                data: record.data.clone(),
-            })
-            .map_err(install_error)?;
+        let insert = InsertRequest {
+            segment: normalize(&record.segment),
+            parent,
+            data: record.data.clone(),
+        };
+        let view = if nonunique_child.as_deref() == Some(insert.segment.as_str()) {
+            engine.insert_nonunique_dependent_last(insert, true)
+        } else {
+            engine.insert_loaded(insert)
+        }
+        .map_err(install_error)?;
         ids.push(view.id);
     }
-    begin_unit(state, run, &name)?;
-    state
-        .generic_databases
-        .insert(name, Arc::new(engine.image()));
+    isolation::publish_image(state, run, &name, engine.image(), limits)?;
     let name = normalize(&image.database);
     reset_positions(state, &name, None);
     Ok(affected(ids.len() as u64))
@@ -831,7 +1090,7 @@ fn unload(
         .psb
         .as_deref()
         .map(normalize)
-        .or_else(|| session_database(state, run).ok())
+        .or_else(|| session_database(state, run, request.pcb).ok())
         .ok_or(HostProblem::NotFound)?;
     let engine = restored(state, &name, limits)?;
     let segments = engine
@@ -867,7 +1126,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
                 .sessions
                 .values()
                 .chain(state.checkpoints.values())
-                .all(|session| !session.generic)
+                .all(|session| !session.generic && session.pcb_positions.is_empty())
         {
             Ok(())
         } else {
@@ -876,6 +1135,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
     };
     validate_ims_metadata(metadata, ImsMetadataLimits::default())
         .map_err(|_| HostProblem::InfrastructureFailure)?;
+    secondary::validate_catalog(metadata).map_err(|_| HostProblem::InfrastructureFailure)?;
     let names = metadata
         .databases
         .iter()
@@ -910,6 +1170,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
     }
     logical::validate_links(state, limits)?;
     for pending in state.generic_pending_undo.values() {
+        pending.validate(limits)?;
         for (name, image) in pending.iter() {
             let engine = DatabaseEngine::restore((**image).clone(), engine_limits(limits))
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
@@ -925,24 +1186,7 @@ pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), Hos
             }
         }
     }
-    for session in state.sessions.values().filter(|session| session.generic) {
-        let pcb = scheduled_pcb(state, &session.psb, session.pcb)
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .1;
-        if state
-            .generic_databases
-            .contains_key(&normalize(&pcb.database))
-        {
-            let engine = restored(state, &normalize(&pcb.database), limits)?;
-            engine
-                .validate_position(&session.position)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-        }
-    }
-    for session in state.checkpoints.values().filter(|session| session.generic) {
-        scheduled_pcb(state, &session.psb, session.pcb)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-    }
+    pcb::validate_sessions(state, limits)?;
     Ok(())
 }
 

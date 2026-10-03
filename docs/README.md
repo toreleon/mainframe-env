@@ -105,6 +105,19 @@ explicitly names that authority as superseded.
 - [ADR-0034: MQ root publication framework](decisions/0034-mq-root-terminal-publication.md)
 - [ADR-0035: Volatile task-root MQI ABI aliases](decisions/0035-mq-root-scoped-abi-aliases.md)
 - [Decision index and template](decisions/README.md)
+- [ADR-0034: Bounded GSAM logical record addresses](decisions/0034-gsam-logical-address.md)
+- [ADR-0031: IMS TM recovery publication and work settlement](decisions/0031-ims-tm-recovery-publication.md)
+- [ADR-0035: Versioned selected database PCB feedback](decisions/0035-selected-pcb-feedback.md)
+- [ADR-0037: Private IMS recovery retention fence](decisions/0037-private-ims-recovery-retention-fence.md)
+- [ADR-0038: Real logical child physical-path key feedback](decisions/0038-logical-child-physical-key-feedback.md)
+- [ADR-0039: Last remaining direct child SSA selection](decisions/0039-last-direct-child-ssa-selection.md)
+- [ADR-0040: Private primary level witnesses and search boundary](decisions/0040-primary-level-position-search-boundary.md)
+- [ADR-0041: First direct child SSA selection](decisions/0041-first-direct-child-ssa-selection.md)
+- [ADR-0042: Private IMS TM output identity and local completion order](decisions/0042-ims-tm-output-identity-local-order.md)
+- [ADR-0033: Raw COBOL DL/I CALL and PCB binding contract](decisions/0033-cobol-dli-call-boundary.md)
+- [ADR-0030: GSAM application record formats and owned length](decisions/0030-gsam-application-record-formats.md)
+- [ADR-0032: Selected secondary checkpoint positions](decisions/0032-selected-secondary-checkpoint-position.md)
+- [ADR-0036: Literal null SSA command slots](decisions/0036-null-ssa-command-slots.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

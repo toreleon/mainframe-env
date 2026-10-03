@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Support default-LAST insertion of nonunique terminal dependents through the typed Batch IMS route for selected two-level fixed physical HISAM metadata; preserve occurrence IDs, ancestor parentage, hold/replay/backout and checkpoint boundaries without changing retained formats or standalone insertion defaults."

@@ -70,6 +70,7 @@ pub(super) fn validate_definition(
 }
 
 pub(super) fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
+    application_recovery::validate_sessions(state)?;
     if state.sessions.len() > limits.max_sessions
         || state.checkpoints.len() > limits.max_checkpoints
         || state.replay.len() > limits.max_replays

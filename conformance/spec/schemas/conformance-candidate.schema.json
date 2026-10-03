@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/conformance-candidate-v1.json",
+  "title": "Shared noncredit Conformance IR candidate preparation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "review_status",
+    "coverage_credit",
+    "spec",
+    "rules",
+    "missing_classes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.conformance-candidate@1"
+    },
+    "review_status": {
+      "const": "pending-maintainer"
+    },
+    "coverage_credit": {
+      "const": 0
+    },
+    "spec": {
+      "type": "object"
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "rationale",
+          "sources",
+          "bindings"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "baseline",
+                "manifest",
+                "topic_path",
+                "sha256",
+                "anchor"
+              ],
+              "properties": {
+                "baseline": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"
+                },
+                "manifest": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "topic_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "anchor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                }
+              }
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "row_id",
+                "obligation_id",
+                "gate"
+              ],
+              "properties": {
+                "row_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"
+                },
+                "obligation_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"
+                },
+                "gate": {
+                  "enum": [
+                    "recognized",
+                    "validated",
+                    "executed",
+                    "conditioned",
+                    "recovered",
+                    "differential"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "missing_classes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "row_id",
+          "classes"
+        ],
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"
+          },
+          "classes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        }
+      }
+    }
+  }
+}

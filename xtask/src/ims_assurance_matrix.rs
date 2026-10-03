@@ -159,7 +159,9 @@ fn check_handler_closure(root: &Path, matrix: &Value, catalog: &Value) -> TaskRe
             .as_array()
             .ok_or("IMS handler variants are missing")?;
         let source = match kind {
-            "ims-operation" => root.join("crates/contracts/mainframe-env-host-api/src/request.rs"),
+            "ims-operation" => {
+                root.join("crates/contracts/mainframe-env-host-api/src/request/ims.rs")
+            }
             "ims-system-call" => {
                 root.join("crates/contracts/mainframe-env-host-api/src/ims_system.rs")
             }

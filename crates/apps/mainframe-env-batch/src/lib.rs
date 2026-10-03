@@ -6,6 +6,7 @@ mod ams;
 mod controller;
 mod dd;
 mod dd_hydration;
+mod ims_launcher;
 mod jcl;
 mod jcl_catalog;
 mod jcl_expand;

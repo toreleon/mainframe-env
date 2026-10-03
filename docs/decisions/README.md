@@ -45,6 +45,12 @@ ADRs capture decisions that constrain implementation and public contracts.
 Parallel subsystem work allocated the same 0028 and 0029 numeric prefixes.
 Their distinct full filenames and subsystem-qualified labels identify each
 proposal; no historical decision body or reference has been replaced.
+| [0034](0034-gsam-logical-address.md) | bounded public GSAM logical addresses using existing engine, PCB and row authorities | Proposed |
+| [0031](0031-ims-tm-recovery-publication.md) | shared work/effect-fenced IMS TM recovery publication and settlement | Proposed |
+| [0035](0035-selected-pcb-feedback.md) | versioned owned selected PCB feedback retained in the existing proposal and receipt | Proposed |
+| [0033](0033-cobol-dli-call-boundary.md) | owned raw COBOL DL/I CALL frame, PCB entry binding and feedback contract proposal | Proposed |
+| [0030](0030-gsam-application-record-formats.md) | explicit GSAM application formats, owned U length and checkpoint format identity | Proposed |
+| [0032](0032-selected-secondary-checkpoint-position.md) | selected secondary checkpoint occurrence witnesses composed with existing local backout | Proposed |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

@@ -13,6 +13,7 @@
     "segment_name_bytes",
     "field_name_bytes",
     "relational_operator_bytes",
+    "null_command_encoding",
     "command_codes",
     "relational_operators",
     "boolean_connectors"
@@ -51,6 +52,7 @@
     "segment_name_bytes": {"const": 8},
     "field_name_bytes": {"const": 8},
     "relational_operator_bytes": {"const": 2},
+    "null_command_encoding": {"const": "2d"},
     "command_codes": {
       "type": "array",
       "minItems": 17,

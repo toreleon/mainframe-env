@@ -708,10 +708,10 @@ impl MqDeliveryKernel {
 }
 
 fn validate_unit(kernel: &MqDeliveryKernel, unit: Option<u64>) -> Result<(), MqDeliveryError> {
-    if let Some(unit) = unit {
-        if unit == 0 || kernel.finalized.contains_key(&unit) {
-            return Err(MqDeliveryError::InvalidUnit);
-        }
+    if let Some(unit) = unit
+        && (unit == 0 || kernel.finalized.contains_key(&unit))
+    {
+        return Err(MqDeliveryError::InvalidUnit);
     }
     Ok(())
 }
@@ -1132,8 +1132,10 @@ mod tests {
     #[test]
     fn distribution_overload_is_atomic_and_replay_is_explicit() {
         let objects = catalog();
-        let mut limits = MqDeliveryLimits::default();
-        limits.depth_per_queue = 1;
+        let limits = MqDeliveryLimits {
+            depth_per_queue: 1,
+            ..MqDeliveryLimits::default()
+        };
         let mut kernel = MqDeliveryKernel::new(
             &objects,
             limits,
@@ -1325,9 +1327,11 @@ mod tests {
     #[test]
     fn pending_capacity_and_cursor_capacity_fail_without_mutation() {
         let objects = catalog();
-        let mut limits = MqDeliveryLimits::default();
-        limits.pending_operations = 1;
-        limits.cursors = 1;
+        let limits = MqDeliveryLimits {
+            pending_operations: 1,
+            cursors: 1,
+            ..MqDeliveryLimits::default()
+        };
         let mut kernel = MqDeliveryKernel::new(
             &objects,
             limits,

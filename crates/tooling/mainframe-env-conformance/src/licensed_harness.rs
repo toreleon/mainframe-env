@@ -97,7 +97,6 @@ impl OracleHarnessRegistry {
         &self.digest
     }
 
-    #[must_use]
     pub fn slot_ids(&self) -> impl Iterator<Item = &str> {
         self.slots.keys().map(String::as_str)
     }

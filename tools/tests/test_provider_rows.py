@@ -22,6 +22,7 @@ class ProviderRowsTests(unittest.TestCase):
             MQ_SERVICE,
             MQ_ROWS,
             Path("crates/providers/mainframe-env-ims/src/service.rs"),
+            Path("crates/providers/mainframe-env-ims/src/service/rows.rs"),
             Path("crates/providers/mainframe-env-db2/src/service.rs"),
         ):
             target = root / path

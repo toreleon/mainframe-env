@@ -148,7 +148,7 @@
         "source_fields": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 255,
+          "maxItems": 5,
           "items": {
             "$ref": "#/$defs/name"
           }
@@ -253,6 +253,9 @@
           "items": {
             "$ref": "#/$defs/logical_relationship"
           }
+        },
+        "gsam_format": {
+          "$ref": "#/$defs/gsam_format"
         }
       },
       "x-ims-source-topics": [
@@ -263,6 +266,31 @@
         {
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_dbdstmt.htm",
           "sha256": "ce1b4b70aa0b5803d25e5d72a71004cffb071361fcbc93a658bd3ce4e17cf7cd"
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "gsam_format"
+            ]
+          },
+          "then": {
+            "properties": {
+              "organization": {
+                "const": "GSAM"
+              },
+              "segments": {
+                "maxItems": 1
+              },
+              "secondary_indexes": {
+                "maxItems": 0
+              },
+              "logical_relationships": {
+                "maxItems": 0
+              }
+            }
+          }
         }
       ]
     },
@@ -327,6 +355,12 @@
         },
         "database": {
           "$ref": "#/$defs/name"
+        },
+        "secondary_index": {
+          "oneOf": [
+            { "$ref": "#/$defs/name" },
+            { "type": "null" }
+          ]
         },
         "database_version": {
           "oneOf": [
@@ -459,6 +493,65 @@
         {
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.sur/ims_psbgenpsbgenstmt.htm",
           "sha256": "b373ee39a66431d4217f96809f90f4e4b648813dd0e484fbe8c87eccb3895d0c"
+        }
+      ]
+    },
+    "gsam_format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "record_format",
+        "access_method",
+        "block_size",
+        "control"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "record_format": {
+          "enum": [
+            "F",
+            "V",
+            "U"
+          ]
+        },
+        "access_method": {
+          "enum": [
+            "Bsam",
+            "Vsam"
+          ]
+        },
+        "block_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32760
+        },
+        "control": {
+          "enum": [
+            "None",
+            "Asa",
+            "Machine"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "record_format": {
+                "const": "U"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "access_method": {
+                "const": "Bsam"
+              }
+            }
+          }
         }
       ]
     }
