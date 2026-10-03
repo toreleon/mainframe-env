@@ -414,6 +414,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/invoke_application.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/security.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests/sqlite_reopen.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control/load.rs",

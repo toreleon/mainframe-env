@@ -3700,3 +3700,64 @@ required. No production/test source or authority change, skip, widened ceiling o
 new semantic credit. Reuse the actual five-test receipt only after exact complete
 Rust/dependency input equality; inventory/status/derived metadata receive fresh
 mandatory checks, without relabelling the earlier test producer as a new candidate.
+
+### PROGRAM preparation after SQLite child74
+
+SPI-1001.program-status-sqlite-reopen is sealed as bounded test preparation at
+06837a9554d503100127293da36a607ac0cd01d9. Five actual integrated tests passed;
+only subsequent inventory/status/derived metadata changed, with exact Rust and
+dependency closure verified for component-receipt reuse. Fresh mandatory gates,
+independent final metadata review, exact six-path child seal/check and cargo clean0
+passed. No full-candidate test execution is inferred from the reused component
+receipt. All runtime/restart/official/license/parent gates remain Pending0.
+
+Pre-dispatch independent SPI-1001.program-inquiry-security-review: frozen author
+fe259cfa61c9728b25fa800342f84cb1e1bbd258, exact two owned paths, whole1027-line
+module and preserved46-line parent plus one registration. Author-local11 tests
+with70 explicit fixture iterations pass0fail0ignore; those are unsealed component
+evidence. A different retained CLI reviewer owns only external findings and
+source/receipt/preservation proofs. Verify all source denial distinctions and
+independent complete state/request/audit fixtures; unexpected decisions, product
+Unauthorized and NOTAUTH-shaped host errors must retain distinct product origin.
+Review exact row0155/e3d8ed4c and security reference57539dc4 source qualifications
+with bounded fresh offline search/read. No Cargo, repairs, cache/index/repository
+writes, network/license or self-approval. Manager alone integrates new code,
+module inventory path, unique fragment/status/derived docs and actual gates/sealer.
+PINQ-01 (nested current time is synthesized as deadline-1) remains a concrete
+shared-owner prerequisite before a selected route; the direct host expiry test
+is supplementary. PINQ-02 deployed policy and trusted issuer/namespace/receiver
+remain Pending. No private helper acceptance becomes public SPI admission.
+
+Manager next shared lane is bounded PINQ-01 control propagation diagnosis and
+repair design under the existing host/run/time owner, including narrowed outer
+effect deadlines and expiry between nested checks. Preserve one nested/host
+authority, cancellation and replay/unknown-outcome contracts. No fabricated time,
+caller-provided authority, clock bypass, new dispatcher or automatic redispatch.
+Worker review remains frozen/read-only; do not edit its retained source inputs.
+Source/control regressions, a concrete owned implementation boundary and
+independent review precede any shared repair or route binding.
+
+### PROGRAM configured security integration child75
+
+Different retained CLI review 01a0fced-45da-7442-b3d2-82ace535b067 completed
+with no actionable defect in frozen fe259cfa61c9728b25fa800342f84cb1e1bbd258.
+Manager consumed all1027 lines, the complete fixture expectations and reports.
+The private row0155 child consumes PROGRAM e3d8ed4c and security reference
+57539dc4, including explicit policy qualification and source denial boundaries.
+Actual author11 pass0fail0ignore and70 fixtures remain author-component receipts;
+manager now owns exact integrated focused tests and mandatory gates. Only two
+reviewed Rust paths, the single new security.rs inventory entry, unique fragment,
+this status and derived documentation are allowed. Preserve all previous inventory
+entries/order/budgets/exemptions and original parent bytes. No source defaults,
+public issuer/namespace/receiver, route or acceptance credit. PINQ-01 and PINQ-02
+remain Pending before runtime. Exact six-path sealer follows passing checks.
+
+Parallel bounded CLI control proposal: SPI-1001.nested-current-control-design
+examines the concrete deadline-1 gap and narrowed outer effect deadline.
+It owns only external design/regression artifacts in an isolated sealed74
+worktree; repository/cache/index and all shared sources are read-only. The
+manager retains the serialized host/run/time interface lane. Deliver exact
+existing owner/call-chain evidence, one concrete minimal repair and focused
+regression patch proposal; no new clock authority, bindings, dispatcher, replay
+relaxation, public SPI admission, Cargo campaign or license/source refresh.
+No implementation starts before manager disposition of its concrete boundary.

@@ -44,3 +44,5 @@ pub(in crate::service) fn observe_named_status(
 
 #[cfg(test)]
 mod tests;
+
+mod security;
