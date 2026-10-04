@@ -118,13 +118,43 @@ pub(super) fn replay(
 /// The delegate is the mandatory real authorizer; this records no inferred permit.
 pub(super) struct Capture<'a> {
     delegate: &'a dyn EnterpriseAuthorizer,
-    resources: Mutex<Vec<StoredResource>>,
+    resources: Mutex<CapturedResources>,
+}
+#[derive(Default)]
+struct CapturedResources {
+    recorded: Vec<StoredResource>,
+    reserved: usize,
+}
+/// Only a bounded collection slot, never a SAF or selected-state permit.
+struct CaptureSlot<'a> {
+    resources: &'a Mutex<CapturedResources>,
+    active: bool,
+}
+impl CaptureSlot<'_> {
+    fn record(mut self, value: StoredResource) -> Result<(), HostProblem> {
+        let mut resources = self
+            .resources
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        resources.reserved -= 1;
+        self.active = false;
+        resources.recorded.push(value);
+        Ok(())
+    }
+}
+impl Drop for CaptureSlot<'_> {
+    fn drop(&mut self) {
+        if self.active {
+            let mut resources = self.resources.lock().unwrap_or_else(|p| p.into_inner());
+            resources.reserved -= 1;
+        }
+    }
 }
 impl<'a> Capture<'a> {
     pub(super) fn new(delegate: &'a dyn EnterpriseAuthorizer) -> Self {
         Self {
             delegate,
-            resources: Mutex::new(Vec::new()),
+            resources: Mutex::new(CapturedResources::default()),
         }
     }
     pub(super) fn into_resources(self) -> Result<Vec<StoredResource>, HostProblem> {
@@ -132,8 +162,36 @@ impl<'a> Capture<'a> {
             .resources
             .into_inner()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        validate(&resources)?;
-        Ok(resources)
+        if resources.reserved != 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        validate(&resources.recorded)?;
+        Ok(resources.recorded)
+    }
+    fn capture(
+        &self,
+        resource: &EnterpriseResource,
+        authorize: impl FnOnce() -> Result<(), HostProblem>,
+    ) -> Result<(), HostProblem> {
+        let projected = StoredResource::capture(resource)?;
+        let slot = {
+            let mut resources = self
+                .resources
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            if resources.recorded.len() + resources.reserved == MAX_RESOURCES {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            resources.reserved += 1;
+            CaptureSlot {
+                resources: &self.resources,
+                active: true,
+            }
+        };
+        // No capture, selected, frame or backend mutex is acquired here. The
+        // real caller still owns all admission/publication obligations.
+        authorize()?;
+        slot.record(projected)
     }
 }
 impl EnterpriseAuthorizer for Capture<'_> {
@@ -142,16 +200,10 @@ impl EnterpriseAuthorizer for Capture<'_> {
         principal: &mainframe_env_execution_api::PrincipalId,
         resource: &EnterpriseResource,
     ) -> Result<(), HostProblem> {
-        let projected = StoredResource::capture(resource)?;
-        let mut resources = self
-            .resources
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if resources.len() == MAX_RESOURCES {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        self.delegate.authorize(principal, resource)?;
-        resources.push(projected);
-        Ok(())
+        self.capture(resource, || self.delegate.authorize(principal, resource))
     }
 }
+
+#[cfg(test)]
+#[path = "authorization/capture_tests.rs"]
+mod capture_tests;

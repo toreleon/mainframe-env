@@ -6,6 +6,30 @@ Target release: **0.15.0**
 
 Status: **Implementation active**
 
+## Authorization capture callback-lock prerequisite
+
+`MQ-1503.authorization-callback-lock` releases the private capture collection
+mutex before invoking the mandatory real authorizer. A short-lived reservation
+counts recorded plus in-flight resources against the existing512-resource cap,
+before delegate invocation. Only actual successful authorization is recorded;
+error or panic releases the reserved slot. Final extraction refuses outstanding
+reservations and retains existing typed-resource validation.
+
+Four helper regressions cover actual delegate success/refusal, nested collection
+without the collection lock, panic cleanup and concurrent max-plus-one refusal
+before delegate invocation. Main verifies the composed selected-operation tests,
+affected consumers and mandatory policy/documentation gates on current inputs.
+This changes infrastructure only, not IBM MQ semantics, SAF policy, public API,
+durable codecs or publication permissions. It does not release callers' other
+locks or solve native independent-concurrency versus callback-entry ownership.
+The larger unsealed native feature remains blocked on that contract and its
+unchanged concurrent-writer regressions; no partial worker pass is acceptance.
+
+All26 full-call gates remain Pending and fullv0.15 is unfinished. The licensed
+IBM MQ oracle alone is human-skipped0/26 with zero conformance credit; all other
+acceptance requirements remain unwaived. Helper fixtures are not installed,
+native, SAF, JES or crash evidence.
+
 ## Bounded provider prefetch prerequisite
 
 `MQ-1503.batch-bounded-provider-prefetch` integrates reviewed sealed worker
