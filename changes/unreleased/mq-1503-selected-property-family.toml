@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a checked selected CRTMH/SETMP/INQMP/DLTMP/DLTMH profile with associated MQMD1, exact property observations, exclusive same-registry staging, original-intent-fenced audited publication and strict additive result storage@3; cold observations cannot revive live property handles."

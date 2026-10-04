@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added complete MQMD payloads and homogeneous queue profiles to the existing delivery kernel, strict additive cold/live/object-row projections, and bounded explicit pre-activation quiescent schema/profile upgrade plans composed under the existing rich publication fences; old partial bytes remain exact and public full-message execution remains unsupported."

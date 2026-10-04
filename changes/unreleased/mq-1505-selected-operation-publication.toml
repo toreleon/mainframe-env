@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added private selected batch MQI operation composition under the existing service authority, with mandatory resolved SAF checks, retained local UOW provenance, original-effect lossless receipts, reviewed GET output and same-store audited CAS publication; historical replay resolves only proven existing live handles, while trusted installed-batch topology, shared recovery and public participant readiness remain pending."

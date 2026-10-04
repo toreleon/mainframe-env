@@ -4,8 +4,10 @@ use mainframe_env_store_api::{ProviderStateMutation, StoreError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod native_terminal;
 mod target;
 mod transfer;
+pub(super) use native_terminal::validate_native_calls;
 pub(super) use transfer::persist_transfer_intent;
 pub(super) use transfer::preserve_control_cursor_failure;
 
@@ -18,6 +20,54 @@ use super::retention::{
 
 const RUN_OWNER_BINDING: &str = "cobol.run-owner-execution";
 const RUN_OWNER_BINDING_SCHEMA: &str = "mainframe-env.cobol.run-owner@1";
+
+/// Constructed only in the successful original CALL reservation branch below.
+pub(super) struct WinningInstalledCall<'a> {
+    parent: &'a Invocation,
+    effect: &'a EffectRequest,
+    store: &'a Arc<dyn PlatformStore>,
+    reservation: &'a ProviderStateRecord,
+    child_execution: &'a str,
+    native: Option<&'a super::mqi::configured::native_call::NativeCallOwnership>,
+}
+impl WinningInstalledCall<'_> {
+    pub(super) fn is_native(&self) -> bool {
+        self.native.is_some()
+    }
+    pub(super) fn native_enrollment(
+        &self,
+    ) -> Option<mainframe_env_interpreter::NativeChildEnrollment> {
+        self.native
+            .map(|native| native.enrollment(self.reservation))
+    }
+    pub(super) fn parent(&self) -> &Invocation {
+        self.parent
+    }
+    pub(super) fn effect(&self) -> &EffectRequest {
+        self.effect
+    }
+    pub(super) fn store(&self) -> &Arc<dyn PlatformStore> {
+        self.store
+    }
+    pub(super) fn reservation(&self) -> &ProviderStateRecord {
+        self.reservation
+    }
+    pub(super) fn child_execution(&self) -> &str {
+        self.child_execution
+    }
+    pub(super) fn recheck(&self) -> Result<(), HostProblem> {
+        if self
+            .store
+            .get_provider_state(&self.reservation.namespace, &self.reservation.key)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .as_ref()
+            != Some(self.reservation)
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -532,16 +582,28 @@ pub(super) fn protocol_terminal_mutation(
     invocation: &Invocation,
     ended_tick: u64,
 ) -> Result<Option<ProviderStateMutation>, HostProblem> {
+    let key = protocol_key(invocation.run_unit_id.as_str());
+    let record = store
+        .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    protocol_terminal_mutation_from(record.as_ref(), invocation, ended_tick)
+}
+
+pub(super) fn protocol_terminal_mutation_from(
+    record: Option<&ProviderStateRecord>,
+    invocation: &Invocation,
+    ended_tick: u64,
+) -> Result<Option<ProviderStateMutation>, HostProblem> {
     if ended_tick == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
-    let key = protocol_key(invocation.run_unit_id.as_str());
-    let Some(record) = store
-        .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
-        .map_err(|_| HostProblem::InfrastructureFailure)?
-    else {
+    let Some(record) = record else {
         return Ok(None);
     };
+    let key = protocol_key(invocation.run_unit_id.as_str());
+    if record.namespace != CALL_PROTOCOL_NAMESPACE || record.key != key {
+        return Err(HostProblem::UnknownOutcome);
+    }
     let protocol = match decode_protocol(&record).map_err(|_| HostProblem::UnknownOutcome)? {
         DecodedProtocol::Legacy => CallProtocol {
             schema_version: 2,
@@ -751,6 +813,10 @@ impl CobolProgram {
             return Ok(result);
         }
         let admitted = preflight()?;
+        let native = self.prepare_native_call(parent, effect, &key, &admitted)?;
+        if payload.schema() == "mainframe-env.program.input@1" {
+            self.validate_typed_parent(parent, effect)?;
+        }
         self.ensure_call_protocol_identity(parent, outer_identity, true)?;
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"
@@ -784,7 +850,7 @@ impl CobolProgram {
             payload: serde_json::to_vec(&receipt)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
         };
-        if let Err(problem) = store.put_provider_state(pending, None) {
+        if let Err(problem) = store.put_provider_state(pending.clone(), None) {
             if matches!(problem, StoreError::Conflict | StoreError::AlreadyExists) {
                 return match store.get_provider_state(CALL_REPLAY_NAMESPACE, &key) {
                     Ok(Some(record)) => {
@@ -800,22 +866,45 @@ impl CobolProgram {
             return Err(HostProblem::InfrastructureFailure);
         }
         // No call can dispatch without winning the durable reservation.
+        let original_call = WinningInstalledCall {
+            parent,
+            effect,
+            store,
+            reservation: &pending,
+            child_execution: &receipt.child_execution,
+            native: native.as_ref(),
+        };
         let mut writes = Vec::new();
         let result = if payload.schema() == "mainframe-env.cobol.call@1" {
-            self.execute_admitted(parent, program, admitted, payload, &key, &mut writes)
+            self.execute_admitted(
+                parent,
+                program,
+                admitted,
+                payload,
+                &key,
+                &mut writes,
+                Some(&original_call),
+            )
         } else {
-            self.execute_installed_batch(parent, program, admitted, payload, &key)
-                .and_then(|output| {
-                    serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
-                })
-                .and_then(|bytes| {
-                    BoundedPayload::new(
-                        "mainframe-env.program.output@1",
-                        bytes,
-                        InvocationLimits::default(),
-                    )
-                    .map_err(|_| HostProblem::ResourceExhausted)
-                })
+            self.execute_installed_batch_from_call(
+                parent,
+                program,
+                admitted,
+                payload,
+                &key,
+                Some(&original_call),
+            )
+            .and_then(|output| {
+                serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
+            })
+            .and_then(|bytes| {
+                BoundedPayload::new(
+                    "mainframe-env.program.output@1",
+                    bytes,
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)
+            })
         }?;
         receipt.reply = Some(Reply {
             schema: result.schema().into(),

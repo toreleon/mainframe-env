@@ -56,6 +56,23 @@ impl ScopedHostService {
         Self { registry, limits }
     }
 
+    /// Observe whether the ready provider selected by this frozen registry is
+    /// the same physical `Arc` allocation retained by a trusted embedding.
+    /// Equal descriptors, generation strings or stores are not object identity.
+    /// Missing/not-ready selection preserves the registry's ordinary refusal.
+    /// This read-only check performs no dispatch and grants no invocation,
+    /// capability, lifecycle, SAF, effect or transaction authority; `invoke`
+    /// still enforces its complete independent admission protocol.
+    pub fn selects_same_provider(
+        &self,
+        capability: &CapabilityId,
+        expected: &Arc<dyn crate::HostProvider>,
+    ) -> Result<bool, HostProblem> {
+        self.registry
+            .select(capability)
+            .map(|selected| Arc::ptr_eq(&selected, expected))
+    }
+
     /// Preflight exact provider-generation requirements before restoring any
     /// state or dispatching the first effect.
     pub fn validate_provider_generations(
@@ -78,13 +95,101 @@ impl ScopedHostService {
         cancellation_requested: bool,
         request: EffectRequest,
     ) -> AuditedEffectResult {
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            None,
+            None,
+        )
+    }
+
+    /// Dispatch only an original Program request with borrowed Rust context.
+    /// Shares every ordinary scoped admission, result and audit check. `Any`
+    /// grants no permission: a future closed receiver must validate its genuine
+    /// owner; providers default to Unsupported without ordinary dispatch.
+    pub fn invoke_program_context(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        context: &(dyn std::any::Any + Send + Sync),
+    ) -> AuditedEffectResult {
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            Some(context),
+            None,
+        )
+    }
+
+    /// Invoke ONLY replay transport under the ordinary scoped host checks.
+    /// The local-type wrapper checks zero/duplicates/capacity/char0 representation,
+    /// not object origin, INQUIRE access or permission. Successful output must
+    /// match that wrapper and the original full canonical result digest. Any
+    /// changed reply becomes actual Unknown before this method creates its audit.
+    /// No provider activation or ordinary invoke fallback is performed here.
+    #[allow(clippy::too_many_arguments)]
+    pub fn replay_retained(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        expected_result_digest: [u8; 32],
+        context: &(dyn std::any::Any + Send + Sync),
+    ) -> AuditedEffectResult {
+        self.invoke_inner(
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+            None,
+            Some((expected_result_digest, context)),
+        )
+    }
+
+    fn invoke_inner(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+        context: Option<&(dyn std::any::Any + Send + Sync)>,
+        replay: Option<([u8; 32], &(dyn std::any::Any + Send + Sync))>,
+    ) -> AuditedEffectResult {
         let capability = request
             .request
             .required_capability(mainframe_env_execution_api::InvocationLimits::default());
         let resource = canonical_audit_resource_digest(&request.request);
         let sequence = request.sequence;
         let mut mutation_dispatched = false;
-        let result = if request.run_unit != invocation.run_unit_id {
+        let checked_limits = match &request.request {
+            crate::HostRequest::MqMqi(host) if replay.is_some() => Some(host.envelope.limits),
+            _ => None,
+        };
+        let checked_inquiry = replay.and_then(|_| match &request.request {
+            crate::HostRequest::MqMqi(host) => match &host.envelope.request {
+                crate::mq_mqi::MqMqiRequest::Inquire(inquiry) if inquiry.selectors.len() <= 256 => {
+                    crate::mq_mqi::MqMqiLocalTypeInquiry::from_inquiry(
+                        inquiry.clone(),
+                        host.envelope.limits,
+                    )
+                    .ok()
+                }
+                _ => None,
+            },
+            _ => None,
+        });
+        let result = if replay.is_some() && checked_inquiry.is_none() {
+            Err(HostProblem::Unsupported)
+        } else if context.is_some() && !matches!(&request.request, crate::HostRequest::Program(_)) {
+            Err(HostProblem::Unsupported)
+        } else if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)
         } else if cancellation_requested || invocation.cancellation_requested() {
             Err(HostProblem::Cancelled)
@@ -118,8 +223,16 @@ impl ScopedHostService {
                 }
                 Ok(provider) => {
                     let mutating = request.request.is_mutating();
-                    mutation_dispatched = mutating;
-                    match catch_unwind(AssertUnwindSafe(|| provider.invoke(invocation, request))) {
+                    mutation_dispatched = mutating && replay.is_none();
+                    match catch_unwind(AssertUnwindSafe(|| match (context, replay) {
+                        (_, Some((digest, context))) => {
+                            provider.replay_retained(invocation, request, digest, now_tick, context)
+                        }
+                        (Some(context), None) => {
+                            provider.invoke_program_context(invocation, request, context)
+                        }
+                        (None, None) => provider.invoke(invocation, request),
+                    })) {
                         // Uncertainty is a control outcome, not an oversized success payload.
                         // Never erase it, even when an untrusted provider also corrupts the envelope.
                         Ok(effect)
@@ -140,7 +253,29 @@ impl ScopedHostService {
                                     .map(|_| ())
                                 });
                             match validation {
+                                Ok(()) if replay.is_some() && effect.outcome.is_ok() => {
+                                    let exact = match (&effect.outcome, &checked_inquiry) {
+                                        (Ok(crate::HostResult::MqMqi(host)), Some(profile)) => {
+                                            Some(host.limits) == checked_limits
+                                                && profile
+                                                    .validate_result(&host.result, host.limits)
+                                                    .is_ok()
+                                        }
+                                        _ => false,
+                                    };
+                                    if exact
+                                        && crate::canonical_result_digest(&effect.outcome).ok()
+                                            == replay.map(|r| r.0)
+                                    {
+                                        effect.outcome
+                                    } else {
+                                        Err(HostProblem::UnknownOutcome)
+                                    }
+                                }
                                 Ok(()) => effect.outcome,
+                                // An unusable replay envelope cannot attest a
+                                // known refusal of this original occurrence.
+                                Err(_) if replay.is_some() => Err(HostProblem::UnknownOutcome),
                                 // The provider has reported a committed success. Losing its
                                 // usable reply is not a known rejection that permits retry.
                                 Err(_) if mutating && effect.outcome.is_ok() => {
@@ -210,6 +345,8 @@ impl AuditedEffectResult {
 
 #[cfg(test)]
 mod tests {
+    mod program_context;
+    mod retained_replay;
     use super::*;
     use crate::{CapabilityDescriptor, HostProvider, HostRequest, RegistrySnapshot, StateRequest};
     use mainframe_env_execution_api::{
@@ -344,6 +481,77 @@ mod tests {
                 .invoke(&invocation, 1, false, request(&invocation.run_unit_id))
                 .effect()
                 .outcome,
+            Err(HostProblem::Unsupported)
+        );
+    }
+
+    fn identity_provider(ready: bool) -> Arc<dyn HostProvider> {
+        Arc::new(PanicProvider {
+            descriptor: CapabilityDescriptor {
+                capability: CapabilityId::new("host.state.read", InvocationLimits::default())
+                    .unwrap(),
+                provider_id: "identity".into(),
+                generation: "same-generation".into(),
+                request_schema: "request@1".into(),
+                result_schema: "result@1".into(),
+                max_request_bytes: 1024,
+                max_result_bytes: 1024,
+                ready,
+            },
+        })
+    }
+    fn identity_service(provider: Arc<dyn HostProvider>) -> ScopedHostService {
+        ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+            ),
+            HostLimits::default(),
+        )
+    }
+
+    #[test]
+    fn physical_provider_observation_accepts_only_the_same_allocation_without_dispatch() {
+        let expected = identity_provider(true);
+        let other = identity_provider(true);
+        assert_eq!(expected.descriptor(), other.descriptor());
+        let host = identity_service(expected.clone());
+        let capability = expected.descriptor().capability.clone();
+        assert_eq!(
+            host.selects_same_provider(&capability, &expected.clone()),
+            Ok(true)
+        );
+        assert_eq!(host.selects_same_provider(&capability, &other), Ok(false));
+        // PanicProvider::invoke would panic. The identity check above cannot
+        // dispatch, and even a true observation cannot bypass principal grants.
+        let denied = invocation(false);
+        assert_eq!(
+            host.invoke(&denied, 1, false, request(&denied.run_unit_id))
+                .effect()
+                .outcome,
+            Err(HostProblem::Unauthorized)
+        );
+    }
+
+    #[test]
+    fn physical_provider_observation_preserves_missing_and_not_ready_refusals() {
+        let expected = identity_provider(false);
+        let capability = expected.descriptor().capability.clone();
+        let host = identity_service(expected.clone());
+        assert_eq!(
+            host.selects_same_provider(&capability, &expected),
+            Err(HostProblem::ProviderFailure)
+        );
+        let absent = CapabilityId::new("host.mq.write", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            host.selects_same_provider(&absent, &expected),
+            Err(HostProblem::Unsupported)
+        );
+        let empty = ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, vec![], InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        );
+        assert_eq!(
+            empty.selects_same_provider(&capability, &expected),
             Err(HostProblem::Unsupported)
         );
     }

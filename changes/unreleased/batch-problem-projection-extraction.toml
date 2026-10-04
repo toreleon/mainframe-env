@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Extracted unchanged batch terminal-problem projections into a bounded child module and reduced the reviewed module budget; condition-code, abend and uncertainty behavior is unchanged."

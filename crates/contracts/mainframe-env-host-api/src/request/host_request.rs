@@ -3,6 +3,8 @@ use super::*;
 
 impl HostRequest {
     #[must_use]
+    /// Return the built-in coarse capability identity for this request; this does not perform resource authorization.
+    /// Panics if supplied identity limits cannot admit the built-in capability spelling.
     pub fn required_capability(&self, limits: InvocationLimits) -> CapabilityId {
         let name = match self {
             Self::Dataset(
@@ -51,12 +53,13 @@ impl HostRequest {
             Self::ImsNavigation(_) => "host.ims.write",
             Self::ImsGsam(_) => "host.ims.write",
             Self::ImsPcbFeedbackV1(_) => "host.ims.write",
-            Self::Mq(_) => "host.mq.write",
+            Self::Mq(_) | Self::MqMqi(_) => "host.mq.write",
         };
         CapabilityId::new(name, limits).expect("built-in capability identities are valid")
     }
 
     #[must_use]
+    /// Classify state-changing effects for outer replay admission, including CICS token-producing reads.
     pub fn is_mutating(&self) -> bool {
         matches!(
             self,
@@ -115,9 +118,11 @@ impl HostRequest {
             || matches!(self, Self::ImsGsam(_))
             || matches!(self, Self::ImsPcbFeedbackV1(_))
             || matches!(self, Self::Mq(request) if request.operation.is_mutating())
+            || matches!(self, Self::MqMqi(_))
     }
 
     #[must_use]
+    /// Borrow the explicit nested mutation identity when this request form carries one; no identity is synthesized.
     pub fn mutation(&self) -> Option<&Mutation> {
         match self {
             Self::Dataset(
@@ -171,12 +176,15 @@ impl HostRequest {
             Self::ImsGsam(request) => request.request.mutation.as_ref(),
             Self::ImsPcbFeedbackV1(request) => request.request.mutation.as_ref(),
             Self::Mq(request) => request.mutation.as_ref(),
+            Self::MqMqi(request) => Some(&request.mutation),
             _ => None,
         }
     }
 
+    /// Check represented request shape and bounds before dispatch; provider capabilities, permissions and live state still require admission.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
+            Self::MqMqi(request) => request.validate(limits),
             Self::ImsRecovery(request) => request.validate(limits),
             Self::Dataset(request) => validate_dataset(request, limits),
             Self::Program(ProgramRequest::Call {
@@ -325,31 +333,7 @@ impl HostRequest {
                 }
                 Ok(())
             }
-            Self::Mq(request) => {
-                if request
-                    .queue
-                    .as_ref()
-                    .is_some_and(|queue| queue.is_empty() || queue.len() > limits.max_name_bytes)
-                    || request.message.len() > limits.max_record_bytes
-                    || request
-                        .message_id
-                        .as_ref()
-                        .is_some_and(|value| value.len() != 24)
-                    || request
-                        .correlation_id
-                        .as_ref()
-                        .is_some_and(|value| value.len() != 24)
-                    || request.max_message_bytes == 0
-                    || request.max_message_bytes as usize > limits.max_record_bytes
-                {
-                    return Err(HostProblem::ResourceExhausted);
-                }
-                request
-                    .mutation
-                    .as_ref()
-                    .ok_or(HostProblem::MissingIdempotency)?
-                    .validate(limits)
-            }
+            Self::Mq(request) => request.validate(limits),
             _ => Ok(()),
         }
     }

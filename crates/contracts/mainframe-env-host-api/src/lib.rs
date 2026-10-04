@@ -5,9 +5,12 @@
 mod canonical;
 pub use canonical::{
     AUDIT_RESOURCE_DIGEST_DOMAIN, EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES,
-    PROVIDER_REPLAY_DIGEST_FORMAT, canonical_audit_resource_digest, canonical_db2_request_digest,
-    canonical_ims_request_digest, canonical_mq_request_digest, canonical_request_digest,
-    canonical_request_size, canonical_result_digest, canonical_result_size,
+    PROVIDER_REPLAY_DIGEST_FORMAT, RootTerminalMachineObservation, RootTerminalResource,
+    RootTerminalResourceRow, RootTerminalSetup, canonical_audit_resource_digest,
+    canonical_db2_request_digest, canonical_ims_request_digest, canonical_mq_request_digest,
+    canonical_request_digest, canonical_request_size, canonical_result_digest,
+    canonical_result_size, canonical_root_terminal_resource_digest,
+    canonical_root_terminal_resource_size, canonical_root_terminal_setup_digest,
 };
 
 mod cics_catalog;
@@ -27,9 +30,15 @@ mod mq_catalog;
 mod mq_context;
 mod mq_contract;
 mod mq_handles;
+pub mod mq_md_value;
 mod mq_message_contract;
+pub mod mq_mqi;
 pub mod mq_object_route;
+pub mod mq_raw_layout;
+pub mod mq_raw_property;
+pub mod mq_status;
 mod mq_validation;
+pub mod mq_wire_options;
 mod names;
 mod registry;
 mod request;
@@ -135,8 +144,8 @@ pub use mq_contract::{
 };
 pub use mq_handles::{
     MQ_MAX_HANDLE_SLOTS, MQHC_DEF_HCONN, MQHC_UNASSOCIATED_HCONN, MqConnectionId, MqHandle,
-    MqHandleKind, MqHandleOwner, MqHandleProblem, MqHandleRegistry, MqHandleSharing, MqHconn,
-    MqHmsg, MqHobj, MqHsub,
+    MqHandleKind, MqHandleObservation, MqHandleOwner, MqHandleProblem, MqHandleRegistry,
+    MqHandleSharing, MqHconn, MqHmsg, MqHobj, MqHsub, MqMessageAdoption, MqMessageCandidate,
 };
 pub use mq_message_contract::{
     MQ_MESSAGE_CONTRACT, MQ_MESSAGE_PENDING, MQ_MESSAGE_SOURCES, MqDeliveryOutcome,
@@ -166,8 +175,9 @@ pub use request::{
     DatasetOrganization, DatasetReadControl, DatasetReadLockMode, DatasetReelUnit, DatasetRequest,
     DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
     EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
-    ImsRequest, ImsResult, ImsSegment, KeyRelation, MqOperation, MqRequest, MqResult, Mutation,
-    ProgramLinkSelection, ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
+    ImsRequest, ImsResult, ImsSegment, KeyRelation, MqMqiEffectOccurrence, MqMqiHostRequest,
+    MqMqiHostResult, MqOperation, MqRequest, MqResult, Mutation, ProgramLinkSelection,
+    ProgramRequest, RecordFormat, RuntimeServiceKind, RuntimeServiceSelector,
     SPOOL_REQUEST_CONTRACT, SPOOL_RESULT_CONTRACT, SecretRef, SecurityDecision, SecurityRequest,
     SpoolFileSummary, SpoolRequest, SpoolResult, StateRequest, TerminalField, TerminalRequest,
 };

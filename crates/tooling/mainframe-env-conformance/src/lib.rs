@@ -35,6 +35,7 @@ mod framework;
 mod ims_candidate;
 mod jcl;
 mod licensed_harness;
+mod mq_selected;
 pub mod profile_intake;
 mod racf;
 mod racf_oracle;
@@ -48,3 +49,4 @@ pub use licensed_harness::{
     OracleCandidateExpectation, OracleHarnessRegistry, OracleHarnessValidation,
     OracleHarnessValidationKind, validate_oracle_harness_receipt, validate_oracle_harness_registry,
 };
+pub use mq_selected::bind_mq_selected;

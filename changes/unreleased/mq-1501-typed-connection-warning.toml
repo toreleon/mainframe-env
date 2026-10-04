@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added compiled CONN/CONNX exact reviewed ALREADY_CONNECTED warning writeback with provider-issued nonhistorical token alias reuse and first child observation, bounded captured atomic connection outputs and fail-closed stale frame/storage checks."

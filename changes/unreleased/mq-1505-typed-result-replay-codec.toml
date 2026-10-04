@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a strict bounded private MQI non-handle result storage codec preserving typed outcomes, exact message/property metadata and full canonical host result identity; opaque handle observation and actual replay/retention integration remain pending."

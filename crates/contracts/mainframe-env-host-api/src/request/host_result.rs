@@ -2,32 +2,50 @@
 use super::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Typed host observations validated for size and shape; result/request binding belongs to the dispatch boundary.
 pub enum HostResult {
+    /// Dataset-owned operation or observation.
     Dataset(DatasetResult),
+    /// Program-routing operation or owned output payload.
     Program(BoundedPayload),
+    /// Job-scoped spool operation or observation.
     Spool(SpoolResult),
+    /// Session-scoped terminal operation or owned output payload.
     Terminal(BoundedPayload),
+    /// Installed security authority request or decision.
     Security(SecurityDecision),
+    /// Explicit clock request or bounded textual observation.
     Clock(String),
+    /// Versioned host state request or observation.
     State {
+        /// Optional observed state bytes; None retains the absence observation.
         value: Option<Vec<u8>>,
+        /// Provider-reported state revision; validation here does not establish request CAS equality.
         version: u64,
     },
+    /// Typed CICS observation retaining application dispositions.
     Cics(CicsResponse),
+    /// Bounded SQL operation or completion data.
     Db2(Db2Result),
+    /// Bounded IMS operation or status/data observation.
     Ims(ImsResult),
     /// Separate I/O PCB recovery response; it does not update a database PCB.
     ImsRecovery(crate::ImsRecoveryResult),
     /// GSAM saved-address output alongside the unchanged IMS status/data result.
     ImsGsam(crate::ImsGsamResult),
-    /// Versioned owned feedback from the selected database PCB's proposal.
+    /// Versioned owned feedback from the selected database PCB proposal.
     ImsPcbFeedbackV1(crate::ImsPcbFeedbackResultV1),
+    /// Legacy MQ request or observation; typed MQI uses its separate contract.
     Mq(MqResult),
+    /// Source-bound result shape with explicit limits, not execution authority.
+    MqMqi(MqMqiHostResult),
 }
 
 impl HostResult {
+    /// Check represented result bounds and internal shape; this does not bind the result to a particular request or establish success.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         match self {
+            Self::MqMqi(result) => result.validate(limits),
             Self::ImsRecovery(result) => result.validate(),
             Self::Dataset(DatasetResult::Description(description)) => {
                 description.definition.validate(

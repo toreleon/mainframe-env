@@ -99,7 +99,7 @@ pub enum WorkState {
     Queued,
     /// Held under a fenced, expiring worker lease.
     Claimed,
-    /// Completed exactly once.
+    /// Terminal completion under the winning lease fence; delivery remains at-least-once.
     Completed,
     /// Cancelled before completion.
     Cancelled,
@@ -141,7 +141,6 @@ pub struct WorkRecord {
     pub effect_sequence: u64,
     pub payload: Vec<u8>,
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CheckpointRecord {
     pub execution_id: ExecutionId,
@@ -161,7 +160,6 @@ pub struct CheckpointRecord {
     pub payload_digest: [u8; 32],
     pub payload: Vec<u8>,
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutboxRecord {
     pub notification_id: String,
@@ -175,7 +173,6 @@ pub struct OutboxRecord {
     pub delivered_tick: Option<u64>,
     pub version: u64,
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SessionRecord {
     pub session_id: String,
@@ -184,14 +181,10 @@ pub struct SessionRecord {
     pub version: u64,
     pub payload: Vec<u8>,
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Immutable executable admission metadata stored beside an artifact payload.
-///
-/// The store owns persistence of these framework-free values. The compiler
-/// API remains responsible for interpreting the versioned manifest and the
-/// product environment selects and enforces `compatibility_profile` before
-/// constructing a machine.
+/// The store persists it; the compiler interprets its manifest. The product
+/// enforces `compatibility_profile` before constructing a machine.
 pub struct ExecutableArtifactMetadata {
     /// Source artifact contract, for example `mainframe-env.artifact@2` or `@3`.
     pub artifact_contract: String,
@@ -216,7 +209,6 @@ pub struct ExecutableArtifactMetadata {
     /// identity to the immutable payload digest.
     pub manifest_payload_digest: [u8; 32],
 }
-
 impl ExecutableArtifactMetadata {
     /// Validate the framework-free storage bounds before persistence.
     #[must_use]
@@ -249,7 +241,6 @@ impl ExecutableArtifactMetadata {
                     && dialects.iter().all(|value| bounded(value, 256))
             })
     }
-
     /// Return the canonical identity binding for this metadata and payload.
     #[must_use]
     pub fn expected_manifest_payload_digest(&self, payload_digest: &[u8; 32]) -> [u8; 32] {
@@ -293,14 +284,12 @@ impl ExecutableArtifactMetadata {
         metadata_field(&mut digest, payload_digest);
         digest.finalize().into()
     }
-
     /// Bind this metadata to an immutable payload before persistence.
     #[must_use]
     pub fn bind_to_payload(mut self, payload_digest: &[u8; 32]) -> Self {
         self.manifest_payload_digest = self.expected_manifest_payload_digest(payload_digest);
         self
     }
-
     /// Validate both bounded shape and the immutable manifest/payload binding.
     #[must_use]
     pub fn validates_payload(&self, payload_digest: &[u8; 32]) -> bool {
@@ -308,16 +297,13 @@ impl ExecutableArtifactMetadata {
             && self.manifest_payload_digest == self.expected_manifest_payload_digest(payload_digest)
     }
 }
-
 fn metadata_field(digest: &mut Sha256, value: &[u8]) {
     digest.update((value.len() as u64).to_be_bytes());
     digest.update(value);
 }
-
 fn metadata_count(digest: &mut Sha256, count: usize) {
     digest.update((count as u64).to_be_bytes());
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ArtifactRecord {
     pub artifact: ArtifactRef,
@@ -328,7 +314,6 @@ pub struct ArtifactRecord {
     /// compiler manifest. Opaque provider objects deliberately leave it absent.
     pub executable: Option<ExecutableArtifactMetadata>,
 }
-
 /// A bounded, backend-reported artifact authority health and capacity snapshot.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArtifactStoreHealth {
@@ -345,7 +330,6 @@ pub struct ArtifactStoreHealth {
     /// Maximum aggregate bytes accepted by the authority, when such a quota is enforced.
     pub max_bytes: Option<usize>,
 }
-
 impl ArtifactStoreHealth {
     /// Return remaining object slots when the backend exposes a count quota.
     #[must_use]
@@ -354,7 +338,6 @@ impl ArtifactStoreHealth {
             .zip(self.used_objects)
             .and_then(|(capacity, used)| capacity.checked_sub(used))
     }
-
     /// Return remaining bytes when the backend exposes an aggregate byte quota.
     #[must_use]
     pub fn byte_headroom(self) -> Option<usize> {
@@ -362,7 +345,6 @@ impl ArtifactStoreHealth {
             .zip(self.used_bytes)
             .and_then(|(capacity, used)| capacity.checked_sub(used))
     }
-
     /// Require readable and writable storage plus nonzero headroom in every reported quota.
     #[must_use]
     pub fn ready(self) -> bool {
@@ -391,10 +373,15 @@ pub struct GenerationRecord {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Coordinator-owned dispatch journal state, distinct from participant UOW status.
 pub enum EffectState {
+    /// Original intent is durable before dispatch; result and resolution tick are absent.
     Intent,
+    /// A known successful host result is retained, not a universal exactly-once guarantee.
     Completed,
+    /// A known failed host result is retained, distinct from mutation uncertainty.
     Failed,
+    /// A result records uncertainty; no resolution tick or automatic redispatch is permitted.
     UnknownOutcome,
 }
 
@@ -459,17 +446,21 @@ pub struct EffectRecord {
     pub state: EffectState,
     pub result_digest: Option<[u8; 32]>,
     /// Non-zero logical tick at which a completed or failed outcome became durable.
-    ///
-    /// `None` is the protected compatibility form for legacy results whose resolution
-    /// time cannot be reconstructed safely.
+    /// `None` protects legacy results whose resolution time cannot be safely reconstructed.
     pub resolved_tick: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One versioned provider-owned object, not a provider-wide state snapshot.
+/// The provider owns its codec/cross-reference legality; store validation checks generic bounds.
 pub struct ProviderStateRecord {
+    /// Nonempty bounded namespace in the owning provider's persistence contract.
     pub namespace: String,
+    /// Nonempty bounded exact object identity within the namespace.
     pub key: String,
+    /// Positive signed-SQL-compatible CAS version; replacement advances by one.
     pub version: u64,
+    /// Bounded opaque object bytes whose envelope/key/schema validation remains provider-owned.
     pub payload: Vec<u8>,
 }
 
@@ -499,13 +490,9 @@ impl ProviderStateRecord {
     }
 
     /// Validate the backend-independent compare-and-swap move contract.
-    ///
-    /// Identifiers must be nonempty, source and destination must differ, and
-    /// the new positive version must be the successor of `expected_version`.
-    /// Versions share the signed 64-bit range used by durable SQL adapters.
-    /// Shape/version failures take precedence over the payload bound. Missing
-    /// or stale source state and an occupied destination are CAS conflicts;
-    /// implementations must reject them without modifying either record.
+    /// Nonempty distinct keys and a positive signed-SQL-compatible successor version are required.
+    /// Shape/version errors precede payload bounds. Missing/stale source or occupied destination
+    /// conflicts must leave both endpoints unchanged.
     pub fn validate_move(
         &self,
         old_key: &str,
@@ -534,8 +521,11 @@ impl ProviderStateRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One insertion/replacement assertion composed into an atomic provider batch.
 pub struct ProviderStateWrite {
+    /// Complete next object, including its successor version and provider-validated payload.
     pub record: ProviderStateRecord,
+    /// `None` requires absence/version1; `Some(v)` requires the exact old version and new `v+1`.
     pub expected_version: Option<u64>,
 }
 
@@ -936,8 +926,7 @@ pub struct ProviderStateArchiveDeletion {
 }
 
 /// Archive private CICS container replay rows while CAS-replacing their shared
-/// capacity row in the same transaction. The ordinary deletion API does not
-/// admit this namespace, so a crash cannot leave live counts out of sync.
+/// capacity row atomically; ordinary deletion refuses this namespace to avoid count drift on crash.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProviderStateArchiveDeletionWithCapacity {
     /// Fully decoded, epoch-fenced replay archive plan.
@@ -1145,16 +1134,27 @@ pub struct RetentionReceipt {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Closed provider-row mutation vocabulary applied atomically under the store authority.
+/// A late CAS/quota failure must roll back the whole batch, not just the failing row.
 pub enum ProviderStateMutation {
+    /// Insert or replace an object under its explicit absence/version assertion.
     Put(ProviderStateWrite),
+    /// Remove an exact existing version without deleting concurrent replacement.
     Delete {
+        /// Exact namespace of the source object.
         namespace: String,
+        /// Exact key of the source object.
         key: String,
+        /// Positive source version that must still be retained at deletion.
         expected_version: u64,
     },
+    /// CAS-remove the old key and publish an unoccupied new key in the same namespace.
     Move {
+        /// Destination object with version exactly one above the asserted source version.
         record: ProviderStateRecord,
+        /// Distinct old key that must still contain the asserted source version.
         old_key: String,
+        /// Positive source version; destination conflict leaves both endpoints unchanged.
         expected_version: u64,
     },
 }

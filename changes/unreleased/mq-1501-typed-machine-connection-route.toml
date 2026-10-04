@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added an explicit host-admitted installed-batch MQI frame seam and original typed MQCONN/MQDISC machine effects with bounded opaque-token ABI aliases and fail-closed writeback/checkpoint handling; selected service registration and durable handle replay remain separate."

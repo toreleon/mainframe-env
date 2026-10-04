@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added bounded atomic provider read/receipt/audit publication and nonpublishing Intent/Completed replay assertions in Memory and SQLite, preserving observed rows and existing durable codecs without activating MQINQ."

@@ -994,3 +994,5 @@ mod container_tests;
 
 #[cfg(test)]
 mod ims_recovery_tests;
+#[cfg(test)]
+mod selected_mq_tests;

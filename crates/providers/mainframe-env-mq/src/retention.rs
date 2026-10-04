@@ -58,6 +58,32 @@ pub enum MqReplayRetentionState {
     Terminal,
 }
 
+/// Conservative recovery dependencies from a fully validated selected snapshot.
+///
+/// These observations only protect core history. They carry no terminal age,
+/// archival eligibility, live handle, participant vote or execution permission.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MqSelectedRetentionDependencies {
+    /// Exact receipt and logical unit-owner executions which must outlive state.
+    pub executions: Vec<ExecutionId>,
+    /// Original occurrence and CONNECT keys which must remain recoverable.
+    pub effect_keys: Vec<IdempotencyKey>,
+}
+
+/// Validate a complete captured rich MQ snapshot and describe blocked history.
+///
+/// The owning marker/catalog/delivery/control/receipt readers perform full
+/// decoding, including the sole lossless result codec. The caller must bind the
+/// captured physical rows to its unchanged provider epoch. This read does not
+/// open a runtime, sample time, rewrite rows or infer retirement from completion.
+/// Legacy-only snapshots are outside this selected adapter's domain.
+pub fn describe_mq_selected_retention_dependencies(
+    records: Vec<ProviderStateRecord>,
+    limits: MqLimits,
+) -> Result<MqSelectedRetentionDependencies, HostProblem> {
+    crate::service::selected_retention_dependencies(records, limits)
+}
+
 /// Exact retention description of one `mq-v1-replay` row.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MqReplayRetentionDescriptor {
@@ -529,7 +555,7 @@ fn validate_core_effect(
     Ok(())
 }
 
-fn origin_for(
+pub(crate) fn origin_for(
     invocation: &Invocation,
     key: &str,
     sequence: u64,

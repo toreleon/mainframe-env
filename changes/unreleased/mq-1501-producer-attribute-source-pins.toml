@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Registered nine independent retained IBM MQ 9.4 producer attribute and application-type source pins through the shared offline manifest reader, preserving prior source bindings and zero semantic, execution and licensed credit. Producer policy and runtime integration remain pending."

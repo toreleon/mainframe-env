@@ -67,6 +67,23 @@ fn verify_execution(
         .get_execution(&id)
         .map_err(|_| HostProblem::UnknownOutcome)?
         .ok_or(HostProblem::UnknownOutcome)?;
+    let events = store
+        .events(&id, proof.version, 1)
+        .map_err(|_| HostProblem::UnknownOutcome)?;
+    let event = events.first().ok_or(HostProblem::UnknownOutcome)?;
+    verify_observation(invocation, program, artifact, proof, &execution, event)
+}
+
+fn verify_observation(
+    invocation: &Invocation,
+    program: &str,
+    artifact: &str,
+    proof: &AbendProof,
+    execution: &mainframe_env_store_api::ExecutionRecord,
+    event: &mainframe_env_execution_api::LifecycleEvent,
+) -> Result<(), HostProblem> {
+    let id = ExecutionId::new(&proof.execution, InvocationLimits::default())
+        .map_err(|_| HostProblem::UnknownOutcome)?;
     if execution.execution_id != id
         || execution.state != ExecutionState::Failed
         || execution.version != proof.version
@@ -82,10 +99,6 @@ fn verify_execution(
     {
         return Err(HostProblem::UnknownOutcome);
     }
-    let events = store
-        .events(&id, proof.version, 1)
-        .map_err(|_| HostProblem::UnknownOutcome)?;
-    let event = events.first().ok_or(HostProblem::UnknownOutcome)?;
     if event.kind != LifecycleEventKind::Abend
         || event.execution_id != id
         || event.run_unit_id != invocation.run_unit_id
@@ -94,6 +107,30 @@ fn verify_execution(
         || Some(event.tick) != execution.terminal_tick
     {
         return Err(HostProblem::UnknownOutcome);
+    }
+    Ok(())
+}
+
+pub(super) fn verify_captured_cleanup(
+    closure: &mainframe_env_store_api::RootClosureSnapshot,
+    invocation: &Invocation,
+    record: &ProviderStateRecord,
+    instance: &Instance,
+) -> Result<(), HostProblem> {
+    if let Some(proof) = &instance.abend {
+        let actor = closure
+            .actors
+            .iter()
+            .find(|actor| actor.execution.execution_id.as_str() == proof.execution)
+            .ok_or(HostProblem::UnknownOutcome)?;
+        verify_observation(
+            invocation,
+            &record.key,
+            &instance.artifact,
+            proof,
+            &actor.execution,
+            &actor.last_event,
+        )?;
     }
     Ok(())
 }

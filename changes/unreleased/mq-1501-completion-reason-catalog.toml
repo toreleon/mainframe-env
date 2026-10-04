@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a source-bound MQ completion/reason catalog for 26 call identities and 27 source positions, strict typed observed status admission and additive canonical encoding; conflicting and unnumbered declarations remain pending, and callback notification retains explicit call-return non-applicability with zero execution credit."

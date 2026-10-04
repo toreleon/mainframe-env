@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 7394,
+      "max_production_lines": 7210,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -36,33 +36,21 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 5991,
+      "max_production_lines": 5699,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
     {
       "path": "crates/contracts/mainframe-env-coverage/src/conformance.rs",
-      "max_production_lines": 2811,
+      "max_production_lines": 2808,
       "responsibility": "Coverage conformance catalogs, binding validation, evidence projection, and gate accounting share this contract module.",
       "split_boundary": "Separate catalog decoding, binding validation, evidence ledger projection, and gate summary contracts."
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 2845,
+      "max_production_lines": 2762,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
-    },
-    {
-      "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 1592,
-      "responsibility": "Owned host request and response records remain in one compatibility boundary, with program and CICS request families split behind stable re-exports.",
-      "split_boundary": "Continue moving family-owned request records into dataset, security, Db2, IMS, and MQ contract modules with stable re-exports."
-    },
-    {
-      "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",
-      "max_production_lines": 3316,
-      "responsibility": "COBOL statement-family grammar recognition and operand extraction are implemented as one lowering grammar table.",
-      "split_boundary": "Split grammar recognizers by control, data, I/O, communication, and exception statement families."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
@@ -71,10 +59,10 @@
       "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
     },
     {
-      "path": "crates/kernel/mainframe-env-compiler/src/semantic/structure.rs",
-      "max_production_lines": 1251,
-      "responsibility": "Program-structure semantic validation covers nested divisions, sections, scopes, and declarative relationships.",
-      "split_boundary": "Extract scope construction and declarative validation from division/section structural checks."
+      "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",
+      "max_production_lines": 3316,
+      "responsibility": "COBOL statement-family grammar recognition and operand extraction are implemented as one lowering grammar table.",
+      "split_boundary": "Split grammar recognizers by control, data, I/O, communication, and exception statement families."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/semantic.rs",
@@ -83,10 +71,10 @@
       "split_boundary": "Separate model construction, symbol resolution, cross-reference validation, and diagnostics behind the semantic facade."
     },
     {
-      "path": "crates/kernel/mainframe-env-compiler/src/syntax/directives.rs",
-      "max_production_lines": 2372,
-      "responsibility": "Compiler-directing statement parsing, replacement semantics, and directive validation share one syntax module.",
-      "split_boundary": "Split COPY/REPLACE processing, conditional directives, and source-control directives by grammar family."
+      "path": "crates/kernel/mainframe-env-compiler/src/semantic/structure.rs",
+      "max_production_lines": 1251,
+      "responsibility": "Program-structure semantic validation covers nested divisions, sections, scopes, and declarative relationships.",
+      "split_boundary": "Extract scope construction and declarative validation from division/section structural checks."
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/syntax.rs",
@@ -95,8 +83,14 @@
       "split_boundary": "Separate token cursor and program-structure parsing from statement-family dispatch and diagnostic recovery."
     },
     {
+      "path": "crates/kernel/mainframe-env-compiler/src/syntax/directives.rs",
+      "max_production_lines": 2372,
+      "responsibility": "Compiler-directing statement parsing, replacement semantics, and directive validation share one syntax module.",
+      "split_boundary": "Split COPY/REPLACE processing, conditional directives, and source-control directives by grammar family."
+    },
+    {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11915,
+      "max_production_lines": 11785,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -150,13 +144,13 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/durable.rs",
-      "max_production_lines": 2285,
+      "max_production_lines": 2282,
       "responsibility": "Shared durable SQL helpers implement effect, event, work, checkpoint, session, replay, and provider-state domains.",
       "split_boundary": "Partition SQL repositories by execution journal, work/session, replay/provider state, and maintenance/retention domains."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3393,
+      "max_production_lines": 3256,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -168,13 +162,13 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
-      "max_production_lines": 1783,
+      "max_production_lines": 1489,
       "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
       "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 13099,
+      "max_production_lines": 13092,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },

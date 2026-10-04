@@ -1,122 +1,127 @@
 //! Typed, bounded IMS SSA grammar contracts.
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Generated syntax descriptor for one command byte; recognition does not imply runtime support.
+/// Reviewed SSA command byte and applicability metadata; it is not provider execution.
 pub struct ImsSsaCommandCodeDescriptor {
-    /// Invariant display-code command byte.
+    /// Exact reviewed display command byte.
     pub code: u8,
-    /// Catalog description of the command's purpose.
+    /// Reviewed behavior label; not a runtime command implementation.
     pub behavior: &'static str,
-    /// Whether parsing this command requires a following subset-pointer digit.
+    /// True when this command requires a pointer digit 1-8.
     pub subset_pointer: bool,
-    /// Whether the generated command descriptor restricts applicability to DEDB.
+    /// Retained DEDB applicability restriction for later context admission.
     pub dedb_only: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Comparison identity for metadata-sized binary SSA values.
+/// Comparison identity resolved from exact accepted two-byte SSA syntax.
 pub enum ImsSsaRelation {
-    /// Select equal comparative values.
+    /// Equality comparison.
     Equal,
-    /// Select values strictly greater than the comparative value.
+    /// Strict greater-than comparison.
     GreaterThan,
-    /// Select values strictly less than the comparative value.
+    /// Strict less-than comparison.
     LessThan,
-    /// Select values greater than or equal to the comparative value.
+    /// Inclusive greater-than comparison.
     GreaterOrEqual,
-    /// Select values less than or equal to the comparative value.
+    /// Inclusive less-than comparison.
     LessOrEqual,
-    /// Select values unequal to the comparative value.
+    /// Inequality comparison.
     NotEqual,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Accepted two-byte display-code spellings for one comparison identity.
+/// One comparison identity and its accepted two-byte display encodings.
 pub struct ImsSsaRelationDescriptor {
-    /// Comparison represented by all listed encodings.
+    /// Typed comparison identity.
     pub relation: ImsSsaRelation,
-    /// Exact accepted pairs of invariant syntax bytes.
+    /// All exact admitted two-byte display spellings.
     pub encodings: &'static [[u8; 2]],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Parsed connector identity; execution support is checked separately.
+/// Boolean connector identity retained without collapsing dependent and independent conjunction.
 pub enum ImsSsaBoolean {
-    /// Dependent-AND connector identity in the grammar registry.
+    /// Dependent conjunction, retained distinctly from independent AND.
     DependentAnd,
-    /// Logical-OR connector identity in the grammar registry.
+    /// Logical disjunction.
     LogicalOr,
-    /// Independent-AND connector identity in the grammar registry.
+    /// Independent conjunction, retained distinctly from dependent AND.
     IndependentAnd,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Generated single-byte encoding for a parsed connector identity.
+/// One connector and its exact display-code byte.
 pub struct ImsSsaBooleanDescriptor {
-    /// Boolean connector represented by the byte.
+    /// Typed conjunction/disjunction identity.
     pub connector: ImsSsaBoolean,
-    /// Exact invariant display-code syntax byte.
+    /// Exact one-byte display spelling.
     pub encoding: u8,
 }
 
 include!("generated/ims_ssa_rules.rs");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Parsed command byte and its optional subset-pointer operand.
+/// Accepted command byte and optional numeric subset pointer, retaining input command order.
 pub struct ImsSsaCommand {
-    /// Command byte already recognized by the grammar registry.
+    /// Exact admitted command byte.
     pub code: u8,
-    /// Pointer number 1 through 8 when the command requires it; otherwise absent.
+    /// Optional numeric pointer in 1-8, only for commands requiring it.
     pub subset_pointer: Option<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Named or explicit byte-range field reference in a parsed predicate.
+/// Named metadata field or explicit one-based byte position and length.
 pub enum ImsSsaField {
-    /// Metadata field name resolved to an exact comparative byte length.
+    /// Resolve a named field through trusted metadata.
     Named(String),
-    /// Explicit O-code range: positive encoded start position and comparative byte length.
-    Offset { position: u16, length: u16 },
+    /// Use a positive one-based byte slice for record search.
+    Offset {
+        /** Positive one-based record-search byte position. */
+        position: u16,
+        /** Positive record-search byte count. */
+        length: u16,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// One parsed field comparison whose value retains exact caller bytes.
+/// Comparison field, relation and exact fixed-width value bytes, without trimming or value scanning.
 pub struct ImsSsaPredicate {
-    /// Metadata name or explicit byte range being compared.
+    /// Named metadata slice or checked explicit record-search range.
     pub field: ImsSsaField,
-    /// Parsed comparison to apply to the value.
+    /// Admitted exact comparison identity.
     pub relation: ImsSsaRelation,
-    /// Exact comparative bytes sized by metadata or the explicit range.
+    /// Exact comparison bytes, retained at the metadata-declared width.
     pub value: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Owned parsed SSA; consumers independently validate supported command and predicate combinations.
+/// Parsed display-code SSA preserving command-format choice, qualification and binary comparison bytes.
 pub struct ImsSsa {
-    /// Normalized fixed-width segment name with padding removed.
+    /// Parsed fixed-width segment name, excluding trailing blank padding.
     pub segment: String,
-    /// Whether the input included the command-format marker, even with no commands.
+    /// True for the explicit asterisk command form, including an empty command list.
     pub command_format: bool,
-    /// Command operands in their original parsed order.
+    /// Accepted command sequence in source order.
     pub commands: Vec<ImsSsaCommand>,
-    /// Exact C-code key bytes; absent when no concatenated-key operand was parsed.
+    /// Optional exact concatenated-key bytes, mutually exclusive with predicates.
     pub concatenated_key: Option<Vec<u8>>,
-    /// Field comparisons in input order.
+    /// Ordered accepted field comparisons.
     pub predicates: Vec<ImsSsaPredicate>,
-    /// Connectors between adjacent predicates; empty for a single or absent predicate.
+    /// Exactly one connector between adjacent predicates; empty for an unqualified form.
     pub connectors: Vec<ImsSsaBoolean>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Local parser resource ceilings for syntax and retained comparative bytes.
+/// Finite SSA input, command, predicate and value byte ceilings checked by the parser.
 pub struct ImsSsaLimits {
-    /// Maximum total SSA input length in bytes; default 32 KiB.
+    /// Maximum complete SSA input bytes.
     pub max_bytes: usize,
-    /// Maximum parsed command count; default 16, and zero rejects parsing.
+    /// Positive maximum parsed command count.
     pub max_command_codes: usize,
-    /// Maximum predicate count; default 16, and zero rejects parsing.
+    /// Positive maximum parsed predicate count.
     pub max_predicates: usize,
-    /// Maximum comparative or concatenated-key value length in bytes; default 32 KiB.
+    /// Positive maximum individual comparison/key bytes.
     pub max_value_bytes: usize,
 }
 
@@ -132,50 +137,50 @@ impl Default for ImsSsaLimits {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Bounded SSA parse failure; no database transition is performed by this parser.
+/// SSA parsing refusal; malformed/truncated input is never admitted as an unqualified request.
 pub enum ImsSsaProblem {
-    /// Input cannot hold a fixed segment name and its control byte.
+    /// Input cannot contain the fixed segment name and control byte.
     TooShort,
-    /// A parser bound is zero or an input/collection/value exceeds its limit.
+    /// Input, count, value or arithmetic bound exceeded.
     ResourceExhausted,
-    /// The fixed segment name is malformed.
+    /// Segment name has invalid bytes or internal blank padding.
     InvalidSegmentName,
-    /// The next syntax control byte is not admitted by the grammar.
+    /// The command/qualification boundary is not admitted syntax.
     InvalidControlByte,
-    /// The command byte has no registered descriptor.
+    /// A command byte is absent from the reviewed vocabulary.
     InvalidCommandCode,
-    /// A required pointer digit is missing or outside 1 through 8.
+    /// Required pointer is absent/outside 1-8 or supplied for a nonpointer command.
     InvalidSubsetPointer,
-    /// Command-format input ends before its terminator.
+    /// Command form ends without its required terminator.
     MissingCommandTerminator,
-    /// Command and qualification operands form a rejected combination.
+    /// Concatenated-key form conflicts with predicate qualification.
     CommandQualificationConflict,
-    /// Metadata cannot supply a concatenated-key byte length.
+    /// Metadata supplies no concatenated-key width.
     UnknownConcatenatedKey,
-    /// The fixed predicate field name is malformed.
+    /// Fixed field name is malformed.
     InvalidFieldName,
-    /// Metadata cannot supply the named field's byte length.
+    /// Metadata supplies no named field width.
     UnknownField,
-    /// An explicit position or length is invalid.
+    /// Explicit record-search slice is zero, invalid or overflowing.
     InvalidOffset,
-    /// The two comparison bytes are not registered.
+    /// Two-byte relation spelling is not reviewed.
     InvalidRelation,
-    /// The connector byte is not registered.
+    /// Connector byte is not reviewed.
     InvalidBooleanConnector,
-    /// The comparative value contains a prohibited parenthesis byte.
+    /// A forbidden parenthesis occurs within exact comparison bytes.
     ParenthesisInValue,
-    /// Input ends before the metadata-sized operand is complete.
+    /// Input ends before its metadata-declared comparison/key width.
     Truncated,
-    /// Bytes remain after a complete SSA.
+    /// Bytes remain after the completed SSA form.
     TrailingData,
 }
 
-/// Metadata authority supplying exact comparative lengths without interpreting value bytes.
+/// Trusted metadata lengths for exact SSA slicing; unknown fields/keys fail closed.
 pub trait ImsSsaFieldResolver {
-    /// Return the named field length in bytes, or None for an unresolved field.
+    /// Return exact comparison byte width for the named segment field; None refuses unknown metadata.
     fn field_length(&self, segment: &str, field: &str) -> Option<usize>;
 
-    /// Return the C-code key length in bytes; the default leaves it unresolved.
+    /// Return exact concatenated-key byte width; the default None refuses unsupported key qualification.
     fn concatenated_key_length(&self, _segment: &str) -> Option<usize> {
         None
     }
@@ -191,7 +196,7 @@ where
 }
 
 #[must_use]
-/// Look up an exact command byte; unknown bytes return None.
+/// Look up exact reviewed command-byte metadata; unknown bytes return None.
 pub fn ims_ssa_command_code(code: u8) -> Option<&'static ImsSsaCommandCodeDescriptor> {
     IMS_SSA_COMMAND_CODES
         .iter()
@@ -199,7 +204,7 @@ pub fn ims_ssa_command_code(code: u8) -> Option<&'static ImsSsaCommandCodeDescri
 }
 
 #[must_use]
-/// Resolve an exact pair of display-code relation bytes, or None.
+/// Resolve only exact reviewed two-byte relation encodings; unknown bytes return None.
 pub fn ims_ssa_relation(bytes: [u8; 2]) -> Option<ImsSsaRelation> {
     IMS_SSA_RELATIONAL_OPERATORS
         .iter()
@@ -208,7 +213,7 @@ pub fn ims_ssa_relation(bytes: [u8; 2]) -> Option<ImsSsaRelation> {
 }
 
 #[must_use]
-/// Resolve an exact display-code connector byte, or None.
+/// Resolve only exact reviewed connector bytes; unknown bytes return None.
 pub fn ims_ssa_boolean(byte: u8) -> Option<ImsSsaBoolean> {
     IMS_SSA_BOOLEAN_CONNECTORS
         .iter()

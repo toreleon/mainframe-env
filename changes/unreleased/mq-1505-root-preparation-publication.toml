@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added atomic registered-row preparation for the exact effect-free Admitted initial root on Memory and SQLite; eager server protocol setup, original CALL wiring and scope succession remain separate prerequisites."

@@ -17,10 +17,13 @@
     "identity_authority",
     "behavioral_coverage_credit",
     "licensed_execution_credit",
-    "calls"
+    "calls",
+    "wire_options",
+    "raw_layout",
+    "property_profile"
   ],
   "properties": {
-    "schema_version": {"const": "mainframe-env.mq-structure-status-catalog@1"},
+    "schema_version": {"const": "mainframe-env.mq-structure-status-catalog@2"},
     "target_version": {"const": "0.15.0"},
     "work_package": {"const": "MQ-1501.structure-status-catalog"},
     "baseline_id": {"const": "ibm-mq-9.4-mqi-2026-08-31"},
@@ -32,6 +35,12 @@
     "identity_authority": {"const": true},
     "behavioral_coverage_credit": {"const": 0},
     "licensed_execution_credit": {"const": 0},
+    "wire_options": {"$ref": "#/$defs/wire-options"},
+    "raw_layout": {"$ref": "#/$defs/raw-layout"},
+    "property_profile": {"$ref": "#/$defs/property-profile"},
+    "rfh2_profile": {"$ref": "#/$defs/rfh2-profile"},
+    "raw_property": {"$ref": "#/$defs/raw-property"},
+    "inquiry_local_type": {"$ref": "#/$defs/inquiry-local-type"},
     "calls": {
       "type": "array",
       "minItems": 26,
@@ -40,6 +49,1185 @@
     }
   },
   "$defs": {
+    "inquiry-local-type": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "profile", "semantic_execution_credit", "historical_catalog_sha256", "official_row", "source_positions", "sources", "facts", "semantics", "owned_limits", "pending"],
+      "properties": {
+        "schema_version": {"const": "mainframe-env.mq-inquiry-local-type-projection@1"},
+        "profile": {"const": "NormalLocalIntegerAdequateV1"},
+        "semantic_execution_credit": {"const": 0},
+        "historical_catalog_sha256": {"const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"},
+        "official_row": {"const": "0016"},
+        "source_positions": {"const": [16]},
+        "sources": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "object", "additionalProperties": false, "required": ["scope_id", "baseline_id", "topic_manifest"], "properties": {"scope_id": {"type": "string", "maxLength": 128}, "baseline_id": {"type": "string", "maxLength": 128}, "topic_manifest": {"$ref": "#/$defs/file-binding"}}}},
+        "facts": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"$ref": "#/$defs/inquiry-selector-fact"}, {"$ref": "#/$defs/inquiry-local-fact"}], "items": false},
+        "semantics": {"type": "object", "additionalProperties": false, "required": ["selector_input", "integer_output", "character_output", "qtype", "local_queue"], "properties": {"selector_input": {"$ref": "#/$defs/property-locator"}, "integer_output": {"$ref": "#/$defs/property-locator"}, "character_output": {"$ref": "#/$defs/property-locator"}, "qtype": {"$ref": "#/$defs/property-locator"}, "local_queue": {"$ref": "#/$defs/property-locator"}}},
+        "owned_limits": {"type": "object", "additionalProperties": false, "required": ["integer_slots"], "properties": {"integer_slots": {"const": 256}}},
+        "pending": {"const": ["other-selectors", "other-object-kinds", "character-attributes", "short-buffers-and-warnings", "selected-and-native-dispatch"]}
+      }
+    },
+    "inquiry-selector-fact": {
+      "type": "object", "additionalProperties": false, "required": ["symbol", "decimal", "hexadecimal", "source"],
+      "properties": {"symbol": {"const": "MQIA_Q_TYPE"}, "decimal": {"const": 20}, "hexadecimal": {"const": "00000014"}, "source": {"$ref": "#/$defs/property-locator"}}
+    },
+    "inquiry-local-fact": {
+      "type": "object", "additionalProperties": false, "required": ["symbol", "decimal", "hexadecimal", "source"],
+      "properties": {"symbol": {"const": "MQQT_LOCAL"}, "decimal": {"const": 1}, "hexadecimal": {"const": "00000001"}, "source": {"$ref": "#/$defs/property-locator"}}
+    },
+    "raw-property": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "profile", "semantic_execution_credit", "historical_catalog_sha256", "sources", "owned_limits", "long", "identity", "layouts", "semantics", "disagreements", "vendor_copybook_equivalence", "short_name_policy", "type_string_policy"],
+      "properties": {
+        "schema_version": {"const": "mainframe-env.mq-raw-property-projection@1"},
+        "profile": {"const": "OwnedReconciledNullSlot4AsciiNormalV1"},
+        "semantic_execution_credit": {"const": 0},
+        "historical_catalog_sha256": {"const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"},
+        "sources": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "object", "additionalProperties": false, "required": ["scope_id", "baseline_id", "topic_manifest"], "properties": {"scope_id": {"type": "string", "maxLength": 128}, "baseline_id": {"type": "string", "maxLength": 128}, "topic_manifest": {"$ref": "#/$defs/file-binding"}}}},
+        "owned_limits": {"type": "object", "additionalProperties": false, "required": ["group_bytes", "batch_plans"], "properties": {"group_bytes": {"const": 65536}, "batch_plans": {"const": 8}}},
+        "long": {"type": "object", "additionalProperties": false, "required": ["width", "cobol_min", "cobol_max", "source", "cobol"], "properties": {"width": {"const": 4}, "cobol_min": {"const": -999999999}, "cobol_max": {"const": 999999999}, "source": {"$ref": "#/$defs/property-locator"}, "cobol": {"$ref": "#/$defs/property-locator"}}},
+        "identity": {"type": "object", "additionalProperties": false, "required": ["identifier_symbol", "identifier_source", "version_symbol", "version_source"], "properties": {"identifier_symbol": {"const": "MQIMPO_STRUC_ID"}, "identifier_source": {"$ref": "#/$defs/property-locator"}, "version_symbol": {"const": "MQIMPO_VERSION_1"}, "version_source": {"$ref": "#/$defs/property-locator"}}},
+        "layouts": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["kind", "identifier", "version", "prefix_bytes", "fields"], "properties": {"kind": {"enum": ["CharvNullSlot4AsciiNormal", "Impo1NullSlot4AsciiNormal"]}, "identifier": {"enum": [null, "IMPO"]}, "version": {"enum": [null, 1]}, "prefix_bytes": {"enum": [20, 60]}, "fields": {"type": "array", "minItems": 5, "maxItems": 14, "items": {"$ref": "#/$defs/raw-property-field"}}}}},
+        "semantics": {"type": "object", "additionalProperties": false, "required": ["encoding", "charv_encoding", "offset_origin", "capacity", "returned_name", "original_call", "unknown_type", "pointer_alignment"], "properties": {"encoding": {"$ref": "#/$defs/property-locator"}, "charv_encoding": {"$ref": "#/$defs/property-locator"}, "offset_origin": {"$ref": "#/$defs/property-locator"}, "capacity": {"$ref": "#/$defs/property-locator"}, "returned_name": {"$ref": "#/$defs/property-locator"}, "original_call": {"$ref": "#/$defs/property-locator"}, "unknown_type": {"$ref": "#/$defs/property-locator"}, "pointer_alignment": {"$ref": "#/$defs/property-locator"}}},
+        "disagreements": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "object", "additionalProperties": false, "required": ["id", "source"], "properties": {"id": {"type": "string", "maxLength": 80}, "source": {"$ref": "#/$defs/property-locator"}}}},
+        "vendor_copybook_equivalence": {"const": "unresolved"},
+        "short_name_policy": {"const": "owned-copied-prefix"},
+        "type_string_policy": {"const": "captured-retained-for-standard-types-no-synthesis"}
+      }
+    },
+    "raw-property-field": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "kind", "width", "offset", "sources", "defined_standard_output"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 64},
+        "kind": {"enum": ["characters", "long", "null-slot"]},
+        "width": {"enum": [4, 8]},
+        "offset": {"type": "integer", "minimum": 0, "maximum": 56},
+        "sources": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"$ref": "#/$defs/property-locator"}},
+        "defined_standard_output": {"type": "boolean"}
+      }
+    },
+    "rfh2-profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "semantic_execution_credit",
+        "property_projection_sha256",
+        "sources",
+        "facts",
+        "identifiers",
+        "fields",
+        "types",
+        "formatter",
+        "reserved_names",
+        "reserved_prefixes",
+        "semantics",
+        "pending_source_conflicts"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.mq-rfh2-profile@1"
+        },
+        "semantic_execution_credit": {
+          "const": 0
+        },
+        "property_projection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope_id",
+              "baseline_id",
+              "topic_manifest"
+            ],
+            "properties": {
+              "scope_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "baseline_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "topic_manifest": {
+                "$ref": "#/$defs/file-binding"
+              }
+            }
+          }
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "decimal",
+              "hexadecimal",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "decimal": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "hexadecimal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "identifiers": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "value",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "offset",
+              "width",
+              "kind",
+              "source"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "width": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "types": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "lexical",
+              "source"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "lexical": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "formatter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inherited_ccsid",
+            "name_value_ccsid"
+          ],
+          "properties": {
+            "inherited_ccsid": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "decimal",
+                "source"
+              ],
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "decimal": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "source": {
+                  "$ref": "#/$defs/property-locator"
+                }
+              }
+            },
+            "name_value_ccsid": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "decimal",
+                "source"
+              ],
+              "properties": {
+                "decimal": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "source": {
+                  "$ref": "#/$defs/property-locator"
+                }
+              }
+            }
+          }
+        },
+        "reserved_names": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "names",
+            "source"
+          ],
+          "properties": {
+            "names": {
+              "type": "array",
+              "minItems": 17,
+              "maxItems": 17,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "source": {
+              "$ref": "#/$defs/property-locator"
+            }
+          }
+        },
+        "reserved_prefixes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "names",
+            "source"
+          ],
+          "properties": {
+            "names": {
+              "type": "array",
+              "minItems": 13,
+              "maxItems": 13,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "source": {
+              "$ref": "#/$defs/property-locator"
+            }
+          }
+        },
+        "semantics": {
+          "type": "array",
+          "minItems": 15,
+          "maxItems": 15,
+          "items": {
+            "$ref": "#/$defs/property-locator"
+          }
+        },
+        "pending_source_conflicts": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "property-locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "topic_sha256",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/(refdev|develop)/q[0-9]+_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "property-profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "semantic_execution_credit",
+        "historical_catalog_sha256",
+        "raw_layout_projection_sha256",
+        "sources",
+        "facts",
+        "identifiers",
+        "semantics",
+        "descriptor_layout",
+        "descriptor_excluded_fields",
+        "default_symbol_conflict",
+        "explicit_string_ccsid",
+        "value_widths"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.mq-property-profile@1"
+        },
+        "semantic_execution_credit": {
+          "const": 0
+        },
+        "historical_catalog_sha256": {
+          "const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"
+        },
+        "raw_layout_projection_sha256": {
+          "const": "2f6d7c679543891ccc768f099963813d981871d2abd35fa7b49aa4e70732ae6a"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope_id",
+              "baseline_id",
+              "topic_manifest"
+            ],
+            "properties": {
+              "scope_id": {
+                "enum": [
+                  "mq-property-sources",
+                  "mq-programming-supplements",
+                  "ibm-mq-9.4-mqi-2026-08-31"
+                ]
+              },
+              "baseline_id": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "topic_manifest": {
+                "$ref": "#/$defs/file-binding"
+              }
+            }
+          }
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 77,
+          "maxItems": 77,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "decimal",
+              "hexadecimal",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "pattern": "^MQ[A-Z0-9_]+$"
+              },
+              "decimal": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "hexadecimal": {
+                "type": "string",
+                "pattern": "^[0-9A-F]{8}$"
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              },
+              "platform": {
+                "const": "z/OS"
+              }
+            }
+          }
+        },
+        "identifiers": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "value",
+              "source"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "pattern": "^MQ[A-Z0-9_]+$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 4
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "semantics": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "purpose",
+              "source"
+            ],
+            "properties": {
+              "purpose": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "descriptor_layout": {
+          "const": "Md1"
+        },
+        "descriptor_excluded_fields": {
+          "const": [
+            "StrucId",
+            "Version"
+          ]
+        },
+        "default_symbol_conflict": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "structure_table",
+            "numeric_authority",
+            "disposition"
+          ],
+          "properties": {
+            "structure_table": {
+              "$ref": "#/$defs/property-locator"
+            },
+            "numeric_authority": {
+              "const": [
+                "MQPD_SUPPORT_OPTIONAL",
+                "MQCOPY_DEFAULT"
+              ]
+            },
+            "disposition": {
+              "const": "explicit-constants-define-symbol-values-structure-table-numeric-columns-conflict"
+            }
+          }
+        },
+        "value_widths": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "bytes",
+              "source"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "Boolean",
+                  "ByteString",
+                  "Int8",
+                  "Int16",
+                  "Int32",
+                  "Int64",
+                  "Float32",
+                  "Float64",
+                  "String",
+                  "Null"
+                ]
+              },
+              "bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 8
+              },
+              "source": {
+                "$ref": "#/$defs/property-locator"
+              }
+            }
+          }
+        },
+        "explicit_string_ccsid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decimal",
+            "source"
+          ],
+          "properties": {
+            "decimal": {
+              "const": 1208
+            },
+            "source": {
+              "$ref": "#/$defs/property-locator"
+            }
+          }
+        }
+      }
+    },
+    "raw-locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "topic_sha256",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "raw-initial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value",
+        "source"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "long",
+            "identifier",
+            "blanks",
+            "nulls",
+            "environment"
+          ]
+        },
+        "value": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "source": {
+          "$ref": "#/$defs/raw-locator"
+        }
+      }
+    },
+    "raw-field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "width",
+        "offset",
+        "c_line",
+        "cobol_line",
+        "initial",
+        "writeback",
+        "writeback_source"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]+$"
+        },
+        "kind": {
+          "enum": [
+            "long",
+            "characters",
+            "bytes",
+            "alias",
+            "signal-slot"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 48
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 364
+        },
+        "c_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "cobol_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "initial": {
+          "$ref": "#/$defs/raw-initial"
+        },
+        "writeback": {
+          "enum": [
+            "input",
+            "get",
+            "get-put",
+            "dynamic-open",
+            "put-count-other",
+            "single-queue-put",
+            "pending-output"
+          ]
+        },
+        "writeback_source": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/raw-locator"
+            }
+          ]
+        }
+      }
+    },
+    "raw-layout-descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "family",
+        "version",
+        "identifier",
+        "prefix_bytes",
+        "c_declaration",
+        "cobol_declaration",
+        "fields"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "Od1",
+            "Md1",
+            "Md2",
+            "Gmo1",
+            "Pmo1",
+            "Cno1"
+          ]
+        },
+        "family": {
+          "enum": [
+            "MQOD",
+            "MQMD",
+            "MQGMO",
+            "MQPMO",
+            "MQCNO"
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 4
+        },
+        "prefix_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 364
+        },
+        "c_declaration": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "cobol_declaration": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 29,
+          "items": {
+            "$ref": "#/$defs/raw-field"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "Cno1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "family": {
+                "const": "MQCNO"
+              },
+              "version": {
+                "const": 1
+              },
+              "identifier": {
+                "const": "CNO "
+              },
+              "prefix_bytes": {
+                "const": 12
+              },
+              "fields": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "fields": {
+                "minItems": 7
+              }
+            }
+          }
+        }
+      ]
+    },
+    "raw-layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "semantic_execution_credit",
+        "historical_catalog_sha256",
+        "wire_options_projection_sha256",
+        "sources",
+        "elementary",
+        "integer_order",
+        "structure_rules",
+        "layouts",
+        "identifier_sources",
+        "signal_policy",
+        "body_encoding_policy",
+        "character_policy",
+        "owned_character_table",
+        "descriptor_output_policy",
+        "previous_projection_sha256",
+        "connx_input"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.mq-raw-layout-projection@1"
+        },
+        "semantic_execution_credit": {
+          "const": 0
+        },
+        "historical_catalog_sha256": {
+          "const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"
+        },
+        "wire_options_projection_sha256": {
+          "const": "4d55b1d825762ff4319215185fb240513ab97b0b9b8ff25192b1b0bab12b9d1c"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope_id",
+              "baseline_id",
+              "topic_manifest"
+            ],
+            "properties": {
+              "scope_id": {
+                "enum": [
+                  "mq-programming-supplements",
+                  "mq-point-layout-sources",
+                  "ibm-mq-9.4-mqi-2026-08-31"
+                ]
+              },
+              "baseline_id": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "topic_manifest": {
+                "$ref": "#/$defs/file-binding"
+              }
+            }
+          }
+        },
+        "elementary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "long_bytes",
+            "cobol_long_min",
+            "cobol_long_max",
+            "source"
+          ],
+          "properties": {
+            "long_bytes": {
+              "const": 4
+            },
+            "cobol_long_min": {
+              "const": -999999999
+            },
+            "cobol_long_max": {
+              "const": 999999999
+            },
+            "source": {
+              "$ref": "#/$defs/raw-locator"
+            }
+          }
+        },
+        "integer_order": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "structure_rules": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "layouts": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/raw-layout-descriptor"
+          }
+        },
+        "identifier_sources": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/raw-locator"
+          }
+        },
+        "signal_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "body_encoding_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "character_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "owned_character_table": {
+          "$ref": "#/$defs/file-binding"
+        },
+        "descriptor_output_policy": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "previous_projection_sha256": {
+          "const": "5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0"
+        },
+        "connx_input": {
+          "$ref": "#/$defs/connx-input"
+        }
+      }
+    },
+    "connx-fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "decimal",
+        "hexadecimal",
+        "kind",
+        "topic_path",
+        "topic_sha256",
+        "first_line",
+        "last_line",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "symbol": {
+          "type": "string",
+          "pattern": "^MQCNO_[A-Z0-9_]+$"
+        },
+        "decimal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "hexadecimal": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{8}$"
+        },
+        "kind": {
+          "enum": [
+            "version",
+            "option"
+          ]
+        },
+        "topic_path": {
+          "type": "string",
+          "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"
+        },
+        "topic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "first_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "last_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "fragment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "connx-input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin_row",
+        "origin",
+        "origin_host_scope",
+        "prefix_input_fields",
+        "options_input",
+        "binding",
+        "sharing",
+        "default",
+        "version_boundary",
+        "structure_applicability",
+        "facts",
+        "admitted_options_symbols"
+      ],
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "origin_host_scope": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "prefix_input_fields": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "options_input": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "binding": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "sharing": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "default": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "version_boundary": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "structure_applicability": {
+          "$ref": "#/$defs/raw-locator"
+        },
+        "origin_row": {
+          "const": "ibm-mq-9.4-mqi-2026-08-31:mqi-calls-unique:0009"
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 29,
+          "maxItems": 29,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/connx-fact"
+          }
+        },
+        "admitted_options_symbols": {
+          "const": [
+            "MQCNO_NONE",
+            "MQCNO_HANDLE_SHARE_NONE"
+          ]
+        }
+      }
+    },
+    "wire-options": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseline_id", "scope_id", "topic_manifest", "historical_catalog_sha256", "semantic_execution_credit", "facts", "corroboration"],
+      "properties": {
+        "baseline_id": {"const": "ibm-mq-9.4-programming-supplements-2026-09-12"},
+        "scope_id": {"const": "mq-programming-supplements"},
+        "topic_manifest": {"$ref": "#/$defs/file-binding"},
+        "historical_catalog_sha256": {"const": "3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448"},
+        "semantic_execution_credit": {"const": 0},
+        "facts": {"type": "array", "minItems": 102, "maxItems": 102, "uniqueItems": true, "items": {"$ref": "#/$defs/wire-fact"}},
+        "corroboration": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"$ref": "#/$defs/wire-locator"}}
+      }
+    },
+    "wire-locator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["topic_path", "topic_sha256", "first_line", "last_line", "fragment_sha256"],
+      "properties": {
+        "topic_path": {"type": "string", "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"},
+        "topic_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "first_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "last_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "fragment_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "wire-fact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["symbol", "decimal", "hexadecimal", "kind", "topic_path", "topic_sha256", "first_line", "last_line", "fragment_sha256"],
+      "properties": {
+        "symbol": {"type": "string", "pattern": "^MQ(?:OO|CO|GMO|PMO|MD|OD)_[A-Z0-9_]+$"},
+        "decimal": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+        "hexadecimal": {"type": ["string", "null"], "pattern": "^[0-9A-Fa-f]{8}$"},
+        "kind": {"enum": ["version", "option", "cpp-only"]},
+        "topic_path": {"type": "string", "pattern": "^SSFKSJ_9\\.4\\.0/refdev/q[0-9]+_\\.html$"},
+        "topic_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "first_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "last_line": {"type": "integer", "minimum": 1, "maximum": 1600},
+        "fragment_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
     "file-binding": {
       "type": "object",
       "additionalProperties": false,

@@ -1,0 +1,472 @@
+# MQ program-to-machine frame handoff
+
+Status: **Proposed**
+Owner: **program/execution and MQ maintainers**
+Scope: **explicit typed installed-batch handoff, not MQ public readiness**
+Applies from: **mainframe-env 0.15.0**
+
+## Decision
+
+The installed-program host can be configured with a single
+`ProgramMqHostAdmission` before runtime binding. After actual installed artifact
+admission and the winning original durable CALL reservation, the batch executor
+constructs a nonserializable `InstalledBatchAdmission` for that factory. Its
+private constructor preserves actual parent and parentSome child Invocations,
+catalog namespace/key/version or selected-program provenance, validated artifact
+reference/content/manifest and original compiler/interface metadata, original
+enclosing ProgramCall, retained canonical core intent and running parent, exact
+CALL reservation and frozen physical store/control/host/artifact-store references.
+The proof has read-only accessors, no Clone/Serde or public numeric constructor.
+Application bindings cannot choose the factory.
+Contradictory CICS task/outer/child provenance is rejected, not erased. The
+factory must independently admit process/frame topology and use the selected
+service's lifecycle/registry authority; decoding this binding is not attestation.
+
+Factory installation and runtime publication use one setup guard. Repeated or
+partial runtime setup fails before publishing new fields. Typed runtime publication
+also freezes the first execution-control binding; legacy embeddings retain their
+existing control installation after construction and before dispatch. Admission
+copies the configured factory/store under that guard and releases it before
+invoking embedding callbacks. This guard is not the complete trusted producer's
+service/store/authorizer/clock bundle, which remains a separate obligation.
+
+With typed configuration, the original parent occurrence must be retained on
+that configured store as an unrecovered canonical intent with exact execution,
+run, attempt, sequence/key, full request digest, capability, audit attribution
+and finite live deadline. The current parent must remain running with its exact
+principal/selector/artifact. The pending CALL record and admitted catalog are
+rechecked before and after the factory; clock regression/cancellation/deadline
+and changed observations reject preparation. Driving rechecks the original core
+and CALL dependency while leaving cancellation/timeout classification with the
+existing coordinator. No protected reservation is deleted or automatically
+retried. Legacy paths without a typed factory keep their existing behavior.
+Direct scheduler/helper paths without a real retained original occurrence are
+Unsupported for typed admission; they cannot manufacture an enclosing call.
+
+This is **admission provenance**, not independently admitted host-root/process
+attestation, an MQ lifecycle lease, SAF or an atomic publication permit. The
+real selected bridge must match the proof's physical Arc store and frozen setup
+to its SAME service, independently admit actual host parent/process/task topology
+and current incarnation, and retain core/CAS/audit ownership. Equal rows in a
+foreign store and decoded binding/owner bytes cannot perform that check. The
+observed core/execution reads do not create whole-store serialization or a
+coordinator permit; physical publication and live lifecycle fencing remain
+their original authorities.
+
+The factory returns a bounded `InstalledMqFrameSession`. Its `program_frame`
+uses the existing `MqMqiProgramFrame`, explicitly installed on the reference
+machine before driving. Its profile supplies the independently minted owner
+and bounded MQI limits. The machine rechecks that profile before constructing
+the original typed effect and before consuming its result. A changed owner or
+profile cannot rewrite an already journaled effect. The existing effect builder
+owns sequence, key, run, deadline and Mutation identity. ScopedHostService and
+the durable coordinator retain capability, audit, original intent and completion
+ownership. This port grants no SAF, queue, UOW, recovery or participant permission.
+
+The session declares its physical store and execution-control Arcs. The server
+compares both against the frozen admission setup before installing any frame;
+equal record/observation bytes on different adapters are rejected and preparation
+is aborted. This necessary composition check is not independently admitted
+service/root identity. A real selected factory must still bind its own SAME
+service authority and host root, rather than merely echoing observed Arcs.
+
+The server owns one session guard per admitted child. All binary/frame/environment
+preparation failures receive one `abort_preparation`; all returned raw coordinator
+outcomes receive one `finish` before ProgramOutput/HostProblem mapping. Completed,
+Condition, Abend, Cancelled, TimedOut, ResourceExhausted, ProviderFailure (including
+Unknown), InfrastructureFailure, Rejected, Suspended, Invoke and Transfer retain
+their original distinctions. Neither return nor Condition proves task/process
+end. Abort/finish failure or panic becomes protected UnknownOutcome. The transport
+is invalidated before callback invocation, and a callback is never retried. Drop
+only invalidates bounded executable transport: it invokes no cleanup callback,
+commit/backout/MQDISC or detached queue. Unwind with no returned raw outcome leaves
+the original CALL/core uncertainty protected by the existing host protocol.
+Factories must roll back only newly owned volatile preparation on admission
+error and must not perform durable cleanup in session Drop. Actual source-bound
+UOW/task-end and fallible retirement policy belongs to the real selected bridge.
+
+The executable transport forwards both `profile` and `local_unit` through the
+same exact frozen Invocation and synchronous active check before and after the
+embedding callback. Lookup carries the actual issued connection token unchanged
+and returns only the embedding's observation; it cannot mint authority, decide
+work or rewrite the original effect. Revocation during a callback suppresses its
+returned observation. Callback panic revokes the transport and returns protected
+UnknownOutcome without retry or cleanup; ordinary abort/finish containment remains
+once-only. Older frames' default lookup remains Unsupported.
+
+For this explicitly configured ordinary batch profile, a present `mq.host-context`
+must have exactly schema `mainframe-env.mq.host-context@1` and payload
+`zos-batch|queue-manager`. Matching inherited bytes are preserved; wrong schema,
+malformed or conflicting context is rejected before factory admission or MQ
+dispatch. Only an absent child binding receives the configured trusted setup.
+The original parent and CALL/core occurrence are never normalized or rewritten.
+This compatibility check does not independently attest a host lifecycle or admit
+client, IMS, CICS or host-coordinated work through an ordinary batch factory.
+
+The first adapter maps MQCONN/MQDISC for ordinary z/OS batch. It validates exact
+argument count, MQCHAR48 input and signed fullword output storage before dispatch,
+preserves case/significant name padding, and retains actual issued HCONN tokens
+behind bounded, non-reused application ABI aliases. It never creates registry
+tokens from application integers. MQDISC retires its alias on actual successful
+completion; retaining undefined z/OS Hconn bytes does not retain access. Reviewed
+failure status is copied exactly without substituting a connection output.
+Uncertain, malformed or unusable post-dispatch replies remain UnknownOutcome.
+Other known MQI calls fail closed under this initial frame rather than bypass
+it through legacy MQ; unrelated program names remain ordinary program calls.
+
+The typed adapter additionally maps MQCMIT/MQBACK for this ordinary batch/local
+queue-manager profile. The embedding frame's read-only `local_unit` lookup takes
+the actual live HCONN token, never an application integer, and supplies a current
+local-UOW assertion before effect construction. It is not a permit: original
+intent, logical owner, physical incarnation/control and UOW CAS remain the
+selected provider's responsibility. Older frames default to Unsupported. The
+adapter rechecks the same profile after lookup and keeps the existing immutable
+effect's sequence/key/actor. External/absent/zero units fail before dispatch.
+
+All three arguments are checked signed fullword reference storage; successful
+UOW output must match the original asserted unit. Actual CompCode/Reason
+observations use the one reviewed call-specific status authority, including
+warnings and failures. Neither status writeback nor normal CALL return decides
+or advances durable work or retires connection aliases. Unknown/duplicate,
+changed profile, wrong unit and unusable typed reply envelopes remain protected
+UnknownOutcome before application writes; legacy reply-validation errors and
+checkpoint bytes remain unchanged. These machine/frame fixtures are not a real
+installed MQ service producer, shared participant or task-end policy. The server
+session containment forwards the lookup through its live revocation guard;
+actual selected-provider ownership and durable-control validation remain required.
+
+The unchanged legacy checkpoint schema has no typed lifecycle/alias references.
+Typed frames therefore do not emit that checkpoint or restore it. A serialized
+binding cannot install a frame after restored/driven execution. Proper durable
+checkpoint/handle replay is still required before public profile acceptance;
+this explicit refusal is not an inapplicable-gate disposition. Legacy machines
+and their checkpoint schema/bytes remain unchanged. Their earlier MQ adapter is
+mechanically extracted to a child module to preserve the production-line ratchet.
+
+Public in-process `snapshot()` exports a typed source only as diagnostic schema
+zero, which no restore accepts, including a fresh unbound destination. Zero is
+not an accepted machine/checkpoint version. Manual binary projection retains that
+invalid marker; `MachineSnapshot` has no Serde projection that removes it. The
+existing destination frame refusal also remains. Legacy sources still export
+schema 12 and unchanged checkpoint bytes. Editing public diagnostic fields cannot
+create provider lifecycle or registry authority. Actual typed durable snapshot
+and historical-handle adoption support remains pending.
+
+## Sources and acceptance boundary
+
+### Deliberate Rust trusted-host facet
+
+`ConfiguredInstalledMqHost` is deliberate server Rust setup over that SAME
+facet. It requires strict existing rich rows, the actual PlatformStore,
+mandatory enterprise authorizer and one MqReplayClock. It constructs the frozen
+ProgramExecutionControl from that exact clock and original cancellation/probe,
+not a sentinel Invocation or matching tick values. Setup registers the SAME Arc
+as HostProvider and uses physical registry selection before consuming genuine
+InstalledBatchAdmission. ProductServer's default remains unchanged; startup
+does not initialize, import, normalize or advance deployment fences.
+
+Finite host maps retain opaque roots/closed frames and exact original Invocations.
+Count slots and a conservative aggregate invocation-memory charge under frozen
+HostLimits.max_state_bytes are reserved before callbacks or snapshot cloning.
+Shared payload bytes are conservatively charged without deep copying; this host
+memory budget is neither a canonical encoding nor a durable authority.
+Root parentNone and already-retained nested parents are checked separately;
+configuration independently chooses ordinary SAME TASK, never inferring host
+admission from bindings or matching identifiers. Map locks are released before
+clock/store/SAF/facet callbacks. Per-frame exclusion and pre/post revocation guard
+profile, current-unit lookup, explicit ordinary CONNX ABI observation and ORIGINAL
+typed effect dispatch. The existing service remains the sole registry/UOW/queue,
+SAF, canonical intent, receipt, replay and audited physical publication authority.
+
+Preparation abort affects only a new predispatch child. Only a returned Completed
+CALL outcome permits explicit nonfinal child return; other raw outcomes fence and
+retain uncertainty rather than guess a task-end or UOW decision. Session Drop
+only revokes host transport access: it calls no service/durable cleanup, detached
+work or automatic retry. Revoked/uncertain retained entries cannot become fresh
+roots/frames. The atomic provider audit and coordinator dispatch observation both
+remain required under their existing independent storage ordering. Test-only
+normalized setup rows are reproducibly captured from the existing quiescent
+import planner; this is not a production normalization route or execution credit.
+
+Deployment normalization, final task-end, typed checkpoint, retention, shared
+participant, full26 and CardDemo acceptance remain separately required. This
+explicit configured profile does not change the public default or grant licensed
+credit.
+
+`ConfiguredInstalledMqHost::open_native_points` is a separate deliberate Rust
+setup over strict existing native-rich state. It installs the existing
+NoContext-only producer-source port once on the unique inactive runtime and the
+same physical store. It supplies neither JES/default context nor GMT and refuses
+CP037 at the compiled structure boundary. The older `open` route retains its
+connection-only behavior. Native point mode requires genuine eager compiled
+root admission, never a lazily inferred root from an installed child.
+
+Before driving that original root, the host charges and preallocates one bounded
+`Arc<MqMqiAbiScope>` from the actual opaque root context. Separately compiled
+SAME TASK CALL frames inherit that exact allocation through their retained live
+parent. Equal context bytes, bindings, a foreign table or historical aliases
+cannot replace it. Raw OPEN/CLOSE decoding captures the same opaque selected
+structure profile first; decoded lookup/access or actual HOBJ is then bound to
+the same provider point profile. All wire queries and rechecks delegate to those
+tuple-bound observations. Successful CLOSE retains its captured retired-object
+encoding policy without reviving the object.
+
+The existing installed session transport forwards both the original ABI scope
+and native structure port. Escaped structure and point objects share its atomic
+revocation gate; finish, preparation abort, Drop or a callback panic disables
+their executable observations without invoking durable cleanup. Encoding and
+platform are captured immutable scalars before the final delegated recheck,
+never authorization. Revocation during a callback suppresses its returned
+observation, and subsequent guarded queries make no underlying callback.
+
+The host completes control callbacks before its final delegated physical
+comparison. Its source checks frozen compiled/original ownership and atomic
+activity with a nonblocking topology observation, releasing that map before
+store/control callbacks. It never reacquires the held frame or selected-service
+mutex. No later external callback follows a successful final physical check.
+Unknown, cancellation, panic or late changes fence and retain; they cannot
+rewind dispatch, clean up a UOW or choose task end. OPEN/CLOSE composition is
+separate from pending PUT/removed GET terminal acceptance, deployment
+normalization, DefaultContext, checkpoint/recovery, participant and full26
+acceptance. Neither source review nor setup fixture generation earns execution
+or licensed credit.
+
+`MqTrustedBatchRuntime` is an explicit privileged Rust embedding facet over one
+selected `MqService`, its same physical `Arc<dyn PlatformStore>`, mandatory
+enterprise authorizer/clock and frozen provider/host/MQI profiles. Opening uses
+only the strict existing reader and rejects absent, legacy, corrupt or mismatched
+rich state. It does not normalize, initialize, migrate, select a public provider
+or add a second queue, store, codec, journal or authorization authority.
+
+Its closed nonSerde/nonClone runtime/root/frame objects expose no numeric lease,
+handle, owner or mutable Invocation constructor. `admit_root` deliberately chooses
+ordinary `ZosBatch/QueueManager`; this is PRIVILEGED HOST SETUP, not application
+binding attestation. The actual server factory must first independently validate
+genuine original installed admission, core/CALL/store/control and topology. A
+root still requires parentNone; a real installed child is never forged into a
+root. Missing MQ binding is allowed only through frozen explicit mode; every
+present MQ/CICS/IMS/client/host-owned contradiction remains a failure. Original
+Invocations and pending effects are never rewritten.
+
+`prepare_same_task_child` requires this exact runtime and opaque live parent,
+original child, explicit trusted SAME TASK CALL selection and the existing
+directory's probe/lineage/nonwidening checks. Separate subtasks remain unsupported.
+Child objects retain the same original root. Read-only context/current-unit
+projections and dispatch reuse the existing service methods and sole authority
+mutex. Dispatch consumes one validated original occurrence, checks its exact
+frozen limits and retains original actor/core/SAF/audit/UOW/control/receipt/replay
+composition. Matching IDs, bindings, projections or possession of a frame is
+neither host attestation nor a SAF/participant permit. UnitOwner@1 and historical
+canonical/replay/storage bytes remain unchanged.
+
+Explicit preparation abort is child-only and unavailable after any dispatch
+attempt. Normal nonfinal child return removes only its volatile frame, preserving
+handles/pending work and surviving parent references. Lifecycle methods require
+exclusive access and revoke their wrapper once; every other wrapper still needs
+fresh directory validation. An unclassified/abnormal lifecycle operation fences
+the same runtime under its sole mutex, revokes the wrapper and retains all work
+for recovery, returning UnknownOutcome. Root/final task-end is unsupported. A
+dispatch reporting UnknownOutcome also revokes its wrapper while retaining its
+directory reference, so it cannot infer a normal return. Drop
+performs no MQDISC, commit, backout, row deletion, detached work or task-end
+decision. Failed new-root preparation reclaims only its new empty process through
+the existing registry/directory guard, never another task or durable work.
+
+This facet supplies a deliberate cross-crate direction without provider dependencies
+on interpreter/server. Actual installed producer/session bridging, route
+registration, normalization, coordinator completion/outbox/Unknown recovery,
+checkpoint/retention, final task-end, participant, all26 and CardDemo acceptance
+remain separately required. Provider-private physical-backend fixture tests do
+not establish any of those claims. Source review and licensed execution credit
+remain zero; only the human's licensed-oracle exception is applied.
+
+### Private same-task child ownership
+
+`MQ-1505.selected-batch-child-ownership` adds a checked provider-private
+`prepare_selected_batch_child(parent_frame, parent, child, relationship)` path.
+The existing opaque parent lease and exact frozen parent Invocation are required.
+The trusted, already-admitted host must independently supply the ordinary SAME
+TASK CALL relationship; the private selector is not an attestation capability.
+Equal bindings, parent IDs or run/principal alone cannot establish that relation.
+Separate subtasks, clients, CICS and IMS cannot inherit this batch processing unit.
+Root minting/binding still refuses every `parentSome` Invocation.
+
+The private explicit-context plane admits an original unbound parent without
+inserting `mq.host-context` into its Invocation. The trusted embedding separately
+selects ordinary `ZosBatch/QueueManager` configuration against the same selected
+service/store. Explicit mint/bind freezes that mode in an opaque process lease;
+the existing binding-only methods cannot upgrade it or fall back to it. Present
+MQ/CICS bindings still use the single decoder and must match; malformed bindings,
+client/IMS/host-owned contexts and contradictory CICS origins fail closed.
+Checked same-task children inherit only their live parent's frozen mode. A
+bounded directory-issued proof ties scope context to the exact original snapshot
+and owner under the sole authority mutex. Neither this private parameter nor
+decoding application JSON is host attestation. Original CALL/core/effect digests,
+child actor attribution, UnitOwner@1 and replay bytes remain unchanged. The real
+cross-crate producer/session bridge and public acceptance remain separately owned.
+
+The directory checks the actual child linkage, distinct execution, exact
+run/principal/grants/generations/attempt, shared physical cancellation probe,
+live controls and non-widening deadline/resource limits before bounded frame
+insertion. Each root batch frame retains a small frozen logical origin; only a
+checked same-task child copies it. Surviving frame references retain that origin
+without reconstructing it from a CONNECT receipt. Origin bytes count against the
+existing directory budget. No lease or origin has a public/Serde constructor.
+
+The selected service obtains that proof afresh under its sole authority mutex.
+It validates access to the original connection's retained logical owner rather
+than reassigning `UnitOwner@1` to the child. Existing owner schema and root bytes
+remain exact. Child GET/PUT and explicit batch CMIT/BACK/DISC retain the actual
+child's immutable effect, core intent, SAF principal, audit and occurrence
+receipt. Physical publication still composes current control/UOW dependencies,
+catalog/marker/delivery CAS and insert-only receipt with audit in the same store
+transaction; adoption follows the entire commit. Nested/outer intents cannot
+replace the child's original intent. Reply uncertainty fences this service and
+leaves reconciliation with the existing recovery authority.
+
+Explicit preparation abort removes only a newly created child frame. Ordinary
+CALL return removes a nonfinal child reference without retiring task handles
+or deciding pending work; no Drop cleanup is installed. A checked same-task child
+may establish the task's first default, nonshared connection. Registry ownership
+uses the admitted task/thread/epoch; the unchanged durable owner record retains
+the logical origin and that child's original CONNECT key. Its core intent, SAF,
+audit and receipt retain the actual child actor. A surviving admitted parent or
+next same-task child can use the retained connection, objects and current UOW;
+explicit CMIT/BACK/DISC still require that caller's original controls, authority
+and whole audited publication. Repeated default, nonshared MQCONN/MQCONNX now
+returns the exact already-issued connection through the existing reviewed-output
+WARNING/ALREADY_CONNECTED pair. Under the same mutex, unique live registry/index
+and retained logical owner/current unit/CONNECT key/control provenance precede
+mandatory SAF and original core-intent publication. The warning allocates no
+connection or unit, reassigns no owner and does not advance delivery expiry or
+change queue, cursor, object or pending work. Its new occurrence receipt and audit
+commit atomically with exact current UOW/control/catalog/marker dependencies;
+dependency versions may advance while semantic payloads remain unchanged.
+Cached warning delivery retains the full original canonical result and requires
+current physical incarnation, original core/actor/limits, SAF, issued reply and
+live registry/UOW proof. Corruption, ambiguity and uncertainty fail closed without
+automatic redispatch. Shared/client, subtasks and host-owned contexts gain no
+authority from the warning.
+
+This rule relies on the trusted host proving an ordinary CALL in the same
+continuing task. MQCONN's nonshared z/OS scope is the task, excluding subtasks;
+the handle expires on MQDISC or termination of that processing unit. The source
+does not attest topology from Invocation fields, and CALL return is not treated
+as task termination. Final task end and raw abnormal/unknown host outcomes need
+separate owned integration. Cold restart restores retained UOW/receipt bytes, never opaque
+lineage or tokens; durable incarnation advancement remains mandatory. This
+private composition awaits the real installed host producer/session and deliberate
+cross-crate authority design. It does not register a ready public provider or
+accept a shared participant.
+
+IBM MQ 9.4 baseline `ibm-mq-9.4-mqi-2026-08-31`, row `0008` MQCONN,
+`SSFKSJ_9.4.0/refdev/q101760_.html`, SHA-256
+`fa0cdd2c5e19326dfb91e5ad0b921fd47a1a3a918682e13c4ff5e36c2ba40347`,
+defines the name, nonshared scope and returned Hconn. Row `0012` MQDISC,
+`SSFKSJ_9.4.0/refdev/q101800_.html`, SHA-256
+`8e33bfec37f7fb467b9f206e8d2f03dc84a18bebf230068582dd84b7d4375e36`,
+defines the input/output Hconn and undefined z/OS value after success. Completion
+numbers come from the existing reviewed status authority, not another table.
+Offline source review grants zero execution/licensed credit.
+
+The warning review uses the same baseline row `0008`, MQCONN usage line 271
+(same prior Hconn), and row `0009`, `SSFKSJ_9.4.0/refdev/q101770_.html`, SHA-256
+`41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633`,
+return lines 76–78 and nonshared task scope lines 30–54. FAILED leaves Hconn
+undefined (MQCONN 273, MQCONNX 41–42); no defined failure handle is synthesized.
+Ordinary nonfinal CALL return still makes no implicit disconnect or UOW decision.
+
+The syncpoint handoff also reviews baseline `ibm-mq-9.4-mqi-2026-08-31`,
+row `0007` MQCMIT, `SSFKSJ_9.4.0/refdev/q101750_.html`, SHA-256
+`590f32c213d129d6937c253f048ccdb9c5cbd963ca2d3310cf5672dcf68c42f4`,
+and row `0001` MQBACK, `SSFKSJ_9.4.0/refdev/q101690_.html`, SHA-256
+`9550bf98c66f47f1d61943e0dbb7ab89043d0db1a3918ea3a4314dccf7182c86`.
+Their signatures use Hconn input and CompCode/Reason output; the reviewed usage
+requires queue-manager coordination and the same connection's UOW. CICS, IMS
+transaction-manager and RRS/shared resource work are not admitted by this port.
+
+The deliberate native-point setup also forwards complete PUT/PUT1 through the
+same retained opaque structure and exact object or predefined lookup. Descriptor
+version and body maximum are independent getters of that tuple, not copied
+attestation. Configured and revocable session wrappers finish every observation
+before the existing final physical comparison; the approved compiler then joins
+pure MD/PMO/status writeback under its retained alias guard. Old embeddings keep
+Unsupported getter defaults. This finite ASCII/big-endian NoContext profile
+requires nonzero supplied MsgId and explicit descriptor policy; it supplies neither
+DefaultContext, JES/GMT nor generated IDs/defaults. Genuine compiled pending PUT
+normal completion and CEE3ABD backout compose the existing native-root publication
+framework on Memory and owned SQLite. Reopen is logical persistence evidence,
+not a process-crash proof. Removed GET, source-known commit-impossible fallback,
+shared participants, recovery/retention and broader native/full26 acceptance remain
+independent requirements; ProductServer defaults are unchanged.
+
+Source review for this forwarding uses the original baseline PUT row0020
+`q101880_`, PUT1 row0021 `q101890_`, BACK row0001 `q101690_`, CMIT row0007
+`q101750_` and DISC row0012 `q101800_` (normal/abnormal z/OS termination), plus
+supplemental `q098655_` explicit syncpoint, NoContext and synchronous response.
+Offline hash-verified sources and generated empty setup fixtures carry zero
+execution or licensed credit.
+
+The same configured native-point plane also captures complete qualified GET
+before MD/GMO decoding. It reuses the retained object's opaque profile and the
+independent descriptor/body getters; both configured and revocable wrappers
+preserve the original frame, current local unit, physical service and final
+comparison. The nine-reference MD1/MD2/GMO1 profile admits finite unformatted,
+unselected removal with represented syncpoint and truncation policy. Exact
+request-bound results preserve complete OK, accepted WARNING2079, rejected
+WARNING2080 and absent FAILED2033 observations; absent MD/GMO/body fields are
+not synthesized. Old Unsupported embeddings and ProductServer defaults remain.
+
+The installed proof produces each message through an actual separately compiled
+same-task PUT/PUT1 child and explicit local MQCMIT, then performs GET under the
+surviving root or another genuinely admitted child sharing its one ABI Arc.
+Normal terminal completion commits removal; genuine CEE3ABD restores the whole
+message with the reviewed BackoutCount increment. Explicit compiled BACK followed
+by another original GET observes that increment without restoring aliases or
+recycling root scope. Completed root scope claims remain retained; a fresh root
+over those claimed MQ namespaces is refused until an owning handoff exists.
+No scope reclamation, second journal or terminal policy is introduced here.
+
+This source review uses original row0015 `q101830_`, row0001 `q101690_`,
+row0007 `q101750_`, row0012 `q101800_`, supplemental GMO `q096715_` and MD
+`q097395_` (BackoutCount lines1498–1508), plus the separately pinned recovery
+topic `q103230_` HardenGetBackout. A persisted live backout and an owned SQLite
+reopen do not establish failure-between-GET-and-BACK accuracy. The explicit z/OS
+queue attribute/default and owning crash recovery remain separate requirements;
+no multiplatform always-hardened policy is inferred. Source review and empty
+setup fixtures carry zero execution/licensed credit. Broader forms, defaults,
+participants, recovery/retention and full native/full26 acceptance remain pending.
+
+ProductServer still opens and registers the previous MQ profile. It does not
+automatically configure this factory. The explicit configured factory bridges
+the genuinely admitted installed CHILD topology to the selected directory;
+pretending it is a parentless root is prohibited. Ordinary `cobol.call@1` now
+forwards its existing winning CALL proof into the same session seam as batch
+input. The proof accepts these two original payload schemas while retaining all
+original core/control/catalog/reservation checks. The owning execution method
+is extracted into a bounded child; session preparation aborts once, parent/core
+controls are rechecked during execution, and finish receives the untouched raw
+outcome before cursor/linkage/CALL mapping. Original run-end and replay protocols
+remain their existing owners.
+
+Real compiled/catalog-published nested and successive ordinary CALL tests on
+Memory and owned SQLite exercise the configured selected CONN/CONNX/CMIT/BACK/DISC
+profile, prior issued connection, current UOW, both actual audit layers and
+original actor-specific core/receipts. They test late proof/control/SAF/CAS failure,
+normal nonfinal return, escaped transport and cold-incarnation fencing. Generic
+rich fixture setup is generated through the existing quiescent import planner,
+not production normalization. These fixture authorizers are recording/denying
+ports, not installed RACF or shared-participant proof. Deployment normalization,
+final task-end/recovery, typed checkpoint/retention, all applicable 26-call
+contexts and CardDemo still require their own composed acceptance before broader
+readiness.
+
+The supplied-identifier profile distinguishes a nonzero caller MsgId from CorrelId:
+supplied MQCI_NONE (all24 binary-zero bytes) and other supplied24-byte correlation
+values do not request generation. Compiled MD1/MD2 PUT/PUT1 tests retain these exact
+bytes in NoContext returned descriptors and pending/committed messages, including
+same-task child CALL provenance and genuine CEE3ABD discard. NEW_MSG_ID,
+NEW_CORREL_ID and zero MsgId still refuse before PUT publication. This evidence
+does not supply generated IDs, fresh crossroot, JES/DefaultContext or official26
+acceptance. Source: supplemental MD q097395_ lines1435–1494, PMO q098655_
+lines122–142 and constants q092190_; original PUT0020/PUT10021 baseline unchanged.

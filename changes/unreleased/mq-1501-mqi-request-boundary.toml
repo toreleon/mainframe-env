@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a frozen, bounded typed MQI request/result boundary for all 26 pinned calls with canonical identities; public dispatch, wire/status mappings and licensed execution remain pending."

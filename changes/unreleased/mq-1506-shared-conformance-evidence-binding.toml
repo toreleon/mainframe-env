@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Bind finite MQ conformance evidence to actual typed input source, separate independent expectations and setup, and retain ordered original/replay RACF decisions with exact core/audit attribution."

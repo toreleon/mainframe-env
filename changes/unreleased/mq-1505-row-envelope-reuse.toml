@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Exposed the existing MQ object-row envelope and encoder within the provider crate for delivery-row composition, without changing serialized bytes, public APIs or legacy behavior."

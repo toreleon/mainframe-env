@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Documented public execution, audited provider publication and row CAS contracts, including attribution, live controls and participant uncertainty, and lowered exact execution/store documentation ratchets to zero and 72 without changing runtime or canonical contracts."

@@ -2,13 +2,18 @@
 
 #![forbid(unsafe_code)]
 
+mod checked_read;
 mod durable;
 mod durable_retention;
 mod local_artifact;
 mod memory;
 mod postgres;
 mod postgres_artifact;
+mod provider_scan;
+mod publication;
+mod replay_refusal;
 mod retention;
+mod root_terminal;
 mod runtime;
 mod sqlite;
 mod validation;

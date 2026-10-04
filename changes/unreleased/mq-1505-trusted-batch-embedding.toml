@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a deliberate opaque Rust trusted-host embedding facet for an already normalized selected MQ runtime, preserving original root/child Invocations, checked same-task lineage, strict core/SAF/publication/replay authority and explicit nonfinal lifecycle revocation without Drop decisions; real installed producer, public registration and participant acceptance remain pending."

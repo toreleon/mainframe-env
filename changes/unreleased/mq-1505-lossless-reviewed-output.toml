@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added request-bound reviewed MQI status plus typed output, preserving GET truncation descriptor, bytes and required length in full canonical host results without remapping statuses or granting service/replay authority."

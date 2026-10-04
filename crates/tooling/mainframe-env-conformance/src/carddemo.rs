@@ -2,6 +2,8 @@
 
 mod corpus_validation;
 use corpus_validation::*;
+mod bounds;
+use bounds::checked_total;
 
 mod bms;
 mod control_library;
@@ -1462,15 +1464,6 @@ pub fn verify_carddemo_control_flow_from_env(
         transfers,
         returns,
         control_sha256: format!("{:x}", control_digest.finalize()),
-    })
-}
-
-fn checked_total(current: usize, increment: usize, name: &str) -> Result<usize, CorpusProblem> {
-    current.checked_add(increment).ok_or_else(|| {
-        CorpusProblem::new(
-            "carddemo.control.resource_exhausted",
-            format!("{name} counter overflow"),
-        )
     })
 }
 

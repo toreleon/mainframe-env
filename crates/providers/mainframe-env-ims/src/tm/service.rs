@@ -22,7 +22,7 @@ use mainframe_env_host_api::{AccessIntent, EnterpriseAuthorizer, HostProblem};
 use mainframe_env_store_api::{ProviderStateMutation, ProviderStateStore, WorkRecord, WorkStore};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-mod conversations;
+mod conversation;
 
 pub(super) const WORK_PAYLOAD_SCHEMA: &str = "mainframe-env.ims-tm-work@1";
 

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Extended the same read-only trusted native structure and exact point facets for finite complete GMO1 GET on held INPUT_SHARED objects, with fresh physical/frame/catalog/current-unit checks. Observations grant no dispatch or SAF authority; complete ResolvedQName output and installed native writeback remain pending."

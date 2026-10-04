@@ -16,6 +16,8 @@ mod ims_catalog;
 mod ims_conformance;
 mod jcl_catalog;
 mod jcl_conformance;
+mod mq_conformance;
+mod mq_status_catalog;
 mod profile_intake;
 mod racf_catalog;
 mod release_attestation;
@@ -67,6 +69,7 @@ use mainframe_env_coverage::{
     OfficialCatalogRow, OfficialRowId, PredicateRef, RunnerContext, RunnerSelection,
     RuntimeRegistry, SpecProblem, TestId, Verdict, VerdictEvent, validate_verdict_batches,
 };
+use mq_conformance::run_focused_mq;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -5325,6 +5328,14 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         !args.prepare_candidates,
         "candidate preparation is not installed for this selector",
     )?;
+    if args.subsystem.as_deref() == Some("mq")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|id| id.starts_with("mq."))
+    {
+        return run_focused_mq(root, args);
+    }
     let dataset_racf_or_jcl_selected = matches!(
         args.subsystem.as_deref(),
         Some("dataset-vsam-ams" | "racf-saf" | "jcl-jes2")
@@ -6021,6 +6032,8 @@ fn combined_conformance_runtime<'a>(
         .map_err(|problem| problem.to_string())?;
     cobol_arithmetic
         .bind(spec, &mut drivers, &mut observations, limits)
+        .map_err(|problem| problem.to_string())?;
+    mainframe_env_conformance::bind_mq_selected(spec, &mut drivers, &mut observations, limits)
         .map_err(|problem| problem.to_string())?;
     let runtime = mainframe_env_conformance::racf_runtime_with(
         spec,
@@ -7845,6 +7858,7 @@ fn check_architecture(root: &Path) -> TaskResult {
 }
 
 fn check_mq_mqi_registry(root: &Path) -> TaskResult {
+    mq_status_catalog::check(root)?;
     let generator = root.join("tools/generate_mq_mqi_registry.py");
     require(
         generator.is_file(),

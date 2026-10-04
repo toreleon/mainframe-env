@@ -21,6 +21,10 @@ mod jes_children;
 mod program;
 mod service;
 
+pub use service::{
+    BatchEffectOccurrence, BatchRunControl, BatchRunExit, RunningStepAdmission, RunningStepView,
+};
+
 pub use controller::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
     BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,

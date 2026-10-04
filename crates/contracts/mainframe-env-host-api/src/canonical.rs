@@ -26,7 +26,9 @@ const OVERSIZED_AUDIT_RESOURCE_DIGEST_DOMAIN: &[u8] = b"mainframe-env.audit-reso
 /// A hard ceiling for the canonical journal representation, not the provider's payload budget.
 pub const MAX_CANONICAL_EFFECT_BYTES: usize = 64 * 1024 * 1024;
 
-struct Encoder<'a> {
+// Crate-private visibility lets additive contracts share this one streaming
+// authority without changing legacy HostRequest/HostResult framing or dispatch.
+pub(crate) struct Encoder<'a> {
     sink: &'a mut dyn FnMut(&[u8]),
     size: usize,
     limit: usize,
@@ -44,7 +46,7 @@ impl Encoder<'_> {
         self.size = size;
         Ok(())
     }
-    fn tag(&mut self, value: u8) -> Result<(), HostProblem> {
+    pub(crate) fn tag(&mut self, value: u8) -> Result<(), HostProblem> {
         self.put(&[value])
     }
     fn length(&mut self, value: usize) -> Result<(), HostProblem> {
@@ -54,24 +56,29 @@ impl Encoder<'_> {
                 .to_le_bytes(),
         )
     }
-    fn text(&mut self, value: &str) -> Result<(), HostProblem> {
+    pub(crate) fn text(&mut self, value: &str) -> Result<(), HostProblem> {
         self.tag(1)?;
         self.length(value.len())?;
         self.put(value.as_bytes())
     }
-    fn object(&mut self, name: &str, fields: usize) -> Result<(), HostProblem> {
+    pub(crate) fn object(&mut self, name: &str, fields: usize) -> Result<(), HostProblem> {
         self.tag(0x40)?;
         self.text(name)?;
         self.length(fields)
     }
-    fn variant(&mut self, name: &str, variant: &str, fields: usize) -> Result<(), HostProblem> {
+    pub(crate) fn variant(
+        &mut self,
+        name: &str,
+        variant: &str,
+        fields: usize,
+    ) -> Result<(), HostProblem> {
         self.tag(0x41)?;
         self.text(name)?;
         self.text(variant)?;
         self.length(fields)
     }
 }
-trait Canonical {
+pub(crate) trait Canonical {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem>;
     fn sequence(values: &[Self], out: &mut Encoder<'_>) -> Result<(), HostProblem>
     where
@@ -272,7 +279,7 @@ fn encode_program_link(
     Ok(())
 }
 
-fn encode<T: Canonical + ?Sized>(
+pub(crate) fn encode<T: Canonical + ?Sized>(
     value: &T,
     domain: &[u8],
     limit: usize,
@@ -360,7 +367,15 @@ mod ims_gsam;
 mod ims_navigation;
 mod ims_recovery;
 mod ims_system;
+mod mq;
+pub(crate) mod mq_mqi;
+mod root_terminal;
 mod security_request;
+pub use root_terminal::{
+    RootTerminalMachineObservation, RootTerminalResource, RootTerminalResourceRow,
+    RootTerminalSetup, canonical_root_terminal_resource_digest,
+    canonical_root_terminal_resource_size, canonical_root_terminal_setup_digest,
+};
 use security_request::encode_principal_validation;
 
 #[cfg(test)]
