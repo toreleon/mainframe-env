@@ -49,14 +49,18 @@ See [Conformance IR](../architecture/CONFORMANCE-IR.md).
 
 ## CardDemo workload boundary
 
-The clean pinned upstream corpus can be preprocessed, its COPY closure checked,
-and its READACCT source/JCL executed locally. Whole-profile compatibility remains
-pending. The current complete gate encounters an account-update rollback failure;
-independent batch, Db2, IMS, and MQ journeys also have unresolved runtime failures.
-Passing a source check or READACCT does not establish completion of all 20
-journeys. Follow the [operator runbook](../runbooks/CARDDEMO-OPERATOR.md) to check
-these paths against your candidate and the [profile track](../delivery/subsystems/PROFILE-TRACK.md)
-for workload acceptance requirements.
+The clean pinned upstream corpus supports all 20 owned local journeys across
+base CICS, the batch cycle, Db2, IMS, and MQ authorization. The complete gate
+also exercises memory isolation and overload, SQLite backup/restore, and
+PostgreSQL restart. Use the optimized runner described in the
+[operator runbook](../runbooks/CARDDEMO-OPERATOR.md); the unoptimized statement
+cycle can exceed the job deadline.
+
+The profile retains its declared substitutions, including the bounded owned
+`CDV1` source for an upstream orphan and z/OSMF transport for FTP/JES helpers.
+It does not execute native archives or establish licensed IBM equivalence.
+Run the complete gate against your candidate and follow the
+[profile track](../delivery/subsystems/PROFILE-TRACK.md) for acceptance requirements.
 
 ## Operational limits
 

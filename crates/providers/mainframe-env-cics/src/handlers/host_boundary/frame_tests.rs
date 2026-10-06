@@ -4,6 +4,42 @@ use mainframe_env_execution_api::{ArtifactRef, Principal, Selector};
 use mainframe_env_store::MemoryStore;
 
 #[test]
+fn nested_participant_origin_attests_default_context_without_changing_actor() {
+    let (_, root) = fixture();
+    let key = IdempotencyKey::new("nested-key", InvocationLimits::default()).unwrap();
+    let nested = invocation_with_nested_origin(&root, &key, "outer-key").unwrap();
+    let context = &nested.bindings["cics.execution-context"];
+    assert_eq!(context.schema(), "mainframe-env.cics.execution-context@1");
+    assert_eq!(context.bytes(), b"local");
+    assert_eq!(nested.execution_id, root.execution_id);
+    assert_eq!(nested.run_unit_id, root.run_unit_id);
+    assert!(!root.bindings.contains_key("cics.execution-context"));
+    assert_eq!(
+        nested.bindings[CICS_NESTED_EFFECT_ORIGIN_BINDING].bytes(),
+        b"nested-key"
+    );
+    assert!(matches!(
+        invocation_with_nested_origin(&nested, &key, "other-key"),
+        Err(HostProblem::Malformed)
+    ));
+    let mut dpl = root;
+    dpl.bindings.insert(
+        "cics.execution-context".into(),
+        BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap(),
+    );
+    let nested = invocation_with_nested_origin(&dpl, &key, "outer-key").unwrap();
+    assert_eq!(
+        nested.bindings["cics.execution-context"],
+        dpl.bindings["cics.execution-context"]
+    );
+}
+
+#[test]
 fn logical_frame_program_identity_binds_outer_actor_and_occurrence_not_task_counter() {
     let (service, root) = fixture();
     let mut caller = CommandLease::acquire(&service, &root.run_unit_id).unwrap();

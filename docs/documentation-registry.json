@@ -94,6 +94,7 @@
     "docs/decisions/0043-batch-contained-all-effect-loan.md",
     "docs/decisions/0045-batch-prepared-selection-plan.md",
     "docs/decisions/0046-batch-bounded-provider-prefetch.md",
+    "docs/decisions/0047-carddemo-participant-completion.md",
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
     "docs/architecture/README.md",
     "docs/contracts/README.md"
@@ -500,6 +501,10 @@
         {
           "label": "ADR-0046: Bounded provider namespace prefetch",
           "path": "docs/decisions/0046-batch-bounded-provider-prefetch.md"
+        },
+        {
+          "label": "ADR-0047: CardDemo participant ownership and batch completion",
+          "path": "docs/decisions/0047-carddemo-participant-completion.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

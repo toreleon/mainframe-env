@@ -2,6 +2,9 @@
 
 ADRs capture decisions that constrain implementation and public contracts.
 
+[ADR-0047](0047-carddemo-participant-completion.md) records the implemented
+CardDemo participant ownership and batch completion boundary.
+
 | ADR | Decision | Status |
 |---|---|---|
 | [0001](0001-technology-stack.md) | initial technology stack and deferred frameworks | Accepted |

@@ -23,8 +23,9 @@ archives. Treating a login-screen pass as full-repository support would be a
 false completion claim.
 
 This ADR defines the cumulative CardDemo workload scope. Compatibility requires
-passing the live checks for the selected profile and backend. Whole-profile
-validation is currently pending; see the CardDemo operator runbook.
+passing the live checks for the selected profile and backend. Use the optimized
+runner in the CardDemo operator runbook; ADR-0047 records the implemented
+participant ownership and batch completion boundary.
 
 ## Decision
 

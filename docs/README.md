@@ -179,6 +179,7 @@ explicitly names that authority as superseded.
 - [ADR-0043: Batch contained all-effect loan](decisions/0043-batch-contained-all-effect-loan.md)
 - [ADR-0045: Batch prepared-selection observation](decisions/0045-batch-prepared-selection-plan.md)
 - [ADR-0046: Bounded provider namespace prefetch](decisions/0046-batch-bounded-provider-prefetch.md)
+- [ADR-0047: CardDemo participant ownership and batch completion](decisions/0047-carddemo-participant-completion.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

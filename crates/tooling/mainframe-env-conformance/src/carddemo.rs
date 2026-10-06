@@ -5,10 +5,12 @@ use corpus_validation::*;
 mod bounds;
 use bounds::checked_total;
 
+mod authorization_context;
 mod bms;
 mod control_library;
 mod ims_packages;
 mod ims_routes;
+use authorization_context::{authorization_invocation, mq_client_invocation};
 mod online_authorities;
 mod readacct;
 
@@ -6998,7 +7000,7 @@ async fn exercise_mq_authorization_routes(
     ims.install(ims_definition).map_err(terminal_problem)?;
     let base_root = ims_record(100, b"000002", b"EXISTING-SUMMARY")?;
     let base_child = ims_record(200, b"20260801", b"EXISTING-DETAIL")?;
-    let admin = authorization_invocation("mq-auth-admin", true, ServiceClass::Interactive)?;
+    let admin = mq_client_invocation("mq-auth-admin", true, ServiceClass::Interactive)?;
     ims.execute(
         &admin,
         &ims_request(
@@ -7020,7 +7022,7 @@ async fn exercise_mq_authorization_routes(
     )
     .map_err(terminal_problem)?;
 
-    let date = authorization_invocation("mq-date", true, ServiceClass::Interactive)?;
+    let date = mq_client_invocation("mq-date", true, ServiceClass::Interactive)?;
     let date_correlation = vec![b'D'; 24];
     let date_put = mq
         .execute(
@@ -7115,7 +7117,7 @@ async fn exercise_mq_authorization_routes(
         ));
     }
 
-    let account = authorization_invocation("mq-account", true, ServiceClass::Interactive)?;
+    let account = mq_client_invocation("mq-account", true, ServiceClass::Interactive)?;
     let account_correlation = vec![b'A'; 24];
     mq.execute(
         &account,
@@ -7214,7 +7216,7 @@ async fn exercise_mq_authorization_routes(
         )
     })?;
     let mut typed_invocation =
-        authorization_invocation("mq-typed-route", true, ServiceClass::Interactive)?;
+        mq_client_invocation("mq-typed-route", true, ServiceClass::Interactive)?;
     typed_invocation.artifact = ArtifactRef::new(
         typed_artifact.content_id().to_reference(),
         InvocationLimits::default(),
@@ -7257,7 +7259,7 @@ async fn exercise_mq_authorization_routes(
         ));
     }
 
-    let denied = authorization_invocation("mq-denied", false, ServiceClass::Interactive)?;
+    let denied = mq_client_invocation("mq-denied", false, ServiceClass::Interactive)?;
     let denied_request = mq_request(
         MqOperation::PutOne,
         1,
@@ -7853,62 +7855,6 @@ fn require_mq_message(
     } else {
         Ok(())
     }
-}
-
-fn authorization_invocation(
-    run: &str,
-    granted: bool,
-    service_class: ServiceClass,
-) -> Result<Invocation, CorpusProblem> {
-    let limits = InvocationLimits::default();
-    let grants = if granted {
-        [
-            "host.mq.read",
-            "host.mq.write",
-            "host.ims.read",
-            "host.ims.write",
-            "host.db2.read",
-            "host.db2.write",
-            "host.cics.execute",
-            "host.security.authorize",
-        ]
-        .into_iter()
-        .map(|capability| CapabilityId::new(capability, limits))
-        .collect::<Result<BTreeSet<_>, _>>()
-        .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "grant invalid"))?
-    } else {
-        BTreeSet::new()
-    };
-    Invocation::new(
-        RequestId::new(format!("carddemo-auth-request-{run}"), limits).map_err(|_| {
-            CorpusProblem::new("carddemo.authorization.invocation", "request invalid")
-        })?,
-        ExecutionId::new(format!("carddemo-auth-execution-{run}"), limits).map_err(|_| {
-            CorpusProblem::new("carddemo.authorization.invocation", "execution invalid")
-        })?,
-        RunUnitId::new(run, limits)
-            .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "run invalid"))?,
-        None,
-        Selector::new("program:CARDDEMO-AUTH", limits).expect("static selector"),
-        ArtifactRef::new("carddemo-authorization", limits).expect("static artifact"),
-        Principal::new(
-            PrincipalId::new("IBMUSER", limits).expect("static principal"),
-            grants,
-            limits,
-        )
-        .expect("bounded principal"),
-        service_class,
-        0,
-        1_000_000,
-        TraceId::new(format!("carddemo-auth-trace-{run}"), limits).expect("bounded trace"),
-        IdempotencyKey::new(format!("carddemo-auth-invocation-{run}"), limits)
-            .expect("bounded invocation key"),
-        1,
-        ResourceLimits::default(),
-        BTreeMap::new(),
-        limits,
-    )
-    .map_err(|_| CorpusProblem::new("carddemo.authorization.invocation", "invocation invalid"))
 }
 
 fn cics_syncpoint(
@@ -13099,6 +13045,24 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn mq_workload_invocations_select_their_actual_syncpoint_owner() {
+        let client = mq_client_invocation("client", true, ServiceClass::Interactive).unwrap();
+        assert_eq!(
+            client.bindings["mq.host-context"].bytes(),
+            b"mqi-client|queue-manager"
+        );
+        assert!(!client.bindings.contains_key("cics.execution-context"));
+        let cics =
+            authorization_invocation("authorization", true, ServiceClass::Interactive).unwrap();
+        assert_eq!(
+            cics.bindings["mq.host-context"].bytes(),
+            b"zos-cics|host-coordinator"
+        );
+        assert_eq!(cics.bindings["cics.execution-context"].bytes(), b"local");
+        assert!(!cics.bindings.contains_key("cics.nested-effect-origin"));
+    }
 
     struct Fixture {
         root: PathBuf,

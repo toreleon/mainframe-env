@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 225,
+    "markdown_documents": 226,
     "navigation_groups": 8,
-    "normative_documents": 89,
-    "xtask_commands": 178
+    "normative_documents": 90,
+    "xtask_commands": 171
   },
   "documents": [
     {
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 169,
-      "sha256": "sha256:1b0c851db52264f32541d8f817407569297a98a9e5cb9fff78221d731a7065a5",
+      "relative_links": 170,
+      "sha256": "sha256:5dbc6a9228dcd0d23bb1d7d85862de2ca3daed23b29d2f8b9267389899306032",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -701,7 +701,7 @@
       "path": "docs/decisions/0006-carddemo-profile.md",
       "relative_links": 0,
       "scope": "additive CardDemo-full product profile and package boundaries",
-      "sha256": "sha256:2301717b4b04cdd4e406709c7ae97e080be42b2e7a71c8a183ea121be33163d2",
+      "sha256": "sha256:2637888ac40e338dd5ae33135910dbd83ee5a32ac5134002a4deee9d28643739",
       "status": "Accepted by repository owner",
       "title": "ADR-0006: Add the CardDemo-full workload profile",
       "xtask_commands": 0
@@ -1343,10 +1343,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "CICS, Batch, and CardDemo maintainers",
+      "path": "docs/decisions/0047-carddemo-participant-completion.md",
+      "relative_links": 1,
+      "scope": "CICS nested participant dispatch and package-owned batch controllers",
+      "sha256": "sha256:078caba6d41d8e46d225cc12803f93c2e57ea4ea18502b07293960452b9aa23d",
+      "status": "Implemented for the owned local workload",
+      "title": "ADR-0047: CardDemo participant ownership and batch completion",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 48,
-      "sha256": "sha256:0efefaf4402058c1cfe02ae673db3cdab835959078ebaf247647fbab74bf8c8c",
+      "relative_links": 49,
+      "sha256": "sha256:d8369f7cf5f7bbe15cee537bec4df4fc4fd7b256594f07c68e6e63ea4eeb3b1f",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1806,7 +1818,7 @@
       "normative": false,
       "path": "docs/guides/CAPABILITIES.md",
       "relative_links": 31,
-      "sha256": "sha256:3b141b2354187a236d2d534206c21eb776d7520d8dd5b72da13a5efdf2d42512",
+      "sha256": "sha256:8a424b56e8e4815aebc1c46023b5e0b5b82405d4611bd5a68e6c357cfdaab1ca",
       "title": "Capabilities and limitations",
       "xtask_commands": 0
     },
@@ -2022,7 +2034,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:7af61f5d880646ce1e7eaf504f1b6c6b9364c5303d78dfe0b814fd894719338f",
+      "sha256": "sha256:633f2c9cece55cd10e8754a048441e714b67b93d30665b5df5a178298b977b9a",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -2070,9 +2082,9 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 1,
-      "sha256": "sha256:87d33f0ec5eba18852d4602117e5358d729602654ad4923efa8e564ad5236dcd",
+      "sha256": "sha256:b47212bdbea1a1406dc48a87a5546285c6a6aae5cf85f3a2ca8e11edb3d4d630",
       "title": "CardDemo operator compatibility",
-      "xtask_commands": 11
+      "xtask_commands": 4
     },
     {
       "normative": false,
@@ -2570,6 +2582,10 @@
         {
           "label": "ADR-0046: Bounded provider namespace prefetch",
           "path": "docs/decisions/0046-batch-bounded-provider-prefetch.md"
+        },
+        {
+          "label": "ADR-0047: CardDemo participant ownership and batch completion",
+          "path": "docs/decisions/0047-carddemo-participant-completion.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2788,7 +2804,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:b908ec8e84d617c0a8747d54a13227b5a21c7b529f2fcb9203b3094109d483ba",
+  "registry_sha256": "sha256:d52af1fe0684ca99ead96dab891d11b69d38486295f7fbdfb4c300028db1d20c",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

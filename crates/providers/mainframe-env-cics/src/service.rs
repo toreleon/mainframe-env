@@ -8,6 +8,7 @@ use crate::retention::{
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
     UowRetentionMetadata,
 };
+use handlers::invocation_with_nested_origin;
 use handlers::invoke_program_control as program;
 use handlers::invoke_terminal_control as terminal;
 pub use handlers::*;
@@ -1940,38 +1941,6 @@ fn validate_cics_effect_replay_identity(
         return Err(HostProblem::IdempotencyConflict);
     }
     Ok(())
-}
-
-fn invocation_with_nested_origin(
-    invocation: &Invocation,
-    key: &IdempotencyKey,
-    outer_effect_key: &str,
-) -> Result<Invocation, HostProblem> {
-    reject_reserved_nested_origin(invocation)?;
-    let limits = InvocationLimits::default();
-    if invocation.bindings.len().saturating_add(2) > limits.max_bindings {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let mut nested = invocation.clone();
-    nested.bindings.insert(
-        CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
-        BoundedPayload::new(
-            CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
-            key.as_str().as_bytes().to_vec(),
-            limits,
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?,
-    );
-    nested.bindings.insert(
-        CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
-        BoundedPayload::new(
-            CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
-            outer_effect_key.as_bytes().to_vec(),
-            limits,
-        )
-        .map_err(|_| HostProblem::ResourceExhausted)?,
-    );
-    Ok(nested)
 }
 
 pub fn cics_provider(service: Arc<CicsService>, limits: InvocationLimits) -> Arc<dyn HostProvider> {

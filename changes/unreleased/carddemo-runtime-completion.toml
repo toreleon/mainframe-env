@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Fixed CardDemo CICS syncpoint context, bounded DSN sessions and continuations, IMS loader completion and signed-controller SYSIN validation, and MQ workload ownership. Split batch and context helpers into bounded subsystem modules. Documented optimized workload execution and repaired the production build to use the pinned attestation dependency's shipped bindings."

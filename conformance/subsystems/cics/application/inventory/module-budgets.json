@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 7210,
+      "max_production_lines": 6829,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -96,7 +96,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3392,
+      "max_production_lines": 3361,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -168,19 +168,19 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 13092,
+      "max_production_lines": 13037,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/cics_pilot.rs",
-      "max_production_lines": 1321,
+      "max_production_lines": 1323,
       "responsibility": "The CICS pilot harness decodes fixtures, drives candidate behavior, and compares licensed and local evidence.",
       "split_boundary": "Separate fixture decoding, local scenario execution, licensed capture adaptation, and evidence assertions."
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/dataset_reference.rs",
-      "max_production_lines": 1654,
+      "max_production_lines": 1655,
       "responsibility": "The independent dataset reference model implements allocation, sequential/VSAM transitions, and AMS expectations.",
       "split_boundary": "Split allocation/catalog transitions, record-access models, and AMS command interpretation without product dependencies."
     },
@@ -192,7 +192,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/racf_reference.rs",
-      "max_production_lines": 1364,
+      "max_production_lines": 1365,
       "responsibility": "The independent RACF reference parses fixtures and models identity, profile, permission, and command outcomes.",
       "split_boundary": "Separate fixture/catalog decoding, profile matching, command transitions, and RACROUTE decision projection."
     }

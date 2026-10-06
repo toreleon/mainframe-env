@@ -5,20 +5,31 @@ These commands operate only on the clean corpus selected by
 PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted
 `CDV1` correction is pinned in the CardDemo workload contract.
 
+Build the optimized runner before executing application workloads:
+
+```bash
+cargo build --locked --release -p xtask
+```
+
+Use `target/release/xtask` for the online and batch workload commands below.
+The statement cycle performs thousands of durable host calls; the unoptimized
+development runner can exceed the gate's two-minute job deadline. The optimized
+runner uses the same source, runtime contracts, and acceptance limits.
+
 ## Owned commands
 
 | Intent | Command | Effect |
 |---|---|---|
-| install | `cargo xtask carddemo-operator-install --check` | validates and installs the content-addressed package, CICS resources, catalog, and exact seed generation through the owned application/provider authorities |
-| compile | `cargo xtask carddemo-operator-compile --check` | compiles all pinned source closures and installs the named online/batch artifacts with owned compatibility services |
-| submit | `cargo xtask carddemo-operator-submit --check` | executes the declared initialization and operational job set through authenticated public z/OSMF Jobs routes and verifies job IDs, return codes, spool, and dataset results |
-| reset | `cargo xtask carddemo-operator-reset --check` | recreates the declared disposable CardDemo data/catalog fixtures and verifies the reset result; do not aim it at an authority containing unretained operator data |
-| certify | `cargo xtask carddemo-full --check` | derives all 20 journeys from lower-profile application runs, then executes memory overload/isolation, SQLite backup/restore, and PostgreSQL restart controls |
+| install | `target/release/xtask carddemo-operator-install --check` | validates and installs the content-addressed package, CICS resources, catalog, and exact seed generation through the owned application/provider authorities |
+| compile | `target/release/xtask carddemo-operator-compile --check` | compiles all pinned source closures and installs the named online/batch artifacts with owned compatibility services |
+| submit | `target/release/xtask carddemo-operator-submit --check` | executes the declared initialization and operational job set through authenticated public z/OSMF Jobs routes and verifies job IDs, return codes, spool, and dataset results |
+| reset | `target/release/xtask carddemo-operator-reset --check` | recreates the declared disposable CardDemo data/catalog fixtures and verifies the reset result; do not aim it at an authority containing unretained operator data |
+| certify | `target/release/xtask carddemo-full --check` | derives all 20 journeys from lower-profile application runs, then executes memory overload/isolation, SQLite backup/restore, and PostgreSQL restart controls |
 
 Run the bounded host integration gate with the same pinned checkout:
 
 ```bash
-CARDDEMO_CORPUS_DIR=/path/to/carddemo cargo xtask carddemo-host-integration --check
+CARDDEMO_CORPUS_DIR=/path/to/carddemo target/release/xtask carddemo-host-integration --check
 ```
 
 It validates the current host operands, resource definitions, and nine base
@@ -84,7 +95,7 @@ For the complete workload, provide a disposable PostgreSQL 18 database and run:
 
 ```bash
 export MAINFRAME_ENV_POSTGRES_TEST_URL=postgresql://postgres@127.0.0.1:55432/mainframe_review
-cargo xtask carddemo-full --check
+target/release/xtask carddemo-full --check
 ```
 
 Use the connection URL for your local test database. The full gate runs 20
