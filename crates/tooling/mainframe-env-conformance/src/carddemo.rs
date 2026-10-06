@@ -12,6 +12,10 @@ mod ims_packages;
 mod ims_routes;
 use authorization_context::{authorization_invocation, mq_client_invocation};
 mod online_authorities;
+mod screen;
+mod serve;
+use screen::online_screen_fields;
+pub use serve::serve_carddemo_from_env;
 mod readacct;
 
 pub use readacct::{capture_carddemo_readacct_from_env, verify_carddemo_readacct_from_env};
@@ -10932,77 +10936,6 @@ fn require_online_mapset(
             ),
         ))
     }
-}
-
-fn online_screen_fields(
-    terminal: &serde_json::Value,
-) -> Result<BTreeMap<String, Vec<u8>>, CorpusProblem> {
-    let bytes =
-        base64::engine::general_purpose::STANDARD
-            .decode(terminal["screen_base64"].as_str().ok_or_else(|| {
-                CorpusProblem::new("carddemo.online.response", "screen is missing")
-            })?)
-            .map_err(|error| CorpusProblem::new("carddemo.online.response", error.to_string()))?;
-    let mut at = 0usize;
-    let mut fields = BTreeMap::new();
-    while at < bytes.len() {
-        let name_length = u32::from_be_bytes(
-            bytes
-                .get(at..at + 4)
-                .ok_or_else(|| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field name is truncated")
-                })?
-                .try_into()
-                .map_err(|_| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field name is invalid")
-                })?,
-        ) as usize;
-        at += 4;
-        let name_end = at.checked_add(name_length).ok_or_else(|| {
-            CorpusProblem::new("carddemo.online.screen_invalid", "field name is too large")
-        })?;
-        let name = String::from_utf8(
-            bytes
-                .get(at..name_end)
-                .ok_or_else(|| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field name is truncated")
-                })?
-                .to_vec(),
-        )
-        .map_err(|_| {
-            CorpusProblem::new("carddemo.online.screen_invalid", "field name is invalid")
-        })?;
-        at = name_end;
-        let value_length = u32::from_be_bytes(
-            bytes
-                .get(at..at + 4)
-                .ok_or_else(|| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field value is truncated")
-                })?
-                .try_into()
-                .map_err(|_| {
-                    CorpusProblem::new("carddemo.online.screen_invalid", "field value is invalid")
-                })?,
-        ) as usize;
-        at += 4;
-        let value_end = at.checked_add(value_length).ok_or_else(|| {
-            CorpusProblem::new("carddemo.online.screen_invalid", "field value is too large")
-        })?;
-        let value = bytes
-            .get(at..value_end)
-            .ok_or_else(|| {
-                CorpusProblem::new("carddemo.online.screen_invalid", "field value is truncated")
-            })?
-            .to_vec();
-        at = value_end;
-        if fields.insert(name, value).is_some() || fields.len() > 512 {
-            return Err(CorpusProblem::new(
-                "carddemo.online.screen_invalid",
-                "screen fields are duplicated or unbounded",
-            ));
-        }
-    }
-    Ok(fields)
 }
 
 fn normal_online_effects(server: &ProductServer, session: &str, operation: CicsOperation) -> usize {

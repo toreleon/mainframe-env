@@ -73,6 +73,7 @@ and [current package map](docs/architecture/PACKAGE-MAP.md) explain the boundari
 | Evaluate the framework | [Getting started](docs/guides/GETTING-STARTED.md) and [capabilities](docs/guides/CAPABILITIES.md) |
 | Embed it in a Rust application | [Embedding guide](docs/guides/EMBEDDING.md) |
 | Start the development server | [Operations runbook](docs/runbooks/OPERATIONS.md) |
+| Use CardDemo in your browser | [CardDemo application launcher](docs/runbooks/CARDDEMO-OPERATOR.md#run-and-use-the-application) |
 | Understand mainframe terminology | [Glossary](docs/guides/GLOSSARY.md) |
 | Contribute code or documentation | [Contributing](CONTRIBUTING.md) |
 | Review public distribution | [Source distribution guide](docs/guides/DISTRIBUTION.md) |

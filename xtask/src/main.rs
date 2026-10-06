@@ -6,6 +6,7 @@
 mod carddemo_base_batch_provenance;
 mod carddemo_host_integration;
 mod carddemo_readacct;
+mod carddemo_serve;
 mod changelog;
 mod cobol_differential;
 mod conformance_catalog;
@@ -242,6 +243,8 @@ enum XtaskCommand {
     CarddemoSecurity(CheckArgs),
     CarddemoTerminal(CheckArgs),
     CarddemoBaseOnline(CheckArgs),
+    /// Start the real CardDemo online application with a browser terminal.
+    CarddemoServe(carddemo_serve::ServeArgs),
     CarddemoJcl(CheckArgs),
     CarddemoUtilities(CheckArgs),
     CarddemoBatchPrograms(CheckArgs),
@@ -591,6 +594,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         }
         XtaskCommand::CarddemoTerminal(args) => {
             checked!("carddemo-terminal", args, check_carddemo_terminal(root))
+        }
+        XtaskCommand::CarddemoServe(args) => {
+            ("carddemo-serve", false, carddemo_serve::run(root, args))
         }
         XtaskCommand::CarddemoBaseOnline(args) => checked!(
             "carddemo-base-online",

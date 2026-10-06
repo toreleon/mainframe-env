@@ -16,6 +16,59 @@ The statement cycle performs thousands of durable host calls; the unoptimized
 development runner can exceed the gate's two-minute job deadline. The optimized
 runner uses the same source, runtime contracts, and acceptance limits.
 
+## Run and use the application
+
+After preparing the pinned upstream checkout below, start a persistent local
+instance:
+
+```bash
+CARDDEMO_CORPUS_DIR=/path/to/carddemo target/release/xtask carddemo-serve \
+  --state-dir /path/to/carddemo-state --listen 127.0.0.1:8080
+```
+
+Open <http://127.0.0.1:8080> and select **Connect**. Sign on with `USER0001`
+and `PASSWORD`. Choose menu option `1`, enter account `00000000050`, and press
+**Enter** to view its details. Use **F3** to return, **Tab** between input fields,
+and the function-key buttons for paging and other screen actions.
+
+Choose the **Administration** workspace before connecting to use the upstream
+`ADMIN001` / `PASSWORD` account. The browser uses separate demonstration
+transport identities (`WEBUSER` / `transport-password` and `WEBADM` /
+`admin-transport-password`); application sign-on still runs the upstream COBOL
+security program and the transport retains its RACF permissions. These are
+local development accounts. Keep the default loopback listener.
+
+The launcher installs 18 source-backed programs, 17 transactions, all 17 BMS
+maps, the upstream seed datasets and alternate indexes. Browser fields use the
+live terminal's protection flags, and password fields remain masked. Account,
+card, user and transaction updates run through the existing CICS/provider
+routes. Report submission writes the owned `JOBS` transient queue; running the
+batch cycle remains a separate workload command. This launcher serves the base
+online application; Db2, IMS and MQ extensions are exercised by their dedicated
+commands and the full gate.
+
+SQLite data and compiled artifacts live in `--state-dir`. Stop with Ctrl-C and
+restart with the same directory to retain application edits. Use a new directory
+for a fresh instance. Restarting does not invoke certification gates or reset
+operator data. The process stays running until stopped, unlike the `--check`
+commands below.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser as Browser terminal
+    participant Gateway as Authenticated CICS gateway
+    participant Program as Upstream COBOL program
+    participant Store as SQLite providers
+    User->>Browser: Connect and sign on
+    Browser->>Gateway: Launch CC00 and submit terminal input
+    Gateway->>Program: Execute the installed program
+    Program->>Store: Read or update application records
+    Store-->>Program: Durable result
+    Program-->>Browser: BMS screen and live field protection
+    Browser-->>User: Render fields and function keys
+```
+
 ## Owned commands
 
 | Intent | Command | Effect |

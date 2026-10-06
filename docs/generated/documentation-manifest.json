@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 226,
+    "markdown_documents": 227,
     "navigation_groups": 8,
-    "normative_documents": 90,
+    "normative_documents": 91,
     "xtask_commands": 171
   },
   "documents": [
@@ -33,8 +33,8 @@
     {
       "normative": false,
       "path": "README.md",
-      "relative_links": 21,
-      "sha256": "sha256:c6876d7d41b9878672346203f0dfe84e56165328b79c74374f6cb714b583cb9d",
+      "relative_links": 22,
+      "sha256": "sha256:94d66070b3b7cce2a44bcd039d6c48bceef81770499dc455cf4ccabe2f135f4e",
       "title": "mainframe-env",
       "xtask_commands": 0
     },
@@ -333,8 +333,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 170,
-      "sha256": "sha256:5dbc6a9228dcd0d23bb1d7d85862de2ca3daed23b29d2f8b9267389899306032",
+      "relative_links": 171,
+      "sha256": "sha256:50c44c585f3b312717cc3fb28c0c56aba926ab59b6ad1a269a444d20eb8dc347",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1355,6 +1355,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "CardDemo and application maintainers",
+      "path": "docs/decisions/0048-carddemo-interactive-application.md",
+      "relative_links": 1,
+      "scope": "Application launcher and browser terminal",
+      "sha256": "sha256:8798df42f9de3b94b522c564c6c60115a5ee1fcf3f985499ef460c8268c339df",
+      "status": "Implemented for local development",
+      "title": "ADR-0048: Persistent interactive CardDemo composition",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 49,
@@ -1841,8 +1853,8 @@
     {
       "normative": false,
       "path": "docs/guides/GETTING-STARTED.md",
-      "relative_links": 9,
-      "sha256": "sha256:2218e33e74777592256c7dd55c5ee647faf8412a9367e793d948712ba6abfd0a",
+      "relative_links": 10,
+      "sha256": "sha256:3abfad5b6fcfbbc3e1e8d25cd43b7f3da5708064847d48159b3a2ba6fc51d06a",
       "title": "Getting started",
       "xtask_commands": 0
     },
@@ -2082,7 +2094,7 @@
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
       "relative_links": 1,
-      "sha256": "sha256:b47212bdbea1a1406dc48a87a5546285c6a6aae5cf85f3a2ca8e11edb3d4d630",
+      "sha256": "sha256:6ba5f51a88241c6b5ec236d26222ff6a581338747da1dd33ea5dc5f4d8caa748",
       "title": "CardDemo operator compatibility",
       "xtask_commands": 4
     },
@@ -2586,6 +2598,10 @@
         {
           "label": "ADR-0047: CardDemo participant ownership and batch completion",
           "path": "docs/decisions/0047-carddemo-participant-completion.md"
+        },
+        {
+          "label": "ADR-0048: Persistent interactive CardDemo composition",
+          "path": "docs/decisions/0048-carddemo-interactive-application.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2804,7 +2820,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:d52af1fe0684ca99ead96dab891d11b69d38486295f7fbdfb4c300028db1d20c",
+  "registry_sha256": "sha256:ca889a4afd85f4b2669998c098a85b8bb25c5cb485e286ea8d666f0bad7e66aa",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

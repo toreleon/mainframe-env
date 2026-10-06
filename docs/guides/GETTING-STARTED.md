@@ -15,7 +15,8 @@ for public scope and review checks.
 - Registry access for the first Cargo build.
 
 PostgreSQL, Jenkins, CardDemo, and a licensed IBM system are unnecessary for
-the local HELLO path. They are needed only for their integration gates.
+the local HELLO path. Use the [CardDemo operator guide](../runbooks/CARDDEMO-OPERATOR.md#run-and-use-the-application)
+to start its persistent browser application from the pinned upstream checkout.
 
 ```bash
 git clone https://github.com/toreleon/mainframe-env.git

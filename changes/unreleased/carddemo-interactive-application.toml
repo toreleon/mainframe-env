@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Added a persistent local CardDemo application launcher with a browser terminal, upstream BMS screen layouts, live field protection, masked sign-on and function keys, backed by the authenticated CICS gateway and SQLite."
