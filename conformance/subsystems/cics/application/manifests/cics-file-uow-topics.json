@@ -1,0 +1,75 @@
+{
+  "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",
+  "book_href": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html",
+  "book_label": "CICS file and unit-of-work behavioral pilot",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSJL4D_6.x",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-08",
+  "subsystem": "cics",
+  "target_subsystem": "cics.application-api",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "topic_count": 9,
+  "topic_manifest_digest": "fb318cc37ebb5a985317bd68a67d0d9614bc4f27edca8a7c4df0464602847007",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 8145,
+      "last_modified": "2026-08-26",
+      "sha256": "9faa985f20ae267453f4fdfecbc945a963c311eecbf1c72595dc580866442dfb",
+      "topic_path": "SSJL4D_6.x/administering/recovery/dfht2c0034.html"
+    },
+    {
+      "bytes": 13023,
+      "last_modified": "2026-01-16",
+      "sha256": "eeb933f5ab493d4f81bcbb07353dad489cbf6edc4b1a97c51cb123e36947d902",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3a5.html"
+    },
+    {
+      "bytes": 10239,
+      "last_modified": "2026-01-16",
+      "sha256": "49b4fa39b83a676be8306742498bd46e0646148af76a7ead3b492b609c982e59",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html"
+    },
+    {
+      "bytes": 3249,
+      "last_modified": "2026-01-16",
+      "sha256": "e6827f360bc1120db72b696d55f6445fd9d6c415ca94afacaeae1fbf47af97bc",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfht5b0054.html"
+    },
+    {
+      "bytes": 86348,
+      "last_modified": "2026-08-26",
+      "sha256": "856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html"
+    },
+    {
+      "bytes": 32804,
+      "last_modified": "2026-08-26",
+      "sha256": "0ef4733dca7d0a743ad31939c61ecf7a820a0885ca56aeef48f5bbef6254d3fc",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html"
+    },
+    {
+      "bytes": 9251,
+      "last_modified": "2026-08-26",
+      "sha256": "2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpoint.html"
+    },
+    {
+      "bytes": 10936,
+      "last_modified": "2026-07-23",
+      "sha256": "566d8661a0af02559d8679234e959d2e2aa2577dcf14c55211ec07c7c03e2954",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpointrollback.html"
+    },
+    {
+      "bytes": 14264,
+      "last_modified": "2026-01-16",
+      "sha256": "d0c41514d9cb8e4fb3ac635054852d22d8cd645bf45372fda71335b1cfb6f76a",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs3c00353.html"
+    }
+  ],
+  "total_bytes": 188259
+}

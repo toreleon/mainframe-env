@@ -11266,7 +11266,7 @@ mod tests {
         assert!(migrated["spool_files"].get("LEGACY").is_some());
         assert!(migrated["program_registrations"].get("STEP1").is_some());
         let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-durable-job.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-durable-job.schema.json"
         ))
         .unwrap();
         jsonschema::draft202012::options()

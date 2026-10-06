@@ -3,7 +3,7 @@
 Status: **Implemented**
 Owner: **Db2, IMS, MQ, and store-contract maintainers**
 Scope: **provider object-row envelopes, manifests, migrations, and CAS boundaries**
-Applies from: **mainframe-env 0.8.3 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 Db2, IMS, and MQ persist independently versioned objects instead of rewriting
 one provider-wide JSON snapshot. Every object payload is a strict JSON envelope

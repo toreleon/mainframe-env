@@ -2,14 +2,13 @@
 
 Subsystem: **ims**
 Phase: **programming**
-Target release: **0.14.0**
 
 Status: **Proposed**
-Start gate: 0.4 COBOL host ABI, 0.5 SAF, and 0.6 storage/catalog contracts frozen
+Start gate: cobol.execution COBOL host ABI, racf.security SAF, and dataset.data storage/catalog contracts frozen
 Completion dependencies: cobol.execution, racf.security, dataset.data
 Estimate: 20–32 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -67,10 +66,10 @@ and stress recovery rather than first introducing it.
 
 Call/SSA parsing, metadata, database organizations, TM, and recovery utilities
 can run as separate cohorts after status and storage contracts freeze. DBD/PSB
-catalog preparation may begin after 0.2, but integration waits for 0.4–0.6.
+catalog preparation may begin after coverage.foundation, but integration waits for cobol.execution–dataset.data.
 
-0.14 can run alongside 0.8–0.13 and 0.15. Cross-subsystem syncpoint behavior is
-implemented against the common UOW contract and completed in 0.16.
+ims.programming can run alongside jes.execution–db2.programming and mq.programming. Cross-subsystem syncpoint behavior is
+implemented against the common UOW contract and completed in integration.transactions.
 
 ## Exit gate
 

@@ -2,8 +2,8 @@
 
 Status: **Proposed within the user-authorized bounded IMS leaf**
 Owner: **host-contract and IMS provider maintainers**
-Scope: **IMS-1401.null-ssa-command-slots, target 0.14.0**
-Applies from: **mainframe-env 0.14.0 development**
+Scope: **IMS-1401.null-ssa-command-slots, target ims.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 The pinned IMS 15.6 command reference defines `-` as a null command slot and
 permits one or more slots to reserve space for later active commands. The

@@ -45,8 +45,8 @@ fn reviewed_property_partial_storage_three_has_a_frozen_full_result_vector() {
     // byte-string fixture; expected bytes are not calculated by the encoder.
     let golden = concat!(
         r#"{"schema_version":"mainframe-env.mq-mqi-result-storage@3","call":"MQINQMP","outcome":{"kind":"ReviewedOutput","completion":"MQCC_FAILED","reason":"MQRC_PROPERTY_VALUE_TOO_BIG","output":{"kind":"PropertyObservation","observation":{"kind":"Inquired","descriptor":{"struc_id":[80,68,32,32],"version":1,"options":0,"support":1,"context":0,"copy_options":22},"property_type":"ByteString","returned_encoding":785,"returned_ccsid":null,"returned_name":[105,110,118,111,105,99,101,46,105,100],"name_length":10,"name_ccsid":1208,"data_length":4,"copied_value":[0,255]}}},"host_result_digest":["#,
-        "238,216,185,94,149,103,51,159,141,163,92,255,235,246,68,133,",
-        "174,50,190,70,211,140,27,63,222,177,179,9,216,46,223,67]}"
+        "40,102,65,223,166,77,92,250,36,71,128,248,252,249,84,74,",
+        "153,247,90,156,186,69,174,251,116,180,140,38,167,15,106,146]}"
     );
     assert_eq!(stored(&value), golden.as_bytes());
     assert_eq!(restore(golden.as_bytes()).unwrap(), value);

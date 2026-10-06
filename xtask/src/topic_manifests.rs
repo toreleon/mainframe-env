@@ -1,6 +1,6 @@
 //! Every committed topic manifest, checked against the explicit pin that names it.
 //!
-//! `conformance/0.2/catalogs/index.json` stopped pinning a file's bytes when the
+//! `conformance/subsystems/coverage/catalogs/index.json` stopped pinning a file's bytes when the
 //! baselines moved onto documentation topics: a `documentation-topics` source
 //! pins `topic_manifest_digest`, a digest over the whole book's topic list, and
 //! names the manifest that list lives in. Nothing in Rust recomputed it, so a
@@ -15,34 +15,34 @@
 
 use super::*;
 
-const INDEX_PATH: &str = "conformance/0.2/catalogs/index.json";
-const MANIFEST_DIRECTORY: &str = "conformance/0.2/manifests";
-const MANIFEST_PREFIX: &str = "conformance/0.2/manifests/";
+const INDEX_PATH: &str = "conformance/subsystems/coverage/catalogs/index.json";
+const MANIFEST_DIRECTORY: &str = "conformance/subsystems/coverage/manifests";
+const MANIFEST_PREFIX: &str = "conformance/subsystems/coverage/manifests/";
 struct LaterRegistry {
     registry_path: &'static str,
     manifest_directory: &'static str,
     manifest_prefix: &'static str,
-    target_version: &'static str,
+    target_subsystem: &'static str,
 }
 
 const LATER_REGISTRIES: &[LaterRegistry] = &[
     LaterRegistry {
-        registry_path: "conformance/0.9/manifests/index.json",
-        manifest_directory: "conformance/0.9/manifests",
-        manifest_prefix: "conformance/0.9/manifests/",
-        target_version: "0.9.0",
+        registry_path: "conformance/subsystems/cics/application/manifests/index.json",
+        manifest_directory: "conformance/subsystems/cics/application/manifests",
+        manifest_prefix: "conformance/subsystems/cics/application/manifests/",
+        target_subsystem: "cics.application-api",
     },
     LaterRegistry {
-        registry_path: "conformance/0.14/manifests/index.json",
-        manifest_directory: "conformance/0.14/manifests",
-        manifest_prefix: "conformance/0.14/manifests/",
-        target_version: "0.14.0",
+        registry_path: "conformance/subsystems/ims/manifests/index.json",
+        manifest_directory: "conformance/subsystems/ims/manifests",
+        manifest_prefix: "conformance/subsystems/ims/manifests/",
+        target_subsystem: "ims.programming",
     },
     LaterRegistry {
-        registry_path: "conformance/0.15/manifests/index.json",
-        manifest_directory: "conformance/0.15/manifests",
-        manifest_prefix: "conformance/0.15/manifests/",
-        target_version: "0.15.0",
+        registry_path: "conformance/subsystems/mq/manifests/index.json",
+        manifest_directory: "conformance/subsystems/mq/manifests",
+        manifest_prefix: "conformance/subsystems/mq/manifests/",
+        target_subsystem: "mq.programming",
     },
 ];
 
@@ -57,7 +57,8 @@ const DIGEST_DEFINITION: &str = "sha256 over the concatenation, sorted by topic_
 pub(super) fn check(root: &Path) -> TaskResult {
     let index_path = root.join(INDEX_PATH);
     let index = json(&index_path)?;
-    let manifest_schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))?;
+    let manifest_schema =
+        json(&root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json"))?;
     let mut pinned = BTreeSet::new();
     for baseline in array(&index, "baselines", &index_path)? {
         let id = text(baseline, "id", &index_path)?;
@@ -90,7 +91,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
         // not the one the manifest lists.
         require(
             text(&manifest, "schema_version", &manifest_path)? == "mainframe-env.topic-manifest@1"
-                && text(&manifest, "target_version", &manifest_path)? == "0.2.0"
+                && text(&manifest, "target_subsystem", &manifest_path)? == "coverage.foundation"
                 && text(&manifest, "baseline_id", &manifest_path)? == id
                 && text(&manifest, "subsystem", &manifest_path)? == subsystem,
             &format!("{relative} identity differs from baseline {id}"),
@@ -155,7 +156,7 @@ pub(super) fn check(root: &Path) -> TaskResult {
     }
     require(
         present == pinned,
-        "conformance/0.2/manifests holds a manifest no baseline pins, or is missing one",
+        "conformance/subsystems/coverage/manifests holds a manifest no baseline pins, or is missing one",
     )?;
     for registry in LATER_REGISTRIES {
         check_later_registry(root, registry)?;
@@ -166,16 +167,19 @@ pub(super) fn check(root: &Path) -> TaskResult {
 fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
     let registry_path = root.join(config.registry_path);
     let registry = json(&registry_path)?;
-    let registry_schema = root.join("conformance/0.9/schemas/topic-manifest-registry.schema.json");
+    let registry_schema = root.join(
+        "conformance/subsystems/cics/application/schemas/topic-manifest-registry.schema.json",
+    );
     validate_schema_instance(&json(&registry_schema)?, &registry, &registry_path)?;
     require(
-        text(&registry, "target_version", &registry_path)? == config.target_version,
+        text(&registry, "target_subsystem", &registry_path)? == config.target_subsystem,
         &format!(
             "{} does not own target version {}",
-            config.registry_path, config.target_version
+            config.registry_path, config.target_subsystem
         ),
     )?;
-    let manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
+    let manifest_schema =
+        root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
     let mut pinned = BTreeSet::new();
     let mut scopes = BTreeSet::new();
     for entry in array(&registry, "manifests", &registry_path)? {
@@ -201,7 +205,7 @@ fn check_later_registry(root: &Path, config: &LaterRegistry) -> TaskResult {
         let digest = recompute(&manifest, &path)?;
         require(
             text(&manifest, "schema_version", &path)? == "mainframe-env.topic-manifest@1"
-                && text(&manifest, "target_version", &path)? == config.target_version
+                && text(&manifest, "target_subsystem", &path)? == config.target_subsystem
                 && text(&manifest, "baseline_id", &path)?
                     == text(entry, "baseline_id", &registry_path)?
                 && text(&manifest, "subsystem", &path)?
@@ -398,14 +402,14 @@ mod tests {
         let fixture = RegistryFixture(root);
         let repository = repository_root().expect("repository");
         for schema in [
-            "conformance/0.2/schemas/topic-manifest.schema.json",
-            "conformance/0.9/schemas/topic-manifest-registry.schema.json",
+            "conformance/subsystems/coverage/schemas/topic-manifest.schema.json",
+            "conformance/subsystems/cics/application/schemas/topic-manifest-registry.schema.json",
         ] {
             let destination = fixture.0.join(schema);
             fs::create_dir_all(destination.parent().unwrap()).unwrap();
             fs::copy(repository.join(schema), destination).unwrap();
         }
-        let relative = "conformance/0.15/manifests/synthetic-topics.json";
+        let relative = "conformance/subsystems/mq/manifests/synthetic-topics.json";
         let path = fixture.0.join(relative);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let mut manifest = manifest(&[
@@ -414,7 +418,7 @@ mod tests {
         ]);
         for (field, value) in [
             ("schema_version", json!("mainframe-env.topic-manifest@1")),
-            ("target_version", json!("0.15.0")),
+            ("target_subsystem", json!("mq.programming")),
             ("baseline_id", json!("mq-synthetic-baseline")),
             ("subsystem", json!("mq")),
             ("product", json!("pp")),
@@ -446,7 +450,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
         let registry = json!({
             "schema_version": "mainframe-env.topic-manifest-registry@1",
-            "target_version": "0.15.0", "semantic_authority": false, "coverage_credit": 0,
+            "target_subsystem": "mq.programming", "semantic_authority": false, "coverage_credit": 0,
             "manifests": [{
                 "scope_id": "mq-synthetic", "subsystem": "mq", "baseline_id": "mq-synthetic-baseline",
                 "manifest": relative,
@@ -468,7 +472,7 @@ mod tests {
     fn config_015() -> &'static LaterRegistry {
         LATER_REGISTRIES
             .iter()
-            .find(|config| config.target_version == "0.15.0")
+            .find(|config| config.target_subsystem == "mq.programming")
             .unwrap()
     }
 
@@ -526,7 +530,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             inquiry["manifest_sha256"],
-            "sha256:1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949"
+            "sha256:2a015ae7e74819b603d2b07a0d7af5eef172623550be86f7fc8e74189b3eb294"
         );
         assert_eq!(
             inquiry["topic_manifest_sha256"],
@@ -583,7 +587,8 @@ mod tests {
         let fixture =
             json(&root.join("conformance/tools/tests/fixtures/mq-message-handle-source-pins.json"))
                 .unwrap();
-        let path = root.join("conformance/0.15/manifests/mq-message-handle-sources-topics.json");
+        let path =
+            root.join("conformance/subsystems/mq/manifests/mq-message-handle-sources-topics.json");
         let manifest = json(&path).unwrap();
         assert_eq!(manifest["topics"], fixture["topics"]);
         assert_eq!(manifest["baseline_id"], fixture["baseline_id"]);
@@ -608,7 +613,8 @@ mod tests {
         check_later_registry(&root, config_015()).expect("registered RFH2 source pins");
         let fixture =
             json(&root.join("conformance/tools/tests/fixtures/mq-rfh2-source-pins.json")).unwrap();
-        let manifest_path = root.join("conformance/0.15/manifests/mq-rfh2-sources-topics.json");
+        let manifest_path =
+            root.join("conformance/subsystems/mq/manifests/mq-rfh2-sources-topics.json");
         let manifest = json(&manifest_path).unwrap();
         assert_eq!(manifest["topics"], fixture["topics"]);
         assert_eq!(manifest["baseline_id"], fixture["baseline_id"]);
@@ -634,9 +640,11 @@ mod tests {
     fn later_015_recovery_scope_binds_exact_harden_get_backout_source() {
         let root = repository_root().expect("repository");
         check_later_registry(&root, config_015()).expect("registered recovery source");
-        let manifest =
-            json(&root.join("conformance/0.15/manifests/mq-recovery-policy-sources-topics.json"))
-                .unwrap();
+        let manifest = json(
+            &root
+                .join("conformance/subsystems/mq/manifests/mq-recovery-policy-sources-topics.json"),
+        )
+        .unwrap();
         assert_eq!(
             manifest["baseline_id"],
             "ibm-mq-9.4-recovery-policy-sources-2026-09-12"
@@ -659,10 +667,11 @@ mod tests {
     fn later_015_producer_scope_binds_exact_attributes_and_application_declaration() {
         let root = repository_root().expect("repository");
         check_later_registry(&root, config_015()).expect("registered producer sources");
-        let manifest = json(
-            &root.join("conformance/0.15/manifests/mq-producer-attribute-sources-topics.json"),
-        )
-        .unwrap();
+        let manifest =
+            json(&root.join(
+                "conformance/subsystems/mq/manifests/mq-producer-attribute-sources-topics.json",
+            ))
+            .unwrap();
         assert_eq!(manifest["product"], "SSFKSJ_9.4.0");
         assert_eq!(manifest["topic_count"], 9);
         assert_eq!(manifest["total_bytes"], 36295);
@@ -703,7 +712,7 @@ mod tests {
         let mut entry = first_entry.clone();
         entry["scope_id"] = json!("mq-layout");
         entry["baseline_id"] = json!("mq-layout-baseline");
-        entry["manifest"] = json!("conformance/0.15/manifests/layout-topics.json");
+        entry["manifest"] = json!("conformance/subsystems/mq/manifests/layout-topics.json");
         entry["manifest_sha256"] = json!(format!(
             "sha256:{:x}",
             Sha256::digest(fs::read(&path).unwrap())
@@ -749,9 +758,12 @@ mod tests {
             ("semantic_authority", json!(true)),
             (
                 "manifest",
-                json!("conformance/0.14/manifests/synthetic-topics.json"),
+                json!("conformance/subsystems/ims/manifests/synthetic-topics.json"),
             ),
-            ("manifest", json!("conformance/0.15/manifests/missing.json")),
+            (
+                "manifest",
+                json!("conformance/subsystems/mq/manifests/missing.json"),
+            ),
         ] {
             let mut registry = original.clone();
             registry["manifests"][0][field] = value;
@@ -766,7 +778,7 @@ mod tests {
             );
         }
         for (field, value) in [
-            ("target_version", json!("0.14.0")),
+            ("target_subsystem", json!("ims.programming")),
             ("semantic_authority", json!(true)),
             ("coverage_credit", json!(1)),
         ] {
@@ -788,7 +800,7 @@ mod tests {
             if repeat_path {
                 entry["scope_id"] = json!("another-scope");
             } else {
-                entry["manifest"] = json!("conformance/0.15/manifests/another.json");
+                entry["manifest"] = json!("conformance/subsystems/mq/manifests/another.json");
             }
             registry["manifests"].as_array_mut().unwrap().push(entry);
             fs::write(
@@ -804,7 +816,7 @@ mod tests {
     fn later_015_manifest_mutants_fail_with_updated_file_binding() {
         let (fixture, original, registry, path, registry_path) = registry_015();
         for (field, value) in [
-            ("target_version", json!("0.14.0")),
+            ("target_subsystem", json!("ims.programming")),
             ("subsystem", json!("ims")),
             ("topic_manifest_digest", json!("0".repeat(64))),
             ("coverage_credit", json!(1)),
@@ -909,10 +921,12 @@ mod tests {
     #[test]
     fn repins_use_the_same_schema_as_a_single_repin() {
         let root = repository_root().expect("repository root");
-        let schema = json(&root.join("conformance/0.2/schemas/topic-manifest.schema.json"))
-            .expect("manifest schema");
+        let schema =
+            json(&root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json"))
+                .expect("manifest schema");
         let mut manifest =
-            json(&root.join("conformance/0.2/manifests/mq-topics.json")).expect("MQ manifest");
+            json(&root.join("conformance/subsystems/coverage/manifests/mq-topics.json"))
+                .expect("MQ manifest");
         let repin = manifest.as_object_mut().unwrap().remove("repin").unwrap();
         manifest["repins"] = json!([repin]);
         validate_schema_instance(&schema, &manifest, Path::new("in-memory")).expect("valid repins");
@@ -920,13 +934,13 @@ mod tests {
         assert!(validate_schema_instance(&schema, &manifest, Path::new("in-memory")).is_err());
     }
 
-    /// Every locator in `conformance/0.3/cobol/language.json` -- the 173 official
+    /// Every locator in `conformance/subsystems/cobol/structure/cobol/language.json` -- the 173 official
     /// rows and the 28 special registers alike -- names a topic the COBOL
     /// baseline actually read.
     #[test]
     fn the_cobol_catalog_cites_only_pinned_topics() {
         let root = repository_root().expect("repository root");
-        let path = root.join("conformance/0.3/cobol/language.json");
+        let path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
         crate::check_cobol_language_catalog(&root, &path).expect("COBOL language catalog");
     }
 }

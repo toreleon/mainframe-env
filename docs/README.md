@@ -1,4 +1,4 @@
-# Documentation portal
+# mainframe-env documentation
 
 This portal separates current operating guidance from normative architecture,
 subsystem delivery records, and historical research. If two normative documents
@@ -7,17 +7,54 @@ silently choosing one.
 
 ## Start here
 
+New to the framework? Follow [getting started](guides/GETTING-STARTED.md),
+then check [capabilities and limitations](guides/CAPABILITIES.md) against your
+workload. The [glossary](guides/GLOSSARY.md) explains terms used throughout
+the documentation. The [README](../README.md#project-status) describes the current source distribution
+and subsystem management model.
+
+```mermaid
+flowchart LR
+    start["Start here"] --> evaluate["Run a local program"]
+    evaluate --> scope["Check workload capabilities"]
+    scope --> embed["Embed in Rust"]
+    scope --> operate["Operate the development server"]
+    scope --> contribute["Contribute and verify"]
+    contribute --> release["Review public distribution"]
+```
+
 | Goal | Document |
 |---|---|
+| Run a local COBOL program | [Getting started](guides/GETTING-STARTED.md) |
+| Evaluate workload support | [Capabilities and limitations](guides/CAPABILITIES.md) |
+| Embed the framework in Rust | [Embedding guide](guides/EMBEDDING.md) |
 | Understand the product boundary | [Project charter](CHARTER.md) |
 | Understand the system | [Architecture overview](architecture/OVERVIEW.md) |
 | Build or test the workspace | [Verification strategy](delivery/VERIFICATION-STRATEGY.md) |
 | Operate the development server | [Core-server operations](runbooks/OPERATIONS.md) |
-| Understand the current release | [0.8 release notes](releases/0.8.md) |
 | Track implementation progress | [Subsystem progress](delivery/IMPLEMENTATION-STATUS.md) |
 | Prepare CICS application API work | [CICS application API progress](delivery/subsystems/cics/application-api-status.md) |
-| Review pre-0.9 risks | [Pre-0.9 deep review](reviews/PRE-0.9.0-DEEP-REVIEW.md) |
+| Review subsystem risks | [Subsystem engineering review](reviews/SUBSYSTEM-REVIEW.md) |
 | Contribute or report security issues | [Contribution guide](../CONTRIBUTING.md) and [security policy](../SECURITY.md) |
+| Prepare public distribution | [Source distribution guide](guides/DISTRIBUTION.md) |
+
+## Browse by subject
+
+| Collection | What you will find |
+|---|---|
+| [Guides](guides/README.md) | Onboarding, capabilities, embedding, terminology and source distribution |
+| [Architecture](architecture/README.md) | System boundaries, compiler/runtime flows and provider ownership |
+| [Contracts](contracts/README.md) | Versioned persistence, transaction, effect interfaces |
+| [Decisions](decisions/README.md) | Accepted design decisions and their superseding relationships |
+| [Delivery](delivery/README.md) | Current subsystem plans/status, verification and compatibility policy |
+| [Runbooks](runbooks/README.md) | Configuration, operations, recovery and environment-specific procedures |
+| [Reviews](reviews/README.md) | Candidate-specific findings and follow-up boundaries |
+| [Research](research/README.md) | Source coverage proposals and conformance investigations |
+| [Implementation prompts](prompts/README.md) | Maintainer work instructions scoped to their original phases |
+
+The generated navigation below is the complete registered contract/phase index.
+Guides explain how to use those authorities; research, reviews and historical
+records retain their original scope and do not silently redefine current support.
 
 ## Normative precedence
 
@@ -25,16 +62,34 @@ silently choosing one.
 2. Accepted or frozen architecture documents in [`architecture/`](architecture)
 3. Versioned contracts in [`contracts/`](contracts)
 4. Accepted architecture decisions in [`decisions/`](decisions)
-5. Delivery, verification, and release contracts in [`delivery/`](delivery)
+5. Delivery, verification contracts in [`delivery/`](delivery)
 6. Subsystem implementation prompts in [`prompts/`](prompts)
-7. Runbooks, release notes, research, and historical status records
+7. Runbooks, research, and status records
 
-Machine-readable schemas, catalogs, and evidence under `conformance/` remain
+Machine-readable schemas, catalogs, and specifications under `conformance/` remain
 authoritative for the exact identities and counts they own. Prose must not
 silently override them. A later ADR overrides an earlier authority only when it
 explicitly names that authority as superseded.
 
 <!-- BEGIN GENERATED DOCUMENTATION NAVIGATION -->
+## User and maintainer guides
+
+- [Capabilities and limitations](guides/CAPABILITIES.md)
+- [Embed mainframe-env in Rust](guides/EMBEDDING.md)
+- [Getting started](guides/GETTING-STARTED.md)
+- [Framework glossary](guides/GLOSSARY.md)
+- [Review public source distribution](guides/DISTRIBUTION.md)
+- [User and maintainer guides](guides/README.md)
+
+## Documentation collections
+
+- [Architecture reference](architecture/README.md)
+- [Versioned contracts](contracts/README.md)
+- [Delivery and verification](delivery/README.md)
+- [Operations and verification runbooks](runbooks/README.md)
+- [Research and source investigations](research/README.md)
+- [Implementation prompts](prompts/README.md)
+
 ## Architecture and contracts
 
 - [Project charter](CHARTER.md)
@@ -61,19 +116,15 @@ explicitly names that authority as superseded.
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
 - [Durable retention lifecycle](contracts/RETENTION-LIFECYCLE-V1.md)
-- [Target release build type](contracts/RELEASE-BUILD-V1.md)
 - [Transaction participant contract](contracts/TRANSACTION-PARTICIPANT-V1.md)
-- [Release builder security model](architecture/RELEASE-BUILDER.md)
 
 ## Architecture decisions
 
 - [ADR-0001: Technology stack](decisions/0001-technology-stack.md)
 - [ADR-0002: Deterministic core](decisions/0002-deterministic-core.md)
 - [ADR-0003: Contract serialization](decisions/0003-contract-serialization.md)
-- [ADR-0004: Versioning and release policy](decisions/0004-versioning-release-policy.md)
 - [ADR-0005: Historical package consolidation](decisions/0005-package-consolidation.md)
-- [ADR-0006: CardDemo 0.1.1 profile](decisions/0006-carddemo-0.1.1-profile.md)
-- [ADR-0007: CardDemo 0.1.1 release](decisions/0007-carddemo-0.1.1-release.md)
+- [ADR-0006: CardDemo workload profile](decisions/0006-carddemo-profile.md)
 - [ADR-0008: ICU license compliance](decisions/0008-icu-license-compliance.md)
 - [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
 - [ADR-0010: Rust module review budgets](decisions/0010-rust-module-review-budgets.md)
@@ -137,10 +188,9 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 - [Implementation status](delivery/IMPLEMENTATION-STATUS.md)
 - [Verification strategy](delivery/VERIFICATION-STRATEGY.md)
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
-- [Versioning and releases](delivery/VERSIONING-AND-RELEASES.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)
 
-Implementation progress is organized by subsystem and phase. Release versions identify compatibility and historical evidence.
+Implementation progress is organized by subsystem and phase. Contract revisions and pinned IBM product baselines identify compatibility.
 
 ## Subsystem progress
 
@@ -148,7 +198,7 @@ Implementation progress is organized by subsystem and phase. Release versions id
 - [Subsystem dependencies and concurrency](delivery/subsystems/DEPENDENCIES.md)
 - [Workload-profile track](delivery/subsystems/PROFILE-TRACK.md)
 - [Subsystem implementation prompts](prompts/subsystems/README.md)
-- [Project coordination and release history](delivery/subsystems/GITHUB-PROJECT.md)
+- [Subsystem project coordination](delivery/subsystems/GITHUB-PROJECT.md)
 - [Coverage and conformance — Coverage authority](delivery/subsystems/coverage/foundation-status.md)
 - [COBOL — Grammar and types](delivery/subsystems/cobol/structure-status.md)
 - [COBOL — Execution semantics](delivery/subsystems/cobol/execution-status.md)
@@ -165,7 +215,6 @@ Implementation progress is organized by subsystem and phase. Release versions id
 - [IBM MQ — MQI programming surface](delivery/subsystems/mq/programming-status.md)
 - [Cross-resource integration — Transactions and recovery](delivery/subsystems/integration/transactions-status.md)
 - [Licensed certification — Differential certification](delivery/subsystems/certification/licensed-status.md)
-- [Licensed certification — Stable release promotion](delivery/subsystems/certification/stable-release-plan.md)
 
 ## Operations
 
@@ -178,10 +227,9 @@ Implementation progress is organized by subsystem and phase. Release versions id
 - [CICS licensed pilot](runbooks/cics-licensed-pilot.md)
 - [Conformance family rollout](runbooks/conformance-family-rollout.md)
 
-## Releases, reviews, and research
+## Reviews and research
 
-- [0.8 release notes](releases/0.8.md)
-- [Pre-0.9 deep review](reviews/PRE-0.9.0-DEEP-REVIEW.md)
+- [Subsystem engineering review](reviews/SUBSYSTEM-REVIEW.md)
 - [Review index](reviews/README.md)
 - [IBM official coverage roadmap](research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
 - [Publication source probe](research/publication-source-probe.md)

@@ -1,16 +1,20 @@
 use super::*;
 
-const CATALOG_PATH: &str = "conformance/0.5/racf/command-language.json";
-const SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-command-catalog.schema.json";
-const CLASS_CATALOG_PATH: &str = "conformance/0.5/racf/supplied-classes.json";
-const CLASS_SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-class-catalog.schema.json";
-const RACROUTE_PATH: &str = "conformance/0.5/racf/racroute.json";
-const RACROUTE_SCHEMA_PATH: &str = "conformance/0.5/schemas/racroute-catalog.schema.json";
-const ORACLE_SCHEMA_PATH: &str = "conformance/0.5/schemas/racf-oracle-campaign.schema.json";
-const DISPOSITIONS_PATH: &str = "conformance/0.5/racf/operand-dispositions.json";
+const CATALOG_PATH: &str = "conformance/subsystems/racf/racf/command-language.json";
+const SCHEMA_PATH: &str = "conformance/subsystems/racf/schemas/racf-command-catalog.schema.json";
+const CLASS_CATALOG_PATH: &str = "conformance/subsystems/racf/racf/supplied-classes.json";
+const CLASS_SCHEMA_PATH: &str =
+    "conformance/subsystems/racf/schemas/racf-class-catalog.schema.json";
+const RACROUTE_PATH: &str = "conformance/subsystems/racf/racf/racroute.json";
+const RACROUTE_SCHEMA_PATH: &str =
+    "conformance/subsystems/racf/schemas/racroute-catalog.schema.json";
+const ORACLE_SCHEMA_PATH: &str =
+    "conformance/subsystems/racf/schemas/racf-oracle-campaign.schema.json";
+const DISPOSITIONS_PATH: &str = "conformance/subsystems/racf/racf/operand-dispositions.json";
 const DISPOSITIONS_SCHEMA_PATH: &str =
-    "conformance/0.5/schemas/racf-operand-dispositions.schema.json";
-const PROJECTION_PATH: &str = "conformance/0.5/generated/racf-html-syntax-projection.json";
+    "conformance/subsystems/racf/schemas/racf-operand-dispositions.schema.json";
+const PROJECTION_PATH: &str =
+    "conformance/subsystems/racf/generated/racf-html-syntax-projection.json";
 const GENERATED_PATH: &str =
     "crates/providers/mainframe-env-racf/src/generated/racf_command_catalog.rs";
 const SPEC_PATH: &str = "conformance/spec/v1/spec.json";
@@ -557,7 +561,7 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
         families.len() == 34,
         "RACF command catalog must contain 34 families",
     )?;
-    let official_path = root.join("conformance/0.2/catalogs/racf-saf.json");
+    let official_path = root.join("conformance/subsystems/coverage/catalogs/racf-saf.json");
     let official = json(&official_path)?;
     let units = array(&official, "units", &official_path)?;
     let official_rows = array(&units[0], "rows", &official_path)?;
@@ -780,7 +784,7 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
 /// topic does not publish as a top-level operand of that command (`catalog_only`). Those names are
 /// normative row content and nothing else in the repository judges them, so the rule enforced here
 /// is that every one of them is accounted for by name in
-/// `conformance/0.5/racf/operand-dispositions.json`: a name is either applied -- rewritten to the
+/// `conformance/subsystems/racf/racf/operand-dispositions.json`: a name is either applied -- rewritten to the
 /// operand the publication does publish -- or explained, with a reason a reviewer can act on.
 ///
 /// The load-bearing clauses are set equality in all three populations and the empty catalog-gap
@@ -841,7 +845,7 @@ fn check_operand_dispositions(
                 .collect::<BTreeSet<_>>()
                 == *operands,
             &format!(
-                "RACF syntax projection is stale for {keyword}; regenerate it with conformance/0.5/tools/extract_racf_html_syntax.py"
+                "RACF syntax projection is stale for {keyword}; regenerate it with conformance/subsystems/racf/tools/extract_racf_html_syntax.py"
             ),
         )?;
         for name in string_array(row, "catalog_only", &projection_path)? {

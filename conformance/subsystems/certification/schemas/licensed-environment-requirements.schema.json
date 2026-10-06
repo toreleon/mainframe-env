@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/licensed-environment-requirements@1",
+  "title": "CER-1701 licensed-environment slot requirements",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "environment_manifest_contract", "credit_policy", "slots"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.licensed-environment-requirements@1"},
+    "target_subsystem": {"const": "certification.licensed"},
+    "environment_manifest_contract": {"const": "mainframe-env.licensed-environment-manifest@1"},
+    "credit_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cer1701_licensed_differential_credit", "pending_or_empty_counts_as_pass", "local_or_synthetic_counts_as_pass", "historical_receipt_relabel_allowed"],
+      "properties": {
+        "cer1701_licensed_differential_credit": {"const": 0},
+        "pending_or_empty_counts_as_pass": {"const": false},
+        "local_or_synthetic_counts_as_pass": {"const": false},
+        "historical_receipt_relabel_allowed": {"const": false}
+      }
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot_id",
+          "subsystem",
+          "environment_status",
+          "differential_status",
+          "required_baselines",
+          "required_products",
+          "required_capabilities",
+          "required_identity_fields",
+          "recorded_pending",
+          "blockers"
+        ],
+        "properties": {
+          "slot_id": {"$ref": "#/$defs/slot"},
+          "subsystem": {"type": "string", "minLength": 1, "maxLength": 128},
+          "environment_status": {"const": "pending"},
+          "differential_status": {"const": "pending"},
+          "required_baselines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 9,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["baseline_id", "topic_manifest_sha256", "catalog_sha256"],
+              "properties": {
+                "baseline_id": {"$ref": "#/$defs/id"},
+                "topic_manifest_sha256": {"$ref": "#/$defs/digest"},
+                "catalog_sha256": {"$ref": "#/$defs/digest"}
+              }
+            }
+          },
+          "required_products": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1, "maxLength": 256}
+          },
+          "required_capabilities": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/id"}
+          },
+          "required_identity_fields": {
+            "const": ["product-version", "service-level", "fmids", "reported-apars", "reported-ptfs", "locale", "ccsids", "topology", "authorization", "tool-identities"]
+          },
+          "recorded_pending": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["numerator", "denominator", "authority"],
+            "properties": {
+              "numerator": {"const": 0},
+              "denominator": {"type": ["integer", "null"], "minimum": 1},
+              "authority": {"type": "string", "minLength": 1, "maxLength": 256}
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1, "maxLength": 512}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "slot": {"enum": ["cobol", "racf-saf", "dataset-vsam-ams", "jes2", "cics", "db2", "ims", "mq", "zosmf", "cross-resource"]},
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.:/@+-]+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

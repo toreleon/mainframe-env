@@ -1,9 +1,9 @@
 # Generic Db2 application catalog
 
-Status: **Frozen for mainframe-env 0.2.0**
+Status: **Frozen for mainframe-env coverage.foundation**
 Owner: **Db2 provider maintainers**
 Scope: **generic application catalog, schema, row, and generation behavior**
-Applies from: **mainframe-env 0.2.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 The Db2 provider owns one generic schema/row engine. An installed catalog
 generation declares tables, ordered columns, null/default policy, primary keys,

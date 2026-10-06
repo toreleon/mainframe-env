@@ -2,10 +2,9 @@
 
 Subsystem: **cobol**
 Phase: **structure**
-Target release: **0.3.0**
 
 Status: **Proposed**
-Start gate: 0.2 catalog, generation, package, and coverage contracts frozen
+Start gate: coverage.foundation catalog, generation, package, and coverage contracts frozen
 Completion dependencies: coverage.foundation
 Estimate: 10–15 engineer-months
 
@@ -32,7 +31,7 @@ typed, lossless, bounded model for every official form.
 - Complete PICTURE/USAGE, alignment, alias, condition, table, and file layout
   validation.
 - Produce executable-blocking diagnostics for rows whose runtime semantics are
-  intentionally assigned to 0.4 rather than publishing partial IR.
+  intentionally assigned to cobol.execution rather than publishing partial IR.
 - Remove the last host-product ABI knowledge from the COBOL compiler.
 
 ## Work packages
@@ -55,12 +54,12 @@ CB-305 can proceed independently from the generated function catalog. One
 semantic owner must integrate name resolution and layouts.
 
 Freeze the generic Conformance IR/obligation/verdict/ledger contract in the
-small CI-300 milestone. The 0.5, 0.6, and 0.7 lanes may prepare catalogs and
+small CI-300 milestone. The racf.security, dataset.data, and jcl.planning lanes may prepare catalogs and
 product code in parallel; after CI-300 is accepted they may integrate claims
 against it without waiting for the remaining COBOL work. They may not create
 subsystem-local conformance frameworks.
 
-This version can be built in parallel with 0.5 RACF, 0.6 dataset, and 0.7 JCL.
+This version can be built in parallel with racf.security RACF, dataset.data dataset, and jcl.planning JCL.
 It shares no provider state with those versions.
 
 ## Exit gate
@@ -71,7 +70,7 @@ It shares no provider state with those versions.
 - Every AST/HIR node has bounded source provenance and stable identity.
 - Recovery or execution-incomplete nodes cannot publish executable artifacts.
 - No CICS, Db2, IMS, MQ, or LE copybook/layout is owned by the compiler.
-- Existing 0.1.1 artifacts remain readable under the declared compatibility
+- Existing profile.carddemo artifacts remain readable under the declared compatibility
   window.
 - Every claimed recognition/validation gate is connected by official row ->
   typed row specification -> mandatory obligation -> executable binding ->
@@ -85,12 +84,12 @@ It shares no provider state with those versions.
 - Every failed generated/property case reports a deterministic replay command,
   IBM source locator, row/obligation/gate, fixture or seed, and bounded
   expected/actual observations.
-- Execution, recovery, and differential gates assigned to 0.4/0.17 remain
+- Execution, recovery, and differential gates assigned to cobol.execution/certification.licensed remain
   explicitly pending.
 
 ## Non-goals
 
-- Claiming all statements/functions execute; that belongs to 0.4.
+- Claiming all statements/functions execute; that belongs to cobol.execution.
 - Native/JIT optimization.
 - CICS, SQL, DLI, or MQ provider semantics.
 - A general predicate/expression or workflow DSL, shell-in-spec, subsystem-local

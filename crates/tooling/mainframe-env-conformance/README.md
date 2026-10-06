@@ -11,3 +11,7 @@ enter receipts. `CARDDEMO_CORPUS_DIR` is consulted only by the explicit
 CardDemo corpus gate. Verify with `cargo test -p mainframe-env-conformance`.
 The corpus-backed source-preprocessor acceptance route is
 `cargo xtask carddemo-source --check`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

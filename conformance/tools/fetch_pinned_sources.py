@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Re-verify every pinned IBM publication against the baseline that cites it.
 
-`conformance/0.2/catalogs/index.json` names, for each baseline, the table of
+`conformance/subsystems/coverage/catalogs/index.json` names, for each baseline, the table of
 contents it was read from and the digest of the topic manifest extracted from
 it. This tool walks that list, re-retrieves the table of contents and every
 topic the manifest records, and reports whether the book still hashes to its
@@ -62,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import docs_api
 
 REPOSITORY = Path(__file__).resolve().parents[2]
-INDEX = Path("conformance/0.2/catalogs/index.json")
+INDEX = Path("conformance/subsystems/coverage/catalogs/index.json")
 DEFAULT_CACHE = docs_api.default_cache()
 
 STALE_READ = "stale-read"
@@ -80,7 +80,7 @@ def outside_repository(path: Path) -> Path:
 
     The one rule that outranks everything else here is that IBM publication
     bytes never enter the repository, and the 0.2 gate now fails on any `.pdf`,
-    `.html` or `.htm` found anywhere beneath `conformance/0.2`. Enforcing it at
+    `.html` or `.htm` found anywhere beneath `conformance/subsystems/coverage`. Enforcing it at
     the tool as well means the gate is a backstop rather than the only guard.
     """
     resolved = path.resolve()

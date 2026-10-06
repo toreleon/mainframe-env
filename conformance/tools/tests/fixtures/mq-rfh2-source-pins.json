@@ -3,10 +3,10 @@
   "scope_id": "mq-rfh2-sources",
   "baseline_id": "ibm-mq-9.4-rfh2-sources-2026-09-12",
   "product": "SSFKSJ_9.4.0",
-  "manifest_sha256": "sha256:117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a",
+  "manifest_sha256": "sha256:48b8c66fe4da276608bd2bff0cca073f770e1841ea326fdf8b85e75d8da169ee",
   "topic_manifest_digest": "b0a9b4656c10ea8ec8a23999935d47cf559f5164a707a0aa3e078d3d2266afdc",
   "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
-  "old_registry_rows_sha256": "095be63d0efafc94e5b95a2f40dd348fea6b50297d7993eb345e3a75b53dc5db",
+  "old_registry_rows_sha256": "15ec29e3dba9bf7fbaa005f868f48f31e8c19f07c0377faaf4fcfd173e2ffa51",
   "semantic_authority": false,
   "coverage_credit": 0,
   "topics": [

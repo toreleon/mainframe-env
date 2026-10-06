@@ -68,9 +68,9 @@ class MqStatusCatalogTests(unittest.TestCase):
                           ("MQCC_FAILED", 2, "00000002")])
         self.assertEqual(wire["excluded_unknown"]["decimal"], -1)
         self.assertEqual(wire["canonical_call_return_sha256"],
-                         "02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa")
+                         "86dd62206045d36ccf3bf8ce0fedb010e185200b2ac82746ab56fafc43d38e56")
         rendered = generator.render()[authority.OUTPUT / "mod.rs"]
-        self.assertIn('"sha256:02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa"', rendered)
+        self.assertIn('"sha256:86dd62206045d36ccf3bf8ce0fedb010e185200b2ac82746ab56fafc43d38e56"', rendered)
 
     def test_completion_projection_mutants_fail_even_with_recomputed_digest(self):
         mutations = [

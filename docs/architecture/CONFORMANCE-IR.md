@@ -1,25 +1,25 @@
 # Conformance IR and executable coverage
 
-Status: **Normative from 0.3.0**
+Status: **Normative from cobol.structure**
 Owner: **conformance maintainers**
 Scope: **conformance catalog, binding, execution, and evidence authority**
-Applies from: **mainframe-env 0.3.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Purpose
 
 mainframe-env is a compatibility product. Official IBM catalog rows define the
 coverage denominator, but a catalog row is not yet a behavioral specification
-and its presence never proves product behavior. From 0.3 onward, one typed
+and its presence never proves product behavior. From cobol.structure onward, one typed
 Conformance IR connects each claimed row and gate to executable observations.
 
-```text
-pinned IBM source
-  -> normalized official row
-  -> typed row specification
-  -> mandatory executable obligations
-  -> generated/registered test bindings
-  -> obligation-level verdict events
-  -> derived coverage ledger
+```mermaid
+flowchart TB
+    source["Pinned IBM source"] --> row["Normalized official row"]
+    row --> spec["Typed row specification"]
+    spec --> obligations["Mandatory executable obligations"]
+    obligations --> bindings["Generated / registered test bindings"]
+    bindings --> verdicts["Obligation-level verdict events"]
+    verdicts --> ledger["Derived coverage ledger"]
 ```
 
 This pipeline is the primary conformance authority. CardDemo and other
@@ -136,8 +136,8 @@ The six existing gates remain independent:
 
 `applicable_gates` says which gates the row can eventually satisfy. A gate owned
 by a later version remains `pending`; it is not silently marked non-applicable.
-For example, 0.3 may pass COBOL recognition and validation while execution,
-recovery, and IBM differential remain pending for 0.4 or 0.17.
+For example, cobol.structure may pass COBOL recognition and validation while execution,
+recovery, and IBM differential remain pending for cobol.execution or certification.licensed.
 
 ## Executable binding
 
@@ -220,7 +220,7 @@ metadata and a scenario-wide success flag therefore cannot emit row credit.
 
 ## Commands and feedback tiers
 
-The 0.3 foundation provides these stable entry points:
+The cobol.structure foundation provides these stable entry points:
 
 ```text
 cargo xtask spec --check
@@ -252,7 +252,7 @@ and are not mass-migrated merely to match the newest schema.
 
 ## Evidence boundary
 
-From 0.3 onward, retained conformance evidence is minimal:
+From cobol.structure onward, retained conformance evidence is minimal:
 
 - candidate commit SHA;
 - catalog and Conformance IR version/digest;
@@ -279,7 +279,7 @@ unknown-outcome behavior. Grammar recognition, catalog completeness, DTO
 validation, and straight-line pure semantics use ordinary examples, properties,
 and fuzzing instead.
 
-## Migration from 0.2
+## Migration from coverage.foundation
 
 An obligation may declare a bounded `pending_reason` when the executable profile
 is still missing. It remains mandatory for every declared gate; cases cannot bind
@@ -306,8 +306,8 @@ full26 completion is refused while mandatory complete-profile obligations remain
 pending. Gates without executable evidence also refuse; no fake future case
 receives credit from a provider Unsupported disposition.
 
-The 0.2 catalog authority, row identities, six-gate contract, and historical
-evidence remain frozen. Do not retrofit 0.2 receipts. Version 0.3 introduces the
+The coverage.foundation catalog authority, row identities, six-gate contract, and historical
+evidence remain frozen. Do not retrofit coverage.foundation receipts. Version cobol.structure introduces the
 shared Conformance IR and begins emitting executable bindings for COBOL rows.
 Rows outside the active minor remain pending. Later subsystem minors reuse this
 same IR, runner, verdict event, and ledger generator rather than creating local

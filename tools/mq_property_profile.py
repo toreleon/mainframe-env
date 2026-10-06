@@ -9,7 +9,7 @@ import mq_raw_layout as raw
 import mq_wire_options as wire
 
 OUTPUT = Path('crates/contracts/mainframe-env-host-api/src/mq_mqi/property/generated.rs')
-PROJECTION_SHA = '8da951d82502333755eee8f45447c2c17f699bbe436e93d3bde1c57a6d60dfd4'
+PROJECTION_SHA = '163cbc407141a7a896d43edf60b549c1ad1b42e272ff02f91334e3961f4f6448'
 SCOPES = ('mq-property-sources', 'mq-programming-supplements', 'ibm-mq-9.4-mqi-2026-08-31')
 
 def digest(value):

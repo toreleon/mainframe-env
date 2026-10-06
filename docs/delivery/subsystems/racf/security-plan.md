@@ -2,10 +2,9 @@
 
 Subsystem: **racf**
 Phase: **security**
-Target release: **0.5.0**
 
 Status: **Implementation candidate — pass with licensed differential pending**
-Start gate: 0.2 official catalog, coverage, identity, and store contracts frozen
+Start gate: coverage.foundation official catalog, coverage, identity, and store contracts frozen
 Completion dependencies: coverage.foundation
 Estimate: 16–24 engineer-months
 
@@ -44,7 +43,7 @@ Command families can be divided by profile class after the transaction and
 authorization contracts freeze. SAF/ACEE work can run beside command-language
 work. Cache/SETROPTS integration is serialized with the security authority.
 
-0.5 is parallel-safe with 0.3 COBOL, 0.6 dataset, and 0.7 JCL. It must finish
+racf.security is parallel-safe with cobol.structure COBOL, dataset.data dataset, and jcl.planning JCL. It must finish
 before JES and CICS security completion.
 
 ## Exit gate
@@ -59,9 +58,9 @@ before JES and CICS security completion.
 - Restart/recovery and the independent bounded reference-simulation gates pass.
 - Licensed z/OS 3.2 RACF/SAF differential remains explicitly 0/48 pending under
   the user-approved 2026-09-01 completion policy. It cannot receive credit from
-  simulation and moves to the 0.17 `release-certify` hard gate.
+  simulation and moves to the certification.licensed `release-certify` hard gate.
 
 ## Non-goals
 
 - Replacing every third-party external security manager.
-- z/OSMF protocol translation, which belongs to 0.11.
+- z/OSMF protocol translation, which belongs to zosmf.rest.

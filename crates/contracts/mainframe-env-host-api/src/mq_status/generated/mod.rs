@@ -35,9 +35,9 @@ mod row_0024_0;
 mod row_0025_0;
 mod row_0026_0;
 pub const MQ_STATUS_CATALOG_SHA256: &str =
-    "sha256:02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa";
+    "sha256:86dd62206045d36ccf3bf8ce0fedb010e185200b2ac82746ab56fafc43d38e56";
 pub const MQ_COMPLETION_WIRE_PROJECTION_SHA256: &str =
-    "sha256:1b67e82e0c85139fd0bf2ce58bb851f4eca5184bebb081ed7b1ccadee71da5cd";
+    "sha256:e46072ef0692357a389ba3cfed55dd7388bc2f35b3b0624b93e3f47df38aa4a5";
 pub const MQ_COMPLETION_WIRE_TOPIC_SHA256: &str =
     "87fb6467cf1e1c1715146fea70957e82970fcf4019ce15d44a750eae443d33ca";
 pub const MQ_STATUS_PAIR_COUNT: usize = 1030;

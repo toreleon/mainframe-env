@@ -1,18 +1,23 @@
-# 0.1 Package Map
+# Package map
 
 Status: **Accepted; current topology governed by ADR-0009**
 Owner: **architecture maintainers**
 Scope: **current package ownership, dependency layers, and split boundaries**
-Applies from: **mainframe-env 0.8.3 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Scope rule
 
-The 0.1 workspace contains only packages required to deliver COBOL, CICS,
-JCL/JES, datasets, RACF/security, z/OSMF, and their runtime infrastructure.
+The current workspace owns compiler/execution infrastructure and bounded COBOL,
+CICS, JCL/JES, dataset, RACF/SAF, z/OSMF, Db2, IMS, MQ, and spool surfaces.
+Package presence does not establish complete subsystem support. Check
+[capabilities](../guides/CAPABILITIES.md) and the owning
+[progress record](../delivery/IMPLEMENTATION-STATUS.md) before selecting a workload.
 
-A current package outside that surface has no migration obligation. It is not
-added as a placeholder, empty facade, optional feature, test dependency, or
-future plugin stub.
+The original platform.runtime-integration proposal was consolidated before implementation. This map
+lists the accepted current packages rather than that superseded proposal;
+[ADR-0005](../decisions/0005-package-consolidation.md) retains the historical
+consolidation decision and [ADR-0009](../decisions/0009-current-package-topology.md)
+governs the current topology.
 
 ## Package-boundary rule
 
@@ -22,76 +27,69 @@ Readability alone is handled with modules.
 
 Module readability is governed by
 [ADR-0010](../decisions/0010-rust-module-review-budgets.md) and the
-[machine budget inventory](../../conformance/0.9/inventory/module-budgets.json).
+[machine budget inventory](../../conformance/subsystems/cics/application/inventory/module-budgets.json).
 New/non-exempt Rust modules have a hard 1,200-production-line maximum; an
 oversized legacy module must retain its exact non-growing ceiling and split at
 the recorded stable reason to change rather than creating an unjustified crate.
 
-## Proposed 0.1 workspace
+## Workspace directory map
 
-```text
-crates/
-  foundation/
-    mainframe-env-source
-    mainframe-env-diagnostics
-    mainframe-env-encoding
-    mainframe-env-ir
-    mainframe-env-ir-codec
-
-  contracts/
-    mainframe-env-compiler-api
-    mainframe-env-execution-api
-    mainframe-env-host-api
-    mainframe-env-store-api
-    mainframe-env-cics-api
-
-  kernel/
-    mainframe-env-compiler
-    mainframe-env-execution
-    mainframe-env-interpreter
-
-  cobol/
-    mainframe-env-cobol-syntax
-    mainframe-env-cobol
-
-  batch/
-    mainframe-env-jcl
-    mainframe-env-jes
-
-  providers/
-    mainframe-env-dataset
-    mainframe-env-cics
-    mainframe-env-db2
-    mainframe-env-ims
-    mainframe-env-mq
-    mainframe-env-racf
-
-  stores/
-    mainframe-env-store-memory
-    mainframe-env-store-sql
-    mainframe-env-artifacts
-
-  apps/
-    mainframe-env-zosmf
-    mainframe-env-server
-    mainframe-env-cli
-
-  tooling/
-    mainframe-env-conformance
-    xtask
+```mermaid
+flowchart TB
+    apps["apps: CLI / batch / server"] --> kernel["kernel: compiler / interpreter / application"]
+    apps --> gateway["gateways: z/OSMF"]
+    apps --> providers["providers: dataset / CICS / RACF / Db2 / IMS / MQ / spool"]
+    apps --> stores["stores: memory / SQLite / PostgreSQL / artifacts"]
+    kernel --> contracts["contracts: compiler / execution / host / store / coverage"]
+    gateway --> contracts
+    providers --> contracts
+    stores --> contracts
+    contracts --> foundation["foundation: source / diagnostics / encoding / IR"]
+    kernel --> foundation
+    tooling["tooling: conformance / xtask"] -.-> apps
+    tooling -.-> kernel
 ```
 
-The exact count may shrink when two proposed packages do not enforce a real
-dependency boundary. It may grow only through an ADR demonstrating an in-scope
-0.1 requirement.
+Arrows summarize dependency direction by role. They are not an exhaustive Cargo
+graph. Dashed arrows identify verification consumers; production packages do
+not depend on tooling. The exact governed edges live in the machine inventories.
+
+| Package reference | Layer | Source directory |
+|---|---|---|
+| [mainframe-env-source](../../crates/foundation/mainframe-env-source/README.md) | foundation | `crates/foundation/mainframe-env-source/` |
+| [mainframe-env-diagnostics](../../crates/foundation/mainframe-env-diagnostics/README.md) | foundation | `crates/foundation/mainframe-env-diagnostics/` |
+| [mainframe-env-encoding](../../crates/foundation/mainframe-env-encoding/README.md) | foundation | `crates/foundation/mainframe-env-encoding/` |
+| [mainframe-env-ir](../../crates/foundation/mainframe-env-ir/README.md) | foundation | `crates/foundation/mainframe-env-ir/` |
+| [mainframe-env-compiler-api](../../crates/contracts/mainframe-env-compiler-api/README.md) | contracts | `crates/contracts/mainframe-env-compiler-api/` |
+| [mainframe-env-execution-api](../../crates/contracts/mainframe-env-execution-api/README.md) | contracts | `crates/contracts/mainframe-env-execution-api/` |
+| [mainframe-env-host-api](../../crates/contracts/mainframe-env-host-api/README.md) | contracts | `crates/contracts/mainframe-env-host-api/` |
+| [mainframe-env-store-api](../../crates/contracts/mainframe-env-store-api/README.md) | contracts | `crates/contracts/mainframe-env-store-api/` |
+| [mainframe-env-coverage](../../crates/contracts/mainframe-env-coverage/README.md) | contracts | `crates/contracts/mainframe-env-coverage/` |
+| [mainframe-env-store](../../crates/stores/mainframe-env-store/README.md) | stores | `crates/stores/mainframe-env-store/` |
+| [mainframe-env-compiler](../../crates/kernel/mainframe-env-compiler/README.md) | kernel | `crates/kernel/mainframe-env-compiler/` |
+| [mainframe-env-interpreter](../../crates/kernel/mainframe-env-interpreter/README.md) | kernel | `crates/kernel/mainframe-env-interpreter/` |
+| [mainframe-env-application](../../crates/kernel/mainframe-env-application/README.md) | kernel | `crates/kernel/mainframe-env-application/` |
+| [mainframe-env-dataset](../../crates/providers/mainframe-env-dataset/README.md) | providers | `crates/providers/mainframe-env-dataset/` |
+| [mainframe-env-racf](../../crates/providers/mainframe-env-racf/README.md) | providers | `crates/providers/mainframe-env-racf/` |
+| [mainframe-env-cics](../../crates/providers/mainframe-env-cics/README.md) | providers | `crates/providers/mainframe-env-cics/` |
+| [mainframe-env-db2](../../crates/providers/mainframe-env-db2/README.md) | providers | `crates/providers/mainframe-env-db2/` |
+| [mainframe-env-ims](../../crates/providers/mainframe-env-ims/README.md) | providers | `crates/providers/mainframe-env-ims/` |
+| [mainframe-env-mq](../../crates/providers/mainframe-env-mq/README.md) | providers | `crates/providers/mainframe-env-mq/` |
+| [mainframe-env-spool](../../crates/providers/mainframe-env-spool/README.md) | providers | `crates/providers/mainframe-env-spool/` |
+| [mainframe-env-batch](../../crates/apps/mainframe-env-batch/README.md) | apps | `crates/apps/mainframe-env-batch/` |
+| [mainframe-env-zosmf](../../crates/gateways/mainframe-env-zosmf/README.md) | gateways | `crates/gateways/mainframe-env-zosmf/` |
+| [mainframe-env-server](../../crates/apps/mainframe-env-server/README.md) | apps | `crates/apps/mainframe-env-server/` |
+| [mainframe-env-cli](../../crates/apps/mainframe-env-cli/README.md) | apps | `crates/apps/mainframe-env-cli/` |
+| [mainframe-env-conformance](../../crates/tooling/mainframe-env-conformance/README.md) | tooling | `crates/tooling/mainframe-env-conformance/` |
+| [xtask](../../xtask/README.md) | tooling | `xtask/` |
 
 ## Current governed topology
 
-ADR-0005 described a 20-package consolidation target. The exact accepted 0.1
+ADR-0005 described a 20-package consolidation target. The exact accepted platform.runtime-integration
 machine inventory ultimately contains 24 workspace packages: the 20 boundary
 packages in that target plus the server and CLI entry applications and the
 conformance and xtask tooling packages. Later versioned additions introduced
-`mainframe-env-coverage` (0.2) and `mainframe-env-spool` (0.8), so the current
+`mainframe-env-coverage` (coverage.foundation) and `mainframe-env-spool` (jes.execution), so the current
 workspace contains 26 packages.
 
 The non-publishing `fuzz/` Cargo workspace is an isolated test driver rather
@@ -99,7 +97,7 @@ than a main-workspace package. Its nightly/libFuzzer dependencies, lockfile,
 corpora, and generated artifacts do not enter a product package or release
 closure; ADR-0008 records that boundary.
 
-`conformance/0.1/inventory/packages.json` plus the versioned
+`conformance/subsystems/platform/inventory/packages.json` plus the versioned
 `package-additions.json` files are the current machine authority. ADR-0005 is a
 historical decision whose original count must not be used as current workspace
 truth. [ADR-0009](../decisions/0009-current-package-topology.md) governs the
@@ -111,9 +109,9 @@ IR codecs remain with `mainframe-env-ir`; CICS contracts remain with
 kernel; COBOL syntax, semantics, HIR, and lowering remain private modules of the
 compiler kernel; JCL and JES share the batch state authority; and
 memory/SQL/artifact adapters share the store package. These units do not require
-independent 0.1 publication or provider selection boundaries. ADR 0005 records
+independent platform.runtime-integration publication or provider selection boundaries. ADR 0005 records
 the decision, and the exact accepted mapping and justification is
-`conformance/0.1/inventory/packages.json`, its versioned additions, and
+`conformance/subsystems/platform/inventory/packages.json`, its versioned additions, and
 ADR-0009.
 
 ## Foundation packages
@@ -126,7 +124,7 @@ ADR-0009.
 | `mainframe-env-ir` | in-memory IR, verifier, versioned text/binary/envelope codecs | COBOL AST, backends |
 
 Foundation encoding also owns `encode_ascii`, a bounded ASCII identity copy into
-owned bytes. It preserves all128 ASCII values, including controls, and rejects
+owned bytes. It preserves all 128 ASCII values, including controls, and rejects
 non-ASCII before checking the caller's inclusive byte bound or allocating.
 Fallible reservation has a distinct allocation error; no replacement, trimming,
 CCSID mapping or locale selection occurs. This additive helper leaves CP037,
@@ -140,6 +138,7 @@ numeric primitives and the `mainframe-env.encoding@1` identity unchanged.
 | `mainframe-env-execution-api` | invocation, context, limits, outcomes, events, lifecycle identity, and the additive provider-neutral transaction participant descriptor |
 | `mainframe-env-host-api` | dataset, program, JES/spool, terminal, security, clock, audit, and typed CICS requests/results |
 | `mainframe-env-store-api` | execution, event, work, checkpoint, session, artifact metadata, idempotency stores |
+| `mainframe-env-coverage` | immutable coverage evidence, typed Conformance IR, obligation/verdict projections and derived ledgers |
 
 These packages expose only mainframe-env-owned types and remain independent of
 Axum, Tokio, SQLx, concrete providers, and current-workspace crates.
@@ -211,7 +210,7 @@ the composing server; names never select behavior outside the registry.
 
 ### `mainframe-env-dataset`
 
-Owns the 0.1 dataset/catalog authority and storage adapters required by accepted
+Owns the platform.runtime-integration dataset/catalog authority and storage adapters required by accepted
 fixtures. Key-sequenced records are addressed by stable primary identity;
 alternate-index paths retain ordered alternate/base identities and duplicate
 policy. A record mutation and every affected index generation commit in one
@@ -225,7 +224,7 @@ compatible upgrade and rollback never consult the original local source path.
 
 ### `mainframe-env-cics`
 
-Owns typed CICS provider behavior required by the 0.1 operation inventory,
+Owns typed CICS provider behavior required by the platform.runtime-integration operation inventory,
 including terminal/session, file, program control, conditions, transactions,
 and EIB outcomes. The provider persists pseudo-conversational continuations,
 transient-data records, and idempotent syncpoint intent/result decisions;
@@ -238,7 +237,7 @@ and DFHBMSCA compatibility source library; the compiler does not.
 ### `mainframe-env-racf`
 
 Owns identity, authentication, SAF authorization, profiles, audit decisions,
-and security conditions required by 0.1. Callers never access its database or
+and security conditions required by platform.runtime-integration. Callers never access its database or
 locks directly.
 
 ### `mainframe-env-db2`
@@ -261,24 +260,32 @@ message/correlation identifiers, wait/no-message conditions, syncpoint gets and
 puts, idempotent replay, unknown-outcome reconciliation, and restart state.
 MQ owns its six reached CMQ* compatibility source members.
 
+### `mainframe-env-spool`
+
+Owns bounded durable JES spool metadata and immutable artifact-backed record
+chunks, including append, read, seal, replay, restart, and intent-first purge.
+JES scheduling and job lifecycle remain with the batch authority.
+
 ## Stores
 
 | Package | Purpose |
 |---|---|
 | `mainframe-env-store` | bounded memory, SQLite/PostgreSQL metadata/state, and immutable local artifact adapters behind separate owned interfaces |
 
-The MQ provider is an owned deterministic authority for the additive 0.1.1
+The MQ provider is an owned deterministic authority for the additive profile.carddemo
 CardDemo profile, not an external broker adapter. Store state is authoritative;
 in-process notifications are bounded and reconstructible.
 
-## Applications
+## Gateway
 
 ### `mainframe-env-zosmf`
 
-Owns route DTOs and IBM-compatible protocol translation for accepted 0.1
+Owns route DTOs and IBM-compatible protocol translation for accepted platform.runtime-integration
 information, job, dataset, and security/console surfaces. Handlers contain no
 compiler, job, dataset, or RACF business authority. Official `/zosmf/*` and
 custom `/mainframe-env/*` registration are generated from disjoint catalogs.
+
+## Applications
 
 ### `mainframe-env-server`
 
@@ -287,21 +294,21 @@ graceful shutdown, and Axum server startup.
 
 ### `mainframe-env-cli`
 
-Provides local compilation, execution, inspection, and administration for the
-same 0.1 services. It does not embed an alternate execution path.
+Provides local compilation, execution, and inspection over the owned services.
+It does not embed an alternate execution path.
 
 ## Tooling
 
-`mainframe-env-conformance` owns 0.1 fixtures, current-workspace oracle
+`mainframe-env-conformance` owns platform.runtime-integration fixtures, current-workspace oracle
 adapters, differential reports, protocol tests, and evidence models. It is not a
 production dependency.
 
 `xtask` owns deterministic code generation, architecture/profile checks,
 schema checks, and release evidence orchestration.
 
-## Explicitly absent from 0.1
+## Initial platform.runtime-integration exclusions
 
-No 0.1 package or feature is created for:
+No platform.runtime-integration package or feature is created for:
 
 ```text
 ADABAS, CLIST, crypto provider pack, deployment generator, DRDA,
@@ -312,18 +319,18 @@ TSO product, TUI, USS, Wiki, WLM product policy, Wasm plugins,
 process plugins, Cranelift, LLVM, or multi-node distribution.
 ```
 
-A runtime dependency is admitted only when an accepted 0.1 selector reaches it
+A runtime dependency is admitted only when an accepted platform.runtime-integration selector reaches it
 through the target architecture and no smaller owned contract satisfies the
 need.
 
-## In-scope migration matrix
+## Initial migration matrix
 
-Before implementation, only current packages/selectors contributing to the 0.1
+Before implementation, only current packages/selectors contributing to the platform.runtime-integration
 surface receive migration rows:
 
 ```text
 current package and selector
-accepted 0.1 fixture
+accepted platform.runtime-integration fixture
 observable current behavior
 mainframe-env target package
 reimplement | port algorithm | replace | retire

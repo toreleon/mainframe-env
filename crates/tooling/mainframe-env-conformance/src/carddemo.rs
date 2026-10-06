@@ -6423,8 +6423,7 @@ pub fn verify_carddemo_full_from_env(
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.full.runtime", error.to_string()))?;
     let exercise = runtime.block_on(exercise_full_certification())?;
-    let release_disposition =
-        "product-0.1.1-released-locally; carddemo-conformance-only".to_string();
+    let release_disposition = "source-checkout; carddemo-conformance-only".to_string();
     let owned_commands = vec![
         "cargo xtask carddemo-operator-install --check".into(),
         "cargo xtask carddemo-operator-compile --check".into(),
@@ -13412,7 +13411,7 @@ mod tests {
     #[test]
     fn accepted_cdv1_correction_compiles_and_runs_public_route() {
         let inventory = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json");
+            .join("../../../conformance/profiles/carddemo/inventory/carddemo-corpus.json");
         let receipt =
             verify_cdv1_correction(&inventory, "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e").unwrap();
         assert_eq!(receipt.disposition, "accepted-owned-source");

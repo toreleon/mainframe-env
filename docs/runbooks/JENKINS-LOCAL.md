@@ -5,9 +5,8 @@ storage boundary.
 
 `Jenkinsfile` is the current CI definition. It keeps the changed-path plan and
 command receipts used by the repository, runs the complete tier weekly or on
-demand, and handles the release offline-bundle path explicitly.
-Historical GitHub Actions receipts under `conformance/0.2/` remain historical
-evidence; they do not describe current CI.
+demand. Historical execution receipts are removed from the repository;
+current checks validate the subsystem inputs.
 
 ## Capped storage
 
@@ -120,7 +119,7 @@ Every build-bearing plan also records the `python-tooling-tests` and
 `api-docs` gates.
 `tools/run_tooling_tests.py` discovers tracked `tools/tests` directories at any
 repository depth, runs every Python and shell test file, and syntax-checks all
-shipped shell tooling. Adding a new versioned conformance tool test therefore
+shipped shell tooling. Adding a new subsystem conformance tool test therefore
 does not require another Jenkinsfile edit. `tools/check_public_api_docs.py`
 enables Rust's `missing_docs` lint for every contract crate and rejects any
 increase over the reviewed per-crate baseline in `tools/public-api-docs.json`;
@@ -128,27 +127,13 @@ an improvement must lower that baseline in the same change, so documentation
 debt cannot silently return.
 Markdown-only plans remain bounded to the documentation-system gate.
 
-For optional GitHub Release publication, create a Secret Text credential named
-`mainframe-env-github-token`. Publication occurs only when both `release` mode
-and `PUBLISH_GITHUB_RELEASE` are selected. The tag must already exist, contain
-the Jenkins migration and all pipeline helper scripts, and point at its matching
-`VERSION`; Jenkins does not create product tags. Tags that predate this migration
-remain covered by their immutable historical release evidence and are rejected
-before checkout rather than failing later with missing helpers.
-Release receipts support `aarch64-apple-darwin` and
-`x86_64-unknown-linux-gnu`. An empty `RELEASE_TARGET` uses the host only when it
-is one of those targets; other hosts must select the supported cross target and
-have its Rust target and linker installed.
-
 ## Running the job
 
 Use **Build with Parameters** in Jenkins:
 
 - `auto`: changed-path PR/main assurance;
 - `full`: all workspace, documentation, conformance, certification,
-  evidence-seal, runtime, mutation, MSRV, and PostgreSQL parity gates;
-- `release`: full assurance for a post-migration tag, native release receipt
-  reproduction, and a verified offline Cargo vendor archive.
+  runtime, mutation, MSRV, and PostgreSQL parity gates.
 
 The full tier receipts bounded and periodic cargo-fuzz runs for the COBOL
 parser and IR decoders, the registered Loom durable-state model, and an LLVM
@@ -165,8 +150,6 @@ java -jar jenkins-cli.jar -s http://127.0.0.1:8080/ -auth USER:TOKEN \
 java -jar jenkins-cli.jar -s http://127.0.0.1:8080/ -auth USER:TOKEN \
   build mainframe-env -s -v -p RUN_MODE=full
 java -jar jenkins-cli.jar -s http://127.0.0.1:8080/ -auth USER:TOKEN \
-  build mainframe-env -s -v -p RUN_MODE=release \
-  -p RELEASE_TAG=mainframe-env-vX.Y.Z
 ```
 
 Every selected command writes an exact-candidate receipt below

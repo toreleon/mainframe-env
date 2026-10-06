@@ -2,11 +2,12 @@
 
 use super::*;
 
-const RULES_PATH: &str = "conformance/0.14/ims/call-applicability-rules.json";
-const SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-call-applicability.schema.json";
+const RULES_PATH: &str = "conformance/subsystems/ims/ims/call-applicability-rules.json";
+const SCHEMA_PATH: &str = "conformance/subsystems/ims/schemas/ims-call-applicability.schema.json";
 const PROGRAMMING_MANIFEST: &str =
-    "conformance/0.14/manifests/ims-programming-contracts-topics.json";
-const DATABASE_MANIFEST: &str = "conformance/0.14/manifests/ims-database-contracts-topics.json";
+    "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json";
+const DATABASE_MANIFEST: &str =
+    "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json";
 
 pub(super) fn render(root: &Path) -> TaskResult<Vec<u8>> {
     let rules_path = root.join(RULES_PATH);
@@ -14,7 +15,7 @@ pub(super) fn render(root: &Path) -> TaskResult<Vec<u8>> {
     validate_schema_instance(&json(&root.join(SCHEMA_PATH))?, &rules, &rules_path)?;
     require(
         rules["schema_version"] == "mainframe-env.ims-call-applicability@1"
-            && rules["target_version"] == "0.14.0"
+            && rules["target_subsystem"] == "ims.programming"
             && rules["baseline_id"] == BASELINE,
         "IMS call applicability identity drifted",
     )?;

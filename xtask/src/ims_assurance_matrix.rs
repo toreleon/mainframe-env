@@ -19,12 +19,13 @@ const PENDING: [&str; 4] = [
 ];
 
 pub(super) fn check(root: &Path) -> TaskResult {
-    let matrix_path = root.join("conformance/0.14/ims/assurance-matrix.json");
-    let schema_path = root.join("conformance/0.14/schemas/ims-assurance-matrix.schema.json");
+    let matrix_path = root.join("conformance/subsystems/ims/ims/assurance-matrix.json");
+    let schema_path =
+        root.join("conformance/subsystems/ims/schemas/ims-assurance-matrix.schema.json");
     let matrix = json(&matrix_path)?;
     validate_schema_instance(&json(&schema_path)?, &matrix, &matrix_path)?;
 
-    let catalog = json(&root.join("conformance/0.2/catalogs/ims.json"))?;
+    let catalog = json(&root.join("conformance/subsystems/coverage/catalogs/ims.json"))?;
     let catalog_rows = catalog["units"]
         .as_array()
         .ok_or("IMS catalog lacks units")?
@@ -110,7 +111,8 @@ pub(super) fn check(root: &Path) -> TaskResult {
 }
 
 fn check_handler_closure(root: &Path, matrix: &Value, catalog: &Value) -> TaskResult {
-    let applicability = json(&root.join("conformance/0.14/ims/call-applicability-rules.json"))?;
+    let applicability =
+        json(&root.join("conformance/subsystems/ims/ims/call-applicability-rules.json"))?;
     let families = applicability["families"]
         .as_array()
         .ok_or("IMS applicability families are missing")?;
@@ -273,7 +275,11 @@ fn check_source_binding(root: &Path, scope: &str, topic: &str) -> TaskResult {
         "ims-recovery-utilities-contracts" => "ims-recovery-utilities-contracts-topics.json",
         _ => return Err(format!("unknown IMS source scope {scope}")),
     };
-    let manifest = json(&root.join("conformance/0.14/manifests").join(filename))?;
+    let manifest = json(
+        &root
+            .join("conformance/subsystems/ims/manifests")
+            .join(filename),
+    )?;
     require(
         manifest["product"] == "SSEPH2_15.6.0"
             && manifest["coverage_credit"] == 0
@@ -299,8 +305,9 @@ mod tests {
     fn matrix_keeps_pending_outcomes_and_refuses_credit() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         check(root).unwrap();
-        let schema_path = root.join("conformance/0.14/schemas/ims-assurance-matrix.schema.json");
-        let matrix_path = root.join("conformance/0.14/ims/assurance-matrix.json");
+        let schema_path =
+            root.join("conformance/subsystems/ims/schemas/ims-assurance-matrix.schema.json");
+        let matrix_path = root.join("conformance/subsystems/ims/ims/assurance-matrix.json");
         let mut matrix = json(&matrix_path).unwrap();
         matrix["coverage_credit"] = json!(1);
         assert!(
@@ -314,8 +321,10 @@ mod tests {
     #[test]
     fn handler_closure_rejects_missing_duplicate_stale_name_dispatch_and_non_executable() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let matrix = json(&root.join("conformance/0.14/ims/assurance-matrix.json")).unwrap();
-        let catalog = json(&root.join("conformance/0.2/catalogs/ims.json")).unwrap();
+        let matrix =
+            json(&root.join("conformance/subsystems/ims/ims/assurance-matrix.json")).unwrap();
+        let catalog =
+            json(&root.join("conformance/subsystems/coverage/catalogs/ims.json")).unwrap();
         check_handler_closure(root, &matrix, &catalog).unwrap();
         let mut changed = matrix.clone();
         changed["bindings"].as_array_mut().unwrap().pop();

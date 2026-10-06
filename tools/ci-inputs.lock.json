@@ -53,25 +53,6 @@
     "container_images": [],
     "package_install_commands": []
   },
-  "offline_bundle": {
-    "generator": "tools/package_offline_cargo_bundle.sh",
-    "inputs": [
-      ".cargo/config.toml",
-      "Cargo.lock",
-      "Cargo.toml",
-      "LICENSE",
-      "LICENSES/ICU.txt",
-      "NOTICE",
-      "rust-toolchain.toml",
-      "tools/assurance-gates.json",
-      "tools/ci-inputs.lock.json",
-      "tools/jenkins/controller-plugins.lock.json",
-      "tools/jenkins/select-python.sh",
-      "tools/package_offline_cargo_bundle.sh",
-      "tools/reproducible_archive.py",
-      "tools/supply_chain.py"
-    ]
-  },
   "unsupported_local_inputs": [
     ".github/workflows/offline-dev-bundle.yml",
     "tools/build_offline_dev_bundle.sh",

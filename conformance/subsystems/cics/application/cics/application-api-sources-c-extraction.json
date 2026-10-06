@@ -1,0 +1,452 @@
+{
+  "schema_version": "mainframe-env.cics-source-extraction@1",
+  "target_subsystem": "cics.application-api",
+  "work_package": "CIC-901.sources-c-project",
+  "status": "candidate-plan",
+  "semantic_authority": false,
+  "automatic_registration": false,
+  "coverage_credit": 0,
+  "differential_credit": 0,
+  "inputs": {
+    "mapping": {
+      "path": "conformance/subsystems/cics/application/cics/application-api-sources-c-map.json",
+      "sha256": "sha256:46f06b6301dbc4172d2d72043fdd549d8b5d342c920e62253e1cfe0d6c7fe23a"
+    },
+    "corpus": {
+      "path": "conformance/subsystems/cics/application/cics/application-api-sources-c-corpus.json",
+      "sha256": "sha256:d022171969f6f365f43f58d8dd27795f9f09ee252ee3d919c38d3add3e3af0f3"
+    },
+    "topic_manifest": {
+      "path": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-c-topics.json",
+      "file_sha256": "sha256:fac2da63eb1bed8dd65748c688b4055607340029cac3d9636492f582e0739493",
+      "topic_manifest_sha256": "sha256:01fb00ebd639d937017cb3f6565cdf38df3c25bb0ebe4393030e66db260d8bc2"
+    },
+    "cache_scope": "cics-application-api-sources-c"
+  },
+  "dimensions": [
+    "syntax",
+    "options",
+    "operand-directions",
+    "conditions",
+    "execution-context"
+  ],
+  "bounds": {
+    "max_topics": 256,
+    "max_topic_bytes": 2097152,
+    "max_dom_depth": 64,
+    "max_locator_bytes": 2048,
+    "max_normalized_fragment_bytes": 65536,
+    "max_fragments": 20000,
+    "max_fragments_per_row": 4096,
+    "max_link_depth": 1,
+    "max_candidate_values_per_key": 64
+  },
+  "expected_shape": {
+    "mapping_rows": 87,
+    "mapped_rows": 85,
+    "source_gap_rows": 2,
+    "mapping_edges": 127,
+    "mapped_command_topics": 121,
+    "linked_context_topics": 95,
+    "manual_topics": 8,
+    "manifest_topics": 224,
+    "browser_verified_topics": 224,
+    "dimensions_per_row": 5,
+    "syntax_section_topics": 117,
+    "syntax_diagrams": 137,
+    "multiple_syntax_diagram_topics": 11,
+    "options_section_topics": 110,
+    "conditions_section_topics": 117,
+    "supplement_topics": 1,
+    "supplement_direct_topics": 2,
+    "supplement_context_topics": 0
+  },
+  "selector_profiles": [
+    {
+      "id": "mapped-syntax-diagrams",
+      "dimension": "syntax",
+      "source_set": "mapped-command-topics",
+      "section_selector": {
+        "tag": "h2",
+        "class_token": "sectiontitle",
+        "normalized_heading": "Syntax"
+      },
+      "fragment_selector": {
+        "root_tag": "div",
+        "class_token": "syntaxdiagram",
+        "nested_same_match": "exclude"
+      },
+      "cardinality": {
+        "default": 1,
+        "declared_absence": 0,
+        "overrides": [
+          {
+            "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_definecounter.html",
+            "count": 2
+          },
+          {
+            "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deletecounter.html",
+            "count": 2
+          },
+          {
+            "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractweb.html",
+            "count": 2
+          },
+          {
+            "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getcounter.html",
+            "count": 2
+          }
+        ]
+      },
+      "association": "mapping-topic-edge"
+    },
+    {
+      "id": "mapped-option-definitions",
+      "dimension": "options",
+      "source_set": "mapped-command-topics",
+      "section_selector": {
+        "tag": "h2",
+        "class_token": "sectiontitle",
+        "normalized_heading": "Options"
+      },
+      "fragment_selector": {
+        "container_tag": "dl",
+        "term_tag": "dt",
+        "definition_tag": "dd",
+        "pairing": "term-plus-consecutive-following-definitions",
+        "nested_terms": "include"
+      },
+      "cardinality": {
+        "section_default": 1,
+        "declared_absence": 0,
+        "term_minimum_when_present": 1
+      },
+      "association": "mapping-topic-edge"
+    },
+    {
+      "id": "mapped-option-operand-directions",
+      "dimension": "operand-directions",
+      "source_set": "mapped-option-definitions",
+      "section_selector": {
+        "derived_from": "mapped-option-definitions"
+      },
+      "fragment_selector": {
+        "operand_marker_sources": [
+          "direct-term-text",
+          "descendant-var-span"
+        ],
+        "direction_authority_selectors": [
+          "global-command-format",
+          "global-command-argument-values"
+        ],
+        "data_area_policy": "receiver-or-sender-receiver-requires-definition-evidence",
+        "bare_option_direction": "none",
+        "unrecognized_operand_marker": "unmatched",
+        "incompatible_direction_candidates": "conflicting"
+      },
+      "cardinality": {
+        "default": "one-per-option-term",
+        "declared_absence": 0
+      },
+      "association": "option-term-and-definition"
+    },
+    {
+      "id": "mapped-condition-definitions",
+      "dimension": "conditions",
+      "source_set": "mapped-command-topics",
+      "section_selector": {
+        "tag": "h2",
+        "class_token": "sectiontitle",
+        "normalized_heading": "Conditions"
+      },
+      "fragment_selector": {
+        "container_tag": "dl",
+        "term_tag": "dt",
+        "definition_tag": "dd",
+        "pairing": "term-plus-consecutive-following-definitions",
+        "nested_terms": "include-as-resp2-hierarchy"
+      },
+      "cardinality": {
+        "section_default": 1,
+        "declared_absence": 0,
+        "term_minimum_when_present": 1
+      },
+      "association": "mapping-topic-edge"
+    },
+    {
+      "id": "mapped-inline-execution-context",
+      "dimension": "execution-context",
+      "source_set": "mapped-command-topics",
+      "section_selector": {
+        "tag": "h2",
+        "class_token": "sectiontitle",
+        "normalized_heading": "Syntax"
+      },
+      "fragment_selector": {
+        "root_tag": "p",
+        "relationship": "direct-child-of-heading-section",
+        "exclude_descendant_of_class": "syntaxdiagram"
+      },
+      "cardinality": {
+        "default": "zero-or-more"
+      },
+      "association": "mapping-topic-edge"
+    },
+    {
+      "id": "mapped-one-hop-context",
+      "dimension": "execution-context",
+      "source_set": "mapped-command-topics",
+      "section_selector": {
+        "normalized_headings": [
+          "Syntax",
+          "Description",
+          "Rules",
+          "Options",
+          "Conditions"
+        ]
+      },
+      "fragment_selector": {
+        "source_tag": "a",
+        "target_set": "linked-context-topics",
+        "target_fragment": "exact-anchor-or-topic-root",
+        "topic_id_anchor": "unique-h1-prefix-to-topic-root",
+        "missing_target_anchor": "unmatched"
+      },
+      "cardinality": {
+        "default": "zero-or-more",
+        "max_link_depth": 1
+      },
+      "association": "mapping-edge-source-fragment-and-target-fragment"
+    }
+  ],
+  "section_exceptions": [],
+  "manual_context_selectors": [
+    {
+      "id": "global-command-format",
+      "source_role": "one-hop-context-candidate",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
+      "applies_to": {
+        "kind": "all-sources-c-rows"
+      },
+      "dimensions": [
+        "syntax",
+        "options",
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "dfhp4kt__title__2",
+          "cardinality": 1
+        },
+        {
+          "tag": "section",
+          "heading_id": "dfhp4kt__title__5",
+          "cardinality": 1
+        },
+        {
+          "tag": "section",
+          "heading_id": "dfhp4kt__dfhp4_cicscmdrestrictions__title__1",
+          "cardinality": 1
+        },
+        {
+          "tag": "section",
+          "heading_id": "dfhp4kt__syntax-notation__title__1",
+          "cardinality": 1
+        }
+      ],
+      "association": "global-context"
+    },
+    {
+      "id": "global-command-argument-values",
+      "source_role": "one-hop-context-candidate",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_argumentvalues.html",
+      "applies_to": {
+        "kind": "all-sources-c-rows"
+      },
+      "dimensions": [
+        "operand-directions"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "dfhp4kr__title__2",
+          "cardinality": 1
+        }
+      ],
+      "association": "argument-kind-and-option-definition"
+    },
+    {
+      "id": "dpl-server-restrictions",
+      "source_role": "execution-context-candidate",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00237.html",
+      "applies_to": {
+        "kind": "all-sources-c-rows"
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "dfhp3002-gen237__title__3",
+          "cardinality": 1
+        },
+        {
+          "tag": "table",
+          "id": "dfhp3002-gen237__dfhp3ci",
+          "cardinality": 1
+        }
+      ],
+      "association": "global-context"
+    },
+    {
+      "id": "threadsafe-command-list",
+      "source_role": "execution-context-candidate",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html",
+      "applies_to": {
+        "kind": "all-sources-c-rows"
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "dfhp4aw__title__2",
+          "cardinality": 1
+        },
+        {
+          "tag": "ul",
+          "within_heading_id": "dfhp4aw__title__2",
+          "relationship": "unique-descendant-list-of-section",
+          "cardinality": 1
+        }
+      ],
+      "association": "global-context"
+    },
+    {
+      "id": "global-response-codes",
+      "source_role": "condition-contract-candidate",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8me.html",
+      "applies_to": {
+        "kind": "all-sources-c-rows"
+      },
+      "dimensions": [
+        "conditions"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "table",
+          "id": "dfha8me__table_fq4_b1p_b1c",
+          "cardinality": 1
+        },
+        {
+          "tag": "table",
+          "id": "dfha8me__table_hcm_21p_b1c",
+          "cardinality": 1
+        }
+      ],
+      "association": "condition-name-to-response-code"
+    },
+    {
+      "id": "gap-exec-interface-classification",
+      "source_role": "gap-classification-candidate",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+      "applies_to": {
+        "kind": "specific-rows",
+        "official_rows": [
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0220"
+        ]
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "section",
+          "heading_id": "dfhs34k__title__7",
+          "cardinality": 1
+        },
+        {
+          "tag": "table",
+          "id": "dfhs34k__dfhs3af",
+          "cardinality": 1
+        }
+      ],
+      "association": "official-row-to-command-table-row-and-notes"
+    },
+    {
+      "id": "gap-eibfn-identity",
+      "source_role": "gap-identity-candidate",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+      "applies_to": {
+        "kind": "specific-rows",
+        "official_rows": [
+          "ibm-cics-ts-6x-2026-08-31:api-commands:0220"
+        ]
+      },
+      "dimensions": [
+        "execution-context"
+      ],
+      "fragment_selectors": [
+        {
+          "tag": "table",
+          "id": "dfha8mf__eibfn_table_cmds_api",
+          "cardinality": 1
+        }
+      ],
+      "association": "official-row-to-api-table-row-by-label-and-eibfn"
+    }
+  ],
+  "conflict_expectations": [],
+  "source_resolutions": [
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0193",
+      "label": "SET ASSOCIATION USERCORRDATA",
+      "eibfn": "C404",
+      "resolution": "target-product-projection",
+      "target_context_topics": [
+        "SSJL4D_6.x/reference-system-programming/commands-spi/set-association-usercorrdata.html"
+      ],
+      "supplement_topics": [],
+      "context_fragments": [],
+      "direct_supplement_topic": "SSJL4D_6.x/reference-system-programming/commands-spi/set-association-usercorrdata.html",
+      "authority_bounded_dimensions": [
+        "syntax",
+        "options",
+        "operand-directions",
+        "conditions"
+      ],
+      "no_one_hop": true
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0220",
+      "label": "TRACE",
+      "eibfn": "1A02",
+      "resolution": "authority-bounded-projection",
+      "target_context_topics": [
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+      ],
+      "supplement_topics": [
+        "SSNAQ8_11.1.0/reference-api/r_set_trace.html"
+      ],
+      "context_fragments": [],
+      "direct_supplement_topic": "SSNAQ8_11.1.0/reference-api/r_set_trace.html",
+      "authority_bounded_dimensions": [
+        "syntax",
+        "options",
+        "operand-directions",
+        "conditions"
+      ],
+      "ambiguity_issue_dimension": "syntax",
+      "forbidden_alias_tokens": [
+        "TRACENUM"
+      ],
+      "no_one_hop": true
+    }
+  ],
+  "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
+  "extraction_sha256": "sha256:c2e69bffcef9ac5b5bff93812c63cf8418906fab0273fdd4ccdb99cbbb47f766"
+}

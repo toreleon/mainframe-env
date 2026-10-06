@@ -4,7 +4,7 @@
 *.profraw
 *.profdata
 
-# Local distribution output; reviewed release/ records remain versioned.
+# Local build and source distribution output.
 /dist/
 
 # Python bytecode, environments, and analysis caches.
@@ -72,7 +72,11 @@ __pycache__/
 
 # Local-only examples and proprietary/raw oracle captures.
 /crates/apps/mainframe-env-server/examples/carddemo_signon.rs
-/conformance/0.1/evidence/raw/
+/conformance/subsystems/platform/evidence/raw/
 
-# Cargo.lock, fuzz/Cargo.lock, fuzz/corpus/, conformance/, and release/ are source/evidence.
+# Cargo.lock, fuzz/Cargo.lock, fuzz/corpus/, and conformance/ inputs are source.
 # Do not add blanket *.lock, *.log, *.db, or archive exclusions.
+
+# Execution receipts are local artifacts; keep subsystem inputs and tests tracked.
+/conformance/**/evidence/
+/release/

@@ -1,0 +1,45 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "ims.programming",
+  "baseline_id": "ibm-ims-15.6-mixed-ssa-supplement-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 mixed SSA archive supplement for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_multiqualificationstmts.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 4,
+  "total_bytes": 25320,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "b47a9522b8447bc969730baafc18aa973041112667a710b1bfe337112112bf72",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_multiqualificationstmts.htm",
+      "sha256": "29e43be1e8fe4ad761cd68de1fcd498d54c59517faa17040b2b9302b8bfdcf21",
+      "bytes": 8962,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_examplmultiqualificationstmts.htm",
+      "sha256": "d8cb14d5d26e439c2bd6dcb4e80ed80323e0404d679a3bb10ae4f3ebc6eebaaa",
+      "bytes": 3397,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_multqualificationstmtshdam_phdam_dedb.htm",
+      "sha256": "81612af040f57982980bff1cbf230d19193af0ad7b2a07dc4be5ba4403ebae93",
+      "bytes": 4859,
+      "last_modified": "2026-03-24"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_multqualificationstatementssecondaryindex.htm",
+      "sha256": "9b966ac7bcbad17af038b4da29be83590b3e5184c146bec4d731b9b9ae787492",
+      "bytes": 8102,
+      "last_modified": "2026-03-24"
+    }
+  ]
+}

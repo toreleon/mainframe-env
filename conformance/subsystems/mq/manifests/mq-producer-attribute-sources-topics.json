@@ -1,0 +1,75 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "mq.programming",
+  "baseline_id": "ibm-mq-9.4-producer-attribute-sources-2026-09-12",
+  "subsystem": "mq",
+  "product": "SSFKSJ_9.4.0",
+  "book_label": "IBM MQ 9.4 producer queue-manager and queue attributes and application-type declaration source-review scope",
+  "book_href": "SSFKSJ_9.4.0/refdev/q090310_.html",
+  "snapshot_date": "2026-09-12",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 9,
+  "total_bytes": 36295,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "bc78af054eb037a938d7224d8e7caa6ea37d834ccb043f30157079087d703f81",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q090310_.html",
+      "sha256": "99c5eb46d8046b6ab2ce7aad0c8284e79bb4f0ae24c0d1942664bec451fa3c2d",
+      "bytes": 12159,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q102230_.html",
+      "sha256": "3a983b400b7497dde61623f58c5656d6d5da7920147b638ea25dc8ee3bae6291",
+      "bytes": 1650,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q102510_.html",
+      "sha256": "c55745f2e5ab347547fb95b1deeff9e9ce980435643fc300dc831c2202a76baa",
+      "bytes": 1617,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q102520_.html",
+      "sha256": "4a4821f9faac0b5605ef05c260fcb9f5858f3770014b2157ae7653514cfae57a",
+      "bytes": 668,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103140_.html",
+      "sha256": "b62d0e01bb209571b35c9cff1bd0292cac6e5a6b517a4e90123a855c785e71a0",
+      "bytes": 2165,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103180_.html",
+      "sha256": "20aa3eba7a13ebcc714d405228fb192cb86411429bb8729142943782138074a0",
+      "bytes": 3963,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103190_.html",
+      "sha256": "523f962203da33fdce4cf7fa638b1c5ee03bfeab664f491d5ae714510f031bc1",
+      "bytes": 4278,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103280_.html",
+      "sha256": "3749a7eea034280f0762a2d80ff564cacbdc67dc4fbd7efe24231845afef289b",
+      "bytes": 3682,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103300_.html",
+      "sha256": "0df88519d9ea7e46448590980fe1619e494048676ac095a66097a5c9ec7762b7",
+      "bytes": 6113,
+      "last_modified": "2026-05-18"
+    }
+  ]
+}

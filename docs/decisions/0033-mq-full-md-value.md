@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **MQ host contract maintainers**
 Scope: **complete descriptor/message values and codecs, not executable message policy**
-Applies from: **mainframe-env 0.15.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 
@@ -216,7 +216,7 @@ initialize a native MQMD, resolve HardenGetBackout crash accuracy, authorize a
 final task end, or implement recovery. Negative surrounding test observations
 prove field preservation only, not native MQMD or licensed execution legality.
 Selected full GET/BACK composition and final-task-end recovery remain required;
-the primitive alone grants no executable call or full-v0.15 acceptance credit.
+the primitive alone grants no executable call or full-mq.programming acceptance credit.
 
 ## Qualified full GET resolved-name observation
 

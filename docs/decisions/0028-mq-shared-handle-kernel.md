@@ -2,8 +2,8 @@
 
 Status: **Proposed**
 Owner: **MQ contract and provider maintainers**
-Scope: **private v0.15 MQ kernel composition, not public route acceptance**
-Applies from: **mainframe-env 0.15.0**
+Scope: **private mq.programming MQ kernel composition, not public route acceptance**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

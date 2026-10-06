@@ -11,15 +11,16 @@ use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-const FIXTURE_BYTES: &[u8] =
-    include_bytes!("../../../../conformance/0.4/cobol/register-runtime-fixtures.json");
+const FIXTURE_BYTES: &[u8] = include_bytes!(
+    "../../../../conformance/subsystems/cobol/execution/cobol/register-runtime-fixtures.json"
+);
 const FIXTURE_PREFIX: &str = "cobol.register-runtime.";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureCatalog {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     fixtures: Vec<RegisterFixture>,
 }
 
@@ -52,7 +53,7 @@ static EXECUTED_OBSERVATION: ExecutedObservation = ExecutedObservation;
 pub fn verify_cobol_register_runtime_fixtures() -> Result<(), String> {
     let catalog = fixture_catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-register-runtime-fixtures@1"
-        || catalog.target_version != "0.4.0"
+        || catalog.target_subsystem != "cobol.execution"
         || catalog.fixtures.len() != 28
     {
         return Err("COBOL register runtime fixture identity or denominator drifted".into());

@@ -1,9 +1,10 @@
 use super::*;
 
-const GENERATED_CATALOG: &str = "conformance/0.7/generated/jcl-catalog.json";
-const SEEDS_PATH: &str = "conformance/0.7/fixtures/jcl-fixture-seeds.json";
-const FIXTURES_PATH: &str = "conformance/0.7/fixtures/jcl-conformance-fixtures.json";
-const FIXTURE_SCHEMA: &str = "conformance/0.7/schemas/jcl-conformance-fixtures.schema.json";
+const GENERATED_CATALOG: &str = "conformance/subsystems/jcl/generated/jcl-catalog.json";
+const SEEDS_PATH: &str = "conformance/subsystems/jcl/fixtures/jcl-fixture-seeds.json";
+const FIXTURES_PATH: &str = "conformance/subsystems/jcl/fixtures/jcl-conformance-fixtures.json";
+const FIXTURE_SCHEMA: &str =
+    "conformance/subsystems/jcl/schemas/jcl-conformance-fixtures.schema.json";
 const SPEC_PATH: &str = "conformance/spec/v1/spec.json";
 const JCL_BASELINE: &str = "ibm-zos-3.2-jcl-jes2-2026-06";
 
@@ -42,7 +43,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
     let seeds = json(&seeds_path)?;
     require(
         seeds["schema_version"] == Value::String("mainframe-env.jcl-fixture-seeds@1".into())
-            && seeds["target_version"] == Value::String("0.7.0".into()),
+            && seeds["target_subsystem"] == Value::String("jcl.planning".into()),
         "JCL fixture seed identity is invalid",
     )?;
     let families = array(&catalog, "families", &catalog_path)?;
@@ -119,7 +120,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
     )?;
     let fixture_value = json!({
         "schema_version": "mainframe-env.jcl-conformance-fixtures@1",
-        "target_version": "0.7.0",
+        "target_subsystem": "jcl.planning",
         "source_catalog_sha256": catalog["source_catalog_sha256"],
         "fixtures": fixtures,
     });
@@ -143,7 +144,7 @@ fn render_spec(
 ) -> TaskResult<Value> {
     let spec_path = root.join(SPEC_PATH);
     let mut spec = json(&spec_path)?;
-    let official = json(&root.join("conformance/0.2/catalogs/jcl-jes2.json"))?;
+    let official = json(&root.join("conformance/subsystems/coverage/catalogs/jcl-jes2.json"))?;
     let mut rows = spec["rows"].as_array().cloned().unwrap_or_default();
     rows.retain(|row| {
         !row["row_id"]
@@ -179,7 +180,7 @@ fn render_spec(
     for unit in array(
         &official,
         "units",
-        &root.join("conformance/0.2/catalogs/jcl-jes2.json"),
+        &root.join("conformance/subsystems/coverage/catalogs/jcl-jes2.json"),
     )? {
         let family = text(unit, "id", &spec_path)?;
         for (index, official_row) in array(unit, "rows", &spec_path)?.iter().enumerate() {
@@ -617,11 +618,11 @@ fn fixture_id(family: &str, ordinal: u64, disposition: &str) -> String {
 }
 
 fn official_catalog_digest(root: &Path) -> TaskResult<Value> {
-    let index = json(&root.join("conformance/0.2/catalogs/index.json"))?;
+    let index = json(&root.join("conformance/subsystems/coverage/catalogs/index.json"))?;
     array(
         &index,
         "baselines",
-        &root.join("conformance/0.2/catalogs/index.json"),
+        &root.join("conformance/subsystems/coverage/catalogs/index.json"),
     )?
     .iter()
     .find(|baseline| baseline["id"] == Value::String(JCL_BASELINE.into()))

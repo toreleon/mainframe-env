@@ -1,11 +1,11 @@
 # Application package generation contract
 
-Status: **Frozen for mainframe-env 0.2.0**
+Status: **Frozen for mainframe-env coverage.foundation**
 Owner: **application-package maintainers**
 Scope: **application package generation and installation contract**
-Applies from: **mainframe-env 0.2.0**
+Applies from: **mainframe-env current subsystem contracts**
 
-Version 2 of the application-package envelope is additive to the accepted 0.1.1
+Version 2 of the application-package envelope is additive to the accepted profile.carddemo
 reader. It binds the version 1 content-addressed manifest, a positive monotonic
 generation, the typed subsystem section contract, and a signature verified by
 an injected trust authority. Signature bytes and key IDs are carried by the

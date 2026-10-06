@@ -2,8 +2,8 @@
 
 Status: Accepted bounded internal extraction; controller activation pending.
 Owner: **Interpreter and execution-coordinator maintainers**
-Scope: **MQ-1503.coordinator-original-dispatch-extraction, target 0.15.0**
-Applies from: **mainframe-env 0.15.0 development**
+Scope: **MQ-1503.coordinator-original-dispatch-extraction, target mq.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 
@@ -42,5 +42,5 @@ mint the missing journal ownership. No Program-context receiver is activated.
 
 Focused real ReferenceMachine and existing owning regressions verify the
 extraction's boundary; fixture host ports are not installed/native/JES, SAF,
-participant, official full26 or licensed acceptance. Parent v0.15 remains active
+participant, official full26 or licensed acceptance. Parent mq.programming remains active
 and its nonlicensed obligations remain required.

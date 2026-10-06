@@ -1,9 +1,9 @@
 # Canonical host effect representation, version 1
 
-- Status: **Frozen contract; implementation deviations tracked before 0.9.0**
+- Status: **Frozen contract; implementation deviations tracked before cics.application-api**
 - Owner: execution and host-contract maintainers
 - Scope: canonical persisted host request/result digest representation
-- Applies from: mainframe-env 0.8.2 hardening
+- Applies from: mainframe-env current subsystem contracts
 
 `mainframe-env.effect-canonical@1` is a frozen binary representation of the typed
 `HostRequest` and `Result<HostResult, HostProblem>` values. It is not Rust Debug,

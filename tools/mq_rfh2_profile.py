@@ -9,7 +9,7 @@ import mq_raw_layout as raw
 import mq_wire_options as wire
 
 OUTPUT = Path('crates/contracts/mainframe-env-host-api/src/mq_mqi/rfh2/generated.rs')
-PROJECTION_SHA = 'd975dd8353d7c3eb5e36be6d045518cf9174bb40447416184261f1e8e564c95b'
+PROJECTION_SHA = '93269ee1143b5322d1fd611386608f84a4ff198ae2abdf0cb429b8b087baa378'
 SCOPES = ('mq-rfh2-sources', 'mq-programming-supplements', 'mq-property-sources',
           'ibm-mq-9.4-mqi-2026-08-31')
 

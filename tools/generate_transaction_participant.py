@@ -10,9 +10,9 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACT_PATH = Path("conformance/0.16/contracts/transaction-participant.json")
+CONTRACT_PATH = Path("conformance/subsystems/integration/contracts/transaction-participant.json")
 FIXTURE_PATH = Path(
-    "conformance/0.16/fixtures/transaction-participant-compatibility.json"
+    "conformance/subsystems/integration/fixtures/transaction-participant-compatibility.json"
 )
 OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-execution-api/src/generated/"

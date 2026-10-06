@@ -1,0 +1,24 @@
+{
+  "schema_version": "mainframe-env.cics-licensed-family@1",
+  "family_id": "bif-builtins-v1",
+  "capture_contract": "mainframe-env.cics-oracle-capture@2",
+  "command_rows": ["ibm-cics-ts-6x-2026-08-31:api-commands:0013", "ibm-cics-ts-6x-2026-08-31:api-commands:0014"],
+  "observations": [
+    {"scenario_id": "deedit-example", "command_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0013"},
+    {"scenario_id": "deedit-lengerr", "command_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0013"},
+    {"scenario_id": "digest-hex", "command_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014"},
+    {"scenario_id": "digest-binary", "command_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014"},
+    {"scenario_id": "digest-base64", "command_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014"},
+    {"scenario_id": "digest-lengerr", "command_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014"}
+  ],
+  "fixture_path": "conformance/subsystems/cics/application/oracles/cics-bif-builtins-fixtures.json",
+  "source_review_path": "conformance/subsystems/cics/application/oracles/cics-bif-builtins-source-review.json",
+  "environment_manifest_fields": ["cics_version_and_maintenance", "enterprise_cobol_version_and_maintenance", "compiler_options", "encoding", "cpacf_msa_availability", "program_and_transaction_definition", "principal_and_saf_configuration", "capture_serialization_version"],
+  "trusted_authority_id": "ibm-cics-protected-runner",
+  "signature_algorithm": "ed25519",
+  "public_key_source": "--public-key",
+  "local_model_and_synthetic_credit": 0,
+  "licensed_campaign_status": "not-run",
+  "differential_gate": "pending",
+  "handoff": "docs/runbooks/cics-licensed-pilot.md"
+}

@@ -646,7 +646,7 @@ def check_roadmap_normalization(row: dict[str, Any]) -> dict[str, Any]:
         "reason": "documented-roadmap-normalization",
         "locator": row["source_locator"],
         "disposition": "deliberate",
-        "documentation": "conformance/0.2/catalogs/README.md",
+        "documentation": "conformance/subsystems/coverage/catalogs/README.md",
         "detail": ROADMAP_NORMALIZATION_REASON,
     }
 
@@ -761,7 +761,7 @@ def audit_row(
 def outside_repository(path: Path) -> Path:
     """Refuse to write a report into the tree.
 
-    Unbound JSON under `conformance/0.2` is what broke this branch once already:
+    Unbound JSON under `conformance/subsystems/coverage` is what broke this branch once already:
     the 0.2 gate validates every artifact it finds against a declared schema, so
     an audit report dropped there fails the build. Reports are review inputs and
     belong outside the repository entirely.
@@ -776,7 +776,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--catalog", type=Path, required=True)
     parser.add_argument(
-        "--index", type=Path, default=Path("conformance/0.2/catalogs/index.json")
+        "--index", type=Path, default=Path("conformance/subsystems/coverage/catalogs/index.json")
     )
     parser.add_argument("--report", type=Path)
     parser.add_argument(

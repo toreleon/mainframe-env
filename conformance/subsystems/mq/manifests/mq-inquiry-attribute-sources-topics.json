@@ -1,0 +1,45 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "mq.programming",
+  "baseline_id": "ibm-mq-9.4-inquiry-attribute-sources-2026-09-12",
+  "subsystem": "mq",
+  "product": "SSFKSJ_9.4.0",
+  "book_label": "IBM MQ 9.4 inquiry attribute and queue-type source-review scope",
+  "book_href": "SSFKSJ_9.4.0/refdev/q103490_.html",
+  "snapshot_date": "2026-09-12",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 4,
+  "total_bytes": 10280,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q092480_.html",
+      "sha256": "ac5de9d74f62635456e566bfcbba7706699686cef14580ab30aa22166b2fb1ba",
+      "bytes": 4661,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q102690_.html",
+      "sha256": "d488b1433fe1fe6b5051459af841e02801df4d62d43bbfc3f9f0954575b411b4",
+      "bytes": 1247,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103420_.html",
+      "sha256": "27228d1ae3bf316c77949becc2ed9b26fe9bb4aad97f974a4d31b95caccc3861",
+      "bytes": 2105,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103490_.html",
+      "sha256": "93bd55632f95b85f9790e3cba75c623bff93c1a679983115546edf32ce527639",
+      "bytes": 2267,
+      "last_modified": "2026-05-18"
+    }
+  ]
+}

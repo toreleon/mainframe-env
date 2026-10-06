@@ -24113,7 +24113,7 @@ mod tests {
         let mut issuer = owner.clone();
         issuer.common_name = b"ISSUER-EXAMPLE".to_vec();
         let der =
-            include_bytes!("../../../../conformance/0.9/cics/fixtures/cics-client-certificate.der")
+            include_bytes!("../../../../conformance/subsystems/cics/application/cics/fixtures/cics-client-certificate.der")
                 .to_vec();
         let context = CicsTcpipContext {
             client_address: Some("192.0.2.10".parse().unwrap()),

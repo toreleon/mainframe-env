@@ -1,0 +1,96 @@
+{
+  "schema_version": "mainframe-env.topic-manifest-registry@1",
+  "target_subsystem": "mq.programming",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "manifests": [
+    {
+      "scope_id": "mq-programming-supplements",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-programming-supplements-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-programming-supplements-topics.json",
+      "manifest_sha256": "sha256:d6b4ec6f15426df98f529c144fb5d5320be0e74a2a82598d54a95712c2b9866a",
+      "topic_count": 80,
+      "topic_manifest_sha256": "sha256:d069fab04063e46679f542bc9b14f93f039ab4d623f18f3cba9447d524928f0b",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-point-layout-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-point-layout-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-point-layout-sources-topics.json",
+      "manifest_sha256": "sha256:40142139c033bea0426d1c489469c1239c8897554c6e0a013a64cff1bdfc1e46",
+      "topic_count": 12,
+      "topic_manifest_sha256": "sha256:5f29e97b1930418d018bbdd7834c6cb164ee567dab1a447c4116bff6a993673e",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-property-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-property-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-property-sources-topics.json",
+      "manifest_sha256": "sha256:5b452011d141285b7ad8d7f064ef87d74d73e9dd19e5368da2ed23bd951a6509",
+      "topic_count": 12,
+      "topic_manifest_sha256": "sha256:cbef5b608afc3f12945f69656c666cae80b19049bcf78b67ff598f855038369e",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-recovery-policy-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-recovery-policy-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-recovery-policy-sources-topics.json",
+      "manifest_sha256": "sha256:4c22648e9ad90c7e60832f6f37488f0c5f7f87401d00707dd4a6c154e2c47742",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:414608491fdbefa8ec0b8b2b1adf8742a4dbc5553cd488344db649ef945bba11",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-producer-attribute-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-producer-attribute-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-producer-attribute-sources-topics.json",
+      "manifest_sha256": "sha256:c596e95c3b295cf99be7cf0def764fc6a685c52a1799a7f99b53f6fc5fee6333",
+      "topic_count": 9,
+      "topic_manifest_sha256": "sha256:bc78af054eb037a938d7224d8e7caa6ea37d834ccb043f30157079087d703f81",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-rfh2-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-rfh2-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-rfh2-sources-topics.json",
+      "manifest_sha256": "sha256:48b8c66fe4da276608bd2bff0cca073f770e1841ea326fdf8b85e75d8da169ee",
+      "topic_count": 15,
+      "topic_manifest_sha256": "sha256:b0a9b4656c10ea8ec8a23999935d47cf559f5164a707a0aa3e078d3d2266afdc",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-message-handle-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-message-handle-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-message-handle-sources-topics.json",
+      "manifest_sha256": "sha256:5f35e67eb0366dbf87f90b45fe06b8bfaa58b3fb020ba0c2c0bbdb88e97fabe7",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:22bf0aaec21fc919bd5e53713d3cbeffc3e3c4673bad42b444e9d22f27e6091b",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "mq-inquiry-attribute-sources",
+      "subsystem": "mq",
+      "baseline_id": "ibm-mq-9.4-inquiry-attribute-sources-2026-09-12",
+      "manifest": "conformance/subsystems/mq/manifests/mq-inquiry-attribute-sources-topics.json",
+      "manifest_sha256": "sha256:2a015ae7e74819b603d2b07a0d7af5eef172623550be86f7fc8e74189b3eb294",
+      "topic_count": 4,
+      "topic_manifest_sha256": "sha256:463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    }
+  ]
+}

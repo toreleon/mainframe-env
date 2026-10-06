@@ -3,7 +3,6 @@
 Subsystem: **jes**
 Phase: **execution**
 
-Target version: **0.8.0**
 Completion dependencies: racf.security, dataset.data, jcl.planning
 
 Use this prompt from the repository root. The
@@ -11,14 +10,14 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.8.0: complete JES2 execution and real
+You are implementing **mainframe-env jes.execution: complete JES2 execution and real
 utility semantics** over accepted JCL plans, dataset authorities, and SAF.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/jes/execution-plan.md`, and accepted evidence/contracts from
-0.5.0, 0.6.0, and 0.7.0. Verify their exact versions for principals/SAF,
+racf.security, dataset.data, and jcl.planning. Verify their exact versions for principals/SAF,
 allocation/locking, typed plans, conditions, durable state, and migrations.
 
 If any dependency is incomplete, only isolated scheduler/utility fixtures and
@@ -41,7 +40,7 @@ private adapters may proceed. Do not merge a public JES execution route.
 ## Approved 2026-09-04 completion policy
 
 For this development cycle, a licensed z/OS 3.2/JES2 receipt is unavailable.
-The user-approved 0.8 disposition is
+The user-approved jes.execution disposition is
 `pass-with-licensed-differential-pending`:
 
 - preserve the licensed differential numerator at exactly 0/16 and keep
@@ -52,7 +51,7 @@ The user-approved 0.8 disposition is
 - complete JES-806 from the bounded local restart, cancellation, overload,
   crash-point, backup/restore, migration, CardDemo, and unchanged-candidate
   gates while reporting the licensed row explicitly pending; and
-- defer the real licensed 16-scenario campaign to the 0.17 CER-1702
+- defer the real licensed 16-scenario campaign to the certification.licensed CER-1702
   release-certification hard gate, where it remains mandatory before 1.0.
 
 ## Reuse and architecture guardrails
@@ -77,10 +76,10 @@ The user-approved 0.8 disposition is
 - Every executable plan node routes to a typed handler with real effects and
   exact return-code/abend propagation; missing handlers fail explicitly.
 - Submission, selection, execution, output access, and control operations apply
-  SAF; dataset allocation and locks use 0.6 authorities.
+  SAF; dataset allocation and locks use dataset.data authorities.
 - Job, step, spool, checkpoint and output state have bounded retention and one
   durable authority. Restart cannot duplicate committed effects silently.
-- Cross-resource outcomes follow the common UOW contract; 0.16 may complete the
+- Cross-resource outcomes follow the common UOW contract; integration.transactions may complete the
   matrix but this version cannot hide heuristic or unknown outcomes.
 
 ## Completion gate
@@ -90,7 +89,7 @@ success; scheduling, spool, output, real utilities, SAF, DISP, return-code/abend
 restart, cancellation, overload and unknown-outcome matrices pass; durable job/
 output state passes migration and backup/restore; and CardDemo batch journeys
 remain exact. Under the approved policy, the licensed z/OS 3.2/JES2
-differential remains explicitly pending at 0/16 and is a hard 0.17
+differential remains explicitly pending at 0/16 and is a hard certification.licensed
 release-certification dependency.
 
 At handoff, include route/utility inventories, lifecycle and failure matrices,

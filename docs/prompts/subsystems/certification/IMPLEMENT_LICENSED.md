@@ -3,7 +3,6 @@
 Subsystem: **certification**
 Phase: **licensed**
 
-Target version: **0.17.0**
 Completion dependencies: zosmf.rest, integration.transactions
 
 Use this prompt from the repository root. The
@@ -15,7 +14,7 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.17.0: licensed IBM differential
+You are implementing **mainframe-env certification.licensed: licensed IBM differential
 certification and 1.0 rehearsal**. This minor closes evidence and defects on one
 unchanged candidate; it does not publish 1.0.
 
@@ -24,7 +23,7 @@ unchanged candidate; it does not publish 1.0.
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/certification/licensed-plan.md`, every pinned official baseline and
 coverage ledger, release/security/durability/provenance contracts, and accepted
-0.11.0 plus 0.16.0 evidence. Verify the full route/profile/provider closure and
+zosmf.rest plus integration.transactions evidence. Verify the full route/profile/provider closure and
 all migration heads before creating the certification candidate.
 
 Licensed IBM systems, credentials, product media and raw oracle data stay
@@ -32,20 +31,20 @@ outside production/release closure. If the required environment is unavailable,
 prepare reproducible harnesses and mark the final differential gate blocked; do
 not fabricate a pass.
 
-The accepted 0.6 implementation enters this gate with its dataset/VSAM/AMS
+The accepted dataset.data implementation enters this gate with its dataset/VSAM/AMS
 licensed differential explicitly pending at 0/36. Its independent reference
 simulation is development assurance only and grants no CER-1702 or differential
 credit. CER-1702 must run the real pinned 36-row dataset campaign and produce a
 reviewed candidate-bound licensed receipt before release certification can pass.
 
-The accepted 0.4 implementation enters this gate with its Enterprise COBOL 6.5
+The accepted cobol.execution implementation enters this gate with its Enterprise COBOL 6.5
 licensed differential explicitly pending at 0/153. Its approved 16-case
 GnuCOBOL reference campaign is local development assurance only and grants no
 CER-1702 or IBM differential credit. CER-1702 must run the real pinned 153-row
 COBOL campaign and produce a reviewed candidate-bound licensed receipt before
 release certification can pass.
 
-The accepted 0.8 implementation enters this gate with its z/OS 3.2/JES2
+The accepted jes.execution implementation enters this gate with its z/OS 3.2/JES2
 licensed differential explicitly pending at 0/16. Hercules, MVS 3.8J, local
 models, CardDemo, and current-product observations are development assurance
 only and grant no CER-1702 or differential credit. CER-1702 must run the real
@@ -60,10 +59,10 @@ licensed receipt before release certification can pass.
 2. Run **CER-1702** independent per-subsystem differential campaigns against the
    same source identity. Normalize only documented nondeterministic fields. The
    campaign must include the 34 RACF command-family and 14 RACROUTE rows deferred
-   from 0.5 with their licensed numerator still starting at 0/48, plus the
-   deferred 0.6 dataset/VSAM/AMS 36-row campaign starting at 0/36 and the
-   deferred 0.4 Enterprise COBOL 6.5 153-row campaign starting at 0/153, plus
-   the deferred 0.8 z/OS 3.2/JES2 16-scenario campaign starting at 0/16.
+   from racf.security with their licensed numerator still starting at 0/48, plus the
+   deferred dataset.data dataset/VSAM/AMS 36-row campaign starting at 0/36 and the
+   deferred cobol.execution Enterprise COBOL 6.5 153-row campaign starting at 0/153, plus
+   the deferred jes.execution z/OS 3.2/JES2 16-scenario campaign starting at 0/16.
 3. Triage each mismatch to an implementation defect, baseline correction or
    explicit out-of-scope row. Add a focused regression before every code fix and
    invalidate/rerun all affected receipts after a merge.

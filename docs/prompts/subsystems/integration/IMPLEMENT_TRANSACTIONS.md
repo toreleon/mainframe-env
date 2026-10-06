@@ -3,7 +3,6 @@
 Subsystem: **integration**
 Phase: **transactions**
 
-Target version: **0.16.0**
 Completion dependencies: jes.execution, cics.system-api, db2.programming, ims.programming, mq.programming
 
 Use this prompt from the repository root. The
@@ -15,15 +14,15 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.16.0: complete cross-resource transaction,
+You are implementing **mainframe-env integration.transactions: complete cross-resource transaction,
 security, and failure semantics** across JES, CICS, datasets, Db2, IMS, and MQ.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/integration/transactions-plan.md`, all UOW/effect/principal/recovery/
-store contracts, and accepted evidence for 0.8.0, 0.10.0, 0.13.0, 0.14.0 and
-0.15.0. Verify exact provider state, transaction, migration, failure and
+store contracts, and accepted evidence for jes.execution, cics.system-api, db2.programming, ims.programming and
+mq.programming. Verify exact provider state, transaction, migration, failure and
 capability versions before integrating adapters.
 
 Provider-specific adapter tests may be prepared as dependencies freeze, but the
@@ -48,11 +47,11 @@ public mixed-state model cannot complete on partial or substituted providers.
 ## Early participant handoff and coherent restore
 
 The common early participant-contract rule applies before dependent provider
-adapters integrate. INT-1601 reviews and completes that accepted boundary; 0.16
+adapters integrate. INT-1601 reviews and completes that accepted boundary; integration.transactions
 is not the first time CICS, Db2, IMS and MQ agree on transaction ownership,
 capabilities, prepare applicability, compensation limits, fencing, idempotency,
 lock order or recovery ownership. Record early slices under the existing parent;
-they neither complete 0.16 nor expose unfinished mixed-resource behavior.
+they neither complete integration.transactions nor expose unfinished mixed-resource behavior.
 
 INT-1605 must restore a coherent mixed-resource recovery boundary, with compatible
 provider/schema generations and valid journal, checkpoint, artifact, replay and

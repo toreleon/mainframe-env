@@ -472,7 +472,10 @@ fn normative_metadata(path: &str, text: &str) -> Result<Metadata> {
         .remove("Applies from")
         .ok_or_else(|| format!("{path} omits Applies from metadata"))?;
     if !applies_from.starts_with("mainframe-env ")
-        || !applies_from.bytes().any(|byte| byte.is_ascii_digit())
+        || applies_from
+            .trim_start_matches("mainframe-env ")
+            .trim()
+            .is_empty()
     {
         return Err(format!("{path} has invalid Applies from metadata"));
     }
@@ -838,24 +841,6 @@ fn manifest(
     documents: &BTreeMap<String, String>,
     command_count: usize,
 ) -> Result<Vec<u8>> {
-    let release_source = fs::read_to_string(root.join("release.toml"))
-        .map_err(|error| format!("release.toml: {error}"))?;
-    let release: toml::Value = release_source
-        .parse()
-        .map_err(|error| format!("release.toml: {error}"))?;
-    let current = release["product"]["version"]
-        .as_str()
-        .ok_or("release.toml product.version is missing")?;
-    let released = release["product"]["released_version"]
-        .as_str()
-        .ok_or("release.toml product.released_version is missing")?;
-    let channel = release["product"]["channel"]
-        .as_str()
-        .ok_or("release.toml product.channel is missing")?;
-    let state = release["product"]["state"]
-        .as_str()
-        .ok_or("release.toml product.state is missing")?;
-
     let metadata = registry
         .normative
         .iter()
@@ -898,21 +883,11 @@ fn manifest(
         "registry":REGISTRY_PATH,
         "registry_sha256":format!("sha256:{:x}", Sha256::digest(registry_bytes)),
         "portal":PORTAL_PATH,
-        "public_version_truth":{
-            "current":current,
-            "released":released,
-            "channel":channel,
-            "state":state,
-            "authorities":[
-                "VERSION",
-                "Cargo.toml",
-                "release.toml",
-                "README.md",
-                "CHANGELOG.md",
-                "conformance/0.2/inventory/versions.json",
-                "docs/delivery/subsystems/README.md",
-                "docs/delivery/subsystems/GITHUB-PROJECT.md"
-            ]
+        "management":{
+            "model":"subsystem",
+            "authority":REGISTRY_PATH,
+            "tracking":"docs/delivery/IMPLEMENTATION-STATUS.md",
+            "committed_execution_receipts":false
         },
         "package_topology":{
             "authority":registry.topology.authority,
@@ -927,7 +902,7 @@ fn manifest(
             "generated_navigation":true,
             "subsystem_ownership_and_dependencies":true,
             "generated_subsystem_indexes":true,
-            "public_version_truth":true
+            "subsystem_management":true
         },
         "counts":{
             "markdown_documents":documents.len(),

@@ -11,7 +11,7 @@ import sys
 import mq_wire_options as wire
 
 OUTPUT = Path('crates/contracts/mainframe-env-host-api/src/mq_mqi/inquiry/generated.rs')
-PROJECTION_SHA = '8ba5dd73b8cc3870dad202885073b821c9525c993e3477f46ddb9c304a825792'
+PROJECTION_SHA = '0788fb791ee6a781efec7cb24a36362ab0aa86a65305c676d1c48ecaebe6311e'
 SCOPES = ('ibm-mq-9.4-mqi-2026-08-31', 'mq-programming-supplements',
           'mq-inquiry-attribute-sources')
 

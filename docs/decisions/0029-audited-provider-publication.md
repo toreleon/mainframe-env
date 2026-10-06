@@ -2,8 +2,8 @@
 
 Status: **Proposed**
 Owner: **store-contract and adapter maintainers**
-Scope: **additive Memory/SQLite publication primitive for v0.15 integration**
-Applies from: **mainframe-env 0.15.0**
+Scope: **additive Memory/SQLite publication primitive for mq.programming integration**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

@@ -1,6 +1,6 @@
 # CI supply-chain inputs
 
-`Jenkinsfile` is the full assurance and release CI workflow. Its executable
+`Jenkinsfile` is the full assurance CI workflow. Its executable
 inputs are governed by two reviewed locks:
 
 - `tools/ci-inputs.lock.json` fixes the workspace and MSRV toolchains by
@@ -20,7 +20,7 @@ and host tools are locked inputs.
 ## Deliberately unsupported local files
 
 The following names have existed as locally excluded experiments on some
-workstations, but they are not in Git and are not CI or release authority:
+workstations, but they are not in Git and are not CI authority:
 
 - `.github/workflows/offline-dev-bundle.yml`;
 - `tools/build_offline_dev_bundle.sh`;
@@ -32,8 +32,7 @@ The lock records those names and the validator requires them to remain
 untracked. Their remote inputs, package commands, and behavior are therefore
 not claimed as pinned. Promoting any of them requires deliberately adding the
 files, replacing every mutable input, updating the tracked-input inventory,
-and reviewing the resulting workflow. Historical GitHub Actions evidence under
-`conformance/` remains historical data, not an active workflow.
+and reviewing the resulting workflow. Historical execution receipts are removed from the tracked tree.
 
 ## Install and verify Jenkins
 
@@ -54,27 +53,10 @@ the same bytes again and launches the locked WAR directly; it does not run a
 package-manager shim. Jenkins also reruns repository, runtime, controller, and
 plugin validation as a blocking `supply-chain` gate.
 
-The unconditional `license-notices` gate also derives both advertised targets'
-exact CLI/server normal dependency closures, builds their dependency graphs,
-validates generated SBOMs against the retained official CycloneDX 1.6 schemas,
-and validates the release attestation trust policy. It therefore blocks prose-
-only pull requests, full runs, and tag runs when those release inputs drift.
-
-## Release provenance signing credential
-
-Before running a release-tag build, provision the release Ed25519 private key
-as a Jenkins **Secret file** credential named
-`mainframe-env-release-ed25519-pkcs8`. The file is PKCS#8 DER, readable only by
-the Jenkins account, and its derived public key must equal the key in
-`config/release-attestation-policy.json`. Never put the private key in Git,
-the workspace, a build parameter, a console value, or a release bundle.
-
-The tag stage exposes the secret only around release receipt generation, uses
-the unique Jenkins `BUILD_URL` as the invocation URI, and immediately verifies
-the resulting DSSE envelope against the repository policy. A missing,
-over-permissive, malformed, or mismatched key fails closed. Rotation requires a
-reviewed policy change, a new key ID, coordinated Jenkins credential update,
-and verification before the old key is retired.
+The unconditional `license-notices` gate derives the current host's CLI/server
+normal dependency closure and verifies project and third-party legal text.
+Release signing and publication stages have been removed. Subsystem checks
+validate current inputs; execution logs remain outside Git.
 
 The host must already provide the exact versions in `tools/ci-inputs.lock.json`.
 The lock currently requires Rust/Cargo 1.98.0, Rust/Cargo 1.95.0 for MSRV,
@@ -91,26 +73,9 @@ cargo +1.98.0 install cargo-llvm-cov --version 0.9.1 --locked
 ```
 
 Package-manager commands are workstation provisioning, not CI steps. A
-different installed version fails before it can receive assurance or release
+different installed version fails before it can receive assurance
 credit.
 
-## Offline release input identity
-
-`tools/package_offline_cargo_bundle.sh` first verifies the locked offline tool
-scope. Each resulting archive contains:
-
-- the two reviewed lock files; and
-- `SUPPLY-CHAIN/BUILD-INPUTS.json`, which binds the tag commit, Cargo lock,
-  Rust toolchain file, CI locks, complete vendored-tree bytes and modes, and the
-  versions plus executable SHA-256 values of Cargo, rustc, Git, and Python.
-
-The record binds the exact Python executable used by the deterministic archive
-implementation. Packaging copies the source tree into two clean directories
-with deliberately different mtimes, normalizes member order, time, ownership,
-mode, and gzip headers, and requires both archives to have the same SHA-256
-before publishing either. Existing local or GitHub assets are retained only
-when their bytes match; different bytes fail
-closed and are never clobbered.
 
 ## Reviewed updates
 

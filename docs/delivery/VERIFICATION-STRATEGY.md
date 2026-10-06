@@ -1,13 +1,13 @@
-# 0.1 Verification Strategy
+# Verification strategy
 
 Status: **Accepted by repository owner**
 Owner: **verification maintainers**
 Scope: **verification layers, assurance tiers, and required evidence**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Objective
 
-Prove the 0.1 COBOL/CICS/JCL/JES/dataset/RACF/z/OSMF surface through independent
+Prove the platform.runtime-integration COBOL/CICS/JCL/JES/dataset/RACF/z/OSMF surface through independent
 layers of evidence. Test count or line coverage alone does not establish
 semantic correctness or operational robustness.
 
@@ -148,7 +148,7 @@ Inject:
 ### Local Jenkins budget policy
 
 The repository Jenkinsfile implements the risk tiers without repeating
-release-grade work on every event:
+full assurance work on every event:
 
 - jobs run only for branches and changes configured in local Jenkins; the
   checked-out SHA is the execution authority;
@@ -164,9 +164,6 @@ release-grade work on every event:
 - a manual `full` run adds complete conformance, certification, evidence, and
   runtime-architecture checks for a minor exit or an explicit integrated
   audit; and
-- release generation, artifact upload, and reproduction run only on a
-  `mainframe-env-v*` tag, after the complete manual-tier checks, and use a clean
-  build rather than the normal debug cache.
 
 Cargo registry downloads are shared in the capped Cargo home. Build outputs are
 kept in the per-build workspace and removed after archiving receipts, so every
@@ -198,13 +195,13 @@ update procedure are in `docs/runbooks/CI-SUPPLY-CHAIN.md`.
 - long-running mixed workload and leak tests;
 - overload/backpressure and cancellation evidence;
 - database backup/restore and restart recovery;
-- release-binary SQLite startup, readiness, and shutdown smoke;
+- optimized-binary SQLite startup, readiness, and shutdown smoke;
 - immutable CI/controller inputs and full-workspace MSRV;
 - blocking `cargo deny check` plus deterministic full target-production license
   notices;
 - compatibility and cutover rehearsal; and
 - reproducible artifacts and documentation.
 
-Broad validation is run once per unchanged release candidate. Failures are
+Broad validation is run once per unchanged candidate. Failures are
 repaired and proven with the narrowest relevant suite before rerunning the full
 gate.

@@ -4,10 +4,10 @@
   "title": "mainframe-env COBOL intrinsic runtime fixtures",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "target_version", "fixtures"],
+  "required": ["schema_version", "target_subsystem", "fixtures"],
   "properties": {
     "schema_version": {"const": "mainframe-env.cobol-function-runtime-fixtures@1"},
-    "target_version": {"const": "0.4.0"},
+    "target_subsystem": {"const": "cobol.execution"},
     "fixtures": {"type": "array", "minItems": 82, "maxItems": 82, "items": {"$ref": "#/$defs/fixture"}}
   },
   "$defs": {

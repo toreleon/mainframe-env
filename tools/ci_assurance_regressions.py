@@ -39,18 +39,14 @@ def main():
         try:
             # Identical source, toolchain and runner; the broader architecture gate
             # additionally executes two targeted runtime tests, not a release build.
-            for label,command in [('architecture-fast','architecture-fast'),('architecture-with-runtime-tests','architecture'),('evidence-fast','evidence-fast')]:
+            for label,command in [('architecture-fast','architecture-fast'),('architecture-with-runtime-tests','architecture')]:
                 receipt['experiments'].append(run(work,binary,command,output,label))
             manifest=work/'crates/contracts/mainframe-env-host-api/Cargo.toml';original=manifest.read_text()
             try:
                 manifest.write_text(original+'\ntokio.workspace = true\n')
                 receipt['experiments'].append(run(work,binary,'architecture-fast',output,'bad-architecture','depends on infrastructure tokio'))
             finally:manifest.write_text(original)
-            schema=sorted((work/'conformance/0.1/schemas').glob('*.json'))[0];original=schema.read_text()
-            try:
-                value=json.loads(original);value['type']='string';schema.write_text(json.dumps(value))
-                receipt['experiments'].append(run(work,binary,'evidence-fast',output,'bad-evidence','must describe an object'))
-            finally:schema.write_text(original)
+        finally:schema.write_text(original)
         finally:subprocess.run(['git','worktree','remove','--force',str(work)],cwd=root,check=True)
     receipt['success']=all(row['detected_as_expected'] for row in receipt['experiments'])
     (output/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

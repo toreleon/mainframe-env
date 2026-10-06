@@ -1,13 +1,16 @@
 use super::*;
 
-const CATALOG: &str = "conformance/0.11/catalogs/zosmf-normalization.json";
-const CONTRACTS: &str = "conformance/0.11/generated/zosmf-contracts.json";
-const COLLISIONS: &str = "conformance/0.11/generated/zosmf-collision-report.json";
-const CLOSURE: &str = "conformance/0.11/generated/zosmf-closure-report.json";
+const CATALOG: &str = "conformance/subsystems/zosmf/catalogs/zosmf-normalization.json";
+const CONTRACTS: &str = "conformance/subsystems/zosmf/generated/zosmf-contracts.json";
+const COLLISIONS: &str = "conformance/subsystems/zosmf/generated/zosmf-collision-report.json";
+const CLOSURE: &str = "conformance/subsystems/zosmf/generated/zosmf-closure-report.json";
 const GENERATED_RUST: &str = "crates/gateways/mainframe-env-zosmf/src/generated/zosmf_contracts.rs";
-const CONTRACTS_SCHEMA: &str = "conformance/0.11/schemas/zosmf-generated-contracts.schema.json";
-const COLLISIONS_SCHEMA: &str = "conformance/0.11/schemas/zosmf-collision-report.schema.json";
-const CLOSURE_SCHEMA: &str = "conformance/0.11/schemas/zosmf-closure-report.schema.json";
+const CONTRACTS_SCHEMA: &str =
+    "conformance/subsystems/zosmf/schemas/zosmf-generated-contracts.schema.json";
+const COLLISIONS_SCHEMA: &str =
+    "conformance/subsystems/zosmf/schemas/zosmf-collision-report.schema.json";
+const CLOSURE_SCHEMA: &str =
+    "conformance/subsystems/zosmf/schemas/zosmf-closure-report.schema.json";
 
 struct Rendered {
     contracts: Value,
@@ -54,13 +57,13 @@ fn render(root: &Path) -> TaskResult<Rendered> {
     let catalog_path = root.join(CATALOG);
     let catalog = json(&catalog_path)?;
     validate_schema_instance(
-        &json(&root.join("conformance/0.11/schemas/zosmf-normalization.schema.json"))?,
+        &json(&root.join("conformance/subsystems/zosmf/schemas/zosmf-normalization.schema.json"))?,
         &catalog,
         &catalog_path,
     )?;
     require(
         catalog["schema_version"] == "mainframe-env.zosmf-normalization@1"
-            && catalog["target_version"] == "0.11.0"
+            && catalog["target_subsystem"] == "zosmf.rest"
             && catalog["work_package"] == "ZMF-1101",
         "z/OSMF normalization identity changed",
     )?;
@@ -305,8 +308,9 @@ fn render(root: &Path) -> TaskResult<Rendered> {
         "z/OSMF backend/publication dispositions changed",
     )?;
 
-    let official_path = root.join("conformance/0.2/routes/official-route-bindings.json");
-    let custom_path = root.join("conformance/0.2/routes/custom-routes.json");
+    let official_path =
+        root.join("conformance/subsystems/coverage/routes/official-route-bindings.json");
+    let custom_path = root.join("conformance/subsystems/coverage/routes/custom-routes.json");
     let official = json(&official_path)?;
     let custom = json(&custom_path)?;
     let official_rows = array(&official, "routes", &official_path)?;
@@ -338,7 +342,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
 
     let contracts = json!({
         "schema_version":"mainframe-env.zosmf-generated-contracts@1",
-        "target_version":"0.11.0",
+        "target_subsystem":"zosmf.rest",
         "normalization":{"path":CATALOG,"sha256":normalization_sha256},
         "generated_coverage_credit":0,
         "counts":{"families":27,"headings":189,"operations":278,"routes":352,"schemas":583,"errors":27,"backend_families":27,"obligations":1727},
@@ -348,7 +352,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
         "errors":error_entries,
         "backend_ownership":backend_entries,
         "legacy_official_routes":legacy.clone(),
-        "custom_namespace":{"catalog":"conformance/0.2/routes/custom-routes.json","route_count":7,"official_coverage_credit":0}
+        "custom_namespace":{"catalog":"conformance/subsystems/coverage/routes/custom-routes.json","route_count":7,"official_coverage_credit":0}
     });
 
     let mut collision_entries = Vec::new();
@@ -407,7 +411,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
     )?;
     let collisions = json!({
         "schema_version":"mainframe-env.zosmf-collision-report@1",
-        "target_version":"0.11.0",
+        "target_subsystem":"zosmf.rest",
         "normalization_sha256":normalization_sha256,
         "generated_coverage_credit":0,
         "counts":{"route_keys":310,"shared_dispatch":14,"source_alias_groups":5,"classified":classified_collisions,"blocked":blocked_collisions},
@@ -425,7 +429,7 @@ fn render(root: &Path) -> TaskResult<Rendered> {
     let source_rows = family_rows.len() + heading_rows.len();
     let closure = json!({
         "schema_version":"mainframe-env.zosmf-closure-report@1",
-        "target_version":"0.11.0",
+        "target_subsystem":"zosmf.rest",
         "normalization_sha256":normalization_sha256,
         "generated_coverage_credit":0,
         "source":{"families":27,"headings":189,"rows":source_rows,"heading_dispositions":heading_dispositions,"closed":source_rows==216},

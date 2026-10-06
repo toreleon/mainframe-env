@@ -1605,7 +1605,7 @@ mod tests {
                 .any(|requirement| requirement.capability() == "dataset.allocation")
         );
         let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.7/schemas/jcl-job-plan.schema.json"
+            "../../../../conformance/subsystems/jcl/schemas/jcl-job-plan.schema.json"
         ))
         .unwrap();
         let validator = jsonschema::draft202012::options()

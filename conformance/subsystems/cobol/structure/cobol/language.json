@@ -1,0 +1,3400 @@
+{
+  "baseline_id": "ibm-enterprise-cobol-6.5-2026-05-31",
+  "compiler_directing_statements": [
+    {
+      "effect": "extended-source-basis",
+      "forms": [
+        "BASIS basis-name"
+      ],
+      "id": "basis",
+      "label": "BASIS statement",
+      "placement": "control-deck",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0001",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsbas.html;topic-id:statements-basis-statement;heading:BASIS statement"
+    },
+    {
+      "effect": "compiler-options",
+      "forms": [
+        "PROCESS options-list",
+        "CBL options-list"
+      ],
+      "id": "process",
+      "label": "PROCESS(CBL) statement",
+      "placement": "before-outermost-identification",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0002",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdscbl.html;topic-id:statements-processcbl-statement;heading:PROCESS(CBL) statement"
+    },
+    {
+      "effect": "listing-control",
+      "forms": [
+        "*CONTROL listing-options",
+        "*CBL listing-options"
+      ],
+      "id": "control",
+      "label": "*CONTROL (*CBL) statement",
+      "placement": "embedded-line-only",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0003",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdscon.html;topic-id:statements-control-cbl-statement;heading:*CONTROL (*CBL) statement"
+    },
+    {
+      "effect": "source-expansion",
+      "forms": [
+        "COPY text-name [OF library-name] [SUPPRESS] [REPLACING operands] ."
+      ],
+      "id": "copy",
+      "label": "COPY statement",
+      "placement": "character-string-boundary",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0004",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdscop.html;topic-id:statements-copy-statement;heading:COPY statement"
+    },
+    {
+      "effect": "extended-source-delete",
+      "forms": [
+        "DELETE sequence-number-field"
+      ],
+      "id": "delete",
+      "label": "DELETE statement",
+      "placement": "basis-control-deck",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0005",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsdel.html;topic-id:cds-delete-statement;heading:DELETE statement"
+    },
+    {
+      "effect": "listing-control",
+      "forms": [
+        "EJECT [.]"
+      ],
+      "id": "eject",
+      "label": "EJECT statement",
+      "placement": "embedded-line-only",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0006",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdseje.html;topic-id:statements-eject-statement;heading:EJECT statement"
+    },
+    {
+      "effect": "syntax-only",
+      "forms": [
+        "ENTER language-name [routine-name] ."
+      ],
+      "id": "enter",
+      "label": "ENTER statement",
+      "placement": "procedure-division",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0007",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsent.html;topic-id:statements-enter-statement;heading:ENTER statement"
+    },
+    {
+      "effect": "extended-source-insert",
+      "forms": [
+        "INSERT sequence-number"
+      ],
+      "id": "insert",
+      "label": "INSERT statement",
+      "placement": "basis-control-deck",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0008",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsins.html;topic-id:statements-insert-statement;heading:INSERT statement"
+    },
+    {
+      "effect": "syntax-only",
+      "forms": [
+        "READY TRACE .",
+        "RESET TRACE ."
+      ],
+      "id": "trace",
+      "label": "READY or RESET TRACE statement",
+      "placement": "procedure-division",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0009",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsrea.html;topic-id:statements-ready-reset-trace-statement;heading:READY or RESET TRACE statement"
+    },
+    {
+      "effect": "source-replacement",
+      "forms": [
+        "REPLACE replacement-pairs .",
+        "REPLACE OFF ."
+      ],
+      "id": "replace",
+      "label": "REPLACE statement",
+      "placement": "character-string-boundary",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0010",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsrps.html;topic-id:statements-replace-statement;heading:REPLACE statement"
+    },
+    {
+      "effect": "control-flow-marker",
+      "forms": [
+        "SERVICE LABEL"
+      ],
+      "id": "service-label",
+      "label": "SERVICE LABEL statement",
+      "placement": "procedure-division-nondeclarative",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0011",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdssvc.html;topic-id:statements-service-label-statement;heading:SERVICE LABEL statement"
+    },
+    {
+      "effect": "syntax-only",
+      "forms": [
+        "SERVICE RELOAD identifier"
+      ],
+      "id": "service-reload",
+      "label": "SERVICE RELOAD statement",
+      "placement": "procedure-division",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0012",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsser.html;topic-id:statements-service-reload-statement;heading:SERVICE RELOAD statement"
+    },
+    {
+      "effect": "listing-control",
+      "forms": [
+        "SKIP1 [.]",
+        "SKIP2 [.]",
+        "SKIP3 [.]"
+      ],
+      "id": "skip",
+      "label": "SKIP statements",
+      "placement": "embedded-line-only",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0013",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsski.html;topic-id:statements-skip;heading:SKIP statements"
+    },
+    {
+      "effect": "listing-control",
+      "forms": [
+        "TITLE literal [.]"
+      ],
+      "id": "title",
+      "label": "TITLE statement",
+      "placement": "embedded-line-only",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0014",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdstit.html;topic-id:statements-title-statement;heading:TITLE statement"
+    },
+    {
+      "effect": "declarative-registration",
+      "forms": [
+        "USE [GLOBAL] AFTER [STANDARD] EXCEPTION|ERROR PROCEDURE ON targets",
+        "USE FOR DEBUGGING ON procedures"
+      ],
+      "id": "use",
+      "label": "USE statement",
+      "placement": "procedure-declaratives",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0015",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlcdsuse.html;topic-id:statements-use-statement;heading:USE statement"
+    }
+  ],
+  "compiler_directive_groups": [
+    {
+      "directives": [
+        "callinterface",
+        "callint"
+      ],
+      "effect": "call-interface-selection",
+      "id": "callinterface",
+      "label": "CALLINTERFACE",
+      "placement": "procedure-division",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0001",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldircal.html;topic-id:directives-callinterface;heading:CALLINTERFACE"
+    },
+    {
+      "directives": [
+        "data"
+      ],
+      "effect": "data-location-selection",
+      "id": "data",
+      "label": "DATA",
+      "placement": "working-storage-lp64",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0002",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldirdata.html;topic-id:directives-data;heading:DATA"
+    },
+    {
+      "directives": [
+        "inline"
+      ],
+      "effect": "inline-eligibility",
+      "id": "inline",
+      "label": "INLINE",
+      "placement": "compilation-unit-line",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0003",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldirinl.html;topic-id:directives-inline;heading:INLINE"
+    },
+    {
+      "directives": [
+        "define",
+        "evaluate",
+        "when",
+        "when-other",
+        "end-evaluate",
+        "if",
+        "else",
+        "end-if"
+      ],
+      "effect": "conditional-source-selection",
+      "id": "conditional",
+      "label": "Conditional compilation",
+      "placement": "compilation-group-line",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0004",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldircon.html;topic-id:directives-conditional-compilation;heading:Conditional compilation"
+    },
+    {
+      "directives": [
+        "java-callable",
+        "java-shareable"
+      ],
+      "effect": "java-interop-metadata",
+      "id": "java-interop",
+      "label": "COBOL/Java interoperability",
+      "placement": "java-interop-context",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0005",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldirintop.html;topic-id:directives-coboljava-interoperability;heading:COBOL/Java interoperability"
+    }
+  ],
+  "data_description_clauses": [
+    {
+      "forms": [
+        "BLANK WHEN ZERO|ZEROS|ZEROES"
+      ],
+      "id": "blank-when-zero",
+      "label": "BLANK WHEN ZERO clause",
+      "placement": "elementary-data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0001",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddebwz.html;topic-id:entry-blank-when-zero-clause;heading:BLANK WHEN ZERO clause"
+    },
+    {
+      "forms": [
+        "DYNAMIC [LENGTH] [LIMIT [IS] integer]"
+      ],
+      "id": "dynamic-length",
+      "label": "DYNAMIC LENGTH clause",
+      "placement": "elementary-data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0002",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddedylen.html;topic-id:entry-dynamic-length-clause;heading:DYNAMIC LENGTH clause"
+    },
+    {
+      "forms": [
+        "EXTERNAL [AS literal]"
+      ],
+      "id": "external",
+      "label": "EXTERNAL clause",
+      "placement": "working-storage-level-01",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0003",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeext.html;topic-id:entry-external-clause;heading:EXTERNAL clause"
+    },
+    {
+      "forms": [
+        "GLOBAL"
+      ],
+      "id": "global",
+      "label": "GLOBAL clause",
+      "placement": "level-01",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0004",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeglo.html;topic-id:entry-global-clause;heading:GLOBAL clause"
+    },
+    {
+      "forms": [
+        "JUSTIFIED|JUST RIGHT"
+      ],
+      "id": "justified",
+      "label": "JUSTIFIED clause",
+      "placement": "elementary-data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0005",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddejus.html;topic-id:entry-justified-clause;heading:JUSTIFIED clause"
+    },
+    {
+      "forms": [
+        "GROUP-USAGE [IS] NATIONAL|UTF-8"
+      ],
+      "id": "group-usage",
+      "label": "GROUP-USAGE clause",
+      "placement": "group-data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0006",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddegrn.html;topic-id:entry-group-usage-clause;heading:GROUP-USAGE clause"
+    },
+    {
+      "forms": [
+        "OCCURS integer TIMES [ASCENDING|DESCENDING KEY [IS] data-name...] [INDEXED BY index-name...]",
+        "OCCURS [integer-1 TO] integer-2|UNBOUNDED TIMES DEPENDING ON data-name [ASCENDING|DESCENDING KEY [IS] data-name...] [INDEXED BY index-name...]"
+      ],
+      "id": "occurs",
+      "label": "OCCURS clause",
+      "placement": "data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0007",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeoc1.html;topic-id:entry-occurs-clause;heading:OCCURS clause"
+    },
+    {
+      "forms": [
+        "PIC|PICTURE [IS] character-string [BYTE-LENGTH integer]"
+      ],
+      "id": "picture",
+      "label": "PICTURE clause",
+      "placement": "elementary-data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0008",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddepic.html;topic-id:entry-picture-clause;heading:PICTURE clause"
+    },
+    {
+      "forms": [
+        "REDEFINES data-name"
+      ],
+      "id": "redefines",
+      "label": "REDEFINES clause",
+      "placement": "immediately-after-data-name",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0009",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddered.html;topic-id:entry-redefines-clause;heading:REDEFINES clause"
+    },
+    {
+      "forms": [
+        "RENAMES data-name-1 [THROUGH|THRU data-name-2]"
+      ],
+      "id": "renames",
+      "label": "RENAMES clause",
+      "placement": "level-66",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0010",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rldderen.html;topic-id:entry-renames-clause;heading:RENAMES clause"
+    },
+    {
+      "forms": [
+        "SIGN [IS] LEADING|TRAILING [SEPARATE [CHARACTER]]"
+      ],
+      "id": "sign",
+      "label": "SIGN clause",
+      "placement": "signed-numeric-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0011",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddesig.html;topic-id:entry-sign-clause;heading:SIGN clause"
+    },
+    {
+      "forms": [
+        "SYNCHRONIZED|SYNC [LEFT|RIGHT]"
+      ],
+      "id": "synchronized",
+      "label": "SYNCHRONIZED clause",
+      "placement": "elementary-or-level-01-group",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0012",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddesyn.html;topic-id:entry-synchronized-clause;heading:SYNCHRONIZED clause"
+    },
+    {
+      "forms": [
+        "[IS] TYPEDEF"
+      ],
+      "id": "typedef",
+      "label": "TYPEDEF clause",
+      "placement": "level-01-type-declaration",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0013",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/typedef.html;topic-id:entry-typedef-clause;heading:TYPEDEF clause"
+    },
+    {
+      "forms": [
+        "TYPE [TO] type-name"
+      ],
+      "id": "type",
+      "label": "TYPE clause",
+      "placement": "data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0014",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/type.html;topic-id:entry-type-clause;heading:TYPE clause"
+    },
+    {
+      "forms": [
+        "[USAGE [IS]] representation"
+      ],
+      "id": "usage",
+      "label": "USAGE clause",
+      "placement": "data-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0015",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeusa.html;topic-id:entry-usage-clause;heading:USAGE clause"
+    },
+    {
+      "forms": [
+        "VALUE [IS] literal|figurative-constant",
+        "VALUES [ARE] literal [THROUGH literal]...",
+        "VALUE [IS] NULL"
+      ],
+      "id": "value",
+      "label": "VALUE clause",
+      "placement": "data-or-condition-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0016",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddeval.html;topic-id:entry-value-clause;heading:VALUE clause"
+    },
+    {
+      "forms": [
+        "VOLATILE"
+      ],
+      "id": "volatile",
+      "label": "VOLATILE clause",
+      "placement": "data-entry-except-level-66-88",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:data-description-clauses:0017",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlddevol.html;topic-id:entry-volatile-clause;heading:VOLATILE clause"
+    }
+  ],
+  "file_description_clauses": [
+    {
+      "forms": [
+        "EXTERNAL"
+      ],
+      "id": "external",
+      "label": "EXTERNAL clause",
+      "placement": "fd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0001",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeext.html;topic-id:entries-external-clause;heading:EXTERNAL clause"
+    },
+    {
+      "forms": [
+        "GLOBAL"
+      ],
+      "id": "global",
+      "label": "GLOBAL clause",
+      "placement": "fd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0002",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeglo.html;topic-id:entries-global-clause;heading:GLOBAL clause"
+    },
+    {
+      "forms": [
+        "BLOCK CONTAINS [integer-1 TO] integer-2 [CHARACTERS|RECORDS]"
+      ],
+      "id": "block-contains",
+      "label": "BLOCK CONTAINS clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0003",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeblo.html;topic-id:entries-block-contains-clause;heading:BLOCK CONTAINS clause"
+    },
+    {
+      "forms": [
+        "RECORD CONTAINS integer-3 CHARACTERS",
+        "RECORD CONTAINS integer-4 TO integer-5 CHARACTERS",
+        "RECORD IS VARYING [IN SIZE] [FROM integer-6] [TO integer-7] [CHARACTERS] [DEPENDING ON data-name-1]"
+      ],
+      "id": "record",
+      "label": "RECORD clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0004",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfderec.html;topic-id:entries-record-clause;heading:RECORD clause"
+    },
+    {
+      "forms": [
+        "LABEL RECORDS [ARE] STANDARD|OMITTED|data-name"
+      ],
+      "id": "label-records",
+      "label": "LABEL RECORDS clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0005",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdelab.html;topic-id:entries-label-records-clause;heading:LABEL RECORDS clause"
+    },
+    {
+      "forms": [
+        "VALUE OF data-name IS literal"
+      ],
+      "id": "value-of",
+      "label": "VALUE OF clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0006",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdeval.html;topic-id:entries-value-clause;heading:VALUE OF clause"
+    },
+    {
+      "forms": [
+        "DATA RECORDS [ARE] data-name..."
+      ],
+      "id": "data-records",
+      "label": "DATA RECORDS clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0007",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdedat.html;topic-id:entries-data-records-clause;heading:DATA RECORDS clause"
+    },
+    {
+      "forms": [
+        "LINAGE [IS] integer|data-name LINES [WITH FOOTING AT integer|data-name] [LINES AT TOP integer|data-name] [LINES AT BOTTOM integer|data-name]"
+      ],
+      "id": "linage",
+      "label": "LINAGE clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0008",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdelin.html;topic-id:entries-linage-clause;heading:LINAGE clause"
+    },
+    {
+      "forms": [
+        "RECORDING MODE [IS] F|V|U|S"
+      ],
+      "id": "recording-mode",
+      "label": "RECORDING MODE clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0009",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdermc.html;topic-id:entries-recording-mode-clause;heading:RECORDING MODE clause"
+    },
+    {
+      "forms": [
+        "CODE-SET [IS] alphabet-name"
+      ],
+      "id": "code-set",
+      "label": "CODE-SET clause",
+      "placement": "fd-or-sd-entry",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:file-description-clauses:0010",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlfdecsc.html;topic-id:entries-code-set-clause;heading:CODE-SET clause"
+    }
+  ],
+  "intrinsic_functions": [
+    {
+      "fixed_length": null,
+      "id": "abs",
+      "literal_arguments": [],
+      "name": "ABS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0001",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "preserve-numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfabs.html;topic-id:functions-abs;heading:Chapter 31. ABS"
+    },
+    {
+      "fixed_length": null,
+      "id": "acos",
+      "literal_arguments": [],
+      "name": "ACOS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0002",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfaco.html;topic-id:functions-acos;heading:Chapter 32. ACOS"
+    },
+    {
+      "fixed_length": null,
+      "id": "annuity",
+      "literal_arguments": [],
+      "name": "ANNUITY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0003",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfann.html;topic-id:functions-annuity;heading:Chapter 33. ANNUITY"
+    },
+    {
+      "fixed_length": null,
+      "id": "asin",
+      "literal_arguments": [],
+      "name": "ASIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0004",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfasi.html;topic-id:functions-asin;heading:Chapter 34. ASIN"
+    },
+    {
+      "fixed_length": null,
+      "id": "atan",
+      "literal_arguments": [],
+      "name": "ATAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0005",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfata.html;topic-id:functions-atan;heading:Chapter 35. ATAN"
+    },
+    {
+      "fixed_length": null,
+      "id": "bit-of",
+      "literal_arguments": [],
+      "name": "BIT-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0006",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "dbcs",
+              "integer",
+              "numeric",
+              "alphanumeric",
+              "national",
+              "utf8",
+              "other"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfbit.html;topic-id:functions-bit;heading:Chapter 36. BIT-OF"
+    },
+    {
+      "fixed_length": null,
+      "id": "bit-to-char",
+      "literal_arguments": [],
+      "name": "BIT-TO-CHAR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0007",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfbitc.html;topic-id:functions-bit-char;heading:Chapter 37. BIT-TO-CHAR"
+    },
+    {
+      "fixed_length": null,
+      "id": "byte-length",
+      "literal_arguments": [],
+      "name": "BYTE-LENGTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0008",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "dbcs",
+              "numeric",
+              "alphanumeric",
+              "national",
+              "utf8",
+              "other"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfbyte.html;topic-id:functions-byte-length;heading:Chapter 38. BYTE-LENGTH"
+    },
+    {
+      "fixed_length": 1,
+      "id": "char",
+      "literal_arguments": [],
+      "name": "CHAR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0009",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcha.html;topic-id:functions-char;heading:Chapter 39. CHAR"
+    },
+    {
+      "fixed_length": null,
+      "id": "combined-datetime",
+      "literal_arguments": [],
+      "name": "COMBINED-DATETIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0010",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ],
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcdt.html;topic-id:functions-combined-datetime;heading:Chapter 40. COMBINED-DATETIME"
+    },
+    {
+      "fixed_length": null,
+      "id": "content-of",
+      "literal_arguments": [],
+      "name": "CONTENT-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0011",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "integer",
+              "numeric",
+              "national",
+              "alphanumeric",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "content",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcont.html;topic-id:functions-content;heading:Chapter 41. CONTENT-OF"
+    },
+    {
+      "fixed_length": null,
+      "id": "cos",
+      "literal_arguments": [],
+      "name": "COS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0012",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcos.html;topic-id:functions-cos;heading:Chapter 42. COS"
+    },
+    {
+      "fixed_length": 21,
+      "id": "current-date",
+      "literal_arguments": [],
+      "name": "CURRENT-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0013",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfcur.html;topic-id:functions-current-date;heading:Chapter 43. CURRENT-DATE"
+    },
+    {
+      "fixed_length": null,
+      "id": "date-of-integer",
+      "literal_arguments": [],
+      "name": "DATE-OF-INTEGER",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0014",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdi.html;topic-id:functions-date-integer;heading:Chapter 44. DATE-OF-INTEGER"
+    },
+    {
+      "fixed_length": null,
+      "id": "date-to-yyyymmdd",
+      "literal_arguments": [],
+      "name": "DATE-TO-YYYYMMDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0015",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "integer"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdy.html;topic-id:functions-date-yyyymmdd;heading:Chapter 45. DATE-TO-YYYYMMDD"
+    },
+    {
+      "fixed_length": null,
+      "id": "day-of-integer",
+      "literal_arguments": [],
+      "name": "DAY-OF-INTEGER",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0016",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdai.html;topic-id:functions-day-integer;heading:Chapter 46. DAY-OF-INTEGER"
+    },
+    {
+      "fixed_length": null,
+      "id": "day-to-yyyyddd",
+      "literal_arguments": [],
+      "name": "DAY-TO-YYYYDDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0017",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "integer"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdad.html;topic-id:functions-day-yyyyddd;heading:Chapter 47. DAY-TO-YYYYDDD"
+    },
+    {
+      "fixed_length": null,
+      "id": "display-of",
+      "literal_arguments": [],
+      "name": "DISPLAY-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0018",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfdis.html;topic-id:functions-display;heading:Chapter 48. DISPLAY-OF"
+    },
+    {
+      "fixed_length": null,
+      "id": "e",
+      "literal_arguments": [],
+      "name": "E",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0019",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfe.html;topic-id:functions-e;heading:Chapter 49. E"
+    },
+    {
+      "fixed_length": null,
+      "id": "exp",
+      "literal_arguments": [],
+      "name": "EXP",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0020",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfexp.html;topic-id:functions-exp;heading:Chapter 50. EXP"
+    },
+    {
+      "fixed_length": null,
+      "id": "exp10",
+      "literal_arguments": [],
+      "name": "EXP10",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0021",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfexp10.html;topic-id:functions-exp10;heading:Chapter 51. EXP10"
+    },
+    {
+      "fixed_length": null,
+      "id": "factorial",
+      "literal_arguments": [],
+      "name": "FACTORIAL",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0022",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffac.html;topic-id:functions-factorial;heading:Chapter 52. FACTORIAL"
+    },
+    {
+      "fixed_length": null,
+      "id": "formatted-current-date",
+      "literal_arguments": [
+        0
+      ],
+      "name": "FORMATTED-CURRENT-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0023",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffcd.html;topic-id:functions-formatted-current-date;heading:Chapter 53. FORMATTED-CURRENT-DATE"
+    },
+    {
+      "fixed_length": null,
+      "id": "formatted-date",
+      "literal_arguments": [
+        0
+      ],
+      "name": "FORMATTED-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0024",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffdt.html;topic-id:functions-formatted-date;heading:Chapter 54. FORMATTED-DATE"
+    },
+    {
+      "fixed_length": null,
+      "id": "formatted-datetime",
+      "literal_arguments": [
+        0
+      ],
+      "name": "FORMATTED-DATETIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0025",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ],
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ],
+            [
+              "numeric"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinffdtt.html;topic-id:functions-formatted-datetime;heading:Chapter 55. FORMATTED-DATETIME"
+    },
+    {
+      "fixed_length": null,
+      "id": "formatted-time",
+      "literal_arguments": [
+        0
+      ],
+      "name": "FORMATTED-TIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0026",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "numeric"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfftime.html;topic-id:functions-formatted-time;heading:Chapter 56. FORMATTED-TIME"
+    },
+    {
+      "fixed_length": null,
+      "id": "hex-of",
+      "literal_arguments": [],
+      "name": "HEX-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0027",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "dbcs",
+              "integer",
+              "numeric",
+              "alphanumeric",
+              "national",
+              "utf8",
+              "other"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfhex.html;topic-id:functions-hex;heading:Chapter 57. HEX-OF"
+    },
+    {
+      "fixed_length": null,
+      "id": "hex-to-char",
+      "literal_arguments": [],
+      "name": "HEX-TO-CHAR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0028",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfhextc.html;topic-id:functions-hex-char;heading:Chapter 58. HEX-TO-CHAR"
+    },
+    {
+      "fixed_length": null,
+      "id": "integer",
+      "literal_arguments": [],
+      "name": "INTEGER",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0029",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfint.html;topic-id:functions-integer;heading:Chapter 59. INTEGER"
+    },
+    {
+      "fixed_length": null,
+      "id": "integer-of-date",
+      "literal_arguments": [],
+      "name": "INTEGER-OF-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0030",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfidt.html;topic-id:functions-integer-date;heading:Chapter 60. INTEGER-OF-DATE"
+    },
+    {
+      "fixed_length": null,
+      "id": "integer-of-day",
+      "literal_arguments": [],
+      "name": "INTEGER-OF-DAY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0031",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfida.html;topic-id:functions-integer-day;heading:Chapter 61. INTEGER-OF-DAY"
+    },
+    {
+      "fixed_length": null,
+      "id": "integer-of-formatted-date",
+      "literal_arguments": [
+        0
+      ],
+      "name": "INTEGER-OF-FORMATTED-DATE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0032",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfiformatted.html;topic-id:functions-integer-formatted-date;heading:Chapter 62. INTEGER-OF-FORMATTED-DATE"
+    },
+    {
+      "fixed_length": null,
+      "id": "integer-part",
+      "literal_arguments": [],
+      "name": "INTEGER-PART",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0033",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfipa.html;topic-id:functions-integer-part;heading:Chapter 63. INTEGER-PART"
+    },
+    {
+      "fixed_length": null,
+      "id": "length",
+      "literal_arguments": [],
+      "name": "LENGTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0034",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "numeric",
+              "other",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinflen.html;topic-id:functions-length;heading:Chapter 64. LENGTH"
+    },
+    {
+      "fixed_length": null,
+      "id": "log",
+      "literal_arguments": [],
+      "name": "LOG",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0035",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinflog.html;topic-id:functions-log;heading:Chapter 65. LOG"
+    },
+    {
+      "fixed_length": null,
+      "id": "log10",
+      "literal_arguments": [],
+      "name": "LOG10",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0036",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfl10.html;topic-id:functions-log10;heading:Chapter 66. LOG10"
+    },
+    {
+      "fixed_length": null,
+      "id": "lower-case",
+      "literal_arguments": [],
+      "name": "LOWER-CASE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0037",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinflow.html;topic-id:functions-lower-case;heading:Chapter 67. LOWER-CASE"
+    },
+    {
+      "fixed_length": null,
+      "id": "max",
+      "literal_arguments": [],
+      "name": "MAX",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0038",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "integer",
+              "numeric",
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "comparable",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmax.html;topic-id:functions-max;heading:Chapter 68. MAX"
+    },
+    {
+      "fixed_length": null,
+      "id": "mean",
+      "literal_arguments": [],
+      "name": "MEAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0039",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmea.html;topic-id:functions-mean;heading:Chapter 69. MEAN"
+    },
+    {
+      "fixed_length": null,
+      "id": "median",
+      "literal_arguments": [],
+      "name": "MEDIAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0040",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmed.html;topic-id:functions-median;heading:Chapter 70. MEDIAN"
+    },
+    {
+      "fixed_length": null,
+      "id": "midrange",
+      "literal_arguments": [],
+      "name": "MIDRANGE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0041",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmid.html;topic-id:functions-midrange;heading:Chapter 71. MIDRANGE"
+    },
+    {
+      "fixed_length": null,
+      "id": "min",
+      "literal_arguments": [],
+      "name": "MIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0042",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "integer",
+              "numeric",
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "comparable",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmin.html;topic-id:functions-min;heading:Chapter 72. MIN"
+    },
+    {
+      "fixed_length": null,
+      "id": "mod",
+      "literal_arguments": [],
+      "name": "MOD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0043",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfmod.html;topic-id:functions-mod;heading:Chapter 73. MOD"
+    },
+    {
+      "fixed_length": null,
+      "id": "national-of",
+      "literal_arguments": [],
+      "name": "NATIONAL-OF",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0044",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "dbcs",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "national",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "dbcs",
+              "utf8"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "national",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnat.html;topic-id:functions-national;heading:Chapter 74. NATIONAL-OF"
+    },
+    {
+      "fixed_length": null,
+      "id": "numval",
+      "literal_arguments": [],
+      "name": "NUMVAL",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0045",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnv.html;topic-id:functions-numval;heading:Chapter 75. NUMVAL"
+    },
+    {
+      "fixed_length": null,
+      "id": "numval-c",
+      "literal_arguments": [],
+      "name": "NUMVAL-C",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0046",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ],
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnvc.html;topic-id:functions-numval-c;heading:Chapter 76. NUMVAL-C"
+    },
+    {
+      "fixed_length": null,
+      "id": "numval-f",
+      "literal_arguments": [],
+      "name": "NUMVAL-F",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0047",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfnumvalf.html;topic-id:functions-numval-f;heading:Chapter 77. NUMVAL-F"
+    },
+    {
+      "fixed_length": null,
+      "id": "ord",
+      "literal_arguments": [],
+      "name": "ORD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0048",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinford.html;topic-id:functions-ord;heading:Chapter 78. ORD"
+    },
+    {
+      "fixed_length": null,
+      "id": "ord-max",
+      "literal_arguments": [],
+      "name": "ORD-MAX",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0049",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "numeric",
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "integer",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfoma.html;topic-id:functions-ord-max;heading:Chapter 79. ORD-MAX"
+    },
+    {
+      "fixed_length": null,
+      "id": "ord-min",
+      "literal_arguments": [],
+      "name": "ORD-MIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0050",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "numeric",
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "integer",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfomi.html;topic-id:functions-ord-min;heading:Chapter 80. ORD-MIN"
+    },
+    {
+      "fixed_length": null,
+      "id": "pi",
+      "literal_arguments": [],
+      "name": "PI",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0051",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfpi.html;topic-id:functions-pi;heading:Chapter 81. PI"
+    },
+    {
+      "fixed_length": null,
+      "id": "present-value",
+      "literal_arguments": [],
+      "name": "PRESENT-VALUE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0052",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ],
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfpre.html;topic-id:functions-present-value;heading:Chapter 82. PRESENT-VALUE"
+    },
+    {
+      "fixed_length": null,
+      "id": "random",
+      "literal_arguments": [],
+      "name": "RANDOM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0053",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfrnd.html;topic-id:functions-random;heading:Chapter 83. RANDOM"
+    },
+    {
+      "fixed_length": null,
+      "id": "range",
+      "literal_arguments": [],
+      "name": "RANGE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0054",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer",
+              "numeric"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "range-sum",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfran.html;topic-id:functions-range;heading:Chapter 84. RANGE"
+    },
+    {
+      "fixed_length": null,
+      "id": "rem",
+      "literal_arguments": [],
+      "name": "REM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0055",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ],
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfrem.html;topic-id:functions-rem;heading:Chapter 85. REM"
+    },
+    {
+      "fixed_length": null,
+      "id": "reverse",
+      "literal_arguments": [],
+      "name": "REVERSE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0056",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfrev.html;topic-id:functions-reverse;heading:Chapter 86. REVERSE"
+    },
+    {
+      "fixed_length": null,
+      "id": "seconds-from-formatted-time",
+      "literal_arguments": [
+        0
+      ],
+      "name": "SECONDS-FROM-FORMATTED-TIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0057",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsecfrom.html;topic-id:functions-seconds-from-formatted-time;heading:Chapter 87. SECONDS-FROM-FORMATTED-TIME"
+    },
+    {
+      "fixed_length": null,
+      "id": "seconds-past-midnight",
+      "literal_arguments": [],
+      "name": "SECONDS-PAST-MIDNIGHT",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0058",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsecpstmn.html;topic-id:functions-seconds-past-midnight;heading:Chapter 88. SECONDS-PAST-MIDNIGHT"
+    },
+    {
+      "fixed_length": null,
+      "id": "sign",
+      "literal_arguments": [],
+      "name": "SIGN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0059",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsign.html;topic-id:functions-sign;heading:Chapter 89. SIGN"
+    },
+    {
+      "fixed_length": null,
+      "id": "sin",
+      "literal_arguments": [],
+      "name": "SIN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0060",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsin.html;topic-id:functions-sin;heading:Chapter 90. SIN"
+    },
+    {
+      "fixed_length": null,
+      "id": "sqrt",
+      "literal_arguments": [],
+      "name": "SQRT",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0061",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsqr.html;topic-id:functions-sqrt;heading:Chapter 91. SQRT"
+    },
+    {
+      "fixed_length": null,
+      "id": "standard-deviation",
+      "literal_arguments": [],
+      "name": "STANDARD-DEVIATION",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0062",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsta.html;topic-id:functions-standard-deviation;heading:Chapter 92. STANDARD-DEVIATION"
+    },
+    {
+      "fixed_length": null,
+      "id": "sum",
+      "literal_arguments": [],
+      "name": "SUM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0063",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer",
+              "numeric"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "range-sum",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfsum.html;topic-id:functions-sum;heading:Chapter 93. SUM"
+    },
+    {
+      "fixed_length": null,
+      "id": "tan",
+      "literal_arguments": [],
+      "name": "TAN",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0064",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftan.html;topic-id:functions-tan;heading:Chapter 94. TAN"
+    },
+    {
+      "fixed_length": null,
+      "id": "test-date-yyyymmdd",
+      "literal_arguments": [],
+      "name": "TEST-DATE-YYYYMMDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0065",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestdate.html;topic-id:functions-test-date-yyyymmdd;heading:Chapter 95. TEST-DATE-YYYYMMDD"
+    },
+    {
+      "fixed_length": null,
+      "id": "test-day-yyyyddd",
+      "literal_arguments": [],
+      "name": "TEST-DAY-YYYYDDD",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0066",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestday.html;topic-id:functions-test-day-yyyyddd;heading:Chapter 96. TEST-DAY-YYYYDDD"
+    },
+    {
+      "fixed_length": null,
+      "id": "test-formatted-datetime",
+      "literal_arguments": [
+        0
+      ],
+      "name": "TEST-FORMATTED-DATETIME",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0067",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestformatted.html;topic-id:functions-test-formatted-datetime;heading:Chapter 97. TEST-FORMATTED-DATETIME"
+    },
+    {
+      "fixed_length": null,
+      "id": "test-numval",
+      "literal_arguments": [],
+      "name": "TEST-NUMVAL",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0068",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestnumval.html;topic-id:functions-test-numval;heading:Chapter 98. TEST-NUMVAL"
+    },
+    {
+      "fixed_length": null,
+      "id": "test-numval-c",
+      "literal_arguments": [],
+      "name": "TEST-NUMVAL-C",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0069",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ],
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": true,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestnumvalc.html;topic-id:functions-test-numval-c;heading:Chapter 99. TEST-NUMVAL-C"
+    },
+    {
+      "fixed_length": null,
+      "id": "test-numval-f",
+      "literal_arguments": [],
+      "name": "TEST-NUMVAL-F",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0070",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphanumeric",
+              "national"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftestnumvalf.html;topic-id:functions-test-numval-f;heading:Chapter 100. TEST-NUMVAL-F"
+    },
+    {
+      "fixed_length": null,
+      "id": "trim",
+      "literal_arguments": [],
+      "name": "TRIM",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0071",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "keyword"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinftrim.html;topic-id:functions-trim;heading:Chapter 101. TRIM"
+    },
+    {
+      "fixed_length": null,
+      "id": "ulength",
+      "literal_arguments": [],
+      "name": "ULENGTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0072",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfule.html;topic-id:functions-ulength;heading:Chapter 102. ULENGTH"
+    },
+    {
+      "fixed_length": null,
+      "id": "upos",
+      "literal_arguments": [],
+      "name": "UPOS",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0073",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfupo.html;topic-id:functions-upos;heading:Chapter 103. UPOS"
+    },
+    {
+      "fixed_length": null,
+      "id": "upper-case",
+      "literal_arguments": [],
+      "name": "UPPER-CASE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0074",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfupp.html;topic-id:functions-upper-case;heading:Chapter 104. UPPER-CASE"
+    },
+    {
+      "fixed_length": null,
+      "id": "usubstr",
+      "literal_arguments": [],
+      "name": "USUBSTR",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0075",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "string-first",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfusu.html;topic-id:functions-usubstr;heading:Chapter 105. USUBSTR"
+    },
+    {
+      "fixed_length": null,
+      "id": "usupplementary",
+      "literal_arguments": [],
+      "name": "USUPPLEMENTARY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0076",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfusup.html;topic-id:functions-usupplementary;heading:Chapter 106. USUPPLEMENTARY"
+    },
+    {
+      "fixed_length": 36,
+      "id": "uuid4",
+      "literal_arguments": [],
+      "name": "UUID4",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0077",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfuuid4.html;topic-id:functions-uuid4;heading:Chapter 107. UUID4"
+    },
+    {
+      "fixed_length": null,
+      "id": "uvalid",
+      "literal_arguments": [],
+      "name": "UVALID",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0078",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfuva.html;topic-id:functions-uvalid;heading:Chapter 108. UVALID"
+    },
+    {
+      "fixed_length": null,
+      "id": "uwidth",
+      "literal_arguments": [],
+      "name": "UWIDTH",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0079",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "alphabetic",
+              "alphanumeric",
+              "national",
+              "utf8"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfuwi.html;topic-id:functions-uwidth;heading:Chapter 109. UWIDTH"
+    },
+    {
+      "fixed_length": null,
+      "id": "variance",
+      "literal_arguments": [],
+      "name": "VARIANCE",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0080",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "numeric"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "numeric",
+          "variadic": true
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfvar.html;topic-id:functions-variance;heading:Chapter 110. VARIANCE"
+    },
+    {
+      "fixed_length": 21,
+      "id": "when-compiled",
+      "literal_arguments": [],
+      "name": "WHEN-COMPILED",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0081",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [],
+          "homogeneous": false,
+          "result": "alphanumeric",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfwhe.html;topic-id:functions-when-compiled;heading:Chapter 111. WHEN-COMPILED"
+    },
+    {
+      "fixed_length": null,
+      "id": "year-to-yyyy",
+      "literal_arguments": [],
+      "name": "YEAR-TO-YYYY",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:intrinsic-functions:0082",
+      "runtime_supported": true,
+      "signatures": [
+        {
+          "arguments": [
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        },
+        {
+          "arguments": [
+            [
+              "integer"
+            ],
+            [
+              "integer"
+            ]
+          ],
+          "homogeneous": false,
+          "result": "integer",
+          "variadic": false
+        }
+      ],
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlinfyy.html;topic-id:functions-year-yyyy;heading:Chapter 112. YEAR-TO-YYYY"
+    }
+  ],
+  "procedure_statements": [
+    {
+      "disposition": {
+        "rationale": "Format 2 is not written. Its whole content is the four conceptual data items DATE, DAY, DAY-OF-WEEK and TIME, and every all-uppercase word in a form joins the global reserved set is_operand_atom rejects, so writing them makes ACCEPT A FROM DATE itself malformed - measured, MECOB0102 'operand is malformed' on all four, and hir::tests::accept_date_and_day_formats_are_matched_suffixes red. Restoring the format needs a keyword branch in validate_accept, which is a Rust change, not an authoring one.",
+        "source_formats": 2
+      },
+      "forms": [
+        "ACCEPT identifier-1 [FROM mnemonic-name-1|environment-name]"
+      ],
+      "id": "accept",
+      "label": "ACCEPT statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsacce.html;topic-id:statements-accept-statement;heading:ACCEPT statement"
+    },
+    {
+      "forms": [
+        "ADD identifier-1|literal-1... TO identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        "ADD identifier-1|literal-1... [TO] identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]",
+        "ADD CORRESPONDING|CORR identifier-1 TO identifier-2 [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-ADD]"
+      ],
+      "id": "add",
+      "label": "ADD statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsadd.html;topic-id:statements-add-statement;heading:ADD statement"
+    },
+    {
+      "forms": [
+        "ALLOCATE arithmetic-expression-1 CHARACTERS|data-name-1 [INITIALIZED] [LOC integer-1] [RETURNING data-name-2]"
+      ],
+      "id": "allocate",
+      "label": "ALLOCATE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsallo.html;topic-id:statements-allocate-statement;heading:ALLOCATE statement"
+    },
+    {
+      "forms": [
+        "ALTER procedure-name-1 TO [PROCEED TO] procedure-name-2"
+      ],
+      "id": "alter",
+      "label": "ALTER statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsalte.html;topic-id:statements-alter-statement;heading:ALTER statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One form against one published format. Four phrases the diagram draws stay out because reserving their words breaks statements that parse today: ADDRESS OF and LENGTH OF make COMPUTE N = LENGTH OF DYN malformed, AS FIXED LENGTH carries the same LENGTH, and OMITTED makes CALL 'SUB' USING OMITTED malformed. All four measured as MECOB0102 regressions against this branch, not argued.",
+        "source_formats": 1
+      },
+      "forms": [
+        "CALL identifier-1|literal-1|procedure-pointer-1|function-pointer-1 [USING [BY REFERENCE] identifier-2|file-name-1 [BY CONTENT identifier-3|literal-2] [BY VALUE identifier-4|literal-3] ...] [RETURNING identifier-5] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [ON OVERFLOW imperative-statement-3] [END-CALL]"
+      ],
+      "id": "call",
+      "label": "CALL statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscall.html;topic-id:statements-call-statement;heading:CALL statement"
+    },
+    {
+      "forms": [
+        "CANCEL identifier-1|literal-1..."
+      ],
+      "id": "cancel",
+      "label": "CANCEL statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscanc.html;topic-id:statements-cancel-statement;heading:CANCEL statement"
+    },
+    {
+      "forms": [
+        "CLOSE file-name-1 [REEL|UNIT] [FOR REMOVAL|WITH NO REWIND] ...",
+        "CLOSE file-name-1 [WITH] [NO REWIND|LOCK] ...",
+        "CLOSE file-name-1 [WITH LOCK] ..."
+      ],
+      "id": "close",
+      "label": "CLOSE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsclos.html;topic-id:statements-close-statement;heading:CLOSE statement"
+    },
+    {
+      "forms": [
+        "COMPUTE identifier-1 [ROUNDED]... =|EQUAL arithmetic-expression [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-COMPUTE]"
+      ],
+      "id": "compute",
+      "label": "COMPUTE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscomp.html;topic-id:statements-compute-statement;heading:COMPUTE statement"
+    },
+    {
+      "forms": [
+        "CONTINUE"
+      ],
+      "id": "continue",
+      "label": "CONTINUE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpscont.html;topic-id:statements-continue-statement;heading:CONTINUE statement"
+    },
+    {
+      "forms": [
+        "DELETE file-name-1 [RECORD] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-DELETE]"
+      ],
+      "id": "delete",
+      "label": "DELETE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsdele.html;topic-id:statements-delete-statement;heading:DELETE statement"
+    },
+    {
+      "forms": [
+        "DISPLAY identifier-1|literal-1... [UPON mnemonic-name-1|environment-name-1] [WITH NO ADVANCING]"
+      ],
+      "id": "display",
+      "label": "DISPLAY statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsdisp.html;topic-id:statements-display-statement;heading:DISPLAY statement"
+    },
+    {
+      "forms": [
+        "DIVIDE identifier-1|literal-1 INTO identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 INTO identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 BY identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 INTO identifier-2|literal-2 GIVING identifier-3 [ROUNDED] REMAINDER identifier-4 [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]",
+        "DIVIDE identifier-1|literal-1 BY identifier-2|literal-2 GIVING identifier-3 [ROUNDED] REMAINDER identifier-4 [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-DIVIDE]"
+      ],
+      "id": "divide",
+      "label": "DIVIDE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsdivi.html;topic-id:statements-divide-statement;heading:DIVIDE statement"
+    },
+    {
+      "forms": [
+        "ENTRY literal-1 [USING [BY REFERENCE|BY VALUE] identifier-1...]"
+      ],
+      "id": "entry",
+      "label": "ENTRY statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsentr.html;topic-id:statements-entry-statement;heading:ENTRY statement"
+    },
+    {
+      "disposition": {
+        "rationale": "The reference draws one EVALUATE format, and the form now spells its subjects and objects with the publication's own operand names rather than the collectives subjects and objects, which named nothing in the diagram. TRUE and FALSE are omitted from both positions because harvesting them would reserve the words globally and break SET condition-name TO TRUE.",
+        "source_formats": 1
+      },
+      "forms": [
+        "EVALUATE identifier-1|literal-1|expression-1 [ALSO identifier-2|literal-2|expression-2]... WHEN ANY|condition-1|[NOT] identifier-3|literal-3|arithmetic-expression-1 [THROUGH|THRU identifier-4|literal-4|arithmetic-expression-2] [ALSO ANY|condition-2|[NOT] identifier-5|literal-5|arithmetic-expression-3 [THROUGH|THRU identifier-6|literal-6|arithmetic-expression-4]]... statements [WHEN OTHER statements] [END-EVALUATE]"
+      ],
+      "id": "evaluate",
+      "label": "EVALUATE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpseval.html;topic-id:statements-evaluate-statement;heading:EVALUATE statement"
+    },
+    {
+      "disposition": {
+        "rationale": "Five formats, five forms. Format 4 (EXIT FUNCTION) is omitted because the reference topic states Enterprise COBOL does not yet support it and draws no format 4 diagram.",
+        "source_formats": 5
+      },
+      "forms": [
+        "EXIT",
+        "EXIT PROGRAM",
+        "EXIT METHOD",
+        "EXIT PERFORM [CYCLE]",
+        "EXIT PARAGRAPH|SECTION"
+      ],
+      "id": "exit",
+      "label": "EXIT statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsexit.html;topic-id:statements-exit-statement;heading:EXIT statement"
+    },
+    {
+      "forms": [
+        "FREE data-name-1..."
+      ],
+      "id": "free",
+      "label": "FREE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsfree.html;topic-id:statements-free-statement;heading:FREE statement"
+    },
+    {
+      "forms": [
+        "GOBACK"
+      ],
+      "id": "goback",
+      "label": "GOBACK statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsgoba.html;topic-id:statements-goback-statement;heading:GOBACK statement"
+    },
+    {
+      "forms": [
+        "GO [TO] procedure-name-1",
+        "GO [TO] procedure-name-1... DEPENDING [ON] identifier-1",
+        "GO [TO]"
+      ],
+      "id": "go-to",
+      "label": "GO TO statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsgoto.html;topic-id:statements-go-statement;heading:GO TO statement"
+    },
+    {
+      "forms": [
+        "IF condition-1 [THEN] statement-1|NEXT SENTENCE [ELSE statement-2|NEXT SENTENCE] [END-IF]"
+      ],
+      "id": "if",
+      "label": "IF statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsif.html;topic-id:statements-if-statement;heading:IF statement"
+    },
+    {
+      "forms": [
+        "INITIALIZE identifier-1... [WITH FILLER] [ALL|category-name TO VALUE] [THEN REPLACING category-name [DATA] BY identifier-2|literal-1 ...] [THEN TO DEFAULT]"
+      ],
+      "id": "initialize",
+      "label": "INITIALIZE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsinit.html;topic-id:statements-initialize-statement;heading:INITIALIZE statement"
+    },
+    {
+      "forms": [
+        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ...",
+        "INSPECT identifier-1 REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ...",
+        "INSPECT identifier-1 TALLYING identifier-2 FOR CHARACTERS|ALL|LEADING [identifier-3|literal-1] [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ... REPLACING CHARACTERS|ALL|LEADING|FIRST [identifier-3|literal-1] BY identifier-5|literal-3 [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ...",
+        "INSPECT identifier-1 CONVERTING identifier-6|literal-4 TO identifier-7|literal-5 [BEFORE|AFTER [INITIAL] identifier-4|literal-2] ..."
+      ],
+      "id": "inspect",
+      "label": "INSPECT statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsinsp.html;topic-id:statements-inspect-statement;heading:INSPECT statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One form against one published format, with four keywords held out. SELF, SUPER and NEW are INVOKE's own senders, and reserving them makes INVOKE SELF 'M', INVOKE SUPER 'M' and INVOKE OBJ NEW malformed - the statement being described. LENGTH OF is held out because it makes COMPUTE N = LENGTH OF DYN malformed. All four measured on this branch; restoring them is a validate_call_like change, not an authoring one.",
+        "source_formats": 1
+      },
+      "forms": [
+        "INVOKE identifier-1|class-name-1 literal-1|identifier-2 [USING [BY VALUE] identifier-3|literal-2...] [RETURNING identifier-4] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-INVOKE]"
+      ],
+      "id": "invoke",
+      "label": "INVOKE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsinvo.html;topic-id:statements-invoke-statement;heading:INVOKE statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One form is the whole format: the topic draws one Format plus five phrase fragments. Five keywords stay outside on purpose. NULL and the nine figurative constants are barred by the binding rule (reserving them breaks SET P TO NULL and MOVE SPACES TO A). OF is barred by measurement: it makes COMPUTE LEN-X = LENGTH OF DYN-X fail MECOB0102. OMITTED is barred for the same reason, measured against CALL 'SUB' USING OMITTED. BOOL/BOOLEAN/TO/USING live only inside converting-phrase, carried by name.",
+        "source_formats": 1
+      },
+      "forms": [
+        "JSON GENERATE identifier-1 FROM identifier-2 [COUNT BYTES IN identifier-11] [COUNT [CHARACTERS] IN identifier-3] [INDICATING indicating-phrase-1 [ALSO indicating-phrase-1]...] [ENCODING identifier-6|literal-3|FROM CODEPAGE] [NAME identifier-4 IS literal-1] [SUPPRESS identifier-5 [WHEN fig-con-1 [OR fig-con-1]]|SUPPRESS EVERY [NUMERIC|NONNUMERIC] WHEN fig-con-1 [OR fig-con-1]] [CONVERTING converting-phrase [ALSO converting-phrase]...] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-JSON]"
+      ],
+      "id": "json-generate",
+      "label": "JSON GENERATE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsjsog.html;topic-id:statements-json-generate-statement;heading:JSON GENERATE statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One form is sufficient: the topic publishes one Format plus five phrase fragments, which is six diagrams and not the seven issue #77 counts. The seventh, in rlpsjsopj.html, draws the lexical shape of a JSON number inside a table footnote and is declared in the reader's NON_SYNTAX. ALL, AND, BOOL, BOOLEAN, IN, USING and NULL are reached only through the fragments; NULL cannot be written and using-phrase-1 is never referenced from the Format. OF and OMITTED are omitted by measurement, per JSON GENERATE.",
+        "source_formats": 1
+      },
+      "forms": [
+        "JSON PARSE identifier-1 INTO identifier-2 [WITH DETAIL] [IGNORING ignoring-phrase-1 [ALSO ignoring-phrase-1]...] [INDICATING indicating-phrase-1 [ALSO indicating-phrase-1]...] [ENCODING identifier-6|literal-4|FROM CODEPAGE] [NAME identifier-3 IS literal-1] [SUPPRESS identifier-4] [CONVERTING converting-phrase-1 [ALSO converting-phrase-1]...] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-JSON]"
+      ],
+      "id": "json-parse",
+      "label": "JSON PARSE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsjsop.html;topic-id:statements-json-parse-statement;heading:JSON PARSE statement"
+    },
+    {
+      "forms": [
+        "MERGE file-name-1 [ON] ASCENDING|DESCENDING [KEY] data-name-1... [COLLATING SEQUENCE IS alphabet-name-1] USING file-name-2 file-name-3... OUTPUT PROCEDURE IS procedure-name-1 [THROUGH|THRU procedure-name-2]|GIVING file-name-4..."
+      ],
+      "id": "merge",
+      "label": "MERGE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsmerg.html;topic-id:statements-merge-statement;heading:MERGE statement"
+    },
+    {
+      "forms": [
+        "MOVE identifier-1|literal-1 TO identifier-2...",
+        "MOVE CORRESPONDING|CORR identifier-1 TO identifier-2"
+      ],
+      "id": "move",
+      "label": "MOVE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsmove.html;topic-id:statements-move-statement;heading:MOVE statement"
+    },
+    {
+      "forms": [
+        "MULTIPLY identifier-1|literal-1 BY identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-MULTIPLY]",
+        "MULTIPLY identifier-1|literal-1 BY identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-MULTIPLY]"
+      ],
+      "id": "multiply",
+      "label": "MULTIPLY statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsmult.html;topic-id:statements-multiply-statement;heading:MULTIPLY statement"
+    },
+    {
+      "forms": [
+        "OPEN INPUT file-name-1 [REVERSED|WITH NO REWIND]|OUTPUT file-name-2 [WITH NO REWIND]|I-O file-name-3|EXTEND file-name-4 ...",
+        "OPEN INPUT file-name-1|OUTPUT file-name-2|I-O file-name-3|EXTEND file-name-4 ...",
+        "OPEN INPUT file-name-1|OUTPUT file-name-2|EXTEND file-name-4 ..."
+      ],
+      "id": "open",
+      "label": "OPEN statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsopen.html;topic-id:statements-open-statement;heading:OPEN statement"
+    },
+    {
+      "forms": [
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] [statements END-PERFORM]",
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] identifier-1|integer-1 TIMES [statements END-PERFORM]",
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] [WITH TEST BEFORE|AFTER] UNTIL condition-1|EXIT [statements END-PERFORM]",
+        "PERFORM [procedure-name-1 [THROUGH|THRU procedure-name-2]] [WITH TEST BEFORE|AFTER] VARYING identifier-2|index-name-1 FROM identifier-3|index-name-2|literal-1 BY identifier-4|literal-2 UNTIL condition-1 [AFTER identifier-5|index-name-3 FROM identifier-6|index-name-4|literal-3 BY identifier-7|literal-4 UNTIL condition-2]... [statements END-PERFORM]"
+      ],
+      "id": "perform",
+      "label": "PERFORM statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsperf.html;topic-id:statements-perform-statement;heading:PERFORM statement"
+    },
+    {
+      "disposition": {
+        "rationale": "Two forms for the two published formats. The lock and wait phrases they also carry are drawn in neither 6.5 diagram; they are retained because the compiler, the interpreter and a conformance case all implement them, and striking them would break that case.",
+        "source_formats": 2
+      },
+      "forms": [
+        "READ file-name-1 [NEXT|PREVIOUS RECORD] [INTO identifier-1] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [AT END imperative-statement-1] [NOT AT END imperative-statement-2] [END-READ]",
+        "READ file-name-1 [RECORD] [INTO identifier-1] [KEY IS data-name-1] [WITH LOCK|WITH KEPT LOCK|WITH NO LOCK|IGNORE LOCK] [WAIT|NO WAIT] [INVALID KEY imperative-statement-3] [NOT INVALID KEY imperative-statement-4] [END-READ]"
+      ],
+      "id": "read",
+      "label": "READ statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsread.html;topic-id:statements-read-statement;heading:READ statement"
+    },
+    {
+      "forms": [
+        "RELEASE record-name-1 [FROM identifier-1]"
+      ],
+      "id": "release",
+      "label": "RELEASE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsrele.html;topic-id:statements-release-statement;heading:RELEASE statement"
+    },
+    {
+      "forms": [
+        "RETURN file-name-1 [RECORD] [INTO identifier-1] [AT END imperative-statement-1] [NOT AT END imperative-statement-2] [END-RETURN]"
+      ],
+      "id": "return",
+      "label": "RETURN statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsretu.html;topic-id:statements-return-statement;heading:RETURN statement"
+    },
+    {
+      "forms": [
+        "REWRITE record-name-1 [FROM identifier-1] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-REWRITE]"
+      ],
+      "id": "rewrite",
+      "label": "REWRITE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsrewr.html;topic-id:statements-rewrite-statement;heading:REWRITE statement"
+    },
+    {
+      "forms": [
+        "SEARCH identifier-1 [VARYING identifier-2|index-name-1] [AT END imperative-statement-1] WHEN condition-1 imperative-statement-2|NEXT SENTENCE ... [END-SEARCH]",
+        "SEARCH ALL identifier-1 [AT END imperative-statement-1] WHEN condition-name-1|data-name-1 [IS] EQUAL|= [TO] identifier-3|literal-1|arithmetic-expression-1 [AND condition-name-2|data-name-2 [IS] EQUAL|= [TO] identifier-4|literal-2|arithmetic-expression-2] ... [imperative-statement-2|NEXT SENTENCE] [END-SEARCH]"
+      ],
+      "id": "search",
+      "label": "SEARCH statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpssear.html;topic-id:statements-search-statement;heading:SEARCH statement"
+    },
+    {
+      "disposition": {
+        "rationale": "Six of the eight published formats are carried, one each; 3 and 4 are not, and 5 to 8 are reduced. Every uppercase word in a form joins the set is_operand_atom rejects, so TRUE, FALSE, SELF, NULL, NULLS, ADDRESS OF and LENGTH OF break what they describe. Format 4's only senders are TRUE and FALSE. Format 3's are ON and OFF: OFF breaks the same way, measured; ON is already reserved by other rows, so SET SW TO ON on a UPSI mnemonic is MECOB0102 today while SET SW TO OFF is accepted. The dropped form wrote ON.",
+        "source_formats": 8
+      },
+      "forms": [
+        "SET index-name-1|identifier-1... TO index-name-2|identifier-2|integer-1",
+        "SET index-name-3... UP BY|DOWN BY identifier-3|integer-2",
+        "SET identifier-4... TO identifier-6",
+        "SET procedure-pointer-data-item-1|function-pointer-data-item-1... TO procedure-pointer-data-item-2|function-pointer-data-item-2|pointer-data-item-3|ENTRY identifier-8|identifier-9|literal-1",
+        "SET object-reference-id-1 TO object-reference-id-2",
+        "SET identifier-1 TO identifier-2|integer-1"
+      ],
+      "id": "set",
+      "label": "SET statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsset.html;topic-id:statements-set-statement;heading:SET statement"
+    },
+    {
+      "forms": [
+        "SORT file-name-1 [ON] ASCENDING|DESCENDING [KEY] data-name-1... [WITH DUPLICATES IN ORDER] [COLLATING SEQUENCE IS alphabet-name-1] USING file-name-2...|INPUT PROCEDURE IS procedure-name-1 [THROUGH|THRU procedure-name-2] GIVING file-name-3...|OUTPUT PROCEDURE IS procedure-name-3 [THROUGH|THRU procedure-name-4]",
+        "SORT data-name-2 [ON ASCENDING|DESCENDING KEY data-name-1...] [WITH DUPLICATES IN ORDER] [COLLATING SEQUENCE IS alphabet-name-1]"
+      ],
+      "id": "sort",
+      "label": "SORT statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpssort.html;topic-id:statements-sort-statement;heading:SORT statement"
+    },
+    {
+      "forms": [
+        "START file-name-1 [KEY IS EQUAL TO|=|GREATER THAN|>|NOT LESS THAN|NOT <|GREATER THAN OR EQUAL TO|>=] [PARTIAL] [data-name-1] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-START]"
+      ],
+      "id": "start",
+      "label": "START statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsstar.html;topic-id:statements-start-statement;heading:START statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One published format: STOP followed by RUN or the operand the diagram names literal. RETURNING is retained although the 6.5 diagram does not draw it, because row 0038 fixtures exercise STOP RUN RETURNING. Its operand is written value, which is this catalog's name and not the publication's: no RETURNING phrase is drawn for STOP, so none is named, and borrowing one from a statement that draws it would cite the wrong diagram. It is the last such name: undefined_placeholders is now value and statements only.",
+        "source_formats": 1
+      },
+      "forms": [
+        "STOP RUN|literal [RETURNING value]"
+      ],
+      "id": "stop",
+      "label": "STOP statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsstop.html;topic-id:statements-stop-statement;heading:STOP statement"
+    },
+    {
+      "forms": [
+        "STRING identifier-1|literal-1... DELIMITED BY identifier-2|literal-2|SIZE ... INTO identifier-3 [WITH POINTER identifier-4] [ON OVERFLOW imperative-statement-1] [NOT ON OVERFLOW imperative-statement-2] [END-STRING]"
+      ],
+      "id": "string",
+      "label": "STRING statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsstri.html;topic-id:statements-string-statement;heading:STRING statement"
+    },
+    {
+      "forms": [
+        "SUBTRACT identifier-1|literal-1... FROM identifier-2 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-SUBTRACT]",
+        "SUBTRACT identifier-1|literal-1... FROM identifier-2|literal-2 GIVING identifier-3 [ROUNDED]... [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-SUBTRACT]",
+        "SUBTRACT CORRESPONDING|CORR identifier-1 FROM identifier-2 [ROUNDED] [ON SIZE ERROR statements] [NOT ON SIZE ERROR statements] [END-SUBTRACT]"
+      ],
+      "id": "subtract",
+      "label": "SUBTRACT statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpssubt.html;topic-id:statements-subtract-statement;heading:SUBTRACT statement"
+    },
+    {
+      "forms": [
+        "UNSTRING identifier-1 [DELIMITED BY [ALL] identifier-2|literal-1 [OR [ALL] identifier-3|literal-2 ...]] INTO identifier-4 [DELIMITER IN identifier-5] [COUNT IN identifier-6] ... [WITH POINTER identifier-7] [TALLYING IN identifier-8] [ON OVERFLOW imperative-statement-1] [NOT ON OVERFLOW imperative-statement-2] [END-UNSTRING]"
+      ],
+      "id": "unstring",
+      "label": "UNSTRING statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsunst.html;topic-id:statements-unstring-statement;heading:UNSTRING statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One form per published format. The ADVANCING PAGE branch of Formats 1 and 3 is omitted: writing PAGE reserves it globally and validate_write then rejects WRITE ... BEFORE ADVANCING PAGE, the very syntax being described. Admitting it needs a Rust change, not an authoring one.",
+        "source_formats": 3
+      },
+      "forms": [
+        "WRITE record-name-1 [FROM identifier-1] [BEFORE|AFTER ADVANCING identifier-2|integer-1 LINE|LINES|mnemonic-name-1] [AT END-OF-PAGE|EOP imperative-statement-3] [NOT AT END-OF-PAGE|EOP imperative-statement-4] [END-WRITE]",
+        "WRITE record-name-1 [FROM identifier-1] [INVALID KEY imperative-statement-1] [NOT INVALID KEY imperative-statement-2] [END-WRITE]",
+        "WRITE record-name-1 [FROM identifier-1] [AFTER ADVANCING identifier-2|integer-1 LINE|LINES] [END-WRITE]"
+      ],
+      "id": "write",
+      "label": "WRITE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpswrit.html;topic-id:statements-write-statement;heading:WRITE statement"
+    },
+    {
+      "disposition": {
+        "rationale": "One form against one published Format. The other two diagrams are the when-phrase and generic-suppression-phrase fragments, and the form cites them by the names XML GENERATE's own Format boxes, instead of inlining them. That keeps the nine figurative constants out, with EVERY, NUMERIC, NONNUMERIC, WHEN and OR. An earlier form inlined it and wrote them as fig-con-1, which XML GENERATE never publishes: it is the JSON converting-phrase name. OF is held back by measurement: it breaks COMPUTE L = LENGTH OF D.",
+        "source_formats": 1
+      },
+      "forms": [
+        "XML GENERATE identifier-1 FROM identifier-2 [COUNT IN identifier-3] [WITH ENCODING codepage] [WITH XML-DECLARATION] [WITH ATTRIBUTES] [NAMESPACE IS identifier-4|literal-4 [NAMESPACE-PREFIX IS identifier-5|literal-5]] [NAME identifier-6 IS literal-6] [TYPE identifier-7 IS ATTRIBUTE|ELEMENT|CONTENT] [SUPPRESS identifier-8 [when-phrase]|generic-suppression-phrase] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-XML]"
+      ],
+      "id": "xml-generate",
+      "label": "XML GENERATE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsxmlg.html;topic-id:statements-xml-generate-statement;heading:XML GENERATE statement"
+    },
+    {
+      "forms": [
+        "XML PARSE identifier-1 [WITH ENCODING codepage] [RETURNING NATIONAL] [VALIDATING WITH identifier-2|FILE xml-schema-name-1] PROCESSING PROCEDURE IS procedure-name-1 [THROUGH|THRU procedure-name-2] [ON EXCEPTION imperative-statement-1] [NOT ON EXCEPTION imperative-statement-2] [END-XML]"
+      ],
+      "id": "xml-parse",
+      "label": "XML PARSE statement",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rlpsxmlp.html;topic-id:statements-xml-parse-statement;heading:XML PARSE statement"
+    }
+  ],
+  "schema_version": "mainframe-env.cobol-language@1",
+  "source": {
+    "manifest": "conformance/subsystems/coverage/manifests/cobol-topics.json",
+    "publication": "SC27-8713-04",
+    "sha256": "sha256:9b0291045414ca38d0e8138c7cc78d7321887a3fad6c27a433efd9e9ca7fd1ad"
+  },
+  "special_registers": [
+    {
+      "id": "address-of",
+      "length_kind": "lp",
+      "name": "ADDRESS OF",
+      "operand": "data-item",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanadd.html;topic-id:registers-address;heading:ADDRESS OF",
+      "usage": "pointer",
+      "value_type": "other",
+      "writable": true
+    },
+    {
+      "id": "debug-item",
+      "length_kind": "dependent",
+      "name": "DEBUG-ITEM",
+      "operand": "debug-context",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllandeb.html;topic-id:registers-debug-item;heading:DEBUG-ITEM",
+      "usage": "group",
+      "value_type": "group",
+      "writable": false
+    },
+    {
+      "id": "igy-javaiop-call-exception",
+      "length_kind": "lp",
+      "name": "IGY-JAVAIOP-CALL-EXCEPTION",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanigy.html;topic-id:registers-igy-javaiop-call-exception;heading:IGY-JAVAIOP-CALL-EXCEPTION",
+      "usage": "native-binary",
+      "value_type": "integer",
+      "writable": false
+    },
+    {
+      "id": "jnienvptr",
+      "length_kind": "lp",
+      "name": "JNIENVPTR",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanjni.html;topic-id:registers-jnienvptr;heading:JNIENVPTR",
+      "usage": "pointer",
+      "value_type": "other",
+      "writable": false
+    },
+    {
+      "fixed_length": 4,
+      "id": "json-code",
+      "length_kind": "fixed",
+      "name": "JSON-CODE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanjco.html;topic-id:registers-json-code;heading:JSON-CODE",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 4,
+      "id": "json-status",
+      "length_kind": "fixed",
+      "name": "JSON-STATUS",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanjst.html;topic-id:registers-json-status;heading:JSON-STATUS",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": false
+    },
+    {
+      "id": "length-of",
+      "length_kind": "lp",
+      "name": "LENGTH OF",
+      "operand": "data-item",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanlen.html;topic-id:registers-length;heading:LENGTH OF",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": false
+    },
+    {
+      "id": "linage-counter",
+      "length_kind": "dependent",
+      "name": "LINAGE-COUNTER",
+      "operand": "file",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanlin.html;topic-id:registers-linage-counter;heading:LINAGE-COUNTER",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": false
+    },
+    {
+      "fixed_length": 2,
+      "id": "return-code",
+      "length_kind": "fixed",
+      "name": "RETURN-CODE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanret.html;topic-id:registers-return-code;heading:RETURN-CODE",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 1,
+      "id": "shift-out",
+      "length_kind": "fixed",
+      "name": "SHIFT-OUT",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanshi.html;topic-id:registers-shift-out-shift-in;heading:SHIFT-OUT",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    },
+    {
+      "fixed_length": 1,
+      "id": "shift-in",
+      "length_kind": "fixed",
+      "name": "SHIFT-IN",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanshi.html;topic-id:registers-shift-out-shift-in;heading:SHIFT-IN",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    },
+    {
+      "fixed_length": 8,
+      "id": "sort-control",
+      "length_kind": "fixed",
+      "name": "SORT-CONTROL",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansc.html;topic-id:registers-sort-control;heading:SORT-CONTROL",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": true
+    },
+    {
+      "fixed_length": 4,
+      "id": "sort-core-size",
+      "length_kind": "fixed",
+      "name": "SORT-CORE-SIZE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanscs.html;topic-id:registers-sort-core-size;heading:SORT-CORE-SIZE",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 4,
+      "id": "sort-file-size",
+      "length_kind": "fixed",
+      "name": "SORT-FILE-SIZE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansfs.html;topic-id:registers-sort-file-size;heading:SORT-FILE-SIZE",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 8,
+      "id": "sort-message",
+      "length_kind": "fixed",
+      "name": "SORT-MESSAGE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansm.html;topic-id:registers-sort-message;heading:SORT-MESSAGE",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": true
+    },
+    {
+      "fixed_length": 4,
+      "id": "sort-mode-size",
+      "length_kind": "fixed",
+      "name": "SORT-MODE-SIZE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansms.html;topic-id:registers-sort-mode-size;heading:SORT-MODE-SIZE",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 2,
+      "id": "sort-return",
+      "length_kind": "fixed",
+      "name": "SORT-RETURN",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllansr.html;topic-id:registers-sort-return;heading:SORT-RETURN",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 4,
+      "id": "tally",
+      "length_kind": "fixed",
+      "name": "TALLY",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllantal.html;topic-id:registers-tally;heading:TALLY",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 16,
+      "id": "when-compiled",
+      "length_kind": "fixed",
+      "name": "WHEN-COMPILED",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanwhe.html;topic-id:registers-when-compiled;heading:WHEN-COMPILED",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    },
+    {
+      "fixed_length": 4,
+      "id": "xml-code",
+      "length_kind": "fixed",
+      "name": "XML-CODE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxco.html;topic-id:registers-xml-code;heading:XML-CODE",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": true
+    },
+    {
+      "fixed_length": 30,
+      "id": "xml-event",
+      "length_kind": "fixed",
+      "name": "XML-EVENT",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxev.html;topic-id:registers-xml-event;heading:XML-EVENT",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    },
+    {
+      "fixed_length": 4,
+      "id": "xml-information",
+      "length_kind": "fixed",
+      "name": "XML-INFORMATION",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxif.html;topic-id:registers-xml-information;heading:XML-INFORMATION",
+      "usage": "binary",
+      "value_type": "integer",
+      "writable": false
+    },
+    {
+      "id": "xml-namespace",
+      "length_kind": "dynamic",
+      "name": "XML-NAMESPACE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxna.html;topic-id:registers-xml-namespace;heading:XML-NAMESPACE",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    },
+    {
+      "id": "xml-nnamespace",
+      "length_kind": "dynamic",
+      "name": "XML-NNAMESPACE",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxnn.html;topic-id:registers-xml-nnamespace;heading:XML-NNAMESPACE",
+      "usage": "national",
+      "value_type": "national",
+      "writable": false
+    },
+    {
+      "id": "xml-namespace-prefix",
+      "length_kind": "dynamic",
+      "name": "XML-NAMESPACE-PREFIX",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxpa.html;topic-id:registers-xml-namespace-prefix;heading:XML-NAMESPACE-PREFIX",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    },
+    {
+      "id": "xml-nnamespace-prefix",
+      "length_kind": "dynamic",
+      "name": "XML-NNAMESPACE-PREFIX",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxpn.html;topic-id:registers-xml-nnamespace-prefix;heading:XML-NNAMESPACE-PREFIX",
+      "usage": "national",
+      "value_type": "national",
+      "writable": false
+    },
+    {
+      "id": "xml-ntext",
+      "length_kind": "dynamic",
+      "name": "XML-NTEXT",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxnt.html;topic-id:registers-xml-ntext;heading:XML-NTEXT",
+      "usage": "national",
+      "value_type": "national",
+      "writable": false
+    },
+    {
+      "id": "xml-text",
+      "length_kind": "dynamic",
+      "name": "XML-TEXT",
+      "operand": "none",
+      "runtime_supported": true,
+      "source_locator": "topic:SS6SG3_6.5/lr/ref/rllanxte.html;topic-id:registers-xml-text;heading:XML-TEXT",
+      "usage": "display",
+      "value_type": "alphanumeric",
+      "writable": false
+    }
+  ],
+  "target_subsystem": "cobol.structure"
+}

@@ -3,7 +3,7 @@
 Status: **Proposed within the authorized bounded IMS leaf**
 Owner: **host-contract and IMS maintainers**
 Scope: **IMS-1403.gsam-record-formats**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 This adds resolved record characteristics to the logical GSAM route of
 [ADR-0034](0034-gsam-logical-address.md). It supersedes that ADR's fixed-only

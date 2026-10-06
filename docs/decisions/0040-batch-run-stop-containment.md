@@ -2,8 +2,8 @@
 
 Status: Accepted bounded opt-in prerequisite; enclosing host activation pending.
 Owner: **Batch maintainers**
-Scope: **MQ-1503.batch-run-stop-containment, target 0.15.0**
-Applies from: **mainframe-env 0.15.0 development**
+Scope: **MQ-1503.batch-run-stop-containment, target mq.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

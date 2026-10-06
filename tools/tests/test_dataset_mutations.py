@@ -55,6 +55,16 @@ class ClassificationTests(unittest.TestCase):
         mutation = module.Mutation('test', 'test', 'ANCHOR', 'CHANGED')
         self.assertEqual(module.apply_mutation('before ANCHOR after', mutation), 'before CHANGED after')
 
+    def test_test_only_declarations_do_not_hide_production_but_remain_protected(self):
+        source = '#[cfg(test)]\nuse test_helpers::ANCHOR;\n#[cfg(test)]\nmod external_tests;\nfn product() { BODY }\n#[cfg(test)]\nmod tests { BODY }\n'
+        mutation = module.Mutation('test', 'test', 'fn product() { BODY }', 'fn product() { CHANGED }')
+        changed = module.apply_mutation(source, mutation)
+        self.assertEqual(changed, source.replace('fn product() { BODY }', 'fn product() { CHANGED }'))
+        with self.assertRaises(ValueError):
+            module.apply_mutation(source, module.Mutation('test', 'test', 'ANCHOR', 'CHANGED'))
+        with self.assertRaises(ValueError):
+            module.apply_mutation(source, module.Mutation('test', 'test', 'external_tests', 'CHANGED'))
+
     def test_cics_product_mutation_anchors_are_unique_and_scenarios_are_unchanged(self):
         scenarios = (TOOL.parents[1] / module.CICS_SCENARIOS).read_bytes()
         for mutation in module.CICS_MUTATIONS:
@@ -77,8 +87,8 @@ class ClassificationTests(unittest.TestCase):
             changed = module.apply_mutation(source, mutation)
             self.assertNotEqual(changed, source)
             self.assertEqual(
-                changed.partition('#[cfg(test)]')[2],
-                source.partition('#[cfg(test)]')[2],
+                module.split_test_code(changed)[1],
+                module.split_test_code(source)[1],
             )
             self.assertEqual(
                 module.digest(scenarios),

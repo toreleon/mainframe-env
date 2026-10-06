@@ -1,15 +1,15 @@
-# 0.1 Compatibility and Cutover Contract
+# Compatibility and cutover contract
 
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **compatibility authority, migration, cutover, and rollback**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Compatibility boundary
 
-Only accepted 0.1 COBOL, CICS, JCL/JES, dataset, RACF/security, and z/OSMF
+Only accepted platform.runtime-integration COBOL, CICS, JCL/JES, dataset, RACF/security, and z/OSMF
 selectors create compatibility obligations. All other current packages and
-selectors are excluded from 0.1 without per-selector migration work.
+selectors are excluded from platform.runtime-integration without per-selector migration work.
 
 ## Current workspace role
 
@@ -30,7 +30,7 @@ It is not:
 
 ## Freeze manifest
 
-The 0.1 freeze records:
+The platform.runtime-integration freeze records:
 
 ```text
 current source revision
@@ -78,7 +78,7 @@ correction identity is explicit. Normalization cannot hide semantic mismatch.
    both systems with no duplicate external mutation.
 4. **Explicit canary** — named selectors and principals use mainframe-env by explicit
    routing.
-5. **0.1 default** — the complete accepted 0.1 profile routes to mainframe-env.
+5. **platform.runtime-integration default** — the complete accepted platform.runtime-integration profile routes to mainframe-env.
 6. **Rollback rehearsal** — actual queued/running/suspended paths return to the
    declared previous authority where compatibility permits.
 7. **Final cutover** — mainframe-env becomes the sole default product workspace and the
@@ -98,6 +98,6 @@ correction identity is explicit. Normalization cannot hide semantic mismatch.
 
 ## Final state
 
-The final 0.1 production workspace contains no compiled dependency on the old
+The final platform.runtime-integration production workspace contains no compiled dependency on the old
 workspace and no hidden legacy fallback. Historical oracle source/evidence may
 remain archived outside the production dependency closure.

@@ -13,3 +13,7 @@ behavioral coverage.
 Invariants: all arenas and strings are bounded; unknown operations and invalid
 references fail verification; binary readers authenticate and bound payloads
 before allocation. Verify with `cargo test -p mainframe-env-ir`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

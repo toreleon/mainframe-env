@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **MQ host/interpreter maintainers**
 Scope: **connection alias translation, not executable handle or terminal authority**
-Applies from: **mainframe-env 0.15.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 
@@ -71,5 +71,5 @@ Installed root ownership/terminal publication, native OPEN/PUT/GET/properties,
 HOBJ/HMSG alias families, source-port forwarding and genuine compiled provider
 verticals remain integration work. Private fixture replies test the adapter and
 must not be reported as installed-host or licensed acceptance. All applicable
-nonlicensed full v0.15 gates remain required; only the unavailable licensed
+nonlicensed full mq.programming gates remain required; only the unavailable licensed
 oracle is human-skipped0/26.

@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **MQ contract and provider maintainers**
 Scope: **typed result storage and readonly existing-handle lookup, not service acceptance**
-Applies from: **mainframe-env 0.15.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/zosmf-closure-report@1",
+  "title": "Generated ZMF-1101 source operation backend and publication closure report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "normalization_sha256", "generated_coverage_credit", "source", "normalized", "backend", "publication", "collisions", "blockers", "zmf_1101_contracts_closed", "zosmf_0_11_exit_complete"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.zosmf-closure-report@1"},
+    "target_subsystem": {"const": "zosmf.rest"},
+    "normalization_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "generated_coverage_credit": {"const": 0},
+    "source": {"$ref": "#/$defs/count_object"},
+    "normalized": {"$ref": "#/$defs/count_object"},
+    "backend": {"$ref": "#/$defs/count_object"},
+    "publication": {"$ref": "#/$defs/count_object"},
+    "collisions": {"$ref": "#/$defs/count_object"},
+    "blockers": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "operation_count": {"type": "integer", "minimum": 1},
+          "route_key_count": {"type": "integer", "minimum": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "zmf_1101_contracts_closed": {"const": true},
+    "zosmf_0_11_exit_complete": {"const": false}
+  },
+  "$defs": {
+    "count_object": {"type": "object"}
+  }
+}

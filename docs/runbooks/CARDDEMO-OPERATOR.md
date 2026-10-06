@@ -3,7 +3,7 @@
 These commands operate only on the clean corpus selected by
 `CARDDEMO_CORPUS_DIR`. The full certification command also requires a disposable
 PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted
-`CDV1` correction is pinned in the 0.1.1 conformance contract.
+`CDV1` correction is pinned in the CardDemo workload contract.
 
 ## Owned commands
 
@@ -15,13 +15,16 @@ PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted
 | reset | `cargo xtask carddemo-operator-reset --check` | recreates the declared disposable CardDemo data/catalog fixtures and verifies the reset result; do not aim it at an authority containing unretained operator data |
 | certify | `cargo xtask carddemo-full --check` | derives all 20 journeys from lower-profile application runs, then executes memory overload/isolation, SQLite backup/restore, and PostgreSQL restart controls |
 
-For a clean 0.9 development candidate, run
-`CARDDEMO_CORPUS_DIR=<pinned-clean-checkout> cargo xtask carddemo-v09-host --check`.
-This bounded selector compares the current host token receipt with a versioned
-0.9 observation, verifies the immutable CD-008 receipt and its documented
-Db2 SQL delta, and repeats the exact resource and nine-journey base online
-comparisons. Its printed receipt includes the checked Git commit and tree.
-It does not run `carddemo-full` or grant licensed or 0.9 completion credit.
+Run the bounded host integration gate with the same pinned checkout:
+
+```bash
+CARDDEMO_CORPUS_DIR=/path/to/carddemo cargo xtask carddemo-host-integration --check
+```
+
+It validates the current host operands, resource definitions, and nine base
+online journeys. It prints the live result and does not compare deleted
+historical receipts. The full gate below is required for all 20 journeys and
+PostgreSQL restart controls.
 
 The commands are certification-safe substitutions for the pinned helper
 scripts; they do not invoke the scripts, native runtime archives, Micro Focus,
@@ -33,14 +36,14 @@ The repository scripts use `tnftp`, `SITE FILETYPE=JES`, and `PUT *.jcl` only
 as a transport for JES submission. The selected substitution is the public
 z/OSMF Jobs contract:
 
-```text
-FTP SITE FILETYPE=JES + PUT job.jcl
-  -> PUT /zosmf/restjobs/jobs
-  -> zowe zos-jobs submit local-file job.jcl
+```mermaid
+flowchart LR
+    ftp["Upstream FTP JES submission"] -->|"substitute transport"| api["PUT /zosmf/restjobs/jobs"]
+    zowe["zowe zos-jobs submit local-file job.jcl"] -->|"client"| api
 ```
 
 The pinned `FTPJCL.JCL` contains the upstream typo
-`AWS.M2.CARDEMO.FTP.TEST`. The released product retains that exact spelling as
+`AWS.M2.CARDEMO.FTP.TEST`. The framework retains that exact spelling as
 a bounded compatibility alias, but the canonical owned dataset is
 `AWS.M2.CARDDEMO.FTP.TEST`. Its selected substitution is an authenticated
 download through `GET /zosmf/restfiles/ds/AWS.M2.CARDDEMO.FTP.TEST`; it
@@ -52,12 +55,39 @@ explicitly unsupported and cannot return generic success.
 
 `CDV1` maps to `COCRDSEC`, but no original source or runtime object is present
 in the pinned corpus. The owner-approved correction supplies bounded owned demo
-source at `conformance/0.1.1/fixtures/carddemo/COCRDSEC.cbl`. It displays an
+source at `conformance/profiles/carddemo/fixtures/carddemo/COCRDSEC.cbl`. It displays an
 explicit unavailable-contract message and returns without reading or mutating
 card data. `carddemo-full` verifies the correction contract, source digest,
 compiled artifact, anonymous denial, and authenticated public CICS route; no
 environment override can silently change the disposition.
 
-The product is released locally as `0.1.1` under ADR-0007. The release commit,
-artifacts, and annotated local tag do not authorize remote push, publication,
-or deployment.
+## Prepare the real upstream corpus
+
+Check out the exact commit from
+[the corpus inventory](../../conformance/profiles/carddemo/inventory/carddemo-corpus.json):
+
+```bash
+git clone https://github.com/aws-samples/aws-mainframe-modernization-carddemo.git /path/to/carddemo
+git -C /path/to/carddemo checkout --detach 59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e
+export CARDDEMO_CORPUS_DIR=/path/to/carddemo
+cargo xtask carddemo-corpus --check
+cargo xtask carddemo-source --check
+cargo xtask carddemo-closure --check
+cargo xtask carddemo-readacct --check
+```
+
+The corpus check requires a clean checkout, the pinned origin URL, commit, Git
+tree, file counts, license, and content identities. Keep the upstream sources
+outside the framework checkout and leave their bytes unchanged.
+
+For the complete workload, provide a disposable PostgreSQL 18 database and run:
+
+```bash
+export MAINFRAME_ENV_POSTGRES_TEST_URL=postgresql://postgres@127.0.0.1:55432/mainframe_review
+cargo xtask carddemo-full --check
+```
+
+Use the connection URL for your local test database. The full gate runs 20
+application journeys, memory isolation/overload, SQLite backup and restore, and
+PostgreSQL restart controls. Keep run output outside Git. These local workload
+checks do not establish licensed IBM equivalence.

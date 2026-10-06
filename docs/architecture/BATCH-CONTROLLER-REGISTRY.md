@@ -1,9 +1,9 @@
 # Installed batch-controller registry
 
-Status: **Frozen for mainframe-env 0.2.0**
+Status: **Frozen for mainframe-env coverage.foundation**
 Owner: **batch and application maintainers**
 Scope: **installed batch-controller selection and generation registry**
-Applies from: **mainframe-env 0.2.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 JES no longer recognizes application program names. A verified, selected
 application-package generation is decoded by the composition layer into an

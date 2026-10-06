@@ -17,15 +17,15 @@ ALL = frozenset({'architecture', 'evidence', 'runtime', 'compiler', 'store', 'mu
 BUILD_OBLIGATIONS = ALL - {DOCS}
 SHARED = {
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'rustfmt.toml',
-    'clippy.toml', 'deny.toml', 'release.toml', 'VERSION', 'Jenkinsfile',
+    'clippy.toml', 'deny.toml', 'Jenkinsfile',
 }
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
 PRIMARY = ['fmt', 'spec', 'cobol', 'python-tooling-tests', 'api-docs', 'tests', 'clippy']
 POLICY = ['supply-chain', 'cargo-deny', 'license-notices']
 FULL = [
     'targets', 'documentation', 'docs', 'conformance', 'certification',
-    'evidence-seal', 'runtime-architecture', 'fuzz-smoke', 'fuzz-periodic',
-    'model-check', 'coverage-baseline', 'archive-reproduction',
+    'runtime-architecture', 'fuzz-smoke', 'fuzz-periodic',
+    'model-check', 'coverage-baseline',
 ]
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 EVENTS = frozenset({'local', 'push', 'pull_request', 'schedule', 'manual', 'tag'})
@@ -45,7 +45,7 @@ def obligations(paths: list[str]) -> list[str]:
             selected.update(ALL)
         elif path.startswith(('docs/contracts/', 'docs/architecture/', 'docs/decisions/', 'docs/compatibility/', 'docs/generated/', 'conformance/spec/')):
             selected.update(ALL)
-        elif path.startswith(('conformance/', 'release/', 'docs/releases/')):
+        elif path.startswith(('conformance/',)):
             # Evidence and obligations can refer to any subsystem. Prefer a bounded
             # superset to skipping a shared-contract obligation.
             selected.update(ALL)
@@ -74,7 +74,7 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
               provider: str = 'local') -> dict:
     if event_name not in EVENTS:
         raise ValueError(f'unsupported CI event: {event_name}')
-    full = event_name in {'schedule', 'manual', 'tag'} or ref.startswith('refs/tags/mainframe-env-v')
+    full = event_name in {'schedule', 'manual', 'tag'}
     reason = 'full-tier' if full else 'changed-paths'
     paths: list[str] = []
     if not full:
@@ -107,7 +107,6 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
     if msrv:
         gates.append('msrv')
     if 'architecture' in selected and not full: gates.append('architecture-fast')
-    if 'evidence' in selected and not full: gates.append('evidence-fast')
     if 'mutation' in selected: gates.append('mutation')
     if docs: gates.append('docs')
     if build and event_name != 'pull_request': gates.extend(['targets', 'documentation'])

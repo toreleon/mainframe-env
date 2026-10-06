@@ -1,15 +1,20 @@
 # CardDemo READACCT run bundle
 
-Set `CARDDEMO_CORPUS_DIR` to the pinned local CardDemo checkout, then run
-`cargo xtask carddemo-readacct --check`. The gate reruns the exact READACCT JCL,
-compares the logical replay digest and observations with
-`conformance/0.8/evidence/carddemo-readacct-bundle@1.json`, verifies five
-digest-pinned modernize-ai schema fixtures, and validates the local projection
-offline. The checked-in wall-clock observation belongs to the recording run;
-the check deliberately allows a different wall clock.
+Set `CARDDEMO_CORPUS_DIR` to the clean pinned upstream checkout described in the
+[operator runbook](CARDDEMO-OPERATOR.md), then run:
 
-To record a new self-recorded candidate after an intentional behavior change,
-run `cargo xtask carddemo-readacct` and review the resulting evidence diff,
-source identities and output bytes. The local projection has
-`development-only` authority and no independent conformance credit; see
-[ADR-0026](../decisions/0026-run-bundle.md).
+```bash
+cargo xtask carddemo-readacct --check
+```
+
+The gate executes the real READACCT source and JCL through the framework,
+validates the live run bundle against the retained schema, verifies its logical
+replay digest, and validates projections against five digest-pinned modernize-ai
+schemas offline. It prints return code, output count, replay digest, and the
+current wall-clock interval. Both command modes perform the same live validation;
+neither writes a historical receipt into the repository.
+
+Capture the command output outside Git when reviewing a candidate. Source and
+expected fixture identities remain checked inputs. The self-recorded local
+projection has development authority and supplies no independent conformance
+credit; see [ADR-0026](../decisions/0026-run-bundle.md).

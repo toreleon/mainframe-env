@@ -266,3 +266,7 @@ unsupported object families, clauses and additional statements. They neither
 infer current-server applicability, resolve an alias or destination qualifier,
 nor prove object existence, privileges, dependency effects or mutation. These
 partial SQL0072/SQL0105 surfaces do not add a generic dispatcher or full-row credit.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

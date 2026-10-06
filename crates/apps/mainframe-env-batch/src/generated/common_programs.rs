@@ -28,7 +28,7 @@ pub enum SystemServiceProgram {
 }
 
 pub(crate) const COMMON_PROGRAM_CATALOG_SHA256: &str =
-    "sha256:973ae4b4bf6d37ede2082fbe9200df70ed8a60c353e4be18ec0bc7dbee8cf411";
+    "sha256:c466d17d5fcefdf3f716298d3955bd64bfd3d193a4cc1ef08a063a1ab725b215";
 
 pub(crate) static COMMON_PROGRAMS: &[super::CommonProgramEntry] = &[
     super::CommonProgramEntry {

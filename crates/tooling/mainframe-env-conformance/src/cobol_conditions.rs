@@ -9,13 +9,15 @@ use mainframe_env_ir::CodecLimits;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-const BYTES: &[u8] = include_bytes!("../../../../conformance/0.4/cobol/condition-fixtures.json");
+const BYTES: &[u8] = include_bytes!(
+    "../../../../conformance/subsystems/cobol/execution/cobol/condition-fixtures.json"
+);
 const PREFIX: &str = "cobol.condition.";
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Catalog {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     fixtures: Vec<Fixture>,
 }
 #[derive(Debug, Deserialize)]
@@ -58,7 +60,7 @@ static CONDITIONED: Conditioned = Conditioned;
 pub fn verify_cobol_condition_fixtures() -> Result<(), String> {
     let catalog = catalog()?;
     if catalog.schema_version != "mainframe-env.cobol-condition-fixtures@1"
-        || catalog.target_version != "0.4.0"
+        || catalog.target_subsystem != "cobol.execution"
         || !(10..=512).contains(&catalog.fixtures.len())
     {
         return Err("COBOL condition fixture denominator drifted".into());

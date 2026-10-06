@@ -43,7 +43,7 @@ cargo test -p mainframe-env-cics
 cargo test -p mainframe-env-coverage
 cargo test -p mainframe-env-conformance cics_pilot_runs_compiler_interpreter_providers_and_real_stores -- --nocapture
 cargo test -p mainframe-env-conformance cics_pilot_sqlite_process_restart_recovers_at_bounded_file_faults -- --nocapture
-python3 -m unittest discover -s conformance/0.9/tools/tests -p 'test_*.py'
+python3 -m unittest discover -s conformance/subsystems/cics/application/tools/tests -p 'test_*.py'
 cargo xtask spec --check
 ```
 
@@ -58,7 +58,7 @@ by `PILOT.ACCTDAT`, with a two-byte key and four-byte record. The resource is
 recoverable. The two executed profiles are the in-memory product store and the
 durable SQLite product store. `IBMUSER` is allowed and `DENIED` is rejected by
 the file-resource security authority. The exact configuration is
-`conformance/0.9/cics/pilot-environment.json`; changing any behavior-relevant
+`conformance/subsystems/cics/application/cics/pilot-environment.json`; changing any behavior-relevant
 field changes its digest and invalidates observation/cache identity.
 
 The selected forms and behaviors are:
@@ -78,7 +78,7 @@ credit selects only its own typed commands, resource state, and boundary
 snapshots. A failure therefore does not make unrelated obligations fail. All
 expected command statuses and records, including both SYNCPOINT steps and the
 post-SYNCPOINT invalid REWRITE, come from
-`conformance/0.9/cics/pilot-fixtures.json`; raw application output is retained
+`conformance/subsystems/cics/application/cics/pilot-fixtures.json`; raw application output is retained
 for diagnostics only. The comparator does not call CICS or dataset semantic
 helpers to compute expectations.
 
@@ -91,7 +91,7 @@ dispositioned `defer-pending` rather than removed.
 
 ## Pinned behavioral source set
 
-`conformance/0.9/manifests/cics-file-uow-topics.json` pins nine CICS TS 6.x
+`conformance/subsystems/cics/application/manifests/cics-file-uow-topics.json` pins nine CICS TS 6.x
 topics: the READ, REWRITE, SYNCPOINT and SYNCPOINT ROLLBACK command pages;
 general updating-records, syncpoint, efficient-VSAM, authorization, and file
 control/recovery topics. The set is finite: 9 topics, 188,259 bytes outside the
@@ -142,7 +142,7 @@ or shard batches fail closed.
 - #15 prerequisites are only the already-reached compiler CICS ABI, file
   READ/REWRITE, RESP/RESP2, resource authorization, SYNCPOINT, product dataset
   provider, and memory/SQLite stores. The pilot neither waits for nor closes
-  full CICS 0.9.
+  full CICS cics.application-api.
 - #53's source-copy mutation campaign is extended to distinguish CICS product
   mutants from its existing independent-model mutants. The unchanged normal
   pilot kills data-transition, rollback and update-guard mutations.
@@ -154,7 +154,7 @@ or shard batches fail closed.
 
 The maintainer review supplied on 2026-09-08 accepted eleven rules, deferred the
 three locking fragments, and required the NOTOPEN applicability and observation
-isolation corrections recorded above. `conformance/0.9/cics/pilot-rule-review.json`
+isolation corrections recorded above. `conformance/subsystems/cics/application/cics/pilot-rule-review.json`
 is now `accepted`, and `cargo xtask spec --check` promotes only those accepted
 rules into the compiled Conformance IR. Any return to proposed/unknown decisions,
 projection drift, or stale review digest fails before scenario execution.

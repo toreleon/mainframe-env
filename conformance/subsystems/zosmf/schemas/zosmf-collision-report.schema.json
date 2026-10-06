@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/zosmf-collision-report@1",
+  "title": "Generated z/OSMF normalized route collision report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "normalization_sha256", "generated_coverage_credit", "counts", "shared_dispatch", "source_aliases", "official_custom_namespaces_disjoint", "new_route_publication_allowed"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.zosmf-collision-report@1"},
+    "target_subsystem": {"const": "zosmf.rest"},
+    "normalization_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "generated_coverage_credit": {"const": 0},
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route_keys", "shared_dispatch", "source_alias_groups", "classified", "blocked"],
+      "properties": {
+        "route_keys": {"const": 310},
+        "shared_dispatch": {"const": 14},
+        "source_alias_groups": {"const": 5},
+        "classified": {"const": 1},
+        "blocked": {"const": 13}
+      }
+    },
+    "shared_dispatch": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "path", "operation_ids", "discriminators", "resolution", "new_route_publication_allowed"],
+        "properties": {
+          "method": {"enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]},
+          "path": {"type": "string", "pattern": "^/zosmf/"},
+          "operation_ids": {"type": "array", "minItems": 2, "items": {"type": "string"}, "uniqueItems": true},
+          "discriminators": {"type": "array", "minItems": 2, "items": {"type": "string"}, "uniqueItems": true},
+          "resolution": {"enum": ["typed-request-discriminator", "blocked-pending-typed-discriminator"]},
+          "new_route_publication_allowed": {"const": false}
+        }
+      }
+    },
+    "source_aliases": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "path", "operation_id", "source_variant_count"],
+        "properties": {
+          "method": {"enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]},
+          "path": {"type": "string", "pattern": "^/zosmf/"},
+          "operation_id": {"type": "string"},
+          "source_variant_count": {"type": "integer", "minimum": 2}
+        }
+      }
+    },
+    "official_custom_namespaces_disjoint": {"const": true},
+    "new_route_publication_allowed": {"const": false}
+  }
+}

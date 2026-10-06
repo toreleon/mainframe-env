@@ -2,7 +2,7 @@
 
 Status: research baseline for planning; not a compatibility claim
 Snapshot date: 2026-09-07
-Repository baseline: `mainframe-env` 0.1.1 working tree based on commit
+Repository baseline: `mainframe-env` profile.carddemo working tree based on commit
 `857115b907ce7098c965a51117a079048ea8182e`
 
 The analysis, the row inventories and every denominator below are the
@@ -34,11 +34,11 @@ up.
 
 The practical path is:
 
-- make coverage authority and dispatch data-driven in 0.2.0;
+- make coverage authority and dispatch data-driven in coverage.foundation;
 - complete the public programming surfaces subsystem by subsystem through
-  0.15.0;
-- complete cross-resource transaction/recovery behavior in 0.16.0;
-- run licensed IBM differential certification in 0.17.0; and
+  mq.programming;
+- complete cross-resource transaction/recovery behavior in integration.transactions;
+- run licensed IBM differential certification in certification.licensed; and
 - promote 1.0.0 only when all pinned programming-surface rows are green.
 
 This program does **not** make the whole IBM product ecosystem 100% equivalent.
@@ -81,18 +81,18 @@ snapshot date, source URL, source digest, extraction method, and denominator.
 When IBM continuous-delivery documentation changes, a new baseline is created;
 the old denominator is never silently rewritten.
 
-### Executable measurement from 0.3
+### Executable COBOL structure measurement
 
-The 0.2 catalog and gate contract is the authority foundation, not the final
-conformance workflow. From 0.3, every claimed gate must flow through the shared
+The coverage.foundation catalog and gate contract is the authority foundation, not the final
+conformance workflow. From cobol.structure, every claimed gate must flow through the shared
 typed [Conformance IR](../architecture/CONFORMANCE-IR.md):
 
-```text
-official row
-  -> typed row specification and mandatory obligations
-  -> generated or registered executable bindings
-  -> canonical (row_id, obligation_id, gate, verdict) events
-  -> generated coverage ledger
+```mermaid
+flowchart TB
+    row["Official row"] --> spec["Typed specification and mandatory obligations"]
+    spec --> bindings["Generated / registered executable bindings"]
+    bindings --> events["Canonical row / obligation / gate / verdict events"]
+    events --> ledger["Generated coverage ledger"]
 ```
 
 CardDemo and other workloads remain valuable integration profiles, but a
@@ -443,25 +443,17 @@ subsystem package owns and versions its ABI assets.
 
 ## Cross-cutting target architecture
 
-```text
-official source receipts
-        |
-        v
-reviewed machine catalogs -----> generated parsers/types/validators/tests
-        |                                      |
-        v                                      v
-versioned semantic IR ----------------> registered generic handlers
-        |                                      |
-        +--------------> differential oracle <-+
-                              |
-                              v
-                 immutable coverage evidence
-
-application package
-  sources + schemas + resources + DDL/DBD/PSB/MQ/CSD/JCL + seed data
-        |
-        v
-generic compiler/providers/runtime (zero application identities)
+```mermaid
+flowchart TB
+    receipts["Official source receipts"] --> catalogs["Reviewed machine catalogs"]
+    catalogs --> generated["Generated parsers / types / validators / tests"]
+    catalogs --> ir["Versioned semantic IR"]
+    generated --> handlers["Registered generic handlers"]
+    ir --> handlers
+    ir --> oracle["Differential oracle"]
+    handlers --> oracle
+    oracle --> evidence["Immutable coverage evidence"]
+    application["Application sources, schemas, resources and seed data"] --> runtime["Generic compiler / providers / runtime"]
 ```
 
 Required cross-cutting components:
@@ -489,25 +481,24 @@ Required cross-cutting components:
 The sequencing minimizes rework. A later subsystem may prototype earlier, but
 it cannot claim completion before its dependencies and exit gates pass.
 
-| Version | Deliverable | Mandatory exit result | Estimate |
+| Subsystem phase | Deliverable | Mandatory exit result | Estimate |
 |---|---|---|---:|
-| 0.2.0 | Official coverage authority and de-hardcoding foundation | Pinned catalogs and coverage schema exist; generated dispatch works; 32 H1 production hits become zero; CardDemo remains 20/20 | 6–9 engineer-months |
-| 0.3.0 | COBOL complete grammar, directives, clauses, and semantic type/layout system | 44/44 statements, 82/82 functions, and all pinned clauses/directives recognized and validated; no compiler-owned host ABI assets | 10–15 |
-| 0.4.0 | COBOL execution and LE/host-extension completeness | All COBOL rows execute and differential gates pass, including unsupported families from 0.1 | 12–18 |
-| 0.5.0 | RACF command language and SAF | 34/34 commands, 14/14 RACROUTE types, profile segments, ACEE/token, cache, policy, certificate, audit, and recovery gates pass | 16–24 |
-| 0.6.0 | Dataset/VSAM/catalog/AMS programming surface | All pinned organizations, record access, catalog forms, 31 AMS commands, locking, RLS/TVS, and recovery rows pass | 18–30 |
-| 0.7.0 | Complete JCL converter and planner | 20/20 JCL statements; 74/74 DD, 19/19 EXEC, 35/35 JOB, 76/76 OUTPUT parameters; 13/13 JECL recognized/validated | 10–16 |
-| 0.8.0 | JES2 execution, spool, NJE/MAS, and real utilities | All JCL/JES operational rows pass; no program-name branch in batch; summary utilities replaced | 14–22 |
-| 0.9.0 | CICS application API | 263/263 API commands generated, implemented, conditioned, recovered, and differentially verified | 18–28 |
-| 0.10.0 | CICS SPI and FEPI | 269/269 unique SPI and 39/39 FEPI commands pass; resource and distributed families complete | 18–30 |
-| 0.11.0 | z/OSMF 3.2 REST portfolio | 27/27 service families and normalized route catalog pass exact protocol/error/security gates | 12–20 |
-| 0.12.0 | Generic Db2 compiler/catalog/executor | Zero Db2 application names; 158 statement and SQL PL forms recognized; common DDL/DML/query/transaction semantics pass | 24–36 |
-| 0.13.0 | Complete Db2 programming surface | Remaining SQL, routines, temporal/XML/LOB, packages/plans, privileges, isolation, diagnostics, and differential rows pass | 24–36 |
-| 0.14.0 | Complete IMS programming surface | 25/25 call families, DBD/PSB/SSA, database organizations, TM interaction, checkpoint/restart, and utilities pass | 20–32 |
-| 0.15.0 | Complete MQ programming surface | 26/26 MQI calls, objects, pub/sub, properties, callbacks, transactions, trigger/dead-letter, security, and recovery pass | 16–26 |
-| 0.16.0 | Cross-resource transaction and failure semantics | CICS/Db2/IMS/MQ/dataset/JES/RACF mixed commit, rollback, heuristic/unknown outcome, restart, and overload matrices pass | 14–22 |
-| 0.17.0 | Licensed IBM differential certification and 1.0 rehearsal | Every mandatory programming-surface row has all applicable gates green; no accepted unsupported row; reproducible certification pack | 12–20 |
-| 1.0.0 | Stable pinned programming-surface release | Exact 0.17 evidence promoted without source drift; cutover, rollback, support, and upgrade contracts complete | release gate |
+| coverage.foundation | Official coverage authority and de-hardcoding foundation | Pinned catalogs and coverage schema exist; generated dispatch works; 32 H1 production hits become zero; CardDemo remains 20/20 | 6–9 engineer-months |
+| cobol.structure | COBOL complete grammar, directives, clauses, and semantic type/layout system | 44/44 statements, 82/82 functions, and all pinned clauses/directives recognized and validated; no compiler-owned host ABI assets | 10–15 |
+| cobol.execution | COBOL execution and LE/host-extension completeness | All COBOL rows execute and differential gates pass, including unsupported families from platform.runtime-integration | 12–18 |
+| racf.security | RACF command language and SAF | 34/34 commands, 14/14 RACROUTE types, profile segments, ACEE/token, cache, policy, certificate, audit, and recovery gates pass | 16–24 |
+| dataset.data | Dataset/VSAM/catalog/AMS programming surface | All pinned organizations, record access, catalog forms, 31 AMS commands, locking, RLS/TVS, and recovery rows pass | 18–30 |
+| jcl.planning | Complete JCL converter and planner | 20/20 JCL statements; 74/74 DD, 19/19 EXEC, 35/35 JOB, 76/76 OUTPUT parameters; 13/13 JECL recognized/validated | 10–16 |
+| jes.execution | JES2 execution, spool, NJE/MAS, and real utilities | All JCL/JES operational rows pass; no program-name branch in batch; summary utilities replaced | 14–22 |
+| cics.application-api | CICS application API | 263/263 API commands generated, implemented, conditioned, recovered, and differentially verified | 18–28 |
+| cics.system-api | CICS SPI and FEPI | 269/269 unique SPI and 39/39 FEPI commands pass; resource and distributed families complete | 18–30 |
+| zosmf.rest | z/OSMF 3.2 REST portfolio | 27/27 service families and normalized route catalog pass exact protocol/error/security gates | 12–20 |
+| db2.core | Generic Db2 compiler/catalog/executor | Zero Db2 application names; 158 statement and SQL PL forms recognized; common DDL/DML/query/transaction semantics pass | 24–36 |
+| db2.programming | Complete Db2 programming surface | Remaining SQL, routines, temporal/XML/LOB, packages/plans, privileges, isolation, diagnostics, and differential rows pass | 24–36 |
+| ims.programming | Complete IMS programming surface | 25/25 call families, DBD/PSB/SSA, database organizations, TM interaction, checkpoint/restart, and utilities pass | 20–32 |
+| mq.programming | Complete MQ programming surface | 26/26 MQI calls, objects, pub/sub, properties, callbacks, transactions, trigger/dead-letter, security, and recovery pass | 16–26 |
+| integration.transactions | Cross-resource transaction and failure semantics | CICS/Db2/IMS/MQ/dataset/JES/RACF mixed commit, rollback, heuristic/unknown outcome, restart, and overload matrices pass | 14–22 |
+| certification.licensed | Licensed IBM differential certification | Every mandatory programming-surface row has all applicable gates green; no accepted unsupported row; reproducible certification pack | 12–20 |
 
 Total order-of-magnitude estimate: **244–384 engineer-months** for the pinned
 programming surfaces, assuming access to IBM environments and subject-matter
@@ -517,22 +508,22 @@ parity is materially larger and is not included in this estimate.
 
 ## Dependency and parallelism plan
 
-- 0.2.0 blocks all coverage claims and all production de-hardcoding.
-- COBOL 0.3/0.4 is required before broad embedded CICS/SQL/DLI/MQ program
+- coverage.foundation blocks all coverage claims and all production de-hardcoding.
+- COBOL cobol.structure/cobol.execution is required before broad embedded CICS/SQL/DLI/MQ program
   differentials.
-- Dataset/RACF can proceed in parallel after 0.2 and must stabilize before JES
+- Dataset/RACF can proceed in parallel after coverage.foundation and must stabilize before JES
   and CICS completion.
 - JCL/JES and CICS can then proceed in parallel.
 - z/OSMF can add families as subsystem ports become stable but cannot claim a
   route complete before its backend is complete.
-- Db2, IMS, and MQ engines can proceed in parallel after 0.2; their embedded
+- Db2, IMS, and MQ engines can proceed in parallel after coverage.foundation; their embedded
   language and CICS integration gates wait for COBOL/CICS.
-- 0.16 and 0.17 are integration/certification phases, not feature catch-up
+- integration.transactions and certification.licensed are integration/certification phases, not feature catch-up
   phases.
 
-## 0.2.0 executable backlog
+## coverage.foundation executable backlog
 
-The first minor release should contain these concrete work items:
+The coverage foundation phase should contain these concrete work items:
 
 1. Add versioned official-source receipts and the six-gate coverage schema.
 2. Normalize the COBOL 6.5, CICS 6.x, JCL/JES2 3.2, AMS 3.2, RACF/SAF 3.2,
@@ -555,12 +546,12 @@ The first minor release should contain these concrete work items:
    land.
 10. Generate z/OSMF router registration from the owned route catalog while
     keeping custom `/mainframe-env/*` routes in a separate inventory.
-11. Make the workload ledger and program-status ledger agree, and add a gate
-    that prevents future contradictory state.
+11. Keep the subsystem registry and progress records consistent with current
+    executable checks.
 12. Re-run all 260 workspace tests, explicit PostgreSQL controls, the full
     CardDemo gate, and live Zowe compatibility after de-hardcoding.
 
-0.2.0 must not increase a numerator merely because a catalog row exists. Its
+coverage.foundation must not increase a numerator merely because a catalog row exists. Its
 primary success is trustworthy measurement and zero application-specific
 production dispatch.
 
@@ -594,7 +585,7 @@ and provenance before publication.
 
 IBM continuous delivery changes denominators. Freeze each baseline and add new
 rows through a versioned compatibility decision. Never rewrite a passing old
-baseline to make a new release appear complete.
+baseline to make a new candidate appear complete.
 
 ### Performance versus correctness
 
@@ -609,7 +600,7 @@ Every source is an IBM Documentation topic set. PDF is retired: no baseline
 pins one and nothing in the repository reads one. Each link below is the book's
 own landing topic; what is actually pinned is the ordered set of topics beneath
 it, named topic by topic with a digest each in
-`conformance/0.2/manifests/`, together with the table-of-contents digest and the
+`conformance/subsystems/coverage/manifests/`, together with the table-of-contents digest and the
 content URL template that produced them. The row inventories and denominators
 below are unchanged by that: they came from these same books, and locators are
 not part of the identity digest.

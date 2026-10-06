@@ -17,3 +17,7 @@ accepted only through `ValidatedArtifact::read`, which decodes canonical IR,
 verifies the executable profile, derives the missing dialect set, and retains
 the original bytes and source-contract identity. Verify with
 `cargo test -p mainframe-env-compiler-api`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

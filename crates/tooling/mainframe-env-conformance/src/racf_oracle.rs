@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-pub const RACF_ORACLE_RELATIVE_PATH: &str = "conformance/0.5/racf/licensed-oracle.json";
+pub const RACF_ORACLE_RELATIVE_PATH: &str = "conformance/subsystems/racf/racf/licensed-oracle.json";
 const MAX_CAMPAIGN_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OBSERVATION_BYTES: usize = 65_536;
 const BASELINE_ID: &str = "ibm-zos-3.2-racf-saf-2026";

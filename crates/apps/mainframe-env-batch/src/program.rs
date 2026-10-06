@@ -1263,7 +1263,7 @@ mod tests {
             RegisteredProgramHandler::ProgramService
         );
         let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-program-registration.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-program-registration.schema.json"
         ))
         .unwrap();
         let validator = jsonschema::draft202012::options()

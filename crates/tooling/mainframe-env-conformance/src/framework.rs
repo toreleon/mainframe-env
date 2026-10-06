@@ -215,7 +215,8 @@ mod tests {
     }
     #[test]
     fn openmainframe_hello_fixture_matches_exact_oracle_output() {
-        let source = include_str!("../../../../conformance/0.1/fixtures/cobol/HELLO.cbl");
+        let source =
+            include_str!("../../../../conformance/subsystems/platform/fixtures/cobol/HELLO.cbl");
         let result = CobolCompiler::default()
             .compile(CompilerRequest {
                 source: source_bundle_with_format(source, SourceFormat::Fixed),

@@ -1,15 +1,16 @@
 # Engineering reviews
 
-Status: **Current index**
+Review work by subsystem and contract boundary. Review guidance is a decision
+input; current validation requires a run against the candidate being changed.
+Execution receipts and historical acceptance snapshots remain outside Git.
 
-Engineering reviews capture findings against an exact candidate. They are
-decision inputs, not conformance evidence, and they remain distinct from
-historical release receipts under `conformance/`.
+- [Subsystem engineering review](SUBSYSTEM-REVIEW.md): security, durability,
+  execution, storage, provider, and tooling risks.
+- [CICS command boundaries](CICS-COMMAND-BOUNDARIES.md): PROGRAM, RETRIEVE,
+  and PURGE MESSAGE promotion requirements.
+- [Current subsystem progress](../delivery/IMPLEMENTATION-STATUS.md): owning
+  phases and work packages.
 
-| Review | Candidate | Disposition |
-|---|---|---|
-| [Pre-0.9.0 deep review](PRE-0.9.0-DEEP-REVIEW.md) | `1bd294c` | No-go until all P1 findings close |
-
-When a finding is repaired, preserve the original review and add resolution,
-regression, candidate, and validation references. Do not rewrite an unfixed
-finding as closed merely because a broad test suite passes.
+Record repairs with focused regressions and a change report. Update the owning
+subsystem status when the implementation changes; a broad test pass alone does
+not close a specific finding.

@@ -8,8 +8,8 @@ fn reviewed_draft_schema_closes_the_new_projection_without_relabelling_old_catal
     let read = |path| -> serde_json::Value {
         serde_json::from_slice(&std::fs::read(root.join(path)).unwrap()).unwrap()
     };
-    let schema = read("conformance/0.15/schemas/mq-structure-status-catalog.schema.json");
-    let catalog = read("conformance/0.15/mq/structure-status-catalog.json");
+    let schema = read("conformance/subsystems/mq/schemas/mq-structure-status-catalog.schema.json");
+    let catalog = read("conformance/subsystems/mq/mq/structure-status-catalog.json");
     let validator = jsonschema::options()
         .with_draft(jsonschema::Draft::Draft202012)
         .build(&schema)
@@ -123,7 +123,7 @@ fn duplicate_occurrences_and_capacity_keep_distinct_original_request_identity() 
     assert_eq!(hashes.into_iter().collect::<BTreeSet<_>>().len(), 3);
     assert_eq!(
         MqMqiLocalTypeInquiry::projection_sha256(),
-        "8ba5dd73b8cc3870dad202885073b821c9525c993e3477f46ddb9c304a825792"
+        "0788fb791ee6a781efec7cb24a36362ab0aa86a65305c676d1c48ecaebe6311e"
     );
 }
 

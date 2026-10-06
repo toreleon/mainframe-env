@@ -1,0 +1,11 @@
+{
+  "schema_version": "mainframe-env.conformance-dependency-additions@1",
+  "target_subsystem": "cobol.structure",
+  "profile_additions": [
+    ["conformance", "mainframe-env-coverage"]
+  ],
+  "edges": [
+    ["mainframe-env-conformance", "mainframe-env-coverage"],
+    ["xtask", "mainframe-env-coverage"]
+  ]
+}

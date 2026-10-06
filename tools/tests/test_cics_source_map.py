@@ -22,7 +22,7 @@ class CicsSourceMapTests(unittest.TestCase):
     def fixture(self, root: Path) -> None:
         for relative in [
             source_map.descriptors.CATALOG_PATH,
-            Path("conformance/0.2/catalogs/cics.json"),
+            Path("conformance/subsystems/coverage/catalogs/cics.json"),
             source_map.TOC_PROJECTION_PATH,
             *(config.map_path for config in source_map.BATCHES.values()),
         ]:
@@ -237,7 +237,7 @@ class CicsSourceMapTests(unittest.TestCase):
         )
         self.assertEqual(
             mapping["mapping_sha256"],
-            "sha256:c535f2cac1072e16a0f3e252045cac975934c5e24d405a560a4e0ad14e0de726",
+            "sha256:f80aa2ebe627b6b5928fd2430bd57a0936252dd2355baaa4a50163d4138b3946",
         )
 
     def test_external_toc_projection_is_structural_and_digest_checked(self):

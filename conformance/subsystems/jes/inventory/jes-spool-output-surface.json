@@ -1,0 +1,51 @@
+{
+  "schema_version": "mainframe-env.jes-spool-output-inventory@1",
+  "target_subsystem": "jes.execution",
+  "work_package": "JES-803",
+  "authorities": {
+    "metadata": "mainframe-env-store-api.ProviderStateStore/jes-spool",
+    "payloads": "mainframe-env-store-api.ArtifactStore",
+    "job_projection": "mainframe-env-store-api.ProviderStateStore/jes-job",
+    "authorization": "mainframe-env-racf/JESJOBS"
+  },
+  "contracts": [
+    "mainframe-env.spool-request@2",
+    "mainframe-env.spool-result@2",
+    "mainframe-env.spool-state@1",
+    "mainframe-env.spool-chunk@1",
+    "mainframe-env.jes-spool@1",
+    "mainframe-env.jes-output@1"
+  ],
+  "capabilities": {
+    "host.spool.read": ["list", "read"],
+    "host.spool.write": ["append", "seal", "purge"]
+  },
+  "routing": {
+    "identity": ["job_id", "step_name", "dd_name"],
+    "selection": ["class", "destination", "writer", "forms", "copies"],
+    "jcl_sources": ["DD SYSOUT", "DD OUTPUT reference", "OUTPUT CLASS", "OUTPUT DEST", "OUTPUT OUTDISP"],
+    "authorized_controls": ["hold", "release", "route", "select", "complete", "purge"]
+  },
+  "bounds": {
+    "jobs": 16384,
+    "files_per_job": 128,
+    "records_per_file": 262144,
+    "record_bytes": 1048576,
+    "bytes_per_job": 268435456,
+    "artifacts_per_file": 262144,
+    "replays_per_job": 65536,
+    "default_retention_ticks": 86400
+  },
+  "recovery": [
+    "append metadata is CAS-published after immutable artifact creation",
+    "failed metadata publication compensates the new artifact or reports unknown-outcome",
+    "purge intent is durable before artifact deletion",
+    "purge-pending remains visible and retryable after partial deletion",
+    "legacy embedded spool migrates lazily through idempotent provider mutations"
+  ],
+  "non_claims": [
+    "physical JES2 spool parity",
+    "printer or punch device emulation",
+    "byte-for-byte JES2 spool dataset layout"
+  ]
+}

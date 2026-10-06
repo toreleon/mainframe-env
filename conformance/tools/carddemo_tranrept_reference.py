@@ -18,11 +18,11 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CORPUS = (ROOT.parents[3] / "workbench/corpora/aws-mainframe-modernization-carddemo")
-INPUT = "conformance/0.8/oracles/carddemo-tranrept-input@1.bin"
-SORT = "conformance/0.8/oracles/carddemo-tranrept-sort@1.cbl"
+DEFAULT_CORPUS = (ROOT.parent / "workbench/corpora/aws-mainframe-modernization-carddemo")
+INPUT = "conformance/subsystems/jes/oracles/carddemo-tranrept-input@1.bin"
+SORT = "conformance/subsystems/jes/oracles/carddemo-tranrept-sort@1.cbl"
 SCRIPT = "conformance/tools/carddemo_tranrept_reference.py"
-MANIFEST = ROOT / "conformance/0.8/oracles/carddemo-tranrept-reference@1.json"
+MANIFEST = ROOT / "conformance/subsystems/jes/oracles/carddemo-tranrept-reference@1.json"
 CORPUS_FILES = ["app/cbl/CBTRN03C.cbl"] + [
     f"app/cpy/{name}.cpy"
     for name in ("CVTRA05Y", "CVACT03Y", "CVTRA03Y", "CVTRA04Y", "CVTRA07Y")

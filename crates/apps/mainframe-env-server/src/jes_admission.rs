@@ -2,7 +2,7 @@
 //! and by internal-reader child admission.
 //!
 //! Split out of `product.rs` to keep it under its ADR-0010 module-review
-//! budget (`conformance/0.9/inventory/module-budgets.json`). See
+//! budget (`conformance/subsystems/cics/application/inventory/module-budgets.json`). See
 //! `docs/architecture/JES-EXECUTION.md` for the admission contract this
 //! implements: every worker-run job, including an internal-reader child, gets
 //! exactly one durable work record with the same validity and authority

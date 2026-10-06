@@ -3,7 +3,7 @@
 Status: **Frozen early additive INT-1601 prerequisite**
 Owner: **execution-contract and coordinator maintainers**
 Scope: **provider-neutral transaction participant capabilities and obligations**
-Applies from: **mainframe-env 0.16.0 early contract**
+Applies from: **mainframe-env current subsystem contracts**
 Contract: `mainframe-env.transaction-participant@1`
 
 ## Boundary
@@ -15,7 +15,7 @@ journal, store CAS operations, and service-specific fenced reconciliation
 remain the only execution authorities.
 
 The readable authority is
-`conformance/0.16/contracts/transaction-participant.json`. The generator checks
+`conformance/subsystems/integration/contracts/transaction-participant.json`. The generator checks
 its semantic invariants and writes the bounded Rust projection consumed by the
 execution contract. The Draft 2020-12 schema fixes the serialized shape. A
 reader accepts version 1 only; additive optional capability vocabulary may be
@@ -130,7 +130,7 @@ context differs across MPP/IFP/BMP/JMP/batch, and symbolic restart requires XRST
 The reference catalog is
 `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002/:0017/:0023`.
 Offline source review gives no official verdict or licensed execution credit;
-the licensed gate remains 0/25 pending and mixed-resource closure stays v0.16.
+the licensed gate remains 0/25 pending and mixed-resource closure stays integration.transactions.
 
 ## Compatibility and recovery ownership
 

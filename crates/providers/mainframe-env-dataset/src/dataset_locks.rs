@@ -1,7 +1,7 @@
 //! Dataset-name lock-conflict checks and DELETE lock retention.
 //!
 //! Split out of `service.rs` to keep it under its ADR-0010 module-review
-//! budget (`conformance/0.9/inventory/module-budgets.json`). Covers the
+//! budget (`conformance/subsystems/cics/application/inventory/module-budgets.json`). Covers the
 //! CREATE/DEFINE dataset-name reservation conflict check, the DELETE
 //! lock-ownership check, and which locks a DELETE removes versus keeps: the
 //! deleting transaction's own `Dataset`-target locks survive the delete so

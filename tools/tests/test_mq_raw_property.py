@@ -47,7 +47,7 @@ class RawPropertyTests(unittest.TestCase):
 
     def test_frozen_historical_and_existing_generated_projection_bytes(self):
         self.assertEqual(wire.historical_sha(registry.ROOT / wire.CATALOG),
-                         '3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448')
+                         '7ff640ea64ade031e55848bd6de0788b1d70471ea9a5a34df158e43390eb6332')
         for helper in [wire, raw, properties, rfh2]:
             self.assertEqual(helper.render(registry.ROOT), (registry.ROOT / helper.OUTPUT).read_text())
         self.assertEqual(registry._contract_digest(registry.load_contract()),

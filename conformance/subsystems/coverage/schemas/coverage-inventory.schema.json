@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/coverage-inventory@1",
+  "title": "mainframe-env 0.2 coverage inventory artifacts",
+  "type": "object",
+  "required": [
+    "schema_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "mainframe-env.coverage-contract-inventory@1",
+        "mainframe-env.coverage-dependency-additions@1",
+        "mainframe-env.coverage-package-additions@1"
+      ]
+    },
+    "target_subsystem": {
+      "const": "coverage.foundation"
+    },
+    "contracts": {
+      "type": "object"
+    },
+    "compatibility": {
+      "type": "object"
+    },
+    "edges": {
+      "type": "array"
+    },
+    "packages": {
+      "type": "array"
+    },
+    "dependency_edges": {
+      "type": "array"
+    },
+    "production_profile_membership": {
+      "type": "boolean"
+    },
+    "rust": {
+      "type": "object"
+    },
+    "profiles": {
+      "type": "object"
+    },
+    "sql_schema": {
+      "type": "integer"
+    },
+    "migration_head": {
+      "type": "string"
+    },
+    "evidence_schema": {
+      "type": "string"
+    },
+    "fixture_schema": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "mainframe-env.coverage-contract-inventory@1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "target_subsystem",
+          "contracts",
+          "compatibility"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "mainframe-env.coverage-dependency-additions@1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "target_subsystem",
+          "edges"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "mainframe-env.coverage-package-additions@1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "target_subsystem",
+          "packages",
+          "dependency_edges",
+          "production_profile_membership"
+        ]
+      }
+    }
+  ]
+}

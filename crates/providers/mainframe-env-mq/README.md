@@ -29,3 +29,7 @@ It is a provider-owned kernel; the existing host request routes do not yet
 execute these object forms. Queue service names preserve case and strip only
 permitted trailing blanks or a null ending significant data. Invalid names
 are rejected before state mutation.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/generated-semantic-identities@1",
+  "title": "mainframe-env generated official semantic identity manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "contract", "catalog_index", "catalog_index_sha256", "identity_set_sha256", "official_identity_count", "handler_registration_count", "coverage_credit"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.generated-semantic-identities@1"},
+    "target_subsystem": {"const": "coverage.foundation"},
+    "contract": {"const": "mainframe-env.generated-semantic-identity@1"},
+    "catalog_index": {"const": "conformance/subsystems/coverage/catalogs/index.json"},
+    "catalog_index_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "identity_set_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "official_identity_count": {"const": 1506},
+    "handler_registration_count": {"type": "integer", "minimum": 0},
+    "coverage_credit": {"const": 0}
+  }
+}

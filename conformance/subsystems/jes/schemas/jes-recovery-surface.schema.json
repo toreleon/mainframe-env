@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/jes-recovery-surface.schema.json",
+  "title": "JES restart, cancellation, overload, and recovery inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "work_package",
+    "checkpoint",
+    "restart",
+    "cancellation",
+    "overload",
+    "backup_restore",
+    "migration",
+    "state_migration_digests",
+    "licensed_differential"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jes-recovery-inventory@1"},
+    "target_subsystem": {"const": "jes.execution"},
+    "work_package": {"const": "JES-806"},
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "authority", "writer_schema", "machine_schema", "integrity", "purge"],
+      "properties": {
+        "contract": {"const": "mainframe-env.jes-checkpoint@1"},
+        "authority": {"const": "mainframe-env-store-api.CheckpointStore"},
+        "writer_schema": {"type": "integer", "minimum": 1},
+        "machine_schema": {"type": "integer", "minimum": 1},
+        "integrity": {"const": "sha256"},
+        "purge": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "restart": {"$ref": "#/$defs/boundedUniqueStrings"},
+    "cancellation": {"$ref": "#/$defs/boundedUniqueStrings"},
+    "overload": {"$ref": "#/$defs/boundedUniqueStrings"},
+    "backup_restore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "restored_authorities", "integrity_check_required"],
+      "properties": {
+        "profile": {"type": "string", "minLength": 1, "maxLength": 256},
+        "restored_authorities": {"$ref": "#/$defs/boundedUniqueStrings"},
+        "integrity_check_required": {"const": true}
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["readers", "writer", "strategy"],
+      "properties": {
+        "readers": {"$ref": "#/$defs/boundedUniqueStrings"},
+        "writer": {"type": "string", "minLength": 1, "maxLength": 128},
+        "strategy": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "state_migration_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conformance/subsystems/jes/schemas/jes-durable-job.schema.json",
+        "conformance/subsystems/jes/schemas/jes-runtime.schema.json",
+        "conformance/subsystems/jes/schemas/spool-state.schema.json",
+        "conformance/subsystems/jes/migrations/jes-durable-job-v1-to-v2.json",
+        "conformance/subsystems/jes/migrations/jes-embedded-spool-to-artifacts.json"
+      ],
+      "properties": {
+        "conformance/subsystems/jes/schemas/jes-durable-job.schema.json": {"$ref": "#/$defs/sha256"},
+        "conformance/subsystems/jes/schemas/jes-runtime.schema.json": {"$ref": "#/$defs/sha256"},
+        "conformance/subsystems/jes/schemas/spool-state.schema.json": {"$ref": "#/$defs/sha256"},
+        "conformance/subsystems/jes/migrations/jes-durable-job-v1-to-v2.json": {"$ref": "#/$defs/sha256"},
+        "conformance/subsystems/jes/migrations/jes-embedded-spool-to-artifacts.json": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "licensed_differential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_scenarios", "result_authority", "candidate_identity", "gate"],
+      "properties": {
+        "required_scenarios": {"const": 16},
+        "result_authority": {"const": "conformance/subsystems/jes/evidence/jes-806-matrix.json"},
+        "candidate_identity": {"const": "cargo xtask jes-oracle-candidate"},
+        "gate": {"const": "cargo xtask jes-oracle --check"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "boundedUniqueStrings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 256}
+    }
+  }
+}

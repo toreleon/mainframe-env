@@ -7,7 +7,7 @@ fn candidate() -> CompiledCandidate {
     ))
     .unwrap();
     let catalog: Value = serde_json::from_slice(include_bytes!(
-        "../../../../../conformance/0.2/catalogs/ims.json"
+        "../../../../../conformance/subsystems/coverage/catalogs/ims.json"
     ))
     .unwrap();
     let rows = catalog["units"][0]["rows"]

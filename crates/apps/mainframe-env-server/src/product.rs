@@ -8200,10 +8200,11 @@ mod tests {
             "cf5de374e76c07ff001af9a20053fd8692f55337a4ebece2085ce62c436d58db";
         const HISTORICAL_SEMANTIC_ID: &str =
             "semantic-sha256:f27f98bc6fa22cc145c9df52483b26346b2e1a9aac3272df49fa14f731ec45c9";
-        const HISTORICAL_B64: &str =
-            include_str!("../../../../conformance/0.9/cobol/artifact-v2-c029219.b64");
+        const HISTORICAL_B64: &str = include_str!(
+            "../../../../conformance/subsystems/cics/application/cobol/artifact-v2-c029219.b64"
+        );
         let provenance: Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.9/cobol/artifact-v2-c029219.json"
+            "../../../../conformance/subsystems/cics/application/cobol/artifact-v2-c029219.json"
         ))
         .unwrap();
         assert_eq!(provenance["source_commit"], HISTORICAL_SOURCE_COMMIT);
@@ -21963,8 +21964,9 @@ mod tests {
                 10_000,
             )
             .unwrap();
-        let der =
-            include_bytes!("../../../../conformance/0.9/cics/fixtures/cics-client-certificate.der");
+        let der = include_bytes!(
+            "../../../../conformance/subsystems/cics/application/cics/fixtures/cics-client-certificate.der"
+        );
         let owner = CicsCertificateName {
             common_name: b"CLIENT-EXAMPLE".to_vec(),
             country: b"US".to_vec(),

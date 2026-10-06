@@ -139,7 +139,7 @@ async fn exercise(backend: StoreProfile) {
     verify_carddemo_corpus(
         &corpus,
         &Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json"),
+            .join("../../../conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .unwrap();
     let artifact_root = env::temp_dir().join(format!("raw-dli-{}-{backend:?}", std::process::id()));

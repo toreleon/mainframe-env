@@ -1,0 +1,39 @@
+{
+  "schema_version": "mainframe-env.jes-licensed-differential-adapter@1",
+  "target_subsystem": "jes.execution",
+  "baseline_id": "ibm-zos-3.2-jcl-jes2-2026-06",
+  "required_product": "z/OS 3.2 JES2 execution environment",
+  "receipt_environment_variable": "MAINFRAME_ENV_JES_LICENSED_ORACLE_RECEIPT",
+  "candidate_identity": {
+    "algorithm": "sha256",
+    "domain": "mainframe-env.jes-oracle-candidate@1",
+    "source": "git-index",
+    "command": "cargo xtask jes-oracle-candidate",
+    "excluded_derived_paths": [
+      "conformance/subsystems/jes/evidence/jes-806-matrix.json",
+      "docs/delivery/subsystems/jes/execution-status.md"
+    ]
+  },
+  "required_scenarios": [
+    "submission-admission",
+    "class-priority-selection",
+    "initiator-capacity",
+    "hold-release-cancel",
+    "condition-return-code-abend",
+    "restart-committed-step",
+    "dd-allocation-disp",
+    "spool-read-retention-purge",
+    "output-selection-routing",
+    "started-task-start-stop",
+    "internal-reader-submission",
+    "nje-node-routing",
+    "mas-member-ownership",
+    "utility-families",
+    "overload-bounds",
+    "unknown-outcome-reconciliation"
+  ],
+  "licensed_receipt_required_for_pass": true,
+  "generated_historical_or_local_result_counts_as_pass": false,
+  "publication_bytes_retained": false,
+  "oracle_binary_retained": false
+}

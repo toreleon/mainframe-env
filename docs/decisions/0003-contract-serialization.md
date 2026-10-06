@@ -3,12 +3,12 @@
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **owned contracts, serialization, durable identity, and evolution**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 Decision scope: **Public DTOs, durable state, artifacts, evidence, and hashes**
 
 ## Context
 
-0.1 needs long-lived artifacts, checkpoints, execution records, z/OSMF payloads,
+platform.runtime-integration needs long-lived artifacts, checkpoints, execution records, z/OSMF payloads,
 configuration, and compatibility evidence. Rust layout and ordinary serializer
 output are not stable contracts.
 
@@ -23,7 +23,7 @@ state.
 
 ### Formats
 
-| Data | 0.1 format |
+| Data | platform.runtime-integration format |
 |---|---|
 | Product configuration | versioned TOML with explicit precedence |
 | z/OSMF requests/responses | route-specific JSON/text/binary compatibility formats |
@@ -80,7 +80,7 @@ versions.
 
 ## Rationale
 
-Protobuf is not required by the 0.1 in-process architecture and ordinary
+Protobuf is not required by the platform.runtime-integration in-process architecture and ordinary
 Protobuf serialization is not canonical for hashing. Human-readable versioned
 metadata makes early compatibility review easier, while owned binary codecs
 keep executable IR independent of Rust serialization internals.

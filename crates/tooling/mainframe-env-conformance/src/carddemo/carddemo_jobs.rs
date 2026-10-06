@@ -2,7 +2,7 @@
 //! spool-log diagnostic for a job that did not finish as expected.
 //!
 //! Split out of `carddemo.rs` to keep it under its ADR-0010 module-review
-//! budget (`conformance/0.9/inventory/module-budgets.json`). Covers the
+//! budget (`conformance/subsystems/cics/application/inventory/module-budgets.json`). Covers the
 //! z/OSMF poll (`wait_for_submitted_job`), the listed-job poll used by the
 //! internal-reader wait (`wait_for_listed_job`), the ABEND submit-and-wait
 //! helper (`submit_expected_abend`), and the shared timeout and poll

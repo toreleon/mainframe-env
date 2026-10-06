@@ -10,7 +10,11 @@ changing a public or durable boundary.
 
 ## Development setup
 
-The repository pins Rust in `rust-toolchain.toml` and commits `Cargo.lock`.
+Start with the [getting-started guide](docs/guides/GETTING-STARTED.md) to verify
+your toolchain and run one local program. The repository pins Rust in
+`rust-toolchain.toml` and commits `Cargo.lock`. Run commands from the checkout
+root. Choose a focused package build/test while developing; the commands below
+are the workspace integration entry points.
 
 ```bash
 cargo build --workspace --all-features --locked
@@ -23,9 +27,24 @@ environment. A skipped external test receives no evidence credit.
 
 ## Change workflow
 
+Use a `codex/<topic>` branch from current `origin/main`. For documentation
+contributions, begin with the [documentation authoring guide](docs/guides/README.md#maintain-documentation).
+For a defect report, include the exact revision, command, sanitized fixture,
+actual output, and expected behavior. Report security findings privately through
+[SECURITY.md](SECURITY.md).
+
+```mermaid
+flowchart LR
+    scope["Identify owning contract and phase"] --> branch["Create focused branch"]
+    branch --> change["Change implementation or documentation"]
+    change --> generated["Regenerate derived files"]
+    generated --> verify["Focused validation and required policy"]
+    verify --> review["Reviewable PR with evidence and limitations"]
+```
+
 Find the owning phase in the [subsystem progress overview](docs/delivery/IMPLEMENTATION-STATUS.md)
 and read its plan and progress record. Update that record after bounded work;
-release versions remain compatibility metadata. Regenerate subsystem indexes
+Cargo package versions and schema revisions remain build and compatibility metadata. Regenerate subsystem indexes
 and navigation with `cargo xtask docs`.
 
 1. Start from a clean branch and preserve unrelated user changes.
@@ -40,8 +59,7 @@ and navigation with `cargo xtask docs`.
 6. Update user-visible documentation and add a unique
    [`changes/unreleased`](changes/README.md) fragment in the same change. Do not
    edit `CHANGELOG.md` directly in parallel feature pull requests.
-7. Keep implementation, release promotion, publication, and deployment as
-   separate decisions.
+7. Keep implementation changes and source publication as separate decisions.
 
 Install the repository-local documentation-manifest merge driver once per
 clone before maintaining parallel worktrees:
@@ -51,7 +69,7 @@ python3 -B tools/setup_git_merge_drivers.py
 ```
 
 Feature branches run `cargo xtask changelog --check` and continue to regenerate
-the documentation manifest normally. Release or batch integration runs
+the documentation manifest normally. Batch integration runs
 `cargo xtask changelog` once to consume all fragments, update `CHANGELOG.md`,
 and regenerate the manifest in one reviewed metadata commit.
 
@@ -62,7 +80,7 @@ checks. During development, select the narrowest meaningful test for the changed
 behavior; expand only when a changed boundary or unresolved failure requires it.
 The following is a command inventory for applicable gates, not a request to run
 the entire list after every edit, commit, or PR operation. CI owns the selected
-integration run; full/release and explicitly requested acceptance gates remain
+integration run; full and explicitly requested acceptance gates remain
 required. See [the workflow](docs/runbooks/VERIFICATION-WORKFLOW.md).
 
 | Change | Development validation |
@@ -72,6 +90,23 @@ required. See [the workflow](docs/runbooks/VERIFICATION-WORKFLOW.md).
 | Rust behavior | Focused regression and affected package tests/lints |
 | Shared/durable/public boundary | Affected consumers, compatibility, failure/recovery, backend parity |
 | Oracle adapter, fixture, or semantic evidence | Relevant deterministic pilot first; required licensed/promotion gate at its acceptance boundary |
+
+For a documentation change, the normal gate sequence is:
+
+```bash
+cargo xtask docs
+cargo xtask docs --check
+cargo xtask changelog --check
+cargo xtask license-notices --check
+cargo deny check
+git diff --check
+```
+
+Preview changed Mermaid diagrams in a compatible renderer and verify runnable
+examples when their commands or behavior change. Preserve generated navigation
+markers and regenerate its registry-owned content. After each build/test/lint/
+generator sequence, run `cargo clean` for this checkout and preserve receipts
+outside disposable target directories. Do not clean shared or unrelated caches.
 
 ## Validation command inventory
 
@@ -107,8 +142,8 @@ be committed. Python bytecode, local credentials, and service databases must
 stay untracked.
 
 Preserve both Cargo lockfiles, fuzz seed corpora, conformance fixtures/evidence,
-and reviewed `release/` records. Avoid broad extension rules that hide these
-inputs. Inspect ignored files before cleanup: local audit directories, release
+and subsystem specifications. Avoid broad extension rules that hide these
+inputs. Inspect ignored files before cleanup: local audit directories, generated
 bundles, and unsupported offline experiments can contain useful work. Cleanup
 should remove only identified disposable artifacts, not every ignored file.
 
@@ -140,7 +175,7 @@ Keep modules and pull requests centered on one reason to change.
 [ADR-0010](docs/decisions/0010-rust-module-review-budgets.md) enforces a hard
 1,200-production-line maximum for new/non-exempt Rust modules; reviewed legacy
 exceptions have exact non-growing ceilings and recorded stable split
-boundaries. Large release programs should use bounded work-package reviews
+boundaries. Large subsystem programs should use bounded work-package reviews
 while incomplete behavior remains unreachable from the public profile; the
 final integrated candidate must still pass the complete exit gate.
 

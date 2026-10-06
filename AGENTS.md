@@ -44,7 +44,7 @@ complete.
 Under `crates/`: `foundation/` owns primitives, `contracts/` interfaces,
 `kernel/` compilation/execution, `providers/` subsystems, `apps/` entry points,
 `gateways/` z/OSMF, and `stores/` persistence. `xtask/`/`tools/` own verification;
-`conformance/` holds fixtures/catalogs/evidence; `fuzz/` holds targets/corpora;
+`conformance/` holds subsystem specifications/fixtures/catalogs; `fuzz/` holds targets/corpora;
 `docs/` contains architecture/runbooks.
 
 ## Build, Test, and Development Commands
@@ -65,7 +65,7 @@ risks, or explicit acceptance requirements. Reuse unchanged exploratory results
 across edits/commits/PRs. Never relabel old candidate receipts.
 
 IBM topic lookup is offline reference review. Whole-cache audits, network refreshes,
-CardDemo-full, licensed oracles, fuzz/coverage campaigns, and release certification
+CardDemo-full, licensed oracles, fuzz/coverage campaigns, and licensed certification
 require relevant scope or an explicit gate. Report unavailable required evidence;
 do not retry unchanged infrastructure or lower acceptance criteria. See the
 [verification workflow](docs/runbooks/VERIFICATION-WORKFLOW.md).
@@ -89,7 +89,7 @@ applicable. Cover negative cases, recovery, authorization, backend parity, and
 Use `codex/<topic>` branches and prefixes `feat(dev):`, `fix(ir):`, `docs:`, or
 `ci:`. Preserve unrelated changes. PRs explain behavior, issues, checks/skips,
 and migration risks. Parallel feature PRs add a unique TOML file under
-`changes/unreleased/` instead of editing `CHANGELOG.md`; release or batch
+`changes/unreleased/` instead of editing `CHANGELOG.md`; batch
 integration consumes the fragments with `cargo xtask changelog`. Regenerate
 derived documentation normally and install the repository merge driver with
 `python3 -B tools/setup_git_merge_drivers.py`. Add ADRs for boundary changes.

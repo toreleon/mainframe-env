@@ -2,11 +2,10 @@
 
 Subsystem: **integration**
 Phase: **transactions**
-Target release: **0.16.0**
 
-Status: **Early INT-1601 participant boundary sealed; 0.16.0 is not complete**
+Status: **Early INT-1601 participant boundary sealed; integration.transactions is not complete**
 Candidate base: `782c65830845ae2c0ddc7289977521fcaf3fa3fa` (`origin/main`)
-Branch: `codex/parallel-v0.16-int1601`
+Branch: `codex/parallel-integration.transactions-int1601`
 
 ## Bounded objective
 
@@ -15,7 +14,7 @@ CICS, Db2, IMS, and MQ mutating adapters integrate. It preserves the accepted
 execution coordinator, canonical effect journal, provider row stores, security
 authority, recovery worker, and retention lifecycle. It adds no public route,
 profile capability, mixed-provider behavior, universal prepare/2PC behavior,
-exactly-once claim, or final 0.16 coverage result.
+exactly-once claim, or final integration.transactions coverage result.
 
 The contract has no official coverage denominator of its own. Its accepted CICS
 mapping is an executable compatibility boundary for application row `0218`
@@ -39,7 +38,7 @@ owned by INT-1601 and INT-1604–INT-1606 on an accepted dependency candidate.
 ## Contract ownership and applicability
 
 - Contract owner: `mainframe-env-execution-api`, projected from
-  `conformance/0.16/contracts/transaction-participant.json`.
+  `conformance/subsystems/integration/contracts/transaction-participant.json`.
 - Runtime authority: the existing `ExecutionCoordinator`; no participant may
   add another effect journal, recovery ledger, security evaluator, or retry
   loop.
@@ -86,14 +85,14 @@ atomicity, or exactly-once execution.
 | Provider | Early binding | Required before integration |
 |---|---|---|
 | CICS | accepted mapping to the existing local and owned-DPL syncpoint boundary | The bounded compatibility suite in this lane; later public DPL and full mixed-resource obligations remain pending |
-| Db2 | pending | Accepted 0.13-owned participant capabilities plus mutation/failure/replay/restart evidence |
-| IMS | pending | Accepted 0.14-owned participant capabilities plus mutation/failure/replay/restart evidence |
-| MQ | pending | Accepted 0.15-owned participant capabilities plus mutation/failure/replay/restart evidence |
+| Db2 | pending | Accepted db2.programming-owned participant capabilities plus mutation/failure/replay/restart evidence |
+| IMS | pending | Accepted ims.programming-owned participant capabilities plus mutation/failure/replay/restart evidence |
+| MQ | pending | Accepted mq.programming-owned participant capabilities plus mutation/failure/replay/restart evidence |
 
-Final v0.16 still depends on accepted 0.8, 0.10, 0.13, 0.14, and 0.15
+Final integration.transactions still depends on accepted jes.execution, cics.system-api, db2.programming, ims.programming, and mq.programming
 candidates and completion of INT-1601 through INT-1606 on one unchanged
 candidate. This status document must not be used as a release, licensed oracle,
-provider-pass, or full-v0.16 receipt.
+provider-pass, or full-integration.transactions receipt.
 
 ## Validation disposition
 
@@ -104,9 +103,9 @@ formatting, and diff checks pass for this slice. Current main already locks
 `Cargo.lock` delta and does not require a separate dependency-policy rerun.
 
 Two unrelated accepted-base failures were diagnosed once and left outside this
-slice: the global schema pass reaches an overlong historical 0.8 CardDemo note,
+slice: the global schema pass reaches an overlong historical jes.execution CardDemo note,
 and the full architecture-fast pass reaches an existing `CARDDEMO` word in a
-dataset replay-index performance comment. The 0.16 contract schemas compile,
+dataset replay-index performance comment. The integration.transactions contract schemas compile,
 their instances validate, and the new participant freshness guard passes before
 that unchanged architecture ratchet failure.
 
@@ -132,12 +131,12 @@ Db2/IMS/MQ provider pass. PostgreSQL was not rerun because this slice changes no
 store or durable participant implementation; its existing accepted evidence is
 not relabeled to this candidate.
 
-## IMS-1406.participant-binding — prepared v0.14 slice; admission pending
+## IMS-1406.participant-binding — prepared ims.programming slice; admission pending
 
-Parent: `IMS-1406`; target: `0.14.0`. This provider-owned slice consumes the
+Parent: `IMS-1406`; target: `ims.programming`. This provider-owned slice consumes the
 early `INT-1601.participant-schema` prerequisite and prepares the IMS binding
 required before INT-1601 adapter integration. It does not close INT-1601 or
-v0.16 mixed-resource integration. Candidate base is
+integration.transactions mixed-resource integration. Candidate base is
 `213ed878ec138bdb2914330db6613559bffc5a86`; branch is
 `codex/v014-ims-participant-20261002`. The inspected implementation includes
 the public recovery bridge. No official row or
@@ -189,7 +188,7 @@ The exact guarantee/owner gaps are recorded in
 `docs/contracts/TRANSACTION-PARTICIPANT-V1.md`; unowned production changes were
 not guessed or added. CICS and the future Db2/MQ bindings retain their prior
 dispositions. The prepared slice can pass its own tests while IMS admission,
-parent IMS-1406, INT-1601, and the 0.14/0.16 milestones remain pending.
+parent IMS-1406, INT-1601, and the ims.programming/integration.transactions milestones remain pending.
 
 Offline `ibm_docs.py search/read` verified the recovery scope's TOC and the
 selected topic hashes using `ims-1405-topic-cache` (no network refresh). Source
@@ -233,6 +232,6 @@ cache in `ims-participant-binding`. No durable row schema or migration changed.
 
 Provider-owned lanes may now consume `mainframe-env.transaction-participant@1`
 only after supplying their pending capability declarations and required
-mutation/failure/replay/restart evidence. Keep parent `INT-1601` and v0.16.0 in
+mutation/failure/replay/restart evidence. Keep parent `INT-1601` and integration.transactions in
 progress until the full mixed-resource, recovery, operator-resolution, and
 coherent-restore gates pass on one accepted candidate.

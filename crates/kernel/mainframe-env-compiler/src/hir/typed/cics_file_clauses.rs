@@ -1,7 +1,7 @@
 //! CICS READ/REWRITE file operand and record-length clause lowering.
 //!
 //! Split out of `typed.rs` to keep it under its ADR-0010 module-review
-//! budget (`conformance/0.9/inventory/module-budgets.json`). Builds the
+//! budget (`conformance/subsystems/cics/application/inventory/module-budgets.json`). Builds the
 //! `FILE`/`DATASET`/`FROM`/`RIDFLD` named operands plus the `LENGTH` and
 //! `KEYLENGTH` operands (halfword binary data items or `LENGTH OF`), and
 //! computes the `READ ... LENGTH` output write-back binding.

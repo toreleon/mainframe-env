@@ -3,7 +3,7 @@
 Status: Implemented store prerequisite; provider/native inquiry remains pending.
 Owner: store contract and Memory/SQLite adapter maintainers.
 Scope: atomic provider read assertions, receipt/audit publication and replay fences.
-Applies from: mainframe-env 0.15.0
+Applies from: mainframe-env mq.programming
 
 ## Decision
 

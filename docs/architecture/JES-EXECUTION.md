@@ -1,9 +1,9 @@
 # JES execution, scheduling, spool, and utilities
 
-Status: **Normative from mainframe-env 0.8.0**
+Status: **Normative from mainframe-env jes.execution**
 Owner: **JES, batch, and spool maintainers**
 Scope: **JES execution, scheduling, spool, and utility behavior**
-Applies from: **mainframe-env 0.8.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Authority boundary
 
@@ -11,9 +11,9 @@ Applies from: **mainframe-env 0.8.0**
 does not own a second work queue, dataset catalog, lock table, security policy,
 effect journal, checkpoint store, artifact store, or program catalog. Durable
 job projections use `ProviderStateStore/jes-job`; asynchronous claims continue
-through the common `WorkStore`; dataset DD effects use the 0.6 dataset
+through the common `WorkStore`; dataset DD effects use the dataset.data dataset
 authority; and every admission, selection, execution, output, and control route
-uses the 0.5 SAF authority.
+uses the racf.security SAF authority.
 
 JCL remains a non-program language path under
 [ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md): its
@@ -39,11 +39,22 @@ The public contracts are:
 
 The projected lifecycle is:
 
-```text
-submitted -> held <-> queued -> selected -> running -> output -> completed
-     |          |         |         |          |          |
-     +----------+---------+---------+----------+----------+-> cancelled
-                                      +---------------------> failed
+```mermaid
+stateDiagram-v2
+    submitted --> held
+    held --> queued
+    queued --> held
+    queued --> selected
+    selected --> running
+    running --> output
+    output --> completed
+    submitted --> cancelled
+    held --> cancelled
+    queued --> cancelled
+    selected --> cancelled
+    running --> cancelled
+    output --> cancelled
+    running --> failed
 ```
 
 No state may jump directly from queued to running or completed. Selection is a
@@ -93,9 +104,9 @@ closed rather than becoming successful output.
 
 ## DD, effect, and restart rules
 
-DD resolution is a typed phase over the immutable 0.7 plan. Allocation,
+DD resolution is a typed phase over the immutable jcl.planning plan. Allocation,
 catalog, GDG, member, record, lock, and lifecycle effects are requests to the
-0.6 dataset authority. Mutations use stable job/step/effect identities. JES
+dataset.data dataset authority. Mutations use stable job/step/effect identities. JES
 checkpoints retain the completed-step set, monotonic effect sequence, temporary
 and GDG resolution map, cancellation state, and an integrity digest. A retry
 must replay recorded provider results or surface `unknown-outcome`; it may not
@@ -105,7 +116,7 @@ Normal and abnormal DISP are evaluated only after the typed program outcome is
 known. Concatenation remains ordered. Temporary datasets are scoped to the job
 identity and are removed at their specified terminal disposition or bounded job
 cleanup. Cross-resource outcomes remain explicit under the common UOW contract;
-0.8 does not claim the 0.16 mixed-provider matrix.
+jes.execution does not claim the integration.transactions mixed-provider matrix.
 
 `mainframe-env.jes-dd-allocation@1` classifies every accepted DD as dataset,
 inline data, DUMMY, or SYSOUT before an effect is issued. Dataset status and
@@ -253,7 +264,7 @@ CAS, preserving all legacy fields and deriving pending step executions from the
 immutable plan without running effects. A failed or conflicting migration
 publishes no partial state. The finite reader range and rollback projection are
 recorded in
-`conformance/0.8/migrations/jes-durable-job-v1-to-v2.json`.
+`conformance/subsystems/jes/migrations/jes-durable-job-v1-to-v2.json`.
 
 Step transitions publish the job projection first and then a digest-bound
 `mainframe-env.jes-checkpoint@1` envelope through the common `CheckpointStore`.
@@ -284,6 +295,6 @@ models, CardDemo, generated catalogs, or historical transcripts cannot produce
 16-scenario receipt from an attested licensed z/OS 3.2 JES2 environment whose
 candidate digest matches the live repository. Under the user-approved
 2026-09-04 development disposition, absence of that receipt leaves differential
-credit at 0/16 and does not block 0.8 implementation completion; the unchanged
-campaign remains a hard 0.17 release-certification gate. Hercules, MVS 3.8J,
+credit at 0/16 and does not block jes.execution implementation completion; the unchanged
+campaign remains a hard certification.licensed release-certification gate. Hercules, MVS 3.8J,
 local models, and current-product observations receive zero licensed credit.

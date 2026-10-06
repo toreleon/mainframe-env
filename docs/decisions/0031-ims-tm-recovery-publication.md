@@ -3,8 +3,8 @@
 Status: **Proposed; shared contract-owner decision required**
 Owner: **store/execution contracts and coordinator maintainers, with host and IMS owners**
 Scope: **proposed shared publication/settlement boundary; no actual TM recovery admission**
-Applies from: **mainframe-env 0.14.0 investigation; implementation pending owner decision**
-Parent: **IMS-1405; mixed-resource closure remains INT-1601/0.16**
+Applies from: **mainframe-env current subsystem contracts**
+Parent: **IMS-1405; mixed-resource closure remains INT-1601/integration.transactions**
 
 ## Bounded delivery
 
@@ -70,7 +70,7 @@ CHKP, `:0005` GU/GN, `:0008` ISRT and `:0024` TERM; PURG is supplemental.
 All paths below start with `SSEPH2_15.6.0/`.
 
 Baseline **`ibm-ims-15.6-recovery-utilities-2026-09-11`**, manifest
-`conformance/0.14/manifests/ims-recovery-utilities-contracts-topics.json`:
+`conformance/subsystems/ims/manifests/ims-recovery-utilities-contracts-topics.json`:
 
 | Topic | SHA-256 | Decision constraint |
 |---|---|---|
@@ -83,7 +83,7 @@ Baseline **`ibm-ims-15.6-recovery-utilities-2026-09-11`**, manifest
 | `com.ibm.ims156.doc.apg/ims_chckpntcallsintro.htm` | `c3aaf84e538be688d44af8fe9072e6cb00c47e4f9e46277f2ba22aa053be013d` | MPP/IFP use basic checkpoint; BMP/JMP/batch forms differ. |
 
 Baseline **`ibm-ims-15.6-tm-contracts-2026-09-11`**, manifest
-`conformance/0.14/manifests/ims-tm-contracts-topics.json`:
+`conformance/subsystems/ims/manifests/ims-tm-contracts-topics.json`:
 
 | Topic | SHA-256 | Decision constraint |
 |---|---|---|

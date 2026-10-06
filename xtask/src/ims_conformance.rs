@@ -27,13 +27,13 @@ fn load(root: &Path) -> TaskResult<(CompiledCandidate, ImsCandidateRuntime)> {
     )?;
     let fixture_value = json(&fixture_path)?;
     validate_schema_instance(
-        &json(&root.join("conformance/0.14/schemas/ims-metadata.schema.json"))?,
+        &json(&root.join("conformance/subsystems/ims/schemas/ims-metadata.schema.json"))?,
         &fixture_value["metadata"],
         &fixture_path,
     )?;
     let digest = format!(
         "sha256:{}",
-        file_digest(&root.join("conformance/0.2/catalogs/index.json"))?
+        file_digest(&root.join("conformance/subsystems/coverage/catalogs/index.json"))?
     );
     let candidate = CompiledCandidate::compile_json(
         &digest,
@@ -82,10 +82,10 @@ fn validate_source(root: &Path, source: &CandidateSource) -> TaskResult {
     require(
         matches!(
             source.manifest.as_str(),
-            "conformance/0.14/manifests/ims-programming-contracts-topics.json"
-                | "conformance/0.14/manifests/ims-database-contracts-topics.json"
-                | "conformance/0.14/manifests/ims-recovery-utilities-contracts-topics.json"
-                | "conformance/0.14/manifests/ims-status-explanations-topics.json"
+            "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json"
+                | "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json"
+                | "conformance/subsystems/ims/manifests/ims-recovery-utilities-contracts-topics.json"
+                | "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json"
         ),
         "IMS candidate source is outside the bounded pinned manifests",
     )?;
@@ -172,7 +172,8 @@ mod tests {
         CompiledCandidate::compile_json(
             &format!(
                 "sha256:{}",
-                file_digest(&root.join("conformance/0.2/catalogs/index.json")).unwrap()
+                file_digest(&root.join("conformance/subsystems/coverage/catalogs/index.json"))
+                    .unwrap()
             ),
             official_catalog_rows(&root).unwrap(),
             &serde_json::to_vec(value).unwrap(),
@@ -184,7 +185,8 @@ mod tests {
         let root = root();
         let mut source = CandidateSource {
             baseline: "ibm-ims-15.6-status-explanations-2026-09-11".into(),
-            manifest: "conformance/0.14/manifests/ims-status-explanations-topics.json".into(),
+            manifest: "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json"
+                .into(),
             topic_path: "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm".into(),
             sha256: "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82".into(),
             anchor: "plain_text:4-8;current hold is required".into(),
@@ -198,7 +200,7 @@ mod tests {
         assert!(validate_source(&root, &source).is_ok());
         source.baseline = "unreviewed-baseline".into();
         assert!(validate_source(&root, &source).is_err());
-        source.manifest = "conformance/0.14/manifests/unregistered.json".into();
+        source.manifest = "conformance/subsystems/ims/manifests/unregistered.json".into();
         assert!(validate_source(&root, &source).is_err());
     }
 

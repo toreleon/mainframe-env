@@ -2,10 +2,9 @@
 
 Subsystem: **dataset**
 Phase: **data**
-Target release: **0.6.0**
 
 Status: **Implemented — pass-with-licensed-differential-pending**
-Start gate: 0.2 catalog/handler/package/store contracts frozen
+Start gate: coverage.foundation catalog/handler/package/store contracts frozen
 Completion dependencies: coverage.foundation
 Estimate: 18–30 engineer-months
 
@@ -46,7 +45,7 @@ Catalog/allocation and record-access teams can work independently after shared
 metadata freezes. AMS handlers can proceed command-family by command-family.
 Locking/recovery integration is serialized with provider-state transactions.
 
-0.6 can run with 0.3, 0.5, and 0.7. It must stabilize before JES DD execution,
+dataset.data can run with cobol.structure, racf.security, and jcl.planning. It must stabilize before JES DD execution,
 CICS file completion, IMS storage integration, and z/OSMF full dataset routes.
 
 ## Exit gate
@@ -61,7 +60,7 @@ CICS file completion, IMS storage integration, and z/OSMF full dataset routes.
   31 AMS identities, documented state/recovery relations, explicit
   capability/unknown boundaries, and representative mutants.
 - Licensed z/OS 3.2 dataset/VSAM/AMS differential remains exactly 0/36 pending;
-  its real reviewed campaign is mandatory in the 0.17 release-certify gate.
+  its real reviewed campaign is mandatory in the certification.licensed release-certify gate.
 - Existing CardDemo records, keys, generations, aliases, and bytes remain exact.
 
 ## Non-goals

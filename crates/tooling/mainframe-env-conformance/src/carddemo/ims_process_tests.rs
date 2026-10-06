@@ -12,7 +12,7 @@ fn corpus_package_sqlite_recovers_after_process_exit() {
     verify_carddemo_corpus(
         &corpus,
         &Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json"),
+            .join("../../../conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .unwrap();
     let root = env::temp_dir().join(format!(

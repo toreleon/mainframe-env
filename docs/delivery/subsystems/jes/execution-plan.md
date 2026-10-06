@@ -2,10 +2,9 @@
 
 Subsystem: **jes**
 Phase: **execution**
-Target release: **0.8.0**
 
 Status: **Proposed**
-Start gate: 0.5 SAF, 0.6 allocation/locking, and 0.7 typed-plan contracts frozen
+Start gate: racf.security SAF, dataset.data allocation/locking, and jcl.planning typed-plan contracts frozen
 Completion dependencies: racf.security, dataset.data, jcl.planning
 Estimate: 14–22 engineer-months
 
@@ -44,8 +43,8 @@ Scheduling, spool/output, utility families, and restart/failure injection can
 run independently behind the frozen plan and state interfaces. DD lifecycle
 and authorization changes are serialized with the dataset and SAF owners.
 
-After its dependencies freeze, 0.8 can run alongside 0.9, 0.12, 0.14, and
-0.15. Cross-resource commit behavior is exercised here but finalized in 0.16.
+After its dependencies freeze, jes.execution can run alongside cics.application-api, db2.core, ims.programming, and
+mq.programming. Cross-resource commit behavior is exercised here but finalized in integration.transactions.
 
 ## Exit gate
 
@@ -59,7 +58,7 @@ After its dependencies freeze, 0.8 can run alongside 0.9, 0.12, 0.14, and
 - Under the user-approved 2026-09-04 completion policy, the licensed z/OS
   3.2/JES2 differential remains explicit at 0/16 pending, the disposition is
   `pass-with-licensed-differential-pending`, the standalone oracle stays
-  fail-closed, and the real campaign is handed to the 0.17
+  fail-closed, and the real campaign is handed to the certification.licensed
   release-certification hard gate.
 
 ## Non-goals

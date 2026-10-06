@@ -10,9 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[cfg(test)]
 const COMMAND_CATALOG: &str =
-    include_str!("../../../../conformance/0.5/racf/command-language.json");
+    include_str!("../../../../conformance/subsystems/racf/racf/command-language.json");
 #[cfg(test)]
-const REQUEST_CATALOG: &str = include_str!("../../../../conformance/0.5/racf/racroute.json");
+const REQUEST_CATALOG: &str =
+    include_str!("../../../../conformance/subsystems/racf/racf/racroute.json");
 const UNKNOWN_CASES: [&str; 4] = [
     "exact-cryptographic-material",
     "installation-exits",

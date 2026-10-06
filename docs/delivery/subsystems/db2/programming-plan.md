@@ -2,21 +2,20 @@
 
 Subsystem: **db2**
 Phase: **programming**
-Target release: **0.13.0**
 
 Status: **Proposed**
-Start gate: 0.12 parser, binder, catalog, relational IR, and transaction contracts frozen
+Start gate: db2.core parser, binder, catalog, relational IR, and transaction contracts frozen
 Completion dependencies: db2.core
 Estimate: 24–36 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
 
 ## Outcome
 
-Complete the pinned Db2 13 SQL and programming surface over the generic 0.12
+Complete the pinned Db2 13 SQL and programming surface over the generic db2.core
 engine, including advanced objects, routines, packages, locking, and recovery.
 
 ## Owned scope
@@ -45,7 +44,7 @@ engine, including advanced objects, routines, packages, locking, and recovery.
 
 ## Pinned platform and advanced-obligation closure
 
-DB2-1301 consumes the frozen 0.12 common/deferred obligation map and closes the
+DB2-1301 consumes the frozen db2.core common/deferred obligation map and closes the
 remaining obligations in the same 174-row catalog (158 SQL headings and 16 SQL
 PL rows). Any correction requires reviewed source provenance; do not import Db2
 LUW features merely because they share a product name. SQL module objects are
@@ -64,11 +63,11 @@ the existing external-substrate semantic-gap rules continue to apply.
 ## Parallelization
 
 Advanced type/query, routine/trigger, package/plan, and lock/recovery cohorts can
-run in parallel behind 0.12 contracts. Catalog mutation and dependency graph
+run in parallel behind db2.core contracts. Catalog mutation and dependency graph
 updates have one owner; statement families may not introduce private catalogs.
 
-0.13 can run alongside 0.10, 0.11, 0.14, and 0.15. Its final transaction and
-recovery evidence becomes an input to 0.16.
+db2.programming can run alongside cics.system-api, zosmf.rest, ims.programming, and mq.programming. Its final transaction and
+recovery evidence becomes an input to integration.transactions.
 
 ## Exit gate
 
@@ -79,7 +78,7 @@ recovery evidence becomes an input to 0.16.
 - Catalog changes, invalidation, authorization, and rollback are atomic across
   every supported failure point.
 - Licensed Db2 13 differentials pass for the complete pinned surface.
-- The 0.12 common subset and CardDemo database behavior remain exact.
+- The db2.core common subset and CardDemo database behavior remain exact.
 
 ## Non-goals
 

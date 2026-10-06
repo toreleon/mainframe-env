@@ -2,7 +2,6 @@
 
 Subsystem: **mq**
 Phase: **programming**
-Target release: **0.15.0**
 
 Status: **Implementation active**
 
@@ -63,7 +62,7 @@ This is a bounded structural read, not a whole-graph/phantom/configuration fence
 total-heap quota, publication permission, physical claim clock or atomic
 Work/Job/absentCore admission. Fixtures and orderly SQLite reopen grant no
 installed/native/SAF/JES/crash/full26 credit. Actual controller ownership,
-supervised handover, late-failure consumption and all other nonlicensed v0.15
+supervised handover, late-failure consumption and all other nonlicensed mq.programming
 acceptance remain required. All26 full-call gates stay Pending; fullv0.15 remains
 unfinished. Only the licensed IBM oracle is human-skipped0/26, with zero credit.
 
@@ -323,7 +322,7 @@ Genuine enclosing controller ownership/ControllerExit/stop latch, private server
 JesClaimRun, physical Work/Job decision-time expiry, scheduled compiled/root
 terminal policy and DefaultContext/JES/GMT remain required separate work. Fixture
 ports are not installed/native/JES/SAF/crash or full26 evidence. Source credit0;
-only licensed oracle human-skipped0/26. All nonlicensed v0.15 acceptance remains
+only licensed oracle human-skipped0/26. All nonlicensed mq.programming acceptance remains
 required and unfinished.
 
 ## Initial-root preparation store prerequisite
@@ -355,7 +354,7 @@ decision-time fencing remain separate work. Logical freshness is not physical
 JES expiry after writer-lock wait. No dynamic enrollment, fabricated intent,
 RunningLifecycle bypass, terminal decision, history release or deployed migration
 is supplied. Source credit0; only licensed oracle human-skipped0/26. Native-root,
-recovery/participants/full26/CardDemo and all other nonlicensed v0.15 gates remain
+recovery/participants/full26/CardDemo and all other nonlicensed mq.programming gates remain
 required and unfinished.
 
 ## Separately pinned inquiry attribute source prerequisite
@@ -365,7 +364,7 @@ required and unfinished.
 baseline `ibm-mq-9.4-inquiry-attribute-sources-2026-09-12`. The bounded
 [source note](inquiry-source-boundary.md) records queue-type values, applicability
 and name-field declarations with exact hashes, parser locators and remaining
-gaps. Manifest SHA1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949;
+gaps. Manifest SHA2a015ae7e74819b603d2b07a0d7af5eef172623550be86f7fc8e74189b3eb294;
 topic-set SHA463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527.
 Retained topic paths were checked first; absent files resolved to exact verified
 raw shards and deterministic metadata/old pinned TOC. Publication last-modified
@@ -488,7 +487,7 @@ OPEN0019, PUT0020, reference PUT10021 and call-list q101650_; supplement
 baseline2026-09-12 MD q097390_/q097395_, GMO q096715_ and PMO q098655_.
 Source credit0; no refresh or publication bodies in Git. Historical d8 dependency
 policy is reused only for all32 unchanged inputs. Only the licensed oracle is
-human-skipped0/26; full v0.15 and other nonlicensed acceptance remain unfinished.
+human-skipped0/26; full mq.programming and other nonlicensed acceptance remain unfinished.
 
 ## Installed supplied zero and binary correlation IDs
 
@@ -519,7 +518,7 @@ No production/compiler/provider/store/schema/default policy changes. Historical
 d8 deny reuse requires all32 unchanged inputs, not fresh deny/CI. Generated IDs,
 genuine JES/DefaultContext, fresh-root succession, recovery/participants/retention,
 shared IR/full26/CardDemo and other nonlicensed acceptance remain mandatory.
-Only the licensed oracle is human-skipped0/26; full v0.15 remains unfinished.
+Only the licensed oracle is human-skipped0/26; full mq.programming remains unfinished.
 
 ## Compiled supplied correlation IDs
 
@@ -552,7 +551,7 @@ Historical d8 dependency policy is reused only for all32 exact inputs, not
 fresh deny/CI. Generated IDs, broader profiles, fresh-root succession,
 installed DefaultContext/JES/GMT, recovery/participants/shared IR/full26 and
 CardDemo acceptance remain required. Only the licensed oracle is human-skipped
-0/26; full v0.15 remains unfinished.
+0/26; full mq.programming remains unfinished.
 
 ## Current composed finite RFH2 prerequisite
 
@@ -601,7 +600,7 @@ reused, not fresh cargo-deny/CI acceptance. No passing tests are relabeled.
 Offline retained-first actual search/read covers original baseline2026-08-31
 BUFMHrow0003/q101710_ and MHBUFrow0018/q101860_ (positions18/25), programming/
 property supplements, and RFH2 baseline2026-09-12 manifest
-117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a.
+48b8c66fe4da276608bd2bff0cca073f770e1841ea326fdf8b85e75d8da169ee.
 BMHO initializer, MHBO reason spelling, RFH structure-ID spelling and i8-limit
 source conflicts remain explicitly pending. Source review earns zero execution
 or licensed credit; no browser/network refresh or source bodies enter Git.
@@ -695,7 +694,7 @@ eight-path/blob,124historical binding,61command receipt,17external artifact,
 15source pin,five pre-run snapshot and32dependency checks. The independent scope
 `mq-rfh2-sources`, baseline `ibm-mq-9.4-rfh2-sources-2026-09-12`, pins15topics/
 478640bytes; manifest SHA
-`117444c499722c1bbbfb687fe76405c87e109ca0d09db9b8d50771991c549b1a`.
+`48b8c66fe4da276608bd2bff0cca073f770e1841ea326fdf8b85e75d8da169ee`.
 Original BUFMHrow0003/MHBUFrow0018 sourcepositions3/18/25 remain26unique/27total;
 original27/supplement80/layout12/property12/recovery1 and new producer9 manifests,
 1030statuses/10pending reasons and old runtime/codec/projection bytes stay exact.
@@ -748,7 +747,7 @@ nine source-pin, 22 pre-run snapshot and 32 dependency-input verification.
 The shared independent registry now includes nine exact retained topics under
 `mq-producer-attribute-sources`, baseline
 `ibm-mq-9.4-producer-attribute-sources-2026-09-12`; manifest SHA
-`8e6ee63586f57c7ee8fb872cb8f8dec0b1c81d66a8f1d2bc4991df32d5a924b0`.
+`c596e95c3b295cf99be7cf0def764fc6a685c52a1799a7f99b53f6fc5fee6333`.
 Original MQPUT/MQPUT1 rows0020/0021, original27/supplement80/layout12/property12/
 recovery1 bindings and the26/27 denominator remain exact. Actual retained-first
 SHA/bytes/metadata/TOC and offline repository search/read checks pass, with no
@@ -1141,7 +1140,7 @@ The additive `mq-point-layout-sources` scope now registers twelve hash-verified
 retained MQ 9.4 layout/scalar/encoding topics independently of the frozen
 80-topic programming supplements and original 27 call positions. Its baseline
 is `ibm-mq-9.4-point-layout-sources-2026-09-12`; manifest SHA-256 is
-`128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa`.
+`40142139c033bea0426d1c489469c1239c8897554c6e0a013a64cff1bdfc1e46`.
 The shared reader and registry keep separate scope closure and zero credit.
 This supplies sources for subsequent reviewed layout projections, not numeric
 admission, wire execution, a new browser capture or licensed certification.
@@ -1165,7 +1164,7 @@ The independent `mq-property-sources` scope now registers twelve retained topics
 for property names/restrictions, descriptor mapping, variable strings and property
 option/structure/copy constants, baseline
 `ibm-mq-9.4-property-sources-2026-09-12`, manifest SHA-256
-`f1537d0ab7feba5c7260e5dced3e9878b5bf999b274e0254f888fc1d78d96ba7`.
+`5b452011d141285b7ad8d7f064ef87d74d73e9dd19e5368da2ed23bd951a6509`.
 Frozen original27/supplemental80/layout12 bindings remain unchanged. Hash-verified
 archive metadata and retained bytes are not refreshed browser capture, semantic
 admission or execution evidence; the in-progress archive's reproduction/freshness
@@ -1230,8 +1229,8 @@ routing and durable service integration remain deliberately unclaimed.
 ## Source review
 
 The denominator authority is baseline `ibm-mq-9.4-mqi-2026-08-31`, catalog
-`conformance/0.2/catalogs/mq.json`, and manifest
-`conformance/0.2/manifests/mq-topics.json`. The call list is pinned at
+`conformance/subsystems/coverage/catalogs/mq.json`, and manifest
+`conformance/subsystems/coverage/manifests/mq-topics.json`. The call list is pinned at
 `SSFKSJ_9.4.0/refdev/q101650_.html`, SHA-256
 `24025a9f40dfc613b8243fef16f902a94794a9fbe517730ae1b6c489a338009f`.
 The 26 other call topics are pinned in the same manifest. Matching retained
@@ -1765,16 +1764,16 @@ goal mode/bypass and no nested workers or orchestration skill:
 - N owns `MQ-1505.rich-state-publication-fence`: the same rich authority's bounded
   ordinary delta and explicit checked persisted fence plan, exact marker/meta/
   catalog CAS, no automatic recovery decision or adoption before full commit.
-- O owns `MQ-1501.supplemental-source-pins`: a separate zero-credit 0.15 manifest
+- O owns `MQ-1501.supplemental-source-pins`: a separate zero-credit mq.programming manifest
   and shared-reader registry extension for the exact 80 inventory topics. The
-  immutable 0.2 call baseline and pending semantic states remain unchanged.
+  immutable coverage.foundation call baseline and pending semantic states remain unchanged.
 - M owns `MQ-1505.original-effect-core-intent-binding`: original service admission
   bound to a real retained coordinator intent and the same physical PlatformStore
   audited transaction. No fabricated intent, private journal, SAF permission,
   UOW minting, public selection or core completion is supplied by this boundary.
 
 O sealed source registration at `86d2b18d` (80 topics, manifest SHA-256
-`7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a`);
+`d6b4ec6f15426df98f529c144fb5d5320be0e74a2a82598d54a95712c2b9866a`);
 the manager integrates the same source/reader/registry bytes after selected
 service commit `830f0164`. Fresh integration runs cover the 27 reader and ten
 xtask topic-manifest tests, plus exact offline selected-scope reproduction and
@@ -1840,7 +1839,7 @@ opaque handle outputs without live/historical authority. No public token
 reconstruction, new journal/pruner, reader namespace allowance or readiness is
 introduced. Minimal pure delivery-codec reuse must retain existing cold/live
 bytes. Actual receipt/CAS/core-reference/retention and historical handle replay
-remain manager obligations, not omitted v0.15 scope.
+remain manager obligations, not omitted mq.programming scope.
 
 The manager integrates M's final sealed `af2e56bc` original-effect/core-intent
 binding. It recomputes digest, capability and origin from the immutable original,
@@ -1909,7 +1908,7 @@ publication, adoption after success, coordinator-owned completion, exact Complet
 receipt replay and fenced Unknown resolution. Warning/error output, opaque handle
 replay, nested CICS/IMS ownership and all remaining applicable contexts are not
 waived by a successful first ordinary batch flow. Public readiness, participant
-acceptance and full v0.15 completion remain unclaimed.
+acceptance and full mq.programming completion remain unclaimed.
 
 The manager's `MQ-1501.typed-machine-connection-route` owns the first original
 typed machine effects for source rows `0008` MQCONN and `0012` MQDISC and an
@@ -1956,7 +1955,7 @@ handoff regressions pass, with no failures or ignored tests. The worker's other
 host-contract receipts remain separately bound to its original candidate.
 Dependency policy is reused only under the same verified 32-input identity
 proof described above. No provider receipt row, service mutation, journal,
-public route or full-v0.15 acceptance is implied by this pure storage feature.
+public route or full-mq.programming acceptance is implied by this pure storage feature.
 
 The next declared isolated CLI slices are `MQ-1505.historical-handle-result-replay`
 (N: strict historical identity plus all-entry registry rejection and checked
@@ -2086,7 +2085,7 @@ same corrected PATH. Older Python receipts retain their actual interpreter and
 candidate identities; they are not relabeled. Rust 1.98 results are unchanged.
 Dependency policy reuse verifies the original receipt and all 32 unchanged
 inputs. The unrelated batch module overage remains unwaived. Only the licensed
-oracle is skipped with zero credit; full v0.15 acceptance remains incomplete.
+oracle is skipped with zero credit; full mq.programming acceptance remains incomplete.
 
 ## Typed frame setup and source-snapshot guards
 
@@ -2184,7 +2183,7 @@ assembly, package-v2, IMS service and CardDemo conformance exceed their recorded
 counts; several previously extracted modules need lower-count inventory refresh.
 Those untouched inputs are not waived, and this batch repair is not a passing
 global module gate or full-release acceptance. They require distinct scoped
-repairs with verification before the final v0.15 candidate can pass that gate.
+repairs with verification before the final mq.programming candidate can pass that gate.
 
 ## Explicit native point and source facets
 
@@ -2225,7 +2224,7 @@ volatile connection alias storage, not forwarding. HOBJ/HMSG alias families,
 compiled original OPEN/PUT/GET/property writeback, genuine pending-PUT normal/
 native-Abend root terminal, recovery/participants/IR/CardDemo and all applicable
 nonlicensed full26 acceptance remain required. Only the licensed oracle is
-human-skipped0/26 with zero credit; the parent v0.15 goal stays active.
+human-skipped0/26 with zero credit; the parent mq.programming goal stays active.
 
 ## Complete GET read-only native binding
 
@@ -2260,7 +2259,7 @@ GMO q096715 lines1260–1268 defines the actual ResolvedQName output, but the
 existing FullGot result does not contain it. This feature does not synthesize
 that output from cached queue facts, alter canonical/replay bytes or claim
 native GET writeback readiness. The additive result and installed ABI forwarding
-remain required, alongside full nonlicensed v0.15 acceptance. Only the licensed
+remain required, alongside full nonlicensed mq.programming acceptance. Only the licensed
 oracle is human-skipped0/26; no other gate is waived.
 
 ## Owned reconciled raw property structures
@@ -2303,7 +2302,7 @@ baseline2026-09-12 q093580/q093600. The manager reproduced all eight selected
 topics and forty exact fragment locators with retained-first SHA/byte checks.
 Declaration/short-name/z/OS availability disagreements remain explicit, and
 source review/raw fixtures earn zero installed native, official or licensed
-execution credit. All nonlicensed parent v0.15 gates remain required; only the
+execution credit. All nonlicensed parent mq.programming gates remain required; only the
 licensed oracle is human-skipped0/26.
 
 ## Root publication failure contracts
@@ -2414,7 +2413,7 @@ PMO q098655. Source/native IBM/official/licensed credit0. Removed GET,
 DefaultContext/JES/GMT/generated IDs/defaults, broad forms, owning recovery/
 checkpoint/retention, participants/IR/full26/CardDemo/public selection and all
 other nonlicensed acceptance remain required. Only licensed oracle skipped0/26;
-full native-root and v0.15 completion are not claimed.
+full native-root and mq.programming completion are not claimed.
 
 ## Installed qualified complete GET host
 
@@ -2446,7 +2445,7 @@ producer-root normal commit -> fresh GET root proof. Owning scope succession,
 HardenGetBackout crash accuracy/default, source-known commit-impossible fallback,
 DefaultContext/JES/GMT/IDs, recovery/retention/participants/IR/full26/CardDemo and
 public/default selection remain mandatory. Only licensed oracle skipped0/26;
-full native-root/v0.15 completion is not claimed.
+full native-root/mq.programming completion is not claimed.
 
 ## Finite complete PUT queue defaults
 
@@ -2507,7 +2506,7 @@ QM/queue CCSID, maxima and delivery sequence. All eight pins were independently
 reproduced after retained-first hash/byte checks; source review earns zero credit.
 Native GMO writeback and the all-argument MD/GMO/body/length/status join remain
 separate work, as do installed forwarding, root/recovery/participants, IR,
-CardDemo and full nonlicensed v0.15 acceptance. Only the licensed oracle is
+CardDemo and full nonlicensed mq.programming acceptance. Only the licensed oracle is
 human-skipped0/26; the parent goal remains active.
 
 ## Compiled OPEN/CLOSE and root-shared object aliases
@@ -2546,7 +2545,7 @@ PUT/PUT1 still require the complete Produced observation and existing descriptor
 context/PMO all-argument writer, with actual configured Foundation encoder.
 Genuine installed root-shared allocation and same-service profile wrappers,
 compiled pendingPUT normal/CEE3ABD and removedGET terminal proofs, recovery,
-participants, IR/full26/CardDemo remain required. Parent v0.15 stays active;
+participants, IR/full26/CardDemo remain required. Parent mq.programming stays active;
 only the unavailable licensed oracle is human-skipped0/26 with zero credit.
 
 ## Qualified GMO1 result staging

@@ -2,7 +2,7 @@
 //!
 //! Split out of `service.rs` to keep `BatchService`'s core state machine
 //! under its ADR-0010 module-review budget
-//! (`conformance/0.9/inventory/module-budgets.json`). The gateway's JES
+//! (`conformance/subsystems/cics/application/inventory/module-budgets.json`). The gateway's JES
 //! admission helper (`mainframe-env-server`) uses this to find every child a
 //! worker-run parent wrote to `SYSOUT=(A,INTRDR)` and to read each child's own
 //! admitted plan, so it can compute the child's own capabilities rather than

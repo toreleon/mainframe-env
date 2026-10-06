@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **host-contract and IMS provider maintainers**
 Scope: **IMS-1401.selected-pcb-feedback, owned host projection**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 `ImsResult` has no owned PCB/key-feedback output. Adding fields to its frozen
 canonical object would change historical effect and replay identities. Reading

@@ -2,8 +2,8 @@
 
 Status: Accepted bounded transport prerequisite; host activation remains pending.
 Owner: **Batch and host-contract maintainers**
-Scope: **MQ-1503.running-step-program-transport, target 0.15.0**
-Applies from: **mainframe-env 0.15.0 development**
+Scope: **MQ-1503.running-step-program-transport, target mq.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

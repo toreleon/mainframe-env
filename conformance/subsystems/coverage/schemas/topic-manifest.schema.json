@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/topic-manifest@1",
+  "title": "mainframe-env documentation-topic manifest for one official baseline",
+  "description": "The set of IBM Documentation topics a baseline was read from, one line per topic, with the digest that pins the set. The topic bytes themselves are never retained in the repository; this manifest is what a re-fetch is verified against.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "baseline_id",
+    "subsystem",
+    "product",
+    "book_label",
+    "book_href",
+    "toc_url",
+    "toc_sha256",
+    "content_url_template",
+    "snapshot_date",
+    "topic_count",
+    "total_bytes",
+    "topic_manifest_digest",
+    "topic_manifest_digest_definition",
+    "coverage_credit",
+    "retained_in_repository",
+    "topics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.topic-manifest@1"
+    },
+    "target_subsystem": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)?$"
+    },
+    "baseline_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "subsystem": {
+      "type": "string",
+      "minLength": 2
+    },
+    "product": {
+      "type": "string",
+      "minLength": 2
+    },
+    "book_label": {
+      "type": "string",
+      "minLength": 2
+    },
+    "book_href": {
+      "$ref": "#/$defs/topic-path"
+    },
+    "toc_url": {
+      "type": "string",
+      "pattern": "^https://www\\.ibm\\.com/docs/api/v1/toc/.+\\?lang=en$"
+    },
+    "toc_sha256": {
+      "$ref": "#/$defs/hex"
+    },
+    "content_url_template": {
+      "const": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en"
+    },
+    "snapshot_date": {
+      "type": "string",
+      "minLength": 4
+    },
+    "topic_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "topic_manifest_digest": {
+      "$ref": "#/$defs/hex"
+    },
+    "topic_manifest_digest_definition": {
+      "const": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex"
+    },
+    "coverage_credit": {
+      "const": 0
+    },
+    "retained_in_repository": {
+      "const": false
+    },
+    "repin": {
+      "$ref": "#/$defs/repin"
+    },
+    "repins": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/repin"
+      }
+    },
+    "topics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic_path",
+          "sha256",
+          "bytes",
+          "last_modified"
+        ],
+        "properties": {
+          "topic_path": {
+            "$ref": "#/$defs/topic-path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/hex"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_modified": {
+            "type": "string",
+            "minLength": 4
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "topic-path": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+\\.html?$"
+    },
+    "repin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue",
+        "topic_path",
+        "superseded_sha256",
+        "superseded_bytes",
+        "superseded_last_modified",
+        "superseded_manifest_file_sha256",
+        "verification_method",
+        "verified_on"
+      ],
+      "properties": {
+        "issue": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "topic_path": {
+          "$ref": "#/$defs/topic-path"
+        },
+        "superseded_sha256": {
+          "$ref": "#/$defs/hex"
+        },
+        "superseded_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "superseded_last_modified": {
+          "type": "string",
+          "minLength": 4
+        },
+        "superseded_manifest_file_sha256": {
+          "$ref": "#/$defs/hex"
+        },
+        "verification_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verified_on": {
+          "type": "string",
+          "minLength": 4
+        }
+      }
+    }
+  }
+}

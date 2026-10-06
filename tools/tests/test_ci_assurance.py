@@ -20,7 +20,7 @@ class SelectionTests(unittest.TestCase):
             'crates/stores/mainframe-env-store/src/durable.rs': {'store','runtime'},
             'Jenkinsfile': ci.ALL,
             'tools/jenkins/disk_guard.py': ci.ALL,
-            'conformance/0.8/evidence/receipt.json': ci.ALL,
+            'conformance/subsystems/jes/evidence/receipt.json': ci.ALL,
             'docs/contracts/effect-canonical-v1.md': {ci.DOCS},
             'docs/architecture/RUNTIME.md': {ci.DOCS},
         }.items():
@@ -30,12 +30,12 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(set(ci.obligations([path])), ci.ALL)
     def test_cics_pilot_manifest_review_fixture_observation_and_provider_paths_are_selected(self):
         for path, required in {
-            'conformance/0.9/manifests/cics-file-uow-topics.json': ci.ALL,
-            'conformance/0.9/cics/pilot-rule-review.json': ci.ALL,
-            'conformance/0.9/cics/pilot-fixtures.json': ci.ALL,
-            'conformance/0.9/cobol/move-rule-review.json': ci.ALL,
-            'conformance/0.9/cobol/move-fixture.json': ci.ALL,
-            'conformance/0.9/oracles/cics-licensed-differential.json': ci.ALL,
+            'conformance/subsystems/cics/application/manifests/cics-file-uow-topics.json': ci.ALL,
+            'conformance/subsystems/cics/application/cics/pilot-rule-review.json': ci.ALL,
+            'conformance/subsystems/cics/application/cics/pilot-fixtures.json': ci.ALL,
+            'conformance/subsystems/cics/application/cobol/move-rule-review.json': ci.ALL,
+            'conformance/subsystems/cics/application/cobol/move-fixture.json': ci.ALL,
+            'conformance/subsystems/cics/application/oracles/cics-licensed-differential.json': ci.ALL,
             'crates/tooling/mainframe-env-conformance/src/cics_pilot.rs': {'architecture','evidence','runtime'},
             'crates/tooling/mainframe-env-conformance/src/cobol_move_pilot.rs': {'architecture','evidence','runtime'},
             'crates/tooling/mainframe-env-conformance/src/cics_licensed.rs': {'architecture','evidence','runtime'},
@@ -79,29 +79,16 @@ class SelectionTests(unittest.TestCase):
         self.assertFalse(plan['build'])
         self.assertEqual(plan['primary_gates'],['supply-chain','cargo-deny','license-notices','docs'])
 
-    def test_jenkins_and_offline_release_bundle_enforce_license_distribution(self):
-        jenkins=(ROOT/'Jenkinsfile').read_text()
-        self.assertIn('--gate cargo-deny -- cargo deny check',jenkins)
-        self.assertIn('--gate license-notices -- cargo xtask license-notices --check',jenkins)
-        self.assertIn('--gate supply-chain',jenkins)
-        self.assertIn('--gate msrv',jenkins)
-        self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked',jenkins)
-        self.assertIn("command -v cargo-deny",jenkins)
-        self.assertIn("mainframe-env-release-ed25519-pkcs8",jenkins)
-        self.assertIn('MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:',jenkins)
-        for required in [
-            'config/release-attestation-policy.json',
-            'conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64',
-            'docs/architecture/RELEASE-BUILDER.md',
-            'docs/contracts/RELEASE-BUILD-V1.md',
-        ]:
-            self.assertIn(required,jenkins)
-        bundle=(ROOT/'tools/package_offline_cargo_bundle.sh').read_text()
-        for required in ['LICENSE','NOTICE','LICENSES/ICU.txt']:
-            self.assertIn(f'"$root/{required}"',bundle)
-        policy=(ROOT/'deny.toml').read_text()
-        self.assertIn('crate = "decnumber-sys@=0.1.6"',policy)
-        self.assertIn('allow = ["ICU"]',policy)
+    def test_jenkins_enforces_dependency_policy_and_current_subsystem_checks(self):
+        jenkins = (ROOT / 'Jenkinsfile').read_text()
+        self.assertIn('--gate cargo-deny -- cargo deny check', jenkins)
+        self.assertIn('--gate license-notices -- cargo xtask license-notices --check', jenkins)
+        self.assertIn('--gate supply-chain', jenkins)
+        self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked', jenkins)
+        self.assertNotIn('RELEASE_TAG', jenkins)
+        self.assertNotIn('publish_release_assets.py', jenkins)
+        self.assertIn('--gate conformance', jenkins)
+
 
     def test_jenkins_records_discovered_tooling_and_all_postgres_gates(self):
         root = Path(__file__).resolve().parents[2]
