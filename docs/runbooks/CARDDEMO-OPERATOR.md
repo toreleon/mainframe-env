@@ -1,5 +1,10 @@
 # CardDemo operator compatibility
 
+Use [Mainframe Sandbox](../guides/MAINFRAME-SANDBOX.md) for a portable executable,
+editable application workspace, CLI/MCP agent tools and retained deployment
+generations. The repository-specific commands below remain available for
+application operation and conformance checks.
+
 These commands operate only on the clean corpus selected by
 `CARDDEMO_CORPUS_DIR`. The full certification command also requires a disposable
 PostgreSQL 18 database in `MAINFRAME_ENV_POSTGRES_TEST_URL`. The accepted

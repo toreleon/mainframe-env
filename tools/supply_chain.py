@@ -211,8 +211,18 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
             raise SupplyChainError(f"tracked CI file is missing or too large: {relative}")
         text = path.read_text(encoding="utf-8")
         is_workflow = relative.startswith(".github/workflows/") and relative.endswith((".yml", ".yaml"))
+        stages: set[str] = set()
         for number, line in enumerate(text.splitlines(), 1):
             stripped = line.strip()
+            if path.name.startswith("Dockerfile"):
+                base = re.match(r"FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?", stripped, re.IGNORECASE)
+                if base:
+                    coordinate = base.group(1)
+                    if coordinate != "scratch" and coordinate.lower() not in stages:
+                        require(IMAGE.fullmatch(coordinate) is not None, f"mutable Docker base at {relative}:{number}: {coordinate}")
+                        images.add(coordinate)
+                    if base.group(2):
+                        stages.add(base.group(2).lower())
             if is_workflow:
                 use = re.match(r"-?\s*uses:\s*['\"]?([^'\"#\s]+)", stripped)
                 if use:

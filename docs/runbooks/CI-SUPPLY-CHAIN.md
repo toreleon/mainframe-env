@@ -13,8 +13,8 @@ inputs are governed by two reviewed locks:
 `tools/supply_chain.py check` enumerates files with `git ls-files`. A tracked
 GitHub action must use a 40-hex commit, a tracked container must use an
 `@sha256:` digest, and tracked CI cannot install ambient packages. The current
-inventory contains no GitHub actions, container images, or package-install
-commands. The Jenkins controller, plugins, Rust toolchains, Cargo dependencies,
+inventory contains two digest-pinned sandbox base images (Rust and Python),
+and no GitHub actions or package-install commands. The Jenkins controller, plugins, Rust toolchains, Cargo dependencies,
 and host tools are locked inputs.
 
 ## Deliberately unsupported local files
@@ -53,7 +53,7 @@ the same bytes again and launches the locked WAR directly; it does not run a
 package-manager shim. Jenkins also reruns repository, runtime, controller, and
 plugin validation as a blocking `supply-chain` gate.
 
-The unconditional `license-notices` gate derives the current host's CLI/server
+The unconditional `license-notices` gate derives the current host's CLI/server/sandbox-runtime
 normal dependency closure and verifies project and third-party legal text.
 Release signing and publication stages have been removed. Subsystem checks
 validate current inputs; execution logs remain outside Git.

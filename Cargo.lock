@@ -1286,6 +1286,7 @@ dependencies = [
  "mainframe-env-ir",
  "mainframe-env-mq",
  "mainframe-env-source",
+ "serde_json",
 ]
 
 [[package]]
@@ -1317,6 +1318,7 @@ version = "0.8.3"
 dependencies = [
  "axum",
  "base64",
+ "clap",
  "jsonschema",
  "mainframe-env-application",
  "mainframe-env-batch",

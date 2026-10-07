@@ -6,6 +6,13 @@ before choosing a workload. There is no maintained release archive or historical
 receipt collection. Cargo package versions and contract schema identities remain
 build and compatibility metadata.
 
+For agent use, build the [executable sandbox bundle or container](MAINFRAME-SANDBOX.md).
+The bundle includes the compiler, CardDemo runtime, Python controller, pinned
+CardDemo reference, and complete legal notices for their normal dependency closure.
+The container also retains its bundled Git source archive and GPL license.
+Build the container locally from its digest-pinned bases; no published image is
+assumed by these instructions.
+
 ## Review the public source
 
 - Execute the [quick start](GETTING-STARTED.md) from the current checkout.

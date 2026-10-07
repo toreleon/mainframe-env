@@ -1,6 +1,6 @@
 {
   "schema_version": "mainframe-env.ci-input-lock@1",
-  "reviewed_on": "2026-09-10",
+  "reviewed_on": "2026-10-07",
   "rust": {
     "workspace": {
       "version": "1.98.0",
@@ -50,7 +50,10 @@
   },
   "tracked_remote_inputs": {
     "github_actions": [],
-    "container_images": [],
+    "container_images": [
+      "python:3.12.13-bookworm@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12",
+      "rust:1.98.0-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922"
+    ],
     "package_install_commands": []
   },
   "unsupported_local_inputs": [
