@@ -1,0 +1,459 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/0.9/cics-source-supplements.schema.json",
+  "title": "CIC-901 direct-content source supplements receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "work_package",
+    "source_kind",
+    "toc_claimed",
+    "target",
+    "semantic_authority",
+    "execution_authority",
+    "automatic_registration",
+    "semantic_credit",
+    "execution_credit",
+    "registration_credit",
+    "coverage_credit",
+    "differential_credit",
+    "capture",
+    "repin",
+    "receipt_contract",
+    "topics",
+    "source_resolutions",
+    "supplement_digest_definition",
+    "supplements_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.cics-source-supplements@1"
+    },
+    "target_subsystem": {
+      "const": "cics.application-api"
+    },
+    "work_package": {
+      "const": "CIC-901.sources-a-corpus"
+    },
+    "source_kind": {
+      "const": "browser-verified-direct-content"
+    },
+    "toc_claimed": {
+      "const": false
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_baseline", "product_key", "target_product"],
+      "properties": {
+        "catalog_baseline": {
+          "const": "ibm-cics-ts-6x-2026-08-31"
+        },
+        "product_key": {
+          "const": "SSJL4D_6.x"
+        },
+        "target_product": {
+          "const": "CICS Transaction Server for z/OS 6.x"
+        }
+      }
+    },
+    "semantic_authority": {
+      "const": false
+    },
+    "execution_authority": {
+      "const": false
+    },
+    "automatic_registration": {
+      "const": false
+    },
+    "semantic_credit": {
+      "const": 0
+    },
+    "execution_credit": {
+      "const": 0
+    },
+    "registration_credit": {
+      "const": 0
+    },
+    "coverage_credit": {
+      "const": 0
+    },
+    "differential_credit": {
+      "const": 0
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_on",
+        "browser",
+        "representation",
+        "source_origin",
+        "raw_publication_retained_in_repository",
+        "topics_requested",
+        "topics_loaded",
+        "reproduction_count",
+        "all_reproductions_identical",
+        "identity_digest_definition",
+        "identity_sha256",
+        "equivalence_controls"
+      ],
+      "properties": {
+        "observed_on": {
+          "const": "2026-09-10"
+        },
+        "browser": {
+          "const": "user-chrome-browser-control"
+        },
+        "representation": {
+          "const": "document.body.innerHTML encoded as UTF-8"
+        },
+        "source_origin": {
+          "const": "https://www.ibm.com/docs/"
+        },
+        "raw_publication_retained_in_repository": {
+          "const": false
+        },
+        "topics_requested": {
+          "const": 5
+        },
+        "topics_loaded": {
+          "const": 5
+        },
+        "reproduction_count": {
+          "const": 2
+        },
+        "all_reproductions_identical": {
+          "const": true
+        },
+        "identity_digest_definition": {
+          "const": "SHA-256 over ASCII domain mainframe-env.cics-source-supplement-identity@1, one NUL byte (0x00), then one UTF-8 '<topic_path> <bytes> <sha256>\\n' line per observed topic sorted by topic_path"
+        },
+        "identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "equivalence_controls": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/equivalenceControl"
+          }
+        }
+      }
+    },
+    "repin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "verified_on", "verification_method", "historical_receipt_path", "historical_receipt_sha256", "topic_path", "topic_sha256", "topic_bytes"],
+      "properties": {
+        "issue": {"const": 173},
+        "verified_on": {"const": "2026-09-28"},
+        "verification_method": {"const": "user-chrome-browser-control"},
+        "historical_receipt_path": {"const": "conformance/subsystems/cics/application/cics/application-api-sources-a-supplements-2026-09-10.json"},
+        "historical_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "topic_path": {"const": "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html"},
+        "topic_sha256": {"$ref": "#/$defs/bareSha256"},
+        "topic_bytes": {"type": "integer", "minimum": 1, "maximum": 2097152}
+      }
+    },
+    "receipt_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "checker"],
+      "properties": {
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "file_sha256"],
+          "properties": {
+            "path": {
+              "const": "conformance/subsystems/cics/application/schemas/cics-source-supplements.schema.json"
+            },
+            "file_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "checker": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "version", "file_sha256"],
+          "properties": {
+            "path": {
+              "const": "conformance/subsystems/cics/application/tools/cache_cics_application_source_supplements.py"
+            },
+            "version": {
+              "const": "cics-source-supplements-cache@1"
+            },
+            "file_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "topics": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/topic"
+      }
+    },
+    "source_resolutions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/sourceResolution"
+      }
+    },
+    "supplement_digest_definition": {
+      "const": "SHA-256 over ASCII domain mainframe-env.cics-source-supplements@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete receipt with supplements_sha256 omitted"
+    },
+    "supplements_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "bareSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "topicPath": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*\\.html?$"
+    },
+    "dimension": {
+      "enum": [
+        "syntax",
+        "options",
+        "operand-directions",
+        "conditions",
+        "execution-context"
+      ]
+    },
+    "equivalenceControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "expected_bytes",
+        "expected_sha256",
+        "observed_bytes",
+        "observed_sha256",
+        "result"
+      ],
+      "properties": {
+        "topic_path": {
+          "$ref": "#/$defs/topicPath"
+        },
+        "expected_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2097152
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/bareSha256"
+        },
+        "observed_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2097152
+        },
+        "observed_sha256": {
+          "$ref": "#/$defs/bareSha256"
+        },
+        "result": {
+          "const": "exact"
+        }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "public_url",
+        "content_url",
+        "source_product",
+        "product_key",
+        "heading",
+        "last_modified",
+        "bytes",
+        "sha256",
+        "cache_key",
+        "source_role",
+        "target_authority_boundary",
+        "target_product_authority",
+        "semantic_authority",
+        "coverage_credit",
+        "applies_to_rows",
+        "allowed_evidence_dimensions",
+        "limitations"
+      ],
+      "properties": {
+        "topic_path": {
+          "$ref": "#/$defs/topicPath"
+        },
+        "public_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://www\\.ibm\\.com/docs/en/"
+        },
+        "content_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://www\\.ibm\\.com/docs/api/v1/content/"
+        },
+        "source_product": {
+          "enum": [
+            "CICS TX 11.1",
+            "Fault Analyzer for z/OS 14.1",
+            "CICS Transaction Server for z/OS 5.5"
+          ]
+        },
+        "product_key": {
+          "enum": ["SSNAQ8_11.1.0", "SSXJAJ_14.1.0", "SSGMCP_5.5.0"]
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "last_modified": {
+          "type": "string",
+          "format": "date"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2097152
+        },
+        "sha256": {
+          "$ref": "#/$defs/bareSha256"
+        },
+        "cache_key": {
+          "type": "string",
+          "pattern": "^topic-[0-9a-f]{64}-sha256-[0-9a-f]{64}\\.html$"
+        },
+        "source_role": {
+          "enum": [
+            "cross-product-explicit-compatibility",
+            "target-platform-interface-example",
+            "target-product-version-compatibility"
+          ]
+        },
+        "target_authority_boundary": {
+          "enum": [
+            "cross-product-not-target-authority",
+            "target-platform-example-only",
+            "target-product-older-version-compatibility",
+            "target-product-older-version-context"
+          ]
+        },
+        "target_product_authority": {
+          "const": false
+        },
+        "semantic_authority": {
+          "const": false
+        },
+        "coverage_credit": {
+          "const": 0
+        },
+        "applies_to_rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+            ]
+          }
+        },
+        "allowed_evidence_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/dimension"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          }
+        }
+      }
+    },
+    "sourceResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "official_row",
+        "label",
+        "eibfn",
+        "state",
+        "target_topic_sources",
+        "supplemental_topic_sources"
+      ],
+      "properties": {
+        "official_row": {
+          "enum": [
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+          ]
+        },
+        "label": {
+          "enum": ["CICSMESSAGE", "DUMP", "ENTER TRACEID"]
+        },
+        "eibfn": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{4}$"
+        },
+        "state": {
+          "enum": [
+            "target-internal-only",
+            "triangulated-compatibility-evidence"
+          ]
+        },
+        "target_topic_sources": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/topicPath"
+          }
+        },
+        "supplemental_topic_sources": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/topicPath"
+          }
+        }
+      }
+    }
+  }
+}

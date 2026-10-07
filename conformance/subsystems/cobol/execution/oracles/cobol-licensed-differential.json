@@ -1,0 +1,14 @@
+{
+  "schema_version":"mainframe-env.cobol-licensed-differential-adapter@1",
+  "target_subsystem":"cobol.execution",
+  "baseline_id":"ibm-enterprise-cobol-6.5-2026-05-31",
+  "required_product":"IBM Enterprise COBOL for z/OS 6.5 compiler and Language Environment runtime",
+  "required_cohorts":["positive","negative","boundary","condition","interaction"],
+  "compiler_options":["ARCH(11)","ARITH(EXTEND)","CODEPAGE(037)","LP(32)","NUMPROC(NOPFD)","OPT(0)","SSRANGE"],
+  "runtime_options":["ALL31(ON)","HEAP(,,,FREE)","RPTOPTS(ON)","TRAP(ON)"],
+  "receipt_environment_variable":"MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT",
+  "status":"pending",
+  "licensed_receipt_required_for_pass":true,
+  "generated_or_historical_result_counts_as_pass":false,
+  "oracle_binary_retained":false
+}

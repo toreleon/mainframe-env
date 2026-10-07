@@ -32,8 +32,8 @@ class CacheTests(unittest.TestCase):
             "example-scope",
             "example",
             "example-v1",
-            "0.9.0",
-            "conformance/0.9/manifests/example.json",
+            "cics.application-api",
+            "conformance/subsystems/cics/application/manifests/example.json",
         )
         self.pin = ibm_docs.Pin(
             "PRODUCT/ref/example.html",
@@ -106,8 +106,8 @@ class CacheTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             ibm_docs.safe_relative_manifest(
-                "conformance/0.9/manifests/../escape.json",
-                "conformance/0.9/manifests/",
+                "conformance/subsystems/cics/application/manifests/../escape.json",
+                "conformance/subsystems/cics/application/manifests/",
                 "test",
             )
 
@@ -327,7 +327,7 @@ class CacheTests(unittest.TestCase):
     def test_same_topic_different_snapshots_are_separately_addressable(self):
         newer_body = self.body + b" newer"
         newer_scope = ibm_docs.Scope(
-            "newer-scope", "example", "example-v2", "0.9.0", self.scope.manifest
+            "newer-scope", "example", "example-v2", "cics.application-api", self.scope.manifest
         )
         newer = ibm_docs.Pin(
             self.pin.topic,
@@ -378,7 +378,7 @@ class CacheTests(unittest.TestCase):
         product = topic.split("/", 1)[0]
         return {
             "schema_version": "mainframe-env.topic-manifest@1",
-            "target_version": target,
+            "target_subsystem": target,
             "baseline_id": baseline,
             "subsystem": subsystem,
             "product": product,
@@ -400,15 +400,15 @@ class CacheTests(unittest.TestCase):
     def source_repository(self, later_body=None, later_topic="PRODUCT/ref/example.html"):
         root = Path(self.directory.name) / "repository"
         old_manifest = self.manifest(
-            self.body, "0.2.0", "baseline-old", "example", self.pin.topic
+            self.body, "coverage.foundation", "baseline-old", "example", self.pin.topic
         )
         later_body = self.body if later_body is None else later_body
         new_manifest = self.manifest(
-            later_body, "0.9.0", "baseline-new", "example", later_topic
+            later_body, "cics.application-api", "baseline-new", "example", later_topic
         )
         paths = {
-            "conformance/0.2/manifests/example.json": old_manifest,
-            "conformance/0.9/manifests/example.json": new_manifest,
+            "conformance/subsystems/coverage/manifests/example.json": old_manifest,
+            "conformance/subsystems/cics/application/manifests/example.json": new_manifest,
         }
         for relative, value in paths.items():
             path = root / relative
@@ -426,7 +426,7 @@ class CacheTests(unittest.TestCase):
                         "url": old_manifest["toc_url"],
                         "toc_sha256": "sha256:" + old_manifest["toc_sha256"],
                         "content_url_template": docs_api.CONTENT_URL,
-                        "manifest": "conformance/0.2/manifests/example.json",
+                        "manifest": "conformance/subsystems/coverage/manifests/example.json",
                         "topic_count": 1,
                         "bytes": len(self.body),
                         "sha256": "sha256:" + old_manifest["topic_manifest_digest"],
@@ -436,7 +436,7 @@ class CacheTests(unittest.TestCase):
         }
         registry = {
             "schema_version": "mainframe-env.topic-manifest-registry@1",
-            "target_version": "0.9.0",
+            "target_subsystem": "cics.application-api",
             "semantic_authority": False,
             "coverage_credit": 0,
             "manifests": [
@@ -444,10 +444,10 @@ class CacheTests(unittest.TestCase):
                     "scope_id": "later-scope",
                     "subsystem": "example",
                     "baseline_id": "baseline-new",
-                    "manifest": "conformance/0.9/manifests/example.json",
+                    "manifest": "conformance/subsystems/cics/application/manifests/example.json",
                     "manifest_sha256": "sha256:"
                     + docs_api.digest(
-                        (root / "conformance/0.9/manifests/example.json").read_bytes()
+                        (root / "conformance/subsystems/cics/application/manifests/example.json").read_bytes()
                     ),
                     "topic_count": 1,
                     "topic_manifest_sha256": "sha256:"
@@ -457,8 +457,8 @@ class CacheTests(unittest.TestCase):
                 }
             ],
         }
-        index_path = root / "conformance/0.2/catalogs/index.json"
-        registry_path = root / "conformance/0.9/manifests/index.json"
+        index_path = root / "conformance/subsystems/coverage/catalogs/index.json"
+        registry_path = root / "conformance/subsystems/cics/application/manifests/index.json"
         index_path.parent.mkdir(parents=True, exist_ok=True)
         index_path.write_text(json.dumps(index))
         registry_path.write_text(json.dumps(registry))
@@ -496,7 +496,7 @@ class CacheTests(unittest.TestCase):
 
     def test_registry_binds_exact_manifest_bytes(self):
         root, index, registry = self.source_repository()
-        manifest = root / "conformance/0.9/manifests/example.json"
+        manifest = root / "conformance/subsystems/cics/application/manifests/example.json"
         manifest.write_text(manifest.read_text() + "\n")
         with patch.object(docs_api, "REPOSITORY", root):
             with self.assertRaisesRegex(ValueError, "registry entry disagrees"):
@@ -512,7 +512,7 @@ class CacheTests(unittest.TestCase):
                 ibm_docs.load_pins(index, registry)
 
         root, index, registry = self.source_repository(later_body=self.body + b" changed")
-        manifest_path = root / "conformance/0.9/manifests/example.json"
+        manifest_path = root / "conformance/subsystems/cics/application/manifests/example.json"
         manifest = json.loads(manifest_path.read_text())
         manifest["baseline_id"] = "baseline-old"
         manifest_path.write_text(json.dumps(manifest))
@@ -573,17 +573,17 @@ class CacheTests(unittest.TestCase):
         self.assertFalse({pin.topic for pin in properties}
                          & {pin.topic for pin in [*supplemental, *layouts]})
         self.assertEqual(docs_api.digest((docs_api.REPOSITORY /
-                         "conformance/0.15/manifests/mq-point-layout-sources-topics.json").read_bytes()),
-                         "128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa")
+                         "conformance/subsystems/mq/manifests/mq-point-layout-sources-topics.json").read_bytes()),
+                         "40142139c033bea0426d1c489469c1239c8897554c6e0a013a64cff1bdfc1e46")
         self.assertEqual(docs_api.digest((docs_api.REPOSITORY /
-                         "conformance/0.15/manifests/mq-programming-supplements-topics.json").read_bytes()),
-                         "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a")
+                         "conformance/subsystems/mq/manifests/mq-programming-supplements-topics.json").read_bytes()),
+                         "d6b4ec6f15426df98f529c144fb5d5320be0e74a2a82598d54a95712c2b9866a")
         self.assertTrue(pins)
         self.assertTrue(tocs)
         index_digest = hashlib.sha256(ibm_docs.INDEX.read_bytes()).hexdigest()
         self.assertEqual(
             index_digest,
-            "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
+            "b51614abbcb8e9522dfced3adc79a9fc834ffe825046cfe3d8e385485461fd48",
         )
 
     def test_recovery_scope_is_one_independent_frozen_zero_credit_source(self):
@@ -602,7 +602,7 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(selected_tocs[0].sha256,
                          "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
         registry = json.loads((docs_api.REPOSITORY /
-                               "conformance/0.15/manifests/index.json").read_text())
+                               "conformance/subsystems/mq/manifests/index.json").read_text())
         current_scopes = {
             "mq-programming-supplements", "mq-point-layout-sources", "mq-property-sources",
             "mq-recovery-policy-sources", "mq-producer-attribute-sources", "mq-rfh2-sources",
@@ -639,7 +639,7 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(inquiry_row["coverage_credit"], 0)
         self.assertEqual(inquiry_row["topic_count"], 4)
         self.assertEqual(inquiry_row["manifest_sha256"],
-                         "sha256:1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949")
+                         "sha256:2a015ae7e74819b603d2b07a0d7af5eef172623550be86f7fc8e74189b3eb294")
         self.assertEqual(inquiry_row["topic_manifest_sha256"],
                          "sha256:463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527")
         old_rows = [row for row in registry["manifests"]
@@ -649,29 +649,29 @@ class CacheTests(unittest.TestCase):
                         "mq-inquiry-attribute-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
             old_rows, sort_keys=True, separators=(",", ":")).encode()),
-            "d21d08a6548a9088640374f8ebfa6fcd5344104c3748678b8002406bd9985033")
+            "087da2037d9a5eadb046dfda6f771293405c10a1a3ec1a99c0c9e498114bdd0e")
         recovery = next(row for row in registry["manifests"]
                         if row["scope_id"] == "mq-recovery-policy-sources")
         self.assertFalse(recovery["semantic_authority"])
         self.assertEqual(recovery["coverage_credit"], 0)
         self.assertEqual(recovery["topic_count"], 1)
         self.assertEqual(recovery["manifest_sha256"],
-                         "sha256:07457101d143b0418032d979a3f499ddcad37e6b43fbb63ffb8213054502bae2")
+                         "sha256:4c22648e9ad90c7e60832f6f37488f0c5f7f87401d00707dd4a6c154e2c47742")
         self.assertEqual(recovery["topic_manifest_sha256"],
                          "sha256:414608491fdbefa8ec0b8b2b1adf8742a4dbc5553cd488344db649ef945bba11")
         frozen = {
-            "conformance/0.2/catalogs/index.json":
-                "f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
-            "conformance/0.2/catalogs/mq.json":
+            "conformance/subsystems/coverage/catalogs/index.json":
+                "b51614abbcb8e9522dfced3adc79a9fc834ffe825046cfe3d8e385485461fd48",
+            "conformance/subsystems/coverage/catalogs/mq.json":
                 "62e70382c8d59e28234f249acde75faf3495acb78f8ac19829ff2d7e8290ebe7",
-            "conformance/0.2/manifests/mq-topics.json":
-                "f5d2fbc4d05cfc8b461b94e72048fffe34d04bafffbd1e711ca2fb8175d65562",
-            "conformance/0.15/manifests/mq-programming-supplements-topics.json":
-                "7960f3118465521a55c541af376c100001feab5d086ec2a0ebe482339d7d7d8a",
-            "conformance/0.15/manifests/mq-point-layout-sources-topics.json":
-                "128e12e5a276b0b3613ce253f357918810b7f74c5351f8064caaea17d1f166fa",
-            "conformance/0.15/manifests/mq-property-sources-topics.json":
-                "f1537d0ab7feba5c7260e5dced3e9878b5bf999b274e0254f888fc1d78d96ba7",
+            "conformance/subsystems/coverage/manifests/mq-topics.json":
+                "90841b086eb887cd2b13512ce41312aab2367f72d7351d6c93e9f52fbd7fab56",
+            "conformance/subsystems/mq/manifests/mq-programming-supplements-topics.json":
+                "d6b4ec6f15426df98f529c144fb5d5320be0e74a2a82598d54a95712c2b9866a",
+            "conformance/subsystems/mq/manifests/mq-point-layout-sources-topics.json":
+                "40142139c033bea0426d1c489469c1239c8897554c6e0a013a64cff1bdfc1e46",
+            "conformance/subsystems/mq/manifests/mq-property-sources-topics.json":
+                "5b452011d141285b7ad8d7f064ef87d74d73e9dd19e5368da2ed23bd951a6509",
         }
         for relative, digest in frozen.items():
             with self.subTest(path=relative):
@@ -702,7 +702,7 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(selected_tocs[0].sha256,
                          "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4")
         registry = json.loads((docs_api.REPOSITORY /
-                               "conformance/0.15/manifests/index.json").read_text())
+                               "conformance/subsystems/mq/manifests/index.json").read_text())
         row = next(row for row in registry["manifests"]
                    if row["scope_id"] == "mq-producer-attribute-sources")
         self.assertFalse(row["semantic_authority"])
@@ -724,7 +724,7 @@ class CacheTests(unittest.TestCase):
         first_bytes = first_path.read_bytes()
         bodies = [f'<h1>Producer fixture {n}</h1><p>Authored example {n}.</p>'.encode()
                   for n in range(9)]
-        manifest = self.manifest(bodies[0], "0.15.0", "producer-fixture", "mq",
+        manifest = self.manifest(bodies[0], "mq.programming", "producer-fixture", "mq",
                                  "PRODUCT/ref/producer-0.html")
         manifest["topics"] = [{
             "topic_path": f"PRODUCT/ref/producer-{n}.html",
@@ -733,7 +733,7 @@ class CacheTests(unittest.TestCase):
         } for n, body in enumerate(bodies)]
         manifest.update(topic_count=9, total_bytes=sum(map(len, bodies)),
                         topic_manifest_digest=docs_api.manifest_digest(manifest["topics"]))
-        relative = "conformance/0.15/manifests/producer-topics.json"
+        relative = "conformance/subsystems/mq/manifests/producer-topics.json"
         path = root / relative
         path.write_text(json.dumps(manifest))
         entry = deepcopy(document["manifests"][0])
@@ -786,7 +786,7 @@ class CacheTests(unittest.TestCase):
                                 for p in fixture["topics"]))
         self.assertTrue(all(p.baseline == fixture["baseline_id"] for p in selected))
         root = docs_api.REPOSITORY
-        registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
+        registry = json.loads((root / "conformance/subsystems/mq/manifests/index.json").read_text())
         old = [r for r in registry["manifests"]
                if r["scope_id"] not in {"mq-rfh2-sources", "mq-producer-attribute-sources",
                                        "mq-message-handle-sources",
@@ -812,9 +812,9 @@ class CacheTests(unittest.TestCase):
 
     def registered_scope_mutants(self, scope_id, wrong_count):
         root = Path(self.directory.name) / (scope_id + "-registry")
-        directory = root / "conformance/0.15/manifests"
+        directory = root / "conformance/subsystems/mq/manifests"
         directory.mkdir(parents=True)
-        source = docs_api.REPOSITORY / "conformance/0.15/manifests"
+        source = docs_api.REPOSITORY / "conformance/subsystems/mq/manifests"
         for path in source.glob("*.json"):
             shutil.copyfile(path, directory / path.name)
         registry_path = directory / "index.json"
@@ -848,7 +848,7 @@ class CacheTests(unittest.TestCase):
                     elif mutation == "foreign":
                         manifest["topics"][0]["topic_path"] = "FOREIGN/ref/topic.html"
                     else:
-                        manifest["target_version"] = "0.14.0"
+                        manifest["target_subsystem"] = "ims.programming"
                     manifest_path.write_text(json.dumps(manifest))
                     registry = deepcopy(original_registry)
                     registry["manifests"][scope]["manifest_sha256"] = (
@@ -893,7 +893,7 @@ class CacheTests(unittest.TestCase):
                           2409))
         self.assertEqual(selected[0].baseline, fixture["baseline_id"])
         root = docs_api.REPOSITORY
-        registry = json.loads((root / "conformance/0.15/manifests/index.json").read_text())
+        registry = json.loads((root / "conformance/subsystems/mq/manifests/index.json").read_text())
         old = [r for r in registry["manifests"]
                if r["scope_id"] not in {fixture["scope_id"], "mq-inquiry-attribute-sources"}]
         self.assertEqual(docs_api.digest(json.dumps(
@@ -947,13 +947,13 @@ class CacheTests(unittest.TestCase):
         old = json.loads(old_registry.read_text())
         old_manifest = root / old["manifests"][0]["manifest"]
         manifest = json.loads(old_manifest.read_text())
-        manifest["target_version"] = "0.15.0"
+        manifest["target_subsystem"] = "mq.programming"
         manifest["subsystem"] = "mq"
-        relative = "conformance/0.15/manifests/synthetic-topics.json"
+        relative = "conformance/subsystems/mq/manifests/synthetic-topics.json"
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(manifest))
-        old["target_version"] = "0.15.0"
+        old["target_subsystem"] = "mq.programming"
         entry = old["manifests"][0]
         entry["manifest"] = relative
         entry["subsystem"] = "mq"
@@ -968,7 +968,7 @@ class CacheTests(unittest.TestCase):
             pins, tocs = ibm_docs.load_pins(index, registry)
             selected, _ = ibm_docs.select(pins, tocs, "later-scope", None)
         self.assertEqual(len(selected), 1)
-        self.assertTrue(any(scope.scope_id == "later-scope" and scope.target_version == "0.15.0"
+        self.assertTrue(any(scope.scope_id == "later-scope" and scope.target_subsystem == "mq.programming"
                             for scope in selected[0].scopes))
         self.assertFalse(self.cache.exists())
 
@@ -976,9 +976,9 @@ class CacheTests(unittest.TestCase):
         root, index, registry, first_path, document, _ = self.registry_015()
         first_bytes = first_path.read_bytes()
         first_entry = deepcopy(document["manifests"][0])
-        second = self.manifest(b'<h1>Layout</h1>', "0.15.0", "layout-baseline",
+        second = self.manifest(b'<h1>Layout</h1>', "mq.programming", "layout-baseline",
                                "mq", "PRODUCT/ref/layout.html")
-        relative = "conformance/0.15/manifests/layout-topics.json"
+        relative = "conformance/subsystems/mq/manifests/layout-topics.json"
         path = root / relative
         path.write_text(json.dumps(second))
         entry = deepcopy(first_entry)
@@ -1016,8 +1016,8 @@ class CacheTests(unittest.TestCase):
             ("topic_count", 2), ("subsystem", "ims"),
             ("baseline_id", "wrong-baseline"), ("coverage_credit", 1),
             ("semantic_authority", True),
-            ("manifest", "conformance/0.14/manifests/synthetic-topics.json"),
-            ("manifest", "conformance/0.15/manifests/missing.json"),
+            ("manifest", "conformance/subsystems/ims/manifests/synthetic-topics.json"),
+            ("manifest", "conformance/subsystems/mq/manifests/missing.json"),
         ]
         with patch.object(docs_api, "REPOSITORY", root):
             for field, value in mutations:
@@ -1026,7 +1026,7 @@ class CacheTests(unittest.TestCase):
                 registry.write_text(json.dumps(document))
                 with self.subTest(field=field, value=value), self.assertRaises((ValueError, OSError)):
                     ibm_docs.registered_sources(registry)
-            for field, value in [("target_version", "0.14.0"),
+            for field, value in [("target_subsystem", "ims.programming"),
                                  ("coverage_credit", 1), ("semantic_authority", True)]:
                 document = deepcopy(original)
                 document[field] = value
@@ -1039,7 +1039,7 @@ class CacheTests(unittest.TestCase):
                 if repeated_path:
                     other["scope_id"] = "another-scope"
                 else:
-                    other["manifest"] = "conformance/0.15/manifests/another.json"
+                    other["manifest"] = "conformance/subsystems/mq/manifests/another.json"
                 document["manifests"].append(other)
                 registry.write_text(json.dumps(document))
                 with self.subTest(repeated_path=repeated_path), self.assertRaises(ValueError):
@@ -1047,7 +1047,7 @@ class CacheTests(unittest.TestCase):
 
     def test_015_manifest_mutants_fail_even_with_updated_file_hash(self):
         root, _, registry, path, registry_original, manifest_original = self.registry_015()
-        mutations = [("target_version", "0.14.0"), ("subsystem", "ims"),
+        mutations = [("target_subsystem", "ims.programming"), ("subsystem", "ims"),
                      ("topic_count", 2), ("total_bytes", 1),
                      ("topic_manifest_digest", "0" * 64),
                      ("coverage_credit", 1), ("retained_in_repository", True)]

@@ -1,4 +1,4 @@
-# 0.4.0 decimal and IEEE semantic-gap spike
+# cobol.execution decimal and IEEE semantic-gap spike
 
 Status: **Frozen decision; licensed IBM differentials pending**
 

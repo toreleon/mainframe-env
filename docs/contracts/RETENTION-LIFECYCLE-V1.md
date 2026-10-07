@@ -3,7 +3,7 @@
 Status: **Implemented**
 Owner: **store-contract, provider, and core-server maintainers**
 Scope: **all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance**
-Applies from: **mainframe-env 0.8.3 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The `mainframe-env.retention@1` contract prevents a healthy bounded store from
 becoming permanently full without weakening replay, checkpoint, effect, audit,

@@ -37,3 +37,7 @@ argument classes, arity, homogeneous/variadic rules, format-literal context,
 special-register operands and receiving restrictions, and infers result type and
 fixed length. Recognized functions without an explicit interpreter route remain
 analyzable but block executable publication.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

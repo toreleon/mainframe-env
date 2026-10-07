@@ -2,8 +2,8 @@
 
 Status: **Proposed — implementation boundary, not owner acceptance**
 Owner: **Db2, application-package and store-contract maintainers**
-Scope: **0.12 catalog/binder preparation and versioned integration**
-Applies from: **mainframe-env 0.12.0 development; integration remains pending**
+Scope: **db2.core catalog/binder preparation and versioned integration**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

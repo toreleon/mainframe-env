@@ -2,8 +2,8 @@
 
 Status: **Proposed within the user-authorized bounded IMS leaf**
 Owner: **IMS recovery and database maintainers**
-Scope: **IMS-1405.secondary-index-checkpoint-restart, target 0.14.0**
-Applies from: **mainframe-env 0.14.0 development**
+Scope: **IMS-1405.secondary-index-checkpoint-restart, target ims.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 The IMS 15.6 XRST pin requires each positioned PCB to be re-established through
 GU, with the resulting status replacing the saved status. A hierarchy key alone

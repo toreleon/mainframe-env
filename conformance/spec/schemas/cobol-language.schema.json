@@ -4,17 +4,17 @@
   "title": "mainframe-env Enterprise COBOL 6.5 language catalog",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "target_version", "baseline_id", "source", "compiler_directing_statements", "compiler_directive_groups", "procedure_statements", "file_description_clauses", "data_description_clauses", "intrinsic_functions", "special_registers"],
+  "required": ["schema_version", "target_subsystem", "baseline_id", "source", "compiler_directing_statements", "compiler_directive_groups", "procedure_statements", "file_description_clauses", "data_description_clauses", "intrinsic_functions", "special_registers"],
   "properties": {
     "schema_version": {"const": "mainframe-env.cobol-language@1"},
-    "target_version": {"const": "0.3.0"},
+    "target_subsystem": {"const": "cobol.structure"},
     "baseline_id": {"const": "ibm-enterprise-cobol-6.5-2026-05-31"},
     "source": {
       "type": "object", "additionalProperties": false,
       "required": ["publication", "manifest", "sha256"],
       "properties": {
         "publication": {"const": "SC27-8713-04"},
-        "manifest": {"const": "conformance/0.2/manifests/cobol-topics.json"},
+        "manifest": {"const": "conformance/subsystems/coverage/manifests/cobol-topics.json"},
         "sha256": {"const": "sha256:9b0291045414ca38d0e8138c7cc78d7321887a3fad6c27a433efd9e9ca7fd1ad"}
       }
     },
@@ -70,7 +70,7 @@
         "label": {"type": "string", "minLength": 1, "maxLength": 128},
         "source_locator": {"type": "string", "pattern": "^topic:[^;]+;topic-id:[^;]+;heading:.+$", "maxLength": 256},
         "forms": {
-          "description": "Reviewed sketches of the statement's formats. Every all-uppercase word here is harvested into a global reserved-word set shared by all 44 rows, so a figurative constant is written as the publication's own operand name (fig-con-1, as SET Formats 5 to 7 publish it) and never as SPACES, ZEROS, LOW-VALUES or their siblings; see conformance/0.3/tools/AUTHORING.md.",
+          "description": "Reviewed sketches of the statement's formats. Every all-uppercase word here is harvested into a global reserved-word set shared by all 44 rows, so a figurative constant is written as the publication's own operand name (fig-con-1, as SET Formats 5 to 7 publish it) and never as SPACES, ZEROS, LOW-VALUES or their siblings; see conformance/subsystems/cobol/structure/tools/AUTHORING.md.",
           "type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 1024}
         },
         "disposition": {

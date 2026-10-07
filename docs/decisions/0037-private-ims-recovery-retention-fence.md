@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **IMS provider and core-server retention maintainers**
 Scope: **IMS-1405.private-recovery-retention-fence, existing unowned core dependency fence**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 Selected application recovery checks the exact canonical core effect before
 serving private recovery replay. Private `ims-recovery-v1-` aggregates retain
@@ -44,8 +44,8 @@ The bounded proof composes existing SQLite integrity/VACUUM INTO backup with
 drained signed selection, real database/checkpoint/undo rows, private LOG,
 canonical journals and immutable artifact copying/verified reads. Separate
 processes must execute seed, backup and restore observations. This proves only
-that selected local composition; it does not certify the v0.16 mixed graph or
-PostgreSQL, licensed execution, participant atomicity, parent IMS-1405 or v0.14.
+that selected local composition; it does not certify the integration.transactions mixed graph or
+PostgreSQL, licensed execution, participant atomicity, parent IMS-1405 or ims.programming.
 
 Pinned reference baseline `ibm-ims-15.6-recovery-utilities-2026-09-11`:
 `SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_logcall.htm` SHA-256

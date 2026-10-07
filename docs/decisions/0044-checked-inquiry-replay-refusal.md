@@ -3,7 +3,7 @@
 Status: Implemented infrastructure prerequisite; configured inquiry activation remains unsupported.
 Owner: host transport, interpreter original dispatch and physical store maintainers.
 Scope: replay-only transport, bounded capture and atomic Completed refusal settlement.
-Applies from: mainframe-env 0.15.0
+Applies from: mainframe-env mq.programming
 
 ## Decision
 

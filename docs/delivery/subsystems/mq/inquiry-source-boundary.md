@@ -3,11 +3,11 @@
 Status: **Normative source boundary; zero execution credit**
 Owner: MQ source-review maintainers
 Scope: four retained inquiry attribute sources and remaining semantic gaps
-Applies from: mainframe-env 0.15.0
+Applies from: mainframe-env mq.programming
 
 `mq-inquiry-attribute-sources` is a separately registered, external-only MQ 9.4
 source-review scope under `ibm-mq-9.4-inquiry-attribute-sources-2026-09-12`.
-Its four-topic [manifest](../../../../conformance/0.15/manifests/mq-inquiry-attribute-sources-topics.json)
+Its four-topic [manifest](../../../../conformance/subsystems/mq/manifests/mq-inquiry-attribute-sources-topics.json)
 uses `mainframe-env.topic-manifest@1`; the shared registry fixes semantic authority
 to false and coverage credit to zero. This note is a source reference, not a
 numeric runtime selector catalog, executable permission or acceptance receipt.
@@ -24,7 +24,7 @@ All topic paths start with `SSFKSJ_9.4.0/refdev/` and end with `.html`.
 | q103490_ | QType | 93bd55632f95b85f9790e3cba75c623bff93c1a679983115546edf32ce527639 | 2267 | 2026-05-18 |
 
 The manifest file SHA-256 is
-`1f43660f41d302b7c84d63b0a25cf9f4238774021978ff67a90002647d9cf949`;
+`2a015ae7e74819b603d2b07a0d7af5eef172623550be86f7fc8e74189b3eb294`;
 the sorted topic-set digest is
 `463e5ba10a4b572cd5a73ff08066820b66c59e3133b37910ecd4c1c9af5ce527`.
 The unchanged MQ 9.4 TOC digest is
@@ -139,6 +139,6 @@ mounting publication bodies; no new reader or schema is introduced.
 Source presence and reference review earn zero execution/native/installed/official
 or licensed credit. Numeric MQINQ forwarding and MQSET remain pending; no public
 profile is promoted. The ten pending reason declarations and official26/27 remain
-unchanged. Licensed oracle alone is human-skipped0/26; all other full v0.15
+unchanged. Licensed oracle alone is human-skipped0/26; all other full mq.programming
 security, durability, recovery, participant, IR and CardDemo acceptance remains
 required.

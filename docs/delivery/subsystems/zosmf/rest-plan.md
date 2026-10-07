@@ -2,14 +2,13 @@
 
 Subsystem: **zosmf**
 Phase: **rest**
-Target release: **0.11.0**
 
 Status: **Proposed**
 Start gate: normalized operation catalog and backend ownership frozen; each adapter waits for its accepted backend
 Completion dependencies: racf.security, dataset.data, jes.execution, cics.system-api
 Estimate: 12–20 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -75,7 +74,7 @@ contracts freeze. Authentication, error normalization, and route publication
 remain shared authorities. An adapter may be built before a backend version is
 released, but cannot be advertised until that backend passes its exit gate.
 
-0.11 can overlap with 0.13–0.15 completion work. Its final full-profile gate is
+zosmf.rest can overlap with db2.programming–mq.programming completion work. Its final full-profile gate is
 serialized over one exact route catalog and one accepted backend closure.
 
 ## Exit gate

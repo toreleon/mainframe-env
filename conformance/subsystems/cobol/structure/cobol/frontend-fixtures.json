@@ -1,0 +1,166 @@
+{
+  "schema_version": "mainframe-env.cobol-frontend-fixtures@1",
+  "target_subsystem": "cobol.structure",
+  "fixtures": [
+    {
+      "id": "basis",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0001",
+      "target_kind": "directing",
+      "target_id": "basis",
+      "valid": [{"source":"       BASIS BASE\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n000300 PROCEDURE DIVISION.\n000400     STOP RUN.\n","format":"fixed"}]},{"source":"       BASIS 'BASE'\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n","format":"fixed"}]}],
+      "invalid": [{"source":"       BASIS BASE EXTRA\n","format":"fixed","options":{},"libraries":[]}]
+    },
+    {
+      "id": "process",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0002",
+      "target_kind": "directing",
+      "target_id": "process",
+      "valid": [{"source":"PROCESS LP(64),DLL\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. PROCESS-OK.\n       PROCEDURE DIVISION.\n           STOP RUN.\n","format":"fixed","options":{},"libraries":[]},{"source":"CBL ARCH(12),OPTIMIZE(2)\nIDENTIFICATION DIVISION.\nPROGRAM-ID. CBL-OK.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"PROCESS LP(\n       IDENTIFICATION DIVISION.\n","format":"fixed","options":{},"libraries":[]}]
+    },
+    {
+      "id": "control",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0003",
+      "target_kind": "directing",
+      "target_id": "control",
+      "valid": [{"source":"      *CONTROL SOURCE,LIST.\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. CONTROL-OK.\n","format":"fixed","options":{},"libraries":[]},{"source":"      *CBL NOSOURCE, NOMAP.\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. CBL-CONTROL.\n","format":"fixed","options":{},"libraries":[]}],
+      "invalid": [{"source":"      *CONTROL UNKNOWN.\n       IDENTIFICATION DIVISION.\n","format":"fixed","options":{},"libraries":[]}]
+    },
+    {
+      "id": "copy",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0004",
+      "target_kind": "directing",
+      "target_id": "copy",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. COPY-OK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\nCOPY MEMBER REPLACING ==FIELD-A== BY ==FIELD-B==.\nPROCEDURE DIVISION.\nSTOP RUN.\n","format":"free","options":{},"libraries":[{"path":"copy/MEMBER.cpy","source":"01 FIELD-A PIC X.\n","format":"free"}]},{"source":"COPY MEMBER OF LIBRARY SUPPRESS REPLACING LEADING ==PRE== BY ==POST== TRAILING ==OLD== BY ==NEW==.\n","format":"free","options":{},"libraries":[{"path":"copy/MEMBER.cpy","source":"01 PRE-NAME-OLD PIC X.\n","format":"free"}]}],
+      "invalid": [{"source":"COPY MEMBER REPLACING ==A== BY.\n","format":"free","options":{},"libraries":[{"path":"copy/MEMBER.cpy","source":"01 A PIC X.\n","format":"free"}]}]
+    },
+    {
+      "id": "delete",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0005",
+      "target_kind": "directing",
+      "target_id": "delete",
+      "valid": [{"source":"       BASIS BASE\n       DELETE 000200\n000250 PROGRAM-ID. CHANGED.\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n000300 PROCEDURE DIVISION.\n000400     STOP RUN.\n","format":"fixed"}]},{"source":"       BASIS BASE\n       DELETE 000200-000300, 000400\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n000300 DATA DIVISION.\n000400 WORKING-STORAGE SECTION.\n000500 PROCEDURE DIVISION.\n000600     STOP RUN.\n","format":"fixed"}]}],
+      "invalid": [{"source":"       BASIS BASE\n       DELETE 000100,000200\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n","format":"fixed"}]}]
+    },
+    {
+      "id": "eject",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0006",
+      "target_kind": "directing",
+      "target_id": "eject",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. EJECT-OK.\nEJECT.\nEJECT\nPROCEDURE DIVISION.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nEJECT EXTRA.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "enter",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0007",
+      "target_kind": "directing",
+      "target_id": "enter",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. ENTER-OK.\nPROCEDURE DIVISION.\nENTER COBOL ROUTINE.\nENTER COBOL.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nENTER COBOL ROUTINE.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "insert",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0008",
+      "target_kind": "directing",
+      "target_id": "insert",
+      "valid": [{"source":"       BASIS BASE\n       INSERT 000200\n000250     DISPLAY 'INSERTED'.\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n000300 PROCEDURE DIVISION.\n000400     STOP RUN.\n","format":"fixed"}]}],
+      "invalid": [{"source":"       BASIS BASE\n       INSERT 000200\n","format":"fixed","options":{},"libraries":[{"path":"basis/BASE.cbl","source":"000100 IDENTIFICATION DIVISION.\n000200 PROGRAM-ID. BASE.\n","format":"fixed"}]}]
+    },
+    {
+      "id": "trace",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0009",
+      "target_kind": "directing",
+      "target_id": "trace",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. TRACE-OK.\nPROCEDURE DIVISION.\nREADY TRACE.\nRESET TRACE.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nREADY TRACE.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "replace",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0010",
+      "target_kind": "directing",
+      "target_id": "replace",
+      "valid": [{"source":"REPLACE ==OLD-NAME== BY ==NEW-NAME==.\nIDENTIFICATION DIVISION.\nPROGRAM-ID. OLD-NAME.\nREPLACE OFF.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"REPLACE ==A== BY.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "service-label",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0011",
+      "target_kind": "directing",
+      "target_id": "service-label",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. LABEL-OK.\nPROCEDURE DIVISION.\nSERVICE LABEL.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nSERVICE LABEL.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "service-reload",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0012",
+      "target_kind": "directing",
+      "target_id": "service-reload",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. RELOAD-OK.\nPROCEDURE DIVISION.\nSERVICE RELOAD HANDLER.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. RELOAD-BAD.\nPROCEDURE DIVISION.\nSERVICE RELOAD 123.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "skip",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0013",
+      "target_kind": "directing",
+      "target_id": "skip",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nSKIP1.\nSKIP2.\nSKIP3.\nPROGRAM-ID. SKIP-OK.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nSKIP2 EXTRA.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "title",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0014",
+      "target_kind": "directing",
+      "target_id": "title",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nTITLE 'COBOL FRONTEND'.\nTITLE N'NATIONAL TITLE'.\nPROGRAM-ID. TITLE-OK.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nTITLE NOT-A-LITERAL.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "use",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directing-statements:0015",
+      "target_kind": "directing",
+      "target_id": "use",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. USE-OK.\nPROCEDURE DIVISION.\nDECLARATIVES.\nERROR-HANDLER SECTION.\nUSE AFTER STANDARD ERROR PROCEDURE ON INPUT.\nEND DECLARATIVES.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]},{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. DEBUG-USE.\nPROCEDURE DIVISION.\nDECLARATIVES.\nDEBUG-HANDLER SECTION.\nUSE FOR DEBUGGING ON ALL PROCEDURES.\nEND DECLARATIVES.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. USE-BAD.\nPROCEDURE DIVISION.\nUSE AFTER STANDARD ERROR PROCEDURE ON INPUT.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "callinterface",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0001",
+      "target_kind": "directive-group",
+      "target_id": "callinterface",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. CALLINT-OK.\nPROCEDURE DIVISION.\n>>CALLINTERFACE\n>>CALLINTERFACE DLL\n>>CALLINTERFACE DYNAMIC\n>>CALLINT STATIC\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":">>CALLINTERFACE DYNAMIC\nIDENTIFICATION DIVISION.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "data",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0002",
+      "target_kind": "directive-group",
+      "target_id": "data",
+      "valid": [{"source":"PROCESS LP(64)\nIDENTIFICATION DIVISION.\nPROGRAM-ID. DATA-OK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n>>DATA\n01 ITEM-A PIC X.\n>>DATA 31\n01 ITEM-B PIC X.\n>>DATA 64\n01 ITEM-C PIC X.\nPROCEDURE DIVISION.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"PROCESS LP(32)\nIDENTIFICATION DIVISION.\nPROGRAM-ID. DATA-BAD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n>>DATA 64\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "inline",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0003",
+      "target_kind": "directive-group",
+      "target_id": "inline",
+      "valid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. INLINE-OK.\nPROCEDURE DIVISION.\n>>INLINE ON\n>>INLINE OFF\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":">>INLINE MAYBE\nIDENTIFICATION DIVISION.\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "conditional",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0004",
+      "target_kind": "directive-group",
+      "target_id": "conditional",
+      "valid": [{"source":">>DEFINE SELECTED B'1'\n>>IF SELECTED\nIDENTIFICATION DIVISION.\nPROGRAM-ID. CONDITIONAL-OK.\n>>ELSE\nIDENTIFICATION DIVISION.\nPROGRAM-ID. OMITTED.\n>>END-IF\n>>DEFINE NUMBER AS 6\n>>EVALUATE NUMBER\n>>WHEN 1\nDISPLAY 'OMITTED'.\n>>WHEN 4 THRU 8\nDISPLAY 'SELECTED'.\n>>WHEN OTHER\nDISPLAY 'OMITTED'.\n>>END-EVALUATE\nPROCEDURE DIVISION.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":">>IF B'1'\n>>ELSE\n>>ELSE\n>>END-IF\n","format":"free","options":{},"libraries":[]}]
+    },
+    {
+      "id": "java-interop",
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:compiler-directive-groups:0005",
+      "target_kind": "directive-group",
+      "target_id": "java-interop",
+      "valid": [{"source":">>JAVA-CALLABLE\nIDENTIFICATION DIVISION.\nPROGRAM-ID. JAVA-OK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n>>JAVA-SHAREABLE ON\n01 SHARED-ITEM PIC X.\n>>JAVA-SHAREABLE OFF\nPROCEDURE DIVISION.\nSTOP RUN.\n","format":"free","options":{},"libraries":[]}],
+      "invalid": [{"source":"IDENTIFICATION DIVISION.\nPROGRAM-ID. JAVA-BAD.\nPROCEDURE DIVISION.\n>>JAVA-CALLABLE\n","format":"free","options":{},"libraries":[]}]
+    }
+  ]
+}

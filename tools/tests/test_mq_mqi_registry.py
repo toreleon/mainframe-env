@@ -30,10 +30,10 @@ class MqMqiRegistryTests(unittest.TestCase):
             mq_registry.rfh2_profile.OUTPUT,
             mq_registry.raw_property.OUTPUT,
             mq_registry.inquiry_local_type.OUTPUT,
-            Path("conformance/0.15/manifests/mq-inquiry-attribute-sources-topics.json"),
-            Path("conformance/0.15/manifests/mq-property-sources-topics.json"),
-            Path("conformance/0.15/manifests/mq-rfh2-sources-topics.json"),
-            Path("conformance/0.15/manifests/mq-point-layout-sources-topics.json"),
+            Path("conformance/subsystems/mq/manifests/mq-inquiry-attribute-sources-topics.json"),
+            Path("conformance/subsystems/mq/manifests/mq-property-sources-topics.json"),
+            Path("conformance/subsystems/mq/manifests/mq-rfh2-sources-topics.json"),
+            Path("conformance/subsystems/mq/manifests/mq-point-layout-sources-topics.json"),
             Path("crates/foundation/mainframe-env-encoding/src/codepage.rs"),
         ]:
             target = root / relative

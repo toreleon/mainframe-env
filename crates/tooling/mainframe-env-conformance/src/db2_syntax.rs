@@ -1079,7 +1079,7 @@ mod tests {
                 .all(|id| !id.as_str().unwrap().starts_with("db2."))
         );
         let catalog: Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.2/catalogs/db2.json"
+            "../../../../conformance/subsystems/coverage/catalogs/db2.json"
         ))
         .unwrap();
         assert_eq!(catalog["mandatory_rows"], 174);

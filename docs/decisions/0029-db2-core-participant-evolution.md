@@ -2,14 +2,14 @@
 
 Status: **Proposed — prerequisite direction, not capability acceptance**
 Owner: **execution-contract, coordinator and Db2 maintainers**
-Scope: **0.12 local Db2 core and early INT-1601 participant integration**
-Applies from: **mainframe-env 0.12.0 development; implementation remains pending**
+Scope: **db2.core local Db2 core and early INT-1601 participant integration**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
 The common implementation prompt requires an owned participant binding before
-new mutating integration. Db2 0.12 includes local transactions, but the frozen
-early participant v1 names `v0.13-owned-participant-binding` for Db2. Its schema,
+new mutating integration. Db2 db2.core includes local transactions, but the frozen
+early participant v1 names `db2.programming-owned-participant-binding` for Db2. Its schema,
 generator, runtime validator and binding guard explicitly admit only CICS
 capabilities. A dependency-string edit cannot make the existing descriptor
 provider-neutral, and a private Db2 coordinator would bypass the required
@@ -25,8 +25,8 @@ Preserve `mainframe-env.transaction-participant@1` and its CICS-only reader,
 schema, fixtures, generated projection and guards unchanged. Prepare an explicit
 `mainframe-env.transaction-participant@2` through the existing execution-contract
 owner and generator, not a Db2-local descriptor registry. Its minimal scope is
-the source-backed local Db2 core required in 0.12. Advanced distributed,
-prepare/heuristic/in-doubt and mixed-resource closure remain separate 0.13/0.16
+the source-backed local Db2 core required in db2.core. Advanced distributed,
+prepare/heuristic/in-doubt and mixed-resource closure remain separate db2.programming/integration.transactions
 obligations; their pending state must not prevent a correctly bounded local
 descriptor or be relabeled accepted by that descriptor.
 
@@ -83,13 +83,13 @@ dispatch or borrowing another provider's accepted context.
    forbidden-context no-mutation and preserved CICS v1 behavior. Memory tests
    alone do not establish durable recovery or cross-resource closure.
 5. Admit the new mutating core only after those actual gates pass. Preserve
-   deferred 0.13/0.16 obligations, source locators and owners in the full
+   deferred db2.programming/integration.transactions obligations, source locators and owners in the full
    174-row common/deferred map. Licensed differential remains pending until
    the pinned authorized Db2 environment supplies exact-candidate observations.
 
 This decision prepares the minimum prerequisite; it does not implement a v2
 reader, accept Db2 capabilities, change the 174-row denominator or certify
-DB2-1204, INT-1601, 0.12 or 0.16.
+DB2-1204, INT-1601, db2.core or integration.transactions.
 
 ## Sources and retained contracts
 

@@ -17,9 +17,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const ALLOWLIST: &str =
-    include_str!("../../../../conformance/0.4/cobol/gnucobol-reference-allowlist.json");
-const OFFICIAL_LANGUAGE: &str = include_str!("../../../../conformance/0.3/cobol/language.json");
+const ALLOWLIST: &str = include_str!(
+    "../../../../conformance/subsystems/cobol/execution/cobol/gnucobol-reference-allowlist.json"
+);
+const OFFICIAL_LANGUAGE: &str =
+    include_str!("../../../../conformance/subsystems/cobol/structure/cobol/language.json");
 const COMPILER_INSTALLED: &str = "/Users/tore/.homebrew/bin/cobc";
 const COMPILER_RESOLVED: &str = "/Users/tore/.homebrew/Cellar/gnucobol/3.2_1/bin/cobc";
 const COMPILER_DIGEST: &str =
@@ -46,7 +48,7 @@ static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 #[serde(deny_unknown_fields)]
 struct Allowlist {
     schema_version: String,
-    target_version: String,
+    target_subsystem: String,
     reference: String,
     reference_version: String,
     dialect: String,
@@ -72,7 +74,7 @@ struct ReferenceCase {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct GnuCobolReferenceReceipt {
     pub schema_version: String,
-    pub target_version: String,
+    pub target_subsystem: String,
     pub status: String,
     pub baseline_id: String,
     pub reference: String,
@@ -221,7 +223,7 @@ pub fn run_gnucobol_reference_campaign(
     }
     Ok(GnuCobolReferenceReceipt {
         schema_version: "mainframe-env.cobol-gnucobol-reference-receipt@1".into(),
-        target_version: "0.4.0".into(),
+        target_subsystem: "cobol.execution".into(),
         status: "pass-with-licensed-differential-pending".into(),
         baseline_id: "ibm-enterprise-cobol-6.5-2026-05-31".into(),
         reference: "gnucobol".into(),
@@ -265,7 +267,7 @@ fn load_allowlist() -> Result<Allowlist, String> {
 
 fn verify_allowlist(allowlist: &Allowlist) -> Result<(), String> {
     if allowlist.schema_version != "mainframe-env.cobol-gnucobol-reference-allowlist@1"
-        || allowlist.target_version != "0.4.0"
+        || allowlist.target_subsystem != "cobol.execution"
         || allowlist.reference != "gnucobol"
         || allowlist.reference_version != VERSION
         || allowlist.dialect != "ibm-strict"

@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("../../../../conformance/0.9/cobol/move-fixture.json");
+const FIXTURE: &str =
+    include_str!("../../../../conformance/subsystems/cics/application/cobol/move-fixture.json");
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CobolMovePilotReport {

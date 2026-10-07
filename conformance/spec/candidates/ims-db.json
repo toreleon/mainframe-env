@@ -5,7 +5,7 @@
   "spec": {
     "schema_version": "mainframe-env.conformance-spec@1",
     "spec_version": "mainframe-env.conformance-ir@1",
-    "catalog_digest": "sha256:f6932f72c8df0d4dc25d35ed58057bee6290bdbde26277de6516fd6b71d6eded",
+    "catalog_digest": "sha256:b51614abbcb8e9522dfced3adc79a9fc834ffe825046cfe3d8e385485461fd48",
     "shard_count": 1,
     "registries": {
       "operations": [
@@ -1446,7 +1446,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:90-124;Usage:Get Unique"
@@ -1471,7 +1471,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
           "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
           "anchor": "plain_text:107-148;unqualified GN order, GB and first occurrence after GB"
@@ -1496,7 +1496,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
           "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
           "anchor": "plain_text:74-114;Usage:Get Next in Parent"
@@ -1521,7 +1521,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
           "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
           "anchor": "plain_text:97-114,161-166;Parentage and GP"
@@ -1546,14 +1546,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
           "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
           "anchor": "plain_text:161-164;GE and unchanged position"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssacodingrules.htm",
           "sha256": "cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5",
           "anchor": "plain_text:5-32,64-68;fixed-width names and relational operands"
@@ -1578,7 +1578,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:143-167;Usage:Get Hold Unique"
@@ -1603,7 +1603,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
           "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
           "anchor": "plain_text:182-198;Usage:Get Hold Next"
@@ -1628,14 +1628,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
           "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
           "anchor": "plain_text:173-175;Usage:Get Hold Next in Parent"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:143-167;hold/update"
@@ -1660,21 +1660,21 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:143-167;hold required"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
           "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
           "anchor": "Table 1 and Table 2;DJ/REPL membership"
         },
         {
           "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
           "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
           "anchor": "plain_text:4-8;REPL requires current Get Hold"
@@ -1699,21 +1699,21 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:143-167;hold required"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
           "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
           "anchor": "Table 1 and Table 2;DJ/DLET membership"
         },
         {
           "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
           "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
           "anchor": "plain_text:4-12;DLET requires current hold and cannot repeat after deletion"
@@ -1738,28 +1738,28 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:149-151;key excluded"
         },
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
           "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
           "anchor": "plain_text:8-13;error changes no data"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_databasecalls.htm",
           "sha256": "2b41e1415ac50690e8ace7761263ef304a0ffd512e6d0beee088356fa439aa7f",
           "anchor": "Table 1 and Table 2;DA/REPL membership"
         },
         {
           "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/da.htm",
           "sha256": "2cdd75d8c8b15e6ca28deecbc28b458fe57cb7bedaf72ac48b24cf5ba825201d",
           "anchor": "plain_text:4-8;REPL cannot modify segment key"
@@ -1784,14 +1784,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_issuedeletecall.htm",
           "sha256": "f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23",
           "anchor": "plain_text:11-21;physical deletion and dependents"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnpghnpcall.htm",
           "sha256": "6daaf5929bf3640a6d4ab17ea97d81328e60b26eb38c32b2c991c77d41592762",
           "anchor": "plain_text:119-122;deleted parent"
@@ -1816,14 +1816,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_formattingssa.htm",
           "sha256": "6d8409b99f914fd6f602666a7120756433726fc7315d3f320c6fa380857dedbe",
           "anchor": "plain_text:3-8;coding authority"
         },
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_ssacodingrules.htm",
           "sha256": "cfb772b7ae68ea657006d135792441a4da20185c2c8833389171c76432c0fba5",
           "anchor": "plain_text:5-32,64-68;fixed-width names and relational operands"
@@ -1848,7 +1848,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:78-83;15 SSA bound"
@@ -1873,7 +1873,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_processingoptions.htm",
           "sha256": "bb549e17230c1990ac0b5b5f0386512493bcd5552b3b4762bd7fc4436a923dd4",
           "anchor": "plain_text:20-23;data security;local SAF denial is host-contract preparation"
@@ -1898,7 +1898,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gnghncall.htm",
           "sha256": "063ff108614ee13694ea7df2f7b39647447059590162614da56de2aa2eb49cb4",
           "anchor": "plain_text:89-114;GN advancement;retry is local canonical host contract"
@@ -1923,7 +1923,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
           "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
           "anchor": "plain_text:8-13;mutation atomicity;rollback is local host UOW contract"
@@ -1948,7 +1948,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
           "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
           "anchor": "plain_text:8-13;mutation atomicity;reopen/retry is local durable host contract"
@@ -1973,7 +1973,7 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_issuedeletecall.htm",
           "sha256": "f40ecf698e4817f47ca8a4abd5214baa880476393c4f765a5c215051acdc6a23",
           "anchor": "plain_text:11-21;deletion;reopen/retry is local durable host contract"
@@ -1998,14 +1998,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:160-167;intervening call cancels hold"
         },
         {
           "baseline": "ibm-ims-15.6-status-explanations-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-status-explanations-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-status-explanations-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/dj.htm",
           "sha256": "61eb932d71cf9d009e0e6652d24840945ba51ed6a3bc98e676dac54164e18c82",
           "anchor": "plain_text:4-8;current hold is required"
@@ -2030,14 +2030,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:143-167;hold permits nonkey replacement"
         },
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
           "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
           "anchor": "plain_text:8-13;atomic replacement"
@@ -2057,14 +2057,14 @@
       "sources": [
         {
           "baseline": "ibm-ims-15.6-programming-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-programming-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_gughucall.htm",
           "sha256": "0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9",
           "anchor": "plain_text:143-167;hold permits nonkey replacement"
         },
         {
           "baseline": "ibm-ims-15.6-database-contracts-2026-09-11",
-          "manifest": "conformance/0.14/manifests/ims-database-contracts-topics.json",
+          "manifest": "conformance/subsystems/ims/manifests/ims-database-contracts-topics.json",
           "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.dag/ims_replacecall.htm",
           "sha256": "55778b03e47f21e92fb967995ec54b7ff1903c7886b98bdb1394d6d85e8fd23a",
           "anchor": "plain_text:8-13;atomic replacement"

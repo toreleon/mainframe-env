@@ -159,8 +159,11 @@ impl Catalog {
             ("db2.json", "db2"),
             ("dataset-vsam-ams.json", "ams"),
         ] {
-            let bytes = fs::read(root.join("conformance/0.2/catalogs").join(file))
-                .map_err(|e| IntakeError::Io(e.to_string()))?;
+            let bytes = fs::read(
+                root.join("conformance/subsystems/coverage/catalogs")
+                    .join(file),
+            )
+            .map_err(|e| IntakeError::Io(e.to_string()))?;
             let document: Value =
                 serde_json::from_slice(&bytes).map_err(|e| IntakeError::Schema(e.to_string()))?;
             let baseline = document["baseline_id"]

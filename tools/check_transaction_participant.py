@@ -23,7 +23,7 @@ def require_fragments(source: str, fragments: tuple[str, ...], label: str) -> No
 
 
 def check(root: Path = ROOT) -> None:
-    contract = json.loads((root / "conformance/0.16/contracts/transaction-participant.json").read_text())
+    contract = json.loads((root / "conformance/subsystems/integration/contracts/transaction-participant.json").read_text())
     ims = next(p for p in contract["participants"] if p["provider_id"] == "ims")
     preparation = ims.get("preparation")
     if preparation is not None:

@@ -1,0 +1,7 @@
+{
+  "schema_version": "mainframe-env.conformance-dependency-additions@1",
+  "target_subsystem": "ims.programming",
+  "edges": [
+    ["mainframe-env-db2", "mainframe-env-encoding"]
+  ]
+}

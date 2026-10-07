@@ -1,17 +1,19 @@
 use super::*;
 
-const SOURCE_PATH: &str = "conformance/0.2/catalogs/ims.json";
-const MANIFEST_PATH: &str = "conformance/0.2/manifests/ims-topics.json";
+const SOURCE_PATH: &str = "conformance/subsystems/coverage/catalogs/ims.json";
+const MANIFEST_PATH: &str = "conformance/subsystems/coverage/manifests/ims-topics.json";
 const GENERATED_PATH: &str =
     "crates/foundation/mainframe-env-ir/src/generated/ims_call_registry.rs";
-const SSA_RULES_PATH: &str = "conformance/0.14/ims/ssa-rules.json";
-const SSA_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-ssa-rules.schema.json";
-const SSA_MANIFEST_PATH: &str = "conformance/0.14/manifests/ims-programming-contracts-topics.json";
+const SSA_RULES_PATH: &str = "conformance/subsystems/ims/ims/ssa-rules.json";
+const SSA_SCHEMA_PATH: &str = "conformance/subsystems/ims/schemas/ims-ssa-rules.schema.json";
+const SSA_MANIFEST_PATH: &str =
+    "conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json";
 const GENERATED_SSA_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_ssa_rules.rs";
-const PCB_STATUS_RULES_PATH: &str = "conformance/0.14/ims/pcb-status-rules.json";
-const PCB_STATUS_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-pcb-status-rules.schema.json";
-const METADATA_SCHEMA_PATH: &str = "conformance/0.14/schemas/ims-metadata.schema.json";
+const PCB_STATUS_RULES_PATH: &str = "conformance/subsystems/ims/ims/pcb-status-rules.json";
+const PCB_STATUS_SCHEMA_PATH: &str =
+    "conformance/subsystems/ims/schemas/ims-pcb-status-rules.schema.json";
+const METADATA_SCHEMA_PATH: &str = "conformance/subsystems/ims/schemas/ims-metadata.schema.json";
 const GENERATED_PCB_PATH: &str =
     "crates/contracts/mainframe-env-host-api/src/generated/ims_pcb_masks.rs";
 const GENERATED_STATUS_PATH: &str =
@@ -405,7 +407,7 @@ fn render_ssa(root: &Path) -> TaskResult<Vec<u8>> {
     validate_schema_instance(&json(&schema_path)?, &rules, &rules_path)?;
     require(
         rules["schema_version"] == Value::String("mainframe-env.ims-ssa-rules@1".into())
-            && rules["target_version"] == Value::String("0.14.0".into())
+            && rules["target_subsystem"] == Value::String("ims.programming".into())
             && rules["source_scope"] == Value::String("ims-programming-contracts".into())
             && rules["segment_name_bytes"].as_u64() == Some(8)
             && rules["field_name_bytes"].as_u64() == Some(8)
@@ -603,7 +605,7 @@ fn render_pcb_status(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
     validate_schema_instance(&json(&schema_path)?, &rules, &rules_path)?;
     require(
         rules["schema_version"] == Value::String("mainframe-env.ims-pcb-status-rules@1".into())
-            && rules["target_version"] == Value::String("0.14.0".into())
+            && rules["target_subsystem"] == Value::String("ims.programming".into())
             && rules["source_scope"] == Value::String("ims-programming-contracts".into()),
         "IMS PCB/status rule identity drifted",
     )?;

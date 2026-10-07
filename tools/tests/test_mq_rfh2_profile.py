@@ -58,9 +58,9 @@ class Rfh2ProfileTests(unittest.TestCase):
                 with self.assertRaises(ValueError):profile.load(root)
 
     def test_generated_freshness_and_historical_identities_are_unchanged(self):
-        self.assertEqual(wire.historical_sha(registry.ROOT/wire.CATALOG),'3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448')
-        self.assertEqual(properties.digest(properties.load(registry.ROOT)[0]),'8da951d82502333755eee8f45447c2c17f699bbe436e93d3bde1c57a6d60dfd4')
-        self.assertEqual(raw.digest(raw.load(registry.ROOT)),'2f6d7c679543891ccc768f099963813d981871d2abd35fa7b49aa4e70732ae6a')
+        self.assertEqual(wire.historical_sha(registry.ROOT/wire.CATALOG),'7ff640ea64ade031e55848bd6de0788b1d70471ea9a5a34df158e43390eb6332')
+        self.assertEqual(properties.digest(properties.load(registry.ROOT)[0]),'163cbc407141a7a896d43edf60b549c1ad1b42e272ff02f91334e3961f4f6448')
+        self.assertEqual(raw.digest(raw.load(registry.ROOT)),'8f3ca67fe72efe6cd4c6c044086de3e9f5d1feebe4390f8163709a5936cb633e')
         self.assertEqual(profile.render(registry.ROOT),(registry.ROOT/profile.OUTPUT).read_text())
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);self.fixture(root);self.assertEqual(profile.render(root),profile.render(registry.ROOT))

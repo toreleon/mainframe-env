@@ -1,8 +1,8 @@
-# Db2 0.12 parser and executor reuse spike
+# Db2 core parser and executor reuse spike
 
 Status: **Recovered development observation; zero conformance credit**
 
-Provenance: recovered on 2026-09-29 from the lost 2026-09-22 v0.12 Codex lane
+Provenance: recovered on 2026-09-29 from the lost 2026-09-22 db2.core Codex lane
 (commit `de4252a9`, never pushed). The executable probe was a temporary `/tmp`
 program in that session and was not retained; the case counts and results below
 are transcribed from the session record and were not re-run on the current
@@ -11,7 +11,7 @@ toolchain or host.
 This lost-lane spike records build-versus-buy observations for DB2-1201 and
 DB2-1203. It compares `sqlparser-rs` 0.63.0 and Apache DataFusion 55.1.0 on a
 bounded 49-case Db2 13 sample before either library can enter production. It
-does not freeze the 0.12 common subset, prove a catalog row, or substitute a
+does not freeze the db2.core common subset, prove a catalog row, or substitute a
 third-party result for Db2 behavior.
 
 ## Source and method
@@ -25,7 +25,7 @@ and negative parsing.
 
 Pinned HTML was read offline from the caller-provided archive under
 `raw/html/sha256`. Each used body was checked for exact byte count and SHA-256
-against `conformance/0.2/manifests/db2-topics.json`, then converted with the
+against `conformance/subsystems/coverage/manifests/db2-topics.json`, then converted with the
 plain-text parser in `conformance/tools/ibm_docs.py`. Representative reviewed
 topics include:
 

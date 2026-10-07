@@ -1,0 +1,19 @@
+{
+  "schema_version":"mainframe-env.cobol-cohorts@1",
+  "cohorts":[
+    {"id":"hello-fixed-oracle","format":"fixed","encoding":"UTF-8","fixture":"conformance/subsystems/platform/fixtures/cobol/HELLO.cbl","oracle_command":"cargo +1.82 test -p open-mainframe r1_direct_hello_preserves_legacy_output_and_records_selection --locked -- --nocapture","selected_route":"compiler:cobol -> mainframe-env-compiler -> mainframe-env-reference@1","status":"pass_exact_output"},
+    {"id":"hello-free","format":"free","encoding":"UTF-8","fixture":"mainframe-env-conformance::HELLO_SOURCE","selected_route":"public compiler service and reference machine","status":"pass"},
+    {"id":"hello-cp037","format":"free","encoding":"EBCDIC CCSID 37","fixture":"mainframe-env-conformance generated exact bytes","status":"pass"},
+    {"id":"copy-replacing","format":"free","encoding":"UTF-8","fixture":"exact primary and REC.cpy dependency bytes","status":"pass_with_expansion_map"},
+    {"id":"data-arithmetic-condition","format":"free","coverage":["PIC X/9","VALUE","MOVE","ADD","IF","DISPLAY"],"status":"pass"},
+    {"id":"frozen-statement-routes","implemented":37,"explicit_unsupported":6,"coverage_test":"every_frozen_supported_statement_has_an_executable_route","status":"pass"},
+    {"id":"failure-controls","coverage":["malformed","unsupported","cancellation","timeout","output-exhaustion","provider-failure","quantum-bound"],"status":"pass"}
+  ],
+  "explicit_unsupported_forms":[
+    "EXEC SQL", "INVOKE", "MERGE", "RELEASE", "RETURN sort-file", "SORT",
+    "PERFORM VARYING/UNTIL", "complex IF without the frozen DISPLAY branch form",
+    "JSON/XML PARSE without INTO", "unregistered EXEC CICS command"
+  ],
+  "legacy_linked":false,
+  "automatic_fallback":false
+}

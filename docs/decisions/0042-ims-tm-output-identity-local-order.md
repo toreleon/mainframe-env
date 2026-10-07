@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **IMS provider maintainers**
 Scope: **IMS-1404.tm-output-identity-local-order, finite local runtime leaf**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 Ordinary ISRT builds a group against one PCB. Express PURG makes that completed
 group available before commit, and the next group on the same PCB must have a
@@ -80,7 +80,7 @@ decision, not an IBM-prescribed hash format or accepted Conformance IR rule.
 
 Local Memory/file SQLite and genuine child-process compatibility/publication
 proofs grant no PostgreSQL, full backup, official/HUMAN, licensed execution or
-full IMS/v0.14 completion. ADR0031/0033 remain Proposed/unanswered: rolling writers,
+full IMS/ims.programming completion. ADR0031/0033 remain Proposed/unanswered: rolling writers,
 pruning/terminal replay, atomic lease publication, settlement, raw CALL/coordinator
 TM admission, participant/shared UOW and real TM backout require their actual
 owners and approvals. This private-owner ADR is not their acceptance.

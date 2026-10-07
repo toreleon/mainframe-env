@@ -3,7 +3,6 @@
 Subsystem: **jcl**
 Phase: **planning**
 
-Target version: **0.7.0**
 Completion dependencies: coverage.foundation
 
 Use this prompt from the repository root. The
@@ -11,16 +10,16 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.7.0: complete JCL converter and planner**.
-Produce a lossless, typed execution plan; JES runtime execution belongs to 0.8.
+You are implementing **mainframe-env jcl.planning: complete JCL converter and planner**.
+Produce a lossless, typed execution plan; JES runtime execution belongs to jes.execution.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/jcl/planning-plan.md`, the pinned JCL/JES2 JECL catalogs,
 source/diagnostic/application-package contracts, and current batch parser tests.
-Verify accepted 0.2 catalog, diagnostic, provenance, plan, and generation
-receipts. Coordinate DD vocabulary with the 0.6 lane without depending on its
+Verify accepted coverage.foundation catalog, diagnostic, provenance, plan, and generation
+receipts. Coordinate DD vocabulary with the dataset.data lane without depending on its
 runtime completion.
 
 ## Implement in this order

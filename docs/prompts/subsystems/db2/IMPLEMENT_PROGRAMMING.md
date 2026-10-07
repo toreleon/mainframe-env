@@ -3,7 +3,6 @@
 Subsystem: **db2**
 Phase: **programming**
 
-Target version: **0.13.0**
 Completion dependencies: db2.core
 
 Use this prompt from the repository root. The
@@ -15,15 +14,15 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.13.0: complete Db2 13 programming
-surface** over the accepted generic 0.12 engine.
+You are implementing **mainframe-env db2.programming: complete Db2 13 programming
+surface** over the accepted generic db2.core engine.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/db2/programming-plan.md`, the complete pinned Db2 catalogs and
-accepted 0.12 parser/binder/catalog/IR/executor/transaction evidence. Verify no
-application-shaped authority remains and that 0.12 artifact/state contracts are
+accepted db2.core parser/binder/catalog/IR/executor/transaction evidence. Verify no
+application-shaped authority remains and that db2.core artifact/state contracts are
 frozen before adding advanced semantics.
 
 ## Implement in this order
@@ -41,7 +40,7 @@ frozen before adding advanced semantics.
 
 ## Pinned platform and advanced-obligation closure
 
-DB2-1301 consumes the frozen 0.12 common/deferred obligation map and closes the
+DB2-1301 consumes the frozen db2.core common/deferred obligation map and closes the
 remaining obligations in the same 174-row catalog (158 SQL headings and 16 SQL
 PL rows). Any correction requires reviewed source provenance; do not import Db2
 LUW features merely because they share a product name. SQL module objects are
@@ -59,7 +58,7 @@ the existing external-substrate semantic-gap rules continue to apply.
 
 ## Reuse and architecture guardrails
 
-- Continue the accepted and pinned 0.12 parser/planner/executor decision. Do not
+- Continue the accepted and pinned db2.core parser/planner/executor decision. Do not
   introduce a second SQL parser, AST, relational IR, optimizer, expression
   runtime, catalog, transaction authority, or compatibility path for advanced
   statements.
@@ -77,7 +76,7 @@ the existing external-substrate semantic-gap rules continue to apply.
 
 ## Version-specific invariants
 
-- All remaining rows extend the single 0.12 catalog/binder/relational execution
+- All remaining rows extend the single db2.core catalog/binder/relational execution
   architecture; no statement-family side engine or private catalog is allowed.
 - Catalog/object/dependency changes, triggers, routines, privilege changes and
   package invalidation are atomic and preserve exact rollback/restart behavior.
@@ -85,7 +84,7 @@ the existing external-substrate semantic-gap rules continue to apply.
   cancellation, retry and unknown-outcome semantics.
 - Advanced values and result sets are bounded; unsupported physical/operational
   Db2 internals remain explicit non-goals rather than simulated successes.
-- Every 0.12 common row and CardDemo database journey stays exact.
+- Every db2.core common row and CardDemo database journey stays exact.
 
 ## Completion gate
 

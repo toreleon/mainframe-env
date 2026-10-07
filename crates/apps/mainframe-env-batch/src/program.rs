@@ -229,7 +229,9 @@ fn control_declaration(program: &str) -> Option<ControlDeclaration> {
         "IDCAMS" => (&["SYSIN", "PARM"][..], ControlGrammar::Idcams),
         "SDSF" => (&["ISFIN"][..], ControlGrammar::Sdsf),
         "IKJEFT01" => (&["SYSTSIN", "SYSIN"][..], ControlGrammar::Tso),
-        "DFSRRC00" => (&["PARM"][..], ControlGrammar::Ims),
+        // SYSIN belongs to the selected signed application controller, which
+        // validates it after launcher selection and before any IMS operation.
+        "DFSRRC00" => (&["PARM", "SYSIN"][..], ControlGrammar::Ims),
         "DSNTEP4" | "DSNTIAD" | "DSNTIAUL" => (&["SYSTSIN", "SYSIN"][..], ControlGrammar::Tso),
         "FTP" | "IKJEFT1B" => (&[][..], ControlGrammar::Unavailable),
         _ => return None,
@@ -298,7 +300,7 @@ pub(crate) fn validate_program_controls(
     }
 }
 
-fn control_source_has_data(input: &ProgramInput, name: &str) -> bool {
+pub(crate) fn control_source_has_data(input: &ProgramInput, name: &str) -> bool {
     let has_nonblank_record = |records: &[Vec<u8>]| {
         records
             .iter()
@@ -376,11 +378,11 @@ pub(crate) fn validate_tso_action_controls(
     if tso_program_execution(program).is_none() {
         return Err(HostProblem::Unsupported);
     }
-    let control = control.trim().to_ascii_uppercase();
-    if control == format!("RUN PROGRAM({program})") {
-        Ok(())
-    } else {
-        Err(HostProblem::Unsupported)
+    match crate::db2_tso::parse(control)? {
+        crate::db2_tso::Action::Run {
+            program: selected, ..
+        } if selected.eq_ignore_ascii_case(program) => Ok(()),
+        _ => Err(HostProblem::Unsupported),
     }
 }
 
@@ -1263,7 +1265,7 @@ mod tests {
             RegisteredProgramHandler::ProgramService
         );
         let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../conformance/0.8/schemas/jes-program-registration.schema.json"
+            "../../../../conformance/subsystems/jes/schemas/jes-program-registration.schema.json"
         ))
         .unwrap();
         let validator = jsonschema::draft202012::options()
@@ -1298,9 +1300,16 @@ mod tests {
                     entry.name
                 );
             } else {
+                // DFSRRC00 delegates SYSIN to its signed application controller;
+                // this malformed PARM is rejected by the launcher first.
+                let expected = if entry.name == "DFSRRC00" {
+                    HostProblem::Malformed
+                } else {
+                    HostProblem::Unsupported
+                };
                 assert_eq!(
                     validate_program_controls(entry.name, &input),
-                    Err(HostProblem::Unsupported),
+                    Err(expected),
                     "{}",
                     entry.name
                 );

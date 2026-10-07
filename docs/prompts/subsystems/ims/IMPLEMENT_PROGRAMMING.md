@@ -3,7 +3,6 @@
 Subsystem: **ims**
 Phase: **programming**
 
-Target version: **0.14.0**
 Completion dependencies: cobol.execution, racf.security, dataset.data
 
 Use this prompt from the repository root. The
@@ -15,7 +14,7 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.14.0: complete IMS 15.6 programming
+You are implementing **mainframe-env ims.programming: complete IMS 15.6 programming
 surface** for the 25 pinned DL/I call/verb families, generic metadata, TM, and
 recovery.
 
@@ -23,8 +22,8 @@ recovery.
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/ims/programming-plan.md`, the pinned IMS comparison catalog,
-IMS/provider/store/host/security contracts, and accepted 0.4.0, 0.5.0 and 0.6.0
-evidence. DBD/PSB/SSA catalog preparation may start after 0.2, but public host,
+IMS/provider/store/host/security contracts, and accepted cobol.execution, racf.security and dataset.data
+evidence. DBD/PSB/SSA catalog preparation may start after coverage.foundation, but public host,
 security and storage integration requires all listed dependencies.
 
 ## Implement in this order
@@ -65,7 +64,7 @@ and stress recovery rather than first introducing it.
 ## Reuse and architecture guardrails
 
 - Build IMS database organizations, indexes, paths, locking, logging, migration,
-  and backup/restore on the accepted 0.6 dataset/storage primitives and common
+  and backup/restore on the accepted dataset.data dataset/storage primitives and common
   effect/UOW protocol. Do not create an IMS-private page manager, object store,
   lock service, transaction coordinator, or migration runner.
 - Generate call/status identities, SSA grammar metadata, DBD/PSB/PCB schemas,
@@ -87,10 +86,10 @@ and stress recovery rather than first introducing it.
   select semantic branches.
 - Preserve exact PCB status, SSA qualification, path and position across normal,
   not-found, duplicate, invalid, cancellation, checkpoint and restart behavior.
-- Database and TM state use typed 0.6 storage/locking and 0.5 principals; provider
+- Database and TM state use typed dataset.data storage/locking and racf.security principals; provider
   code cannot bypass either authority.
 - Checkpoint/restart and cross-resource syncpoints report heuristic/unknown
-  outcomes honestly; final mixed-resource closure belongs to 0.16.
+  outcomes honestly; final mixed-resource closure belongs to integration.transactions.
 - Utilities perform real bounded state transitions, not summaries.
 
 ## Completion gate

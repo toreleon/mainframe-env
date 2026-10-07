@@ -96,3 +96,8 @@ codegen-units = 1
 debug = 0
 incremental = false
 strip = "symbols"
+
+# The published attestation crate ships generated bindings but omits the
+# ../protos inputs used by its release-only generator. Use its shipped bindings.
+[profile.release.package.in_toto_attestation]
+debug-assertions = true

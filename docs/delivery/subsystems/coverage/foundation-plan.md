@@ -2,10 +2,9 @@
 
 Subsystem: **coverage**
 Phase: **foundation**
-Target release: **0.2.0**
 
 Status: **Proposed**
-Start gate: released 0.1.1 source and evidence are immutable
+Start gate: preserve the pinned CardDemo source and compatibility contracts
 Completion dependencies: none
 Estimate: 6–9 engineer-months
 

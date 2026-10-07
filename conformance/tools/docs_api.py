@@ -57,7 +57,7 @@ TOC_URL = "https://www.ibm.com/docs/api/v1/toc/{product}?lang=en"
 CONTENT_URL = "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en"
 
 #: The manifest digest, stated identically in
-#: `conformance/0.2/schemas/topic-manifest.schema.json` as a `const`.
+#: `conformance/subsystems/coverage/schemas/topic-manifest.schema.json` as a `const`.
 DIGEST_DEFINITION = (
     'sha256 over the concatenation, sorted by topic_path, of one '
     '"<topic_path> <sha256>\\n" line per topic, each <sha256> written as bare '
@@ -503,32 +503,32 @@ DECLARED_WRITES: dict[str, dict[str, str]] = {
     "conformance/tools/docs_api.py": {
         "target": "retrieved: the guarded writer itself, and `_cached`",
     },
-    "conformance/0.2/tools/extract_official_catalogs.py": {
+    "conformance/subsystems/coverage/tools/extract_official_catalogs.py": {
         "path": "derived: `write_catalog` emits a normalized catalog, in the tree by design",
         "args.assertions": "derived: the assertion report, in the tree by design",
     },
-    "conformance/0.3/tools/extract_cobol_reserved_words.py": {
+    "conformance/subsystems/cobol/structure/tools/extract_cobol_reserved_words.py": {
         "args.output": "derived: the reserved-word list, in the tree by design",
     },
-    "conformance/0.3/tools/fetch_cobol_topics.py": {
+    "conformance/subsystems/cobol/structure/tools/fetch_cobol_topics.py": {
         "args.destination / name": "retrieved: topic bodies",
         "args.manifest": "derived: digests and headings this tool composes",
     },
-    "conformance/0.5/tools/fetch_racf_topics.py": {
+    "conformance/subsystems/racf/tools/fetch_racf_topics.py": {
         "args.manifest": "derived: digests and headings this tool composes",
     },
-    "conformance/0.6/tools/fetch_ams_topics.py": {
+    "conformance/subsystems/dataset/tools/fetch_ams_topics.py": {
         "args.toc": "retrieved: IBM navigation JSON",
         "args.destination / name": "retrieved: topic bodies",
         "args.manifest": "derived: digests and headings this tool composes",
     },
-    "conformance/0.7/tools/fetch_jcl_topics.py": {
+    "conformance/subsystems/jcl/tools/fetch_jcl_topics.py": {
         "args.toc": "retrieved: IBM navigation JSON",
         "target": "retrieved: a topic body copied out of a --reuse directory",
         "args.destination / file_name(path)": "retrieved: topic bodies",
         "args.manifest": "derived: digests and headings this tool composes",
     },
-    "conformance/0.9/tools/fetch_cics_application_sources.py": {
+    "conformance/subsystems/cics/application/tools/fetch_cics_application_sources.py": {
         "path": "derived: the topic manifest, source-role projection, and registry entry",
     },
     "conformance/tools/fetch_pinned_sources.py": {

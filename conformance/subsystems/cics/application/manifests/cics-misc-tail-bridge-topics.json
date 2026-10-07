@@ -1,0 +1,45 @@
+{
+  "baseline_id": "ibm-cics-ts-6x-misc-tail-bridge-2026-09-23",
+  "book_href": "SSJL4D_6.x/applications/developing/interfaces/dfhtm2b.html",
+  "book_label": "CICS START BREXIT bridge interface review",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSJL4D_6.x",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-23",
+  "subsystem": "cics",
+  "target_subsystem": "cics.application-api",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "topic_count": 4,
+  "topic_manifest_digest": "d88613a155bfb43541df5e0973775af1d2dce2b7488d555d0858a93be2431611",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 5924,
+      "last_modified": "2026-08-26",
+      "sha256": "b42a27ac3ec0e6d98be46f19cde1446ab305e4154e53d178faaced6948ae77b3",
+      "topic_path": "SSJL4D_6.x/applications/developing/interfaces/dfhtm2b.html"
+    },
+    {
+      "bytes": 10866,
+      "last_modified": "2026-01-16",
+      "sha256": "7d875c69692a78c070ab46d0ae1e549b4ffd9d593bf34aa2789f10cac0c02231",
+      "topic_path": "SSJL4D_6.x/fundamentals/interfaces/dfhtm28.html"
+    },
+    {
+      "bytes": 79920,
+      "last_modified": "2026-07-23",
+      "sha256": "56075309a1bb829491a830bd3343f1806cf7dad90c2d758587f3d3e0fefee55e",
+      "topic_path": "SSJL4D_6.x/reference-data-areas/data-areas/DFHBRARK_6.2_6.1.html"
+    },
+    {
+      "bytes": 4158,
+      "last_modified": "2026-01-16",
+      "sha256": "873fb638e3c3de90136e050882accea235b98aad4f2d4cc2dca5457175ab8704",
+      "topic_path": "SSJL4D_6.x/system-programming/cics/dfha3kz.html"
+    }
+  ],
+  "total_bytes": 100868
+}

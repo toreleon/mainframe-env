@@ -308,21 +308,21 @@ fn observed_status_canonical_vectors_and_limits_preserve_outcome_distinctions() 
             "MQCC_FAILED",
             "MQRC_NO_MSG_AVAILABLE",
             1785,
-            "58ae77258476b8e37191f99047b02a8f4a25682641ad2f4ef7f3ea3456be5084",
+            "210c8ca4a54a55e1fec10816daf3b96330190ac5d4e6dcee3764c63b59a2bbbe",
         ),
         (
             MqMqiCall::Get,
             "MQCC_WARNING",
             "MQRC_TRUNCATED_MSG_ACCEPTED",
             1792,
-            "bfd8bcd280d4a08fc13ae4b216eae5894b779437fb1075a096eeee7c5e2f5fec",
+            "124a93ee0bc88a93459306543ca09b28f0c842bbe2b068d5e925dfd5ab24840a",
         ),
         (
             MqMqiCall::Put,
             "MQCC_OK",
             "MQRC_NONE",
             1769,
-            "f909a123e8afed08eab39935358725198fe0030b44acfd1e9c96dddab9fe7a7f",
+            "768bc2a0480ceb2f98f6642328d63a7ff51a227edfa59f504cb1761cff9fa53a",
         ),
     ];
     for (call, completion, reason, size, hash) in vectors {

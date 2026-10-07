@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.example/schemas/jcl-generated-catalog.schema.json",
+  "title": "Generated JCL and JES2 catalog projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "source_catalog",
+    "source_catalog_sha256",
+    "planner_semantics",
+    "planner_semantics_sha256",
+    "plan_schema",
+    "plan_schema_sha256",
+    "generated_coverage_credit",
+    "families"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.jcl-generated-catalog@1"},
+    "target_subsystem": {"const": "jcl.planning"},
+    "source_catalog": {"const": "conformance/subsystems/coverage/catalogs/jcl-jes2.json"},
+    "source_catalog_sha256": {"$ref": "#/$defs/digest"},
+    "planner_semantics": {"const": "conformance/subsystems/jcl/catalogs/jcl-planner-semantics.json"},
+    "planner_semantics_sha256": {"$ref": "#/$defs/digest"},
+    "plan_schema": {"const": "conformance/subsystems/jcl/schemas/jcl-job-plan.schema.json"},
+    "plan_schema_sha256": {"$ref": "#/$defs/digest"},
+    "generated_coverage_credit": {"const": 0},
+    "families": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {"$ref": "#/$defs/family"}
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "denominator", "rows"],
+      "properties": {
+        "id": {
+          "enum": [
+            "jcl-statements",
+            "jes2-jecl-statements",
+            "dd-parameters",
+            "exec-parameters",
+            "job-parameters",
+            "output-parameters"
+          ]
+        },
+        "denominator": {"type": "integer", "minimum": 1, "maximum": 76},
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 76,
+          "items": {"$ref": "#/$defs/row"}
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row_id",
+        "ordinal",
+        "label",
+        "keyword",
+        "aliases",
+        "rust_variant",
+        "source_locator",
+        "validation",
+        "minimum",
+        "maximum",
+        "choices",
+        "support",
+        "sensitive",
+        "capability"
+      ],
+      "properties": {
+        "row_id": {
+          "type": "string",
+          "pattern": "^ibm-zos-3\\.2-jcl-jes2-2026-06:[a-z0-9-]+:[0-9]{4}$"
+        },
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 76},
+        "label": {"type": "string", "minLength": 1, "maxLength": 128},
+        "keyword": {"type": "string", "minLength": 1, "maxLength": 64},
+        "aliases": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 64}
+        },
+        "rust_variant": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"},
+        "source_locator": {"type": "string", "minLength": 1, "maxLength": 256},
+        "validation": {"type": "string", "minLength": 1, "maxLength": 64},
+        "minimum": {"type": ["integer", "null"], "minimum": 0, "maximum": 4294967295},
+        "maximum": {"type": ["integer", "null"], "minimum": 0, "maximum": 4294967295},
+        "choices": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 64}
+        },
+        "support": {"enum": ["available", "deferred"]},
+        "sensitive": {"type": "boolean"},
+        "capability": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$"}
+      }
+    }
+  }
+}

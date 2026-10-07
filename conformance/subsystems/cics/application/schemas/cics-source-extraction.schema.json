@@ -1,0 +1,613 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-source-extraction@1",
+  "title": "CIC-901 application-source batch extraction plan",
+  "description": "Strict zero-credit selectors for five source dimensions; publication prose and semantic acceptance are outside this artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "work_package",
+    "status",
+    "semantic_authority",
+    "automatic_registration",
+    "coverage_credit",
+    "differential_credit",
+    "inputs",
+    "dimensions",
+    "bounds",
+    "expected_shape",
+    "selector_profiles",
+    "section_exceptions",
+    "manual_context_selectors",
+    "conflict_expectations",
+    "source_resolutions",
+    "extraction_digest_definition",
+    "extraction_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-source-extraction@1"},
+    "target_subsystem": {"const": "cics.application-api"},
+    "work_package": {"enum": ["CIC-901.sources-a-project", "CIC-901.sources-b-project", "CIC-901.sources-c-project"]},
+    "status": {"const": "candidate-plan"},
+    "semantic_authority": {"const": false},
+    "automatic_registration": {"const": false},
+    "coverage_credit": {"const": 0},
+    "differential_credit": {"const": 0},
+    "inputs": {"$ref": "#/$defs/inputs"},
+    "dimensions": {"$ref": "#/$defs/five-dimensions"},
+    "bounds": {"$ref": "#/$defs/bounds"},
+    "expected_shape": {"$ref": "#/$defs/expected-shape"},
+    "selector_profiles": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/selector-profile"}
+    },
+    "section_exceptions": {
+      "type": "array",
+      "maxItems": 440,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/section-exception"}
+    },
+    "manual_context_selectors": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/manual-selector"}
+    },
+    "conflict_expectations": {
+      "type": "array",
+      "maxItems": 440,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/conflict-expectation"}
+    },
+    "source_resolutions": {
+      "type": "array",
+      "maxItems": 88,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/source-resolution"}
+    },
+    "extraction_digest_definition": {
+      "const": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted"
+    },
+    "extraction_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "row": {
+      "type": "string",
+      "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:(?:000[1-9]|00[1-9][0-9]|01[0-9]{2}|02[0-5][0-9]|026[0-3])$"
+    },
+    "topic": {
+      "type": "string",
+      "pattern": "^SSJL4D_6\\.x/(?:[A-Za-z0-9_$][A-Za-z0-9_.$-]*/)*[A-Za-z0-9_$][A-Za-z0-9_$.-]*\\.html$",
+      "maxLength": 512
+    },
+    "supplement-topic": {
+      "enum": [
+        "SSNAQ8_11.1.0/reference-api/r_dump.html",
+        "SSNAQ8_11.1.0/reference-api/r_enter.html",
+        "SSNAQ8_11.1.0/reference-api/r_set_trace.html",
+        "SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html",
+        "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
+        "SSXJAJ_14.1.0/com.ibm.faultanalyzer.doc_14.1/idiug166.html"
+      ]
+    },
+    "resolution-topic": {
+      "oneOf": [
+        {"$ref": "#/$defs/topic"},
+        {"$ref": "#/$defs/supplement-topic"}
+      ]
+    },
+    "dimension": {
+      "enum": ["syntax", "options", "operand-directions", "conditions", "execution-context"]
+    },
+    "five-dimensions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {"const": "syntax"},
+        {"const": "options"},
+        {"const": "operand-directions"},
+        {"const": "conditions"},
+        {"const": "execution-context"}
+      ],
+      "items": false
+    },
+    "identity-input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^conformance/subsystems/cics/application/cics/[A-Za-z0-9_-]+\\.json$"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "manifest-input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "file_sha256", "topic_manifest_sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^conformance/subsystems/cics/application/manifests/cics-application-api-sources-[abc]-topics\\.json$"},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "topic_manifest_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "browser-input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "file_sha256", "identity_sha256"],
+      "properties": {
+        "path": {"const": "conformance/subsystems/cics/application/cics/application-api-sources-a-browser-verification.json"},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "identity_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "supplement-input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "file_sha256", "supplements_sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^conformance/subsystems/cics/application/cics/application-api-sources-[abc]-supplements\\.json$"},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "supplements_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mapping", "corpus", "topic_manifest", "cache_scope"],
+      "properties": {
+        "mapping": {
+          "allOf": [
+            {"$ref": "#/$defs/identity-input"},
+            {"properties": {"path": {"pattern": "^conformance/subsystems/cics/application/cics/application-api-sources-[abc]-map\\.json$"}}}
+          ]
+        },
+        "corpus": {
+          "allOf": [
+            {"$ref": "#/$defs/identity-input"},
+            {"properties": {"path": {"pattern": "^conformance/subsystems/cics/application/cics/application-api-sources-[abc]-corpus\\.json$"}}}
+          ]
+        },
+        "topic_manifest": {"$ref": "#/$defs/manifest-input"},
+        "browser_verification": {"$ref": "#/$defs/browser-input"},
+        "supplements": {"$ref": "#/$defs/supplement-input"},
+        "cache_scope": {"enum": ["cics-application-api-sources-a", "cics-application-api-sources-b", "cics-application-api-sources-c"]}
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_topics", "max_topic_bytes", "max_dom_depth", "max_locator_bytes",
+        "max_normalized_fragment_bytes", "max_fragments", "max_fragments_per_row",
+        "max_link_depth", "max_candidate_values_per_key"
+      ],
+      "properties": {
+        "max_topics": {"const": 256},
+        "max_topic_bytes": {"const": 2097152},
+        "max_dom_depth": {"const": 64},
+        "max_locator_bytes": {"const": 2048},
+        "max_normalized_fragment_bytes": {"const": 65536},
+        "max_fragments": {"const": 20000},
+        "max_fragments_per_row": {"const": 4096},
+        "max_link_depth": {"const": 1},
+        "max_candidate_values_per_key": {"const": 64}
+      }
+    },
+    "expected-shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapping_rows", "mapped_rows", "source_gap_rows", "mapping_edges",
+        "mapped_command_topics", "linked_context_topics", "manual_topics", "manifest_topics",
+        "browser_verified_topics", "dimensions_per_row", "syntax_section_topics",
+        "syntax_diagrams", "multiple_syntax_diagram_topics", "options_section_topics",
+        "conditions_section_topics", "supplement_topics",
+        "supplement_direct_topics", "supplement_context_topics"
+      ],
+      "properties": {
+        "mapping_rows": {"type": "integer", "minimum": 87, "maximum": 88},
+        "mapped_rows": {"type": "integer", "minimum": 0, "maximum": 88},
+        "source_gap_rows": {"type": "integer", "minimum": 0, "maximum": 88},
+        "mapping_edges": {"type": "integer", "minimum": 0, "maximum": 512},
+        "mapped_command_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "linked_context_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "manual_topics": {"type": "integer", "minimum": 0, "maximum": 64},
+        "manifest_topics": {"type": "integer", "minimum": 1, "maximum": 256},
+        "browser_verified_topics": {"type": "integer", "minimum": 1, "maximum": 256},
+        "dimensions_per_row": {"const": 5},
+        "syntax_section_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "syntax_diagrams": {"type": "integer", "minimum": 0, "maximum": 512},
+        "multiple_syntax_diagram_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "options_section_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "conditions_section_topics": {"type": "integer", "minimum": 0, "maximum": 256}
+        ,"supplement_topics": {"type": "integer", "minimum": 0, "maximum": 32}
+        ,"supplement_direct_topics": {"type": "integer", "minimum": 0, "maximum": 32}
+        ,"supplement_context_topics": {"type": "integer", "minimum": 0, "maximum": 32}
+      }
+    },
+    "selector-profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dimension", "source_set", "section_selector", "fragment_selector", "cardinality", "association"],
+      "properties": {
+        "id": {
+          "enum": [
+            "mapped-syntax-diagrams", "mapped-option-definitions",
+            "mapped-option-operand-directions", "mapped-condition-definitions",
+            "mapped-inline-execution-context", "mapped-one-hop-context"
+          ]
+        },
+        "dimension": {"$ref": "#/$defs/dimension"},
+        "source_set": {
+          "enum": ["mapped-command-topics", "mapped-option-definitions"]
+        },
+        "section_selector": {"$ref": "#/$defs/section-selector"},
+        "fragment_selector": {"$ref": "#/$defs/profile-fragment-selector"},
+        "cardinality": {"$ref": "#/$defs/cardinality"},
+        "association": {
+          "enum": [
+            "mapping-topic-edge", "option-term-and-definition",
+            "mapping-edge-source-fragment-and-target-fragment"
+          ]
+        }
+      }
+    },
+    "section-selector": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["tag", "class_token", "normalized_heading"],
+          "properties": {
+            "tag": {"const": "h2"}, "class_token": {"const": "sectiontitle"},
+            "normalized_heading": {"enum": ["Syntax", "Options", "Conditions"]}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["derived_from"],
+          "properties": {"derived_from": {"const": "mapped-option-definitions"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["normalized_headings"],
+          "properties": {
+            "normalized_headings": {
+              "type": "array", "minItems": 5, "maxItems": 5,
+              "prefixItems": [
+                {"const": "Syntax"}, {"const": "Description"}, {"const": "Rules"},
+                {"const": "Options"}, {"const": "Conditions"}
+              ],
+              "items": false
+            }
+          }
+        }
+      ]
+    },
+    "profile-fragment-selector": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["root_tag", "class_token", "nested_same_match"],
+          "properties": {
+            "root_tag": {"const": "div"}, "class_token": {"const": "syntaxdiagram"},
+            "nested_same_match": {"const": "exclude"}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["container_tag", "term_tag", "definition_tag", "pairing", "nested_terms"],
+          "properties": {
+            "container_tag": {"const": "dl"}, "term_tag": {"const": "dt"},
+            "definition_tag": {"const": "dd"},
+            "pairing": {"const": "term-plus-consecutive-following-definitions"},
+            "nested_terms": {"enum": ["include", "include-as-resp2-hierarchy"]}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "operand_marker_sources", "direction_authority_selectors", "data_area_policy",
+            "bare_option_direction", "unrecognized_operand_marker", "incompatible_direction_candidates"
+          ],
+          "properties": {
+            "operand_marker_sources": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "prefixItems": [{"const": "direct-term-text"}, {"const": "descendant-var-span"}],
+              "items": false
+            },
+            "direction_authority_selectors": {
+              "type": "array", "minItems": 2, "maxItems": 2,
+              "prefixItems": [{"const": "global-command-format"}, {"const": "global-command-argument-values"}],
+              "items": false
+            },
+            "data_area_policy": {"const": "receiver-or-sender-receiver-requires-definition-evidence"},
+            "bare_option_direction": {"const": "none"},
+            "unrecognized_operand_marker": {"const": "unmatched"},
+            "incompatible_direction_candidates": {"const": "conflicting"}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["root_tag", "relationship", "exclude_descendant_of_class"],
+          "properties": {
+            "root_tag": {"const": "p"}, "relationship": {"const": "direct-child-of-heading-section"},
+            "exclude_descendant_of_class": {"const": "syntaxdiagram"}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "source_tag", "target_set", "target_fragment", "topic_id_anchor",
+            "missing_target_anchor"
+          ],
+          "properties": {
+            "source_tag": {"const": "a"}, "target_set": {"const": "linked-context-topics"},
+            "target_fragment": {"const": "exact-anchor-or-topic-root"},
+            "topic_id_anchor": {"const": "unique-h1-prefix-to-topic-root"},
+            "missing_target_anchor": {"const": "unmatched"}
+          }
+        }
+      ]
+    },
+    "cardinality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {"oneOf": [{"type": "integer", "minimum": 0}, {"enum": ["one-per-option-term", "zero-or-more"]}]},
+        "declared_absence": {"const": 0},
+        "overrides": {
+          "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["topic_path", "count"],
+            "properties": {"topic_path": {"$ref": "#/$defs/topic"}, "count": {"const": 2}}
+          }
+        },
+        "section_default": {"const": 1},
+        "term_minimum_when_present": {"const": 1},
+        "max_link_depth": {"const": 1}
+      },
+      "minProperties": 1
+    },
+    "section-exception": {
+      "type": "object", "additionalProperties": false,
+      "required": ["topic_path", "dimension", "state", "reason"],
+      "properties": {
+        "topic_path": {"$ref": "#/$defs/topic"},
+        "official_row": {"$ref": "#/$defs/row"},
+        "dimension": {"enum": ["syntax", "options", "operand-directions", "conditions"]},
+        "state": {"const": "declared-absent"},
+        "reason": {
+          "enum": [
+            "option-condition-supplement-topic", "no-options-section-in-pinned-topic",
+            "no-conditions-section-in-pinned-topic",
+            "shared-page-sibling-option"
+          ]
+        }
+      }
+    },
+    "manual-selector": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "source_role", "topic_path", "applies_to", "dimensions", "fragment_selectors", "association"],
+      "properties": {
+        "id": {
+          "enum": [
+            "global-command-format", "global-command-argument-values", "dpl-server-restrictions",
+            "threadsafe-command-list", "gap-exec-interface-classification", "gap-eibfn-identity",
+            "traceid-monitor-compatibility", "traceid-dfhcmp-compatibility",
+            "global-response-codes", "gds-send-response-contract", "appc-basic-state-transitions",
+            "appc-basic-state-transitions-sl0", "appc-basic-state-transitions-sl1", "appc-basic-state-transitions-sl2",
+            "appc-mapped-state-transitions", "appc-mapped-state-transitions-sl0",
+            "appc-mapped-state-transitions-sl1", "appc-mapped-state-transitions-sl2"
+          ]
+        },
+        "source_role": {
+          "enum": ["one-hop-context-candidate", "execution-context-candidate", "gap-classification-candidate", "gap-identity-candidate", "compatibility-context-candidate", "condition-contract-candidate"]
+        },
+        "topic_path": {"$ref": "#/$defs/topic"},
+        "applies_to": {"$ref": "#/$defs/applies-to"},
+        "dimensions": {
+          "type": "array", "minItems": 1, "maxItems": 5, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/dimension"}
+        },
+        "fragment_selectors": {
+          "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/manual-fragment-selector"}
+        },
+        "association": {
+          "enum": [
+            "global-context", "argument-kind-and-option-definition",
+            "catalog-label-to-command-and-option-table-row", "catalog-label-to-list-item",
+            "official-row-to-command-table-row-and-notes",
+            "official-row-to-api-table-row-by-label-and-eibfn",
+            "compatibility-context-only-no-command-alias",
+            "condition-name-to-response-code", "row-specific-context"
+          ]
+        }
+      }
+    },
+    "applies-to": {
+      "type": "object", "additionalProperties": false, "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["all-sources-a-rows", "all-sources-b-rows", "all-sources-c-rows", "specific-rows"]},
+        "official_rows": {
+          "type": "array", "minItems": 1, "maxItems": 88, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/row"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "specific-rows"}}, "required": ["kind"]},
+          "then": {"required": ["official_rows"]},
+          "else": {"properties": {"official_rows": false}}
+        }
+      ]
+    },
+    "manual-fragment-selector": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tag", "cardinality"],
+      "properties": {
+        "tag": {"enum": ["section", "table", "ul"]},
+        "heading_id": {"type": "string", "pattern": "^[A-Za-z0-9_$][A-Za-z0-9_$:.-]{0,255}$"},
+        "within_heading_id": {"type": "string", "pattern": "^[A-Za-z0-9_$][A-Za-z0-9_$:.-]{0,255}$"},
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9_$][A-Za-z0-9_$:.-]{0,255}$"},
+        "relationship": {"const": "unique-descendant-list-of-section"},
+        "cardinality": {"const": 1}
+      },
+      "oneOf": [
+        {"required": ["heading_id"]},
+        {"required": ["within_heading_id", "relationship"]},
+        {"required": ["id"]}
+      ]
+    },
+    "conflict-expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "official_row", "dimension", "key", "topic_path",
+        "evidence_values", "resolution"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*-argument-kind$",
+          "maxLength": 80
+        },
+        "official_row": {"$ref": "#/$defs/row"},
+        "dimension": {"const": "operand-directions"},
+        "key": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,31}$"},
+        "topic_path": {"$ref": "#/$defs/topic"},
+        "evidence_values": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["section", "marker"],
+              "properties": {
+                "section": {"const": "syntax"},
+                "marker": {"enum": ["data-area", "data-value"]}
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["section", "marker"],
+              "properties": {
+                "section": {"const": "options"},
+                "marker": {"enum": ["data-area", "data-value"]}
+              }
+            }
+          ],
+          "items": false
+        },
+        "resolution": {"const": "options-definition-over-syntax-metavariable"}
+      }
+    },
+    "source-resolution": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "official_row", "label", "eibfn", "resolution",
+        "target_context_topics", "supplement_topics", "context_fragments"
+      ],
+      "properties": {
+        "official_row": {"$ref": "#/$defs/row"},
+        "label": {"type": "string", "pattern": "^[A-Z][A-Z0-9 -]{0,79}$"},
+        "eibfn": {"type": "string", "pattern": "^[0-9A-F]{4}$"},
+        "resolution": {
+          "enum": ["target-internal-only", "target-product-projection", "authority-bounded-projection"]
+        },
+        "target_context_topics": {
+          "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/topic"}
+        },
+        "supplement_topics": {
+          "type": "array", "maxItems": 8, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/resolution-topic"}
+        },
+        "context_fragments": {
+          "type": "array", "maxItems": 8, "uniqueItems": true,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["topic_path", "selector"],
+            "properties": {
+              "topic_path": {
+                "oneOf": [
+                  {"$ref": "#/$defs/topic"},
+                  {"$ref": "#/$defs/supplement-topic"}
+                ]
+              },
+              "selector": {
+                "enum": [
+                  "unique-article-root", "unique-h1",
+                  "dump-applicability-item", "traceid-compatibility-note"
+                ]
+              }
+            }
+          }
+        },
+        "non_applicable_dimensions": {
+          "type": "array", "minItems": 4, "maxItems": 4,
+          "prefixItems": [
+            {"const": "syntax"}, {"const": "options"},
+            {"const": "operand-directions"}, {"const": "conditions"}
+          ],
+          "items": false
+        },
+        "direct_supplement_topic": {"$ref": "#/$defs/resolution-topic"},
+        "forbidden_alias_tokens": {
+          "type": "array", "minItems": 1, "maxItems": 8,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,31}$"}
+        },
+        "no_one_hop": {"const": true}
+        ,"authority_bounded_dimensions": {
+          "type": "array", "minItems": 4, "maxItems": 4,
+          "prefixItems": [
+            {"const": "syntax"}, {"const": "options"},
+            {"const": "operand-directions"}, {"const": "conditions"}
+          ],
+          "items": false
+        }
+        ,"ambiguity_issue_dimension": {"const": "syntax"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"resolution": {"const": "target-internal-only"}}},
+          "then": {
+            "required": ["non_applicable_dimensions"],
+            "properties": {
+              "supplement_topics": {"maxItems": 0},
+              "context_fragments": {"maxItems": 0}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"resolution": {"const": "authority-bounded-projection"}}},
+          "then": {
+            "required": [
+              "direct_supplement_topic", "forbidden_alias_tokens", "no_one_hop",
+              "authority_bounded_dimensions", "ambiguity_issue_dimension"
+            ],
+            "properties": {"supplement_topics": {"minItems": 1}}
+          }
+        },
+        {
+          "if": {"properties": {"resolution": {"const": "target-product-projection"}}},
+          "then": {
+            "required": [
+              "direct_supplement_topic", "no_one_hop", "authority_bounded_dimensions"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

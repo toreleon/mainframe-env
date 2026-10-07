@@ -1,0 +1,16 @@
+{
+  "schema_version": "mainframe-env.conformance-dependency-additions@1",
+  "target_subsystem": "jes.execution",
+  "profile_additions": [
+    ["core-server", "mainframe-env-spool"],
+    ["conformance", "mainframe-env-spool"]
+  ],
+  "edges": [
+    ["mainframe-env-conformance", "mainframe-env-spool"],
+    ["mainframe-env-server", "mainframe-env-spool"],
+    ["mainframe-env-spool", "mainframe-env-execution-api"],
+    ["mainframe-env-spool", "mainframe-env-host-api"],
+    ["mainframe-env-spool", "mainframe-env-store-api"],
+    ["mainframe-env-zosmf", "mainframe-env-execution-api"]
+  ]
+}

@@ -73,10 +73,10 @@ CITATION = re.compile(
     r"(?P<value>\d[\d,]*|(?i:" + "|".join(NUMBER_WORDS) + r"))<!--f:(?P<key>[a-z0-9_.]+)-->"
 )
 
-CATALOGS = "conformance/0.2/catalogs"
-MANIFESTS = "conformance/0.2/manifests"
+CATALOGS = "conformance/subsystems/coverage/catalogs"
+MANIFESTS = "conformance/subsystems/coverage/manifests"
 
-#: Baselines in the order `conformance/0.2/catalogs/index.json` lists them, so
+#: Baselines in the order `conformance/subsystems/coverage/catalogs/index.json` lists them, so
 #: the tables the record prints come out in the record's own order rather than
 #: alphabetically.
 BASELINES = (
@@ -93,10 +93,10 @@ BASELINES = (
 
 #: Reader manifest -> the baseline pin every topic in it must appear in.
 READERS = (
-    ("cobol", "conformance/0.3/generated/cobol-topic-manifest.json", "cobol"),
-    ("ams", "conformance/0.6/generated/ams-topic-manifest.json", "dataset-vsam-ams"),
-    ("racf", "conformance/0.5/generated/racf-topic-manifest.json", "racf-saf"),
-    ("jcl", "conformance/0.7/generated/jcl-topic-manifest.json", "jcl-jes2"),
+    ("cobol", "conformance/subsystems/cobol/structure/generated/cobol-topic-manifest.json", "cobol"),
+    ("ams", "conformance/subsystems/dataset/generated/ams-topic-manifest.json", "dataset-vsam-ams"),
+    ("racf", "conformance/subsystems/racf/generated/racf-topic-manifest.json", "racf-saf"),
+    ("jcl", "conformance/subsystems/jcl/generated/jcl-topic-manifest.json", "jcl-jes2"),
 )
 
 
@@ -315,21 +315,6 @@ def locators(root: Path) -> Iterator[Figure]:
             )
 
 
-def ledger(root: Path) -> Iterator[Figure]:
-    """The two numbers that say none of this bought coverage."""
-    source = "conformance/0.2/evidence/coverage-ledger.json"
-    book = read(root, source)
-    yield Figure(
-        "ledger.official_compatibility_numerator",
-        book["official_compatibility_numerator"],
-        f"{source} official_compatibility_numerator",
-    )
-    yield Figure(
-        "ledger.generated_catalog_credit",
-        book["generated_catalog_credit"],
-        f"{source} generated_catalog_credit",
-    )
-
 
 def readers(root: Path) -> Iterator[Figure]:
     """Each reader reads only pinned topics, at pinned digests -- checkably.
@@ -357,7 +342,7 @@ def readers(root: Path) -> Iterator[Figure]:
 
 def cobol(root: Path) -> Iterator[Figure]:
     """The comparison's own totals, plus the per-row figures the record names."""
-    source = "conformance/0.3/generated/cobol-grammar-comparison.json"
+    source = "conformance/subsystems/cobol/structure/generated/cobol-grammar-comparison.json"
     comparison = read(root, source)
     for name, value in sorted(comparison["totals"].items()):
         yield Figure(f"cobol.{name}", value, f"{source} totals.{name}")
@@ -417,7 +402,7 @@ def cobol(root: Path) -> Iterator[Figure]:
         f"{source} rows carrying more forms than the publication has formats",
     )
 
-    language = "conformance/0.3/cobol/language.json"
+    language = "conformance/subsystems/cobol/structure/cobol/language.json"
     statements = read(root, language)["procedure_statements"]
     yield Figure(
         "cobol.dispositions",
@@ -446,7 +431,7 @@ def cobol(root: Path) -> Iterator[Figure]:
 
 def racf(root: Path) -> Iterator[Figure]:
     """The projection's totals, the nesting histogram, and the dispositions."""
-    source = "conformance/0.5/generated/racf-html-syntax-projection.json"
+    source = "conformance/subsystems/racf/generated/racf-html-syntax-projection.json"
     projection = read(root, source)
     for name, value in sorted(projection["totals"].items()):
         yield Figure(f"racf.{name}", value, f"{source} totals.{name}")
@@ -496,7 +481,7 @@ def racf(root: Path) -> Iterator[Figure]:
         f"{source} rows[], one command topic each",
     )
 
-    dispositions = "conformance/0.5/racf/operand-dispositions.json"
+    dispositions = "conformance/subsystems/racf/racf/operand-dispositions.json"
     book = read(root, dispositions)
     for name in (
         "baseline_catalog_only_names",
@@ -543,7 +528,7 @@ def racf(root: Path) -> Iterator[Figure]:
 
 def ams(root: Path) -> Iterator[Figure]:
     """The parameter/value split, the wide commands, and the emulator's allowlist."""
-    source = "conformance/0.6/generated/ams-html-parameter-projection.json"
+    source = "conformance/subsystems/dataset/generated/ams-html-parameter-projection.json"
     projection = read(root, source)
     rows = projection["rows"]
     yield Figure("ams.commands", len(rows), f"{source} rows[]")
@@ -574,7 +559,7 @@ def ams(root: Path) -> Iterator[Figure]:
             f"{source} rows[{label}].source_parameters",
         )
 
-    grammar = "conformance/0.6/ams/grammar.json"
+    grammar = "conformance/subsystems/dataset/ams/grammar.json"
     entries = read(root, grammar)
     entries = entries["commands"] if isinstance(entries, dict) and "commands" in entries else entries
     if isinstance(entries, list):
@@ -608,7 +593,7 @@ def ams(root: Path) -> Iterator[Figure]:
 
 def jcl(root: Path) -> Iterator[Figure]:
     """The four unit counts the comparison confirms, and the subtree it refuses."""
-    source = "conformance/0.7/generated/jcl-html-parameter-projection.json"
+    source = "conformance/subsystems/jcl/generated/jcl-html-parameter-projection.json"
     projection = read(root, source)
     yield Figure("jcl.topics", projection["source"]["topics"], f"{source} source.topics")
     total = 0
@@ -654,7 +639,7 @@ def jcl(root: Path) -> Iterator[Figure]:
         total + statements,
         f"{source} inventory and statements catalog_count summed",
     )
-    manifest = "conformance/0.7/generated/jcl-topic-manifest.json"
+    manifest = "conformance/subsystems/jcl/generated/jcl-topic-manifest.json"
     for role, count in sorted(read(root, manifest)["role_counts"].items()):
         yield Figure(f"jcl.role.{slug(role)}", count, f"{manifest} role_counts.{role}")
 
@@ -702,7 +687,6 @@ def guards(root: Path) -> Iterator[Figure]:
 SECTIONS: tuple[tuple[str, Callable[[Path], Iterator[Figure]]], ...] = (
     ("Pinned publications", pins),
     ("Catalog row locators", locators),
-    ("Coverage ledger", ledger),
     ("Reader topic manifests", readers),
     ("COBOL", cobol),
     ("RACF", racf),

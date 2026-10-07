@@ -4,6 +4,7 @@
 
 mod ams;
 mod controller;
+mod db2_tso;
 mod dd;
 mod dd_hydration;
 mod ims_launcher;

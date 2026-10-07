@@ -2,16 +2,15 @@
 
 Subsystem: **racf**
 Phase: **security**
-Target release: **0.5.0**
 
-Status: **Implementation candidate; pass with licensed differential pending; not released**
+Status: **Implementation candidate; pass with licensed differential pending**
 
 The isolated implementation branch `impl/0.5.0` starts from the controller-
 accepted CI-300 repair candidate
-`7d50310381a44878c23c51c38aed841e3a70347f`. The 0.2 dependency evidence is
-checked in under `conformance/0.2/`; its frozen RACF/SAF baseline is
+`7d50310381a44878c23c51c38aed841e3a70347f`. The coverage.foundation dependency evidence is
+checked in under `conformance/subsystems/coverage/`; its frozen RACF/SAF baseline is
 `ibm-zos-3.2-racf-saf-2026`, with 34 command-family rows and 14 RACROUTE rows.
-The 0.5 implementation must reuse shared Conformance IR v1 without an
+The racf.security implementation must reuse shared Conformance IR v1 without an
 incompatible contract change.
 
 ## Current work package
@@ -93,11 +92,11 @@ passes.
 
 This lane has no configured licensed z/OS 3.2 RACF/SAF oracle or receipt, so
 licensed differential remains exactly 0/48 pending rather than inferred. The
-scoped policy permits that pending state for the 0.5 exit only and moves the
-real 48-row campaign to the 0.17 `release-certify` hard gate.
+scoped policy permits that pending state for the racf.security exit only and moves the
+real 48-row campaign to the certification.licensed `release-certify` hard gate.
 The fail-closed campaign adapter is ready: it accepts only one bounded,
 secret-scanned 48-row receipt at
-`conformance/0.5/racf/licensed-oracle.json`, checks its frozen source/product/
+`conformance/subsystems/racf/racf/licensed-oracle.json`, checks its frozen source/product/
 license and fixture identities, requires external licensed execution plus a
 fresh release-certify campaign from approved adapter/environment namespaces,
 executes the same current-product routes, and requires canonical observation
@@ -159,7 +158,7 @@ not change licensed differential credit.
 
 - RACF/SAF observable semantics remain owned by `mainframe-env-racf`; the
   provider-state store remains the durable transaction substrate.
-- The shared 0.2 catalog and CI-300 Conformance IR, registries, runner, shard
+- The shared coverage.foundation catalog and CI-300 Conformance IR, registries, runner, shard
   identity, ScenarioSpec, verdict events, and derived ledger remain the only
   conformance authorities.
 - Secret and cryptographic material crosses stable boundaries only as owned
@@ -169,20 +168,20 @@ not change licensed differential credit.
 - The independent reference simulation is development assurance only. It does
   not create an oracle receipt, add differential bindings, or change the
   licensed numerator from 0/48.
-- No public 0.5 behavior will be claimed until the 0.2 dependency checks and
+- No public racf.security behavior will be claimed until the coverage.foundation dependency checks and
   the relevant executable obligation gates pass.
 
 ## Blockers
 
-There is no remaining 0.5 implementation blocker. Licensed differential is
+There is no remaining racf.security implementation blocker. Licensed differential is
 still unavailable and remains 0/48 pending, but the user-approved scoped policy
-makes it a 0.17 release-certification blocker rather than a 0.5 completion
+makes it a certification.licensed release-certification blocker rather than a racf.security completion
 blocker. No result is fabricated, inferred from simulation, or repurposed from
 historical evidence.
 
 ## Deferred certification step
 
-At 0.17 `release-certify`, install a real approved 48-row campaign at
-`conformance/0.5/racf/licensed-oracle.json`, regenerate the shared spec, and run
+At certification.licensed `release-certify`, install a real approved 48-row campaign at
+`conformance/subsystems/racf/racf/licensed-oracle.json`, regenerate the shared spec, and run
 the licensed differential gate on the unchanged release candidate. Until then,
 the numerator remains exactly 0/48 pending.

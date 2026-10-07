@@ -12,6 +12,57 @@ mod lifecycle_tests;
 #[path = "host_boundary/frame_tests.rs"]
 mod tests;
 
+pub(in crate::service) fn invocation_with_nested_origin(
+    invocation: &Invocation,
+    key: &IdempotencyKey,
+    outer_effect_key: &str,
+) -> Result<Invocation, HostProblem> {
+    reject_reserved_nested_origin(invocation)?;
+    let limits = InvocationLimits::default();
+    let needs_context = !invocation.bindings.contains_key("cics.execution-context");
+    if invocation
+        .bindings
+        .len()
+        .saturating_add(2 + usize::from(needs_context))
+        > limits.max_bindings
+    {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut nested = invocation.clone();
+    if needs_context {
+        // The CICS dispatcher owns this invocation. Make its default local
+        // context explicit so nested participants can validate the origin.
+        nested.bindings.insert(
+            "cics.execution-context".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.execution-context@1",
+                b"local".to_vec(),
+                limits,
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
+    nested.bindings.insert(
+        CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+        BoundedPayload::new(
+            CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+            key.as_str().as_bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    nested.bindings.insert(
+        CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
+        BoundedPayload::new(
+            CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+            outer_effect_key.as_bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    Ok(nested)
+}
+
 const MAX_PROGRAM_LEVELS: usize = 16;
 
 /// A program occurrence belongs to its durable CICS command and frame actor,

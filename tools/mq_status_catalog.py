@@ -11,14 +11,14 @@ import sys
 import generate_mq_mqi_registry as registry
 
 ROOT = registry.ROOT
-CATALOG = Path("conformance/0.15/mq/completion-reason-catalog.json")
-SCHEMA = Path("conformance/0.15/schemas/mq-completion-reason-catalog.schema.json")
+CATALOG = Path("conformance/subsystems/mq/mq/completion-reason-catalog.json")
+SCHEMA = Path("conformance/subsystems/mq/schemas/mq-completion-reason-catalog.schema.json")
 OUTPUT = Path("crates/contracts/mainframe-env-host-api/src/mq_status/generated")
 COMPLETIONS = {"MQCC_OK": "Ok", "MQCC_WARNING": "Warning", "MQCC_FAILED": "Failed"}
 # Reviewed immutable source-projection fixtures, not another numeric authority.
-WIRE_PROJECTION_SHA256 = "1b67e82e0c85139fd0bf2ce58bb851f4eca5184bebb081ed7b1ccadee71da5cd"
-CALL_RETURN_SHA256 = "02bd30d078388918b002fe4e8272bf8c4b3403b1d7e383d580cc1496dd64edaa"
-SUPPLEMENT_MANIFEST = Path("conformance/0.15/manifests/mq-programming-supplements-topics.json")
+WIRE_PROJECTION_SHA256 = "e46072ef0692357a389ba3cfed55dd7388bc2f35b3b0624b93e3f47df38aa4a5"
+CALL_RETURN_SHA256 = "86dd62206045d36ccf3bf8ce0fedb010e185200b2ac82746ab56fafc43d38e56"
+SUPPLEMENT_MANIFEST = Path("conformance/subsystems/mq/manifests/mq-programming-supplements-topics.json")
 ISSUES = {"admitted", "pending-number", "pending-numeric-conflict", "pending-symbol-conflict", "pending-symbol-spelling"}
 CALL_VARIANTS = (
     "Back", "Begin", "BufferToHandle", "Callback", "CallbackFunction", "Close",
@@ -82,7 +82,7 @@ def load_wire(catalog: dict, root: Path) -> None:
             "topic_manifest_digest": manifest["topic_manifest_digest"]}:
         raise ValueError("MQ supplemental manifest binding differs")
     topics, _, _ = ibm_docs.validate_manifest(manifest, root / SUPPLEMENT_MANIFEST,
-        target_version="0.15.0", baseline=wire["baseline_id"], subsystem="mq")
+        target_subsystem="mq.programming", baseline=wire["baseline_id"], subsystem="mq")
     index = read_json(root / SUPPLEMENT_MANIFEST.parent / "index.json")
     entries = [entry for entry in index["manifests"] if entry["scope_id"] == wire["scope_id"]]
     expected = {"scope_id": wire["scope_id"], "subsystem": "mq", "baseline_id": wire["baseline_id"],
@@ -90,7 +90,7 @@ def load_wire(catalog: dict, root: Path) -> None:
         "topic_count": len(topics), "topic_manifest_sha256": "sha256:" + manifest["topic_manifest_digest"],
         "semantic_authority": False, "coverage_credit": 0}
     if (index["schema_version"] != "mainframe-env.topic-manifest-registry@1"
-            or index["target_version"] != "0.15.0" or index["semantic_authority"] is not False
+            or index["target_subsystem"] != "mq.programming" or index["semantic_authority"] is not False
             or type(index["coverage_credit"]) is not int or index["coverage_credit"] != 0
             or entries != [expected] or entries[0]["semantic_authority"] is not False
             or type(entries[0]["coverage_credit"]) is not int):
@@ -129,13 +129,13 @@ def wire_source_lines(catalog: dict, supplemental_cache: Path, call_cache: Path)
 
 def load(root: Path = ROOT) -> dict:
     catalog = read_json(root / CATALOG)
-    fields(catalog, {"schema_version", "target_version", "work_package", "baseline_id",
+    fields(catalog, {"schema_version", "target_subsystem", "work_package", "baseline_id",
         "topic_manifest", "source_call_list", "structure_status_catalog", "unique_call_count",
         "source_position_count", "call_return_count", "callback_notification_count", "pair_count",
         "source_occurrence_count", "admitted_pair_count", "pending_pair_count", "completion_symbols",
         "completion_numeric_mapping", "completion_wire_mapping", "behavioral_coverage_credit", "licensed_execution_credit", "calls"}, "catalog")
     constants = {"schema_version": "mainframe-env.mq-completion-reason-catalog@2",
-        "target_version": "0.15.0", "work_package": "MQ-1501.completion-reason-catalog",
+        "target_subsystem": "mq.programming", "work_package": "MQ-1501.completion-reason-catalog",
         "baseline_id": registry.BASELINE, "unique_call_count": 26, "source_position_count": 27,
         "call_return_count": 25, "callback_notification_count": 1,
         "pair_count": 1030, "source_occurrence_count": 1031,

@@ -2,12 +2,12 @@
 
 Status: **Proposed for the first increment of issue #245**
 Owner: **conformance and xtask maintainers**
-Scope: **CardDemo 0.8 base-batch expected values and conformance credit**
-Applies from: **mainframe-env 0.8 evidence contract v2**
+Scope: **CardDemo jes.execution base-batch expected values and conformance credit**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
-The 0.8 CardDemo base-batch receipt pins statuses, counts, dataset and spool
+The jes.execution CardDemo base-batch receipt pins statuses, counts, dataset and spool
 digests, and a journey digest. It does not identify an independent source for
 each expected value. Replaying those pins is useful regression evidence, but a
 self-recorded result cannot establish conformance to an external system.
@@ -27,7 +27,7 @@ conformance credit. Refreshes leave the historical v1 receipt unchanged.
 
 A `licensed-ibm` label alone grants no licensed equivalence. That still
 requires CER-1701 protected attestation and the relevant subsystem validators
-under `conformance/0.17/schemas/oracle-harness-*.schema.json`. Until those
+under `conformance/subsystems/certification/schemas/oracle-harness-*.schema.json`. Until those
 checks establish authority for an assertion, the CardDemo reader reports it
 as licensed pending and gives it zero credit.
 
@@ -42,7 +42,7 @@ For documentation only, the source classes map to modernize-ai's
 
 ### First independent reference: TRANREPT
 
-The CardDemo 0.8 TRANREPT reference binds a product-captured, fixed-record
+The CardDemo jes.execution TRANREPT reference binds a product-captured, fixed-record
 `TRANSACT.BKUP.G0002V00` input to a separately compiled GnuCOBOL translation
 of the JCL SORT/INCLUDE card and the unmodified corpus `CBTRN03C` program.
 It tests the selected records and report stage for that exact input. The input
@@ -61,7 +61,7 @@ comma defect #229. The captured input also carries the upstream defect #266
 pinned input.
 
 **Compatibility impact:** this is an additive versioned evidence contract.
-The v1 0.8 artifact and historical 0.1.1 CD-023 receipt remain readable and
+The v1 jes.execution artifact and historical profile.carddemo CD-023 receipt remain readable and
 unchanged; readers assign their unattributed assertions zero credit. The new
 v2 artifact supersedes v1 for the ordinary CardDemo base-batch check. Under
 ADR-0004's expand/migrate/contract sequence, this increment expands the

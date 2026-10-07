@@ -1,35 +1,32 @@
 # Subsystem implementation prompts
 
-Status: **Prepared prompts; implementation and release remain separate actions**
-
-Use one prompt from the repository root for a named subsystem phase.
-Target releases retain the original compatibility and acceptance boundaries.
-Stable release promotion has no implementation prompt.
+Use the prompt for a named subsystem phase from the repository root. Plans,
+status, specifications, fixtures, and tests define the work.
 
 ## Prompt index
 
 <!-- BEGIN GENERATED SUBSYSTEM INDEX -->
-| Subsystem | Phase | Prompt | Target release |
-|---|---|---|---|
-| Coverage and conformance | Coverage authority | [Implement](coverage/IMPLEMENT_FOUNDATION.md) | 0.2.0 |
-| COBOL | Grammar and types | [Implement](cobol/IMPLEMENT_STRUCTURE.md) | 0.3.0 |
-| COBOL | Execution semantics | [Implement](cobol/IMPLEMENT_EXECUTION.md) | 0.4.0 |
-| RACF / SAF | Commands and authorization | [Implement](racf/IMPLEMENT_SECURITY.md) | 0.5.0 |
-| Datasets / VSAM / AMS | Dataset services | [Implement](dataset/IMPLEMENT_DATA.md) | 0.6.0 |
-| JCL | Converter and planner | [Implement](jcl/IMPLEMENT_PLANNING.md) | 0.7.0 |
-| JES2 and utilities | Jobs, spool and utilities | [Implement](jes/IMPLEMENT_EXECUTION.md) | 0.8.0 |
-| CICS | Application API | [Implement](cics/IMPLEMENT_APPLICATION_API.md) | 0.9.0 |
-| CICS | SPI and FEPI | [Implement](cics/IMPLEMENT_SYSTEM_API.md) | 0.10.0 |
-| z/OSMF | REST portfolio | [Implement](zosmf/IMPLEMENT_REST.md) | 0.11.0 |
-| Db2 | Engine and common SQL | [Implement](db2/IMPLEMENT_CORE.md) | 0.12.0 |
-| Db2 | Complete programming surface | [Implement](db2/IMPLEMENT_PROGRAMMING.md) | 0.13.0 |
-| IMS | DB / TM programming surface | [Implement](ims/IMPLEMENT_PROGRAMMING.md) | 0.14.0 |
-| IBM MQ | MQI programming surface | [Implement](mq/IMPLEMENT_PROGRAMMING.md) | 0.15.0 |
-| Cross-resource integration | Transactions and recovery | [Implement](integration/IMPLEMENT_TRANSACTIONS.md) | 0.16.0 |
-| Licensed certification | Differential certification | [Implement](certification/IMPLEMENT_LICENSED.md) | 0.17.0 |
+| Subsystem | Phase | Prompt |
+|---|---|---|
+| Coverage and conformance | Coverage authority | [Implement](coverage/IMPLEMENT_FOUNDATION.md) |
+| COBOL | Grammar and types | [Implement](cobol/IMPLEMENT_STRUCTURE.md) |
+| COBOL | Execution semantics | [Implement](cobol/IMPLEMENT_EXECUTION.md) |
+| RACF / SAF | Commands and authorization | [Implement](racf/IMPLEMENT_SECURITY.md) |
+| Datasets / VSAM / AMS | Dataset services | [Implement](dataset/IMPLEMENT_DATA.md) |
+| JCL | Converter and planner | [Implement](jcl/IMPLEMENT_PLANNING.md) |
+| JES2 and utilities | Jobs, spool and utilities | [Implement](jes/IMPLEMENT_EXECUTION.md) |
+| CICS | Application API | [Implement](cics/IMPLEMENT_APPLICATION_API.md) |
+| CICS | SPI and FEPI | [Implement](cics/IMPLEMENT_SYSTEM_API.md) |
+| z/OSMF | REST portfolio | [Implement](zosmf/IMPLEMENT_REST.md) |
+| Db2 | Engine and common SQL | [Implement](db2/IMPLEMENT_CORE.md) |
+| Db2 | Complete programming surface | [Implement](db2/IMPLEMENT_PROGRAMMING.md) |
+| IMS | DB / TM programming surface | [Implement](ims/IMPLEMENT_PROGRAMMING.md) |
+| IBM MQ | MQI programming surface | [Implement](mq/IMPLEMENT_PROGRAMMING.md) |
+| Cross-resource integration | Transactions and recovery | [Implement](integration/IMPLEMENT_TRANSACTIONS.md) |
+| Licensed certification | Differential certification | [Implement](certification/IMPLEMENT_LICENSED.md) |
 <!-- END GENERATED SUBSYSTEM INDEX -->
 
-The release dossiers are indexed in
+The subsystem plans are indexed in
 [`docs/delivery/subsystems/README.md`](../../delivery/subsystems/README.md).
 The dependency and concurrency rules are in
 [`DEPENDENCIES.md`](../../delivery/subsystems/DEPENDENCIES.md).
@@ -44,11 +41,11 @@ completely before editing.
 1. Work from the `mainframe-env` repository root.
 2. Read `AGENTS.md` and any more-local instructions when present.
 3. Read the target subsystem phase plan and progress record, this contract, the research roadmap, the
-   machine roadmap, accepted ADRs, architecture contracts, version/release
+   machine roadmap, accepted ADRs, architecture contracts, subsystem tracking
    policy, and relevant package READMEs before editing.
 4. Inspect the current source and tests; do not assume the roadmap's snapshot
    still describes the tree exactly.
-5. Verify each completion dependency from checked-in evidence. A version may
+5. Verify each completion dependency using current checks. A subsystem may
    prepare private catalogs, parsers, fixtures, and oracle harnesses early only
    where its prompt permits. It may not merge or advertise public behavior
    whose dependency gate has not passed.
@@ -67,16 +64,16 @@ candidate/dependency identity, current and completed work packages, blockers,
 decisions, and next executable step. Do not turn controller state into product
 conformance evidence.
 
-From 0.3 onward, do not create a version-specific status schema, command-result
+From cobol.structure onward, do not create a version-specific status schema, command-result
 ledger, dirty-tree receipt, or `review-repair-round-N` evidence/schema family.
 The documentation manifest provides the shared subsystem mapping outside the
 coverage ledger. Automation must not create another controller ledger. Read the status at every continuation and
 never restart completed discovery after compaction.
 
-### Conformance-driven SDLC from 0.3
+### Conformance-driven COBOL structure workflow
 
 Read and follow [`CONFORMANCE-IR.md`](../../architecture/CONFORMANCE-IR.md).
-The 0.2 catalogs and row identities define the denominator; the shared typed
+The coverage.foundation catalogs and row identities define the denominator; the shared typed
 Conformance IR defines behavior and binds claimed gates to executable tests.
 
 - Each claimed official row has a typed specification with `row_id`, operation,
@@ -130,7 +127,7 @@ shell-in-spec, general formal languages, or generated tests for internal details
 
 ### Hardened slice acceptance
 
-For 0.9–0.17, bind each slice to the current accepted baseline and existing
+For cics.application-api–certification.licensed, bind each slice to the current accepted baseline and existing
 [execution/durability](../../architecture/EXECUTION-AND-DURABILITY.md),
 [security](../../architecture/PLUGIN-AND-SECURITY.md),
 [canonical effect](../../contracts/EFFECT-CANONICAL-V1.md),
@@ -188,16 +185,16 @@ fencing; deadline/cancellation; and durable recovery/schema ownership.
 Review what the accepted coordinator already supplies and extend it additively.
 Declare the early contract slice under INT-1601 in the existing status mechanism;
 it is a prerequisite to dependent adapter integration, not a claim that all of
-0.16 has passed. Each participant supplies minimum mutation, failure, replay and
+integration.transactions has passed. Each participant supplies minimum mutation, failure, replay and
 restart evidence when its slice lands. Full mixed-resource combinations,
-operator resolution and coherent backup/restore close in 0.16. Do not require
+operator resolution and coherent backup/restore close in integration.transactions. Do not require
 universal prepare, rollback, two-phase commit or exactly-once behavior where the
 pinned execution context does not support it.
 
 ### Licensed-harness preparation
 
 Prepare CER-1701 environment/adapter inputs alongside each provider lane rather
-than first discovering oracle prerequisites at 0.17. Record pinned product and
+than first discovering oracle prerequisites at certification.licensed. Record pinned product and
 service levels, authorized access, capabilities, independent fixtures, capture,
 reviewed normalization, bounds and representative harness checks in existing
 status/spec/fixture authorities. Keep proprietary media, credentials and raw
@@ -206,7 +203,7 @@ licensed outputs outside production and public release closure.
 Local fixtures validate harness plumbing only. Earlier licensed observations
 retain their original candidate/environment identities; they do not certify a
 later candidate. All phase-specific licensed completion requirements and the final
-0.17 campaigns remain binding. Missing environments stay explicit blockers to
+certification.licensed campaigns remain binding. Missing environments stay explicit blockers to
 those gates, not fabricated passes or new blanket implementation exceptions.
 Source, spec, fixture, oracle or environment changes invalidate affected receipts
 under the existing candidate policy; any permitted reuse needs explicit identity
@@ -223,7 +220,7 @@ and compatibility proof, never silent relabeling of an old receipt.
 
   ```text
   Work-Package: <WORK-PACKAGE-ID>=pass
-  Target-Version: <target-version>
+  Target-Subsystem: <target-subsystem>
   Evidence-Digest: sha256:<canonical-work-package-digest>
   ```
 
@@ -283,9 +280,9 @@ Commodity infrastructure and standards implementations are not product
 semantics. Before implementing either category, classify the boundary and
 record the decision in the target status ledger.
 
-- Reuse the accepted 0.2 authorities rather than creating subsystem-private
+- Reuse the accepted coverage.foundation authorities rather than creating subsystem-private
   variants: the contract/catalog compiler, application-package trust and
-  generation runtime, store/migration/artifact adapters, and the 0.3 shared
+  generation runtime, store/migration/artifact adapters, and the cobol.structure shared
   Conformance IR/compiler/runner/ledger pipeline. Extend their typed contracts
   through their owners.
 - One readable normative catalog or schema must generate all applicable Rust
@@ -339,7 +336,7 @@ Use these validation tiers:
 
 1. **Inner loop:** run the smallest focused package tests and affected schema,
    inventory, architecture, or conformance shard. Do not run full workspace,
-   CardDemo, PostgreSQL, Zowe, dual-target release, or licensed-oracle gates.
+   CardDemo, PostgreSQL, Zowe, dual-subsystem phase, or licensed-oracle gates.
 2. **Work-package/PR:** run formatting, compile/check, focused tests, every
    affected public-route conformance shard, required negative/condition tests,
    and `git diff --check`. Add restart/rollback/security checks only when the
@@ -350,12 +347,12 @@ Use these validation tiers:
    on one unchanged candidate. Regress prior profiles that consume the changed
    contracts or routes; do not rerun unrelated subsystem matrices.
 4. **Nightly/release certification:** run global CardDemo 20/20, PostgreSQL,
-   live Zowe, bounded load, backup/restore, dual-target release reproduction,
+   live Zowe, bounded load, backup/restore, dual-subsystem phase reproduction,
    cross-subsystem replay, and licensed IBM differential gates. Run this tier
-   for 0.16/0.17, release candidates, scheduled integration, or earlier only
+   for integration.transactions/certification.licensed, release candidates, scheduled integration, or earlier only
    when the changed scope actually affects the corresponding environment.
 
-Unless a target is 0.16/0.17 or its dossier explicitly marks an environment as
+Unless a target is integration.transactions/certification.licensed or its dossier explicitly marks an environment as
 affected, references to “full validation” in an individual minor prompt mean
 tier-3 complete affected-scope validation, not tier-4 global certification.
 These tiers guide local validation; they do not waive unconditional policy
@@ -374,22 +371,11 @@ gate merely to refresh hashes, prose, receipts, or commit metadata.
 
 ### Change and release boundary
 
-Implement the named subsystem phase only, within its target-release boundary. A future-version capability may not leak into
-an earlier public profile. Do not weaken earlier released behavior, rewrite
-historical evidence, or silently change a durable/public contract.
-
-This managed implementation program authorizes implementation edits, local
-validation, and bounded work-package commits. A large minor may use reviewable
-work-package pull requests when incomplete behavior remains unreachable from
-the public profile and each pull request preserves all prior gates. The final
-integration pull request against `main` must list every work package and
-evidence digest, pass the entire minor exit gate, and must not claim the minor
-is released.
-
-It does not authorize destructive migration, force-push, merge, tag,
-publication, deployment, production cutover, or a compatibility claim. Version
-promotion occurs only after the target exit gate passes on the exact candidate;
-the controller reviews and merges the pull request separately.
+Keep changes scoped to the owning subsystem and consumed shared contracts.
+Preserve tests, specifications, fixture identities, and compatibility schemas.
+Add an isolated changelog fragment and regenerate documentation. Keep execution
+receipts outside Git and report current checks and pending environments in the
+handoff. Release tags and published assets do not manage subsystem progress.
 
 ### Stop-the-line and handoff
 

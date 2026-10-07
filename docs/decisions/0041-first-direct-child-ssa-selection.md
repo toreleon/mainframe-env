@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **IMS provider maintainers**
 Scope: **IMS-1403.ssa-first-direct-child, bounded local runtime leaf**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 Admit only existing typed CALL/public-provider and signed-selected DbBatch
 GNP/GHNP with one unqualified direct-child SSA and exactly one active F.
@@ -80,4 +80,4 @@ backup with database/session/undo/checkpoint/replay/package/journal/audit
 references. Never rewrite live replies or invent history to resume F.
 Memory/file SQLite reopen and separate processes prove only their local routes,
 not PostgreSQL, full backup/backend/official/HUMAN/licensed/participant acceptance
-or completion of all F, IMS-1401/1403 or v0.14.
+or completion of all F, IMS-1401/1403 or ims.programming.

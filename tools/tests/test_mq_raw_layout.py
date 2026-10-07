@@ -40,13 +40,13 @@ class MqRawLayoutTests(unittest.TestCase):
 
     def test_historical_contract_and_wire_projection_stay_identical(self):
         self.assertEqual(wire.historical_sha(registry.ROOT/wire.CATALOG),
-                         '3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448')
+                         '7ff640ea64ade031e55848bd6de0788b1d70471ea9a5a34df158e43390eb6332')
         self.assertEqual(registry._contract_digest(registry.load_contract()),
                          'sha256:8452faa699ae5ed8431605958196aabf52fc4d550cca7b3d485b26c0beb0c965')
         self.assertEqual(registry.render_contract(),(registry.ROOT/registry.CONTRACT_OUTPUT_PATH).read_text())
         self.assertEqual(wire.render(registry.ROOT),(registry.ROOT/wire.OUTPUT).read_text())
         self.assertEqual(raw.digest(raw.previous_projection(raw.load(registry.ROOT))),
-                         '5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0')
+                         '328ced5efce5d0ca96f7984d13ad3bb168dcc8518097f4535601a5278ddaae91')
 
     def test_fixed_connx_facts_and_input_output_boundary(self):
         value = raw.load(registry.ROOT)

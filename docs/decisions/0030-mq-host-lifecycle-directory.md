@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **MQ contract and provider maintainers**
 Scope: **volatile trusted-service composition, not public route acceptance**
-Applies from: **mainframe-env 0.15.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

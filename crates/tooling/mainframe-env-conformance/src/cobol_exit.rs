@@ -24,8 +24,9 @@ use mainframe_env_source::{
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-const PRIOR_ARTIFACT_B64: &str =
-    include_str!("../../../../conformance/0.9/cobol/artifact-v2-c029219.b64");
+const PRIOR_ARTIFACT_B64: &str = include_str!(
+    "../../../../conformance/subsystems/cics/application/cobol/artifact-v2-c029219.b64"
+);
 const PRIOR_ARTIFACT_SHA256: &str =
     "cf5de374e76c07ff001af9a20053fd8692f55337a4ebece2085ce62c436d58db";
 

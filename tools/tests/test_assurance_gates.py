@@ -129,7 +129,6 @@ class AssuranceGateTests(unittest.TestCase):
             "fuzz-periodic",
             "model-check",
             "coverage-baseline",
-            "archive-reproduction",
         }
         self.assertTrue(expected <= set(ci.FULL))
         pipeline = (REPOSITORY / "Jenkinsfile").read_text()

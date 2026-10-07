@@ -1,6 +1,6 @@
 # mainframe-env-batch
 
-The single 0.1 JCL/JES authority. Bounded JCL is expanded into a typed workflow;
+The owned JCL/JES authority. Bounded JCL is expanded into a typed workflow;
 JES owns durable job, step, queue, and spool state; and every executable step is
 dispatched through the typed `host.program.invoke` service. The package contains
 only the explicitly accepted utility selectors and has no generic-success path.
@@ -33,3 +33,7 @@ DD/EXEC overrides, nested invocation chains, and backward DD references retain
 their exact definition, use, invocation, and override source ranges. Expansion
 only produces converter input; it performs no scheduling, allocation mutation,
 utility execution, or JES success simulation.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

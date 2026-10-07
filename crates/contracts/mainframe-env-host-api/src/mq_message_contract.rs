@@ -8,7 +8,7 @@
 pub const MQ_MESSAGE_CONTRACT: &str = "mainframe-env.mq-message@1";
 
 /// Pinned IBM MQ 9.4 call-topic identities reviewed for this vocabulary.
-/// Rows refer to `conformance/0.2/catalogs/mq.json`, baseline
+/// Rows refer to `conformance/subsystems/coverage/catalogs/mq.json`, baseline
 /// `ibm-mq-9.4-mqi-2026-08-31`; hashes refer to its topic manifest.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MqMessageSource {

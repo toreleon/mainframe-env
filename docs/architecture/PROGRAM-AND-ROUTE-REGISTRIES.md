@@ -1,9 +1,9 @@
 # Generated common-program and route registries
 
-Status: **Frozen for mainframe-env 0.2.0**
+Status: **Frozen for mainframe-env coverage.foundation**
 Owner: **application, batch, and gateway maintainers**
 Scope: **generated common-program and route registries**
-Applies from: **mainframe-env 0.2.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 The reviewed `mainframe-env.common-program-catalog@1` is the single name-to-
 type boundary for JES utilities, nested Db2 TSO programs, and installed COBOL
@@ -30,7 +30,7 @@ coverage credit.
 
 From ZMF-1101, `cargo xtask zosmf-contracts --check` separately derives the
 z/OSMF 3.2 route, operation, schema/error, backend-ownership, collision, and
-closure artifacts from `conformance/0.11/catalogs/zosmf-normalization.json`.
+closure artifacts from `conformance/subsystems/zosmf/catalogs/zosmf-normalization.json`.
 This candidate registry is not router registration: only the frozen 23-route
 binding file feeds `official_routes::register`. The generated closure must keep
 new advertised routes at zero, preserve the seven-route custom namespace with

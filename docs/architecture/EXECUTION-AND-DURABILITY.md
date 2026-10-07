@@ -3,7 +3,7 @@
 Status: **Accepted by repository owner**
 Owner: **execution and store maintainers**
 Scope: **execution lifecycle, effects, work, checkpoints, and durability**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Design outcome
 
@@ -59,18 +59,16 @@ state are recorded.
 
 The machine executes a bounded quantum and returns one drive action:
 
-```text
-machine state + resume input
-        |
-        v
-execute deterministic quantum
-        |
-        +-> continue with updated state
-        +-> request one ordered host effect
-        +-> invoke/transfer child program
-        +-> persist suspension/checkpoint
-        +-> complete
-        +-> fail explicitly
+```mermaid
+flowchart TB
+    input["Machine state and resume input"] --> quantum["Execute deterministic quantum"]
+    quantum --> next{"Drive action"}
+    next --> continue["Continue with updated state"]
+    next --> effect["Request one ordered host effect"]
+    next --> child["Invoke / transfer child program"]
+    next --> suspend["Persist suspension / checkpoint"]
+    next --> complete["Complete"]
+    next --> fail["Fail explicitly"]
 ```
 
 One ordered effect at a time is the reference behavior. Batching is an
@@ -89,6 +87,32 @@ and transaction state before emitting the request. Provider and store
 authorities remain unchanged as semantic families migrate.
 
 For a mutating effect:
+
+```mermaid
+sequenceDiagram
+    participant Machine
+    participant Coordinator
+    participant Store
+    participant Provider
+    Machine->>Coordinator: Typed effect request
+    Coordinator->>Coordinator: Validate capability, principal and bounds
+    Coordinator->>Store: Persist intent and original idempotency identity
+    Store-->>Coordinator: Intent retained
+    Coordinator->>Provider: Dispatch mutation
+    Provider-->>Coordinator: Typed result or unresolved outcome
+    alt Terminal result can be retained
+        Coordinator->>Store: Persist typed terminal result
+        Coordinator-->>Machine: Feed retained typed result
+        Coordinator->>Store: Persist next machine state or terminal outcome
+    else Mutation outcome or result persistence is uncertain
+        Coordinator->>Store: Retain unresolved intent for reconciliation
+        Coordinator-->>Machine: UnknownOutcome
+        Note over Coordinator,Provider: Recovery consults the durable ledger without redispatching the mutation
+    end
+```
+
+The sequence summarizes the numbered protocol below. An unavailable store can
+leave only the original intent durable; recovery must resolve it before progress.
 
 1. Validate request, capability, principal, bounds, transaction, and deadline.
 2. Allocate a monotonic effect sequence in the run unit.

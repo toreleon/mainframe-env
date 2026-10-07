@@ -1,0 +1,81 @@
+{
+  "backend": {
+    "all_families_executable": false,
+    "families": {
+      "accepted": 1,
+      "missing": 6,
+      "partial": 4,
+      "unresolved": 16
+    },
+    "operations": {
+      "accepted": 22,
+      "missing": 38,
+      "partial": 27,
+      "unresolved": 191
+    }
+  },
+  "blockers": [
+    {
+      "id": "missing-or-unresolved-backend",
+      "operation_count": 256
+    },
+    {
+      "id": "identity-only-schema-detail",
+      "operation_count": 256
+    },
+    {
+      "id": "shared-route-discriminator",
+      "route_key_count": 13
+    },
+    {
+      "id": "licensed-zosmf-3.2-differential",
+      "operation_count": 278
+    }
+  ],
+  "collisions": {
+    "blocked": 13,
+    "classified": 1,
+    "new_route_publication_allowed": false,
+    "shared_dispatch": 14
+  },
+  "generated_coverage_credit": 0,
+  "normalization_sha256": "sha256:2a76fda53cac8267bf55fe3d0c67e60562cefd802377783de36a3d1f41b28520",
+  "normalized": {
+    "errors": 27,
+    "obligations": 1727,
+    "operations": 278,
+    "route_keys": 310,
+    "route_variants": 352,
+    "schemas": 583
+  },
+  "publication": {
+    "custom_routes": 7,
+    "custom_routes_official_credit": 0,
+    "existing_official_routes": 23,
+    "legacy_unmapped_routes": 1,
+    "namespaces_disjoint": true,
+    "new_official_routes": 0,
+    "operation_states": {
+      "legacy-accepted-route": 22,
+      "withheld": 256
+    }
+  },
+  "schema_version": "mainframe-env.zosmf-closure-report@1",
+  "source": {
+    "closed": true,
+    "families": 27,
+    "heading_dispositions": {
+      "concrete-operation": 174,
+      "context-reference": 1,
+      "error-reference": 4,
+      "operation-bundle": 2,
+      "operation-group": 6,
+      "schema-reference": 2
+    },
+    "headings": 189,
+    "rows": 216
+  },
+  "target_subsystem": "zosmf.rest",
+  "zmf_1101_contracts_closed": true,
+  "zosmf_0_11_exit_complete": false
+}

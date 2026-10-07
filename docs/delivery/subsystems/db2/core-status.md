@@ -2,7 +2,6 @@
 
 Subsystem: **db2**
 Phase: **core**
-Target release: **0.12.0**
 
 Status: **In progress — second/third-wave pure surfaces sealed; catalog/binder and execution pending**
 
@@ -30,7 +29,7 @@ making changes because the CLI account rejected `gpt-6.1-sol`.
 | `DB2-1202.schema-qualification` | Pure static/dynamic qualification with explicit context; `name_resolution`. |
 
 These declarations grant no row, execution or coverage credit. Implementation
-remains paused; the conflict repair does not complete v0.12 or waive its gates.
+remains paused; the conflict repair does not complete db2.core or waive its gates.
 
 ## Resumed implementation on 2026-10-02
 
@@ -325,8 +324,8 @@ Source review of the 174-row map is a required scoped freeze prerequisite, not
 a whole-cache refresh/audit; no network or browser request is authorized.
 
 The freeze preparation identified a prerequisite mismatch: frozen participant
-v1 permits only the accepted CICS mapping and fixes Db2's dependency to a 0.13
-binding, while new 0.12 mutating integration requires an owned early binding.
+v1 permits only the accepted CICS mapping and fixes Db2's dependency to a db2.programming
+binding, while new db2.core mutating integration requires an owned early binding.
 The manager's proposed [core participant evolution](../../../decisions/0029-db2-core-participant-evolution.md)
 preserves v1 and chooses a shared versioned extension for the bounded local
 Db2 core, with action/context applicability and minimum durable proof before
@@ -954,13 +953,13 @@ All three release commits are ancestors of the candidate.
 
 | Dependency | Accepted identity | Disposition and retained authority |
 |---|---|---|
-| 0.2.0 | commit `e8dfa89583d866a365f496297d50aeb602e468bf`; tree `b60b14435b7466e937f58391297a62a38fb86ee2`; annotated tag `mainframe-env-v0.2.0` | Released catalog/package/handler authority; `docs/releases/0.2.md` and `conformance/0.2/` retained. No later Db2 semantic numerator is inferred. |
-| 0.4.0 | commit `4a50a4e66f08b9cb5d293fb276cfbd52424b07fc`; tree `92ba4ce0855c02b6157d08fedac2cae51977a972`; source `sha256:143050b6cc13f22dd23e1edba1a4f5a872dde835be9bb7c7ce02a2479ad903ca` | Released COBOL host ABI; pass-with-licensed-differential-pending, Enterprise COBOL 0/153. |
-| 0.5.0 | commit `bd5e8ecd211b7da4f3e18dfcfc807352d0ebd2e8`; tree `7e89e90c372a8bb1ca63a7b06c3c744e1a85e8d9`; source `sha256:67faf4b40e2e8c1c619a9564188d4ffe26efff5354e2c60b7032035e37d8b4f6` | Released RACF/SAF authority; pass-with-licensed-differential-pending, RACF/SAF 0/48. |
+| coverage.foundation | commit `e8dfa89583d866a365f496297d50aeb602e468bf`; tree `b60b14435b7466e937f58391297a62a38fb86ee2`; annotated tag `mainframe-env-coverage.foundation` | Catalog/package/handler authority is retained under `conformance/subsystems/coverage/`. No later Db2 semantic numerator is inferred. |
+| cobol.execution | commit `4a50a4e66f08b9cb5d293fb276cfbd52424b07fc`; tree `92ba4ce0855c02b6157d08fedac2cae51977a972`; source `sha256:143050b6cc13f22dd23e1edba1a4f5a872dde835be9bb7c7ce02a2479ad903ca` | Released COBOL host ABI; pass-with-licensed-differential-pending, Enterprise COBOL 0/153. |
+| racf.security | commit `bd5e8ecd211b7da4f3e18dfcfc807352d0ebd2e8`; tree `7e89e90c372a8bb1ca63a7b06c3c744e1a85e8d9`; source `sha256:67faf4b40e2e8c1c619a9564188d4ffe26efff5354e2c60b7032035e37d8b4f6` | Released RACF/SAF authority; pass-with-licensed-differential-pending, RACF/SAF 0/48. |
 
-The pending licensed obligations of 0.4 and 0.5 remain unchanged. They do not
+The pending licensed obligations of cobol.execution and racf.security remain unchanged. They do not
 block consumption of the recorded implementation baselines and do not grant a
-licensed disposition to 0.12.
+licensed disposition to db2.core.
 
 ## Current work package
 
@@ -970,7 +969,7 @@ used different versions and rejected both as direct dependencies. Neither study
 settles current adoption. No parser dependency was added.
 
 The recovered official catalog derives a typed 174-row identity/descriptor projection
-directly from the frozen 0.2 catalog and rejects denominator, row, locator, and
+directly from the frozen coverage.foundation catalog and rejects denominator, row, locator, and
 generated-output drift. It includes pinned topic paths and hashes. Remaining stages define exact recognition obligations,
 source-review state, and the common/deferred disposition without granting
 execution credit. The slice cannot be sealed until every row has pinned source
@@ -1133,7 +1132,7 @@ and parameter markers; `db2z_sqlidentifiers` (`d5c99a5640234e19a310d2e44f1abd9bb
 `db2z_graphicstringconstants` (`7755678351defbdf211b1164eb5127ee088860ad6fddd7835a965040ea41689a`) for graphic/Unicode hex forms; and
 `db2z_refs2hostvars` (`3bf1787c8a0538738a20724bb4ba7d8302f6f77a2efac5605f9795de28e61e54`) for host references. Paths are under
 `SSEPEK_13.0.0/sqlref/src/tpc/` with `.html` suffixes in
-`conformance/0.2/manifests/db2-topics.json`. The pinned
+`conformance/subsystems/coverage/manifests/db2-topics.json`. The pinned
 `db2z_constantsintro.html` body (`9bbe7aeaa74f37a2a55977368714d0f8d3fd33465e65d3e416795218236f0fa7`) is absent from the offline
 corpus; its replacement is not accepted as the pin. Numeric-constant rules
 remain pending on #350. The configured cache reader could not verify the
@@ -1141,7 +1140,7 @@ baseline TOC; the matching retained topic HTML was read locally.
 
 The AST review verified retained bytes for these Db2 13 baseline topics under
 `SSEPEK_13.0.0/sqlref/src/tpc/` in
-`conformance/0.2/manifests/db2-topics.json`:
+`conformance/subsystems/coverage/manifests/db2-topics.json`:
 
 | Topic | SHA-256 |
 |---|---|
@@ -1177,7 +1176,7 @@ Common dynamic syntax reviewed these pinned Db2 13 statement diagrams in the
 same baseline. The configured cache lacks the bodies, so matching retained
 HTML was hash-verified and read locally. Paths are under
 `SSEPEK_13.0.0/sqlref/src/tpc/` in
-`conformance/0.2/manifests/db2-topics.json`:
+`conformance/subsystems/coverage/manifests/db2-topics.json`:
 
 | Catalog row | Topic path | SHA-256 |
 |---|---|---|
@@ -1189,7 +1188,7 @@ Transaction syntax reviewed these pinned Db2 13 statement topics in the same
 baseline. The cache reader could not verify the baseline TOC, so the matching
 retained HTML bytes were read locally. Paths are under
 `SSEPEK_13.0.0/sqlref/src/tpc/` in
-`conformance/0.2/manifests/db2-topics.json`:
+`conformance/subsystems/coverage/manifests/db2-topics.json`:
 
 | Catalog row | Topic path | SHA-256 |
 |---|---|---|
@@ -1206,9 +1205,9 @@ common/deferred freeze remain pending until matching bodies are available.
 
 ## Declared slice ownership
 
-| Boundary | Existing authority to extend | 0.12 rule |
+| Boundary | Existing authority to extend | db2.core rule |
 |---|---|---|
-| Official denominator and evidence | `conformance/0.2/catalogs/db2.json` and shared Conformance IR | Preserve all 174 row IDs, locators, obligations, and six independent gates. |
+| Official denominator and evidence | `conformance/subsystems/coverage/catalogs/db2.json` and shared Conformance IR | Preserve all 174 row IDs, locators, obligations, and six independent gates. |
 | SQL syntax and semantic types | `mainframe-env-db2` plus typed IR owners | Private parser substrate converts immediately to owned bounded Db2 tokens/AST/diagnostics; no third-party public types. |
 | Public host route | `Db2Request`, `Db2Operation`, and canonical host effects | Extend additively; do not introduce a text bypass or a second provider route. |
 | Catalog and application data | `Db2CatalogGeneration` and selected signed application package | Keep application names, schemas, rows, packages, and privileges data-driven. |
@@ -1239,9 +1238,9 @@ common/deferred freeze remain pending until matching bodies are available.
   numeric slice. Float/decfloat forms remain rejected and integer/decimal tokens
   carry no numeric semantics here.
 - No pinned licensed Db2 13 oracle receipt is present. Differential remains
-  pending and 0.12 cannot pass its exit gate without the required environment.
+  pending and db2.core cannot pass its exit gate without the required environment.
 - The early shared participant contract must be audited before DB2-1204 mutating
-  integration; 0.12 will extend it rather than create a Db2-private protocol.
+  integration; db2.core will extend it rather than create a Db2-private protocol.
 
 No execution, conformance, differential, licensed, release, or compatibility
 credit is claimed for this recovery slice.

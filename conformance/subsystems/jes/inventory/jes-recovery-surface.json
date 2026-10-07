@@ -1,0 +1,69 @@
+{
+  "schema_version": "mainframe-env.jes-recovery-inventory@1",
+  "target_subsystem": "jes.execution",
+  "work_package": "JES-806",
+  "checkpoint": {
+    "contract": "mainframe-env.jes-checkpoint@1",
+    "authority": "mainframe-env-store-api.CheckpointStore",
+    "writer_schema": 1,
+    "machine_schema": 2,
+    "integrity": "sha256",
+    "purge": "delete through CheckpointStore after durable job purge intent"
+  },
+  "restart": [
+    "selected or running job returns to queued below max attempts",
+    "completed step is not reexecuted after checkpoint acknowledgement loss",
+    "attempt exhaustion becomes terminal failure",
+    "checkpoint ahead of job or corrupt checkpoint fails closed",
+    "provider mutation replay or unknown-outcome remains explicit"
+  ],
+  "cancellation": [
+    "before-selection cancellation",
+    "provider-observed cancellation",
+    "step cancellation termination",
+    "job cancellation terminal state",
+    "checkpoint cancellation projection",
+    "cancelled output state"
+  ],
+  "overload": [
+    "job capacity",
+    "queue capacity",
+    "spool file capacity",
+    "spool record capacity",
+    "spool byte capacity",
+    "event capacity",
+    "node inbound capacity",
+    "member active capacity",
+    "effect capacity"
+  ],
+  "backup_restore": {
+    "profile": "SQLite VACUUM INTO with provider-backed artifacts",
+    "restored_authorities": [
+      "jes-job",
+      "jes-spool",
+      "spool-artifact",
+      "durable-checkpoint",
+      "jes-scheduler",
+      "jes-topology"
+    ],
+    "integrity_check_required": true
+  },
+  "migration": {
+    "readers": ["mainframe-env.jes-durable-job@1", "mainframe-env.jes-durable-job@2"],
+    "writer": "mainframe-env.jes-durable-job@2",
+    "strategy": "read-old-write-new-cas"
+  },
+  "state_migration_digests": {
+    "conformance/subsystems/jes/schemas/jes-durable-job.schema.json": "sha256:a36242ee73cef37ef4f320dd7c12790ca9540705f360a4a16e644737c9b81cf8",
+    "conformance/subsystems/jes/schemas/jes-runtime.schema.json": "sha256:a4e539d88c3c62cc40cb828af63e857ffd80199019542bd5ce36b899f2c02156",
+    "conformance/subsystems/jes/schemas/spool-state.schema.json": "sha256:872994c8d68152ae7c41c686c75ceb89bb5f42d09ac39b2a3d7a505a2eb54f6a",
+    "conformance/subsystems/jes/migrations/jes-durable-job-v1-to-v2.json": "sha256:1d0546dfad00d386a1be893e4c8d82eae465c200dc4138c245e6a335fe9a40a0",
+    "conformance/subsystems/jes/migrations/jes-embedded-spool-to-artifacts.json": "sha256:5407391603160fe2807090bec19b069f75df4bb7352d02bdb1a4925ad363bf8c"
+  },
+  "licensed_differential": {
+    "required_scenarios": 16,
+    "result_authority": "conformance/subsystems/jes/evidence/jes-806-matrix.json",
+    "candidate_identity": "cargo xtask jes-oracle-candidate",
+    "gate": "cargo xtask jes-oracle --check"
+  }
+}

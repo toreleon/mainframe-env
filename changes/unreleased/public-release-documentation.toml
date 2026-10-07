@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Revamped public documentation with local onboarding, capabilities, embedding and source distribution guides, collection indexes, a current package map, and Mermaid architecture and workflow diagrams; organized conformance inputs and tracking by subsystem and removed historical release/version management and committed execution receipts. Reviewed live CardDemo source and workload checks, corrected stale operator instructions, and refreshed mutation anchors for the current interpreter."

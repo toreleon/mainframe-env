@@ -2,10 +2,9 @@
 
 Subsystem: **cobol**
 Phase: **execution**
-Target release: **0.4.0**
 
 Status: **Implemented — pass-with-licensed-differential-pending**
-Start gate: 0.3 typed COBOL model and publication legality accepted
+Start gate: cobol.structure typed COBOL model and publication legality accepted
 Completion dependencies: cobol.structure
 Estimate: 12–18 engineer-months
 
@@ -45,8 +44,8 @@ CB-401 through CB-404 may use separate interpreter modules once operation and
 value contracts freeze. CB-405 is serialized with durable-state ownership.
 Oracle cohorts in CB-406 can run by statement/function family in parallel.
 
-0.4 can run alongside 0.5–0.7. Db2/IMS/MQ parser work may proceed, but embedded
-host integration must consume the final 0.4 extension ABI.
+cobol.execution can run alongside racf.security–jcl.planning. Db2/IMS/MQ parser work may proceed, but embedded
+host integration must consume the final cobol.execution extension ABI.
 
 ## Exit gate
 
@@ -58,9 +57,9 @@ host integration must consume the final 0.4 extension ABI.
   and focused comparator mutants pass with a candidate-bound external receipt.
 - Licensed Enterprise COBOL 6.5 differential remains exactly 0/153 pending;
   its real positive, negative, boundary, condition, and interaction campaign is
-  mandatory at the 0.17 release-certification hard gate.
+  mandatory at the certification.licensed release-certification hard gate.
 - CardDemo and all earlier COBOL fixtures remain byte/condition compatible.
-- Every execution/condition/recovery/differential claim extends an accepted 0.3
+- Every execution/condition/recovery/differential claim extends an accepted cobol.structure
   Conformance IR obligation and is derived from explicit executable verdict
   events; broad workload success alone grants no row coverage.
 

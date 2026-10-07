@@ -1,9 +1,9 @@
 # ADR-0012: Keep AMODE(64) storage in a checked virtual task arena
 
-Status: **Proposed for v0.9 development; acceptance gate pending**
+Status: **Proposed for cics.application-api development; acceptance gate pending**
 Owner: **CICS and execution maintainers**
 Scope: **GETMAIN64 and FREEMAIN64 typed IR, host effects, virtual addresses, and checkpoints**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 
@@ -23,7 +23,7 @@ The COBOL GETMAIN/FREEMAIN path already uses checked virtual pointers and a
 task checkpoint. Reusing its pointer identity for the 64-bit commands would
 conceal the caller ABI, address width, location selection, key policy, and
 cross-task lifetime. Native process pointers would make replay and restart
-unsafe. The v0.9 implementation therefore needs an explicit bounded contract
+unsafe. The cics.application-api implementation therefore needs an explicit bounded contract
 while assembler source admission and durable shared storage remain unavailable.
 
 ## Decision
@@ -74,7 +74,7 @@ while assembler source admission and durable shared storage remain unavailable.
 - The required `architecture-fast --check` currently lacks a passing receipt
   because unrelated pinned source-closure HTML bodies and a CICS TX DUMP
   supplement are unavailable in the bounded offline caches. Their identities
-  and cache-specific availability are recorded in the v0.9 status. This ADR
+  and cache-specific availability are recorded in the cics.application-api status. This ADR
   does not waive that gate or request a network refresh.
 
 ## Verification

@@ -2,15 +2,14 @@
 
 Subsystem: **cics**
 Phase: **system-api**
-Target release: **0.10.0**
 
 Status: **SPI-1001 identity foundation sealed; semantic source dependency
-blocked; SPI-1001 and 0.10.0 remain Proposed**
+blocked; SPI-1001 and cics.system-api remain Proposed**
 
-- Branch: `codex/parallel-v0.10-spi1001`
+- Branch: `codex/parallel-cics.system-api-spi1001`
 - Dependency candidate: `5ab706b1dd069e26db7cb9a2b66e921c9001fc39`
-- Dependency disposition: 0.9.0 remains Proposed. Its shared CICS authorities are
-  available for private 0.10 catalog/code-generation preparation, but no 0.10
+- Dependency disposition: cics.application-api remains Proposed. Its shared CICS authorities are
+  available for private cics.system-api catalog/code-generation preparation, but no cics.system-api
   runtime integration or public route is permitted.
 - Official baseline: `ibm-cics-ts-6x-2026-08-31`
 - Official catalog SHA-256:
@@ -28,21 +27,21 @@ and 39 FEPI command identities. This slice may establish source identity,
 deduplication, schemas, generated catalogs, and a non-routing Rust registry.
 It must not infer grammar or behavior from command labels or EIBFN values,
 register handlers, advertise routes, mutate CICS state, or claim SPI-1001 or
-0.10.0 complete.
+cics.system-api complete.
 
-The 0.9 application registry, dynamic EIBRESP condition-name authority,
+The cics.application-api application registry, dynamic EIBRESP condition-name authority,
 resource/security policies, canonical effects, durable coordinator,
 persistence, storage, response mapping, and recovery ownership remain the only
-accepted shared authorities. The 0.10 foundation references those authorities;
+accepted shared authorities. The cics.system-api foundation references those authorities;
 it does not copy or replace them.
 
 ## Stable slices
 
 | Slice | State | Dependency | Acceptance boundary |
 |---|---|---|---|
-| `SPI-1001.source-authority` | Pass (`e514061dc320566b735490be7a54c8d11d821ef8`) | Frozen 0.2 CICS catalog; exact retained IBM EIBFN topic and TOC | Verified topic/TOC bytes; preserves 273-to-269 SPI label deduplication, all alternate EIBFN identities, 39 FEPI rows, and the exact source normalization; every unproved semantic dimension is blocked with zero coverage credit |
+| `SPI-1001.source-authority` | Pass (`e514061dc320566b735490be7a54c8d11d821ef8`) | Frozen coverage.foundation CICS catalog; exact retained IBM EIBFN topic and TOC | Verified topic/TOC bytes; preserves 273-to-269 SPI label deduplication, all alternate EIBFN identities, 39 FEPI rows, and the exact source normalization; every unproved semantic dimension is blocked with zero coverage credit |
 | `SPI-1001.catalog` | Pass (`789c6079c02a6581533431ceaac2e16c74396a76`) | `SPI-1001.source-authority` | Generated exactly 269 SPI and 39 FEPI identity records from the frozen catalog and reviewed source disposition; schema, freshness, malformed/foreign/duplicate/mutation checks pass; no handlers or routes |
-| `SPI-1001.generated-registry` | Pass | `SPI-1001.catalog` | Generated and compiled a typed non-routing registry; exact denominator and digest checks pass; every entry is identity-only, unadvertised, unregistered, and zero-credit; the 0.9 registry/runtime surface is unchanged |
+| `SPI-1001.generated-registry` | Pass | `SPI-1001.catalog` | Generated and compiled a typed non-routing registry; exact denominator and digest checks pass; every entry is identity-only, unadvertised, unregistered, and zero-credit; the cics.application-api registry/runtime surface is unchanged |
 
 The parent `SPI-1001` remains pending. Its required grammar, options, resource
 schemas, condition mappings, lifecycle/context matrix, authorized intent,
@@ -72,7 +71,7 @@ command identities and are never deduplicated by code.
 
 ## Source gaps and blockers
 
-No reviewed 0.10 SPI or FEPI row-to-command-topic map or digest-pinned
+No reviewed cics.system-api SPI or FEPI row-to-command-topic map or digest-pinned
 command-body manifest exists. Consequently there is no exact command-body
 `topic_path` or SHA-256 authority to read for any of the 269 SPI or 39 FEPI
 rows. These are exact unresolved-locator gaps, recorded as
@@ -97,11 +96,11 @@ accepted the mapped authority instance.
 generator emits 308 ordered rows with logical identity digest
 `sha256:5f4867c8a3973c9344e62288ced4c0be6d45356bcc506638e0a6822fdfc333da`;
 the generated JSON file SHA-256 is
-`d9045ff97496e2eac27ba0706ab186382e4186d60afb5650d62ffdf12bd2da4d`.
+`406295b2bdc284ea9fa1b68ad57a20380e64277a299dc7d5c69d142def59a9ae`.
 The combined focused source/catalog suite passes 15/15 positive, negative, and
 mutation tests. `cargo xtask schemas --check` compiled both new Draft 2020-12
 schemas and accepted both mapped instances, then stopped later on the unchanged
-0.8 `carddemo-base-batch.json` note exceeding its existing 256-character schema
+jes.execution `carddemo-base-batch.json` note exceeding its existing 256-character schema
 cap. This is an inherited, unrelated gate failure and is not relabeled as a
 pass.
 
@@ -109,11 +108,11 @@ pass.
 generated Rust registry carries the same logical identity digest
 `sha256:5f4867c8a3973c9344e62288ced4c0be6d45356bcc506638e0a6822fdfc333da`;
 its file SHA-256 is
-`7980237b5e2a7a11953d3fc43e247ddb493113194803fe0ea7f450b44488f133`.
+`7a8cf34454f3c97d5c6d282c6e88371f24d14ac3737ea121193c5341cb2f381b`.
 It exposes official-row and ambiguous EIBFN lookup only; there is no label-token
 dispatcher, handler identity, runtime operation, advertisement, automatic
 registration, or public route. The complete `mainframe-env-ir` suite passes
-54/54, including the three new registry tests and the unchanged 0.9 application
+54/54, including the three new registry tests and the unchanged cics.application-api application
 registry closure. Package Clippy passes with warnings denied. The combined
 source/catalog generator suite passes 17/17, including an advertisement
 mutation that the Rust generator rejects.
@@ -124,12 +123,12 @@ files untouched by SPI-1001: the production hardcode scan finds `CARDDEMO` in
 records 1,321 lines for the now-1,345-line
 `crates/tooling/mainframe-env-conformance/src/cics_pilot.rs`; and the public API
 documentation ratchet records 1,129 undocumented host-API items while the
-candidate emits 1,130. The schema gate's inherited 0.8 receipt-length failure
+candidate emits 1,130. The schema gate's inherited jes.execution receipt-length failure
 is recorded above. These unchanged failures are not retried or relabeled as
 SPI-1001 passes.
 
 Coverage, semantic, execution, condition, recovery, and differential credit
-remain **0/269 SPI and 0/39 FEPI**. The 0.9 public/runtime surface is unchanged.
+remain **0/269 SPI and 0/39 FEPI**. The cics.application-api public/runtime surface is unchanged.
 
 ## Next executable step
 

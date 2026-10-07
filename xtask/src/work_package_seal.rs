@@ -11,7 +11,7 @@ struct ChangedPath {
 
 pub(super) fn run(root: &Path, args: &WorkPackageSealArgs) -> TaskResult {
     validate_token_argument(&args.id, "work-package ID")?;
-    validate_token_argument(&args.target_version, "target version")?;
+    validate_token_argument(&args.target_subsystem, "target subsystem")?;
     let expected = validate_allowlist(&args.paths)?;
     let changes = if args.check {
         committed_changes(root)?
@@ -30,10 +30,10 @@ pub(super) fn run(root: &Path, args: &WorkPackageSealArgs) -> TaskResult {
             actual.difference(&expected).collect::<Vec<_>>()
         ),
     )?;
-    let digest = digest(&args.id, &args.target_version, &changes);
+    let digest = digest(&args.id, &args.target_subsystem, &changes);
     let message = format!(
-        "Complete {}\n\nWork-Package: {}=pass\nTarget-Version: {}\nEvidence-Digest: sha256:{}\n",
-        args.id, args.id, args.target_version, digest
+        "Complete {}\n\nWork-Package: {}=pass\nTarget-Subsystem: {}\nEvidence-Digest: sha256:{}\n",
+        args.id, args.id, args.target_subsystem, digest
     );
     if args.check {
         let actual_message = command_text(root, "git", &["show", "-s", "--format=%B", "HEAD"])?;
@@ -169,11 +169,11 @@ fn changes(
     Ok(result)
 }
 
-fn digest(id: &str, target_version: &str, changes: &[ChangedPath]) -> String {
+fn digest(id: &str, target_subsystem: &str, changes: &[ChangedPath]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(DOMAIN);
     digest_field(&mut hasher, id.as_bytes());
-    digest_field(&mut hasher, target_version.as_bytes());
+    digest_field(&mut hasher, target_subsystem.as_bytes());
     hasher.update(
         u64::try_from(changes.len())
             .unwrap_or(u64::MAX)
@@ -206,14 +206,14 @@ mod tests {
         let mut two = one.clone();
         two[0].bytes = b"two".to_vec();
         assert_ne!(
-            digest("SEC-501", "0.5.0", &one),
-            digest("SEC-501", "0.5.0", &two)
+            digest("SEC-501", "racf.security", &one),
+            digest("SEC-501", "racf.security", &two)
         );
         two[0].bytes = b"one".to_vec();
         two[0].status = 'D';
         assert_ne!(
-            digest("SEC-501", "0.5.0", &one),
-            digest("SEC-501", "0.5.0", &two)
+            digest("SEC-501", "racf.security", &one),
+            digest("SEC-501", "racf.security", &two)
         );
     }
 

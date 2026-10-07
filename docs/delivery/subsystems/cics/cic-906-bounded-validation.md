@@ -23,8 +23,8 @@ of the stated boundary only. The following CIC-906 matrix cells remain open:
   saturation, journal failure after provider mutation, full reconciliation and
   retention coverage, and scale/soak. The focused PostgreSQL adapter and CICS
   checkpoint-retention selectors do not close these campaign cells.
-- Licensed CICS differential capture and the exact-candidate full-minor gate.
+- Licensed CICS differential capture and the exact-candidate full-phase gate.
 
 The frozen CICS TS 6.x source maps, generated contracts, and registry are
 unchanged. This validation-only slice requires no new IBM semantic source
-review. Existing family source citations remain in the v0.9 status document.
+review. Existing family source citations remain in the cics.application-api status document.

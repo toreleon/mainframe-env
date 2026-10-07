@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **MQ provider and execution/store maintainers**
 Scope: **private service composition, not public MQI acceptance**
-Applies from: **mainframe-env 0.15.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

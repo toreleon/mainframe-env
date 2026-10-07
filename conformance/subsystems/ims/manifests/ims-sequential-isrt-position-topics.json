@@ -1,0 +1,39 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "ims.programming",
+  "baseline_id": "ibm-ims-15.6-sequential-isrt-position-2026-09-11",
+  "subsystem": "ims",
+  "product": "SSEPH2_15.6.0",
+  "book_label": "IMS 15.6 sequential ISRT positioning archive supplement for mainframe-env 0.14",
+  "book_href": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_isrtcall.htm",
+  "snapshot_date": "2026-09-11",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/ims/15.6.0?lang=en",
+  "toc_sha256": "aaa12586b41e9994921bfddce588b186dc5bdda8ab253db054ae1e5014d6f618",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 3,
+  "total_bytes": 33864,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "f50d0ca77232e353343bfc37bd9b02fef87d20c6bb5926becc5c8e1ef09e55a0",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_posafterisrt.htm",
+      "sha256": "6788ba399b8bba78a7af93fc0788c07535c57bcd77739bbb6e61aebfa8cba521",
+      "bytes": 4327,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.apr/ims_isrtcall.htm",
+      "sha256": "3095a5cc7d24ec775a2dbc36463d171e87d896ba21783db6d8efd13f1d871d82",
+      "bytes": 26140,
+      "last_modified": "not-recorded-in-retained-archive"
+    },
+    {
+      "topic_path": "SSEPH2_15.6.0/com.ibm.ims156.doc.mc/msgs/ii.htm",
+      "sha256": "5ac05c96282a80fa09efa34f48335ccfdd0947e713a4dce6d922976d5f3fb3fc",
+      "bytes": 3397,
+      "last_modified": "not-recorded-in-retained-archive"
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 - Date: 2026-10-03
 - Owner: execution coordinator, store adapters, configured COBOL host and MQ provider
 - Scope: the explicitly configured synchronous ordinary z/OS batch root
-- Applies from: mainframe-env 0.15.0
+- Applies from: mainframe-env current subsystem contracts
 
 ## Decision
 

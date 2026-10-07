@@ -20,3 +20,7 @@ Db2/IMS/MQ replay rows move atomically into content-verified archive batches;
 live retries, unresolved effects, and checkpoint-owned rows remain protected.
 Verify with `cargo test -p mainframe-env-store` and the opt-in PostgreSQL
 storage-profile and retention contracts.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

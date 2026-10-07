@@ -15,7 +15,7 @@ SPEC.loader.exec_module(binding)
 class TransactionParticipantBindingTests(unittest.TestCase):
     def fixture(self, root: Path) -> None:
         for relative in [
-            "conformance/0.16/contracts/transaction-participant.json",
+            "conformance/subsystems/integration/contracts/transaction-participant.json",
             "crates/providers/mainframe-env-ims/tests/participant_contract.rs",
             "crates/kernel/mainframe-env-interpreter/src/coordinator.rs",
             "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",

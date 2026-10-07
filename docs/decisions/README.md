@@ -2,15 +2,16 @@
 
 ADRs capture decisions that constrain implementation and public contracts.
 
+[ADR-0047](0047-carddemo-participant-completion.md) records the implemented
+CardDemo participant ownership and batch completion boundary.
+
 | ADR | Decision | Status |
 |---|---|---|
-| [0001](0001-technology-stack.md) | 0.1 technology stack and deferred frameworks | Accepted |
+| [0001](0001-technology-stack.md) | initial technology stack and deferred frameworks | Accepted |
 | [0002](0002-deterministic-core.md) | deterministic core with asynchronous shell | Accepted |
 | [0003](0003-contract-serialization.md) | owned contracts, codecs, identity, and schema evolution | Accepted |
-| [0004](0004-versioning-release-policy.md) | v0.1 product, contract, phase-commit, and release policy | Accepted |
 | [0005](0005-package-consolidation.md) | historical twenty-package physical map and split triggers | Superseded by 0009 |
-| [0006](0006-carddemo-0.1.1-profile.md) | additive 0.1.1 CardDemo-full profile and new split triggers | Accepted |
-| [0007](0007-carddemo-0.1.1-release.md) | release CardDemo-full 0.1.1 and canonicalize CARDDEMO naming | Accepted |
+| [0006](0006-carddemo-profile.md) | additive profile.carddemo CardDemo-full profile and new split triggers | Accepted |
 | [0008](0008-icu-license-compliance.md) | retain the locked decNumber dependency under ICU and ship complete notices | Accepted |
 | [0009](0009-current-package-topology.md) | current 26-package topology and change governance | Accepted |
 | [0010](0010-rust-module-review-budgets.md) | hard Rust module budgets, facade ratchet, and CICS family layout | Accepted |

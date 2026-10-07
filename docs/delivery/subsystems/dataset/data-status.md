@@ -2,16 +2,15 @@
 
 Subsystem: **dataset**
 Phase: **data**
-Target release: **0.6.0**
 
 Status: **DAT-601 through DAT-606 complete — pass-with-licensed-differential-pending**
 
 The isolated implementation branch `impl/0.6.0` starts from candidate
-`7d50310381a44878c23c51c38aed841e3a70347f`. The accepted 0.2.0 catalog,
+`7d50310381a44878c23c51c38aed841e3a70347f`. The accepted coverage.foundation catalog,
 handler-identity, package-generation, store, source-provenance, and coverage
 receipts remain frozen. The shared Conformance IR v1 foundation is available;
 this workstream will add dataset/VSAM/AMS specifications and executable
-bindings without rewriting 0.2 evidence.
+bindings without rewriting coverage.foundation evidence.
 
 ## Work packages
 
@@ -22,7 +21,7 @@ bindings without rewriting 0.2 evidence.
 | DAT-603 | pass | PDS/PDSE generations and aliases, catalog routing/search, GDG lifecycle, MEDS4, and shared dependency graph pass |
 | DAT-604 | pass | CI/CA and spanned geometry, mixed atomic state mutation, SHAREOPTIONS, owner-scoped RLS locks, KSDS TVS, lock order, restart, and unknown-outcome reconciliation pass |
 | DAT-605 | pass | Generated 31-command grammar, modal MAXCC/LASTCC execution, typed handlers, explicit capability conditions, authorization, AIX build, and snapshot flows pass |
-| DAT-606 | pass | Independent reference simulation plus local failure, corruption, backup/restore, migration, scale, retry, restart, unknown-outcome, and concurrency gates pass; licensed campaign is handed to the 0.17 hard gate at 0/36 pending |
+| DAT-606 | pass | Independent reference simulation plus local failure, corruption, backup/restore, migration, scale, retry, restart, unknown-outcome, and concurrency gates pass; licensed campaign is handed to the certification.licensed hard gate at 0/36 pending |
 
 ## Pinned denominator and dependencies
 
@@ -30,11 +29,11 @@ bindings without rewriting 0.2 evidence.
   `ibm-zos-3.2-dfsms-ams-2026-06`.
 - Immutable official denominator: 31 AMS functional commands and five primary
   VSAM organizations (36 mandatory rows).
-- Accepted 0.2.0 dependency status: complete implementation candidate, with all
+- Accepted coverage.foundation dependency status: complete implementation candidate, with all
   CV-201 through CV-209 receipts present and no recorded blocker.
 - Licensed IBM differential evidence is not inferred from local or simulated
   behavior. It remains 0/36 pending until the pinned z/OS 3.2 campaign runs in
-  the 0.17 release-certify gate.
+  the certification.licensed release-certify gate.
 
 ## Decisions and risks
 
@@ -45,15 +44,15 @@ bindings without rewriting 0.2 evidence.
   path; it will not own a second catalog or persistence model.
 - Every accepted operand must either affect the typed semantic state or fail
   with an explicit unsupported capability.
-- The 0.2 official catalog has no separate DCB/SMS/catalog-row denominator.
+- The coverage.foundation official catalog has no separate DCB/SMS/catalog-row denominator.
   DAT-601 must freeze the dossier's detailed programming inventory as typed
   obligations beneath the immutable official rows, without inventing official
   coverage rows or changing their identities.
 
 Release-certification handoff: the required licensed z/OS 3.2 environment and
 reviewed 36-case receipt are unavailable in this worktree. Under the approved
-2026-09-01 policy this is not a 0.6 implementation blocker, but it remains a
-strict 0.17/1.0 blocker.
+2026-09-01 policy this is not a dataset.data implementation blocker, but it remains a
+strict certification.licensed/1.0 blocker.
 
 DAT-601 focused validation passes `cargo xtask dataset-contract --check`,
 `cargo xtask schemas --check`, `cargo xtask spec --check`, targeted Clippy with
@@ -121,7 +120,7 @@ and CardDemo exactness. `cargo test --workspace --all-targets`, warnings-denied
 workspace Clippy, schemas, generated contracts, the 36-row spec projection,
 180 focused bindings, and the accepted full-regression check all pass on the
 same worktree. The local evidence is recorded at
-`conformance/0.6/evidence/dataset-certification.json`.
+execution output stored outside Git.
 
 DAT-606 also runs a bounded, table-driven, pure-state reference model that owns
 its organization, record, catalog, AIX, GDG, alias, snapshot, register,
@@ -150,9 +149,9 @@ and state writer/readers are MEDS6/MEDS1-6 with a reviewed non-destructive
 `cargo xtask dataset-oracle --check` remains intentionally fail-closed until
 `MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT` names a reviewed 36-case receipt from the
 pinned licensed z/OS 3.2 environment. No such receipt or oracle configuration
-is present, so differential remains exactly 0/36. The approved 0.6 disposition
+is present, so differential remains exactly 0/36. The approved dataset.data disposition
 is `pass-with-licensed-differential-pending`; the real campaign is mandatory at
-0.17 and cannot be satisfied by this simulation.
+certification.licensed and cannot be satisfied by this simulation.
 
 ## Controller review 1 repair
 
@@ -189,4 +188,4 @@ local certification fixture use `observation_perturbations_rejected` and
 `mainframe-env.dataset-certification@2`. This corrects the classification of
 existing evidence; it does not retroactively claim a behavioral mutation campaign.
 Published artifacts and historical commits are unchanged. New source-mutation
-receipts are candidate-bound and separate; see [the hardening note](../../hardening/53-dataset-mutations.md).
+receipts are candidate-bound and separate; see the hardening note.

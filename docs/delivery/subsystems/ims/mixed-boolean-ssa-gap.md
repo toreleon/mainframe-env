@@ -166,7 +166,7 @@ requires stopping new mixed/independent calls while preserving their receipts.
 No row/SQL/host/AST migration or replay rewrite is introduced. Existing extended
 index and recovery backup/downgrade restrictions remain applicable. The new leaf
 can seal bounded implementation and local regressions only; official review,
-licensed differentials, remaining classes, parent IMS-1401 and v0.14 stay open.
+licensed differentials, remaining classes, parent IMS-1401 and ims.programming stay open.
 
 Integrated local regressions and independent policy/contract gates pass, but the
 mandatory coverage check stops at three stale AMS line citations in unchanged

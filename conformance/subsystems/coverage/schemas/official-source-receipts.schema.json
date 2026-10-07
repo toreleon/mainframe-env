@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/official-source-receipts@1",
+  "title": "mainframe-env immutable official-source receipt index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "catalog_contract", "coverage_gates", "claim_policy", "review", "baselines", "baseline_count", "mandatory_rows"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.official-source-receipts@1"},
+    "target_subsystem": {"const": "coverage.foundation"},
+    "catalog_contract": {"const": "mainframe-env.official-catalog@1"},
+    "coverage_gates": {
+      "const": ["recognized", "validated", "executed", "conditioned", "recovered", "differential"]
+    },
+    "claim_policy": {"type": "object"},
+    "review": {"type": "object"},
+    "baselines": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/baseline"}},
+    "baseline_count": {"const": 9},
+    "mandatory_rows": {"type": "integer", "minimum": 1}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["url", "media_type", "sha256", "bytes", "snapshot_date", "retained_in_repository"],
+      "properties": {
+        "url": {"type": "string", "pattern": "^https://www\\.ibm\\.com/"},
+        "media_type": {"const": "text/html"},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "snapshot_date": {"type": "string", "minLength": 4},
+        "retained_in_repository": {"const": false}
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["id", "subsystem", "product", "version", "publication_identity", "source", "catalog", "catalog_sha256", "immutable_denominators", "mandatory_rows"],
+      "properties": {
+        "id": {"type": "string", "minLength": 8},
+        "subsystem": {"type": "string", "minLength": 2},
+        "product": {"type": "string", "minLength": 2},
+        "version": {"type": "string", "minLength": 1},
+        "publication_identity": {"type": "string", "minLength": 12},
+        "source": {"$ref": "#/$defs/source"},
+        "supporting_sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+        "catalog": {"type": "string", "pattern": "^conformance/subsystems/coverage/catalogs/.+\\.json$"},
+        "catalog_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "immutable_denominators": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "integer", "minimum": 1}},
+        "mandatory_rows": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

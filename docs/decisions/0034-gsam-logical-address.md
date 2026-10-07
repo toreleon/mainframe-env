@@ -3,7 +3,7 @@
 Status: **Proposed within the human-authorized bounded IMS implementation**
 Owner: **host-contract and IMS maintainers**
 Scope: **IMS-1403.gsam-record-addressability; IMS-1405.gsam-checkpoint-restart**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 IBM IMS 15.6 defines an RSA as an access-method-dependent physical record
 address, previously returned by GN or ISRT. The existing GSAM engine stores

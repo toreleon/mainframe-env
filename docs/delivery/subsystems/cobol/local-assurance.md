@@ -1,4 +1,4 @@
-# mainframe-env 0.4.0 local COBOL assurance matrix
+# mainframe-env cobol.execution local COBOL assurance matrix
 
 Status: **pass-with-licensed-differential-pending**
 
@@ -79,7 +79,7 @@ restart tests run locally.
 ## Licensed oracle boundary
 
 The approved portable reference campaign is separate from the licensed oracle.
-`conformance/0.4/cobol/gnucobol-reference-allowlist.json` contains 16 bounded
+`conformance/subsystems/cobol/execution/cobol/gnucobol-reference-allowlist.json` contains 16 bounded
 cases: three statement/control, two exact small-decimal, four MOVE/string, and
 seven portable intrinsic cases. Every case records a portability rationale and
 the pinned IBM row/source locator. `cargo xtask cobol-reference --check
@@ -101,7 +101,7 @@ adapter fails closed on a missing or drifted tool. No production manifest links,
 imports, or packages GnuCOBOL or `libcob`.
 
 The adapter policy is
-`conformance/0.4/oracles/cobol-licensed-differential.json`. It requires IBM
+`conformance/subsystems/cobol/execution/oracles/cobol-licensed-differential.json`. It requires IBM
 Enterprise COBOL for z/OS 6.5 plus Language Environment, recorded compiler and
 runtime options, candidate/spec/fixture digests, normalization rules, and
 positive, negative, boundary, condition, and interaction cohorts. Its status is
@@ -120,9 +120,9 @@ cannot pass as an empty selection.
 The GnuCOBOL campaign is labeled `reference=gnucobol`, contributes zero
 licensed differential credit, and cannot satisfy or alter those 153 cases. The
 real Enterprise COBOL 6.5 campaign remains exactly 0/153 pending and is handed
-to the 0.17 release-certification hard gate.
+to the certification.licensed release-certification hard gate.
 
-After normally merging accepted 0.5 security and 0.6 dataset authorities, the
+After normally merging accepted racf.security security and dataset.data dataset authorities, the
 checked-in shared spec contains 463 rows, 2,273 obligations, 2,621 bindings,
 and 1,604 fixture identities. The compiled repository IR contains 2,304
 obligations and 2,776 bindings after generated catalog bindings are included.

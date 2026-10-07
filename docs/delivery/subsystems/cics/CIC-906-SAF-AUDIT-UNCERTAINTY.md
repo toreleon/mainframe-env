@@ -26,7 +26,7 @@ file, queue, or UOW reconciliation. The remaining 188 typed application rows,
 72 unready rows, other options of these three rows, cross-family concurrent
 workflows, syncpoint/retention/scale combinations, PostgreSQL SEND receipt-gap,
 and licensed CICS differentials remain outside this slice. The CIC-906 parent
-and full 0.9 completion gate remain open.
+and full cics.application-api completion gate remain open.
 
 ## Source and evidence boundary
 

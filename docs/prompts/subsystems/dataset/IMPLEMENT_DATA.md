@@ -3,7 +3,6 @@
 Subsystem: **dataset**
 Phase: **data**
 
-Target version: **0.6.0**
 Completion dependencies: coverage.foundation
 
 Use this prompt from the repository root. The
@@ -11,7 +10,7 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.6.0: complete dataset, VSAM, catalog,
+You are implementing **mainframe-env dataset.data: complete dataset, VSAM, catalog,
 locking, and AMS programming surface**.
 
 ## Read and verify first
@@ -19,7 +18,7 @@ locking, and AMS programming surface**.
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/dataset/data-plan.md`, the pinned dataset/VSAM and 31-command
 AMS inventories, store/allocation/effect contracts, durability/security ADRs,
-and existing provider tests. Verify accepted 0.2 catalog, handler, package, and
+and existing provider tests. Verify accepted coverage.foundation catalog, handler, package, and
 store receipts before exposing new public behavior.
 
 ## Implement in this order
@@ -49,7 +48,7 @@ unavailable. The user-approved completion disposition is
   organization rows, all 31 AMS identities, applicable state/recovery
   properties, explicit capability/unknown boundaries, and representative
   mutants; and
-- defer the real licensed 36-row campaign to the 0.17 `release-certify` hard
+- defer the real licensed 36-row campaign to the certification.licensed `release-certify` hard
   gate, which remains mandatory before 1.0 certification.
 
 ## Reuse and architecture guardrails
@@ -89,7 +88,7 @@ recovered; base/AIX, locks, RLS/TVS, GDG, DISP, restart, unknown-outcome and
 concurrent-mutation matrices pass; the approved independent reference
 simulation and mutants pass; and CardDemo records, keys, generations, aliases,
 and bytes remain exact. The licensed differential remains pending at exactly
-0/36 under the approved policy and is a hard 0.17 release-certify dependency.
+0/36 under the approved policy and is a hard certification.licensed release-certify dependency.
 
 At handoff, report inventory counts by gate, state/migration versions, lock and
 recovery evidence, provider-capability gaps, oracle receipts, and full unchanged-

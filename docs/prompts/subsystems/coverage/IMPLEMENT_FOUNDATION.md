@@ -3,7 +3,6 @@
 Subsystem: **coverage**
 Phase: **foundation**
 
-Target version: **0.2.0**
 Completion dependencies: none
 
 Use this prompt from the repository root. The
@@ -11,8 +10,8 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.2.0: coverage authority and
-de-hardcoding foundation**. Continue until the complete 0.2.0 exit gate passes
+You are implementing **mainframe-env coverage.foundation: coverage authority and
+de-hardcoding foundation**. Continue until the complete coverage.foundation exit gate passes
 or a genuine stop-the-line condition is recorded.
 
 ## Read and verify first
@@ -23,9 +22,9 @@ Read `docs/prompts/subsystems/README.md`,
 `conformance/roadmap/ibm-official-coverage-roadmap.json`, and all referenced
 architecture, evidence, application-package, profile, and release contracts.
 
-The accepted 0.1.1 source/evidence is the baseline. Record its exact identity
+The accepted profile.carddemo source/evidence is the baseline. Record its exact identity
 and inventory the current tree before editing. There is no earlier minor
-dependency, but no 0.1.1 behavior may regress.
+dependency, but no profile.carddemo behavior may regress.
 
 ## Implement in this order
 

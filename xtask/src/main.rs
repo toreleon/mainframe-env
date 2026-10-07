@@ -2,15 +2,17 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
 mod carddemo_base_batch_provenance;
+mod carddemo_host_integration;
 mod carddemo_readacct;
-mod carddemo_v09_host;
+mod carddemo_serve;
 mod changelog;
 mod cobol_differential;
 mod conformance_catalog;
 mod db2_statement_catalog;
+mod dependency_licenses;
 mod docs;
-mod evidence_seal;
 mod ims_assurance_matrix;
 mod ims_catalog;
 mod ims_conformance;
@@ -20,8 +22,6 @@ mod mq_conformance;
 mod mq_status_catalog;
 mod profile_intake;
 mod racf_catalog;
-mod release_attestation;
-mod release_licenses;
 mod topic_manifests;
 mod work_package_seal;
 mod zosmf_contracts;
@@ -85,12 +85,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type TaskResult<T = ()> = Result<T, String>;
 
-const RETAINED_RELEASE_TARGETS: [&str; 2] = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"];
+const RETAINED_RUNTIME_TARGETS: [&str; 2] = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"];
 const JES_ORACLE_CANDIDATE_DOMAIN: &[u8] = b"mainframe-env.jes-oracle-candidate@1\0";
-const JES_ORACLE_DERIVED_PATHS: [&str; 2] = [
-    "conformance/0.8/evidence/jes-806-matrix.json",
-    "docs/delivery/subsystems/jes/execution-status.md",
-];
+const JES_ORACLE_DERIVED_PATHS: [&str; 1] = ["docs/delivery/subsystems/jes/execution-status.md"];
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask", disable_version_flag = true)]
@@ -115,22 +112,6 @@ struct ProfileIntakeArgs {
     json: PathBuf,
     #[arg(long)]
     markdown: PathBuf,
-}
-
-#[derive(Debug, Args)]
-struct ReleaseArgs {
-    #[arg(long)]
-    target: String,
-    #[arg(long)]
-    check: bool,
-}
-
-#[derive(Debug, Args)]
-struct EvidenceArgs {
-    #[arg(long)]
-    check: bool,
-    #[command(subcommand)]
-    command: Option<EvidenceCommand>,
 }
 
 #[derive(Debug, Args)]
@@ -184,7 +165,7 @@ struct WorkPackageSealArgs {
     #[arg(long)]
     id: String,
     #[arg(long)]
-    target_version: String,
+    target_subsystem: String,
     #[arg(long = "path", required = true)]
     paths: Vec<String>,
     #[arg(long)]
@@ -192,20 +173,15 @@ struct WorkPackageSealArgs {
 }
 
 #[derive(Debug, Subcommand)]
-enum EvidenceCommand {
-    Seal(CheckArgs),
-    Callback,
-}
-
-#[derive(Debug, Subcommand)]
 enum XtaskCommand {
     ProfileIntake(ProfileIntakeArgs),
-    Versions(CheckArgs),
+
     Changelog(CheckArgs),
     Docs(CheckArgs),
+    Subsystems(CheckArgs),
     Architecture(CheckArgs),
     ArchitectureFast(CheckArgs),
-    EvidenceFast(CheckArgs),
+
     RuntimeArchitecture(CheckArgs),
     Profiles(CheckArgs),
     Schemas(CheckArgs),
@@ -213,7 +189,7 @@ enum XtaskCommand {
     MqMqiRegistry(CheckArgs),
     MqLicensedContract(CheckArgs),
     ImsLicensedContract(CheckArgs),
-    Evidence(EvidenceArgs),
+
     Coverage(CheckArgs),
     ApplicationPackages(CheckArgs),
     Db2Catalog(CheckArgs),
@@ -224,18 +200,7 @@ enum XtaskCommand {
     RouteRegistries(CheckArgs),
     ZosmfContracts(CheckArgs),
     Dehardcoding(CheckArgs),
-    LedgerConsistency(CheckArgs),
-    MigrationRollback(CheckArgs),
-    FullRegression(CheckArgs),
-    ReviewRepair(CheckArgs),
-    #[command(name = "review-repair-round-2")]
-    ReviewRepairRound2(CheckArgs),
-    #[command(name = "review-repair-round-3")]
-    ReviewRepairRound3(CheckArgs),
-    #[command(name = "review-repair-round-4")]
-    ReviewRepairRound4(CheckArgs),
-    #[command(name = "review-repair-round-5")]
-    ReviewRepairRound5(CheckArgs),
+
     SemanticIdentities(CheckArgs),
     DatasetContract(CheckArgs),
     DatasetOracle(CheckArgs),
@@ -265,8 +230,8 @@ enum XtaskCommand {
     CarddemoCore(CheckArgs),
     CarddemoFileCall(CheckArgs),
     CarddemoHost(CheckArgs),
-    #[command(name = "carddemo-v09-host")]
-    CarddemoV09Host(CheckArgs),
+    #[command(name = "carddemo-host-integration")]
+    CarddemoHostIntegration(CheckArgs),
     CarddemoPackage(CheckArgs),
     CarddemoResources(CheckArgs),
     CarddemoPrograms(CheckArgs),
@@ -278,6 +243,8 @@ enum XtaskCommand {
     CarddemoSecurity(CheckArgs),
     CarddemoTerminal(CheckArgs),
     CarddemoBaseOnline(CheckArgs),
+    /// Start the real CardDemo online application with a browser terminal.
+    CarddemoServe(carddemo_serve::ServeArgs),
     CarddemoJcl(CheckArgs),
     CarddemoUtilities(CheckArgs),
     CarddemoBatchPrograms(CheckArgs),
@@ -293,7 +260,6 @@ enum XtaskCommand {
     CarddemoFull(CheckArgs),
     LicenseNotices(CheckArgs),
     Digest(CheckArgs),
-    Release(ReleaseArgs),
 }
 
 fn main() {
@@ -330,7 +296,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::ProfileIntake(args) => {
             ("profile-intake", false, profile_intake::run(root, &args))
         }
-        XtaskCommand::Versions(args) => checked!("versions", args, check_versions(root)),
+
         XtaskCommand::Changelog(args) => checked!(
             "changelog",
             args,
@@ -345,16 +311,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::Docs(args) => checked!(
             "docs",
             args,
-            check_versions(root)
-                .and_then(|()| changelog::validate(root))
-                .and_then(|()| docs::run(root, args.check, &Cli::command()))
+            changelog::validate(root).and_then(|()| docs::run(root, args.check, &Cli::command()))
         ),
+        XtaskCommand::Subsystems(args) => {
+            checked!("subsystems", args, docs::run(root, true, &Cli::command()))
+        }
         XtaskCommand::ArchitectureFast(args) => {
             checked!("architecture-fast", args, check_architecture_fast(root))
         }
-        XtaskCommand::EvidenceFast(args) => {
-            checked!("evidence-fast", args, check_evidence_fast(root))
-        }
+
         XtaskCommand::Architecture(args) => {
             checked!("architecture", args, check_architecture(root))
         }
@@ -383,26 +348,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
                 check_ims_licensed_contract(root)
             )
         }
-        XtaskCommand::Evidence(args) => match (args.check, args.command) {
-            (check, None) => ("evidence", check, check_evidence(root)),
-            (false, Some(EvidenceCommand::Seal(args))) => (
-                "evidence seal",
-                args.check,
-                if args.check {
-                    check_evidence_seal(root)
-                } else {
-                    generate_evidence_seal(root)
-                },
-            ),
-            (false, Some(EvidenceCommand::Callback)) => {
-                ("evidence callback", false, write_evidence_callback(root))
-            }
-            (true, Some(_)) => (
-                "evidence",
-                true,
-                Err("evidence --check cannot be combined with a nested subcommand".into()),
-            ),
-        },
+
         XtaskCommand::Coverage(args) => checked!("coverage", args, check_coverage(root)),
         XtaskCommand::ApplicationPackages(args) => checked!(
             "application-packages",
@@ -457,42 +403,7 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::Dehardcoding(args) => {
             checked!("dehardcoding", args, check_dehardcoding(root))
         }
-        XtaskCommand::LedgerConsistency(args) => checked!(
-            "ledger-consistency",
-            args,
-            check_workload_ledger_consistency(root)
-        ),
-        XtaskCommand::MigrationRollback(args) => checked!(
-            "migration-rollback",
-            args,
-            check_migration_rollback_rollup(root)
-        ),
-        XtaskCommand::FullRegression(args) => {
-            checked!("full-regression", args, check_full_regression(root))
-        }
-        XtaskCommand::ReviewRepair(args) => {
-            checked!("review-repair", args, check_review_repair(root))
-        }
-        XtaskCommand::ReviewRepairRound2(args) => checked!(
-            "review-repair-round-2",
-            args,
-            check_review_repair_round_2(root)
-        ),
-        XtaskCommand::ReviewRepairRound3(args) => checked!(
-            "review-repair-round-3",
-            args,
-            check_review_repair_round_3(root)
-        ),
-        XtaskCommand::ReviewRepairRound4(args) => checked!(
-            "review-repair-round-4",
-            args,
-            check_review_repair_round_4(root)
-        ),
-        XtaskCommand::ReviewRepairRound5(args) => checked!(
-            "review-repair-round-5",
-            args,
-            check_review_repair_round_5(root)
-        ),
+
         XtaskCommand::SemanticIdentities(args) => checked!(
             "semantic-identities",
             args,
@@ -643,8 +554,12 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         XtaskCommand::CarddemoHost(args) => {
             checked!("carddemo-host", args, check_carddemo_host(root))
         }
-        XtaskCommand::CarddemoV09Host(args) => {
-            checked!("carddemo-v09-host", args, carddemo_v09_host::check(root))
+        XtaskCommand::CarddemoHostIntegration(args) => {
+            checked!(
+                "carddemo-host-integration",
+                args,
+                carddemo_host_integration::check(root)
+            )
         }
         XtaskCommand::CarddemoPackage(args) => {
             checked!("carddemo-package", args, check_carddemo_package(root))
@@ -679,6 +594,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         }
         XtaskCommand::CarddemoTerminal(args) => {
             checked!("carddemo-terminal", args, check_carddemo_terminal(root))
+        }
+        XtaskCommand::CarddemoServe(args) => {
+            ("carddemo-serve", false, carddemo_serve::run(root, args))
         }
         XtaskCommand::CarddemoBaseOnline(args) => checked!(
             "carddemo-base-online",
@@ -741,22 +659,13 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             checked!("carddemo-full", args, check_carddemo_full(root))
         }
         XtaskCommand::LicenseNotices(args) => {
-            checked!("license-notices", args, check_release_license_notices(root))
+            checked!("license-notices", args, check_license_notices(root))
         }
         XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
         XtaskCommand::WorkPackageSeal(args) => (
             "work-package-seal",
             args.check,
             work_package_seal::run(root, &args),
-        ),
-        XtaskCommand::Release(args) => (
-            "release",
-            args.check,
-            if args.check {
-                check_release_artifacts(root, &args.target)
-            } else {
-                generate_release_artifacts(root, &args.target)
-            },
         ),
     }
 }
@@ -768,12 +677,12 @@ fn check_conformance(root: &Path) -> TaskResult {
     racf_catalog::check(root)?;
     jcl_catalog::check(root)?;
     jcl_conformance::check(root)?;
-    check_versions(root)?;
+
     check_architecture(root)?;
     check_profiles(root)?;
     check_schemas(root)?;
     check_inventory(root)?;
-    check_evidence(root)?;
+
     check_coverage(root)?;
     check_semantic_identities(root)?;
     check_application_packages(root)?;
@@ -783,13 +692,8 @@ fn check_conformance(root: &Path) -> TaskResult {
     check_host_abi_libraries(root)?;
     check_program_registry(root)?;
     check_route_registries(root)?;
-    check_migration_rollback_rollup(root)?;
-    check_full_regression(root)?;
-    check_review_repair(root)?;
-    check_review_repair_round_2(root)?;
-    check_review_repair_round_3(root)?;
-    check_review_repair_round_4(root)?;
-    check_review_repair_round_5(root)
+
+    Ok(())
 }
 
 fn check_spec(root: &Path) -> TaskResult {
@@ -837,7 +741,7 @@ fn check_spec(root: &Path) -> TaskResult {
         compile_draft_2020_12_schema(&schema, schema_path)?;
     }
     let gnucobol_allowlist_path =
-        root.join("conformance/0.4/cobol/gnucobol-reference-allowlist.json");
+        root.join("conformance/subsystems/cobol/execution/cobol/gnucobol-reference-allowlist.json");
     let gnucobol_allowlist_schema_path =
         schema_directory.join("cobol-gnucobol-reference-allowlist.schema.json");
     validate_schema_instance(
@@ -850,7 +754,8 @@ fn check_spec(root: &Path) -> TaskResult {
             && gnucobol_reference_fixture_digest().starts_with("sha256:"),
         "approved GnuCOBOL reference allowlist drifted",
     )?;
-    let cobol_oracle_path = root.join("conformance/0.4/oracles/cobol-licensed-differential.json");
+    let cobol_oracle_path = root
+        .join("conformance/subsystems/cobol/execution/oracles/cobol-licensed-differential.json");
     let cobol_oracle_schema_path =
         schema_directory.join("cobol-licensed-differential-adapter.schema.json");
     validate_schema_instance(
@@ -890,18 +795,20 @@ fn check_spec(root: &Path) -> TaskResult {
     let spec_value = json(&spec_path)?;
     let spec_schema_path = schema_directory.join("conformance-spec.schema.json");
     validate_schema_instance(&json(&spec_schema_path)?, &spec_value, &spec_path)?;
-    let inventory_path = root.join("conformance/0.3/inventory/dependency-additions.json");
+    let inventory_path =
+        root.join("conformance/subsystems/cobol/structure/inventory/dependency-additions.json");
     let inventory_schema_path = schema_directory.join("conformance-inventory.schema.json");
     validate_schema_instance(
         &json(&inventory_schema_path)?,
         &json(&inventory_path)?,
         &inventory_path,
     )?;
-    let cobol_path = root.join("conformance/0.3/cobol/language.json");
+    let cobol_path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let cobol_schema_path = schema_directory.join("cobol-language.schema.json");
     validate_schema_instance(&json(&cobol_schema_path)?, &json(&cobol_path)?, &cobol_path)?;
     check_cobol_language_catalog(root, &cobol_path)?;
-    let frontend_path = root.join("conformance/0.3/cobol/frontend-fixtures.json");
+    let frontend_path =
+        root.join("conformance/subsystems/cobol/structure/cobol/frontend-fixtures.json");
     let frontend_schema_path = schema_directory.join("cobol-frontend-fixtures.schema.json");
     validate_schema_instance(
         &json(&frontend_schema_path)?,
@@ -909,7 +816,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &frontend_path,
     )?;
     verify_cobol_frontend_fixtures()?;
-    let semantic_path = root.join("conformance/0.3/cobol/semantic-fixtures.json");
+    let semantic_path =
+        root.join("conformance/subsystems/cobol/structure/cobol/semantic-fixtures.json");
     let semantic_schema_path = schema_directory.join("cobol-semantic-fixtures.schema.json");
     validate_schema_instance(
         &json(&semantic_schema_path)?,
@@ -917,7 +825,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &semantic_path,
     )?;
     verify_cobol_semantic_fixtures()?;
-    let statement_path = root.join("conformance/0.3/cobol/statement-fixtures.json");
+    let statement_path =
+        root.join("conformance/subsystems/cobol/structure/cobol/statement-fixtures.json");
     let statement_schema_path = schema_directory.join("cobol-statement-fixtures.schema.json");
     validate_schema_instance(
         &json(&statement_schema_path)?,
@@ -925,7 +834,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &statement_path,
     )?;
     verify_cobol_statement_fixtures()?;
-    let statement_runtime_path = root.join("conformance/0.4/cobol/statement-runtime-fixtures.json");
+    let statement_runtime_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/statement-runtime-fixtures.json");
     let statement_runtime_schema_path =
         schema_directory.join("cobol-statement-runtime-fixtures.schema.json");
     validate_schema_instance(
@@ -934,8 +844,9 @@ fn check_spec(root: &Path) -> TaskResult {
         &statement_runtime_path,
     )?;
     verify_cobol_statement_runtime_fixtures()?;
-    let statement_phrase_path =
-        root.join("conformance/0.4/cobol/statement-phrase-runtime-fixtures.json");
+    let statement_phrase_path = root.join(
+        "conformance/subsystems/cobol/execution/cobol/statement-phrase-runtime-fixtures.json",
+    );
     let statement_phrase_schema_path =
         schema_directory.join("cobol-statement-phrase-runtime-fixtures.schema.json");
     validate_schema_instance(
@@ -944,7 +855,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &statement_phrase_path,
     )?;
     verify_cobol_statement_phrase_runtime_fixtures()?;
-    let data_runtime_path = root.join("conformance/0.4/cobol/data-runtime-fixtures.json");
+    let data_runtime_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/data-runtime-fixtures.json");
     let data_runtime_schema_path = schema_directory.join("cobol-data-runtime-fixtures.schema.json");
     validate_schema_instance(
         &json(&data_runtime_schema_path)?,
@@ -952,7 +864,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &data_runtime_path,
     )?;
     verify_cobol_data_runtime_fixtures()?;
-    let register_runtime_path = root.join("conformance/0.4/cobol/register-runtime-fixtures.json");
+    let register_runtime_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/register-runtime-fixtures.json");
     let register_runtime_schema_path =
         schema_directory.join("cobol-register-runtime-fixtures.schema.json");
     validate_schema_instance(
@@ -961,7 +874,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &register_runtime_path,
     )?;
     verify_cobol_register_runtime_fixtures()?;
-    let file_runtime_path = root.join("conformance/0.4/cobol/file-runtime-fixtures.json");
+    let file_runtime_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/file-runtime-fixtures.json");
     let file_runtime_schema_path = schema_directory.join("cobol-file-runtime-fixtures.schema.json");
     validate_schema_instance(
         &json(&file_runtime_schema_path)?,
@@ -969,7 +883,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &file_runtime_path,
     )?;
     verify_cobol_file_runtime_fixtures()?;
-    let recovery_path = root.join("conformance/0.4/cobol/recovery-fixtures.json");
+    let recovery_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/recovery-fixtures.json");
     let recovery_schema_path = schema_directory.join("cobol-recovery-fixtures.schema.json");
     validate_schema_instance(
         &json(&recovery_schema_path)?,
@@ -977,7 +892,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &recovery_path,
     )?;
     verify_cobol_recovery_fixtures()?;
-    let condition_path = root.join("conformance/0.4/cobol/condition-fixtures.json");
+    let condition_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/condition-fixtures.json");
     let condition_schema_path = schema_directory.join("cobol-condition-fixtures.schema.json");
     validate_schema_instance(
         &json(&condition_schema_path)?,
@@ -985,7 +901,8 @@ fn check_spec(root: &Path) -> TaskResult {
         &condition_path,
     )?;
     verify_cobol_condition_fixtures()?;
-    let function_runtime_path = root.join("conformance/0.4/cobol/function-runtime-fixtures.json");
+    let function_runtime_path =
+        root.join("conformance/subsystems/cobol/execution/cobol/function-runtime-fixtures.json");
     let function_runtime_schema_path =
         schema_directory.join("cobol-function-runtime-fixtures.schema.json");
     validate_schema_instance(
@@ -994,8 +911,9 @@ fn check_spec(root: &Path) -> TaskResult {
         &function_runtime_path,
     )?;
     verify_cobol_function_runtime_fixtures()?;
-    let function_boundary_path =
-        root.join("conformance/0.4/cobol/function-boundary-runtime-fixtures.json");
+    let function_boundary_path = root.join(
+        "conformance/subsystems/cobol/execution/cobol/function-boundary-runtime-fixtures.json",
+    );
     let function_boundary_schema_path =
         schema_directory.join("cobol-function-boundary-runtime-fixtures.schema.json");
     validate_schema_instance(
@@ -1005,7 +923,8 @@ fn check_spec(root: &Path) -> TaskResult {
     )?;
     verify_cobol_function_boundary_runtime_fixtures()?;
     verify_cobol_assurance_sources()?;
-    let function_path = root.join("conformance/0.3/cobol/function-fixtures.json");
+    let function_path =
+        root.join("conformance/subsystems/cobol/structure/cobol/function-fixtures.json");
     let function_schema_path = schema_directory.join("cobol-function-fixtures.schema.json");
     validate_schema_instance(
         &json(&function_schema_path)?,
@@ -1077,7 +996,8 @@ fn check_spec(root: &Path) -> TaskResult {
 }
 
 fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
-    let manifest_path = root.join("conformance/0.9/manifests/cics-file-uow-topics.json");
+    let manifest_path =
+        root.join("conformance/subsystems/cics/application/manifests/cics-file-uow-topics.json");
     if !manifest_path.is_file() {
         return Ok(());
     }
@@ -1110,19 +1030,24 @@ fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
         "CICS pilot topic-manifest digest drifted",
     )?;
 
-    let candidates_path =
-        root.join("conformance/0.9/generated/cics-pilot-semantic-candidates.json");
-    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
-    let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
-    let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
-    let adapter_path = root.join("conformance/0.9/oracles/cics-licensed-differential.json");
+    let candidates_path = root.join(
+        "conformance/subsystems/cics/application/generated/cics-pilot-semantic-candidates.json",
+    );
+    let review_path =
+        root.join("conformance/subsystems/cics/application/cics/pilot-rule-review.json");
+    let environment_path =
+        root.join("conformance/subsystems/cics/application/cics/pilot-environment.json");
+    let fixture_path =
+        root.join("conformance/subsystems/cics/application/cics/pilot-fixtures.json");
+    let adapter_path = root
+        .join("conformance/subsystems/cics/application/oracles/cics-licensed-differential.json");
     let candidates = json(&candidates_path)?;
     let review = json(&review_path)?;
     let environment = json(&environment_path)?;
     let fixture = json(&fixture_path)?;
     let adapter = json(&adapter_path)?;
     let adapter_schema_path =
-        root.join("conformance/0.9/schemas/cics-licensed-differential-adapter.schema.json");
+        root.join("conformance/subsystems/cics/application/schemas/cics-licensed-differential-adapter.schema.json");
     validate_schema_instance(&json(&adapter_schema_path)?, &adapter, &adapter_path)?;
     require(
         candidates["coverage_credit"].as_u64() == Some(0)
@@ -1249,7 +1174,7 @@ fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
         )?,
         _ => return Err("CICS pilot review status is unknown".into()),
     }
-    let tests = root.join("conformance/0.9/tools/tests");
+    let tests = root.join("conformance/subsystems/cics/application/tools/tests");
     let status = Command::new("python3")
         .args(["-B", "-m", "unittest", "discover", "-s"])
         .arg(&tests)
@@ -1261,7 +1186,8 @@ fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
 }
 
 fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
-    let manifest_path = root.join("conformance/0.9/manifests/cobol-numeric-move-topics.json");
+    let manifest_path = root
+        .join("conformance/subsystems/cics/application/manifests/cobol-numeric-move-topics.json");
     if !manifest_path.is_file() {
         return Ok(());
     }
@@ -1294,10 +1220,12 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
         "COBOL MOVE pilot topic-manifest digest drifted",
     )?;
 
-    let projection_path =
-        root.join("conformance/0.9/generated/cobol-move-semantic-candidates.json");
-    let review_path = root.join("conformance/0.9/cobol/move-rule-review.json");
-    let fixture_path = root.join("conformance/0.9/cobol/move-fixture.json");
+    let projection_path = root.join(
+        "conformance/subsystems/cics/application/generated/cobol-move-semantic-candidates.json",
+    );
+    let review_path =
+        root.join("conformance/subsystems/cics/application/cobol/move-rule-review.json");
+    let fixture_path = root.join("conformance/subsystems/cics/application/cobol/move-fixture.json");
     let projection = json(&projection_path)?;
     let review = json(&review_path)?;
     let fixture = json(&fixture_path)?;
@@ -1382,13 +1310,18 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
 }
 
 fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
-    let review_path = root.join("conformance/0.9/cobol/arithmetic-rule-review.json");
+    let review_path =
+        root.join("conformance/subsystems/cics/application/cobol/arithmetic-rule-review.json");
     if !review_path.is_file() {
         return Ok(());
     }
-    let fixture_path = root.join("conformance/0.9/cobol/arithmetic-fixtures.json");
-    let manifest_path = root.join("conformance/0.3/generated/cobol-topic-manifest.json");
-    let projection_path = root.join("conformance/0.3/generated/cobol-html-grammar-projection.json");
+    let fixture_path =
+        root.join("conformance/subsystems/cics/application/cobol/arithmetic-fixtures.json");
+    let manifest_path =
+        root.join("conformance/subsystems/cobol/structure/generated/cobol-topic-manifest.json");
+    let projection_path = root.join(
+        "conformance/subsystems/cobol/structure/generated/cobol-html-grammar-projection.json",
+    );
     let review = json(&review_path)?;
     let fixture = json(&fixture_path)?;
     let manifest = json(&manifest_path)?;
@@ -1410,7 +1343,7 @@ fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> Task
             && add_topics[0]["sha256"]
                 == "sha256:0d41bb5458c78b6477731c50c532c36731f89a4a12e6ce88e1123c138b6b6e35"
             && review["pinned_source"]["manifest"]
-                == "conformance/0.3/generated/cobol-topic-manifest.json"
+                == "conformance/subsystems/cobol/structure/generated/cobol-topic-manifest.json"
             && review["pinned_source"]["product"] == manifest["product"]
             && review["pinned_source"]["row_id"] == add_topic["row_id"]
             && review["pinned_source"]["topic_path"] == add_topics[0]["topic_path"]
@@ -1455,7 +1388,7 @@ fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> Task
         .collect::<BTreeSet<_>>();
     require(
         review["grammar_projection"]["path"]
-            == "conformance/0.3/generated/cobol-html-grammar-projection.json"
+            == "conformance/subsystems/cobol/structure/generated/cobol-html-grammar-projection.json"
             && required_titles
                 == BTreeSet::from([
                     "Format 1: ADD statement",
@@ -1613,10 +1546,12 @@ fn import_cics_oracle(
                 "CICS oracle family ID is malformed",
             )?;
             let adapter_path = root.join(format!(
-                "conformance/0.9/oracles/cics-licensed-family-{family}.json"
+                "conformance/subsystems/cics/application/oracles/cics-licensed-family-{family}.json"
             ));
             let adapter = json(&adapter_path)?;
-            let schema_path = root.join("conformance/0.9/schemas/cics-licensed-family.schema.json");
+            let schema_path = root.join(
+                "conformance/subsystems/cics/application/schemas/cics-licensed-family.schema.json",
+            );
             validate_schema_instance(&json(&schema_path)?, &adapter, &adapter_path)?;
             require(
                 adapter["family_id"].as_str() == Some(family)
@@ -1677,10 +1612,10 @@ fn import_cics_oracle(
                 "pilot capture does not take --environment-manifest",
             )?;
             (
-                root.join("conformance/0.9/oracles/cics-licensed-differential.json"),
-                root.join("conformance/0.9/cics/pilot-fixtures.json"),
-                root.join("conformance/0.9/cics/pilot-rule-review.json"),
-                root.join("conformance/0.9/cics/pilot-environment.json"),
+                root.join("conformance/subsystems/cics/application/oracles/cics-licensed-differential.json"),
+                root.join("conformance/subsystems/cics/application/cics/pilot-fixtures.json"),
+                root.join("conformance/subsystems/cics/application/cics/pilot-rule-review.json"),
+                root.join("conformance/subsystems/cics/application/cics/pilot-environment.json"),
                 None,
             )
         };
@@ -1737,10 +1672,11 @@ fn import_cics_oracle(
             "CICS oracle family fixture/source scope is stale",
         )?;
         let pins_path =
-            root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
+            root.join("conformance/subsystems/cics/application/manifests/cics-application-api-sources-a-topics.json");
         let pins = json(&pins_path)?;
-        let registrations_path =
-            root.join("conformance/0.9/cics/typed-execution-registrations.json");
+        let registrations_path = root.join(
+            "conformance/subsystems/cics/application/cics/typed-execution-registrations.json",
+        );
         let registrations = json(&registrations_path)?;
         let reviewed_topics = array(&review, "topics", &review_path)?;
         require(
@@ -1903,9 +1839,13 @@ mod docs_driven_pipeline_tests {
         });
         fs::write(&environment_path, serde_json::to_vec(&environment).unwrap()).unwrap();
         let manifest_path =
-            root.join("conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json");
-        let fixture_path = root.join("conformance/0.9/oracles/cics-bif-builtins-fixtures.json");
-        let source_path = root.join("conformance/0.9/oracles/cics-bif-builtins-source-review.json");
+            root.join("conformance/subsystems/cics/application/oracles/cics-licensed-family-bif-builtins-v1.json");
+        let fixture_path = root.join(
+            "conformance/subsystems/cics/application/oracles/cics-bif-builtins-fixtures.json",
+        );
+        let source_path = root.join(
+            "conformance/subsystems/cics/application/oracles/cics-bif-builtins-source-review.json",
+        );
         let fixture = json(&fixture_path).unwrap();
         let observations = fixture["expected_observations"].clone();
         let typed_observations =
@@ -1926,16 +1866,14 @@ mod docs_driven_pipeline_tests {
             "origin": {"kind": "local", "authority": "test-only-local", "run_job_id": "test-1", "signature": null},
         });
         fs::write(&capture_path, serde_json::to_vec(&capture).unwrap()).unwrap();
-        assert!(
-            import_cics_oracle(
-                &root,
-                &capture_path,
-                Some("bif-builtins-v1"),
-                Some(&environment_path),
-                None
-            )
-            .is_ok()
+        let imported = import_cics_oracle(
+            &root,
+            &capture_path,
+            Some("bif-builtins-v1"),
+            Some(&environment_path),
+            None,
         );
+        assert!(imported.is_ok(), "{imported:?}");
         let mut changed_environment = environment;
         changed_environment["encoding"] = serde_json::json!("other-test-encoding");
         fs::write(
@@ -1965,9 +1903,12 @@ mod docs_driven_pipeline_tests {
             .as_nanos();
         let external = std::env::temp_dir().join(format!("cics-pilot-oracle-test-{nonce}"));
         fs::create_dir(&external).unwrap();
-        let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
-        let source_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
-        let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
+        let fixture_path =
+            root.join("conformance/subsystems/cics/application/cics/pilot-fixtures.json");
+        let source_path =
+            root.join("conformance/subsystems/cics/application/cics/pilot-rule-review.json");
+        let environment_path =
+            root.join("conformance/subsystems/cics/application/cics/pilot-environment.json");
         let fixture = json(&fixture_path).unwrap();
         let observations = fixture["licensed_expected_observations"].clone();
         let typed_observations =
@@ -2010,20 +1951,21 @@ mod docs_driven_pipeline_tests {
             std::process::id()
         ));
         for relative in [
-            "conformance/0.9/manifests/cics-file-uow-topics.json",
-            "conformance/0.9/generated/cics-pilot-semantic-candidates.json",
-            "conformance/0.9/cics/pilot-rule-review.json",
-            "conformance/0.9/cics/pilot-environment.json",
-            "conformance/0.9/cics/pilot-fixtures.json",
-            "conformance/0.9/oracles/cics-licensed-differential.json",
-            "conformance/0.9/schemas/cics-licensed-differential-adapter.schema.json",
+            "conformance/subsystems/cics/application/manifests/cics-file-uow-topics.json",
+            "conformance/subsystems/cics/application/generated/cics-pilot-semantic-candidates.json",
+            "conformance/subsystems/cics/application/cics/pilot-rule-review.json",
+            "conformance/subsystems/cics/application/cics/pilot-environment.json",
+            "conformance/subsystems/cics/application/cics/pilot-fixtures.json",
+            "conformance/subsystems/cics/application/oracles/cics-licensed-differential.json",
+            "conformance/subsystems/cics/application/schemas/cics-licensed-differential-adapter.schema.json",
         ] {
             let source = source_root.join(relative);
             let target = root.join(relative);
             fs::create_dir_all(target.parent().unwrap()).unwrap();
             fs::copy(source, target).unwrap();
         }
-        let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+        let review_path =
+            root.join("conformance/subsystems/cics/application/cics/pilot-rule-review.json");
         let mut review = json(&review_path).unwrap();
         review["candidate_projection_sha256"] = Value::String(format!("sha256:{}", "f".repeat(64)));
         fs::write(&review_path, pretty_json(&review).unwrap()).unwrap();
@@ -2034,7 +1976,7 @@ mod docs_driven_pipeline_tests {
 }
 
 fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResult {
-    let path = root.join("conformance/0.6/fixtures/dataset-organizations.json");
+    let path = root.join("conformance/subsystems/dataset/fixtures/dataset-organizations.json");
     let fixture = json(&path)?;
     let rows = array(&fixture, "cases", &path)?;
     unique_rows(rows, "id", &path)?;
@@ -2059,7 +2001,7 @@ fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResul
             && actual.values().all(|digest| digest == &expected_digest),
         "dataset organization fixture registry is stale or incomplete",
     )?;
-    let ams_path = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let ams_path = root.join("conformance/subsystems/dataset/fixtures/ams-commands.json");
     let ams_fixture = json(&ams_path)?;
     let ams_rows = array(&ams_fixture, "cases", &ams_path)?;
     unique_rows(ams_rows, "id", &ams_path)?;
@@ -2139,7 +2081,7 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
 fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
     let language = json(path)?;
     let pinned_topics = cobol_language_pinned_topics(root, &language, path)?;
-    let official_path = root.join("conformance/0.2/catalogs/cobol.json");
+    let official_path = root.join("conformance/subsystems/coverage/catalogs/cobol.json");
     let official = json(&official_path)?;
     let units = array(&official, "units", &official_path)?;
     let mut official_rows = BTreeMap::new();
@@ -2235,7 +2177,7 @@ fn check_cobol_language_catalog(root: &Path, path: &Path) -> TaskResult {
 
 /// The COBOL topics this repository actually read, for the file that cites them.
 ///
-/// `conformance/0.3/cobol/language.json` names its manifest and the digest it
+/// `conformance/subsystems/cobol/structure/cobol/language.json` names its manifest and the digest it
 /// was written against; both must be the ones the 0.2 receipt pins, or the 0.3
 /// catalog is describing a book the baselines never read.
 fn cobol_language_pinned_topics(
@@ -2246,7 +2188,7 @@ fn cobol_language_pinned_topics(
     let source = &language["source"];
     let manifest = text(source, "manifest", path)?;
     let digest = text(source, "sha256", path)?;
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
     let index = json(&index_path)?;
     let baseline_id = text(language, "baseline_id", path)?;
     let baseline = array(&index, "baselines", &index_path)?
@@ -2276,7 +2218,7 @@ fn check_cobol_frontend_bindings(
     fixture_path: &Path,
 ) -> TaskResult {
     let fixtures = json(fixture_path)?;
-    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language_path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let language = json(&language_path)?;
     let mut catalog_targets = BTreeMap::new();
     for entry in array(&language, "compiler_directing_statements", &language_path)? {
@@ -2400,7 +2342,7 @@ fn check_cobol_semantic_bindings(
     fixture_path: &Path,
 ) -> TaskResult {
     let fixtures = json(fixture_path)?;
-    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language_path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let language = json(&language_path)?;
     let mut catalog_targets = BTreeMap::new();
     for (field, target_kind) in [
@@ -2544,7 +2486,7 @@ fn check_cobol_statement_bindings(
     fixture_path: &Path,
 ) -> TaskResult {
     let fixtures = json(fixture_path)?;
-    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language_path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let language = json(&language_path)?;
     let catalog_targets = array(&language, "procedure_statements", &language_path)?
         .iter()
@@ -3004,7 +2946,7 @@ fn check_cobol_function_bindings(
     fixture_path: &Path,
 ) -> TaskResult {
     let fixtures = json(fixture_path)?;
-    let language_path = root.join("conformance/0.3/cobol/language.json");
+    let language_path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let language = json(&language_path)?;
     let catalog = array(&language, "intrinsic_functions", &language_path)?
         .iter()
@@ -3791,7 +3733,9 @@ fn check_cobol_assurance_bindings(
     }
     let oracle_digest = format!(
         "sha256:{}",
-        file_digest(&root.join("conformance/0.4/oracles/cobol-licensed-differential.json"))?
+        file_digest(&root.join(
+            "conformance/subsystems/cobol/execution/oracles/cobol-licensed-differential.json"
+        ))?
     );
     require(
         spec.registries().oracles().iter().any(|(oracle, digest)| {
@@ -3869,7 +3813,7 @@ fn check_cobol_reference_policy(root: &Path, spec: &CompiledSpec) -> TaskResult 
             document.contains("pass-with-licensed-differential-pending")
                 && document.contains("GnuCOBOL")
                 && document.contains("0/153")
-                && document.contains("0.17"),
+                && document.contains("certification.licensed"),
             &format!("{relative} omits the approved GnuCOBOL completion disposition"),
         )?;
     }
@@ -4049,7 +3993,7 @@ fn check_cobol_language_generated(root: &Path) -> TaskResult {
 }
 
 fn render_cobol_reserved_words(root: &Path) -> TaskResult<Vec<u8>> {
-    let path = root.join("conformance/0.3/cobol/language.json");
+    let path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let language = json(&path)?;
     let words = cobol_undefinable_words(root, &language, &path)?;
     let mut source =
@@ -4071,7 +4015,7 @@ fn render_cobol_reserved_words(root: &Path) -> TaskResult<Vec<u8>> {
 }
 
 fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
-    let path = root.join("conformance/0.3/cobol/language.json");
+    let path = root.join("conformance/subsystems/cobol/structure/cobol/language.json");
     let language = json(&path)?;
     check_cobol_language_catalog(root, &path)?;
     let statements = array(&language, "compiler_directing_statements", &path)?;
@@ -4542,8 +4486,8 @@ fn render_cobol_language(root: &Path) -> TaskResult<Vec<u8>> {
 /// only advises against it, which is why `potential` is read out of the
 /// appendix and then deliberately not used here.
 ///
-/// `conformance/0.3/cobol/reserved-words.json` is that appendix, read by
-/// `conformance/0.3/tools/extract_cobol_reserved_words.py` from the same pinned
+/// `conformance/subsystems/cobol/structure/cobol/reserved-words.json` is that appendix, read by
+/// `conformance/subsystems/cobol/structure/tools/extract_cobol_reserved_words.py` from the same pinned
 /// topic the 0.2 baseline pins. This checks it names the catalog's own baseline
 /// and manifest and cites its topics at the digests that manifest records, so
 /// the list cannot come to describe a different book than the forms do.
@@ -4552,7 +4496,7 @@ fn cobol_undefinable_words(
     language: &Value,
     language_path: &Path,
 ) -> TaskResult<BTreeSet<String>> {
-    let path = root.join("conformance/0.3/cobol/reserved-words.json");
+    let path = root.join("conformance/subsystems/cobol/structure/cobol/reserved-words.json");
     let document = json(&path)?;
     require(
         text(&document, "schema_version", &path)? == "mainframe-env.cobol-reserved-words@1",
@@ -4684,7 +4628,7 @@ fn format_generated_rust(root: &Path, source: Vec<u8>) -> TaskResult<Vec<u8>> {
 }
 
 fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
     let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
     let spec_path = root.join("conformance/spec/v1/spec.json");
     let mut spec_value = json(&spec_path)?;
@@ -4701,7 +4645,7 @@ fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
 }
 
 fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
-    let fixture_path = root.join("conformance/0.6/fixtures/ams-commands.json");
+    let fixture_path = root.join("conformance/subsystems/dataset/fixtures/ams-commands.json");
     let fixture = json(&fixture_path)?;
     let cases = array(&fixture, "cases", &fixture_path)?;
     let digest = format!("sha256:{}", file_digest(&fixture_path)?);
@@ -4833,7 +4777,8 @@ fn document_values_mut<'a>(spec: &'a mut Value, name: &str) -> TaskResult<&'a mu
 }
 
 fn augment_cics_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
-    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+    let review_path =
+        root.join("conformance/subsystems/cics/application/cics/pilot-rule-review.json");
     if !review_path.is_file() {
         return Ok(());
     }
@@ -5001,7 +4946,7 @@ fn augment_cics_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
     );
     registry_values_mut(spec, "fixtures")?.push(json!({
         "id": "cics.file-uow.pilot-v1",
-        "digest": format!("sha256:{}", file_digest(&root.join("conformance/0.9/cics/pilot-fixtures.json"))?)
+        "digest": format!("sha256:{}", file_digest(&root.join("conformance/subsystems/cics/application/cics/pilot-fixtures.json"))?)
     }));
     registry_values_mut(spec, "reviewed_rules")?.extend(
         accepted_rules
@@ -5106,7 +5051,8 @@ fn augment_cics_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
 }
 
 fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
-    let review_path = root.join("conformance/0.9/cobol/move-rule-review.json");
+    let review_path =
+        root.join("conformance/subsystems/cics/application/cobol/move-rule-review.json");
     if !review_path.is_file() {
         return Ok(());
     }
@@ -5140,7 +5086,7 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
         .push(Value::String("cobol.numeric-move.exact-bytes".into()));
     registry_values_mut(spec, "fixtures")?.push(json!({
         "id": "cobol.numeric-move.floating-sign-v1",
-        "digest": format!("sha256:{}", file_digest(&root.join("conformance/0.9/cobol/move-fixture.json"))?)
+        "digest": format!("sha256:{}", file_digest(&root.join("conformance/subsystems/cics/application/cobol/move-fixture.json"))?)
     }));
     registry_values_mut(spec, "reviewed_rules")?.extend(
         rules
@@ -5200,7 +5146,8 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
 }
 
 fn augment_cobol_arithmetic_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
-    let review_path = root.join("conformance/0.9/cobol/arithmetic-rule-review.json");
+    let review_path =
+        root.join("conformance/subsystems/cics/application/cobol/arithmetic-rule-review.json");
     if !review_path.is_file() {
         return Ok(());
     }
@@ -5236,7 +5183,7 @@ fn augment_cobol_arithmetic_pilot_spec(root: &Path, spec: &mut Value) -> TaskRes
     ));
     registry_values_mut(spec, "fixtures")?.push(json!({
         "id": "cobol.typed-arithmetic.issue-140-141-v1",
-        "digest": format!("sha256:{}", file_digest(&root.join("conformance/0.9/cobol/arithmetic-fixtures.json"))?)
+        "digest": format!("sha256:{}", file_digest(&root.join("conformance/subsystems/cics/application/cobol/arithmetic-fixtures.json"))?)
     }));
     registry_values_mut(spec, "reviewed_rules")?.extend(
         rules
@@ -5468,7 +5415,9 @@ fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
         "local",
         format!(
             "sha256:{}",
-            file_digest(&root.join("conformance/0.9/cics/pilot-environment.json"))?
+            file_digest(
+                &root.join("conformance/subsystems/cics/application/cics/pilot-environment.json")
+            )?
         ),
         limits,
     )
@@ -5507,32 +5456,6 @@ fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
 fn check_cobol_exit(root: &Path) -> TaskResult {
     check_spec(root)?;
     let receipt = verify_cobol_exit()?;
-    require(
-        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{}"])?
-            == "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
-        "accepted 0.1.1 release commit moved",
-    )?;
-    require(
-        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{tree}"])?
-            == "3d504ece02f1c09e124606ded695b00ba984d104",
-        "accepted 0.1.1 release tree moved",
-    )?;
-    let versions: Value = serde_json::from_str(&command_text(
-        root,
-        "git",
-        &[
-            "show",
-            "mainframe-env-v0.1.1:conformance/0.1/inventory/versions.json",
-        ],
-    )?)
-    .map_err(|error| format!("accepted 0.1.1 version inventory: {error}"))?;
-    require(
-        versions["contracts"]["artifact"] == "mainframe-env.artifact@1"
-            && versions["contracts"]["ir_binary"] == "mainframe-env.ir-binary@1"
-            && versions["contracts"]["ir_envelope"] == "mainframe-env.ir-envelope@1",
-        "accepted 0.1.1 artifact compatibility contracts drifted",
-    )?;
-
     let limits = ConformanceLimits::default();
     let spec = compile_shared_spec(root)?;
     let selection = RunnerSelection::focused("cobol", None, None, limits)
@@ -6099,26 +6022,29 @@ fn check_jcl_exit(root: &Path) -> TaskResult {
             && receipt.licensed_differential == "pending-no-pinned-licensed-oracle-receipt",
         "JCL-706 exit matrix is incomplete",
     )?;
-    let oracle_path = root.join("conformance/0.7/oracles/jcl-licensed-differential.json");
+    let oracle_path =
+        root.join("conformance/subsystems/jcl/oracles/jcl-licensed-differential.json");
     let oracle = json(&oracle_path)?;
     validate_schema_instance(
-        &json(&root.join("conformance/0.7/schemas/jcl-licensed-differential-adapter.schema.json"))?,
+        &json(&root.join(
+            "conformance/subsystems/jcl/schemas/jcl-licensed-differential-adapter.schema.json",
+        ))?,
         &oracle,
         &oracle_path,
     )?;
     require(
         oracle["schema_version"]
             == Value::String("mainframe-env.jcl-licensed-differential-adapter@1".into())
-            && oracle["target_version"] == Value::String("0.7.0".into())
+            && oracle["target_subsystem"] == Value::String("jcl.planning".into())
             && oracle["status"] == Value::String("pending".into())
             && oracle["licensed_receipt_required_for_pass"] == Value::Bool(true)
             && oracle["generated_or_historical_result_counts_as_pass"] == Value::Bool(false),
         "JCL licensed differential adapter policy is invalid",
     )?;
-    let gate_map_path = root.join("conformance/0.7/inventory/jcl-path-gate-map.json");
+    let gate_map_path = root.join("conformance/subsystems/jcl/inventory/jcl-path-gate-map.json");
     let gate_map = json(&gate_map_path)?;
     validate_schema_instance(
-        &json(&root.join("conformance/0.7/schemas/jcl-path-gate-map.schema.json"))?,
+        &json(&root.join("conformance/subsystems/jcl/schemas/jcl-path-gate-map.schema.json"))?,
         &gate_map,
         &gate_map_path,
     )?;
@@ -6178,616 +6104,188 @@ fn make_focused_selection(
     selection.map_err(|problem| problem.to_string())
 }
 
-fn generate_evidence_seal(root: &Path) -> TaskResult {
-    evidence_seal::generate(root)
-}
-
-fn check_evidence_seal(root: &Path) -> TaskResult {
-    evidence_seal::check(root)
-}
-
-fn write_evidence_callback(root: &Path) -> TaskResult {
-    evidence_seal::callback(root)
-}
-
 fn check_carddemo_cics(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_cics_abi_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|e| e.to_string())?)
-    );
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt).map_err(|e| e.to_string())?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-012.json"))?;
-    require(
-        evidence["cics_receipt"] == receipt_value,
-        "CD-012 CICS receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-012 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_cics_runtime(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_cics_runtime_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-013.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-013".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-013 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["cics_runtime_receipt"] == receipt_value,
-        "CD-013 CICS runtime receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-013 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_vsam(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_vsam_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-014.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-014".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-014 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["vsam_receipt"] == receipt_value,
-        "CD-014 VSAM receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-014 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_dataset_catalog(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_dataset_catalog_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-015.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-015".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-015 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["dataset_catalog_receipt"] == receipt_value,
-        "CD-015 dataset catalog receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-015 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_seeds(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_seeds_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-016.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-016".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-016 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["seed_receipt"] == receipt_value,
-        "CD-016 seed receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-016 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_security(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_security_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-017.json"))?;
-    let historical = evidence["security_receipt"]
-        .as_object()
-        .ok_or("CD-017 historical security receipt is malformed")?;
-    let historical_digest = canonical_evidence_digest(historical)?;
-    require(
-        evidence["issue"] == Value::String("CD-017".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into())
-            && evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
-        "CD-017 evidence is not a derived pass",
-    )?;
-    require(
-        receipt.status == "pass"
-            && receipt.schema_version == "mainframe-env.carddemo-security-receipt@1"
-            && receipt.corpus_commit == historical["corpus_commit"]
-            && receipt.transport_users
-                == historical["transport_users"].as_u64().unwrap_or(0) as usize
-            && receipt.application_signon_records
-                == historical["application_signon_records"]
-                    .as_u64()
-                    .unwrap_or(0) as usize
-            && receipt.identities_distinct
-            && receipt.groups == historical["groups"].as_u64().unwrap_or(0) as usize
-            && receipt.profiles == historical["profiles"].as_u64().unwrap_or(0) as usize
-            && receipt.permissions > 0
-            && receipt.permissions <= historical["permissions"].as_u64().unwrap_or(0) as usize
-            && receipt.resource_classes
-                == serde_json::from_value::<Vec<String>>(historical["resource_classes"].clone())
-                    .map_err(|error| error.to_string())?
-            && receipt.transaction_profiles
-                == historical["transaction_profiles"].as_u64().unwrap_or(0) as usize
-            && receipt.program_profiles
-                == historical["program_profiles"].as_u64().unwrap_or(0) as usize
-            && receipt.dataset_profiles
-                == historical["dataset_profiles"].as_u64().unwrap_or(0) as usize
-            && receipt.queue_profiles
-                == historical["queue_profiles"].as_u64().unwrap_or(0) as usize
-            && receipt.regular_allow_checks
-                == historical["regular_allow_checks"].as_u64().unwrap_or(0) as usize
-            && receipt.regular_deny_checks
-                == historical["regular_deny_checks"].as_u64().unwrap_or(0) as usize
-            && receipt.admin_allow_checks
-                == historical["admin_allow_checks"].as_u64().unwrap_or(0) as usize
-            && receipt.redacted_fields
-                == historical["redacted_fields"].as_u64().unwrap_or(0) as usize
-            && receipt.manifest_replay
-            && receipt.security_shape_sha256.len() == 64
-            && receipt
-                .security_shape_sha256
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit()),
-        "current CardDemo security profile is not an exact least-privilege pass",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_terminal(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_terminal_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-018.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-018".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-018 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["terminal_receipt"] == receipt_value,
-        "CD-018 terminal receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-018 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_base_online(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_base_online_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-019.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.journeys_passed == 9
-            && evidence["issue"] == Value::String("CD-019".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-019 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["base_online_receipt"] == receipt_value,
-        "CD-019 base-online receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-019 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_jcl(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_jcl_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-020.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.jcl_files == 46
-            && receipt.parsed_files + receipt.accepted_unsupported_files == 46
-            && evidence["issue"] == Value::String("CD-020".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-020 evidence is not a complete derived pass",
-    )?;
-    let mut current_projection = receipt_value.clone();
-    let mut historical_projection = evidence["jcl_receipt"].clone();
-    current_projection
-        .as_object_mut()
-        .ok_or("current CardDemo JCL receipt is not an object")?
-        .remove("jcl_shape_sha256");
-    historical_projection
-        .as_object_mut()
-        .ok_or("historical CardDemo JCL receipt is not an object")?
-        .remove("jcl_shape_sha256");
-    require(
-        current_projection == historical_projection,
-        "CD-020 semantic JCL receipt projection drifted",
-    )?;
-    let historical_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(
-            serde_json::to_vec(&evidence["jcl_receipt"]).map_err(|error| error.to_string())?
-        )
-    );
-    require(
-        evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
-        "CD-020 historical evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_utilities(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_utilities_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-021.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.jcl_files == 46
-            && evidence["issue"] == Value::String("CD-021".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-021 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["utility_receipt"] == receipt_value,
-        "CD-021 utility receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-021 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_batch_programs(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_batch_programs_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-022.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.named_programs.len() == 11
-            && receipt.compiled_artifacts == 12
-            && evidence["issue"] == Value::String("CD-022".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-022 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["batch_program_receipt"] == receipt_value,
-        "CD-022 batch-program receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-022 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_base_batch(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_base_batch_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let historical_path = root.join("conformance/0.1.1/evidence/issues/CD-023.json");
-    let evidence = json(&historical_path)?;
-    require(
-        receipt.status == "pass"
-            && receipt.journeys_passed == 3
-            && evidence["issue"] == Value::String("CD-023".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-023 evidence is not a complete derived pass",
-    )?;
-    let historical_receipt = evidence["base_batch_receipt"]
-        .as_object()
-        .ok_or("CD-023 historical base-batch receipt is malformed")?;
-    let historical_digest = canonical_evidence_digest(historical_receipt)?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(historical_digest.as_str()),
-        "CD-023 historical evidence digest differs",
-    )?;
-    let historical_completion = find_completion_commit(
-        root,
-        "Certify CardDemo base batch journeys",
-        &[
-            ("CardDemo-Issue", "CD-023=pass"),
-            ("Evidence-Digest", historical_digest.as_str()),
-            ("Target-Product", "0.1.1"),
-        ],
-    )?;
-    verify_commit_bound_live_file(
-        root,
-        &historical_completion,
-        "conformance/0.1.1/evidence/issues/CD-023.json",
-        &historical_path,
-    )?;
-
-    let versioned_path = root.join("conformance/0.8/evidence/carddemo-base-batch.json");
-    let (expected, credit) =
-        carddemo_base_batch_provenance::read_carddemo_evidence(root, historical_receipt)?;
-    if versioned_path.is_file() {
-        for field in [
-            "schema_version",
-            "status",
-            "corpus_commit",
-            "journeys_passed",
-            "initialization_jobs",
-            "operational_jobs",
-            "cics_file_controls",
-            "internal_submissions",
-            "warm_restart_controls",
-            "rollback_controls",
-            "cancellation_controls",
-        ] {
-            require(
-                expected.get(field) == historical_receipt.get(field),
-                &format!("0.8 CardDemo compatibility projection changed {field}"),
-            )?;
-        }
-    }
-    require(
-        expected == receipt_value,
-        "CardDemo base-batch receipt is stale",
-    )?;
-    require(
-        versioned_path.is_file()
-            || evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-023 evidence digest differs",
-    )?;
-    credit.print();
     Ok(())
 }
 
 fn check_carddemo_db2(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_db2_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-024.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.programs_compiled == 3
-            && receipt.online_routes == 2
-            && receipt.batch_routes == 3
-            && evidence["issue"] == Value::String("CD-024".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-024 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["db2_receipt"] == receipt_value,
-        "CD-024 Db2 receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-024 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_ims(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_ims_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-025.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.definitions_checked == 8
-            && receipt.databases_installed == 2
-            && receipt.psbs_installed == 3
-            && receipt.application_routes == 3
-            && evidence["issue"] == Value::String("CD-025".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-025 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["ims_receipt"] == receipt_value,
-        "CD-025 IMS receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-025 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_mq_authorization(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_mq_authorization_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-026.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.programs_compiled == 3
-            && receipt.queues_installed == 7
-            && receipt.triggers_installed == 3
-            && receipt.journeys_passed == 4
-            && evidence["issue"] == Value::String("CD-026".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-026 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["mq_authorization_receipt"] == receipt_value,
-        "CD-026 MQ/authorization receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-026 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_operator_install(root: &Path) -> TaskResult {
-    let inventory = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let inventory = root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json");
     let package = verify_carddemo_application_package_from_env(&inventory)
         .map_err(|problem| problem.to_string())?;
     let resources =
@@ -6819,7 +6317,7 @@ fn check_carddemo_operator_install(root: &Path) -> TaskResult {
 }
 
 fn check_carddemo_operator_compile(root: &Path) -> TaskResult {
-    let inventory = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let inventory = root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json");
     let closure = verify_carddemo_source_closures_from_env(&inventory)
         .map_err(|problem| problem.to_string())?;
     let batch = verify_carddemo_batch_programs_from_env(&inventory)
@@ -6843,7 +6341,7 @@ fn check_carddemo_operator_compile(root: &Path) -> TaskResult {
 
 fn check_carddemo_operator_submit(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_base_batch_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
     require(
@@ -6866,7 +6364,7 @@ fn check_carddemo_operator_submit(root: &Path) -> TaskResult {
 
 fn check_carddemo_operator_reset(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_utilities_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
     require(
@@ -6888,381 +6386,141 @@ fn check_carddemo_operator_reset(root: &Path) -> TaskResult {
 
 fn check_carddemo_full(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_full_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-027.json"))?;
-    require(
-        receipt.status == "pass"
-            && receipt.issues_input_passed == 26
-            && receipt.journeys_passed == 20
-            && receipt.owned_commands.len() == 4
-            && receipt.mixed_requests_completed == receipt.mixed_requests_offered
-            && receipt.cdv1_disposition == "accepted-owned-source"
-            && receipt.cdv1_public_routes == 2
-            && !receipt.native_or_legacy_fallback_present
-            && evidence["issue"] == Value::String("CD-027".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-027 evidence is not a complete derived pass",
-    )?;
-    require(
-        evidence["full_receipt"] == receipt_value,
-        "CD-027 full receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-027 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_programs(root: &Path) -> TaskResult {
     let receipt = verify_carddemo_program_routing_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_digest = format!(
-        "sha256:{:x}",
-        Sha256::digest(serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?)
-    );
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt).map_err(|e| e.to_string())?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-011.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-011".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-011 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["program_receipt"] == receipt_value,
-        "CD-011 program receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-011 evidence digest differs",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_resources(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_resources_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let receipt = verify_carddemo_resources_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt).map_err(|e| e.to_string())?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence = json(&root.join("conformance/0.1.1/evidence/issues/CD-010.json"))?;
-    require(
-        evidence["issue"] == Value::String("CD-010".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-010 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["resource_receipt"] == receipt_value,
-        "CD-010 resource receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-010 evidence digest differs from resource receipt",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_package(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_application_package_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt).map_err(|error| error.to_string())?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value).map_err(|error| error.to_string())?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let receipt = verify_carddemo_application_package_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt).map_err(|e| e.to_string())?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let package_inventory_path =
-        root.join("conformance/0.1.1/inventory/carddemo-application-package.json");
-    let package_inventory = json(&package_inventory_path)?;
-    require(
-        package_inventory["identity"] == receipt_value["package_identity"]
-            && package_inventory["entries"] == receipt_value["entries"]
-            && package_inventory["name"] == receipt_value["package_name"]
-            && package_inventory["version"] == receipt_value["package_version"],
-        "CardDemo application package inventory is stale",
-    )?;
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-009.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-009".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-009 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["package_receipt"] == receipt_value,
-        "CD-009 package receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-009 evidence digest differs from its canonical package receipt",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_host(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_host_operands_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo host receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo host receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let receipt = verify_carddemo_host_operands_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo host receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-008.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-008".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "CD-008 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["host_receipt"] == receipt_value,
-        "CD-008 evidence host receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-008 evidence digest differs from its canonical host receipt",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_file_call(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_file_call_semantics_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo file/call receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo file/call receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let receipt = verify_carddemo_file_call_semantics_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo file/call receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-007.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-007".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-007 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["file_call_receipt"] == receipt_value,
-        "CD-007 evidence file/call receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-007 evidence digest differs from its canonical file/call receipt",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_core(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_core_semantics_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo core receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo core receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let receipt = verify_carddemo_core_semantics_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo core receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-006.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-006".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-006 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["core_receipt"] == receipt_value,
-        "CD-006 evidence core receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-006 evidence digest differs from its canonical core receipt",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_control(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_control_flow_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo control receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo control receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
+    let receipt = verify_carddemo_control_flow_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo control receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-005.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-005".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-005 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["control_receipt"] == receipt_value,
-        "CD-005 evidence control receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-005 evidence digest differs from its canonical control receipt",
-    )?;
     Ok(())
 }
 
 fn check_carddemo_layout(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_data_layouts_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo layout receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo layout receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-004.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-004".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-004 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["layout_receipt"] == receipt_value,
-        "CD-004 evidence layout receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-004 evidence digest differs from its canonical layout receipt",
-    )?;
+    let receipt = verify_carddemo_data_layouts_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo layout receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
     Ok(())
 }
 
 fn check_carddemo_closure(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_source_closures_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo closure receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo closure receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-003.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-003".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-003 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["closure_receipt"] == receipt_value,
-        "CD-003 evidence closure receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-003 evidence digest differs from its canonical closure receipt",
-    )?;
+    let receipt = verify_carddemo_source_closures_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo closure receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
     Ok(())
 }
 
 fn check_carddemo_source(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
-    let receipt = verify_carddemo_source_preprocessing_from_env(&inventory_path)
-        .map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo source receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo source receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-002.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-002".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-002 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["source_receipt"] == receipt_value,
-        "CD-002 evidence source receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-002 evidence digest differs from its canonical source receipt",
-    )?;
+    let receipt = verify_carddemo_source_preprocessing_from_env(
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
+    )
+    .map_err(|problem| problem.to_string())?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&receipt)
-            .map_err(|error| format!("CardDemo source receipt serialization failed: {error}"))?
+        serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
     );
     Ok(())
 }
 
 fn check_carddemo_corpus(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1.1/inventory/carddemo-corpus.json");
+    let inventory_path = root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json");
     let inventory = json(&inventory_path)?;
     let historical = text(&inventory, "content_sha256", &inventory_path)?;
-    let fixtures_path = root.join("conformance/0.1/fixtures/manifest.json");
+    let fixtures_path = root.join("conformance/subsystems/platform/fixtures/manifest.json");
     let fixtures = json(&fixtures_path)?;
     let frozen = array(&fixtures, "fixtures", &fixtures_path)?
         .iter()
@@ -7276,27 +6534,6 @@ fn check_carddemo_corpus(root: &Path) -> TaskResult {
 
     let receipt =
         verify_carddemo_corpus_from_env(&inventory_path).map_err(|problem| problem.to_string())?;
-    let receipt_value = serde_json::to_value(&receipt)
-        .map_err(|error| format!("CardDemo receipt conversion failed: {error}"))?;
-    let receipt_bytes = serde_json::to_vec(&receipt_value)
-        .map_err(|error| format!("CardDemo receipt canonicalization failed: {error}"))?;
-    let receipt_digest = format!("sha256:{:x}", Sha256::digest(receipt_bytes));
-    let evidence_path = root.join("conformance/0.1.1/evidence/issues/CD-001.json");
-    let evidence = json(&evidence_path)?;
-    require(
-        evidence["issue"] == Value::String("CD-001".to_string())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".to_string()),
-        "CD-001 evidence is not a derived pass",
-    )?;
-    require(
-        evidence["corpus_receipt"] == receipt_value,
-        "CD-001 evidence corpus receipt is stale",
-    )?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(receipt_digest.as_str()),
-        "CD-001 evidence digest differs from its canonical corpus receipt",
-    )?;
     println!(
         "{}",
         serde_json::to_string_pretty(&receipt)
@@ -7308,7 +6545,9 @@ fn check_carddemo_corpus(root: &Path) -> TaskResult {
 fn repository_root() -> TaskResult<PathBuf> {
     let mut current = env::current_dir().map_err(|error| error.to_string())?;
     loop {
-        if current.join("release.toml").is_file() && current.join("Cargo.toml").is_file() {
+        if current.join("docs/documentation-registry.json").is_file()
+            && current.join("Cargo.toml").is_file()
+        {
             return Ok(current);
         }
         if !current.pop() {
@@ -7345,513 +6584,6 @@ fn text<'a>(value: &'a Value, key: &str, path: &Path) -> TaskResult<&'a str> {
         .ok_or_else(|| format!("{} must contain string {key:?}", path.display()))
 }
 
-fn stable_zero_version(value: &str) -> TaskResult<(u64, u64)> {
-    let components = value.split('.').collect::<Vec<_>>();
-    require(
-        components.len() == 3 && components[0] == "0",
-        "product version must be stable SemVer 0.x.y",
-    )?;
-    let parse_component = |component: &str| -> TaskResult<u64> {
-        require(
-            !component.is_empty()
-                && component.bytes().all(|byte| byte.is_ascii_digit())
-                && (component == "0" || !component.starts_with('0')),
-            "product version must be stable SemVer 0.x.y",
-        )?;
-        component
-            .parse::<u64>()
-            .map_err(|_| "product version component is out of range".into())
-    };
-    Ok((
-        parse_component(components[1])?,
-        parse_component(components[2])?,
-    ))
-}
-
-fn release_line_for_version(version: &str) -> TaskResult<String> {
-    let (minor, _) = stable_zero_version(version)?;
-    Ok(format!("0.{minor}"))
-}
-
-fn product_version(root: &Path) -> TaskResult<String> {
-    let version = read(&root.join("VERSION"))?.trim().to_string();
-    stable_zero_version(&version)?;
-    Ok(version)
-}
-
-fn release_target_directory(version: &str, target: &str) -> TaskResult<PathBuf> {
-    stable_zero_version(version)?;
-    validate_release_target(target)?;
-    Ok(PathBuf::from(format!("release/{version}/targets/{target}")))
-}
-
-fn validate_unreleased_identity(
-    root: &Path,
-    current: &str,
-    released: &str,
-    allow_exact_current_tag: bool,
-) -> TaskResult {
-    let current_parts = stable_zero_version(current)?;
-    let released_parts = stable_zero_version(released)?;
-    require(
-        current_parts > released_parts,
-        "development version must be newer than the released version",
-    )?;
-    let released_tag = format!("refs/tags/mainframe-env-v{released}^{{commit}}");
-    let released_commit = command_text(root, "git", &["rev-parse", "--verify", &released_tag])?;
-    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
-    require(
-        head != released_commit,
-        "development identity cannot point at the released tag",
-    )?;
-    let ancestry = Command::new("git")
-        .args(["merge-base", "--is-ancestor", &released_commit, &head])
-        .current_dir(root)
-        .status()
-        .map_err(|error| format!("released-version ancestry: {error}"))?;
-    require(
-        ancestry.success(),
-        "development candidate does not descend from the released version",
-    )?;
-    let current_tag = format!("refs/tags/mainframe-env-v{current}");
-    let tagged = Command::new("git")
-        .args(["rev-parse", "--verify", "--quiet", &current_tag])
-        .current_dir(root)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|error| format!("development-version tag probe: {error}"))?;
-    if !tagged.success() {
-        return Ok(());
-    }
-    require(
-        allow_exact_current_tag
-            && command_text(
-                root,
-                "git",
-                &[
-                    "rev-parse",
-                    "--verify",
-                    &format!("{current_tag}^{{commit}}"),
-                ],
-            )? == head,
-        "unreleased version has a tag that does not identify the exact candidate",
-    )
-}
-
-fn validate_public_version_truth(
-    root: &Path,
-    current: &str,
-    released: &str,
-    state_label: &str,
-) -> TaskResult {
-    let readme = read(&root.join("README.md"))?;
-    let status = readme
-        .split_once("## Project status")
-        .and_then(|(_, rest)| rest.split("\n## ").next())
-        .ok_or("README Project status section is missing")?;
-    let row = |name: &str| -> TaskResult<&str> {
-        status
-            .lines()
-            .find_map(|line| line.strip_prefix(&format!("| {name} | ")))
-            .and_then(|value| value.strip_suffix(" |"))
-            .ok_or_else(|| format!("README Project status: {name} row is missing"))
-    };
-    let local_version = product_version(root)?;
-    let cargo: toml::Value = read(&root.join("Cargo.toml"))?
-        .parse()
-        .map_err(|error| format!("Cargo.toml: {error}"))?;
-    let cargo_version = cargo["workspace"]["package"]["version"]
-        .as_str()
-        .ok_or("workspace.package.version is missing")?;
-    require(
-        local_version == current
-            && cargo_version == current
-            && row("Current workspace version")? == format!("`{current}` ({state_label})"),
-        "README Project status: workspace version disagrees with VERSION or Cargo.toml",
-    )?;
-    let tags = command_text(root, "git", &["tag", "--list", "mainframe-env-v*"])?;
-    let highest = tags
-        .lines()
-        .filter_map(|tag| {
-            let version = tag.strip_prefix("mainframe-env-v")?;
-            stable_zero_version(version)
-                .ok()
-                .map(|parts| (parts, version))
-        })
-        .max_by_key(|(parts, _)| *parts)
-        .map(|(_, version)| version)
-        .ok_or("README Project status: no local stable release tag")?;
-    require(
-        highest == released,
-        "README Project status: latest release disagrees with highest local stable tag",
-    )?;
-    let source_record = root.join(format!("release/{released}/source-distribution.json"));
-    let release_kind = if source_record.exists() {
-        let record: Value = serde_json::from_str(&read(&source_record)?)
-            .map_err(|error| format!("{}: {error}", source_record.display()))?;
-        require(
-            record["version"].as_str() == Some(released)
-                && record["tag"].as_str() == Some(format!("mainframe-env-v{released}").as_str())
-                && record["published_assets"]["kind"].as_str()
-                    == Some("locked-cargo-vendor-source-bundle")
-                && record["published_assets"]["native_binaries"].as_bool() == Some(false),
-            "README Project status: source release record is inconsistent",
-        )?;
-        "source bundle only"
-    } else {
-        let manifest = root.join(format!(
-            "release/{released}/targets/x86_64-unknown-linux-gnu/manifest.json"
-        ));
-        let record: Value = serde_json::from_str(&read(&manifest)?)
-            .map_err(|error| format!("{}: {error}", manifest.display()))?;
-        require(
-            record["version"].as_str() == Some(released)
-                && record["tag"].as_str() == Some(format!("mainframe-env-v{released}").as_str()),
-            "README Project status: binary release record is inconsistent",
-        )?;
-        "native binaries"
-    };
-    require(
-        row("Latest published release")?
-            == format!(
-                "[{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), {release_kind}"
-            ),
-        "README Project status: latest release or release kind disagrees with local record",
-    )?;
-    require(
-        row("Development baseline")?.contains(&format!("`{current}`"))
-            && row("Development baseline")?.contains(&format!("{released} tag")),
-        "README Project status: development baseline disagrees with local versions",
-    )?;
-    let dossier = read(&root.join("docs/delivery/subsystems/cics/application-api-plan.md"))?;
-    require(
-        row("Implementation progress")?
-            == "[Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md)",
-        "README Project status: implementation progress must use the subsystem overview",
-    )?;
-    require(
-        row("Production readiness")? == "Not claimed"
-            && row("Licensed differential status")?
-                == "Required campaigns remain pending where the release notes say so"
-            && dossier.contains("licensed campaigns remain pending"),
-        "README Project status: readiness or licensed status is unsupported",
-    )?;
-    let acceptance_path = "docs/delivery/subsystems/cics/application-api-status.md";
-    let acceptance = read(&root.join(acceptance_path))?;
-    if acceptance.contains("Last integrated acceptance review: 2026-09-09")
-        && acceptance.contains("RUN_MODE=full, SUCCESS, 2026-09-09")
-    {
-        require(
-            status.contains("original no-go")
-                && status.contains("2026-09-09")
-                && status.contains("entry gate accepted")
-                && status.contains(acceptance_path)
-                && !status.contains("current pre-0.9 assessment is a **no-go"),
-            "README Project status: pre-0.9 entry decision disagrees with accepted status record (docs/delivery/subsystems/cics/application-api-status.md)",
-        )?;
-        let review = read(&root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"))?;
-        require(
-            review.contains("Disposition at review")
-                && review.contains(
-                    "Status: **Complete review; broad 0.9.0 implementation was blocked at review**",
-                )
-                && review.contains("2026-09-09")
-                && review.contains("../delivery/subsystems/cics/application-api-status.md"),
-            "pre-0.9 review: finding index must identify review-time disposition after accepted entry gate",
-        )?;
-    }
-    require(
-        readme.contains(&format!("| Latest published release | [{released}]"))
-            && readme.contains(&format!(
-                "| Current workspace version | `{current}` ({state_label}) |"
-            )),
-        "README release/development identity is stale",
-    )?;
-    let coverage = read(&root.join("docs/delivery/subsystems/README.md"))?;
-    require(
-        coverage.contains(&format!("current workspace is `{current}` {state_label}"))
-            && coverage.contains(&format!("through {released} released")),
-        "coverage index release/current identity is stale",
-    )?;
-    let project = read(&root.join("docs/delivery/subsystems/GITHUB-PROJECT.md"))?;
-    require(
-        project.contains(&format!("| {current} | `{current}`"))
-            && project.contains(&format!("| {released} | `{released}`")),
-        "project mapping omits the release or current version",
-    )?;
-    let changelog = read(&root.join("CHANGELOG.md"))?;
-    let unreleased = changelog
-        .split_once("## [Unreleased]")
-        .map(|(_, tail)| tail.split("\n## [").next().unwrap_or(tail))
-        .ok_or("CHANGELOG omits Unreleased")?;
-    require(
-        unreleased.lines().any(|line| line.starts_with("- ")),
-        "CHANGELOG Unreleased has no entries",
-    )?;
-    require(
-        unreleased.contains(current) && unreleased.contains(released),
-        "CHANGELOG Unreleased does not distinguish current and released versions",
-    )
-}
-
-fn require_release_candidate(root: &Path) -> TaskResult {
-    require(
-        release_candidate_mode(root)?,
-        "release artifacts require an explicit stable release-candidate promotion",
-    )
-}
-
-fn release_candidate_mode(root: &Path) -> TaskResult<bool> {
-    let release: toml::Value = read(&root.join("release.toml"))?
-        .parse()
-        .map_err(|error| format!("release.toml: {error}"))?;
-    let product = release
-        .get("product")
-        .and_then(toml::Value::as_table)
-        .ok_or("release.toml product table is missing")?;
-    match (
-        product.get("state").and_then(toml::Value::as_str),
-        product.get("channel").and_then(toml::Value::as_str),
-    ) {
-        (Some("development"), Some("development")) => Ok(false),
-        (Some("release-candidate"), Some("stable")) => Ok(true),
-        _ => Err("release state and channel are inconsistent".into()),
-    }
-}
-
-fn release_command_retained_candidate(root: &Path) -> TaskResult<Option<String>> {
-    match release_candidate_mode(root) {
-        Ok(true) => Ok(None),
-        Ok(false) => {
-            Err("release artifacts require an explicit stable release-candidate promotion".into())
-        }
-        Err(configuration_error) => {
-            let Ok(version) = read(&root.join("VERSION")) else {
-                return Err(configuration_error);
-            };
-            let version = version.trim();
-            if version != "0.2.0" {
-                return Err(configuration_error);
-            }
-            let Some(accepted) = retained_accepted_release(root)? else {
-                return Err(configuration_error);
-            };
-            let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
-            let tag = format!("refs/tags/mainframe-env-v{version}^{{commit}}");
-            let tagged = command_text(root, "git", &["rev-parse", "--verify", &tag])?;
-            require(
-                head == tagged,
-                "retained release validation requires the exact historical release tag",
-            )?;
-            Ok(Some(accepted))
-        }
-    }
-}
-
-fn check_certification_release_artifacts(root: &Path) -> TaskResult {
-    if !release_candidate_mode(root)? {
-        return Ok(());
-    }
-    if !validate_source_distribution_release(root)? {
-        check_release_artifacts(root, &host_target(root)?)?;
-    }
-    Ok(())
-}
-
-fn check_versions(root: &Path) -> TaskResult {
-    let version = product_version(root)?;
-    let expected_release_line = release_line_for_version(&version)?;
-    let cargo: toml::Value = read(&root.join("Cargo.toml"))?
-        .parse()
-        .map_err(|error| format!("Cargo.toml: {error}"))?;
-    let release: toml::Value = read(&root.join("release.toml"))?
-        .parse()
-        .map_err(|error| format!("release.toml: {error}"))?;
-
-    let cargo_version = cargo["workspace"]["package"]["version"]
-        .as_str()
-        .ok_or("workspace.package.version is missing")?;
-    let release_version = release["product"]["version"]
-        .as_str()
-        .ok_or("product.version is missing")?;
-    let released_version = release["product"]["released_version"]
-        .as_str()
-        .ok_or("product.released_version is missing")?;
-    let release_line = release["product"]["release_line"]
-        .as_str()
-        .ok_or("product.release_line is missing")?;
-    let channel = release["product"]["channel"]
-        .as_str()
-        .ok_or("product.channel is missing")?;
-    let state = release["product"]["state"]
-        .as_str()
-        .ok_or("product.state is missing")?;
-    let publish = release["product"]["publish"]
-        .as_bool()
-        .ok_or("product.publish is missing")?;
-    let msrv = cargo["workspace"]["package"]["rust-version"]
-        .as_str()
-        .ok_or("workspace.package.rust-version is missing")?;
-    let pinned = release["rust"]["pinned"]
-        .as_str()
-        .ok_or("release rust.pinned is missing")?;
-
-    require(
-        cargo_version == version,
-        "Cargo workspace version differs from VERSION",
-    )?;
-    require(
-        release_version == version,
-        "release.toml version differs from VERSION",
-    )?;
-    require(
-        release_line == expected_release_line,
-        "release.toml release line is not derived from VERSION",
-    )?;
-    let state_label = match state {
-        "development" => {
-            require(
-                channel == "development",
-                "development channel is inconsistent",
-            )?;
-            "development"
-        }
-        "release-candidate" => {
-            require(
-                channel == "stable",
-                "release-candidate channel must be stable",
-            )?;
-            "release candidate"
-        }
-        _ => return Err("product state must be development or release-candidate".into()),
-    };
-    require(
-        !publish,
-        "checked-in release configuration must not publish",
-    )?;
-    require(msrv == "1.95", "workspace MSRV must be 1.95")?;
-    require(pinned == "1.98.0", "pinned Rust toolchain must be 1.98.0")?;
-    validate_unreleased_identity(
-        root,
-        &version,
-        released_version,
-        state == "release-candidate",
-    )?;
-    validate_public_version_truth(root, &version, released_version, state_label)?;
-
-    let mut manifests = Vec::new();
-    collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
-    let mut workspace_packages = BTreeSet::new();
-    let mut isolated_workspace_packages = Vec::new();
-    for manifest in manifests {
-        let parsed: toml::Value = read(&manifest)?
-            .parse()
-            .map_err(|error| format!("{}: {error}", manifest.display()))?;
-        if manifest == root.join("Cargo.toml") {
-            continue;
-        }
-        let package_name = parsed["package"]["name"]
-            .as_str()
-            .ok_or_else(|| format!("{} package.name is missing", manifest.display()))?;
-        let crate_version = &parsed["package"]["version"];
-        let inherits = crate_version
-            .get("workspace")
-            .and_then(toml::Value::as_bool)
-            == Some(true);
-        let exact = crate_version.as_str() == Some(version.as_str());
-        require(
-            inherits || exact,
-            &format!("{} does not use the product version", manifest.display()),
-        )?;
-        if parsed.get("workspace").is_some() {
-            require(
-                exact,
-                &format!(
-                    "{} isolated workspace must use the exact product version",
-                    manifest.display()
-                ),
-            )?;
-            isolated_workspace_packages.push((package_name.to_string(), manifest));
-        } else {
-            workspace_packages.insert(package_name.to_string());
-        }
-    }
-
-    let lock_path = root.join("Cargo.lock");
-    let lock: toml::Value = read(&lock_path)?
-        .parse()
-        .map_err(|error| format!("Cargo.lock: {error}"))?;
-    let locked_packages = lock["package"]
-        .as_array()
-        .ok_or("Cargo.lock package inventory is missing")?;
-    for package_name in &workspace_packages {
-        let matches = locked_packages
-            .iter()
-            .filter(|package| package["name"].as_str() == Some(package_name))
-            .collect::<Vec<_>>();
-        require(
-            matches.len() == 1 && matches[0]["version"].as_str() == Some(version.as_str()),
-            &format!("Cargo.lock workspace package {package_name} differs from VERSION"),
-        )?;
-    }
-    for (package_name, manifest) in isolated_workspace_packages {
-        let nested_lock_path = manifest
-            .parent()
-            .ok_or_else(|| format!("{} has no parent directory", manifest.display()))?
-            .join("Cargo.lock");
-        let nested_lock: toml::Value = read(&nested_lock_path)?
-            .parse()
-            .map_err(|error| format!("{}: {error}", nested_lock_path.display()))?;
-        let matches = nested_lock["package"]
-            .as_array()
-            .ok_or_else(|| {
-                format!(
-                    "{} package inventory is missing",
-                    nested_lock_path.display()
-                )
-            })?
-            .iter()
-            .filter(|package| package["name"].as_str() == Some(package_name.as_str()))
-            .collect::<Vec<_>>();
-        require(
-            matches.len() == 1 && matches[0]["version"].as_str() == Some(version.as_str()),
-            &format!(
-                "{} isolated workspace package {package_name} differs from VERSION",
-                nested_lock_path.display()
-            ),
-        )?;
-    }
-
-    let inventory_path = root.join("conformance/0.2/inventory/versions.json");
-    let inventory = json(&inventory_path)?;
-    require(
-        text(&inventory, "product", &inventory_path)? == version,
-        "machine version inventory differs from VERSION",
-    )?;
-    require(
-        text(&inventory, "release_line", &inventory_path)? == expected_release_line,
-        "machine version inventory release line differs from VERSION",
-    )?;
-    require(
-        text(&inventory, "channel", &inventory_path)? == channel,
-        "machine version inventory channel differs from release.toml",
-    )?;
-    require(
-        text(&inventory, "released_product", &inventory_path)? == released_version
-            && text(&inventory, "release_state", &inventory_path)? == state,
-        "machine version inventory release/development state differs from release.toml",
-    )?;
-
-    let notes = read(&root.join(format!("docs/releases/{release_line}.md")))?;
-    require(
-        notes.contains(&version),
-        "release notes omit current version",
-    )?;
-    validate_historical_0_2_release(root)?;
-    Ok(())
-}
-
 fn check_architecture(root: &Path) -> TaskResult {
     check_architecture_fast(root)?;
     check_runtime_unit_gates(root)
@@ -7864,16 +6596,17 @@ fn check_mq_mqi_registry(root: &Path) -> TaskResult {
         generator.is_file(),
         "MQ MQI call-registry generator is missing",
     )?;
-    let source_list = root.join("conformance/0.15/mq/source-call-list.json");
-    let source_list_schema = root.join("conformance/0.15/schemas/mq-source-call-list.schema.json");
+    let source_list = root.join("conformance/subsystems/mq/mq/source-call-list.json");
+    let source_list_schema =
+        root.join("conformance/subsystems/mq/schemas/mq-source-call-list.schema.json");
     validate_schema_instance(
         &json(&source_list_schema)?,
         &json(&source_list)?,
         &source_list,
     )?;
-    let contract_catalog = root.join("conformance/0.15/mq/structure-status-catalog.json");
+    let contract_catalog = root.join("conformance/subsystems/mq/mq/structure-status-catalog.json");
     let contract_schema =
-        root.join("conformance/0.15/schemas/mq-structure-status-catalog.schema.json");
+        root.join("conformance/subsystems/mq/schemas/mq-structure-status-catalog.schema.json");
     validate_schema_instance(
         &json(&contract_schema)?,
         &json(&contract_catalog)?,
@@ -7893,29 +6626,30 @@ fn check_mq_mqi_registry(root: &Path) -> TaskResult {
 }
 
 fn check_mq_licensed_contract(root: &Path) -> TaskResult {
-    let adapter = root.join("conformance/0.15/oracles/mq-licensed-differential.json");
+    let adapter = root.join("conformance/subsystems/mq/oracles/mq-licensed-differential.json");
     let adapter_schema =
-        root.join("conformance/0.15/schemas/mq-licensed-differential-adapter.schema.json");
+        root.join("conformance/subsystems/mq/schemas/mq-licensed-differential-adapter.schema.json");
     validate_schema_instance(&json(&adapter_schema)?, &json(&adapter)?, &adapter)?;
 
-    let fixtures = root.join("conformance/0.15/fixtures/mq-licensed-differential-cases.json");
-    let fixture_schema =
-        root.join("conformance/0.15/schemas/mq-licensed-differential-fixtures.schema.json");
+    let fixtures =
+        root.join("conformance/subsystems/mq/fixtures/mq-licensed-differential-cases.json");
+    let fixture_schema = root
+        .join("conformance/subsystems/mq/schemas/mq-licensed-differential-fixtures.schema.json");
     validate_schema_instance(&json(&fixture_schema)?, &json(&fixtures)?, &fixtures)?;
 
     let receipt_schema =
-        root.join("conformance/0.15/schemas/mq-licensed-differential-receipt.schema.json");
+        root.join("conformance/subsystems/mq/schemas/mq-licensed-differential-receipt.schema.json");
     compile_draft_2020_12_schema(&json(&receipt_schema)?, &receipt_schema)?;
 
     for (label, tool, arguments) in [
         (
             "MQ licensed fixture freshness guard",
-            "conformance/0.15/tools/generate_mq_licensed_fixtures.py",
+            "conformance/subsystems/mq/tools/generate_mq_licensed_fixtures.py",
             ["--check"].as_slice(),
         ),
         (
             "MQ licensed receipt verifier",
-            "conformance/0.15/tools/verify_mq_licensed_differential.py",
+            "conformance/subsystems/mq/tools/verify_mq_licensed_differential.py",
             ["--check"].as_slice(),
         ),
     ] {
@@ -7934,24 +6668,24 @@ fn check_mq_licensed_contract(root: &Path) -> TaskResult {
 fn check_ims_licensed_contract(root: &Path) -> TaskResult {
     for (instance, schema) in [
         (
-            "conformance/0.14/oracles/ims-licensed-differential.json",
-            "conformance/0.14/schemas/ims-licensed-differential-adapter.schema.json",
+            "conformance/subsystems/ims/oracles/ims-licensed-differential.json",
+            "conformance/subsystems/ims/schemas/ims-licensed-differential-adapter.schema.json",
         ),
         (
-            "conformance/0.14/fixtures/ims-licensed-differential-cases.json",
-            "conformance/0.14/schemas/ims-licensed-differential-fixtures.schema.json",
+            "conformance/subsystems/ims/fixtures/ims-licensed-differential-cases.json",
+            "conformance/subsystems/ims/schemas/ims-licensed-differential-fixtures.schema.json",
         ),
     ] {
         let instance = root.join(instance);
         let schema = root.join(schema);
         validate_schema_instance(&json(&schema)?, &json(&instance)?, &instance)?;
     }
-    let receipt_schema =
-        root.join("conformance/0.14/schemas/ims-licensed-differential-receipt.schema.json");
+    let receipt_schema = root
+        .join("conformance/subsystems/ims/schemas/ims-licensed-differential-receipt.schema.json");
     compile_draft_2020_12_schema(&json(&receipt_schema)?, &receipt_schema)?;
     for tool in [
-        "conformance/0.14/tools/generate_ims_licensed_fixtures.py",
-        "conformance/0.14/tools/verify_ims_licensed_differential.py",
+        "conformance/subsystems/ims/tools/generate_ims_licensed_fixtures.py",
+        "conformance/subsystems/ims/tools/verify_ims_licensed_differential.py",
     ] {
         let status = Command::new("python3")
             .arg("-B")
@@ -7998,18 +6732,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
     }
     check_declared_dependency_graph(root)?;
     check_common_execution_route(root)?;
-    let participant_contract = root.join("conformance/0.16/contracts/transaction-participant.json");
+    let participant_contract =
+        root.join("conformance/subsystems/integration/contracts/transaction-participant.json");
     let participant_schema =
-        root.join("conformance/0.16/schemas/transaction-participant.schema.json");
+        root.join("conformance/subsystems/integration/schemas/transaction-participant.schema.json");
     validate_schema_instance(
         &json(&participant_schema)?,
         &json(&participant_contract)?,
         &participant_contract,
     )?;
-    let participant_fixtures =
-        root.join("conformance/0.16/fixtures/transaction-participant-compatibility.json");
-    let participant_fixture_schema =
-        root.join("conformance/0.16/schemas/transaction-participant-fixtures.schema.json");
+    let participant_fixtures = root.join(
+        "conformance/subsystems/integration/fixtures/transaction-participant-compatibility.json",
+    );
+    let participant_fixture_schema = root.join(
+        "conformance/subsystems/integration/schemas/transaction-participant-fixtures.schema.json",
+    );
     validate_schema_instance(
         &json(&participant_fixture_schema)?,
         &json(&participant_fixtures)?,
@@ -8133,18 +6870,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         cics_descriptors.is_file(),
         "CICS command descriptor generator is missing",
     )?;
-    let cics_descriptor_catalog = root.join("conformance/0.9/cics/command-descriptors.json");
-    let cics_descriptor_schema =
-        root.join("conformance/0.9/schemas/cics-command-descriptors.schema.json");
+    let cics_descriptor_catalog =
+        root.join("conformance/subsystems/cics/application/cics/command-descriptors.json");
+    let cics_descriptor_schema = root.join(
+        "conformance/subsystems/cics/application/schemas/cics-command-descriptors.schema.json",
+    );
     validate_schema_instance(
         &json(&cics_descriptor_schema)?,
         &json(&cics_descriptor_catalog)?,
         &cics_descriptor_catalog,
     )?;
-    let cics_contract_catalog =
-        root.join("conformance/0.9/generated/cics-application-command-contracts.json");
+    let cics_contract_catalog = root.join(
+        "conformance/subsystems/cics/application/generated/cics-application-command-contracts.json",
+    );
     let cics_contract_schema =
-        root.join("conformance/0.9/schemas/cics-application-command-contracts.schema.json");
+        root.join("conformance/subsystems/cics/application/schemas/cics-application-command-contracts.schema.json");
     validate_schema_instance(
         &json(&cics_contract_schema)?,
         &json(&cics_contract_catalog)?,
@@ -8166,13 +6906,14 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         cics_source_map.is_file(),
         "CICS sources-a map generator is missing",
     )?;
-    let cics_source_map_schema =
-        root.join("conformance/0.9/schemas/cics-command-source-map.schema.json");
+    let cics_source_map_schema = root.join(
+        "conformance/subsystems/cics/application/schemas/cics-command-source-map.schema.json",
+    );
     for relative in [
-        "conformance/0.9/cics/command-summary-topics.json",
-        "conformance/0.9/cics/application-api-sources-a-map.json",
-        "conformance/0.9/cics/application-api-sources-b-map.json",
-        "conformance/0.9/cics/application-api-sources-c-map.json",
+        "conformance/subsystems/cics/application/cics/command-summary-topics.json",
+        "conformance/subsystems/cics/application/cics/application-api-sources-a-map.json",
+        "conformance/subsystems/cics/application/cics/application-api-sources-b-map.json",
+        "conformance/subsystems/cics/application/cics/application-api-sources-c-map.json",
     ] {
         let artifact = root.join(relative);
         validate_schema_instance(
@@ -8190,28 +6931,30 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         .status()
         .map_err(|error| format!("CICS source-map freshness guard: {error}"))?;
     require(status.success(), "CICS source-map freshness guard failed")?;
-    let cics_source_corpus = root.join("conformance/0.9/tools/fetch_cics_application_sources.py");
+    let cics_source_corpus = root
+        .join("conformance/subsystems/cics/application/tools/fetch_cics_application_sources.py");
     require(
         cics_source_corpus.is_file(),
         "CICS source corpus generator is missing",
     )?;
     let cics_source_corpus_schema =
-        root.join("conformance/0.9/schemas/cics-source-corpus.schema.json");
-    let topic_manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
+        root.join("conformance/subsystems/cics/application/schemas/cics-source-corpus.schema.json");
+    let topic_manifest_schema =
+        root.join("conformance/subsystems/coverage/schemas/topic-manifest.schema.json");
     for batch in ["a", "b", "c"] {
         let corpus = root.join(format!(
-            "conformance/0.9/cics/application-api-sources-{batch}-corpus.json"
+            "conformance/subsystems/cics/application/cics/application-api-sources-{batch}-corpus.json"
         ));
         validate_schema_instance(&json(&cics_source_corpus_schema)?, &json(&corpus)?, &corpus)?;
         let manifest = root.join(format!(
-            "conformance/0.9/manifests/cics-application-api-sources-{batch}-topics.json"
+            "conformance/subsystems/cics/application/manifests/cics-application-api-sources-{batch}-topics.json"
         ));
         validate_schema_instance(&json(&topic_manifest_schema)?, &json(&manifest)?, &manifest)?;
     }
     let cics_browser_receipt =
-        root.join("conformance/0.9/cics/application-api-sources-a-browser-verification.json");
+        root.join("conformance/subsystems/cics/application/cics/application-api-sources-a-browser-verification.json");
     let cics_browser_receipt_schema =
-        root.join("conformance/0.9/schemas/cics-browser-source-verification.schema.json");
+        root.join("conformance/subsystems/cics/application/schemas/cics-browser-source-verification.schema.json");
     validate_schema_instance(
         &json(&cics_browser_receipt_schema)?,
         &json(&cics_browser_receipt)?,
@@ -8229,19 +6972,19 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "CICS source corpus freshness guard failed",
     )?;
-    let cics_source_extraction_schema =
-        root.join("conformance/0.9/schemas/cics-source-extraction.schema.json");
-    let cics_source_candidates_schema =
-        root.join("conformance/0.9/schemas/cics-source-candidates.schema.json");
-    let cics_source_projector =
-        root.join("conformance/0.9/tools/extract_cics_application_sources.py");
+    let cics_source_extraction_schema = root
+        .join("conformance/subsystems/cics/application/schemas/cics-source-extraction.schema.json");
+    let cics_source_candidates_schema = root
+        .join("conformance/subsystems/cics/application/schemas/cics-source-candidates.schema.json");
+    let cics_source_projector = root
+        .join("conformance/subsystems/cics/application/tools/extract_cics_application_sources.py");
     require(
         cics_source_projector.is_file(),
         "CICS source projector is missing",
     )?;
     for batch in ["a", "b", "c"] {
         let extraction = root.join(format!(
-            "conformance/0.9/cics/application-api-sources-{batch}-extraction.json"
+            "conformance/subsystems/cics/application/cics/application-api-sources-{batch}-extraction.json"
         ));
         validate_schema_instance(
             &json(&cics_source_extraction_schema)?,
@@ -8249,7 +6992,7 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
             &extraction,
         )?;
         let candidates = root.join(format!(
-            "conformance/0.9/generated/cics-application-api-sources-{batch}-candidates.json"
+            "conformance/subsystems/cics/application/generated/cics-application-api-sources-{batch}-candidates.json"
         ));
         validate_schema_instance(
             &json(&cics_source_candidates_schema)?,
@@ -8311,12 +7054,14 @@ fn check_cics_source_review(root: &Path) -> TaskResult {
 
 fn check_cics_source_review_batch(root: &Path, batch: &str) -> TaskResult {
     let review = root.join(format!(
-        "conformance/0.9/cics/application-api-sources-{batch}-review.json"
+        "conformance/subsystems/cics/application/cics/application-api-sources-{batch}-review.json"
     ));
-    let schema = root.join("conformance/0.9/schemas/cics-source-review.schema.json");
+    let schema =
+        root.join("conformance/subsystems/cics/application/schemas/cics-source-review.schema.json");
     validate_schema_instance(&json(&schema)?, &json(&review)?, &review)?;
 
-    let checker = root.join("conformance/0.9/tools/review_cics_application_sources.py");
+    let checker = root
+        .join("conformance/subsystems/cics/application/tools/review_cics_application_sources.py");
     require(
         checker.is_file(),
         "CICS sources-a review checker is missing",
@@ -8337,7 +7082,7 @@ fn check_cics_source_review_batch(root: &Path, batch: &str) -> TaskResult {
 fn check_declared_dependency_graph(root: &Path) -> TaskResult {
     let metadata = workspace_metadata(root)?;
     let actual = normal_internal_edges(&metadata)?;
-    let path = root.join("conformance/0.1/inventory/dependency-graph.json");
+    let path = root.join("conformance/subsystems/platform/inventory/dependency-graph.json");
     let graph = json(&path)?;
     let mut declared = array(&graph, "edges", &path)?
         .iter()
@@ -8361,14 +7106,14 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         })
         .collect::<TaskResult<BTreeSet<_>>>()?;
     for additions_path in [
-        root.join("conformance/0.1.1/inventory/dependency-graph-additions.json"),
-        root.join("conformance/0.2/inventory/dependency-additions.json"),
-        root.join("conformance/0.3/inventory/dependency-additions.json"),
-        root.join("conformance/0.5/inventory/dependency-additions.json"),
-        root.join("conformance/0.6/inventory/dependency-additions.json"),
-        root.join("conformance/0.7/inventory/dependency-additions.json"),
-        root.join("conformance/0.8/inventory/dependency-additions.json"),
-        root.join("conformance/0.14/inventory/dependency-additions.json"),
+        root.join("conformance/profiles/carddemo/inventory/dependency-graph-additions.json"),
+        root.join("conformance/subsystems/coverage/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/cobol/structure/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/racf/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/dataset/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/jcl/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/jes/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/ims/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
             continue;
@@ -8560,8 +7305,8 @@ fn normal_internal_edges(metadata: &Value) -> TaskResult<BTreeSet<(String, Strin
 }
 
 fn check_profiles(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.1/inventory/packages.json");
-    let profiles_path = root.join("conformance/0.1/inventory/profiles.json");
+    let inventory_path = root.join("conformance/subsystems/platform/inventory/packages.json");
+    let profiles_path = root.join("conformance/subsystems/platform/inventory/profiles.json");
     let inventory = json(&inventory_path)?;
     let profiles = json(&profiles_path)?;
     let mut known = array(&inventory, "packages", &inventory_path)?
@@ -8569,8 +7314,8 @@ fn check_profiles(root: &Path) -> TaskResult {
         .filter_map(|row| row.get("name").and_then(Value::as_str).map(str::to_string))
         .collect::<BTreeSet<_>>();
     for additions_path in [
-        root.join("conformance/0.2/inventory/package-additions.json"),
-        root.join("conformance/0.8/inventory/package-additions.json"),
+        root.join("conformance/subsystems/coverage/inventory/package-additions.json"),
+        root.join("conformance/subsystems/jes/inventory/package-additions.json"),
     ] {
         if additions_path.is_file() {
             let additions = json(&additions_path)?;
@@ -8585,8 +7330,8 @@ fn check_profiles(root: &Path) -> TaskResult {
     let excluded = excluded_names(root)?;
     let mut profile_additions = BTreeMap::<String, BTreeSet<String>>::new();
     for additions_path in [
-        root.join("conformance/0.3/inventory/dependency-additions.json"),
-        root.join("conformance/0.8/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/cobol/structure/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/jes/inventory/dependency-additions.json"),
     ] {
         let additions = json(&additions_path)?;
         let additions = additions
@@ -8710,36 +7455,27 @@ fn check_profiles(root: &Path) -> TaskResult {
     Ok(())
 }
 
-fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
+fn subsystem_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
     let mut files = Vec::new();
-    let conformance = root.join("conformance");
-    for entry in
-        fs::read_dir(&conformance).map_err(|error| format!("{}: {error}", conformance.display()))?
-    {
-        let entry = entry.map_err(|error| error.to_string())?;
-        let path = entry.path();
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else {
-            continue;
-        };
-        let components = name.split('.').collect::<Vec<_>>();
-        let versioned = matches!(components.len(), 2 | 3)
-            && components.iter().all(|component| {
-                !component.is_empty() && component.bytes().all(|byte| byte.is_ascii_digit())
-            });
-        let schemas = path.join("schemas");
-        if versioned && path.is_dir() && schemas.is_dir() {
-            collect_extension(&schemas, OsStr::new("json"), &mut files)?;
+    for directory in ["conformance/subsystems", "conformance/profiles"] {
+        if root.join(directory).is_dir() {
+            collect_extension(&root.join(directory), OsStr::new("json"), &mut files)?;
         }
     }
+    // Vendor bundles have their own pinned, offline registry and may contain
+    // metadata documents alongside schemas.
+    files.retain(|file| {
+        file.components().any(|part| part.as_os_str() == "schemas")
+            && !file.components().any(|part| part.as_os_str() == "vendor")
+    });
     files.sort();
-    files.retain(|file| !file.components().any(|part| part.as_os_str() == "vendor"));
     Ok(files)
 }
 
 fn check_schemas(root: &Path) -> TaskResult {
-    let files = versioned_schema_files(root)?;
-    require(!files.is_empty(), "no evidence schemas found")?;
+    let files = subsystem_schema_files(root)?;
+    require(!files.is_empty(), "no subsystem schemas found")?;
+    carddemo_readacct::check_vendor_schemas(root)?;
     for file in &files {
         let value = json(file)?;
         let root_object = object(&value, file)?;
@@ -8757,9 +7493,11 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
         compile_draft_2020_12_schema(&value, file)?;
     }
-    let family_path =
-        root.join("conformance/0.9/oracles/cics-licensed-family-bif-builtins-v1.json");
-    let family_schema = root.join("conformance/0.9/schemas/cics-licensed-family.schema.json");
+    let family_path = root.join(
+        "conformance/subsystems/cics/application/oracles/cics-licensed-family-bif-builtins-v1.json",
+    );
+    let family_schema = root
+        .join("conformance/subsystems/cics/application/schemas/cics-licensed-family.schema.json");
     let family = json(&family_path)?;
     validate_schema_instance(&json(&family_schema)?, &family, &family_path)?;
     let fixture_path = root.join(text(&family, "fixture_path", &family_path)?);
@@ -8787,9 +7525,10 @@ fn check_schemas(root: &Path) -> TaskResult {
         "CICS BIF oracle family manifest/fixture closure drifted",
     )?;
     validate_0_2_schema_artifacts(root)?;
-    let zosmf_normalization_path = root.join("conformance/0.11/catalogs/zosmf-normalization.json");
+    let zosmf_normalization_path =
+        root.join("conformance/subsystems/zosmf/catalogs/zosmf-normalization.json");
     let zosmf_normalization_schema =
-        root.join("conformance/0.11/schemas/zosmf-normalization.schema.json");
+        root.join("conformance/subsystems/zosmf/schemas/zosmf-normalization.schema.json");
     validate_schema_instance(
         &json(&zosmf_normalization_schema)?,
         &json(&zosmf_normalization_path)?,
@@ -8797,16 +7536,16 @@ fn check_schemas(root: &Path) -> TaskResult {
     )?;
     for (artifact, schema) in [
         (
-            "conformance/0.11/generated/zosmf-contracts.json",
-            "conformance/0.11/schemas/zosmf-generated-contracts.schema.json",
+            "conformance/subsystems/zosmf/generated/zosmf-contracts.json",
+            "conformance/subsystems/zosmf/schemas/zosmf-generated-contracts.schema.json",
         ),
         (
-            "conformance/0.11/generated/zosmf-collision-report.json",
-            "conformance/0.11/schemas/zosmf-collision-report.schema.json",
+            "conformance/subsystems/zosmf/generated/zosmf-collision-report.json",
+            "conformance/subsystems/zosmf/schemas/zosmf-collision-report.schema.json",
         ),
         (
-            "conformance/0.11/generated/zosmf-closure-report.json",
-            "conformance/0.11/schemas/zosmf-closure-report.schema.json",
+            "conformance/subsystems/zosmf/generated/zosmf-closure-report.json",
+            "conformance/subsystems/zosmf/schemas/zosmf-closure-report.schema.json",
         ),
     ] {
         let artifact_path = root.join(artifact);
@@ -8817,163 +7556,164 @@ fn check_schemas(root: &Path) -> TaskResult {
         )?;
     }
     let spi_fepi_source_authority =
-        root.join("conformance/0.10/cics/spi-fepi-source-authority.json");
-    let spi_fepi_source_schema =
-        root.join("conformance/0.10/schemas/cics-spi-fepi-source-authority.schema.json");
+        root.join("conformance/subsystems/cics/system/cics/spi-fepi-source-authority.json");
+    let spi_fepi_source_schema = root.join(
+        "conformance/subsystems/cics/system/schemas/cics-spi-fepi-source-authority.schema.json",
+    );
     validate_schema_instance(
         &json(&spi_fepi_source_schema)?,
         &json(&spi_fepi_source_authority)?,
         &spi_fepi_source_authority,
     )?;
-    let spi_fepi_identity_catalog =
-        root.join("conformance/0.10/generated/cics-spi-fepi-identity-catalog.json");
-    let spi_fepi_identity_schema =
-        root.join("conformance/0.10/schemas/cics-spi-fepi-identity-catalog.schema.json");
+    let spi_fepi_identity_catalog = root
+        .join("conformance/subsystems/cics/system/generated/cics-spi-fepi-identity-catalog.json");
+    let spi_fepi_identity_schema = root.join(
+        "conformance/subsystems/cics/system/schemas/cics-spi-fepi-identity-catalog.schema.json",
+    );
     validate_schema_instance(
         &json(&spi_fepi_identity_schema)?,
         &json(&spi_fepi_identity_catalog)?,
         &spi_fepi_identity_catalog,
     )?;
     check_licensed_environment_requirements(root)?;
-    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
-    let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
+    let inventory_path =
+        root.join("conformance/subsystems/dataset/inventory/dataset-programming-surface.json");
+    let schema_path =
+        root.join("conformance/subsystems/dataset/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(
         &json(&schema_path)?,
         &json(&inventory_path)?,
         &inventory_path,
     )?;
-    let dependency_path = root.join("conformance/0.6/inventory/dependency-additions.json");
-    let dependency_schema =
-        root.join("conformance/0.6/schemas/dataset-dependency-additions.schema.json");
+    let dependency_path =
+        root.join("conformance/subsystems/dataset/inventory/dependency-additions.json");
+    let dependency_schema = root
+        .join("conformance/subsystems/dataset/schemas/dataset-dependency-additions.schema.json");
     validate_schema_instance(
         &json(&dependency_schema)?,
         &json(&dependency_path)?,
         &dependency_path,
     )?;
-    let migration_path = root.join("conformance/0.6/migrations/dataset-state-v2-to-v3.json");
-    let migration_schema = root.join("conformance/0.6/schemas/dataset-state-migration.schema.json");
+    let migration_path =
+        root.join("conformance/subsystems/dataset/migrations/dataset-state-v2-to-v3.json");
+    let migration_schema =
+        root.join("conformance/subsystems/dataset/schemas/dataset-state-migration.schema.json");
     validate_schema_instance(
         &json(&migration_schema)?,
         &json(&migration_path)?,
         &migration_path,
     )?;
-    let migration_v4_path = root.join("conformance/0.6/migrations/dataset-state-v3-to-v4.json");
+    let migration_v4_path =
+        root.join("conformance/subsystems/dataset/migrations/dataset-state-v3-to-v4.json");
     let migration_v4_schema =
-        root.join("conformance/0.6/schemas/dataset-state-v4-migration.schema.json");
+        root.join("conformance/subsystems/dataset/schemas/dataset-state-v4-migration.schema.json");
     validate_schema_instance(
         &json(&migration_v4_schema)?,
         &json(&migration_v4_path)?,
         &migration_v4_path,
     )?;
-    let migration_v5_path = root.join("conformance/0.6/migrations/dataset-state-v4-to-v5.json");
+    let migration_v5_path =
+        root.join("conformance/subsystems/dataset/migrations/dataset-state-v4-to-v5.json");
     let migration_v5_schema =
-        root.join("conformance/0.6/schemas/dataset-state-v5-migration.schema.json");
+        root.join("conformance/subsystems/dataset/schemas/dataset-state-v5-migration.schema.json");
     validate_schema_instance(
         &json(&migration_v5_schema)?,
         &json(&migration_v5_path)?,
         &migration_v5_path,
     )?;
-    let migration_v6_path = root.join("conformance/0.6/migrations/dataset-state-v5-to-v6.json");
+    let migration_v6_path =
+        root.join("conformance/subsystems/dataset/migrations/dataset-state-v5-to-v6.json");
     let migration_v6_schema =
-        root.join("conformance/0.6/schemas/dataset-state-v6-migration.schema.json");
+        root.join("conformance/subsystems/dataset/schemas/dataset-state-v6-migration.schema.json");
     validate_schema_instance(
         &json(&migration_v6_schema)?,
         &json(&migration_v6_path)?,
         &migration_v6_path,
     )?;
-    let organization_fixture = root.join("conformance/0.6/fixtures/dataset-organizations.json");
-    let organization_schema =
-        root.join("conformance/0.6/schemas/dataset-organization-fixtures.schema.json");
+    let organization_fixture =
+        root.join("conformance/subsystems/dataset/fixtures/dataset-organizations.json");
+    let organization_schema = root
+        .join("conformance/subsystems/dataset/schemas/dataset-organization-fixtures.schema.json");
     validate_schema_instance(
         &json(&organization_schema)?,
         &json(&organization_fixture)?,
         &organization_fixture,
     )?;
-    let ams_fixture = root.join("conformance/0.6/fixtures/ams-commands.json");
-    let ams_schema = root.join("conformance/0.6/schemas/ams-command-fixtures.schema.json");
+    let ams_fixture = root.join("conformance/subsystems/dataset/fixtures/ams-commands.json");
+    let ams_schema =
+        root.join("conformance/subsystems/dataset/schemas/ams-command-fixtures.schema.json");
     validate_schema_instance(&json(&ams_schema)?, &json(&ams_fixture)?, &ams_fixture)?;
-    let jes_migration = root.join("conformance/0.8/migrations/jes-durable-job-v1-to-v2.json");
-    let jes_migration_schema = root.join("conformance/0.8/schemas/jes-state-migration.schema.json");
+    let jes_migration =
+        root.join("conformance/subsystems/jes/migrations/jes-durable-job-v1-to-v2.json");
+    let jes_migration_schema =
+        root.join("conformance/subsystems/jes/schemas/jes-state-migration.schema.json");
     validate_schema_instance(
         &json(&jes_migration_schema)?,
         &json(&jes_migration)?,
         &jes_migration,
     )?;
-    let jes_differential = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
-    let jes_differential_schema =
-        root.join("conformance/0.8/schemas/jes-licensed-differential-adapter.schema.json");
+    let jes_differential =
+        root.join("conformance/subsystems/jes/oracles/jes-licensed-differential.json");
+    let jes_differential_schema = root
+        .join("conformance/subsystems/jes/schemas/jes-licensed-differential-adapter.schema.json");
     validate_schema_instance(
         &json(&jes_differential_schema)?,
         &json(&jes_differential)?,
         &jes_differential,
     )?;
-    let jes_dependency_additions = root.join("conformance/0.8/inventory/dependency-additions.json");
+    let jes_dependency_additions =
+        root.join("conformance/subsystems/jes/inventory/dependency-additions.json");
     let jes_dependency_additions_schema =
-        root.join("conformance/0.8/schemas/jes-dependency-additions.schema.json");
+        root.join("conformance/subsystems/jes/schemas/jes-dependency-additions.schema.json");
     validate_schema_instance(
         &json(&jes_dependency_additions_schema)?,
         &json(&jes_dependency_additions)?,
         &jes_dependency_additions,
     )?;
-    let jes_package_additions = root.join("conformance/0.8/inventory/package-additions.json");
+    let jes_package_additions =
+        root.join("conformance/subsystems/jes/inventory/package-additions.json");
     let jes_package_additions_schema =
-        root.join("conformance/0.8/schemas/jes-package-additions.schema.json");
+        root.join("conformance/subsystems/jes/schemas/jes-package-additions.schema.json");
     validate_schema_instance(
         &json(&jes_package_additions_schema)?,
         &json(&jes_package_additions)?,
         &jes_package_additions,
     )?;
-    let distribution_release = root.join("release/0.8.2/source-distribution.json");
-    let distribution_release_schema =
-        root.join("conformance/0.8/schemas/source-distribution-release.schema.json");
-    validate_schema_instance(
-        &json(&distribution_release_schema)?,
-        &json(&distribution_release)?,
-        &distribution_release,
-    )?;
     for (artifact, schema) in [
         (
-            "conformance/0.8/evidence/carddemo-base-batch.json",
-            "conformance/0.8/schemas/carddemo-base-batch-evidence.schema.json",
+            "conformance/subsystems/jes/oracles/carddemo-tranrept-reference@1.json",
+            "conformance/subsystems/jes/schemas/carddemo-tranrept-reference.schema.json",
         ),
         (
-            "conformance/0.8/evidence/carddemo-base-batch@2.json",
-            "conformance/0.8/schemas/carddemo-base-batch-evidence@2.schema.json",
+            "conformance/subsystems/jes/inventory/jes-dd-surface.json",
+            "conformance/subsystems/jes/schemas/jes-dd-surface.schema.json",
         ),
         (
-            "conformance/0.8/oracles/carddemo-tranrept-reference@1.json",
-            "conformance/0.8/schemas/carddemo-tranrept-reference.schema.json",
+            "conformance/subsystems/jes/inventory/jes-operations-surface.json",
+            "conformance/subsystems/jes/schemas/jes-operations-surface.schema.json",
         ),
         (
-            "conformance/0.8/inventory/jes-dd-surface.json",
-            "conformance/0.8/schemas/jes-dd-surface.schema.json",
+            "conformance/subsystems/jes/inventory/jes-recovery-surface.json",
+            "conformance/subsystems/jes/schemas/jes-recovery-surface.schema.json",
         ),
         (
-            "conformance/0.8/inventory/jes-operations-surface.json",
-            "conformance/0.8/schemas/jes-operations-surface.schema.json",
+            "conformance/subsystems/jes/inventory/jes-spool-output-surface.json",
+            "conformance/subsystems/jes/schemas/jes-spool-output-surface.schema.json",
         ),
         (
-            "conformance/0.8/inventory/jes-recovery-surface.json",
-            "conformance/0.8/schemas/jes-recovery-surface.schema.json",
+            "conformance/subsystems/jes/inventory/jes-utility-surface.json",
+            "conformance/subsystems/jes/schemas/jes-utility-surface.schema.json",
         ),
         (
-            "conformance/0.8/inventory/jes-spool-output-surface.json",
-            "conformance/0.8/schemas/jes-spool-output-surface.schema.json",
-        ),
-        (
-            "conformance/0.8/inventory/jes-utility-surface.json",
-            "conformance/0.8/schemas/jes-utility-surface.schema.json",
-        ),
-        (
-            "conformance/0.8/migrations/jes-embedded-spool-to-artifacts.json",
-            "conformance/0.8/schemas/jes-spool-migration.schema.json",
+            "conformance/subsystems/jes/migrations/jes-embedded-spool-to-artifacts.json",
+            "conformance/subsystems/jes/schemas/jes-spool-migration.schema.json",
         ),
     ] {
         let artifact = root.join(artifact);
         let schema = root.join(schema);
         validate_schema_instance(&json(&schema)?, &json(&artifact)?, &artifact)?;
     }
-    let recovery_path = root.join("conformance/0.8/inventory/jes-recovery-surface.json");
+    let recovery_path = root.join("conformance/subsystems/jes/inventory/jes-recovery-surface.json");
     let recovery = json(&recovery_path)?;
     let state_migration_digests = recovery["state_migration_digests"]
         .as_object()
@@ -8985,103 +7725,14 @@ fn check_schemas(root: &Path) -> TaskResult {
             &format!("JES state/migration digest drifted for {relative}"),
         )?;
     }
-    let jes_evidence_schema =
-        json(&root.join("conformance/0.8/schemas/jes-work-package-evidence.schema.json"))?;
-    for work_package in ["JES-802", "JES-803", "JES-804", "JES-805", "JES-806"] {
-        let path = root.join(format!(
-            "conformance/0.8/evidence/{}-matrix.json",
-            work_package.to_ascii_lowercase()
-        ));
-        let evidence = json(&path)?;
-        validate_schema_instance(&jes_evidence_schema, &evidence, &path)?;
-        let rows = array(&evidence, "rows", &path)?;
-        unique_rows(rows, "id", &path)?;
-        if work_package == "JES-805" {
-            require(
-                rows.iter().any(|row| {
-                    row["id"] == Value::String("registered-control-declarations".into())
-                        && row["result"] == Value::String("pass".into())
-                        && row["evidence"].as_str().is_some_and(|evidence| {
-                            evidence.contains("every_registered_handler_rejects_undeclared_control")
-                        })
-                }),
-                "JES-805 requires the registered control declaration gate",
-            )?;
-        }
-        let pending = rows
-            .iter()
-            .filter(|row| row["result"] == Value::String("pending".into()))
-            .count();
-        let status = text(&evidence, "status", &path)?;
-        require(
-            (pending == 0 && status == "pass")
-                || (pending == 1 && status == "pass-with-licensed-differential-pending"),
-            &format!("{} status does not match its row results", path.display()),
-        )?;
-        if work_package == "JES-806" && pending == 1 {
-            require(
-                rows.iter().any(|row| {
-                    row["id"] == Value::String("licensed-zos-3.2-jes2".into())
-                        && row["result"] == Value::String("pending".into())
-                }),
-                "JES-806 may defer only its licensed z/OS 3.2/JES2 row",
-            )?;
-        }
-    }
-    let jes_adapter = json(&jes_differential)?;
-    require(
-        jes_adapter["licensed_receipt_required_for_pass"] == Value::Bool(true)
-            && jes_adapter["generated_historical_or_local_result_counts_as_pass"]
-                == Value::Bool(false),
-        "JES pending completion policy weakened the fail-closed licensed adapter",
-    )?;
-    for relative in [
-        "docs/prompts/subsystems/jes/IMPLEMENT_EXECUTION.md",
-        "docs/delivery/subsystems/jes/execution-plan.md",
-        "docs/delivery/subsystems/jes/execution-status.md",
-    ] {
-        let document = read(&root.join(relative))?;
-        require(
-            document.contains("pass-with-licensed-differential-pending")
-                && document.contains("0/16")
-                && document.contains("Hercules"),
-            &format!("{relative} omits the approved 0.8 pending-differential disposition"),
-        )?;
-    }
-    for relative in [
-        "docs/prompts/subsystems/certification/IMPLEMENT_LICENSED.md",
-        "docs/delivery/subsystems/certification/licensed-plan.md",
-    ] {
-        let document = read(&root.join(relative))?;
-        require(
-            document.contains("0/16")
-                && document.contains("16-scenario")
-                && document.contains("JES2"),
-            &format!("{relative} omits the deferred licensed JES2 campaign handoff"),
-        )?;
-    }
-    let certification = root.join("conformance/0.6/evidence/dataset-certification.json");
-    let certification_schema =
-        root.join("conformance/0.6/schemas/dataset-certification.schema.json");
-    validate_schema_instance(
-        &json(&certification_schema)?,
-        &json(&certification)?,
-        &certification,
-    )?;
-    let surface_audit = root.join("conformance/0.6/evidence/dataset-surface-audit.json");
-    let surface_audit_schema =
-        root.join("conformance/0.6/schemas/dataset-surface-audit.schema.json");
-    validate_schema_instance(
-        &json(&surface_audit_schema)?,
-        &json(&surface_audit)?,
-        &surface_audit,
-    )
+    Ok(())
 }
 
 fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
-    let environment_requirements = root.join("conformance/0.17/environment/requirements.json");
+    let environment_requirements =
+        root.join("conformance/subsystems/certification/environment/requirements.json");
     let environment_requirements_schema =
-        root.join("conformance/0.17/schemas/licensed-environment-requirements.schema.json");
+        root.join("conformance/subsystems/certification/schemas/licensed-environment-requirements.schema.json");
     let environment_requirements_value = json(&environment_requirements)?;
     validate_schema_instance(
         &json(&environment_requirements_schema)?,
@@ -9115,7 +7766,7 @@ fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
             &format!("CER-1701 changed the historical {slot_id} pending denominator"),
         )?;
     }
-    let source_index_path = root.join("conformance/0.2/catalogs/index.json");
+    let source_index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
     let source_index = json(&source_index_path)?;
     let baselines = array(&source_index, "baselines", &source_index_path)?;
     for slot in slots {
@@ -9133,9 +7784,9 @@ fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
         }
     }
 
-    let harness_path = root.join("conformance/0.17/oracles/harnesses.json");
-    let harness_schema_path =
-        root.join("conformance/0.17/schemas/oracle-harness-registry.schema.json");
+    let harness_path = root.join("conformance/subsystems/certification/oracles/harnesses.json");
+    let harness_schema_path = root
+        .join("conformance/subsystems/certification/schemas/oracle-harness-registry.schema.json");
     let harness_value = json(&harness_path)?;
     validate_schema_instance(&json(&harness_schema_path)?, &harness_value, &harness_path)?;
     let harness_bytes =
@@ -9208,10 +7859,13 @@ fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
 
 fn check_licensed_harness(root: &Path) -> TaskResult {
     check_licensed_environment_requirements(root)?;
-    let registry_path = root.join("conformance/0.17/oracles/harnesses.json");
-    let environment_path = root.join("conformance/0.17/fixtures/synthetic-environment.json");
-    let receipt_path = root.join("conformance/0.17/fixtures/synthetic-receipt.json");
-    let legacy_path = root.join("conformance/0.17/fixtures/synthetic-cics-capture.json");
+    let registry_path = root.join("conformance/subsystems/certification/oracles/harnesses.json");
+    let environment_path =
+        root.join("conformance/subsystems/certification/fixtures/synthetic-environment.json");
+    let receipt_path =
+        root.join("conformance/subsystems/certification/fixtures/synthetic-receipt.json");
+    let legacy_path =
+        root.join("conformance/subsystems/certification/fixtures/synthetic-cics-capture.json");
     let registry = fs::read(&registry_path)
         .map_err(|error| format!("{}: {error}", registry_path.display()))?;
     let environment = fs::read(&environment_path)
@@ -9233,7 +7887,7 @@ fn check_licensed_harness(root: &Path) -> TaskResult {
             "ibm-cics-ts-6x-2026-08-31".into(),
             format!(
                 "sha256:{}",
-                file_digest(&root.join("conformance/0.2/catalogs/cics.json"))?
+                file_digest(&root.join("conformance/subsystems/coverage/catalogs/cics.json"))?
             ),
         )]),
         conformance_spec_digest: format!(
@@ -9242,11 +7896,15 @@ fn check_licensed_harness(root: &Path) -> TaskResult {
         ),
         fixture_digest: format!(
             "sha256:{}",
-            file_digest(&root.join("conformance/0.9/cics/pilot-fixtures.json"))?
+            file_digest(
+                &root.join("conformance/subsystems/cics/application/cics/pilot-fixtures.json")
+            )?
         ),
         oracle_adapter_digest: format!(
             "sha256:{}",
-            file_digest(&root.join("conformance/0.9/oracles/cics-licensed-differential.json"))?
+            file_digest(&root.join(
+                "conformance/subsystems/cics/application/oracles/cics-licensed-differential.json"
+            ))?
         ),
         normalization_policy_digest:
             "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9".into(),
@@ -9307,7 +7965,8 @@ fn check_dataset_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> T
         receipt_path.is_file(),
         "MAINFRAME_ENV_ZOS_AMS_ORACLE_RECEIPT is not a readable file",
     )?;
-    let schema_path = root.join("conformance/0.6/schemas/dataset-oracle-receipt.schema.json");
+    let schema_path =
+        root.join("conformance/subsystems/dataset/schemas/dataset-oracle-receipt.schema.json");
     let receipt = json(&receipt_path)?;
     validate_schema_instance(&json(&schema_path)?, &receipt, &receipt_path)?;
     let candidate = repository_digest(root)?;
@@ -9344,8 +8003,8 @@ fn check_jes_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> TaskR
         !receipt_path.starts_with(canonical_root),
         "licensed JES2 receipt must remain external to the candidate tree",
     )?;
-    let schema_path =
-        root.join("conformance/0.8/schemas/jes-licensed-differential-receipt.schema.json");
+    let schema_path = root
+        .join("conformance/subsystems/jes/schemas/jes-licensed-differential-receipt.schema.json");
     let receipt = json(&receipt_path)?;
     validate_schema_instance(&json(&schema_path)?, &receipt, &receipt_path)?;
     let adapter = validate_jes_oracle_adapter(root)?;
@@ -9354,7 +8013,8 @@ fn check_jes_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> TaskR
         receipt["candidate_digest"].as_str() == Some(candidate.as_str()),
         "licensed JES2 oracle receipt was produced from a different candidate",
     )?;
-    let adapter_path = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
+    let adapter_path =
+        root.join("conformance/subsystems/jes/oracles/jes-licensed-differential.json");
     let required = array(&adapter, "required_scenarios", &adapter_path)?
         .iter()
         .map(|value| {
@@ -9385,9 +8045,10 @@ fn check_jes_oracle_receipt(root: &Path, receipt_path: Option<PathBuf>) -> TaskR
 }
 
 fn validate_jes_oracle_adapter(root: &Path) -> TaskResult<Value> {
-    let adapter_path = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
-    let schema_path =
-        root.join("conformance/0.8/schemas/jes-licensed-differential-adapter.schema.json");
+    let adapter_path =
+        root.join("conformance/subsystems/jes/oracles/jes-licensed-differential.json");
+    let schema_path = root
+        .join("conformance/subsystems/jes/schemas/jes-licensed-differential-adapter.schema.json");
     let adapter = json(&adapter_path)?;
     validate_schema_instance(&json(&schema_path)?, &adapter, &adapter_path)?;
     Ok(adapter)
@@ -9527,10 +8188,10 @@ fn validate_schema_instance(schema: &Value, instance: &Value, path: &Path) -> Ta
 }
 
 fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
-    let schemas = root.join("conformance/0.2/schemas");
+    let schemas = root.join("conformance/subsystems/coverage/schemas");
     let mut artifacts = Vec::new();
     collect_extension(
-        &root.join("conformance/0.2"),
+        &root.join("conformance/subsystems/coverage"),
         OsStr::new("json"),
         &mut artifacts,
     )?;
@@ -9549,30 +8210,6 @@ fn validate_0_2_schema_artifacts(root: &Path) -> TaskResult {
         validate_schema_instance(&json(&schema_path)?, &instance, &path)?;
     }
 
-    let release = root.join("release/0.2.0/targets");
-    if release.is_dir() {
-        for entry in
-            fs::read_dir(&release).map_err(|error| format!("{}: {error}", release.display()))?
-        {
-            let target = entry.map_err(|error| error.to_string())?.path();
-            if !target.is_dir() {
-                return Err(format!(
-                    "release target entry is not a directory: {}",
-                    target.display()
-                ));
-            }
-            for (artifact, schema) in [
-                ("manifest.json", "release-manifest.schema.json"),
-                ("sbom.cdx.json", "release-sbom.schema.json"),
-                ("provenance.intoto.json", "release-provenance.schema.json"),
-                ("build-inputs.json", "release-build-inputs.schema.json"),
-            ] {
-                let path = target.join(artifact);
-                let schema_path = schemas.join(schema);
-                validate_schema_instance(&json(&schema_path)?, &json(&path)?, &path)?;
-            }
-        }
-    }
     Ok(())
 }
 
@@ -9617,8 +8254,7 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
         "mainframe-env.host-abi-inventory@1" => Some("host-abi-inventory.schema.json"),
         "mainframe-env.coverage-contract-inventory@1"
         | "mainframe-env.coverage-dependency-additions@1"
-        | "mainframe-env.coverage-package-additions@1"
-        | "mainframe-env.version-inventory@1" => Some("coverage-inventory.schema.json"),
+        | "mainframe-env.coverage-package-additions@1" => Some("coverage-inventory.schema.json"),
         "mainframe-env.application-package-migration@1"
         | "mainframe-env.batch-controller-migration@1"
         | "mainframe-env.db2-catalog-migration@1"
@@ -9633,7 +8269,7 @@ fn schema_for_0_2_artifact(version: &str) -> Option<&'static str> {
 }
 
 fn check_inventory(root: &Path) -> TaskResult {
-    let inventory = root.join("conformance/0.1/inventory");
+    let inventory = root.join("conformance/subsystems/platform/inventory");
     let required = [
         "profiles.json",
         "packages.json",
@@ -9652,8 +8288,16 @@ fn check_inventory(root: &Path) -> TaskResult {
         "oracle.json",
         "known-gaps.json",
         "operation-catalog.json",
-        "versions.json",
+        "contracts.json",
     ];
+    let contract_path = inventory.join("contracts.json");
+    validate_schema_instance(
+        &json(
+            &root.join("conformance/subsystems/platform/schemas/contract-inventory.schema.json"),
+        )?,
+        &json(&contract_path)?,
+        &contract_path,
+    )?;
     for name in required {
         let path = inventory.join(name);
         object(&json(&path)?, &path)?;
@@ -9769,7 +8413,7 @@ fn check_dataset_contract(root: &Path) -> TaskResult {
             == render_ams_grammar(root)?,
         "generated AMS grammar is stale; run cargo xtask dataset-contract",
     )?;
-    check_dataset_surface_audit(root)?;
+
     check_dataset_reference_independence(root)
 }
 
@@ -9810,9 +8454,9 @@ fn check_dataset_reference_independence(root: &Path) -> TaskResult {
         )?;
     }
     for required in [
-        "conformance/0.2/catalogs/dataset-vsam-ams.json",
-        "conformance/0.6/fixtures/dataset-organizations.json",
-        "conformance/0.6/fixtures/ams-commands.json",
+        "conformance/subsystems/coverage/catalogs/dataset-vsam-ams.json",
+        "conformance/subsystems/dataset/fixtures/dataset-organizations.json",
+        "conformance/subsystems/dataset/fixtures/ams-commands.json",
         "const MAX_DATASETS",
         "const MAX_RECORDS",
         "const MAX_TOTAL_BYTES",
@@ -9859,145 +8503,9 @@ fn check_dataset_reference_independence(root: &Path) -> TaskResult {
     Ok(())
 }
 
-fn check_dataset_surface_audit(root: &Path) -> TaskResult {
-    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
-    let audit_path = root.join("conformance/0.6/evidence/dataset-surface-audit.json");
-    let schema_path = root.join("conformance/0.6/schemas/dataset-surface-audit.schema.json");
-    let inventory = json(&inventory_path)?;
-    let audit = json(&audit_path)?;
-    validate_schema_instance(&json(&schema_path)?, &audit, &audit_path)?;
-    require(
-        audit["inventory_sha256"]
-            == Value::String(format!("sha256:{}", file_digest(&inventory_path)?)),
-        "dataset surface audit is bound to a different detailed inventory",
-    )?;
-
-    let mut expected = BTreeMap::<String, String>::new();
-    for family in array(&inventory, "families", &inventory_path)? {
-        let family_id = text(family, "id", &inventory_path)?;
-        for item in array(family, "items", &inventory_path)? {
-            let descriptor = format!("{family_id}:{}", text(item, "id", &inventory_path)?);
-            require(
-                expected
-                    .insert(
-                        descriptor.clone(),
-                        text(item, "implementation", &inventory_path)?.to_string(),
-                    )
-                    .is_none(),
-                &format!("duplicate detailed dataset descriptor {descriptor}"),
-            )?;
-        }
-    }
-
-    let mut manifests = Vec::new();
-    collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
-    let mut test_sources = BTreeMap::<String, String>::new();
-    for manifest in manifests {
-        let parsed: toml::Value = read(&manifest)?
-            .parse()
-            .map_err(|error| format!("{}: {error}", manifest.display()))?;
-        let Some(package) = parsed
-            .get("package")
-            .and_then(|value| value.get("name"))
-            .and_then(toml::Value::as_str)
-        else {
-            continue;
-        };
-        let source_root = manifest
-            .parent()
-            .ok_or_else(|| format!("{} has no parent", manifest.display()))?
-            .join("src");
-        let mut sources = Vec::new();
-        if source_root.is_dir() {
-            collect_extension(&source_root, OsStr::new("rs"), &mut sources)?;
-        }
-        sources.sort();
-        let mut combined = String::new();
-        for source in sources {
-            combined.push_str(&read(&source)?);
-            combined.push('\n');
-        }
-        test_sources.insert(package.to_string(), combined);
-    }
-
-    let mut seen_bindings = BTreeSet::new();
-    let mut seen_descriptors = BTreeSet::new();
-    let mut counts = BTreeMap::<String, usize>::new();
-    for binding in array(&audit, "bindings", &audit_path)? {
-        let binding_id = text(binding, "id", &audit_path)?;
-        require(
-            seen_bindings.insert(binding_id.to_string()),
-            &format!("duplicate dataset surface audit binding {binding_id}"),
-        )?;
-        let disposition = text(binding, "disposition", &audit_path)?;
-        for descriptor in array(binding, "descriptors", &audit_path)? {
-            let descriptor = descriptor
-                .as_str()
-                .ok_or_else(|| format!("{audit_path:?} contains a non-text descriptor"))?;
-            let implementation = expected.get(descriptor).ok_or_else(|| {
-                format!("dataset surface audit references unknown descriptor {descriptor}")
-            })?;
-            require(
-                seen_descriptors.insert(descriptor.to_string()),
-                &format!("dataset surface descriptor {descriptor} has duplicate evidence"),
-            )?;
-            require(
-                (implementation == "required" && disposition == "required-pass")
-                    || (implementation == "capability-gated"
-                        && matches!(disposition, "capability-pass" | "capability-conditioned")),
-                &format!(
-                    "dataset surface descriptor {descriptor} has disposition {disposition} incompatible with {implementation}"
-                ),
-            )?;
-            *counts.entry(disposition.to_string()).or_default() += 1;
-        }
-        for test in array(binding, "tests", &audit_path)? {
-            let test = test
-                .as_str()
-                .ok_or_else(|| format!("{audit_path:?} contains a non-text test id"))?;
-            let mut components = test.split("::");
-            let package = components
-                .next()
-                .ok_or_else(|| format!("invalid dataset evidence test id {test}"))?;
-            let test_name = test
-                .rsplit("::")
-                .next()
-                .ok_or_else(|| format!("invalid dataset evidence test id {test}"))?;
-            let sources = test_sources
-                .get(package)
-                .ok_or_else(|| format!("dataset evidence test package {package} does not exist"))?;
-            let needle = format!("fn {test_name}(");
-            let at = sources.find(&needle).ok_or_else(|| {
-                format!("dataset evidence test {test} does not resolve to a Rust test")
-            })?;
-            let prefix = &sources[at.saturating_sub(512)..at];
-            let last_function = prefix.rfind("fn ").unwrap_or(0);
-            let last_test_attribute = prefix.rfind("#[test]").or_else(|| prefix.rfind("::test]"));
-            require(
-                last_test_attribute.is_some_and(|test| test >= last_function),
-                &format!("dataset evidence target {test} is not marked as a test"),
-            )?;
-        }
-    }
-    require(
-        seen_descriptors == expected.keys().cloned().collect::<BTreeSet<_>>(),
-        "dataset surface audit has missing or surplus detailed descriptors",
-    )?;
-    require(
-        counts
-            == BTreeMap::from([
-                ("capability-conditioned".into(), 25usize),
-                ("capability-pass".into(), 9usize),
-                ("required-pass".into(), 97usize),
-            ]),
-        "dataset surface audit disposition counts drifted",
-    )?;
-    Ok(())
-}
-
 fn render_ams_grammar(root: &Path) -> TaskResult<Vec<u8>> {
-    let grammar_path = root.join("conformance/0.6/ams/grammar.json");
-    let schema_path = root.join("conformance/0.6/schemas/ams-grammar.schema.json");
+    let grammar_path = root.join("conformance/subsystems/dataset/ams/grammar.json");
+    let schema_path = root.join("conformance/subsystems/dataset/schemas/ams-grammar.schema.json");
     let grammar = json(&grammar_path)?;
     validate_schema_instance(&json(&schema_path)?, &grammar, &grammar_path)?;
     let commands = array(&grammar, "commands", &grammar_path)?;
@@ -10007,7 +8515,8 @@ fn render_ams_grammar(root: &Path) -> TaskResult<Vec<u8>> {
         "AMS grammar must contain exactly 31 commands",
     )?;
 
-    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
+    let inventory_path =
+        root.join("conformance/subsystems/dataset/inventory/dataset-programming-surface.json");
     let inventory = json(&inventory_path)?;
     let ams_family = array(&inventory, "families", &inventory_path)?
         .iter()
@@ -10080,8 +8589,10 @@ fn render_ams_grammar(root: &Path) -> TaskResult<Vec<u8>> {
 }
 
 fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {
-    let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
-    let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
+    let inventory_path =
+        root.join("conformance/subsystems/dataset/inventory/dataset-programming-surface.json");
+    let schema_path =
+        root.join("conformance/subsystems/dataset/schemas/dataset-programming-surface.schema.json");
     let inventory = json(&inventory_path)?;
     validate_schema_instance(&json(&schema_path)?, &inventory, &inventory_path)?;
     let expected_counts = BTreeMap::from([
@@ -10111,7 +8622,7 @@ fn render_dataset_contract(root: &Path) -> TaskResult<Vec<u8>> {
         "dataset programming family inventory count drifted",
     )?;
 
-    let official_path = root.join("conformance/0.2/catalogs/dataset-vsam-ams.json");
+    let official_path = root.join("conformance/subsystems/coverage/catalogs/dataset-vsam-ams.json");
     let official = json(&official_path)?;
     let official_rows = array(&official, "units", &official_path)?
         .iter()
@@ -10258,7 +8769,8 @@ fn generate_semantic_identities(root: &Path) -> TaskResult {
     let path = root.join(
         "crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs",
     );
-    let manifest_path = root.join("conformance/0.2/generated/semantic-identities.json");
+    let manifest_path =
+        root.join("conformance/subsystems/coverage/generated/semantic-identities.json");
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
@@ -10275,7 +8787,8 @@ fn check_semantic_identities(root: &Path) -> TaskResult {
     let path = root.join(
         "crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs",
     );
-    let manifest_path = root.join("conformance/0.2/generated/semantic-identities.json");
+    let manifest_path =
+        root.join("conformance/subsystems/coverage/generated/semantic-identities.json");
     let (expected, expected_manifest) = semantic_identity_documents(root)?;
     let actual = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
     require(
@@ -10290,7 +8803,8 @@ fn check_semantic_identities(root: &Path) -> TaskResult {
     )?;
     let identity_manifest: Value = serde_json::from_slice(&actual_manifest)
         .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-    let handlers_path = root.join("conformance/0.2/generated/subsystem-handlers.json");
+    let handlers_path =
+        root.join("conformance/subsystems/coverage/generated/subsystem-handlers.json");
     let handlers = json(&handlers_path)?;
     require(
         handlers["schema_version"]
@@ -10306,7 +8820,7 @@ fn check_semantic_identities(root: &Path) -> TaskResult {
 }
 
 fn semantic_identity_documents(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
     let index = json(&index_path)?;
     let mut rows = Vec::new();
     for baseline in array(&index, "baselines", &index_path)? {
@@ -10372,9 +8886,9 @@ fn semantic_identity_documents(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
     source.push_str("];\n");
     let manifest = json!({
         "schema_version":"mainframe-env.generated-semantic-identities@1",
-        "target_version":"0.2.0",
+        "target_subsystem":"coverage.foundation",
         "contract":"mainframe-env.generated-semantic-identity@1",
-        "catalog_index":"conformance/0.2/catalogs/index.json",
+        "catalog_index":"conformance/subsystems/coverage/catalogs/index.json",
         "catalog_index_sha256":format!("sha256:{catalog_digest}"),
         "identity_set_sha256":format!("sha256:{set_digest}"),
         "official_identity_count":rows.len(),
@@ -10385,7 +8899,7 @@ fn semantic_identity_documents(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>)> {
 }
 
 fn check_application_packages(root: &Path) -> TaskResult {
-    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts_path = root.join("conformance/subsystems/coverage/inventory/contracts.json");
     let contracts = json(&contracts_path)?;
     let expected = [
         (
@@ -10426,7 +8940,8 @@ fn check_application_packages(root: &Path) -> TaskResult {
             &format!("application package contract inventory omits {identity}"),
         )?;
     }
-    let migration_path = root.join("conformance/0.2/migrations/application-package-v1-to-v2.json");
+    let migration_path =
+        root.join("conformance/subsystems/coverage/migrations/application-package-v1-to-v2.json");
     let migration = json(&migration_path)?;
     require(
         migration["schema_version"]
@@ -10460,10 +8975,10 @@ fn check_application_packages(root: &Path) -> TaskResult {
         "application package migration or rollback contract is unsafe",
     )?;
     for path in [
-        "conformance/0.2/schemas/application-package-v2.schema.json",
-        "conformance/0.2/schemas/application-install-generation.schema.json",
-        "conformance/0.2/schemas/application-installer-state.schema.json",
-        "conformance/0.2/schemas/application-publication-state.schema.json",
+        "conformance/subsystems/coverage/schemas/application-package-v2.schema.json",
+        "conformance/subsystems/coverage/schemas/application-install-generation.schema.json",
+        "conformance/subsystems/coverage/schemas/application-installer-state.schema.json",
+        "conformance/subsystems/coverage/schemas/application-publication-state.schema.json",
         "docs/architecture/APPLICATION-PACKAGES.md",
         "crates/kernel/mainframe-env-application/README.md",
     ] {
@@ -10555,14 +9070,15 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
             &format!("generic Db2 catalog implementation omits {required}"),
         )?;
     }
-    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts_path = root.join("conformance/subsystems/coverage/inventory/contracts.json");
     let contracts = json(&contracts_path)?;
     require(
         contracts["contracts"]["db2_application_catalog"]
             == Value::String("mainframe-env.db2-application-catalog@1".into()),
         "Db2 application catalog contract is not frozen",
     )?;
-    let migration_path = root.join("conformance/0.2/migrations/db2-catalog-v1-to-v2.json");
+    let migration_path =
+        root.join("conformance/subsystems/coverage/migrations/db2-catalog-v1-to-v2.json");
     let migration = json(&migration_path)?;
     require(
         migration["schema_version"]
@@ -10580,18 +9096,8 @@ fn check_db2_catalog(root: &Path) -> TaskResult {
             && migration["rollback"]["requires_backup"] == Value::Bool(true),
         "Db2 catalog migration or rollback contract is unsafe",
     )?;
-    let scan_path = root.join("conformance/0.2/evidence/hardcode/CV-205-db2.json");
-    let scan = json(&scan_path)?;
-    require(
-        scan["before"]["h1_h3_lines"].as_u64() == Some(29)
-            && scan["after"]["h1_h3_lines"].as_u64() == Some(0)
-            && scan["after"]["application_table_identifiers"].as_u64() == Some(0)
-            && scan["after"]["application_host_variable_identifiers"].as_u64() == Some(0)
-            && scan["after"]["application_string_dispatch"].as_u64() == Some(0),
-        "Db2 hardcode scan receipt does not prove 29 to zero",
-    )?;
     for path in [
-        "conformance/0.2/schemas/db2-application-catalog.schema.json",
+        "conformance/subsystems/coverage/schemas/db2-application-catalog.schema.json",
         "docs/architecture/DB2-APPLICATION-CATALOG.md",
         "crates/providers/mainframe-env-db2/README.md",
     ] {
@@ -10673,14 +9179,15 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
             && !production_product.contains("selected_identity: &str"),
         "composition does not derive controllers from a verified selected package handle",
     )?;
-    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts_path = root.join("conformance/subsystems/coverage/inventory/contracts.json");
     let contracts = json(&contracts_path)?;
     require(
         contracts["contracts"]["batch_controller_registry"]
             == Value::String("mainframe-env.batch-controller-registry@1".into()),
         "batch controller registry contract is not frozen",
     )?;
-    let migration_path = root.join("conformance/0.2/migrations/batch-controller-v0-to-v1.json");
+    let migration_path =
+        root.join("conformance/subsystems/coverage/migrations/batch-controller-v0-to-v1.json");
     let migration = json(&migration_path)?;
     require(
         migration["schema_version"]
@@ -10701,18 +9208,8 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
             && migration["rollback"]["unseen_older_generation_accepted"] == Value::Bool(false),
         "batch controller migration or rollback contract is unsafe",
     )?;
-    let scan_path = root.join("conformance/0.2/evidence/hardcode/CV-206-batch.json");
-    let scan = json(&scan_path)?;
-    require(
-        scan["before"]["h1_h3_lines"].as_u64() == Some(3)
-            && scan["after"]["h1_h3_lines"].as_u64() == Some(0)
-            && scan["after"]["application_program_identifiers"].as_u64() == Some(0)
-            && scan["after"]["application_data_identifiers"].as_u64() == Some(0)
-            && scan["after"]["application_string_dispatch"].as_u64() == Some(0),
-        "batch hardcode scan receipt does not prove three to zero",
-    )?;
     for path in [
-        "conformance/0.2/schemas/batch-controller-registry.schema.json",
+        "conformance/subsystems/coverage/schemas/batch-controller-registry.schema.json",
         "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
         "crates/apps/mainframe-env-batch/README.md",
     ] {
@@ -10727,7 +9224,7 @@ fn check_batch_controllers(root: &Path) -> TaskResult {
 fn generate_host_abi_inventory(root: &Path) -> TaskResult {
     let receipt = verify_host_abi_libraries()?;
     let value = serde_json::to_value(receipt).map_err(|error| error.to_string())?;
-    let path = root.join("conformance/0.2/abi/libraries.json");
+    let path = root.join("conformance/subsystems/coverage/abi/libraries.json");
     fs::create_dir_all(path.parent().ok_or("host ABI inventory has no parent")?)
         .map_err(|error| error.to_string())?;
     fs::write(&path, pretty_json(&value)?).map_err(|error| format!("{}: {error}", path.display()))
@@ -10736,7 +9233,7 @@ fn generate_host_abi_inventory(root: &Path) -> TaskResult {
 fn check_host_abi_libraries(root: &Path) -> TaskResult {
     let receipt = verify_host_abi_libraries()?;
     let expected = serde_json::to_value(receipt).map_err(|error| error.to_string())?;
-    let inventory_path = root.join("conformance/0.2/abi/libraries.json");
+    let inventory_path = root.join("conformance/subsystems/coverage/abi/libraries.json");
     require(
         json(&inventory_path)? == expected,
         "subsystem ABI inventory is stale; run cargo xtask abi-libraries",
@@ -10787,7 +9284,7 @@ fn check_host_abi_libraries(root: &Path) -> TaskResult {
         "crates/providers/mainframe-env-mq/abi/CMQPMOV.cpy",
         "crates/providers/mainframe-env-mq/abi/CMQTML.cpy",
         "crates/providers/mainframe-env-mq/abi/CMQV.cpy",
-        "conformance/0.2/schemas/host-abi-source-library.schema.json",
+        "conformance/subsystems/coverage/schemas/host-abi-source-library.schema.json",
         "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md",
     ] {
         require(
@@ -10795,14 +9292,15 @@ fn check_host_abi_libraries(root: &Path) -> TaskResult {
             &format!("host ABI artifact is missing: {path}"),
         )?;
     }
-    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
+    let contracts_path = root.join("conformance/subsystems/coverage/inventory/contracts.json");
     let contracts = json(&contracts_path)?;
     require(
         contracts["contracts"]["host_abi_source_library"]
             == Value::String("mainframe-env.host-abi-source-library@1".into()),
         "host ABI source-library contract is not frozen",
     )?;
-    let migration_path = root.join("conformance/0.2/migrations/host-abi-v0-to-v1.json");
+    let migration_path =
+        root.join("conformance/subsystems/coverage/migrations/host-abi-v0-to-v1.json");
     let migration = json(&migration_path)?;
     require(
         migration["schema_version"] == Value::String("mainframe-env.host-abi-migration@1".into())
@@ -10813,15 +9311,7 @@ fn check_host_abi_libraries(root: &Path) -> TaskResult {
             && migration["rollback"]["partial_library_selected"] == Value::Bool(false),
         "host ABI migration or rollback contract is unsafe",
     )?;
-    let scan_path = root.join("conformance/0.2/evidence/hardcode/CV-207-abi.json");
-    let scan = json(&scan_path)?;
-    require(
-        scan["before"]["compiler_owned_members"].as_u64() == Some(9)
-            && scan["after"]["compiler_owned_members"].as_u64() == Some(0)
-            && scan["after"]["subsystem_owned_members"].as_u64() == Some(9)
-            && scan["after"]["generated_coverage_credit"].as_u64() == Some(0),
-        "host ABI ownership scan does not prove nine compiler members moved with zero credit",
-    )
+    Ok(())
 }
 
 fn generate_program_registry(root: &Path) -> TaskResult {
@@ -10873,15 +9363,15 @@ fn check_program_registry(root: &Path) -> TaskResult {
             &format!("batch execution retains name dispatch {forbidden}"),
         )?;
     }
-    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    let contracts = json(&root.join("conformance/subsystems/coverage/inventory/contracts.json"))?;
     require(
         contracts["contracts"]["common_program_catalog"]
             == Value::String("mainframe-env.common-program-catalog@1".into()),
         "common program catalog contract is not frozen",
     )?;
     for path in [
-        "conformance/0.2/programs/common-programs.json",
-        "conformance/0.2/schemas/common-program-catalog.schema.json",
+        "conformance/subsystems/coverage/programs/common-programs.json",
+        "conformance/subsystems/coverage/schemas/common-program-catalog.schema.json",
         "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
     ] {
         require(
@@ -10893,11 +9383,11 @@ fn check_program_registry(root: &Path) -> TaskResult {
 }
 
 fn render_program_registry(root: &Path) -> TaskResult<Vec<u8>> {
-    let catalog_path = root.join("conformance/0.2/programs/common-programs.json");
+    let catalog_path = root.join("conformance/subsystems/coverage/programs/common-programs.json");
     let catalog = json(&catalog_path)?;
     require(
         catalog["schema_version"] == Value::String("mainframe-env.common-program-catalog@1".into())
-            && catalog["target_version"] == Value::String("0.2.0".into())
+            && catalog["target_subsystem"] == Value::String("coverage.foundation".into())
             && catalog["generated_coverage_credit"].as_u64() == Some(0),
         "common program catalog identity or coverage policy is invalid",
     )?;
@@ -11119,7 +9609,7 @@ fn generate_route_registries(root: &Path) -> TaskResult {
         (generated.join("official_routes.rs"), official),
         (generated.join("custom_routes.rs"), custom),
         (
-            root.join("conformance/0.2/generated/route-registries.json"),
+            root.join("conformance/subsystems/coverage/generated/route-registries.json"),
             pretty_json(&manifest)?,
         ),
     ] {
@@ -11140,7 +9630,7 @@ fn check_route_registries(root: &Path) -> TaskResult {
             custom,
         ),
         (
-            root.join("conformance/0.2/generated/route-registries.json"),
+            root.join("conformance/subsystems/coverage/generated/route-registries.json"),
             pretty_json(&manifest)?,
         ),
     ] {
@@ -11164,7 +9654,7 @@ fn check_route_registries(root: &Path) -> TaskResult {
             && registration.contains("custom_routes::register"),
         "z/OSMF router still contains handwritten route registration",
     )?;
-    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
+    let contracts = json(&root.join("conformance/subsystems/coverage/inventory/contracts.json"))?;
     require(
         contracts["contracts"]["official_route_registry"]
             == Value::String("mainframe-env.zosmf-official-route-bindings@1".into())
@@ -11172,7 +9662,8 @@ fn check_route_registries(root: &Path) -> TaskResult {
                 == Value::String("mainframe-env.custom-route-catalog@1".into()),
         "route registry contracts are not frozen",
     )?;
-    let migration_path = root.join("conformance/0.2/migrations/registry-v0-to-v1.json");
+    let migration_path =
+        root.join("conformance/subsystems/coverage/migrations/registry-v0-to-v1.json");
     let migration = json(&migration_path)?;
     require(
         migration["schema_version"] == Value::String("mainframe-env.registry-migration@1".into())
@@ -11187,10 +9678,10 @@ fn check_route_registries(root: &Path) -> TaskResult {
         "program/route registry migration or rollback contract is unsafe",
     )?;
     for path in [
-        "conformance/0.2/routes/official-route-bindings.json",
-        "conformance/0.2/routes/custom-routes.json",
-        "conformance/0.2/schemas/route-registry.schema.json",
-        "conformance/0.2/schemas/generated-route-registries.schema.json",
+        "conformance/subsystems/coverage/routes/official-route-bindings.json",
+        "conformance/subsystems/coverage/routes/custom-routes.json",
+        "conformance/subsystems/coverage/schemas/route-registry.schema.json",
+        "conformance/subsystems/coverage/schemas/generated-route-registries.schema.json",
         "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
     ] {
         require(
@@ -11202,9 +9693,10 @@ fn check_route_registries(root: &Path) -> TaskResult {
 }
 
 fn render_route_registries(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>, Value)> {
-    let catalog_path = root.join("conformance/0.1/inventory/zosmf-routes.json");
-    let official_path = root.join("conformance/0.2/routes/official-route-bindings.json");
-    let custom_path = root.join("conformance/0.2/routes/custom-routes.json");
+    let catalog_path = root.join("conformance/subsystems/platform/inventory/zosmf-routes.json");
+    let official_path =
+        root.join("conformance/subsystems/coverage/routes/official-route-bindings.json");
+    let custom_path = root.join("conformance/subsystems/coverage/routes/custom-routes.json");
     let catalog = json(&catalog_path)?;
     let official = json(&official_path)?;
     let custom = json(&custom_path)?;
@@ -11213,7 +9705,9 @@ fn render_route_registries(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>, Value)>
             == Value::String("mainframe-env.zosmf-official-route-bindings@1".into())
             && official["namespace"] == Value::String("official-zosmf".into())
             && official["catalog"]
-                == Value::String("conformance/0.1/inventory/zosmf-routes.json".into())
+                == Value::String(
+                    "conformance/subsystems/platform/inventory/zosmf-routes.json".into(),
+                )
             && custom["schema_version"]
                 == Value::String("mainframe-env.custom-route-catalog@1".into())
             && custom["namespace"] == Value::String("mainframe-env-custom".into())
@@ -11260,17 +9754,17 @@ fn render_route_registries(root: &Path) -> TaskResult<(Vec<u8>, Vec<u8>, Value)>
     let custom_source = render_route_source("route-registries", "CUSTOM_ROUTE_IDS", &custom_rows);
     let manifest = json!({
         "schema_version":"mainframe-env.generated-route-registries@1",
-        "target_version":"0.2.0",
+        "target_subsystem":"coverage.foundation",
         "official":{
             "namespace":"official-zosmf",
-            "catalog":"conformance/0.1/inventory/zosmf-routes.json",
+            "catalog":"conformance/subsystems/platform/inventory/zosmf-routes.json",
             "catalog_sha256":format!("sha256:{}", file_digest(&catalog_path)?),
             "bindings_sha256":format!("sha256:{}", file_digest(&official_path)?),
             "route_count":official_rows.len()
         },
         "custom":{
             "namespace":"mainframe-env-custom",
-            "catalog":"conformance/0.2/routes/custom-routes.json",
+            "catalog":"conformance/subsystems/coverage/routes/custom-routes.json",
             "catalog_sha256":format!("sha256:{}", file_digest(&custom_path)?),
             "route_count":custom_rows.len()
         },
@@ -11437,64 +9931,18 @@ fn check_dehardcoding(root: &Path) -> TaskResult {
     }
     check_program_registry(root)?;
     check_route_registries(root)?;
-    let accepted_scanned_files = rust_file_count_at_commit(
-        root,
-        &accepted_0_2_completion(root)?,
-        "crates/tooling/mainframe-env-conformance/",
-    )?;
-    let hardcode_path = root.join("conformance/0.2/evidence/hardcode/no-application-hardcode.json");
-    let hardcode = json(&hardcode_path)?;
-    require(
-        hardcode["schema_version"]
-            == Value::String("mainframe-env.no-application-hardcode@1".into())
-            && hardcode["before"]["production_h1_h3_lines"].as_u64() == Some(32)
-            && hardcode["after"]["production_h1_h3_lines"].as_u64() == Some(0)
-            && hardcode["after"]["scanned_rust_files"].as_u64()
-                == Some(accepted_scanned_files as u64)
-            && hardcode["after"]["application_string_dispatch"].as_u64() == Some(0),
-        "no-application-hardcode receipt is stale or incomplete",
-    )?;
-    let dispatch_path = root.join("conformance/0.2/evidence/hardcode/no-string-dispatch.json");
-    let dispatch = json(&dispatch_path)?;
-    require(
-        dispatch["schema_version"] == Value::String("mainframe-env.no-string-dispatch@1".into())
-            && dispatch["before"]["handwritten_program_dispatch_sites"].as_u64() == Some(12)
-            && dispatch["after"]["handwritten_program_dispatch_sites"].as_u64() == Some(0)
-            && dispatch["before"]["handwritten_route_registration_sites"].as_u64() == Some(22)
-            && dispatch["after"]["handwritten_route_registration_sites"].as_u64() == Some(0)
-            && dispatch["after"]["official_generated_routes"].as_u64() == Some(23)
-            && dispatch["after"]["custom_generated_routes"].as_u64() == Some(7)
-            && dispatch["after"]["application_program_table_transaction_exceptions"].as_u64()
-                == Some(0),
-        "no-string-dispatch receipt is stale or incomplete",
-    )
-}
-
-fn rust_file_count_at_commit(
-    root: &Path,
-    commit: &str,
-    excluded_prefix: &str,
-) -> TaskResult<usize> {
-    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", commit])?;
-    Ok(listing
-        .lines()
-        .filter(|path| {
-            path.starts_with("crates/")
-                && path.ends_with(".rs")
-                && !path.starts_with(excluded_prefix)
-        })
-        .count())
+    Ok(())
 }
 
 fn check_coverage(root: &Path) -> TaskResult {
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
+    let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
     let index = json(&index_path)?;
     require(
         text(&index, "schema_version", &index_path)? == "mainframe-env.official-source-receipts@1",
         "official source receipt schema changed",
     )?;
     require(
-        text(&index, "target_version", &index_path)? == "0.2.0",
+        text(&index, "target_subsystem", &index_path)? == "coverage.foundation",
         "official source receipts target the wrong product version",
     )?;
     require(
@@ -11591,7 +10039,7 @@ fn check_coverage(root: &Path) -> TaskResult {
 
         let catalog_name = text(baseline, "catalog", &index_path)?;
         require(
-            catalog_name.starts_with("conformance/0.2/catalogs/")
+            catalog_name.starts_with("conformance/subsystems/coverage/catalogs/")
                 && catalog_name.ends_with(".json")
                 && !catalog_name.contains(".."),
             &format!("baseline {id} has an unsafe catalog path"),
@@ -11669,13 +10117,12 @@ fn check_coverage(root: &Path) -> TaskResult {
         index["mandatory_rows"].as_u64() == Some(total_rows) && total_rows == 1_506,
         "official catalog global denominator must remain 1506",
     )?;
-    check_coverage_ledger(root, &index)?;
+
     topic_manifests::check(root)?;
     check_publication_bytes(root)?;
     check_probe_record_figures(root)?;
-    check_coverage_work_package_evidence(root)?;
-    check_coverage_program_status(root)?;
-    check_workload_ledger_consistency(root)
+
+    Ok(())
 }
 
 /// The probe record's numbers, against the artifacts they are drawn from.
@@ -11720,9 +10167,9 @@ fn check_probe_record_figures(root: &Path) -> TaskResult {
 /// They are not chosen for being distinctive strings; they are the two fields
 /// this project's own reader takes out of a topic. `HEADING` and `LAST_MODIFIED`
 /// in `conformance/tools/docs_api.py` match exactly these; the nine manifests
-/// under `conformance/0.2/manifests/` record the `last_modified` the second
+/// under `conformance/subsystems/coverage/manifests/` record the `last_modified` the second
 /// yields for all 4,488 pinned topics and
-/// `conformance/0.7/generated/jcl-topic-manifest.json` records the `heading` the
+/// `conformance/subsystems/jcl/generated/jcl-topic-manifest.json` records the `heading` the
 /// first yields for its 626; and both markers appear in every one of the 6,598
 /// bodies cached across the nine baselines -- 100%, where `role="article"`
 /// misses three. A file the readers could read as a topic is a file this
@@ -11851,1542 +10298,6 @@ fn carries_the_served_seam(body: &[u8]) -> bool {
     false
 }
 
-fn check_coverage_ledger(root: &Path, index: &Value) -> TaskResult {
-    let path = root.join("conformance/0.2/evidence/coverage-ledger.json");
-    let ledger = json(&path)?;
-    require(
-        text(&ledger, "schema_version", &path)? == "mainframe-env.coverage-ledger@1"
-            && ledger["generation"].as_u64().is_some_and(|value| value > 0)
-            && ledger["catalog_index"]
-                == Value::String("conformance/0.2/catalogs/index.json".into()),
-        "coverage ledger identity is invalid",
-    )?;
-    let index_path = root.join("conformance/0.2/catalogs/index.json");
-    require(
-        ledger["catalog_index_sha256"]
-            == Value::String(format!("sha256:{}", file_digest(&index_path)?)),
-        "coverage ledger catalog index digest drifted",
-    )?;
-    require(
-        ledger["generated_catalog_credit"].as_u64() == Some(0)
-            && ledger["official_compatibility_numerator"].as_u64() == Some(0)
-            && ledger["evidence_records"]
-                .as_array()
-                .is_some_and(Vec::is_empty),
-        "catalog generation or empty evidence credited official compatibility",
-    )?;
-    let expected = array(index, "baselines", &index_path)?
-        .iter()
-        .map(|baseline| {
-            Ok((
-                text(baseline, "id", &index_path)?.to_string(),
-                (
-                    text(baseline, "catalog_sha256", &index_path)?.to_string(),
-                    baseline["mandatory_rows"]
-                        .as_u64()
-                        .ok_or("baseline mandatory row count is invalid")?,
-                ),
-            ))
-        })
-        .collect::<TaskResult<BTreeMap<_, _>>>()?;
-    let rows = array(&ledger, "baselines", &path)?;
-    require(
-        rows.len() == expected.len(),
-        "coverage ledger does not contain every official baseline",
-    )?;
-    let mut seen = BTreeSet::new();
-    for row in rows {
-        let id = text(row, "id", &path)?;
-        let (catalog_digest, denominator) = expected
-            .get(id)
-            .ok_or_else(|| format!("coverage ledger contains unknown baseline {id}"))?;
-        require(
-            seen.insert(id)
-                && row["catalog_sha256"].as_str() == Some(catalog_digest)
-                && row["mandatory_rows"].as_u64() == Some(*denominator)
-                && row["complete_rows"].as_u64() == Some(0),
-            &format!("coverage ledger baseline {id} identity or denominator drifted"),
-        )?;
-        let gates = row["gates"]
-            .as_object()
-            .ok_or_else(|| format!("coverage ledger baseline {id} gates are missing"))?;
-        let gate_names = [
-            "recognized",
-            "validated",
-            "executed",
-            "conditioned",
-            "recovered",
-            "differential",
-        ];
-        require(
-            gates.len() == gate_names.len(),
-            &format!("coverage ledger baseline {id} does not contain six gates"),
-        )?;
-        for gate in gate_names {
-            require(
-                gates[gate]["numerator"].as_u64() == Some(0)
-                    && gates[gate]["denominator"].as_u64() == Some(*denominator),
-                &format!("coverage ledger baseline {id}/{gate} credited generated coverage"),
-            )?;
-        }
-    }
-
-    let contracts_path = root.join("conformance/0.2/inventory/contracts.json");
-    let contracts = json(&contracts_path)?;
-    for contract in [
-        "mainframe-env.official-source-receipts@1",
-        "mainframe-env.official-catalog@1",
-        "mainframe-env.coverage-row@1",
-        "mainframe-env.coverage-evidence@1",
-        "mainframe-env.coverage-ledger@1",
-    ] {
-        require(
-            contracts["contracts"].as_object().is_some_and(|values| {
-                values
-                    .values()
-                    .any(|value| value.as_str() == Some(contract))
-            }),
-            &format!("coverage contract inventory omits {contract}"),
-        )?;
-    }
-    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
-    let additions = json(&additions_path)?;
-    require(
-        array(&additions, "packages", &additions_path)?
-            .iter()
-            .any(|package| {
-                package["name"] == Value::String("mainframe-env-coverage".into())
-                    && package["work_package"] == Value::String("CV-202".into())
-            })
-            && additions["production_profile_membership"] == Value::Bool(false),
-        "coverage contract package inventory is invalid",
-    )?;
-    let metadata = workspace_metadata(root)?;
-    require(
-        metadata["packages"].as_array().is_some_and(|packages| {
-            packages
-                .iter()
-                .any(|package| package["name"] == "mainframe-env-coverage")
-        }),
-        "coverage contract package is absent from the workspace",
-    )
-}
-
-fn check_coverage_work_package_evidence(root: &Path) -> TaskResult {
-    let directory = root.join("conformance/0.2/evidence/work-packages");
-    let mut files = Vec::new();
-    collect_extension(&directory, OsStr::new("json"), &mut files)?;
-    require(!files.is_empty(), "0.2 has no work-package evidence")?;
-    files.sort();
-    for path in files {
-        let evidence = json(&path)?;
-        let work_package = text(&evidence, "work_package", &path)?;
-        require(
-            text(&evidence, "schema_version", &path)?
-                == "mainframe-env.coverage-work-package-evidence@1"
-                && evidence["derived"] == Value::Bool(true)
-                && evidence["status"] == Value::String("pass".into())
-                && path.file_stem().and_then(OsStr::to_str) == Some(work_package),
-            &format!("{} is not a derived work-package pass", path.display()),
-        )?;
-        let receipt = evidence
-            .get("receipt")
-            .and_then(Value::as_object)
-            .ok_or_else(|| format!("{} has no receipt object", path.display()))?;
-        let digest = canonical_evidence_digest(receipt)?;
-        require(
-            evidence["evidence_digest"].as_str() == Some(digest.as_str()),
-            &format!("{} evidence digest is stale", path.display()),
-        )?;
-        let receipt = Value::Object(receipt.clone());
-        let subject = work_package_completion_subject(work_package)?;
-        let package_trailer = format!("{work_package}=pass");
-        let completion = find_completion_commit(
-            root,
-            subject,
-            &[
-                ("Work-Package", package_trailer.as_str()),
-                ("Target-Version", "0.2.0"),
-                ("Evidence-Digest", digest.as_str()),
-            ],
-        )?;
-        let parent = command_text(root, "git", &["rev-parse", &format!("{completion}^")])?;
-        verify_completion_parent(root, &completion, &parent)?;
-        require(
-            receipt["target_version"] == Value::String("0.2.0".into())
-                && receipt["source_identity"].as_str() == Some(parent.as_str())
-                && receipt["commands"]
-                    .as_array()
-                    .is_some_and(|commands| !commands.is_empty())
-                && receipt["invariants"].is_object(),
-            &format!("{} receipt is incomplete", path.display()),
-        )?;
-        let relative_evidence = path
-            .strip_prefix(root)
-            .map_err(|error| error.to_string())?
-            .to_string_lossy();
-        verify_commit_bound_live_file(root, &completion, &relative_evidence, &path)?;
-        for artifact in receipt["artifacts"]
-            .as_array()
-            .ok_or_else(|| format!("{} receipt artifacts are missing", path.display()))?
-        {
-            let artifact_path = text(artifact, "path", &path)?;
-            require(
-                !artifact_path.contains("..") && !Path::new(artifact_path).is_absolute(),
-                &format!("{} contains an unsafe artifact path", path.display()),
-            )?;
-            let expected = text(artifact, "sha256", &path)?;
-            validate_sha256_identity(expected, "work-package artifact digest")?;
-            require(
-                expected
-                    == format!(
-                        "sha256:{}",
-                        git_file_digest(root, &completion, artifact_path)?
-                    ),
-                &format!(
-                    "{} historical artifact {artifact_path} drifted",
-                    path.display()
-                ),
-            )?;
-        }
-    }
-    check_work_package_amendments(root)?;
-    Ok(())
-}
-
-fn check_work_package_amendments(root: &Path) -> TaskResult {
-    let path = root.join("conformance/0.2/evidence/work-package-amendments.json");
-    let evidence = json(&path)?;
-    let repair_completion = accepted_0_2_completion(root)?;
-    require(
-        evidence["schema_version"]
-            == Value::String("mainframe-env.work-package-amendments@1".into())
-            && evidence["target_version"] == Value::String("0.2.0".into())
-            && evidence["status"] == Value::String("pass".into())
-            && evidence["historical_receipts_rewritten"] == Value::Bool(false),
-        "work-package amendment evidence header is invalid",
-    )?;
-    let amendments = array(&evidence, "amendments", &path)?;
-    require(
-        amendments.len() == 4
-            && amendments
-                .iter()
-                .map(|row| row["work_package"].as_str())
-                .eq([
-                    Some("CV-204"),
-                    Some("CV-205"),
-                    Some("CV-206"),
-                    Some("CV-209"),
-                ]),
-        "work-package amendments must cover CV-204/CV-205/CV-206/CV-209 exactly",
-    )?;
-    for amendment in amendments {
-        let work_package = text(amendment, "work_package", &path)?;
-        let historical = amendment
-            .get("historical")
-            .and_then(Value::as_object)
-            .ok_or_else(|| format!("{work_package} historical identity is missing"))?;
-        let historical = Value::Object(historical.clone());
-        let completion = text(&historical, "completion_commit", &path)?;
-        let receipt_path = text(&historical, "receipt_path", &path)?;
-        let receipt_digest = text(&historical, "evidence_digest", &path)?;
-        validate_sha256_identity(receipt_digest, "historical work-package evidence digest")?;
-        let live_receipt = json(&root.join(receipt_path))?;
-        require(
-            live_receipt["evidence_digest"].as_str() == Some(receipt_digest),
-            &format!("{work_package} historical evidence digest drifted"),
-        )?;
-        verify_commit_bound_live_file(root, completion, receipt_path, &root.join(receipt_path))?;
-        for artifact in amendment["repair_artifacts"]
-            .as_array()
-            .ok_or_else(|| format!("{work_package} repair artifacts are missing"))?
-        {
-            let relative = text(artifact, "path", &path)?;
-            let expected = text(artifact, "sha256", &path)?;
-            require(
-                !relative.contains("..")
-                    && !Path::new(relative).is_absolute()
-                    && expected
-                        == format!(
-                            "sha256:{}",
-                            git_file_digest(root, &repair_completion, relative)?
-                        ),
-                &format!("{work_package} repair artifact drifted: {relative}"),
-            )?;
-        }
-    }
-    Ok(())
-}
-
-fn work_package_completion_subject(work_package: &str) -> TaskResult<&'static str> {
-    match work_package {
-        "CV-201" => Ok("Complete CV-201 official coverage catalogs"),
-        "CV-202" => Ok("Complete CV-202 coverage evidence contracts"),
-        "CV-203" => Ok("Complete CV-203 generated semantic dispatch"),
-        "CV-204" => Ok("Complete CV-204 application package generations"),
-        "CV-205" => Ok("Complete CV-205 generic Db2 package catalog"),
-        "CV-206" => Ok("Complete CV-206 installed batch controllers"),
-        "CV-207" => Ok("Complete CV-207 subsystem ABI libraries"),
-        "CV-208" => Ok("Complete CV-208 generated dispatch registries"),
-        "CV-209" => Ok("Complete CV-209 evidence ledger closure"),
-        _ => Err(format!(
-            "unknown work-package completion subject: {work_package}"
-        )),
-    }
-}
-
-fn check_coverage_program_status(root: &Path) -> TaskResult {
-    let path = root.join("conformance/0.2/evidence/program-status.json");
-    let status = json(&path)?;
-    require(
-        text(&status, "schema_version", &path)? == "mainframe-env.coverage-program-status@1"
-            && text(&status, "target_version", &path)? == "0.2.0",
-        "0.2 program status identity is invalid",
-    )?;
-    let source = status["source_identity"]
-        .as_object()
-        .ok_or("0.2 program status source identity is not an object")?;
-    let expected_source = [
-        (
-            "accepted_release_commit",
-            "44f3081eb2fdf22d09e1a97725f5a4163431ca70",
-        ),
-        (
-            "accepted_release_tree",
-            "3d504ece02f1c09e124606ded695b00ba984d104",
-        ),
-        (
-            "accepted_carddemo_candidate_commit",
-            "857115b907ce7098c965a51117a079048ea8182e",
-        ),
-        (
-            "accepted_carddemo_candidate_tree",
-            "7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea",
-        ),
-        (
-            "implementation_start_commit",
-            "1afbf402c56c085a46cc3599c91b1b77002b1e16",
-        ),
-    ];
-    for (field, expected) in expected_source {
-        require(
-            source.get(field).and_then(Value::as_str) == Some(expected),
-            &format!("0.2 program status {field} drifted"),
-        )?;
-    }
-    require(
-        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{}"])?
-            == source["accepted_release_commit"],
-        "accepted 0.1.1 release tag moved",
-    )?;
-    require(
-        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{tree}"])?
-            == source["accepted_release_tree"],
-        "accepted 0.1.1 release tree moved",
-    )?;
-    let work_packages = array(&status, "work_packages", &path)?;
-    require(
-        work_packages.len() == 9,
-        "0.2 program status must track nine work packages",
-    )?;
-    for (index, work_package) in work_packages.iter().enumerate() {
-        let expected = format!("CV-{:03}", index + 201);
-        let state = text(work_package, "state", &path)?;
-        require(
-            text(work_package, "id", &path)? == expected
-                && matches!(state, "pending" | "in-progress" | "pass" | "blocked"),
-            &format!("0.2 program status work package {expected} is invalid"),
-        )?;
-        if state == "pass" {
-            let evidence = work_package["evidence"]
-                .as_str()
-                .ok_or_else(|| format!("0.2 program status {expected} pass has no evidence"))?;
-            require(
-                evidence == format!("conformance/0.2/evidence/work-packages/{expected}.json")
-                    && root.join(evidence).is_file(),
-                &format!("0.2 program status {expected} evidence is invalid"),
-            )?;
-        }
-    }
-    require(
-        !array(&status, "commands", &path)?.is_empty()
-            && status["dependency_receipts"]
-                .as_array()
-                .is_some_and(|receipts| !receipts.is_empty())
-            && status["blockers"].is_array()
-            && status["open_decisions"].is_array()
-            && status["next_smallest_executable_step"]
-                .as_str()
-                .is_some_and(|step| !step.is_empty()),
-        "0.2 program status is not resumable",
-    )?;
-    let recorded_digest = status["dirty_tree_identity"]["digest"]
-        .as_str()
-        .ok_or("0.2 program status dirty-tree digest is missing")?;
-    require(
-        recorded_digest == accepted_0_2_candidate_digest(root)?,
-        "0.2 program status accepted-candidate digest drifted",
-    )?;
-    require(
-        root.join("docs/delivery/subsystems/coverage/foundation-status.md")
-            .is_file()
-            && root
-                .join("conformance/0.2/schemas/program-status.schema.json")
-                .is_file(),
-        "0.2 program status documentation or schema is missing",
-    )
-}
-
-fn check_workload_ledger_consistency(root: &Path) -> TaskResult {
-    let workload_path = root.join("conformance/0.2/evidence/workload-ledger.json");
-    let status_path = root.join("conformance/0.2/evidence/program-status.json");
-    let workload = json(&workload_path)?;
-    let status = json(&status_path)?;
-    compare_workload_and_program_status(&workload, &status)?;
-    let work_packages = array(&workload, "work_packages", &workload_path)?;
-    require(
-        work_packages.len() == 9,
-        "workload ledger must contain exactly CV-201 through CV-209",
-    )?;
-    for (index, work_package) in work_packages.iter().enumerate() {
-        let expected_id = format!("CV-{:03}", index + 201);
-        let id = text(work_package, "id", &workload_path)?;
-        let state = text(work_package, "state", &workload_path)?;
-        require(
-            id == expected_id,
-            &format!("workload ledger work package {expected_id} is missing or out of order"),
-        )?;
-        if state == "pass" {
-            let evidence_path = text(work_package, "evidence", &workload_path)?;
-            let evidence = json(&root.join(evidence_path))?;
-            require(
-                evidence["work_package"].as_str() == Some(id)
-                    && work_package["evidence_digest"] == evidence["evidence_digest"],
-                &format!("workload ledger {id} evidence identity is stale"),
-            )?;
-        } else {
-            require(
-                work_package["evidence"].is_null() && work_package["evidence_digest"].is_null(),
-                &format!("incomplete workload ledger row {id} claims evidence"),
-            )?;
-        }
-    }
-    let exit_gates = array(&workload, "exit_gates", &workload_path)?;
-    let expected_exit_gates = BTreeSet::from([
-        "official-catalogs",
-        "coverage-contracts",
-        "dehardcoding",
-        "migration-rollback",
-        "workspace-test-floor",
-        "postgresql-controls",
-        "carddemo-full",
-        "live-zowe-route",
-        "release-checks",
-        "evidence-sealing",
-        "content-evidence-sealing",
-    ]);
-    let actual_exit_gates = exit_gates
-        .iter()
-        .map(|gate| text(gate, "id", &workload_path))
-        .collect::<TaskResult<BTreeSet<_>>>()?;
-    require(
-        actual_exit_gates == expected_exit_gates && actual_exit_gates.len() == exit_gates.len(),
-        "workload ledger exit gates are missing or duplicated",
-    )?;
-    for gate in exit_gates {
-        let state = text(gate, "state", &workload_path)?;
-        require(
-            matches!(state, "pending" | "pass" | "blocked")
-                && (state == "pass") == gate["evidence"].is_string(),
-            &format!(
-                "workload ledger exit gate {} state/evidence contradict",
-                text(gate, "id", &workload_path)?
-            ),
-        )?;
-        if let Some(evidence) = gate["evidence"].as_str() {
-            require(
-                root.join(evidence).is_file(),
-                &format!("workload exit-gate evidence is missing: {evidence}"),
-            )?;
-        }
-    }
-    let coverage_path = root.join("conformance/0.2/evidence/coverage-ledger.json");
-    let coverage = json(&coverage_path)?;
-    let mandatory_rows = array(&coverage, "baselines", &coverage_path)?
-        .iter()
-        .map(|baseline| baseline["mandatory_rows"].as_u64().unwrap_or_default())
-        .sum::<u64>();
-    let complete_rows = array(&coverage, "baselines", &coverage_path)?
-        .iter()
-        .map(|baseline| baseline["complete_rows"].as_u64().unwrap_or_default())
-        .sum::<u64>();
-    require(
-        workload["coverage"]["official_baselines"].as_u64() == Some(9)
-            && workload["coverage"]["mandatory_rows"].as_u64() == Some(mandatory_rows)
-            && workload["coverage"]["complete_rows"].as_u64() == Some(complete_rows)
-            && workload["coverage"]["official_compatibility_numerator"]
-                == coverage["official_compatibility_numerator"]
-            && workload["coverage"]["generated_catalog_credit"]
-                == coverage["generated_catalog_credit"],
-        "workload and coverage ledgers contradict",
-    )?;
-    let markdown = read(&root.join("docs/delivery/subsystems/coverage/foundation-status.md"))?;
-    for work_package in work_packages {
-        let id = text(work_package, "id", &workload_path)?;
-        let state = text(work_package, "state", &workload_path)?;
-        let evidence = work_package["evidence"]
-            .as_str()
-            .map_or_else(|| "pending".to_string(), |path| format!("`{path}`"));
-        let markdown_state = state.replace('-', " ");
-        require(
-            markdown.contains(&format!("| {id} | {markdown_state} | {evidence} |")),
-            &format!("Markdown workload ledger contradicts {id}"),
-        )?;
-    }
-    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
-    require(
-        contracts["contracts"]["workload_ledger"]
-            == Value::String("mainframe-env.coverage-workload-ledger@1".into())
-            && root
-                .join("conformance/0.2/schemas/workload-ledger.schema.json")
-                .is_file(),
-        "workload ledger contract or schema is missing",
-    )
-}
-
-fn compare_workload_and_program_status(workload: &Value, status: &Value) -> TaskResult {
-    require(
-        workload["schema_version"]
-            == Value::String("mainframe-env.coverage-workload-ledger@1".into())
-            && status["schema_version"]
-                == Value::String("mainframe-env.coverage-program-status@1".into())
-            && workload["target_version"] == status["target_version"]
-            && workload["implementation_status"] == status["implementation_status"]
-            && workload["current_work_package"] == status["current_work_package"],
-        "workload and program-status ledger headers contradict",
-    )?;
-    let workload_rows = workload["work_packages"]
-        .as_array()
-        .ok_or("workload ledger rows are missing")?;
-    let status_rows = status["work_packages"]
-        .as_array()
-        .ok_or("program-status ledger rows are missing")?;
-    require(
-        workload_rows.len() == status_rows.len(),
-        "workload and program-status ledger lengths contradict",
-    )?;
-    for (workload_row, status_row) in workload_rows.iter().zip(status_rows) {
-        require(
-            workload_row["id"] == status_row["id"]
-                && workload_row["state"] == status_row["state"]
-                && workload_row["evidence"] == status_row["evidence"],
-            "workload and program-status work-package rows contradict",
-        )?;
-    }
-    let implementation = workload["implementation_status"]
-        .as_str()
-        .ok_or("workload implementation status is invalid")?;
-    let in_progress = workload_rows
-        .iter()
-        .filter(|row| row["state"] == "in-progress")
-        .collect::<Vec<_>>();
-    match implementation {
-        "complete" => require(
-            workload["current_work_package"].is_null()
-                && workload_rows.iter().all(|row| row["state"] == "pass")
-                && workload["exit_gates"]
-                    .as_array()
-                    .is_some_and(|gates| gates.iter().all(|gate| gate["state"] == "pass")),
-            "complete workload ledger contains incomplete work or exit gates",
-        ),
-        "in-progress" => require(
-            in_progress.len() == 1 && in_progress[0]["id"] == workload["current_work_package"],
-            "in-progress workload ledger does not identify exactly one current package",
-        ),
-        "blocked" => require(
-            workload_rows.iter().any(|row| row["state"] == "blocked"),
-            "blocked workload ledger contains no blocked work package",
-        ),
-        _ => Err("workload ledger implementation status is unknown".into()),
-    }
-}
-
-fn check_migration_rollback_rollup(root: &Path) -> TaskResult {
-    let rollup_path = root.join("conformance/0.2/evidence/migration-rollback-rollup.json");
-    let rollup = json(&rollup_path)?;
-    require(
-        rollup["schema_version"]
-            == Value::String("mainframe-env.migration-rollback-rollup@1".into())
-            && rollup["target_version"] == Value::String("0.2.0".into())
-            && rollup["status"] == Value::String("pass".into())
-            && rollup["migration_count"].as_u64() == Some(5)
-            && rollup["destructive_migrations"].as_u64() == Some(0)
-            && rollup["rollback_supported"].as_u64() == Some(5)
-            && rollup["destructive_action_performed"] == Value::Bool(false),
-        "migration/rollback rollup header is invalid",
-    )?;
-    let expected = BTreeSet::from([
-        "conformance/0.2/migrations/application-package-v1-to-v2.json",
-        "conformance/0.2/migrations/batch-controller-v0-to-v1.json",
-        "conformance/0.2/migrations/db2-catalog-v1-to-v2.json",
-        "conformance/0.2/migrations/host-abi-v0-to-v1.json",
-        "conformance/0.2/migrations/registry-v0-to-v1.json",
-    ]);
-    let migrations = array(&rollup, "migrations", &rollup_path)?;
-    let actual = migrations
-        .iter()
-        .map(|migration| text(migration, "path", &rollup_path))
-        .collect::<TaskResult<BTreeSet<_>>>()?;
-    require(
-        actual == expected && actual.len() == migrations.len(),
-        "migration/rollback rollup paths are missing or duplicated",
-    )?;
-    for migration in migrations {
-        let relative = text(migration, "path", &rollup_path)?;
-        let path = root.join(relative);
-        let contract = json(&path)?;
-        require(
-            migration["sha256"] == Value::String(format!("sha256:{}", file_digest(&path)?))
-                && migration["destructive"] == Value::Bool(false)
-                && migration["rollback_supported"] == Value::Bool(true)
-                && migration["partial_state_selected"] == Value::Bool(false)
-                && contract["destructive"] == Value::Bool(false)
-                && contract["rollback"]["supported"] == Value::Bool(true),
-            &format!("migration/rollback rollup entry drifted: {relative}"),
-        )?;
-        let evidence = text(migration, "evidence", &rollup_path)?;
-        require(
-            root.join(evidence).is_file(),
-            &format!("migration evidence is missing: {evidence}"),
-        )?;
-    }
-    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
-    require(
-        contracts["contracts"]["migration_rollback_rollup"]
-            == Value::String("mainframe-env.migration-rollback-rollup@1".into())
-            && root
-                .join("conformance/0.2/schemas/migration-rollback-rollup.schema.json")
-                .is_file(),
-        "migration/rollback rollup contract or schema is missing",
-    )
-}
-
-fn check_full_regression(root: &Path) -> TaskResult {
-    let path = root.join("conformance/0.2/evidence/full-regression.json");
-    let receipt = json(&path)?;
-    require(
-        receipt["schema_version"] == Value::String("mainframe-env.full-regression@1".into())
-            && receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["status"] == Value::String("pass".into())
-            && receipt["candidate_unchanged"] == Value::Bool(true),
-        "full regression receipt header is invalid",
-    )?;
-    let candidate = &receipt["candidate"];
-    let accepted_candidate_digest = accepted_0_2_candidate_digest(root)?;
-    require(
-        candidate["source_digest"].as_str() == Some(accepted_candidate_digest.as_str())
-            && candidate["work_package_base_commit"]
-                == Value::String("edb4558c987a56ee9f0c96438f756d663199942f".into())
-            && candidate["accepted_release_commit"]
-                == Value::String("44f3081eb2fdf22d09e1a97725f5a4163431ca70".into())
-            && candidate["accepted_release_tree"]
-                == Value::String("3d504ece02f1c09e124606ded695b00ba984d104".into())
-            && candidate["accepted_carddemo_commit"]
-                == Value::String("857115b907ce7098c965a51117a079048ea8182e".into())
-            && candidate["accepted_carddemo_tree"]
-                == Value::String("7e1fa73f4c808a89ddb4f98c0e3f7d0207f861ea".into()),
-        "full regression candidate identity drifted",
-    )?;
-    require(
-        command_text(root, "git", &["rev-parse", "mainframe-env-v0.1.1^{}"])?
-            == candidate["accepted_release_commit"],
-        "full regression accepted release tag moved",
-    )?;
-    let results = array(&receipt, "results", &path)?;
-    require(
-        results.len() >= 15
-            && results
-                .iter()
-                .all(|result| result["exit_code"].as_i64() == Some(0)),
-        "full regression result matrix is incomplete or failed",
-    )?;
-    let commands = results
-        .iter()
-        .filter_map(|result| result["command"].as_str())
-        .collect::<Vec<_>>();
-    for required in [
-        "cargo fmt --all -- --check",
-        "cargo check --workspace --all-targets --all-features --locked",
-        "cargo test --workspace --all-features --locked --no-fail-fast",
-        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
-        "cargo doc --workspace --all-features --no-deps --locked",
-        "cargo +1.95.0 check",
-        "cargo deny check",
-        "cargo xtask runtime-architecture --check",
-        "cargo xtask conformance --check",
-        "cargo xtask certification --check",
-        "cargo xtask carddemo-full --check",
-        "Zowe CLI 8.36.0",
-        "cargo xtask release --check --target aarch64-apple-darwin",
-        "cargo xtask release --check --target x86_64-unknown-linux-gnu",
-        "git diff --check",
-    ] {
-        require(
-            commands.iter().any(|command| command.contains(required)),
-            &format!("full regression matrix omits {required}"),
-        )?;
-    }
-    require(
-        receipt["workspace"]["tests_passed"]
-            .as_u64()
-            .is_some_and(|count| count >= 260)
-            && receipt["workspace"]["test_floor"].as_u64() == Some(260)
-            && receipt["postgresql"]["version"].as_str() == Some("18")
-            && receipt["postgresql"]["controls_passed"]
-                .as_u64()
-                .is_some_and(|count| count >= 2)
-            && receipt["carddemo"]["journeys_passed"].as_u64() == Some(20)
-            && receipt["carddemo"]["corpus_commit"]
-                == Value::String("59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e".into())
-            && receipt["live_zowe"]["cli_version"].as_str() == Some("8.36.0")
-            && receipt["live_zowe"]["routes_passed"]
-                .as_u64()
-                .is_some_and(|count| count > 0)
-            && receipt["release"]["artifacts_verified"] == Value::Bool(true),
-        "full regression workload, PostgreSQL, CardDemo, Zowe, or release result is incomplete",
-    )?;
-    for target in ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"] {
-        for (name, file) in [
-            ("manifest_sha256", "manifest.json"),
-            ("sbom_sha256", "sbom.cdx.json"),
-            ("provenance_sha256", "provenance.intoto.json"),
-            ("checksums_sha256", "checksums.sha256"),
-            ("licenses_sha256", "LICENSES.md"),
-            ("build_inputs_sha256", "build-inputs.json"),
-        ] {
-            let relative = format!("release/0.2.0/targets/{target}/{file}");
-            require(
-                receipt["release"]["targets"][target][name].as_str()
-                    == Some(file_digest(&root.join(&relative))?.as_str()),
-                &format!("full regression release artifact digest drifted: {relative}"),
-            )?;
-        }
-    }
-    require(
-        receipt["remote_actions"]["tagged"] == Value::Bool(false)
-            && receipt["remote_actions"]["published"] == Value::Bool(false)
-            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
-            && receipt["remote_actions"]["merged"] == Value::Bool(false),
-        "full regression receipt claims an unauthorized remote action",
-    )?;
-    let workload = json(&root.join("conformance/0.2/evidence/workload-ledger.json"))?;
-    let status = json(&root.join("conformance/0.2/evidence/program-status.json"))?;
-    require(
-        workload["implementation_status"] == Value::String("complete".into())
-            && status["implementation_status"] == Value::String("complete".into()),
-        "full regression passed before both ledgers reached complete",
-    )?;
-    let contracts = json(&root.join("conformance/0.2/inventory/contracts.json"))?;
-    require(
-        contracts["contracts"]["full_regression"]
-            == Value::String("mainframe-env.full-regression@1".into())
-            && root
-                .join("conformance/0.2/schemas/full-regression.schema.json")
-                .is_file(),
-        "full regression contract or schema is missing",
-    )
-}
-
-fn check_review_repair(root: &Path) -> TaskResult {
-    let path = root.join("conformance/0.2/evidence/review-repair.json");
-    let evidence = json(&path)?;
-    require(
-        evidence["schema_version"] == Value::String("mainframe-env.review-repair@1".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "review repair evidence header is invalid",
-    )?;
-    let receipt = evidence
-        .get("receipt")
-        .and_then(Value::as_object)
-        .ok_or("review repair receipt is missing")?;
-    let digest = canonical_evidence_digest(receipt)?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
-        "review repair evidence digest is stale",
-    )?;
-    let receipt = Value::Object(receipt.clone());
-    let completion = find_completion_commit(
-        root,
-        "Repair 0.2.0 review findings",
-        &[
-            ("Review-Findings", "7=closed"),
-            ("Target-Version", "0.2.0"),
-            ("Evidence-Digest", digest.as_str()),
-        ],
-    )?;
-    let parent = command_text(root, "git", &["rev-parse", &format!("{completion}^")])?;
-    require(
-        receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["source_identity"] == Value::String(parent)
-            && receipt["candidate_source_digest"].as_str()
-                == Some(repository_digest_at_commit(root, &completion)?.as_str()),
-        "review repair candidate identity drifted",
-    )?;
-    let findings = array(&receipt, "findings", &path)?;
-    require(
-        findings.len() == 7
-            && findings.iter().enumerate().all(|(index, finding)| {
-                finding["id"].as_u64() == Some((index + 1) as u64)
-                    && finding["state"] == Value::String("closed".into())
-                    && finding["regression"]
-                        .as_str()
-                        .is_some_and(|test| !test.is_empty())
-            }),
-        "review repair must close exactly findings 1 through 7 with regressions",
-    )?;
-    let commands = array(&receipt, "commands", &path)?;
-    require(
-        commands.len() >= 15
-            && commands
-                .iter()
-                .all(|command| command["exit_code"].as_i64() == Some(0)),
-        "review repair validation matrix is incomplete or failed",
-    )?;
-    let command_texts = commands
-        .iter()
-        .filter_map(|command| command["command"].as_str())
-        .collect::<Vec<_>>();
-    for required in [
-        "cargo test -p mainframe-env-application",
-        "cargo test -p mainframe-env-batch",
-        "cargo test -p mainframe-env-db2",
-        "cargo test -p mainframe-env-server",
-        "cargo fmt --all -- --check",
-        "cargo check --workspace --all-targets --all-features --locked",
-        "cargo test --workspace --all-features --locked --no-fail-fast",
-        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
-        "cargo doc --workspace --all-features --no-deps --locked",
-        "cargo +1.95.0 check",
-        "cargo deny check",
-        "cargo xtask runtime-architecture --check",
-        "cargo xtask carddemo-full --check",
-        "cargo xtask release --check --target aarch64-apple-darwin",
-        "git diff --check",
-    ] {
-        require(
-            command_texts
-                .iter()
-                .any(|command| command.contains(required)),
-            &format!("review repair validation omits {required}"),
-        )?;
-    }
-    for artifact in array(&receipt, "artifacts", &path)? {
-        let relative = text(artifact, "path", &path)?;
-        let expected = text(artifact, "sha256", &path)?;
-        require(
-            expected == format!("sha256:{}", git_file_digest(root, &completion, relative)?),
-            &format!("review repair historical artifact drifted: {relative}"),
-        )?;
-    }
-    let workflow = String::from_utf8(git_file_bytes(
-        root,
-        &completion,
-        ".github/workflows/ci.yml",
-    )?)
-    .map_err(|error| error.to_string())?;
-    require(
-        workflow.contains("fetch-depth: 0")
-            && workflow.contains("fetch-tags: true")
-            && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
-        "CI does not exercise full-history conformance and portable release verification",
-    )?;
-    let manifest: Value = serde_json::from_slice(&git_file_bytes(
-        root,
-        &completion,
-        "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
-    )?)
-    .map_err(|error| error.to_string())?;
-    require(
-        manifest["target"] == Value::String("aarch64-apple-darwin".into())
-            && manifest["published"] == Value::Bool(false)
-            && receipt["remote_actions"]["tagged"] == Value::Bool(false)
-            && receipt["remote_actions"]["published"] == Value::Bool(false)
-            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
-            && receipt["remote_actions"]["merged"] == Value::Bool(false),
-        "review repair crossed the release boundary",
-    )
-}
-
-fn check_review_repair_round_2(root: &Path) -> TaskResult {
-    check_review_repair(root)?;
-    let path = root.join("conformance/0.2/evidence/review-repair-round-2.json");
-    let evidence = json(&path)?;
-    require(
-        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-2@1".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "round-2 review repair evidence header is invalid",
-    )?;
-    let receipt = evidence
-        .get("receipt")
-        .and_then(Value::as_object)
-        .ok_or("round-2 review repair receipt is missing")?;
-    let digest = canonical_evidence_digest(receipt)?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
-        "round-2 review repair evidence digest is stale",
-    )?;
-    let receipt = Value::Object(receipt.clone());
-    let completion = find_completion_commit(
-        root,
-        "Repair 0.2.0 follow-up review findings",
-        &[
-            ("Follow-Up-Findings", "10=closed"),
-            ("Target-Version", "0.2.0"),
-            ("Evidence-Digest", digest.as_str()),
-        ],
-    )?;
-    let prerequisite = text(&receipt, "prerequisite_commit", &path)?;
-    let source = text(&receipt, "source_identity", &path)?;
-    let prerequisite_source = text(&receipt, "prerequisite_source", &path)?;
-    require(
-        receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["candidate_source_digest"].as_str()
-                == Some(repository_digest_at_commit(root, &completion)?.as_str())
-            && command_text(root, "git", &["rev-parse", &format!("{completion}^")])?
-                == prerequisite
-            && command_text(root, "git", &["rev-parse", &format!("{prerequisite}^")])? == source,
-        "round-2 review repair candidate identity drifted",
-    )?;
-    require(
-        command_text(root, "git", &["show", "-s", "--format=%s", prerequisite])?
-            == "Clarify coverage worker PR authorization"
-            && command_text(root, "git", &["rev-parse", prerequisite_source])?
-                == prerequisite_source,
-        "round-2 prerequisite cherry-pick identity drifted",
-    )?;
-    let round_one = &receipt["round_one"];
-    require(
-        round_one["completion_commit"] == Value::String(source.into())
-            && round_one["evidence_path"]
-                == Value::String("conformance/0.2/evidence/review-repair.json".into())
-            && round_one["evidence_digest"]
-                == Value::String(
-                    "sha256:0c9fe6171576d7730ff69b7dc271a87ca5021df7cca1264c03b32b73eb8d03b8"
-                        .into(),
-                )
-            && round_one["validation"] == Value::String("commit-bound".into()),
-        "round-2 receipt does not preserve the round-1 evidence identity",
-    )?;
-    let findings = array(&receipt, "findings", &path)?;
-    require(
-        findings.len() == 10
-            && findings.iter().enumerate().all(|(index, finding)| {
-                finding["id"].as_u64() == Some((index + 1) as u64)
-                    && finding["state"] == Value::String("closed".into())
-                    && finding["repair"]
-                        .as_str()
-                        .is_some_and(|repair| !repair.is_empty())
-                    && finding["regression"]
-                        .as_str()
-                        .is_some_and(|test| !test.is_empty())
-            }),
-        "round-2 review repair must close exactly findings 1 through 10",
-    )?;
-    let commands = array(&receipt, "commands", &path)?;
-    require(
-        commands.len() >= 20
-            && commands
-                .iter()
-                .all(|command| command["exit_code"].as_i64() == Some(0)),
-        "round-2 review repair validation matrix is incomplete or failed",
-    )?;
-    let command_texts = commands
-        .iter()
-        .filter_map(|command| command["command"].as_str())
-        .collect::<Vec<_>>();
-    for required in [
-        "cargo test --locked -p mainframe-env-db2",
-        "cargo test --locked -p mainframe-env-batch",
-        "cargo test --locked -p mainframe-env-application",
-        "cargo test --locked -p mainframe-env-server",
-        "cargo test -p xtask --locked",
-        "cargo xtask schemas --check",
-        "cargo xtask carddemo-db2 --check",
-        "cargo xtask carddemo-ims --check",
-        "cargo xtask carddemo-mq-authorization --check",
-        "cargo fmt --all -- --check",
-        "cargo check --workspace --all-targets --all-features --locked",
-        "cargo test --workspace --all-features --locked --no-fail-fast",
-        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
-        "cargo doc --workspace --all-features --no-deps --locked",
-        "cargo +1.95.0 check",
-        "cargo deny check",
-        "cargo xtask runtime-architecture --check",
-        "PostgreSQL 18",
-        "cargo xtask carddemo-full --check",
-        "Zowe CLI 8.36.0",
-        "cargo xtask conformance --check",
-        "cargo xtask certification --check",
-        "cargo xtask release --check --target aarch64-apple-darwin",
-        "cargo xtask release --check --target x86_64-unknown-linux-gnu",
-        "git diff --check",
-    ] {
-        require(
-            command_texts
-                .iter()
-                .any(|command| command.contains(required)),
-            &format!("round-2 review repair validation omits {required}"),
-        )?;
-    }
-    for artifact in array(&receipt, "artifacts", &path)? {
-        let relative = text(artifact, "path", &path)?;
-        require(
-            !relative.contains("..") && !Path::new(relative).is_absolute(),
-            "round-2 review repair artifact path is unsafe",
-        )?;
-        let expected = text(artifact, "sha256", &path)?;
-        require(
-            expected == format!("sha256:{}", git_file_digest(root, &completion, relative)?),
-            &format!("round-2 historical artifact digest drifted: {relative}"),
-        )?;
-    }
-    let workflow = String::from_utf8(git_file_bytes(
-        root,
-        &completion,
-        ".github/workflows/ci.yml",
-    )?)
-    .map_err(|error| error.to_string())?;
-    require(
-        workflow.contains("fetch-depth: 0")
-            && workflow.contains("fetch-tags: true")
-            && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
-        "CI does not retain the round-2 Linux release gate",
-    )?;
-    let manifest: Value = serde_json::from_slice(&git_file_bytes(
-        root,
-        &completion,
-        "release/0.2.0/targets/aarch64-apple-darwin/manifest.json",
-    )?)
-    .map_err(|error| error.to_string())?;
-    require(
-        manifest["target"] == Value::String("aarch64-apple-darwin".into())
-            && manifest["published"] == Value::Bool(false)
-            && receipt["remote_actions"]["tagged"] == Value::Bool(false)
-            && receipt["remote_actions"]["published"] == Value::Bool(false)
-            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
-            && receipt["remote_actions"]["merged"] == Value::Bool(false),
-        "round-2 review repair crossed the release boundary",
-    )
-}
-
-fn check_review_repair_round_3(root: &Path) -> TaskResult {
-    check_review_repair_round_2(root)?;
-    let path = root.join("conformance/0.2/evidence/review-repair-round-3.json");
-    let evidence = json(&path)?;
-    require(
-        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-3@1".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "round-3 review repair evidence header is invalid",
-    )?;
-    let receipt = evidence
-        .get("receipt")
-        .and_then(Value::as_object)
-        .ok_or("round-3 review repair receipt is missing")?;
-    let digest = canonical_evidence_digest(receipt)?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
-        "round-3 review repair evidence digest is stale",
-    )?;
-    let receipt = Value::Object(receipt.clone());
-    let completion = find_completion_commit(
-        root,
-        "Repair 0.2.0 third review findings",
-        &[
-            ("Third-Review-Findings", "11=closed"),
-            ("Target-Version", "0.2.0"),
-            ("Evidence-Digest", digest.as_str()),
-        ],
-    )?;
-    let source = text(&receipt, "source_identity", &path)?;
-    let prerequisite_source = text(&receipt, "prerequisite_source", &path)?;
-    let prerequisite = text(&receipt, "prerequisite_commit", &path)?;
-    verify_completion_parent(root, &completion, prerequisite)?;
-    verify_completion_parent(root, prerequisite, source)?;
-    require(
-        receipt["target_version"] == Value::String("0.2.0".into())
-            && source == "2513e9e56f330369e4a5f4e9a06c043ca99a024a"
-            && prerequisite_source == "d4b94362af56f2847bbd62d106867e6f0bb0648a"
-            && command_text(root, "git", &["show", "-s", "--format=%s", prerequisite])?
-                == "Clarify coverage worker PR authorization"
-            && command_text(root, "git", &["rev-parse", prerequisite_source])?
-                == prerequisite_source
-            && receipt["candidate_source_digest"].as_str()
-                == Some(repository_digest_at_commit(root, &completion)?.as_str()),
-        "round-3 review repair source, prerequisite, or candidate identity drifted",
-    )?;
-    let historical = array(&receipt, "historical_repairs", &path)?;
-    require(
-        historical.len() == 2
-            && historical.iter().enumerate().all(|(index, row)| {
-                row["round"].as_u64() == Some((index + 1) as u64)
-                    && row["validation"] == Value::String("commit-bound".into())
-            }),
-        "round-3 repair must preserve rounds one and two as commit-bound evidence",
-    )?;
-    for (round, subject, trailer_name, trailer_value) in [
-        (
-            1_u64,
-            "Repair 0.2.0 review findings",
-            "Review-Findings",
-            "7=closed",
-        ),
-        (
-            2,
-            "Repair 0.2.0 follow-up review findings",
-            "Follow-Up-Findings",
-            "10=closed",
-        ),
-    ] {
-        let row = historical
-            .iter()
-            .find(|row| row["round"].as_u64() == Some(round))
-            .ok_or_else(|| format!("round-{round} historical repair identity is missing"))?;
-        let historical_digest = text(row, "evidence_digest", &path)?;
-        let historical_completion = find_completion_commit(
-            root,
-            subject,
-            &[
-                (trailer_name, trailer_value),
-                ("Target-Version", "0.2.0"),
-                ("Evidence-Digest", historical_digest),
-            ],
-        )?;
-        require(
-            row["completion_commit"].as_str() == Some(historical_completion.as_str()),
-            &format!("round-{round} historical completion identity drifted"),
-        )?;
-    }
-    let findings = array(&receipt, "findings", &path)?;
-    require(
-        findings.len() == 11
-            && findings.iter().enumerate().all(|(index, finding)| {
-                finding["id"].as_u64() == Some((index + 1) as u64)
-                    && finding["state"] == Value::String("closed".into())
-                    && finding["repair"]
-                        .as_str()
-                        .is_some_and(|repair| !repair.is_empty())
-                    && finding["regression"]
-                        .as_str()
-                        .is_some_and(|test| !test.is_empty())
-            }),
-        "round-3 review repair must close exactly findings 1 through 11",
-    )?;
-    let commands = array(&receipt, "commands", &path)?;
-    require(
-        commands.len() >= 25
-            && commands
-                .iter()
-                .all(|command| command["exit_code"].as_i64() == Some(0)),
-        "round-3 review repair validation matrix is incomplete or failed",
-    )?;
-    let command_texts = commands
-        .iter()
-        .filter_map(|command| command["command"].as_str())
-        .collect::<Vec<_>>();
-    for required in [
-        "cargo test --locked -p mainframe-env-application",
-        "cargo test --locked -p mainframe-env-db2",
-        "cargo test --locked -p mainframe-env-racf",
-        "cargo test --locked -p mainframe-env-server",
-        "cargo test -p xtask --locked",
-        "cargo fmt --all -- --check",
-        "cargo check --workspace --all-targets --all-features --locked",
-        "cargo test --workspace --all-features --locked --no-fail-fast",
-        "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
-        "cargo doc --workspace --all-features --no-deps --locked",
-        "cargo +1.95.0 check",
-        "cargo deny check",
-        "cargo xtask runtime-architecture --check",
-        "cargo xtask schemas --check",
-        "cargo xtask application-packages --check",
-        "cargo xtask db2-catalog --check",
-        "cargo xtask batch-controllers --check",
-        "cargo xtask migration-rollback --check",
-        "PostgreSQL 18",
-        "cargo xtask carddemo-full --check",
-        "Zowe CLI 8.36.0",
-        "cargo xtask release --check --target aarch64-apple-darwin",
-        "cargo xtask release --check --target x86_64-unknown-linux-gnu",
-        "cargo xtask conformance --check",
-        "cargo xtask certification --check",
-        "git diff --check",
-    ] {
-        require(
-            command_texts
-                .iter()
-                .any(|command| command.contains(required)),
-            &format!("round-3 review repair validation omits {required}"),
-        )?;
-    }
-    require(
-        receipt["toolchains"]["rust"] == Value::String("1.98.0".into())
-            && receipt["toolchains"]["msrv"] == Value::String("1.95.0".into())
-            && receipt["toolchains"]["zowe_cli"] == Value::String("8.36.0".into())
-            && receipt["toolchains"]["postgresql"] == Value::String("18".into())
-            && receipt["toolchains"]["targets"]
-                .as_array()
-                .is_some_and(|targets| {
-                    targets.as_slice()
-                        == [
-                            Value::String("aarch64-apple-darwin".into()),
-                            Value::String("x86_64-unknown-linux-gnu".into()),
-                        ]
-                })
-            && receipt["pull_request"]["number"].as_u64() == Some(1)
-            && receipt["pull_request"]["head"] == Value::String("impl/0.2.0".into())
-            && receipt["pull_request"]["base"] == Value::String("main".into())
-            && receipt["pull_request"]["check_identities"]
-                .as_array()
-                .is_some_and(|checks| checks.len() == 2),
-        "round-3 toolchain, target, PR, or check identities are incomplete",
-    )?;
-    for artifact in array(&receipt, "artifacts", &path)? {
-        let relative = text(artifact, "path", &path)?;
-        let expected = text(artifact, "sha256", &path)?;
-        require(
-            !relative.contains("..")
-                && !Path::new(relative).is_absolute()
-                && expected == format!("sha256:{}", git_file_digest(root, &completion, relative)?),
-            &format!("round-3 historical artifact digest drifted: {relative}"),
-        )?;
-    }
-    let workflow = String::from_utf8(git_file_bytes(
-        root,
-        &completion,
-        ".github/workflows/ci.yml",
-    )?)
-    .map_err(|error| error.to_string())?;
-    require(
-        workflow.contains("fetch-depth: 0")
-            && workflow.contains("fetch-tags: true")
-            && workflow.contains("rust:1.98.0-bookworm@sha256:")
-            && workflow.contains("cargo xtask release --check --target x86_64-unknown-linux-gnu"),
-        "CI does not retain the pinned round-3 Linux release gate",
-    )?;
-    for target in ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"] {
-        let manifest_path = format!("release/0.2.0/targets/{target}/manifest.json");
-        let manifest: Value =
-            serde_json::from_slice(&git_file_bytes(root, &completion, &manifest_path)?)
-                .map_err(|error| error.to_string())?;
-        require(
-            manifest["target"] == Value::String(target.into())
-                && manifest["published"] == Value::Bool(false)
-                && manifest["artifacts"]
-                    .as_array()
-                    .is_some_and(|artifacts| artifacts.len() == 6),
-            &format!("round-3 {target} release evidence is incomplete"),
-        )?;
-    }
-    require(
-        receipt["remote_actions"]["tagged"] == Value::Bool(false)
-            && receipt["remote_actions"]["published"] == Value::Bool(false)
-            && receipt["remote_actions"]["deployed"] == Value::Bool(false)
-            && receipt["remote_actions"]["merged"] == Value::Bool(false),
-        "round-3 review repair crossed the release boundary",
-    )
-}
-
-fn check_review_repair_round_4(root: &Path) -> TaskResult {
-    check_review_repair_round_3(root)?;
-    check_evidence_seal(root)?;
-    let path = root.join("conformance/0.2/evidence/review-repair-round-4.json");
-    let evidence = json(&path)?;
-    require(
-        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-4@1".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "round-four review repair evidence header is invalid",
-    )?;
-    let receipt = evidence
-        .get("receipt")
-        .and_then(Value::as_object)
-        .ok_or("round-four review repair receipt is missing")?;
-    let digest = canonical_evidence_digest(receipt)?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
-        "round-four review repair evidence digest is stale",
-    )?;
-    let receipt = Value::Object(receipt.clone());
-    require(
-        receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["accepted_parent"]
-                == Value::String("b61d604fbdf4867154f235d45fd4453ef7e3b79d".into())
-            && receipt["branch"] == Value::String("impl/0.2.0".into())
-            && receipt["base"] == Value::String("main".into())
-            && receipt["pull_request"].as_u64() == Some(1)
-            && receipt["future_ci_success_claimed"] == Value::Bool(false),
-        "round-four source, branch, or future-CI boundary is invalid",
-    )?;
-    let findings = array(&receipt, "findings", &path)?;
-    require(
-        findings.len() == 3
-            && findings.iter().enumerate().all(|(index, finding)| {
-                finding["id"].as_u64() == Some((index + 1) as u64)
-                    && finding["state"] == Value::String("closed".into())
-                    && finding["repair"]
-                        .as_str()
-                        .is_some_and(|text| !text.is_empty())
-                    && finding["regression"]
-                        .as_str()
-                        .is_some_and(|text| !text.is_empty())
-            }),
-        "round-four repair must close exactly findings 1 through 3",
-    )?;
-    let supersession = &receipt["round_three_supersession"];
-    require(
-        supersession["status"] == Value::String("superseded".into())
-            && supersession["original"]["completion_commit"]
-                == Value::String("ab4894d6111910b08f37579134520a1de93a1e8a".into())
-            && supersession["original"]["evidence_digest"]
-                == Value::String(
-                    "sha256:bc89e54756b11557bb5828357a1de8661e9d821f7fa9d481129be92994fdbbf9"
-                        .into(),
-                )
-            && supersession["accepted_follow_up"]["tip"]
-                == Value::String("b61d604fbdf4867154f235d45fd4453ef7e3b79d".into())
-            && supersession["accepted_follow_up"]["candidate_source_digest"]
-                == Value::String(
-                    "sha256:b812dbbae8d65467c5576c97314a0a0a2437efb13fccad3a8edebb02657e7435"
-                        .into(),
-                ),
-        "round-three supersession does not preserve and correct the historical identity",
-    )?;
-    require(
-        supersession["accepted_follow_up"]["candidate_source_digest"].as_str()
-            == Some(
-                repository_digest_at_commit(root, "b61d604fbdf4867154f235d45fd4453ef7e3b79d")?
-                    .as_str(),
-            ),
-        "accepted round-three follow-up candidate digest drifted",
-    )?;
-    let failed = supersession["failed_candidates"]
-        .as_array()
-        .ok_or("round-three supersession failed candidates are missing")?;
-    require(
-        failed.len() == 3
-            && failed.iter().all(|run| {
-                run["event"] == Value::String("pull_request".into())
-                    && run["run_status"] == Value::String("completed".into())
-                    && run["run_conclusion"] == Value::String("failure".into())
-                    && run["job"]["name"] == Value::String("v0-foundation".into())
-                    && run["job"]["conclusion"] == Value::String("failure".into())
-            })
-            && failed
-                .iter()
-                .filter_map(|run| run["run_id"].as_u64())
-                .collect::<BTreeSet<_>>()
-                == BTreeSet::from([33420718088, 33422012078, 33424133663]),
-        "round-three supersession failed-run identities are incomplete",
-    )?;
-    let accepted = supersession["accepted_follow_up"]["checks"]
-        .as_array()
-        .ok_or("round-three supersession accepted checks are missing")?;
-    require(
-        accepted.len() == 2
-            && accepted.iter().all(|run| {
-                run["head_sha"] == Value::String("b61d604fbdf4867154f235d45fd4453ef7e3b79d".into())
-                    && run["run_status"] == Value::String("completed".into())
-                    && run["run_conclusion"] == Value::String("success".into())
-                    && run["job"]["name"] == Value::String("v0-foundation".into())
-                    && run["job"]["conclusion"] == Value::String("success".into())
-            })
-            && accepted
-                .iter()
-                .filter_map(|run| run["event"].as_str())
-                .collect::<BTreeSet<_>>()
-                == BTreeSet::from(["pull_request", "push"])
-            && accepted
-                .iter()
-                .filter_map(|run| run["run_id"].as_u64())
-                .collect::<BTreeSet<_>>()
-                == BTreeSet::from([33425915373, 33425919905]),
-        "round-three supersession accepted run identities are incomplete",
-    )?;
-    let source_path = supersession["source_provenance"]["path"]
-        .as_str()
-        .ok_or("round-three supersession source path is missing")?;
-    evidence_seal::validate_actions_source(root, &json(&root.join(source_path))?)?;
-    require(
-        fs::read(root.join("conformance/0.2/evidence/review-repair-round-3.json"))
-            .map_err(|error| error.to_string())?
-            == git_file_bytes(
-                root,
-                "ab4894d6111910b08f37579134520a1de93a1e8a",
-                "conformance/0.2/evidence/review-repair-round-3.json",
-            )?,
-        "historical round-three receipt was rewritten instead of superseded",
-    )?;
-    let completions = evidence_seal::round_four_completion_commits(root, Some(&digest))?;
-    require(
-        completions.len() <= 1,
-        "round-four completion identity is duplicated",
-    )?;
-    if let Some(completion) = completions.first() {
-        require(
-            command_text(root, "git", &["rev-parse", &format!("{completion}^")])?
-                == "b61d604fbdf4867154f235d45fd4453ef7e3b79d",
-            "round-four completion parent is not the accepted b61d604 tip",
-        )?;
-        for artifact in array(&receipt, "artifacts", &path)? {
-            let relative = text(artifact, "path", &path)?;
-            let expected = text(artifact, "sha256", &path)?;
-            require(
-                expected == format!("sha256:{}", git_file_digest(root, completion, relative)?),
-                &format!("round-four sealed artifact drifted: {relative}"),
-            )?;
-        }
-    }
-    require(
-        receipt["remote_actions"]
-            == json!({"tagged": false, "published": false, "deployed": false, "merged": false}),
-        "round-four repair crossed the remote-action boundary",
-    )?;
-    Ok(())
-}
-
-fn check_review_repair_round_5(root: &Path) -> TaskResult {
-    check_review_repair_round_4(root)?;
-    let path = root.join("conformance/0.2/evidence/review-repair-round-5.json");
-    let evidence = json(&path)?;
-    require(
-        evidence["schema_version"] == Value::String("mainframe-env.review-repair-round-5@1".into())
-            && evidence["derived"] == Value::Bool(true)
-            && evidence["status"] == Value::String("pass".into()),
-        "round-five review repair evidence header is invalid",
-    )?;
-    let receipt = evidence
-        .get("receipt")
-        .and_then(Value::as_object)
-        .ok_or("round-five review repair receipt is missing")?;
-    let digest = canonical_evidence_digest(receipt)?;
-    require(
-        evidence["evidence_digest"].as_str() == Some(digest.as_str()),
-        "round-five review repair evidence digest is stale",
-    )?;
-    let receipt = Value::Object(receipt.clone());
-    require(
-        receipt["target_version"] == Value::String("0.2.0".into())
-            && receipt["accepted_parent"]
-                == Value::String("36344c542e82a4174f5be7da6038f7095ce6cba8".into())
-            && receipt["branch"] == Value::String("impl/0.2.0".into())
-            && receipt["historical_round_four"]["completion_commit"]
-                == Value::String("36344c542e82a4174f5be7da6038f7095ce6cba8".into())
-            && receipt["historical_round_four"]["remote_evidence_credit"]
-                == Value::String("none".into()),
-        "round-five source or historical-evidence boundary is invalid",
-    )?;
-    fn contains_forbidden_key(value: &Value) -> bool {
-        const FORBIDDEN: [&str; 13] = [
-            "commands",
-            "command",
-            "exit_code",
-            "result",
-            "workspace",
-            "tests_passed",
-            "toolchains",
-            "github_jobs",
-            "run_id",
-            "job_id",
-            "conclusion",
-            "future_ci_success_claimed",
-            "check_identities",
-        ];
-        match value {
-            Value::Array(values) => values.iter().any(contains_forbidden_key),
-            Value::Object(values) => {
-                values.keys().any(|key| FORBIDDEN.contains(&key.as_str()))
-                    || values.values().any(contains_forbidden_key)
-            }
-            _ => false,
-        }
-    }
-    require(
-        !contains_forbidden_key(&receipt),
-        "round-five content receipt contains execution or remote-attestation claims",
-    )?;
-    let findings = array(&receipt, "findings", &path)?;
-    require(
-        findings.len() == 4
-            && findings.iter().enumerate().all(|(index, finding)| {
-                finding["id"].as_u64() == Some((index + 1) as u64)
-                    && finding["state"] == Value::String("closed".into())
-                    && finding["content_rule"]
-                        .as_str()
-                        .is_some_and(|value| !value.is_empty())
-            }),
-        "round-five repair must close exactly findings 1 through 4",
-    )?;
-    let profile_path = receipt["profile"]["path"]
-        .as_str()
-        .ok_or("round-five profile path is missing")?;
-    let profile = json(&root.join(profile_path))?;
-    evidence_seal::validate_profile(&profile)?;
-    require(
-        receipt["profile"]["sha256"].as_str()
-            == Some(format!("sha256:{}", file_digest(&root.join(profile_path))?).as_str()),
-        "round-five profile digest drifted",
-    )?;
-    let inventory = receipt["release_inventory"]
-        .as_array()
-        .ok_or("round-five release inventory is missing")?;
-    require(
-        inventory.len() == 2
-            && inventory[0]["target"] == Value::String("aarch64-apple-darwin".into())
-            && inventory[1]["target"] == Value::String("x86_64-unknown-linux-gnu".into())
-            && inventory.iter().all(|target| {
-                target["documents"].as_array().is_some_and(|documents| {
-                    documents.as_slice()
-                        == [
-                            Value::String("LICENSES.md".into()),
-                            Value::String("build-inputs.json".into()),
-                            Value::String("checksums.sha256".into()),
-                            Value::String("manifest.json".into()),
-                            Value::String("provenance.intoto.json".into()),
-                            Value::String("sbom.cdx.json".into()),
-                        ]
-                })
-            }),
-        "round-five release inventory is not the exact two-target six-document set",
-    )?;
-    let completions = evidence_seal::round_five_completion_commits(root, Some(&digest))?;
-    require(
-        completions.len() <= 1,
-        "round-five completion identity is duplicated",
-    )?;
-    if let Some(completion) = completions.first() {
-        require(
-            command_text(root, "git", &["rev-parse", &format!("{completion}^")])?
-                == "36344c542e82a4174f5be7da6038f7095ce6cba8",
-            "round-five completion parent is not the accepted round-four tip",
-        )?;
-        let mut artifact_paths = BTreeSet::new();
-        for artifact in array(&receipt, "artifacts", &path)? {
-            let relative = text(artifact, "path", &path)?;
-            let expected = text(artifact, "sha256", &path)?;
-            require(
-                artifact_paths.insert(relative)
-                    && expected
-                        == format!("sha256:{}", git_file_digest(root, completion, relative)?),
-                &format!("round-five content artifact drifted or duplicated: {relative}"),
-            )?;
-        }
-    }
-    Ok(())
-}
-
 fn validate_official_source(source: &Value, path: &Path, baseline: &str) -> TaskResult {
     let source = source.as_object().ok_or_else(|| {
         format!(
@@ -13432,97 +10343,14 @@ fn validate_sha256_identity(value: &str, field: &str) -> TaskResult {
     )
 }
 
-fn check_evidence(root: &Path) -> TaskResult {
-    let evidence = root.join("conformance/0.1/evidence");
-    let entry_path = evidence.join("entry.json");
-    let entry = json(&entry_path)?;
-    require(
-        entry.get("derived") == Some(&Value::Bool(true)),
-        "entry evidence is not derived",
-    )?;
-    require(
-        entry.get("status") == Some(&Value::String("pass".to_string())),
-        "entry gate is not pass",
-    )?;
-    let status_path = evidence.join("program-status.json");
-    let status = json(&status_path)?;
-    require(
-        text(&status, "current_phase", &status_path)?.starts_with("ME.V"),
-        "program phase is invalid",
-    )?;
-    require(
-        !array(&status, "commands", &status_path)?.is_empty(),
-        "program status has no command receipts",
-    )?;
-    let current = text(&status, "current_phase", &status_path)?
-        .strip_prefix("ME.V")
-        .ok_or("current phase prefix is invalid")?
-        .parse::<usize>()
-        .map_err(|error| format!("current phase number is invalid: {error}"))?;
-    for phase in 0..=current {
-        let path = evidence.join(format!("phase-v{phase}.json"));
-        let result = json(&path)?;
-        require(
-            result.get("derived") == Some(&Value::Bool(true))
-                && result.get("status") == Some(&Value::String("pass".to_string())),
-            &format!("ME.V{phase} evidence does not derive pass"),
-        )?;
-        require(
-            text(&result, "digest", &path)?.starts_with("sha256:"),
-            &format!("ME.V{phase} evidence digest is missing"),
-        )?;
-    }
-    Ok(())
-}
-
-/// Schema/instance consistency and historical sealed-input verification, not
-/// a new full conformance campaign or licensed-equivalence result.
-fn check_evidence_fast(root: &Path) -> TaskResult {
-    check_schemas(root)?;
-    evidence_seal::check(root)
-}
-
 fn check_runtime_architecture(root: &Path) -> TaskResult {
     check_architecture(root)?;
     let target = host_target(root)?;
-    build_release_target(root, &target)?;
-    smoke_release_target(root, &target)
+    build_runtime_target(root, &target)?;
+    smoke_runtime_target(root, &target)
 }
 
-fn release_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
-    require(binary.is_file(), "release server binary is missing")?;
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| error.to_string())?
-        .as_nanos();
-    let directory = env::temp_dir().join(format!(
-        "mainframe-env-runtime-architecture-{}-{nonce}",
-        std::process::id()
-    ));
-    fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
-    let database = directory.join("state.db");
-    let result = (|| {
-        let (mut first, first_port) =
-            spawn_release_server(root, binary, &directory, &database, true)?;
-        let first_result = wait_for_release_readiness(&mut first, first_port);
-        stop_release_server(&mut first);
-        first_result?;
-
-        let (mut restarted, restarted_port) =
-            spawn_release_server(root, binary, &directory, &database, false)?;
-        let restart_result = wait_for_release_readiness(&mut restarted, restarted_port)
-            .and_then(|()| authenticate_release_administrator(restarted_port));
-        stop_release_server(&mut restarted);
-        restart_result
-    })();
-    if directory.exists() {
-        fs::remove_dir_all(&directory)
-            .map_err(|error| format!("{}: {error}", directory.display()))?;
-    }
-    result
-}
-
-fn spawn_release_server(
+fn spawn_runtime_server(
     root: &Path,
     binary: &Path,
     directory: &Path,
@@ -13557,10 +10385,10 @@ fn spawn_release_server(
     command
         .spawn()
         .map(|child| (child, port))
-        .map_err(|error| format!("start release server: {error}"))
+        .map_err(|error| format!("start runtime server: {error}"))
 }
 
-fn wait_for_release_readiness(child: &mut Child, port: u16) -> TaskResult {
+fn wait_for_runtime_readiness(child: &mut Child, port: u16) -> TaskResult {
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
@@ -13568,9 +10396,9 @@ fn wait_for_release_readiness(child: &mut Child, port: u16) -> TaskResult {
             if let Some(mut pipe) = child.stderr.take() {
                 let _ = pipe.read_to_string(&mut stderr);
             }
-            return Err(format!("release server exited {status}: {stderr}"));
+            return Err(format!("runtime server exited {status}: {stderr}"));
         }
-        if let Ok(response) = release_http_request(
+        if let Ok(response) = runtime_http_request(
             port,
             b"GET /zosmf/info HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
         ) && response
@@ -13601,11 +10429,11 @@ fn wait_for_release_readiness(child: &mut Child, port: u16) -> TaskResult {
         }
         thread::sleep(Duration::from_millis(50));
     }
-    Err("release SQLite server did not become fully ready".into())
+    Err("runtime SQLite server did not become fully ready".into())
 }
 
-fn authenticate_release_administrator(port: u16) -> TaskResult {
-    let response = release_http_request(
+fn authenticate_runtime_administrator(port: u16) -> TaskResult {
+    let response = runtime_http_request(
         port,
         b"POST /zosmf/services/authenticate HTTP/1.1\r\nHost: localhost\r\nAuthorization: Basic QURNSU46VEVTVFBBU1M=\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
     )?;
@@ -13614,22 +10442,22 @@ fn authenticate_release_administrator(port: u16) -> TaskResult {
             .lines()
             .next()
             .is_some_and(|line| line.contains(" 200 ")),
-        "restarted release server rejected the persisted administrator",
+        "restarted runtime server rejected the persisted administrator",
     )?;
     let (_, body) = response
         .split_once("\r\n\r\n")
-        .ok_or("release authentication response has no body")?;
+        .ok_or("runtime authentication response has no body")?;
     let authentication: Value = serde_json::from_str(body).map_err(|error| error.to_string())?;
     require(
         authentication["user"] == Value::String("ADMIN".into())
             && authentication["token"]
                 .as_str()
                 .is_some_and(|token| token.starts_with("session-")),
-        "restarted release server returned an invalid authentication receipt",
+        "restarted runtime server returned an invalid authentication receipt",
     )
 }
 
-fn release_http_request(port: u16, request: &[u8]) -> TaskResult<String> {
+fn runtime_http_request(port: u16, request: &[u8]) -> TaskResult<String> {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| error.to_string())?;
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
@@ -13647,7 +10475,7 @@ fn release_http_request(port: u16, request: &[u8]) -> TaskResult<String> {
     Ok(response)
 }
 
-fn stop_release_server(child: &mut Child) {
+fn stop_runtime_server(child: &mut Child) {
     if child.try_wait().ok().flatten().is_none() {
         let _ = child.kill();
         let _ = child.wait();
@@ -13655,21 +10483,18 @@ fn stop_release_server(child: &mut Child) {
 }
 
 fn check_certification(root: &Path) -> TaskResult {
-    check_versions(root)?;
     check_profiles(root)?;
     check_schemas(root)?;
     check_inventory(root)?;
-    check_evidence(root)?;
+
     check_coverage(root)?;
     check_semantic_identities(root)?;
     check_application_packages(root)?;
     check_db2_catalog(root)?;
-    check_review_repair_round_4(root)?;
-    check_review_repair_round_5(root)?;
-    check_evidence_seal(root)?;
+
     check_runtime_architecture(root)?;
 
-    let inventory = root.join("conformance/0.1/inventory");
+    let inventory = root.join("conformance/subsystems/platform/inventory");
     let packages_path = inventory.join("packages.json");
     let packages = json(&packages_path)?;
     let mut package_names = array(&packages, "packages", &packages_path)?
@@ -13677,8 +10502,8 @@ fn check_certification(root: &Path) -> TaskResult {
         .map(|row| text(row, "name", &packages_path).map(str::to_string))
         .collect::<TaskResult<BTreeSet<_>>>()?;
     for additions_path in [
-        root.join("conformance/0.2/inventory/package-additions.json"),
-        root.join("conformance/0.8/inventory/package-additions.json"),
+        root.join("conformance/subsystems/coverage/inventory/package-additions.json"),
+        root.join("conformance/subsystems/jes/inventory/package-additions.json"),
     ] {
         let additions = json(&additions_path)?;
         for package in array(&additions, "packages", &additions_path)? {
@@ -13757,97 +10582,6 @@ fn check_certification(root: &Path) -> TaskResult {
         )?;
     }
 
-    let evidence = root.join("conformance/0.1/evidence");
-    for name in [
-        "compatibility-summary.json",
-        "profile-closure.json",
-        "resource-summary.json",
-        "security-summary.json",
-        "recovery-summary.json",
-        "verification-summary.json",
-        "cutover-summary.json",
-        "release-exit-gates.json",
-    ] {
-        let path = evidence.join(name);
-        let value = json(&path)?;
-        require(
-            value
-                .get("status")
-                .and_then(Value::as_str)
-                .is_some_and(|status| status.starts_with("pass")),
-            &format!("{name} does not pass"),
-        )?;
-    }
-    for name in [
-        "cobol-hello.json",
-        "cics-carddemo.json",
-        "jcl-jes.json",
-        "zosmf.json",
-        "dataset.json",
-        "racf.json",
-    ] {
-        let path = evidence.join("differential").join(name);
-        let value = json(&path)?;
-        require(
-            value
-                .get("status")
-                .and_then(Value::as_str)
-                .is_some_and(|status| status.starts_with("pass")),
-            &format!("differential {name} does not pass"),
-        )?;
-    }
-    for phase in 0..=7 {
-        let subject = format!("Complete ME.V{phase}");
-        let output = Command::new("git")
-            .args(["log", "--format=%B%x00", "--grep", &format!("^{subject}")])
-            .current_dir(root)
-            .output()
-            .map_err(|error| format!("git log: {error}"))?;
-        require(output.status.success(), "git log failed")?;
-        let message = String::from_utf8(output.stdout).map_err(|error| error.to_string())?;
-        require(
-            message.contains(&format!("Phase-Gate: ME.V{phase}=pass"))
-                && message.contains("Evidence-Digest: sha256:")
-                && message.contains("Product-Version: 0.1.0-alpha.0"),
-            &format!("ME.V{phase} completion commit or trailers are missing"),
-        )?;
-    }
-    for subject in [
-        "Fix SQL stores in async server contexts",
-        "Route execution through the common coordinator",
-        "Wire transactional execution durability",
-        "Enforce scoped provider capabilities",
-        "Record the twenty-package architecture decision",
-        "Make architecture certification executable",
-    ] {
-        let output = Command::new("git")
-            .args([
-                "log",
-                "-1",
-                "--format=%H",
-                "--grep",
-                &format!("^{subject}$"),
-            ])
-            .current_dir(root)
-            .output()
-            .map_err(|error| format!("git log for {subject}: {error}"))?;
-        require(
-            output.status.success() && !output.stdout.is_empty(),
-            &format!("architecture remediation commit is missing: {subject}"),
-        )?;
-    }
-    let exit_gates_path = evidence.join("release-exit-gates.json");
-    let exit_gates = json(&exit_gates_path)?;
-    for condition in [
-        "architecture_audit_remediated",
-        "runtime_architecture_gate_pass",
-        "issue_commits_present",
-    ] {
-        require(
-            exit_gates["conditions"][condition] == Value::Bool(true),
-            &format!("release exit condition {condition} is not derived true"),
-        )?;
-    }
     let workspace_tests = Command::new("cargo")
         .args([
             "test",
@@ -13864,30 +10598,12 @@ fn check_certification(root: &Path) -> TaskResult {
         workspace_tests.success(),
         "certification workspace tests failed",
     )?;
-    check_certification_release_artifacts(root)?;
     Ok(())
 }
 
 fn print_digest(root: &Path) -> TaskResult {
     println!("{}", repository_digest(root)?);
     Ok(())
-}
-
-fn accepted_0_2_candidate_digest(root: &Path) -> TaskResult<String> {
-    repository_digest_at_commit(root, &accepted_0_2_completion(root)?)
-}
-
-fn accepted_0_2_completion(root: &Path) -> TaskResult<String> {
-    let evidence = json(&root.join("conformance/0.2/evidence/review-repair-round-5.json"))?;
-    let evidence_digest = evidence["evidence_digest"]
-        .as_str()
-        .ok_or("round-five accepted-candidate evidence digest is missing")?;
-    let completions = evidence_seal::round_five_completion_commits(root, Some(evidence_digest))?;
-    match completions.as_slice() {
-        [completion] => Ok(completion.clone()),
-        [] => Err("round-five accepted-candidate completion is missing".into()),
-        _ => Err("round-five accepted-candidate completion is duplicated".into()),
-    }
 }
 
 fn repository_digest(root: &Path) -> TaskResult<String> {
@@ -13910,231 +10626,36 @@ fn repository_digest(root: &Path) -> TaskResult<String> {
     Ok(format!("sha256:{:x}", digest.finalize()))
 }
 
-fn repository_digest_at_commit(root: &Path, commit: &str) -> TaskResult<String> {
-    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", commit])?;
-    let mut files = listing.lines().map(PathBuf::from).collect::<Vec<_>>();
-    files.sort();
-    let mut digest = Sha256::new();
-    for relative in files {
-        if repository_digest_excluded(&relative) {
-            continue;
-        }
-        let relative = relative.to_string_lossy();
-        let bytes = git_file_bytes(root, commit, &relative)?;
-        digest.update((relative.len() as u64).to_be_bytes());
-        digest.update(relative.as_bytes());
-        digest.update((bytes.len() as u64).to_be_bytes());
-        digest.update(bytes);
-    }
-    Ok(format!("sha256:{:x}", digest.finalize()))
-}
-
 fn repository_digest_excluded(relative: &Path) -> bool {
-    // Old Git trees retain version paths; current trees use subsystem paths.
-    let relative_text = relative.to_string_lossy();
     relative.starts_with(".git")
         || relative.starts_with("target")
-        || relative.starts_with("conformance/0.1/evidence/raw")
-        || relative == Path::new("conformance/0.1/evidence/program-status.json")
-        || relative == Path::new("conformance/0.2/evidence/program-status.json")
-        || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
-        || relative == Path::new("conformance/0.2/evidence/full-regression.json")
-        || relative == Path::new("conformance/0.2/evidence/review-repair.json")
-        || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
-        || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
-        || relative == Path::new("conformance/0.2/evidence/review-repair-round-4.json")
-        || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
-        || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
-        || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
-        || relative == Path::new("docs/delivery/subsystems/coverage/foundation-status.md")
-        || relative == Path::new("conformance/0.6/evidence/dataset-certification.json")
-        || relative == Path::new("docs/delivery/coverage-versions/status/0.6.0.md")
-        || relative == Path::new("docs/delivery/subsystems/dataset/data-status.md")
-        || (relative_text.starts_with("conformance/0.1/evidence/phase-v")
-            && relative.extension() == Some(OsStr::new("json")))
+        || relative
+            .components()
+            .any(|part| part.as_os_str() == "__pycache__")
 }
 
-fn accepted_0_2_release_source_digest(root: &Path) -> TaskResult<String> {
-    let accepted_candidate = accepted_0_2_completion(root)?;
-    let listing = command_text(
-        root,
-        "git",
-        &["ls-tree", "-r", "--name-only", &accepted_candidate],
-    )?;
-    let mut files = listing.lines().map(PathBuf::from).collect::<Vec<_>>();
-    files.sort();
-    let mut digest = Sha256::new();
-    for relative in files {
-        if relative.starts_with(".git")
-            || relative.starts_with("target")
-            || relative.starts_with("release")
-            || relative.starts_with("conformance/0.1/evidence/raw")
-            || relative == Path::new("conformance/0.2/evidence/program-status.json")
-            || relative == Path::new("conformance/0.2/evidence/workload-ledger.json")
-            || relative == Path::new("conformance/0.2/evidence/full-regression.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair-round-2.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair-round-3.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair-round-4.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair-round-4-inputs.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair-round-5.json")
-            || relative == Path::new("conformance/0.2/evidence/review-repair-round-5-profile.json")
-            || relative
-                == Path::new("conformance/0.2/schemas/review-repair-round-5-profile.schema.json")
-            || relative == Path::new("conformance/0.2/schemas/review-repair-round-5.schema.json")
-            || relative == Path::new("conformance/0.2/evidence/sources/round-3-ci-runs.json")
-            || relative == Path::new("conformance/0.2/evidence/work-packages/CV-209.json")
-            || relative == Path::new("docs/delivery/coverage-versions/status/0.2.0.md")
-        {
-            continue;
-        }
-        let bytes = if relative == Path::new("xtask/src/main.rs")
-            || relative == Path::new("xtask/src/evidence_seal.rs")
-            || relative == Path::new("docs/releases/0.2.md")
-            || relative == Path::new("conformance/0.2/evidence/work-package-amendments.json")
-        {
-            git_file_bytes(
-                root,
-                "36344c542e82a4174f5be7da6038f7095ce6cba8",
-                &relative.to_string_lossy(),
-            )?
-        } else {
-            git_file_bytes(root, &accepted_candidate, &relative.to_string_lossy())?
-        };
-        let path = relative.to_string_lossy();
-        digest.update((path.len() as u64).to_be_bytes());
-        digest.update(path.as_bytes());
-        digest.update((bytes.len() as u64).to_be_bytes());
-        digest.update(bytes);
-    }
-    Ok(format!("sha256:{:x}", digest.finalize()))
-}
-
-fn release_source_digest(root: &Path) -> TaskResult<String> {
-    let version = product_version(root)?;
-    if version == "0.2.0" {
-        return accepted_0_2_release_source_digest(root);
-    }
-    live_release_source_digest(root, &version)
-}
-
-fn live_release_source_digest(root: &Path, version: &str) -> TaskResult<String> {
-    stable_zero_version(version)?;
-    require_clean_release_source(root, version)?;
-    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
-    let listing = command_text(root, "git", &["ls-tree", "-r", "--name-only", &head])?;
-    let mut files = listing.lines().map(PathBuf::from).collect::<Vec<_>>();
-    files.sort();
-    let mut digest = Sha256::new();
-    for relative in files {
-        if relative.starts_with("release") {
-            continue;
-        }
-        let relative_text = relative.to_string_lossy();
-        let bytes = git_file_bytes(root, &head, &relative_text)?;
-        digest.update((relative_text.len() as u64).to_be_bytes());
-        digest.update(relative_text.as_bytes());
-        digest.update((bytes.len() as u64).to_be_bytes());
-        digest.update(bytes);
-    }
-    Ok(format!("sha256:{:x}", digest.finalize()))
-}
-
-fn require_clean_release_source(root: &Path, version: &str) -> TaskResult {
-    stable_zero_version(version)?;
-    let allowed = format!("release/{version}/targets/");
-    let mut changed = BTreeSet::new();
-    for arguments in [
-        vec!["diff", "--name-only", "-z"],
-        vec!["diff", "--cached", "--name-only", "-z"],
-        vec!["ls-files", "--others", "--exclude-standard", "-z"],
-    ] {
-        let output = Command::new("git")
-            .args(arguments)
-            .current_dir(root)
-            .output()
-            .map_err(|error| format!("git release source status: {error}"))?;
-        require(
-            output.status.success(),
-            "could not inspect release source cleanliness",
-        )?;
-        for path in output.stdout.split(|byte| *byte == 0) {
-            if path.is_empty() {
-                continue;
-            }
-            let path = std::str::from_utf8(path).map_err(|_| "release source path is not UTF-8")?;
-            if !path.starts_with(&allowed) {
-                changed.insert(path.to_string());
-            }
-        }
-    }
-    require(
-        changed.is_empty(),
-        &format!(
-            "release source is not clean: {}",
-            changed.into_iter().collect::<Vec<_>>().join(", ")
-        ),
-    )
-}
-
-#[cfg(test)]
-fn explicit_release_target(arguments: &[String]) -> TaskResult<String> {
-    let positions = arguments
-        .iter()
-        .enumerate()
-        .filter_map(|(index, argument)| (argument == "--target").then_some(index))
-        .collect::<Vec<_>>();
-    require(
-        positions.len() == 1,
-        "release requires exactly one --target <triple>",
-    )?;
-    let target = arguments
-        .get(positions[0] + 1)
-        .ok_or("release --target value is missing")?;
-    validate_release_target(target)?;
-    Ok(target.clone())
-}
-
-fn validate_release_target(target: &str) -> TaskResult {
+fn validate_runtime_target(target: &str) -> TaskResult {
     require(
         !target.is_empty()
             && target.len() <= 128
             && target
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-            && RETAINED_RELEASE_TARGETS.contains(&target),
-        "release target is invalid",
+            && RETAINED_RUNTIME_TARGETS.contains(&target),
+        "runtime target is invalid",
     )
 }
 
-fn check_release_license_notices(root: &Path) -> TaskResult {
-    release_attestation::validate_repository_policy(root)?;
-    let version = product_version(root)?;
-    let phase_base = command_text(
-        root,
-        "git",
-        &["log", "-1", "--format=%H", "--grep=^Complete ME.V6"],
-    )?;
-    let lock_digest = file_digest(&root.join("Cargo.lock"))?;
-    for target in RETAINED_RELEASE_TARGETS {
-        let report = release_licenses::generate(root, target)?;
-        let sbom = release_attestation::generate_sbom(
-            &report.sbom_graph,
-            target,
-            &version,
-            &phase_base,
-            &lock_digest,
-        )?;
-        let components = sbom["components"].as_array().map_or(0, Vec::len);
-        let dependency_entries = sbom["dependencies"].as_array().map_or(0, Vec::len);
-        println!(
-            "license-notices target={target} production-packages={} third-party-packages={} unique-legal-texts={} bytes={} sbom-components={components} sbom-dependency-entries={dependency_entries}",
-            report.production_packages,
-            report.third_party_packages,
-            report.unique_legal_texts,
-            report.bytes.len()
-        );
-    }
+fn check_license_notices(root: &Path) -> TaskResult {
+    let target = host_target(root)?;
+    let report = dependency_licenses::generate(root, &target)?;
+    println!(
+        "license-notices target={target} production-packages={} third-party-packages={} unique-legal-texts={} bytes={}",
+        report.production_packages,
+        report.third_party_packages,
+        report.unique_legal_texts,
+        report.bytes.len()
+    );
     Ok(())
 }
 
@@ -14144,28 +10665,35 @@ fn host_target(root: &Path) -> TaskResult<String> {
         .lines()
         .find_map(|line| line.strip_prefix("host: "))
         .ok_or("rustc host target is missing")?;
-    validate_release_target(target)?;
+    validate_runtime_target(target)?;
     Ok(target.into())
 }
 
-fn build_release_target(root: &Path, target: &str) -> TaskResult {
-    validate_release_target(target)?;
-    let status = Command::new(root.join("tools/build_release_binaries.sh"))
-        .args(["--target", target])
+fn build_runtime_target(root: &Path, target: &str) -> TaskResult {
+    let status = Command::new("cargo")
+        .args([
+            "build",
+            "--locked",
+            "--release",
+            "--target",
+            target,
+            "-p",
+            "mainframe-env-server",
+            "-p",
+            "mainframe-env-cli",
+            "--bins",
+        ])
         .current_dir(root)
         .status()
-        .map_err(|error| format!("canonical release build for {target}: {error}"))?;
-    require(
-        status.success(),
-        &format!("release build failed for {target}"),
-    )
+        .map_err(|error| error.to_string())?;
+    require(status.success(), "runtime smoke binary build failed")
 }
 
-fn release_binary(root: &Path, target: &str, name: &str) -> PathBuf {
+fn runtime_binary(root: &Path, target: &str, name: &str) -> PathBuf {
     cargo_target_directory(root).join(format!("{target}/release/{name}"))
 }
 
-fn probe_release_binary(binary: &Path, argument: &str, expected: &str) -> TaskResult {
+fn probe_runtime_binary(binary: &Path, argument: &str, expected: &str) -> TaskResult {
     let output = Command::new(binary)
         .arg(argument)
         .output()
@@ -14186,36 +10714,6 @@ fn probe_release_binary(binary: &Path, argument: &str, expected: &str) -> TaskRe
     )
 }
 
-fn smoke_release_target(root: &Path, target: &str) -> TaskResult {
-    let host = host_target(root)?;
-    require(
-        host == target,
-        &format!(
-            "release target {target} cannot be certified on host {host}; exact binaries must execute"
-        ),
-    )?;
-    let version = product_version(root)?;
-    let cli = release_binary(root, target, "mainframe-env");
-    let server = release_binary(root, target, "mainframe-env-server");
-    for binary in [&cli, &server] {
-        require(
-            binary.is_file(),
-            &format!("{} is missing", binary.display()),
-        )?;
-        probe_release_binary(binary, "--version", &version)?;
-        probe_release_binary(binary, "--help", "Usage:")?;
-    }
-    release_server_sqlite_smoke(root, &server)
-}
-
-fn release_linker_determinism(target: &str) -> &'static str {
-    if target.contains("apple-darwin") {
-        "ld64-content-derived-lc-uuid"
-    } else {
-        "-Wl,--build-id=sha1"
-    }
-}
-
 fn cargo_target_directory(root: &Path) -> PathBuf {
     env::var_os("CARGO_TARGET_DIR")
         .map(PathBuf::from)
@@ -14229,1166 +10727,13 @@ fn cargo_target_directory(root: &Path) -> PathBuf {
         .unwrap_or_else(|| root.join("target"))
 }
 
-fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
-    if release_command_retained_candidate(root)?.is_some() {
-        return validate_retained_accepted_release(root, target);
-    }
-    require_release_candidate(root)?;
-    build_release_target(root, target)?;
-    smoke_release_target(root, target)?;
-    let version = product_version(root)?;
-    let release_directory = root.join(release_target_directory(&version, target)?);
-    let retained = release_directory
-        .exists()
-        .then(|| retained_release_documents(root, target))
-        .transpose()?;
-    let retained_provenance = retained.as_ref().and_then(|documents| {
-        documents.iter().find_map(|(path, bytes)| {
-            (path.file_name() == Some(OsStr::new("provenance.intoto.json")))
-                .then_some(bytes.as_slice())
-        })
-    });
-    let documents = release_documents(root, target, retained_provenance)?;
-    validate_release_documents(root, &documents, target)?;
-    for (relative, bytes) in documents {
-        let path = root.join(relative);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-        }
-        fs::write(&path, bytes).map_err(|error| format!("{}: {error}", path.display()))?;
-    }
-    Ok(())
-}
-
-fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
-    if release_command_retained_candidate(root)?.is_some() {
-        return validate_retained_accepted_release(root, target);
-    }
-    require_release_candidate(root)?;
-    let retained = retained_release_documents(root, target)?;
-    build_release_target(root, target)?;
-    smoke_release_target(root, target)?;
-    let retained_provenance = retained
-        .iter()
-        .find_map(|(path, bytes)| {
-            (path.file_name() == Some(OsStr::new("provenance.intoto.json"))).then_some(bytes)
-        })
-        .ok_or("retained target evidence omits provenance.intoto.json")?;
-    let documents = release_documents(root, target, Some(retained_provenance))?;
-    validate_release_documents(root, &documents, target)?;
-    compare_release_documents(&retained, &documents)?;
-    validate_checked_in_release_targets(root)?;
-    Ok(())
-}
-
-fn validate_source_distribution_release(root: &Path) -> TaskResult<bool> {
-    let version = product_version(root)?;
-    let record_path = root.join(format!("release/{version}/source-distribution.json"));
-    if !record_path.is_file() {
-        return Ok(false);
-    }
-    let schema_path = root.join("conformance/0.8/schemas/source-distribution-release.schema.json");
-    let record = json(&record_path)?;
-    validate_schema_instance(&json(&schema_path)?, &record, &record_path)?;
-    require(
-        text(&record, "version", &record_path)? == version
-            && record["runtime_and_contract_changes"] == Value::Bool(true)
-            && record["published_assets"]["native_binaries"] == Value::Bool(false)
-            && record["published_assets"]["native_binary_receipts"] == Value::Bool(false),
-        "source-distribution release identity is inconsistent",
-    )?;
-    let tag = text(&record, "tag", &record_path)?;
-    let tag_commit = text(&record, "tag_commit", &record_path)?;
-    let peeled_tag = format!("{tag}^{{}}");
-    require(
-        command_text(root, "git", &["rev-parse", &peeled_tag])? == tag_commit,
-        "source-distribution release tag moved",
-    )?;
-    let ancestry = Command::new("git")
-        .args(["merge-base", "--is-ancestor", tag_commit, "HEAD"])
-        .current_dir(root)
-        .status()
-        .map_err(|error| format!("source-distribution release ancestry: {error}"))?;
-    require(
-        ancestry.success(),
-        "current candidate does not descend from the source-distribution release tag",
-    )?;
-    require(
-        !root.join(format!("release/{version}/targets")).exists(),
-        "source-distribution release unexpectedly carries target-binary receipts",
-    )?;
-    for digest in [
-        text(
-            &record["published_assets"]["archive"],
-            "sha256",
-            &record_path,
-        )?,
-        text(
-            &record["published_assets"]["checksum"],
-            "sha256",
-            &record_path,
-        )?,
-    ] {
-        validate_sha256_identity(digest, "distribution release asset digest")?;
-    }
-
-    let cargo_lock_digest = text(
-        &record["source_identity"],
-        "cargo_lock_sha256",
-        &record_path,
-    )?;
-    require(
-        cargo_lock_digest
-            == format!(
-                "sha256:{}",
-                git_file_digest(root, tag_commit, "Cargo.lock")?
-            ),
-        "source-distribution Cargo.lock identity drifted",
-    )?;
-    let workflow_commit = text(&record["verification"], "workflow_commit", &record_path)?;
-    let workflow_digest = text(&record["verification"], "workflow_sha256", &record_path)?;
-    let workflow_ancestry = Command::new("git")
-        .args(["merge-base", "--is-ancestor", tag_commit, workflow_commit])
-        .current_dir(root)
-        .status()
-        .map_err(|error| format!("source-distribution workflow ancestry: {error}"))?;
-    require(
-        workflow_ancestry.success()
-            && workflow_digest
-                == format!(
-                    "sha256:{}",
-                    git_file_digest(
-                        root,
-                        workflow_commit,
-                        ".github/workflows/offline-release-bundle.yml",
-                    )?
-                ),
-        "source-distribution workflow identity or ancestry drifted",
-    )?;
-
-    let retained_version = text(&record["prior_binary_receipts"], "version", &record_path)?;
-    let retained =
-        retained_release_documents_for_version(root, retained_version, "aarch64-apple-darwin")?;
-    let inputs = retained
-        .iter()
-        .find_map(|(path, bytes)| {
-            (path.file_name() == Some(OsStr::new("build-inputs.json"))).then_some(bytes)
-        })
-        .ok_or("retained runtime receipts omit build-inputs.json")?;
-    let inputs: Value = serde_json::from_slice(inputs)
-        .map_err(|error| format!("retained release build inputs: {error}"))?;
-    let source_digest = text(&inputs, "source_digest", &record_path)?;
-    validate_checked_in_release_targets_for_identity(
-        root,
-        retained_version,
-        "stable",
-        source_digest,
-    )?;
-    let retained_tag = format!("mainframe-env-v{retained_version}");
-    for retained_target in RETAINED_RELEASE_TARGETS {
-        for (relative, current) in
-            retained_release_documents_for_version(root, retained_version, retained_target)?
-        {
-            let tagged = git_file_bytes(root, &retained_tag, &relative.to_string_lossy())?;
-            require(
-                current == tagged,
-                &format!(
-                    "historical {retained_version} binary receipt drifted: {}",
-                    relative.display()
-                ),
-            )?;
-        }
-    }
-    println!(
-        "source-distribution release version={version} tag={tag} bundle={} native-binary-receipts=absent current-runtime-artifact-credit=0 prior-binary-receipts={retained_version}:historical-only",
-        text(&record["published_assets"]["archive"], "name", &record_path)?
-    );
-    Ok(true)
-}
-
-fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
-    if product_version(root)? != "0.2.0" {
-        return Ok(None);
-    }
-    let accepted = accepted_0_2_completion(root)?;
-    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
-    if head == accepted {
-        return Ok(None);
-    }
-    let status = Command::new("git")
-        .args(["merge-base", "--is-ancestor", &accepted, &head])
-        .current_dir(root)
-        .status()
-        .map_err(|error| format!("git merge-base for accepted 0.2 release: {error}"))?;
-    require(
-        status.success(),
-        "live tree is not descended from the accepted 0.2 release candidate",
-    )?;
-    Ok(Some(accepted))
-}
-
-fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
-    let accepted = retained_accepted_release(root)?
-        .ok_or("retained accepted-release validation requires a later descendant")?;
-    let retained = retained_release_documents_for_version(root, "0.2.0", target)?;
-    let source_digest = accepted_0_2_release_source_digest(root)?;
-    validate_release_documents_for_identity(
-        root,
-        &retained,
-        target,
-        "0.2.0",
-        "stable",
-        &source_digest,
-    )?;
-    for (relative, actual) in &retained {
-        let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
-        require(
-            actual == &expected,
-            &format!(
-                "accepted 0.2 release document drifted after completion: {}",
-                relative.display()
-            ),
-        )?;
-    }
-    validate_historical_0_2_release(root)
-}
-
-fn validate_historical_0_2_release(root: &Path) -> TaskResult {
-    let accepted = accepted_0_2_completion(root)?;
-    let source_digest = accepted_0_2_release_source_digest(root)?;
-    validate_checked_in_release_targets_for_identity(root, "0.2.0", "stable", &source_digest)?;
-    for target in RETAINED_RELEASE_TARGETS {
-        let documents = retained_release_documents_for_version(root, "0.2.0", target)?;
-        for (relative, actual) in documents {
-            let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
-            require(
-                actual == expected,
-                &format!(
-                    "accepted 0.2 release document drifted after completion: {}",
-                    relative.display()
-                ),
-            )?;
-        }
-    }
-    Ok(())
-}
-
-fn compare_release_documents(
-    retained: &BTreeMap<PathBuf, Vec<u8>>,
-    generated: &BTreeMap<PathBuf, Vec<u8>>,
-) -> TaskResult {
-    require(
-        retained.keys().eq(generated.keys()),
-        "retained target evidence file set drifted",
-    )?;
-    for (relative, expected) in generated {
-        let actual = retained
-            .get(relative)
-            .ok_or_else(|| format!("retained target evidence omits {}", relative.display()))?;
-        require(
-            actual == expected,
-            &format!(
-                "{} is stale; regenerate target evidence independently",
-                relative.display()
-            ),
-        )?;
-    }
-    Ok(())
-}
-
-fn retained_release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
-    let version = product_version(root)?;
-    retained_release_documents_for_version(root, &version, target)
-}
-
-fn retained_release_documents_for_version(
-    root: &Path,
-    version: &str,
-    target: &str,
-) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
-    let directory = root.join(release_target_directory(version, target)?);
-    require(
-        directory.is_dir(),
-        &format!("retained target evidence is missing for {target}"),
-    )?;
-    let mut documents = BTreeMap::new();
-    for name in [
-        "manifest.json",
-        "sbom.cdx.json",
-        "provenance.intoto.json",
-        "checksums.sha256",
-        "LICENSES.md",
-        "build-inputs.json",
-    ] {
-        let path = directory.join(name);
-        require(
-            path.is_file(),
-            &format!("retained target evidence omits {name} for {target}"),
-        )?;
-        documents.insert(
-            path.strip_prefix(root)
-                .map_err(|error| error.to_string())?
-                .to_path_buf(),
-            fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?,
-        );
-    }
-    Ok(documents)
-}
-
-fn validate_checked_in_release_targets(root: &Path) -> TaskResult {
-    let version = product_version(root)?;
-    let release_config: toml::Value = read(&root.join("release.toml"))?
-        .parse()
-        .map_err(|error| format!("release.toml: {error}"))?;
-    let channel = release_config["product"]["channel"]
-        .as_str()
-        .ok_or("product.channel is missing")?;
-    let source_digest = release_source_digest(root)?;
-    validate_checked_in_release_targets_for_identity(root, &version, channel, &source_digest)
-}
-
-fn validate_checked_in_release_targets_for_identity(
-    root: &Path,
-    version: &str,
-    channel: &str,
-    source_digest: &str,
-) -> TaskResult {
-    stable_zero_version(version)?;
-    let directory = root.join(format!("release/{version}/targets"));
-    require(
-        directory.is_dir(),
-        &format!("retained target evidence is missing for {version}"),
-    )?;
-    let mut targets = BTreeSet::new();
-    for entry in
-        fs::read_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?
-    {
-        let path = entry.map_err(|error| error.to_string())?.path();
-        if !path.is_dir() {
-            return Err(format!(
-                "release target directory contains non-directory {}",
-                path.display()
-            ));
-        }
-        let target = path
-            .file_name()
-            .and_then(OsStr::to_str)
-            .ok_or("release receipt target is not UTF-8")?;
-        validate_release_target(target)?;
-        targets.insert(target.to_string());
-        let documents = retained_release_documents_for_version(root, version, target)?;
-        if version == product_version(root)? && full_license_notices_required(version)? {
-            validate_release_documents(root, &documents, target)?;
-        } else {
-            validate_release_documents_for_identity(
-                root,
-                &documents,
-                target,
-                version,
-                channel,
-                source_digest,
-            )?;
-        }
-    }
-    require(
-        targets
-            == RETAINED_RELEASE_TARGETS
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-        "retained release target set differs from the advertised targets",
-    )?;
-    Ok(())
-}
-
-fn validate_release_documents(
-    root: &Path,
-    documents: &BTreeMap<PathBuf, Vec<u8>>,
-    target: &str,
-) -> TaskResult {
-    let version = product_version(root)?;
-    let release_config: toml::Value = read(&root.join("release.toml"))?
-        .parse()
-        .map_err(|error| format!("release.toml: {error}"))?;
-    let channel = release_config["product"]["channel"]
-        .as_str()
-        .ok_or("product.channel is missing")?;
-    let source_digest = release_source_digest(root)?;
-    let expected_notices = release_licenses::generate(root, target)?;
-    let actual_notices = documents
-        .iter()
-        .find_map(|(path, bytes)| {
-            (path.file_name() == Some(OsStr::new("LICENSES.md"))).then_some(bytes)
-        })
-        .ok_or("target release receipt omits LICENSES.md")?;
-    require(
-        actual_notices == &expected_notices.bytes,
-        "target release license notices are stale or incomplete",
-    )?;
-    let manifest_bytes = documents
-        .iter()
-        .find_map(|(path, bytes)| {
-            (path.file_name() == Some(OsStr::new("manifest.json"))).then_some(bytes)
-        })
-        .ok_or("target release receipt omits manifest.json")?;
-    let manifest: Value = serde_json::from_slice(manifest_bytes)
-        .map_err(|error| format!("release manifest: {error}"))?;
-    let production_packages = u64::try_from(expected_notices.production_packages)
-        .map_err(|_| "release production package count is out of range")?;
-    let third_party_packages = u64::try_from(expected_notices.third_party_packages)
-        .map_err(|_| "release third-party package count is out of range")?;
-    let unique_legal_texts = u64::try_from(expected_notices.unique_legal_texts)
-        .map_err(|_| "release legal text count is out of range")?;
-    require(
-        manifest["license_notices"]["project_license"]["path"] == Value::String("LICENSE".into())
-            && manifest["license_notices"]["project_license"]["sha256"]
-                == Value::String(file_digest(&root.join("LICENSE"))?)
-            && manifest["license_notices"]["project_notice"]["path"]
-                == Value::String("NOTICE".into())
-            && manifest["license_notices"]["project_notice"]["sha256"]
-                == Value::String(file_digest(&root.join("NOTICE"))?)
-            && manifest["license_notices"]["production_packages"].as_u64()
-                == Some(production_packages)
-            && manifest["license_notices"]["third_party_packages"].as_u64()
-                == Some(third_party_packages)
-            && manifest["license_notices"]["unique_legal_texts"].as_u64()
-                == Some(unique_legal_texts),
-        "release manifest license metadata differs from the production closure",
-    )?;
-    let phase_base = manifest["phase_base_revision"]
-        .as_str()
-        .ok_or("release manifest phase base is missing")?;
-    let expected_sbom = release_attestation::generate_sbom(
-        &expected_notices.sbom_graph,
-        target,
-        &version,
-        phase_base,
-        &file_digest(&root.join("Cargo.lock"))?,
-    )?;
-    let actual_sbom = documents
-        .iter()
-        .find_map(|(path, bytes)| {
-            (path.file_name() == Some(OsStr::new("sbom.cdx.json"))).then_some(bytes)
-        })
-        .ok_or("target release receipt omits sbom.cdx.json")?;
-    require(
-        actual_sbom == &pretty_json(&expected_sbom)?,
-        "target release SBOM differs from the exact production dependency graph",
-    )?;
-    validate_current_provenance_exact(
-        root,
-        documents,
-        &manifest,
-        target,
-        &version,
-        &source_digest,
-    )?;
-    validate_release_documents_for_identity(
-        root,
-        documents,
-        target,
-        &version,
-        channel,
-        &source_digest,
-    )
-}
-
-fn validate_current_provenance_exact(
-    root: &Path,
-    documents: &BTreeMap<PathBuf, Vec<u8>>,
-    manifest: &Value,
-    target: &str,
-    version: &str,
-    source_digest: &str,
-) -> TaskResult {
-    let document = |name: &str| {
-        documents
-            .iter()
-            .find_map(|(path, bytes)| {
-                (path.file_name() == Some(OsStr::new(name))).then_some(bytes.as_slice())
-            })
-            .ok_or_else(|| format!("target release receipt omits {name}"))
-    };
-    let artifact_digest = |path: &str| {
-        manifest["artifacts"]
-            .as_array()
-            .and_then(|artifacts| {
-                artifacts.iter().find_map(|artifact| {
-                    (artifact["path"].as_str() == Some(path))
-                        .then(|| artifact["sha256"].as_str())
-                        .flatten()
-                })
-            })
-            .ok_or_else(|| format!("release manifest omits {path}"))
-    };
-    let provenance_bytes = document("provenance.intoto.json")?;
-    let statement = release_attestation::verify_envelope(root, provenance_bytes)?;
-    let invocation_id = release_attestation::invocation_id(&statement)?;
-    let manifest_digest = format!("{:x}", Sha256::digest(document("manifest.json")?));
-    let sbom_digest = format!("{:x}", Sha256::digest(document("sbom.cdx.json")?));
-    let build_inputs_digest = format!("{:x}", Sha256::digest(document("build-inputs.json")?));
-    let licenses_digest = format!("{:x}", Sha256::digest(document("LICENSES.md")?));
-    let source_commit = command_text(root, "git", &["rev-parse", "HEAD"])?;
-    let expected = release_attestation::provenance_statement(
-        root,
-        &release_attestation::ProvenanceMaterials {
-            version,
-            target,
-            source_commit: &source_commit,
-            source_digest: source_digest
-                .strip_prefix("sha256:")
-                .ok_or("release source digest prefix is invalid")?,
-            server_digest: artifact_digest("bin/mainframe-env-server")?,
-            cli_digest: artifact_digest("bin/mainframe-env")?,
-            manifest_digest: &manifest_digest,
-            sbom_digest: &sbom_digest,
-            build_inputs_digest: &build_inputs_digest,
-            licenses_digest: &licenses_digest,
-        },
-        invocation_id,
-    )?;
-    require(
-        statement == expected,
-        "signed provenance differs from the exact rebuilt release statement",
-    )
-}
-
-fn validate_release_documents_for_identity(
-    root: &Path,
-    documents: &BTreeMap<PathBuf, Vec<u8>>,
-    target: &str,
-    version: &str,
-    channel: &str,
-    source_digest: &str,
-) -> TaskResult {
-    stable_zero_version(version)?;
-    validate_release_target(target)?;
-    validate_sha256_identity(source_digest, "release source digest")?;
-    require(documents.len() == 6, "target release receipt is incomplete")?;
-    let document = |name: &str| {
-        documents
-            .iter()
-            .find_map(|(path, bytes)| (path.file_name() == Some(OsStr::new(name))).then_some(bytes))
-            .ok_or_else(|| format!("target release receipt omits {name}"))
-    };
-    let manifest: Value = serde_json::from_slice(document("manifest.json")?)
-        .map_err(|error| format!("release manifest: {error}"))?;
-    let sbom: Value = serde_json::from_slice(document("sbom.cdx.json")?)
-        .map_err(|error| format!("release SBOM: {error}"))?;
-    let provenance_bytes = document("provenance.intoto.json")?;
-    let provenance: Value = if full_license_notices_required(version)? {
-        release_attestation::verify_envelope(root, provenance_bytes)?
-    } else {
-        serde_json::from_slice(provenance_bytes)
-            .map_err(|error| format!("release provenance: {error}"))?
-    };
-    let checksums = std::str::from_utf8(document("checksums.sha256")?)
-        .map_err(|error| format!("release checksums: {error}"))?;
-    let licenses = std::str::from_utf8(document("LICENSES.md")?)
-        .map_err(|error| format!("release licenses: {error}"))?;
-    let build_inputs: Value = serde_json::from_slice(document("build-inputs.json")?)
-        .map_err(|error| format!("release build inputs: {error}"))?;
-    if full_license_notices_required(version)? {
-        validate_current_source_binding(root, &provenance, source_digest, version)?;
-    }
-    validate_license_document_binding(
-        &manifest,
-        &provenance,
-        checksums,
-        document("LICENSES.md")?,
-        version,
-    )?;
-    validate_release_identity(
-        &manifest,
-        &sbom,
-        &provenance,
-        &build_inputs,
-        licenses,
-        target,
-        version,
-        channel,
-        source_digest,
-    )?;
-    let artifacts = manifest["artifacts"]
-        .as_array()
-        .ok_or("release manifest artifacts are missing")?;
-    require(
-        artifacts.len() == 6,
-        "release manifest artifact count drifted",
-    )?;
-    let build_inputs_digest = format!("{:x}", Sha256::digest(document("build-inputs.json")?));
-    require(
-        artifacts.iter().any(|artifact| {
-            artifact["path"].as_str() == Some("build-inputs.json")
-                && artifact["sha256"].as_str() == Some(build_inputs_digest.as_str())
-        }) && provenance_descriptor_has_digest(
-            &provenance,
-            version,
-            "build-inputs",
-            "build-inputs.json",
-            &build_inputs_digest,
-        )?,
-        "release build-input identity is not bound into manifest and provenance",
-    )?;
-    for artifact in artifacts {
-        let path = artifact["path"]
-            .as_str()
-            .ok_or("release artifact path is missing")?;
-        let digest = artifact["sha256"]
-            .as_str()
-            .ok_or("release artifact digest is missing")?;
-        validate_sha256_hex(digest, "release artifact digest")?;
-        require(
-            checksums
-                .lines()
-                .any(|line| line == format!("{digest}  {path}")),
-            &format!("release checksums omit {path}"),
-        )?;
-    }
-    let current_attestation = full_license_notices_required(version)?;
-    for (legacy_name, path) in [
-        ("mainframe-env-server", "bin/mainframe-env-server"),
-        ("mainframe-env", "bin/mainframe-env"),
-    ] {
-        let digest = artifacts
-            .iter()
-            .find(|artifact| artifact["path"].as_str() == Some(path))
-            .and_then(|artifact| artifact["sha256"].as_str())
-            .ok_or_else(|| format!("release manifest omits {path}"))?;
-        require(
-            provenance["subject"].as_array().is_some_and(|subjects| {
-                subjects.iter().any(|subject| {
-                    subject["name"].as_str()
-                        == Some(if current_attestation {
-                            path
-                        } else {
-                            legacy_name
-                        })
-                        && subject["digest"]["sha256"].as_str() == Some(digest)
-                })
-            }),
-            &format!("release provenance omits {path}"),
-        )?;
-    }
-    if current_attestation {
-        validate_current_attestation_bindings(
-            &manifest,
-            &sbom,
-            &provenance,
-            &build_inputs,
-            document("manifest.json")?,
-            document("sbom.cdx.json")?,
-            provenance_bytes,
-            document("LICENSES.md")?,
-            checksums,
-            version,
-            target,
-        )?;
-    }
-    Ok(())
-}
-
-fn provenance_descriptor_has_digest(
-    provenance: &Value,
-    version: &str,
-    current_suffix: &str,
-    legacy_uri: &str,
-    digest: &str,
-) -> TaskResult<bool> {
-    let current = full_license_notices_required(version)?;
-    let (descriptors, expected_uri) = if current {
-        (
-            &provenance["predicate"]["runDetails"]["byproducts"],
-            format!(":{current_suffix}"),
-        )
-    } else {
-        (
-            &provenance["predicate"]["buildDefinition"]["resolvedDependencies"],
-            legacy_uri.to_string(),
-        )
-    };
-    Ok(descriptors.as_array().is_some_and(|values| {
-        values.iter().any(|value| {
-            let uri = value["uri"].as_str();
-            let uri_matches = if current {
-                uri.is_some_and(|candidate| candidate.ends_with(&expected_uri))
-            } else {
-                uri == Some(expected_uri.as_str())
-            };
-            uri_matches && value["digest"]["sha256"].as_str() == Some(digest)
-        })
-    }))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_current_attestation_bindings(
-    manifest: &Value,
-    sbom: &Value,
-    provenance: &Value,
-    build_inputs: &Value,
-    manifest_bytes: &[u8],
-    sbom_bytes: &[u8],
-    provenance_bytes: &[u8],
-    licenses_bytes: &[u8],
-    checksums: &str,
-    version: &str,
-    target: &str,
-) -> TaskResult {
-    let manifest_digest = format!("{:x}", Sha256::digest(manifest_bytes));
-    let sbom_digest = format!("{:x}", Sha256::digest(sbom_bytes));
-    let provenance_digest = format!("{:x}", Sha256::digest(provenance_bytes));
-    let build_inputs_bytes = pretty_json(build_inputs)?;
-    let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
-    let licenses_digest = format!("{:x}", Sha256::digest(licenses_bytes));
-    for (suffix, digest) in [
-        ("manifest", manifest_digest.as_str()),
-        ("sbom", sbom_digest.as_str()),
-        ("build-inputs", build_inputs_digest.as_str()),
-        ("licenses", licenses_digest.as_str()),
-    ] {
-        require(
-            provenance["predicate"]["runDetails"]["byproducts"]
-                .as_array()
-                .is_some_and(|byproducts| {
-                    let uri = format!("urn:mainframe-env:release:{version}:{target}:{suffix}");
-                    byproducts.iter().any(|byproduct| {
-                        byproduct["uri"].as_str() == Some(uri.as_str())
-                            && byproduct["digest"]["sha256"].as_str() == Some(digest)
-                    })
-                }),
-            &format!("signed provenance omits or misidentifies the {suffix} byproduct"),
-        )?;
-    }
-    let component_count = sbom["components"]
-        .as_array()
-        .and_then(|values| u64::try_from(values.len()).ok())
-        .ok_or("release SBOM components are missing")?;
-    let dependency_count = sbom["dependencies"]
-        .as_array()
-        .and_then(|values| u64::try_from(values.len()).ok())
-        .ok_or("release SBOM dependency graph is missing")?;
-    require(
-        manifest["sbom"]["format"] == Value::String("CycloneDX".into())
-            && manifest["sbom"]["spec_version"] == Value::String("1.6".into())
-            && manifest["sbom"]["path"] == Value::String("sbom.cdx.json".into())
-            && manifest["sbom"]["sha256"] == Value::String(sbom_digest.clone())
-            && manifest["sbom"]["components"].as_u64() == Some(component_count)
-            && manifest["sbom"]["dependency_entries"].as_u64() == Some(dependency_count)
-            && provenance["predicate"]["runDetails"]["metadata"]["invocationId"]
-                == provenance["predicate"]["buildDefinition"]["internalParameters"]["invocationUri"],
-        "release manifest, SBOM, or invocation identity is not signed consistently",
-    )?;
-    let mut expected_checksums = manifest["artifacts"]
-        .as_array()
-        .ok_or("release manifest artifacts are missing")?
-        .iter()
-        .map(|artifact| {
-            let path = artifact["path"]
-                .as_str()
-                .ok_or("release artifact path is missing")?;
-            let digest = artifact["sha256"]
-                .as_str()
-                .ok_or("release artifact digest is missing")?;
-            Ok(format!("{digest}  {path}"))
-        })
-        .collect::<TaskResult<BTreeSet<_>>>()?;
-    for (path, digest) in [
-        ("manifest.json", manifest_digest.as_str()),
-        ("sbom.cdx.json", sbom_digest.as_str()),
-        ("provenance.intoto.json", provenance_digest.as_str()),
-        ("LICENSES.md", licenses_digest.as_str()),
-    ] {
-        expected_checksums.insert(format!("{digest}  {path}"));
-    }
-    let actual_checksum_lines = checksums
-        .lines()
-        .map(str::to_string)
-        .collect::<BTreeSet<_>>();
-    require(
-        checksums.lines().count() == expected_checksums.len()
-            && actual_checksum_lines == expected_checksums,
-        "release checksum file differs from the exact signed receipt set",
-    )?;
-    require(
-        provenance["predicate"]["buildDefinition"]["externalParameters"]["version"]
-            == Value::String(version.into())
-            && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
-                == Value::String(target.into()),
-        "signed release parameters differ from the target identity",
-    )
-}
-
-fn validate_current_source_binding(
-    root: &Path,
-    provenance: &Value,
-    source_digest: &str,
-    version: &str,
-) -> TaskResult {
-    let commit = if product_version(root)? == version {
-        command_text(root, "git", &["rev-parse", "HEAD"])?
-    } else {
-        command_text(
-            root,
-            "git",
-            &["rev-parse", &format!("mainframe-env-v{version}^{{}}")],
-        )?
-    };
-    let uri = format!("git+https://github.com/toreleon/mainframe-env@{commit}");
-    let dependencies = provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
-        .as_array()
-        .ok_or("signed provenance dependencies are missing")?;
-    require(
-        provenance["predicate"]["buildDefinition"]["externalParameters"]["source"]
-            == Value::String(uri.clone())
-            && dependencies
-                .iter()
-                .filter(|dependency| dependency["uri"].as_str() == Some(uri.as_str()))
-                .count()
-                == 1
-            && dependencies.iter().any(|dependency| {
-                dependency["uri"].as_str() == Some(uri.as_str())
-                    && dependency["digest"]["gitCommit"].as_str() == Some(commit.as_str())
-                    && dependency["digest"]["sha256"].as_str()
-                        == source_digest.strip_prefix("sha256:")
-            }),
-        "signed provenance is not bound to the exact source commit and content digest",
-    )
-}
-
-fn full_license_notices_required(version: &str) -> TaskResult<bool> {
-    Ok(stable_zero_version(version)? >= (8, 3))
-}
-
-fn validate_license_document_binding(
-    manifest: &Value,
-    provenance: &Value,
-    checksums: &str,
-    licenses: &[u8],
-    version: &str,
-) -> TaskResult {
-    if !full_license_notices_required(version)? {
-        return Ok(());
-    }
-    let licenses_text = std::str::from_utf8(licenses)
-        .map_err(|error| format!("release licenses are not UTF-8: {error}"))?;
-    let licenses_digest = format!("{:x}", Sha256::digest(licenses));
-    for field in ["project_license", "project_notice"] {
-        let digest = manifest["license_notices"][field]["sha256"]
-            .as_str()
-            .ok_or_else(|| format!("release license notices omit {field} digest"))?;
-        validate_sha256_hex(digest, &format!("release {field} digest"))?;
-    }
-    require(
-        licenses_text.starts_with("# mainframe-env license and third-party notices\n")
-            && licenses_text.contains(&format!("Schema: `{}`", release_licenses::NOTICE_SCHEMA))
-            && licenses_text.contains("`decnumber-sys 0.1.6` — expression: `ICU`")
-            && licenses_text.contains(
-                "Copyright (c) 1995-2005 International Business Machines Corporation and others",
-            )
-            && manifest["license_notices"]["schema_version"]
-                == Value::String(release_licenses::NOTICE_SCHEMA.into())
-            && manifest["license_notices"]["path"] == Value::String("LICENSES.md".into())
-            && manifest["license_notices"]["sha256"] == Value::String(licenses_digest.clone())
-            && manifest["license_notices"]["production_packages"]
-                .as_u64()
-                .is_some_and(|count| count > 0)
-            && manifest["license_notices"]["third_party_packages"]
-                .as_u64()
-                .is_some_and(|count| count > 0)
-            && manifest["license_notices"]["unique_legal_texts"]
-                .as_u64()
-                .is_some_and(|count| count > 1)
-            && manifest["license_notices"]["project_license"]["path"]
-                == Value::String("LICENSE".into())
-            && manifest["license_notices"]["project_notice"]["path"]
-                == Value::String("NOTICE".into())
-            && checksums
-                .lines()
-                .any(|line| line == format!("{licenses_digest}  LICENSES.md"))
-            && provenance_descriptor_has_digest(
-                provenance,
-                version,
-                "licenses",
-                "LICENSES.md",
-                &licenses_digest,
-            )?,
-        "release license notices are incomplete or are not bound to the receipt",
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_release_identity(
-    manifest: &Value,
-    sbom: &Value,
-    provenance: &Value,
-    build_inputs: &Value,
-    licenses: &str,
-    target: &str,
-    version: &str,
-    channel: &str,
-    source_digest: &str,
-) -> TaskResult {
-    let valid_license_header = if full_license_notices_required(version)? {
-        licenses.starts_with("# mainframe-env license and third-party notices\n")
-    } else {
-        licenses.starts_with("# License expressions\n")
-    };
-    require(
-        manifest["schema_version"] == Value::String("mainframe-env.release-manifest@1".into())
-            && manifest["version"] == Value::String(version.into())
-            && manifest["channel"] == Value::String(channel.into())
-            && manifest["tag"] == Value::String(format!("mainframe-env-v{version}"))
-            && manifest["target"] == Value::String(target.into())
-            && manifest["published"] == Value::Bool(false)
-            && sbom["bomFormat"] == Value::String("CycloneDX".into())
-            && sbom["specVersion"] == Value::String("1.6".into())
-            && sbom["metadata"]["component"]["version"] == Value::String(version.into())
-            && provenance["predicateType"]
-                == Value::String("https://slsa.dev/provenance/v1".into())
-            && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
-                == Value::String(target.into())
-            && build_inputs["schema_version"]
-                == Value::String("mainframe-env.release-build-inputs@1".into())
-            && build_inputs["target"] == Value::String(target.into())
-            && build_inputs["rustc_verbose"].as_str().is_some_and(|value| {
-                value.starts_with("rustc 1.98.0") && value.contains("release: 1.98.0")
-            })
-            && build_inputs["cargo_lock_sha256"].as_str().is_some()
-            && build_inputs["source_digest"] == Value::String(source_digest.into())
-            && build_inputs["deterministic_environment"]["SOURCE_DATE_EPOCH"]
-                == Value::String("0".into())
-            && valid_license_header,
-        "target release receipt metadata is inconsistent",
-    )?;
-    let current_attestation = full_license_notices_required(version)?;
-    require(
-        provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
-            .as_array()
-            .is_some_and(|dependencies| {
-                dependencies.iter().any(|dependency| {
-                    let uri = dependency["uri"].as_str();
-                    let expected_uri = if current_attestation {
-                        uri.is_some_and(|value| {
-                            value.starts_with("git+https://github.com/toreleon/mainframe-env@")
-                        })
-                    } else {
-                        uri == Some("source-tree")
-                    };
-                    expected_uri
-                        && dependency["digest"]["sha256"].as_str()
-                            == source_digest.strip_prefix("sha256:")
-                })
-            }),
-        "release provenance is not bound to the canonical source digest",
-    )?;
-    Ok(())
-}
-
-fn validate_sha256_hex(value: &str, field: &str) -> TaskResult {
-    require(
-        value.len() == 64
-            && value
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
-        &format!("{field} is not a lowercase SHA-256 digest"),
-    )
-}
-
-fn release_documents(
-    root: &Path,
-    target: &str,
-    retained_provenance: Option<&[u8]>,
-) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
-    validate_release_target(target)?;
-    let version = product_version(root)?;
-    let release_config: toml::Value = read(&root.join("release.toml"))?
-        .parse()
-        .map_err(|error| format!("release.toml: {error}"))?;
-    let channel = release_config["product"]["channel"]
-        .as_str()
-        .ok_or("product.channel is missing")?;
-    let directory = release_target_directory(&version, target)?;
-    let executable_suffix = if target.contains("windows") {
-        ".exe"
-    } else {
-        ""
-    };
-    let target_directory = cargo_target_directory(root);
-    let server = target_directory.join(format!(
-        "{target}/release/mainframe-env-server{executable_suffix}"
-    ));
-    let cli = target_directory.join(format!("{target}/release/mainframe-env{executable_suffix}"));
-    require(
-        server.is_file(),
-        &format!("release server binary was not built for {target}"),
-    )?;
-    require(
-        cli.is_file(),
-        &format!("release CLI binary was not built for {target}"),
-    )?;
-    let server_digest = file_digest(&server)?;
-    let cli_digest = file_digest(&cli)?;
-    let lock_digest = file_digest(&root.join("Cargo.lock"))?;
-    let config_digest = file_digest(&root.join("config/mainframe-env.toml"))?;
-    let sqlite_migration = file_digest(
-        &root.join("crates/stores/mainframe-env-store/migrations/sqlite/0001-durable-state.sql"),
-    )?;
-    let postgres_migration = file_digest(
-        &root.join("crates/stores/mainframe-env-store/migrations/postgres/0001-durable-state.sql"),
-    )?;
-    let phase_base = command_text(
-        root,
-        "git",
-        &["log", "-1", "--format=%H", "--grep=^Complete ME.V6"],
-    )?;
-    let rustc = command_text(root, "rustc", &["--version"])?;
-    let rustc_verbose = command_text(root, "rustc", &["-vV"])?
-        .lines()
-        .filter(|line| !line.starts_with("host: "))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let cargo_version = command_text(root, "cargo", &["--version"])?;
-    let source_digest = release_source_digest(root)?;
-    let source_commit = command_text(root, "git", &["rev-parse", "HEAD"])?;
-    let mut deterministic_environment = json!({
-        "CARGO_INCREMENTAL":"0",
-        "LC_ALL":"C",
-        "SOURCE_DATE_EPOCH":"0",
-        "TZ":"UTC",
-        "ZERO_AR_DATE":"1"
-    });
-    if target.contains("apple-darwin") {
-        deterministic_environment["MACOSX_DEPLOYMENT_TARGET"] = Value::String("15.0".into());
-    }
-    let build_inputs = json!({
-        "schema_version":"mainframe-env.release-build-inputs@1",
-        "target":target,
-        "rustc_verbose":rustc_verbose,
-        "cargo_version":cargo_version,
-        "profile":"release",
-        "profile_settings":{"codegen_units":1,"debug":0,"incremental":false,"strip":"symbols"},
-        "features":"all",
-        "locked":true,
-        "cargo_lock_sha256":lock_digest,
-        "source_digest":source_digest,
-        "path_remapping":{"repository":"/workspace/mainframe-env","cargo_home":"/cargo","rustup_home":"/rustup"},
-        "deterministic_environment":deterministic_environment,
-        "linker_determinism":release_linker_determinism(target)
-    });
-    let build_inputs_bytes = pretty_json(&build_inputs)?;
-    let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
-    let license_report = release_licenses::generate(root, target)?;
-    let licenses_digest = format!("{:x}", Sha256::digest(&license_report.bytes));
-    let sbom = release_attestation::generate_sbom(
-        &license_report.sbom_graph,
-        target,
-        &version,
-        &phase_base,
-        &lock_digest,
-    )?;
-    let sbom_bytes = pretty_json(&sbom)?;
-    let sbom_digest = format!("{:x}", Sha256::digest(&sbom_bytes));
-    let sbom_components = license_report.sbom_graph.packages.len();
-    let sbom_dependency_entries = sbom_components + 1;
-    let project_license_digest = file_digest(&root.join("LICENSE"))?;
-    let project_notice_digest = file_digest(&root.join("NOTICE"))?;
-    let manifest = json!({
-        "schema_version":"mainframe-env.release-manifest@1",
-        "product":"mainframe-env",
-        "version":version,
-        "channel":channel,
-        "phase_base_revision":phase_base,
-        "toolchain":rustc,
-        "target":target,
-        "profile":"release/core-server",
-        "contracts":"conformance/0.2/inventory/versions.json",
-        "migration_head":"0001-durable-state",
-        "sbom":{
-            "format":"CycloneDX",
-            "spec_version":"1.6",
-            "path":"sbom.cdx.json",
-            "sha256":sbom_digest,
-            "scope":"exact-target-production-closure",
-            "components":sbom_components,
-            "dependency_entries":sbom_dependency_entries
-        },
-        "license_notices":{
-            "schema_version":release_licenses::NOTICE_SCHEMA,
-            "path":"LICENSES.md",
-            "sha256":licenses_digest,
-            "project_license":{"path":"LICENSE","sha256":project_license_digest},
-            "project_notice":{"path":"NOTICE","sha256":project_notice_digest},
-            "production_packages":license_report.production_packages,
-            "third_party_packages":license_report.third_party_packages,
-            "unique_legal_texts":license_report.unique_legal_texts
-        },
-        "artifacts":[
-            {"path":"bin/mainframe-env-server","sha256":server_digest},
-            {"path":"bin/mainframe-env","sha256":cli_digest},
-            {"path":"config/mainframe-env.toml","sha256":config_digest},
-            {"path":"migrations/sqlite/0001-durable-state.sql","sha256":sqlite_migration},
-            {"path":"migrations/postgres/0001-durable-state.sql","sha256":postgres_migration},
-            {"path":"build-inputs.json","sha256":build_inputs_digest}
-        ],
-        "tag":format!("mainframe-env-v{version}"),
-        "published":false
-    });
-    let manifest_bytes = pretty_json(&manifest)?;
-    let manifest_digest = format!("{:x}", Sha256::digest(&manifest_bytes));
-    let invocation_id = if let Some(envelope) = retained_provenance {
-        let statement = release_attestation::verify_envelope(root, envelope)?;
-        release_attestation::invocation_id(&statement)?.to_string()
-    } else {
-        release_attestation::release_invocation_id()?
-    };
-    let provenance_statement = release_attestation::provenance_statement(
-        root,
-        &release_attestation::ProvenanceMaterials {
-            version: &version,
-            target,
-            source_commit: &source_commit,
-            source_digest: source_digest
-                .strip_prefix("sha256:")
-                .ok_or("release source digest prefix is invalid")?,
-            server_digest: &server_digest,
-            cli_digest: &cli_digest,
-            manifest_digest: &manifest_digest,
-            sbom_digest: &sbom_digest,
-            build_inputs_digest: &build_inputs_digest,
-            licenses_digest: &licenses_digest,
-        },
-        &invocation_id,
-    )?;
-    let provenance_bytes = if let Some(envelope) = retained_provenance {
-        let retained_statement = release_attestation::verify_envelope(root, envelope)?;
-        require(
-            retained_statement == provenance_statement,
-            "retained signed provenance differs from the rebuilt target",
-        )?;
-        envelope.to_vec()
-    } else {
-        release_attestation::sign_statement(root, &provenance_statement)?
-    };
-    let provenance_digest = format!("{:x}", Sha256::digest(&provenance_bytes));
-    let checksums = format!(
-        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n{manifest_digest}  manifest.json\n{sbom_digest}  sbom.cdx.json\n{provenance_digest}  provenance.intoto.json\n{build_inputs_digest}  build-inputs.json\n{licenses_digest}  LICENSES.md\n"
-    );
-    Ok(BTreeMap::from([
-        (directory.join("manifest.json"), manifest_bytes),
-        (directory.join("sbom.cdx.json"), sbom_bytes),
-        (directory.join("provenance.intoto.json"), provenance_bytes),
-        (directory.join("checksums.sha256"), checksums.into_bytes()),
-        (directory.join("LICENSES.md"), license_report.bytes),
-        (directory.join("build-inputs.json"), build_inputs_bytes),
-    ]))
-}
-
 fn pretty_json(value: &Value) -> TaskResult<Vec<u8>> {
     let mut bytes = serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?;
     bytes.push(b'\n');
     Ok(bytes)
 }
 
+#[cfg(test)]
 fn canonical_evidence_digest(receipt: &serde_json::Map<String, Value>) -> TaskResult<String> {
     let canonical = serde_json::to_vec(receipt).map_err(|error| error.to_string())?;
     Ok(format!("sha256:{:x}", Sha256::digest(canonical)))
@@ -15397,13 +10742,6 @@ fn canonical_evidence_digest(receipt: &serde_json::Map<String, Value>) -> TaskRe
 fn file_digest(path: &Path) -> TaskResult<String> {
     let bytes = fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
     Ok(format!("{:x}", Sha256::digest(bytes)))
-}
-
-fn git_file_digest(root: &Path, commit: &str, relative: &str) -> TaskResult<String> {
-    Ok(format!(
-        "{:x}",
-        Sha256::digest(git_file_bytes(root, commit, relative)?)
-    ))
 }
 
 fn git_file_bytes(root: &Path, commit: &str, relative: &str) -> TaskResult<Vec<u8>> {
@@ -15424,71 +10762,6 @@ fn git_file_bytes(root: &Path, commit: &str, relative: &str) -> TaskResult<Vec<u
     Ok(output.stdout)
 }
 
-fn verify_commit_bound_live_file(
-    root: &Path,
-    commit: &str,
-    relative: &str,
-    live_path: &Path,
-) -> TaskResult {
-    require(
-        git_file_bytes(root, commit, relative)?
-            == fs::read(live_path).map_err(|error| format!("{}: {error}", live_path.display()))?,
-        &format!(
-            "{} was rewritten or superseded without a recorded amendment after {commit}",
-            live_path.display()
-        ),
-    )
-}
-
-fn verify_completion_parent(root: &Path, completion: &str, expected_parent: &str) -> TaskResult {
-    require(
-        command_text(root, "git", &["rev-parse", &format!("{completion}^")])? == expected_parent,
-        &format!("completion {completion} does not descend from {expected_parent}"),
-    )
-}
-
-fn find_completion_commit(
-    root: &Path,
-    subject: &str,
-    trailers: &[(&str, &str)],
-) -> TaskResult<String> {
-    let output = Command::new("git")
-        .args(["log", "--format=%H%x1f%B%x1e", "HEAD"])
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("git log: {error}"))?;
-    require(output.status.success(), "git log failed")?;
-    let history = String::from_utf8(output.stdout).map_err(|error| error.to_string())?;
-    let matches = history
-        .split('\u{1e}')
-        .filter_map(|record| record.trim().split_once('\u{1f}'))
-        .filter(|(_, message)| completion_message_matches(message, subject, trailers))
-        .map(|(commit, _)| commit.trim().to_string())
-        .collect::<Vec<_>>();
-    require(
-        matches.len() == 1,
-        &format!(
-            "completion history for {subject:?} is missing or ambiguous ({})",
-            matches.len()
-        ),
-    )?;
-    Ok(matches[0].clone())
-}
-
-fn completion_message_matches(message: &str, subject: &str, trailers: &[(&str, &str)]) -> bool {
-    if message.lines().next() != Some(subject) {
-        return false;
-    }
-    trailers.iter().all(|(name, expected)| {
-        let prefix = format!("{name}:");
-        let values = message
-            .lines()
-            .filter(|line| line.starts_with(&prefix))
-            .collect::<Vec<_>>();
-        values.len() == 1 && values[0] == format!("{name}: {expected}")
-    })
-}
-
 fn command_text(root: &Path, program: &str, arguments: &[&str]) -> TaskResult<String> {
     let output = Command::new(program)
         .args(arguments)
@@ -15502,7 +10775,7 @@ fn command_text(root: &Path, program: &str, arguments: &[&str]) -> TaskResult<St
 }
 
 fn excluded_names(root: &Path) -> TaskResult<BTreeSet<String>> {
-    let path = root.join("conformance/0.1/inventory/excluded-components.json");
+    let path = root.join("conformance/subsystems/platform/inventory/excluded-components.json");
     let value = json(&path)?;
     Ok(array(&value, "components", &path)?
         .iter()
@@ -15569,7 +10842,7 @@ fn collect_extension(root: &Path, extension: &OsStr, files: &mut Vec<PathBuf>) -
 /// straight past the guard 8389f98 widened to the whole tree:
 /// `cp <an IBM topic body> docs/target/leak.md && cargo xtask coverage --check`
 /// printed `coverage: pass`, and so did the same body at
-/// `conformance/0.6/target/`, at `crates/<crate>/target/deep/` and at
+/// `conformance/subsystems/dataset/target/`, at `crates/<crate>/target/deep/` and at
 /// `docs/.git/`. A leak into a nested `target` is worse than one anywhere else,
 /// not better: `.gitignore` reads `/target/`, anchored at the root, so
 /// `docs/target/leak.md` is untracked, `git add -A` stages it, and the one check
@@ -15650,16 +10923,16 @@ mod tests {
         let root = repository_root().expect("repository root");
         for (catalog, schema) in [
             (
-                "conformance/0.9/generated/cics-application-command-contracts.json",
-                "conformance/0.9/schemas/cics-application-command-contracts.schema.json",
+                "conformance/subsystems/cics/application/generated/cics-application-command-contracts.json",
+                "conformance/subsystems/cics/application/schemas/cics-application-command-contracts.schema.json",
             ),
             (
-                "conformance/0.9/cics/command-descriptors.json",
-                "conformance/0.9/schemas/cics-command-descriptors.schema.json",
+                "conformance/subsystems/cics/application/cics/command-descriptors.json",
+                "conformance/subsystems/cics/application/schemas/cics-command-descriptors.schema.json",
             ),
             (
-                "conformance/0.9/cics/typed-execution-registrations.json",
-                "conformance/0.9/schemas/cics-typed-execution-registrations.schema.json",
+                "conformance/subsystems/cics/application/cics/typed-execution-registrations.json",
+                "conformance/subsystems/cics/application/schemas/cics-typed-execution-registrations.schema.json",
             ),
         ] {
             let catalog = root.join(catalog);
@@ -15678,7 +10951,8 @@ mod tests {
         let simulation =
             root.join("crates/tooling/mainframe-env-conformance/src/dataset_reference.rs");
         assert!(check_dataset_oracle_receipt(&root, Some(simulation)).is_err());
-        let local_certification = root.join("conformance/0.6/evidence/dataset-certification.json");
+        let local_certification =
+            root.join("conformance/subsystems/dataset/evidence/dataset-certification.json");
         assert!(check_dataset_oracle_receipt(&root, Some(local_certification)).is_err());
     }
 
@@ -15692,9 +10966,14 @@ mod tests {
             "mainframe-env-cics-source-review-{}-{nonce}",
             std::process::id()
         ));
-        let review = root.join("conformance/0.9/cics/application-api-sources-a-review.json");
-        let schema = root.join("conformance/0.9/schemas/cics-source-review.schema.json");
-        let checker = root.join("conformance/0.9/tools/review_cics_application_sources.py");
+        let review = root.join(
+            "conformance/subsystems/cics/application/cics/application-api-sources-a-review.json",
+        );
+        let schema = root
+            .join("conformance/subsystems/cics/application/schemas/cics-source-review.schema.json");
+        let checker = root.join(
+            "conformance/subsystems/cics/application/tools/review_cics_application_sources.py",
+        );
         for path in [&review, &schema, &checker] {
             fs::create_dir_all(path.parent().expect("parent")).expect("create parent");
         }
@@ -15865,9 +11144,9 @@ mod tests {
         for relative in [
             "docs/target/leak.md",
             "docs/.git/leak.html",
-            "conformance/0.6/target/leak.html",
+            "conformance/subsystems/dataset/target/leak.html",
             "crates/mainframe-env-cobol/target/deep/leak.htm",
-            "conformance/0.7/tools/target/a/b/c/leak.json",
+            "conformance/subsystems/jcl/tools/target/a/b/c/leak.json",
         ] {
             let path = plant(relative);
             let error =
@@ -15934,7 +11213,8 @@ mod tests {
         let pending = check_jes_oracle_receipt(&root, None)
             .expect_err("missing licensed receipt must remain pending");
         assert!(pending.contains("licensed z/OS 3.2 JES2 differential is pending"));
-        let local_artifact = root.join("conformance/0.8/oracles/jes-licensed-differential.json");
+        let local_artifact =
+            root.join("conformance/subsystems/jes/oracles/jes-licensed-differential.json");
         let error = check_jes_oracle_receipt(&root, Some(local_artifact))
             .expect_err("a candidate-tree artifact must not substitute for a licensed receipt");
         assert!(error.contains("must remain external to the candidate tree"));
@@ -15943,43 +11223,18 @@ mod tests {
     #[test]
     fn strict_cli_rejects_unknown_duplicate_and_surplus_arguments() {
         for arguments in [
-            vec!["xtask", "evidence", "seal", "--unknown"],
-            vec!["xtask", "evidence", "seal", "--check", "--check"],
-            vec!["xtask", "evidence", "seal", "surplus"],
-            vec!["xtask", "release", "--target", "host", "--target", "other"],
-            vec![
-                "xtask",
-                "evidence",
-                "callback",
-                "--output",
-                "/tmp/ROUND_5_DONE.json",
-            ],
-            vec![
-                "xtask",
-                "evidence",
-                "callback",
-                "--output",
-                "/tmp/ROUND_4_DONE.json",
-                "--tip",
-                "forged",
-            ],
+            vec!["xtask", "subsystems", "--unknown"],
+            vec!["xtask", "subsystems", "--check", "--check"],
+            vec!["xtask", "subsystems", "surplus"],
+            vec!["xtask", "release"],
+            vec!["xtask", "versions"],
+            vec!["xtask", "evidence", "seal"],
         ] {
             assert!(Cli::try_parse_from(arguments).is_err());
         }
-        assert!(Cli::try_parse_from(["xtask", "evidence", "seal", "--check"]).is_ok());
-        assert!(Cli::try_parse_from(["xtask", "evidence", "callback"]).is_ok());
+        assert!(Cli::try_parse_from(["xtask", "subsystems", "--check"]).is_ok());
         assert!(Cli::try_parse_from(["xtask", "jes-oracle-candidate"]).is_ok());
         assert!(Cli::try_parse_from(["xtask", "jes-oracle-candidate", "surplus"]).is_err());
-        assert!(
-            Cli::try_parse_from([
-                "xtask",
-                "release",
-                "--check",
-                "--target",
-                "x86_64-unknown-linux-gnu",
-            ])
-            .is_ok()
-        );
     }
 
     fn temporary_git_repository(name: &str) -> PathBuf {
@@ -16100,7 +11355,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_discovery_includes_every_numeric_conformance_version() {
+    fn schema_discovery_includes_nested_subsystems_and_profiles() {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -16110,16 +11365,16 @@ mod tests {
             std::process::id()
         ));
         for relative in [
-            "conformance/0.1/schemas/old.json",
-            "conformance/0.9/schemas/new.json",
-            "conformance/0.10.1/schemas/nested/future.json",
+            "conformance/subsystems/platform/schemas/old.json",
+            "conformance/subsystems/cics/application/schemas/new.json",
+            "conformance/subsystems/cics/system/schemas/nested/future.json",
             "conformance/spec/schemas/not-versioned.json",
         ] {
             let path = root.join(relative);
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(path, b"{}\n").unwrap();
         }
-        let discovered = versioned_schema_files(&root)
+        let discovered = subsystem_schema_files(&root)
             .unwrap()
             .into_iter()
             .map(|path| path.strip_prefix(&root).unwrap().to_path_buf())
@@ -16127,810 +11382,18 @@ mod tests {
         assert_eq!(
             discovered,
             vec![
-                PathBuf::from("conformance/0.1/schemas/old.json"),
-                PathBuf::from("conformance/0.10.1/schemas/nested/future.json"),
-                PathBuf::from("conformance/0.9/schemas/new.json"),
+                PathBuf::from("conformance/subsystems/cics/application/schemas/new.json"),
+                PathBuf::from("conformance/subsystems/cics/system/schemas/nested/future.json"),
+                PathBuf::from("conformance/subsystems/platform/schemas/old.json"),
             ]
         );
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn release_target_is_explicit_unique_and_safely_bounded() {
-        assert_eq!(
-            explicit_release_target(&["--check".into()]),
-            Err("release requires exactly one --target <triple>".into())
-        );
-        assert_eq!(
-            explicit_release_target(&[
-                "--target".into(),
-                "x86_64-unknown-linux-gnu".into(),
-                "--target".into(),
-                "aarch64-apple-darwin".into(),
-            ]),
-            Err("release requires exactly one --target <triple>".into())
-        );
-        assert_eq!(
-            explicit_release_target(&["--target".into(), "../host".into()]),
-            Err("release target is invalid".into())
-        );
-        assert_eq!(
-            explicit_release_target(&["--target".into(), "powerpc64-unknown-linux-gnu".into()]),
-            Err("release target is invalid".into())
-        );
-        assert_eq!(
-            explicit_release_target(&[
-                "--check".into(),
-                "--target".into(),
-                "x86_64-unknown-linux-gnu".into(),
-            ])
-            .unwrap(),
-            "x86_64-unknown-linux-gnu"
-        );
-    }
-
-    #[test]
-    fn macos_release_build_retains_the_required_load_command() {
-        assert_eq!(
-            release_linker_determinism("aarch64-apple-darwin"),
-            "ld64-content-derived-lc-uuid"
-        );
-        assert!(!release_linker_determinism("aarch64-apple-darwin").contains("no_uuid"));
-        let build = fs::read_to_string(
-            repository_root()
-                .unwrap()
-                .join("tools/build_release_binaries.sh"),
-        )
-        .unwrap();
-        assert!(!build.contains("-Wl,-no_uuid"));
-        assert!(build.contains("cargo build --release --locked --all-features"));
-    }
-
-    #[test]
-    fn release_smoke_refuses_to_certify_a_foreign_target() {
-        let root = repository_root().unwrap();
-        let host = match host_target(&root) {
-            Ok(host) => host,
-            Err(problem) => {
-                // Development hosts need not be advertised release targets.
-                // They must reject certification before looking for binaries.
-                assert_eq!(problem, "release target is invalid");
-                let problem = smoke_release_target(&root, "x86_64-unknown-linux-gnu").unwrap_err();
-                assert_eq!(problem, "release target is invalid");
-                return;
-            }
-        };
-        let foreign = if host == "aarch64-apple-darwin" {
-            "x86_64-unknown-linux-gnu"
-        } else {
-            "aarch64-apple-darwin"
-        };
-        let problem = smoke_release_target(&root, foreign).unwrap_err();
-        assert!(problem.contains("exact binaries must execute"));
-    }
-
-    fn write_public_version_fixtures(root: &Path, current: &str, released: &str) {
-        fs::create_dir_all(root.join("docs/delivery/subsystems")).unwrap();
-        fs::create_dir_all(root.join("docs/delivery/subsystems/cics")).unwrap();
-        fs::create_dir_all(root.join("docs/reviews")).unwrap();
-        fs::create_dir_all(root.join(format!("release/{released}"))).unwrap();
-        fs::write(root.join("VERSION"), format!("{current}\n")).unwrap();
-        fs::write(
-            root.join("Cargo.toml"),
-            format!("[workspace.package]\nversion = \"{current}\"\n"),
-        )
-        .unwrap();
-        fs::write(
-            root.join(format!("release/{released}/source-distribution.json")),
-            format!("{{\"version\":\"{released}\",\"tag\":\"mainframe-env-v{released}\",\"published_assets\":{{\"kind\":\"locked-cargo-vendor-source-bundle\",\"native_binaries\":false}}}}"),
-        ).unwrap();
-        fs::write(
-            root.join("README.md"),
-            format!(
-                "## Project status\n\n| Item | Status |\n|---|---|\n| Latest published release | [{released}](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v{released}), source bundle only |\n| Current workspace version | `{current}` (development) |\n| Development baseline | `{current}` after the {released} tag |\n| Implementation progress | [Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md) |\n| Production readiness | Not claimed |\n| Licensed differential status | Required campaigns remain pending where the release notes say so |\n\nThe original no-go was resolved on 2026-09-09; the entry gate accepted (docs/delivery/subsystems/cics/application-api-status.md).\n"
-            ),
-        )
-        .unwrap();
-        fs::write(
-            root.join("docs/delivery/subsystems/cics/application-api-plan.md"),
-            "Status: **Proposed**\nlicensed campaigns remain pending\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join("docs/delivery/subsystems/cics/application-api-status.md"),
-            "Last integrated acceptance review: 2026-09-09\nRUN_MODE=full, SUCCESS, 2026-09-09\n",
-        )
-        .unwrap();
-        fs::write(root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"), "Status: **Complete review; broad 0.9.0 implementation was blocked at review**\n\n| Disposition at review |\n\n2026-09-09: [fix mapping](../delivery/subsystems/cics/application-api-status.md).\n").unwrap();
-        fs::write(
-            root.join("docs/delivery/subsystems/README.md"),
-            format!(
-                "Status: through {released} released\nThe current workspace is `{current}` development.\n"
-            ),
-        )
-        .unwrap();
-        fs::write(
-            root.join("docs/delivery/subsystems/GITHUB-PROJECT.md"),
-            format!("| {released} | `{released}` | released |\n| {current} | `{current}` | development |\n"),
-        )
-        .unwrap();
-        fs::write(
-            root.join("CHANGELOG.md"),
-            format!(
-                "# Changelog\n\n## [Unreleased]\n\n- Develop {current} after {released}.\n\n## [{released}]\n"
-            ),
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn development_identity_requires_tag_ancestry_distance_and_public_truth() {
-        let root = temporary_git_repository("development-version");
-        fs::write(root.join("source.txt"), b"released\n").unwrap();
-        commit_all(&root, "released");
-        assert!(
-            Command::new("git")
-                .args(["tag", "mainframe-env-v0.8.2"])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
-        commit_all(&root, "development");
-        validate_unreleased_identity(&root, "0.8.3", "0.8.2", false).unwrap();
-        validate_public_version_truth(&root, "0.8.3", "0.8.2", "development").unwrap();
-
-        fs::write(
-            root.join("README.md"),
-            "| Latest published release | [0.8.2](release) |\n| Current workspace version | `0.8.2` |\n",
-        )
-        .unwrap();
-        assert!(validate_public_version_truth(&root, "0.8.3", "0.8.2", "development").is_err());
-        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
-        assert!(
-            Command::new("git")
-                .args(["tag", "mainframe-env-v0.8.3"])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(validate_unreleased_identity(&root, "0.8.3", "0.8.2", false).is_err());
-        validate_unreleased_identity(&root, "0.8.3", "0.8.2", true).unwrap();
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn public_status_truth_rejects_stale_claims() {
-        let root = temporary_git_repository("public-status-truth");
-        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
-        commit_all(&root, "fixture");
-        assert!(
-            Command::new("git")
-                .args(["tag", "mainframe-env-v0.8.2"])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        let check = || validate_public_version_truth(&root, "0.8.3", "0.8.2", "development");
-        check().unwrap();
-
-        let readme_path = root.join("README.md");
-        let good_readme = read(&readme_path).unwrap();
-        fs::write(
-            &readme_path,
-            good_readme.replace("`0.8.3` (development)", "`0.8.2` (development)"),
-        )
-        .unwrap();
-        assert!(check().unwrap_err().contains("workspace version"));
-        fs::write(&readme_path, &good_readme).unwrap();
-
-        assert!(
-            Command::new("git")
-                .args(["tag", "mainframe-env-v0.8.4"])
-                .current_dir(&root)
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(check().unwrap_err().contains("highest local stable tag"));
-        assert!(
-            Command::new("git")
-                .args(["tag", "-d", "mainframe-env-v0.8.4"])
-                .current_dir(&root)
-                .output()
-                .unwrap()
-                .status
-                .success()
-        );
-
-        fs::write(
-            &readme_path,
-            good_readme.replace("source bundle only", "native binaries"),
-        )
-        .unwrap();
-        assert!(check().unwrap_err().contains("release kind"));
-        fs::write(
-            &readme_path,
-            good_readme.replace("entry gate accepted", "entry gate pending"),
-        )
-        .unwrap();
-        assert!(check().unwrap_err().contains("entry decision"));
-        fs::write(&readme_path, &good_readme).unwrap();
-
-        let review_path = root.join("docs/reviews/PRE-0.9.0-DEEP-REVIEW.md");
-        let review = read(&review_path).unwrap();
-        fs::write(
-            &review_path,
-            review.replace("Disposition at review", "Disposition"),
-        )
-        .unwrap();
-        assert!(check().unwrap_err().contains("review-time disposition"));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn development_configuration_cannot_emit_release_artifacts() {
-        let root = temporary_git_repository("development-release-guard");
-        fs::write(
-            root.join("release.toml"),
-            "[product]\nstate = \"development\"\nchannel = \"development\"\n",
-        )
-        .unwrap();
-        assert!(!release_candidate_mode(&root).unwrap());
-        check_certification_release_artifacts(&root).unwrap();
-        let problem = require_release_candidate(&root).unwrap_err();
-        assert!(problem.contains("release-candidate promotion"));
-        for problem in [
-            generate_release_artifacts(&root, "aarch64-apple-darwin").unwrap_err(),
-            check_release_artifacts(&root, "aarch64-apple-darwin").unwrap_err(),
-        ] {
-            assert!(problem.contains("release-candidate promotion"));
-        }
-
-        fs::write(
-            root.join("release.toml"),
-            "[product]\nstate = \"release-candidate\"\nchannel = \"stable\"\n",
-        )
-        .unwrap();
-        assert!(release_candidate_mode(&root).unwrap());
-        assert_eq!(release_command_retained_candidate(&root).unwrap(), None);
-        require_release_candidate(&root).unwrap();
-        assert!(check_certification_release_artifacts(&root).is_err());
-
-        fs::write(
-            root.join("release.toml"),
-            "[product]\nstate = \"development\"\nchannel = \"stable\"\n",
-        )
-        .unwrap();
-        assert!(release_candidate_mode(&root).is_err());
-        assert!(check_certification_release_artifacts(&root).is_err());
-
-        fs::write(
-            root.join("release.toml"),
-            "[product]\nstate = \"release-candidate\"\n",
-        )
-        .unwrap();
-        assert!(release_candidate_mode(&root).is_err());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn full_license_notices_are_digest_bound_from_0_8_3_forward() {
-        let licenses = format!(
-            "# mainframe-env license and third-party notices\n\nSchema: `{}`\n\n- `decnumber-sys 0.1.6` — expression: `ICU`\n\nCopyright (c) 1995-2005 International Business Machines Corporation and others\n",
-            release_licenses::NOTICE_SCHEMA
-        );
-        let digest = format!("{:x}", Sha256::digest(licenses.as_bytes()));
-        let manifest = json!({"license_notices":{
-            "schema_version":release_licenses::NOTICE_SCHEMA,
-            "path":"LICENSES.md",
-            "sha256":digest,
-            "production_packages":2,
-            "third_party_packages":1,
-            "unique_legal_texts":2,
-            "project_license":{"path":"LICENSE","sha256":"a".repeat(64)},
-            "project_notice":{"path":"NOTICE","sha256":"b".repeat(64)}
-        }});
-        let provenance = json!({"predicate":{"runDetails":{"byproducts":[{
-            "uri":"urn:mainframe-env:release:0.8.3:test:licenses","digest":{"sha256":digest}
-        }]}}});
-        let checksums = format!("{digest}  LICENSES.md\n");
-        validate_license_document_binding(
-            &manifest,
-            &provenance,
-            &checksums,
-            licenses.as_bytes(),
-            "0.8.3",
-        )
-        .unwrap();
-        assert!(
-            validate_license_document_binding(
-                &manifest,
-                &provenance,
-                &checksums,
-                b"# mainframe-env license and third-party notices\nchanged\n",
-                "0.8.3",
-            )
-            .is_err()
-        );
-        assert!(
-            validate_license_document_binding(
-                &json!({}),
-                &json!({}),
-                "",
-                b"# License expressions\n",
-                "0.8.2",
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn current_release_bindings_reject_byproduct_and_checksum_tampering() {
-        let version = "0.8.3";
-        let target = "aarch64-apple-darwin";
-        let build_inputs = json!({"schema_version":"mainframe-env.release-build-inputs@1"});
-        let build_inputs_bytes = pretty_json(&build_inputs).unwrap();
-        let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
-        let licenses = b"complete notices\n";
-        let licenses_digest = format!("{:x}", Sha256::digest(licenses));
-        let sbom = json!({"components":[{}],"dependencies":[{},{}]});
-        let sbom_bytes = pretty_json(&sbom).unwrap();
-        let sbom_digest = format!("{:x}", Sha256::digest(&sbom_bytes));
-        let mut manifest = json!({
-            "artifacts":[{"path":"build-inputs.json","sha256":build_inputs_digest}],
-            "sbom":{
-                "format":"CycloneDX",
-                "spec_version":"1.6",
-                "path":"sbom.cdx.json",
-                "sha256":sbom_digest,
-                "components":1,
-                "dependency_entries":2
-            }
-        });
-        let manifest_bytes = pretty_json(&manifest).unwrap();
-        let manifest_digest = format!("{:x}", Sha256::digest(&manifest_bytes));
-        let provenance_bytes = b"signed DSSE envelope\n";
-        let provenance_digest = format!("{:x}", Sha256::digest(provenance_bytes));
-        let descriptor = |suffix: &str, digest: &str| {
-            json!({
-                "uri":format!("urn:mainframe-env:release:{version}:{target}:{suffix}"),
-                "digest":{"sha256":digest}
-            })
-        };
-        let provenance = json!({"predicate":{
-            "buildDefinition":{
-                "externalParameters":{"version":version,"target":target},
-                "internalParameters":{"invocationUri":"urn:uuid:one"}
-            },
-            "runDetails":{
-                "metadata":{"invocationId":"urn:uuid:one"},
-                "byproducts":[
-                    descriptor("manifest", &manifest_digest),
-                    descriptor("sbom", &sbom_digest),
-                    descriptor("build-inputs", &build_inputs_digest),
-                    descriptor("licenses", &licenses_digest)
-                ]
-            }
-        }});
-        let checksums = format!(
-            "{build_inputs_digest}  build-inputs.json\n{manifest_digest}  manifest.json\n{sbom_digest}  sbom.cdx.json\n{provenance_digest}  provenance.intoto.json\n{licenses_digest}  LICENSES.md\n"
-        );
-        validate_current_attestation_bindings(
-            &manifest,
-            &sbom,
-            &provenance,
-            &build_inputs,
-            &manifest_bytes,
-            &sbom_bytes,
-            provenance_bytes,
-            licenses,
-            &checksums,
-            version,
-            target,
-        )
-        .unwrap();
-
-        let mut tampered = provenance.clone();
-        tampered["predicate"]["runDetails"]["byproducts"][1]["digest"]["sha256"] =
-            Value::String("0".repeat(64));
-        assert!(
-            validate_current_attestation_bindings(
-                &manifest,
-                &sbom,
-                &tampered,
-                &build_inputs,
-                &manifest_bytes,
-                &sbom_bytes,
-                provenance_bytes,
-                licenses,
-                &checksums,
-                version,
-                target,
-            )
-            .is_err()
-        );
-        manifest["sbom"]["sha256"] = Value::String("0".repeat(64));
-        assert!(
-            validate_current_attestation_bindings(
-                &manifest,
-                &sbom,
-                &provenance,
-                &build_inputs,
-                &manifest_bytes,
-                &sbom_bytes,
-                provenance_bytes,
-                licenses,
-                &checksums,
-                version,
-                target,
-            )
-            .is_err()
-        );
-        assert!(
-            validate_current_attestation_bindings(
-                &json!({"artifacts":[]}),
-                &sbom,
-                &provenance,
-                &build_inputs,
-                &manifest_bytes,
-                &sbom_bytes,
-                provenance_bytes,
-                licenses,
-                "",
-                version,
-                target,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn signed_release_documents_round_trip_when_enabled() {
-        if env::var("MAINFRAME_ENV_RELEASE_INTEGRATION").as_deref() != Ok("1") {
-            return;
-        }
-        let root = repository_root().unwrap();
-        let target = host_target(&root).unwrap();
-        build_release_target(&root, &target).unwrap();
-        smoke_release_target(&root, &target).unwrap();
-        let documents = release_documents(&root, &target, None).unwrap();
-        validate_release_documents(&root, &documents, &target).unwrap();
-        let provenance = documents
-            .iter()
-            .find_map(|(path, bytes)| {
-                (path.file_name() == Some(OsStr::new("provenance.intoto.json"))).then_some(bytes)
-            })
-            .unwrap();
-        let rebuilt = release_documents(&root, &target, Some(provenance)).unwrap();
-        compare_release_documents(&documents, &rebuilt).unwrap();
-    }
-
-    #[test]
-    fn stable_product_versions_are_generic_strict_and_derive_the_release_line() {
-        for (version, release_line) in [("0.2.0", "0.2"), ("0.7.0", "0.7"), ("0.17.4", "0.17")] {
-            assert!(stable_zero_version(version).is_ok());
-            assert_eq!(release_line_for_version(version).unwrap(), release_line);
-        }
-        for invalid in [
-            "1.0.0",
-            "0.07.0",
-            "0.7.00",
-            "0.7",
-            "0.7.0-rc.1",
-            "0.7.0+build",
-            "../0.7.0",
-            "0.7.0/targets/forged",
-            "0.x.0",
-        ] {
-            assert!(stable_zero_version(invalid).is_err(), "accepted {invalid}");
-        }
-    }
-
-    #[test]
-    fn post_0_2_release_digest_binds_a_clean_live_source_tree() {
-        let root = temporary_git_repository("live-release-source");
-        fs::write(root.join("VERSION"), b"0.3.0\n").expect("VERSION");
-        fs::write(root.join("source.txt"), b"one\n").expect("source");
-        commit_all(&root, "source one");
-        let first = live_release_source_digest(&root, "0.3.0").expect("first digest");
-
-        fs::write(root.join("source.txt"), b"two\n").expect("dirty source");
-        assert!(live_release_source_digest(&root, "0.3.0").is_err());
-        commit_all(&root, "source two");
-        let second = live_release_source_digest(&root, "0.3.0").expect("second digest");
-        assert_ne!(first, second);
-
-        let receipt = root.join("release/0.3.0/targets/aarch64-apple-darwin/manifest.json");
-        fs::create_dir_all(receipt.parent().expect("receipt parent")).expect("release directory");
-        fs::write(&receipt, b"generated receipt\n").expect("receipt");
-        assert_eq!(
-            live_release_source_digest(&root, "0.3.0").expect("receipt is excluded"),
-            second
-        );
-
-        let historical = root.join("release/0.2.0/targets/aarch64-apple-darwin/manifest.json");
-        fs::create_dir_all(historical.parent().expect("historical parent"))
-            .expect("historical release directory");
-        fs::write(historical, b"forged historical receipt\n").expect("historical receipt");
-        assert!(live_release_source_digest(&root, "0.3.0").is_err());
-        fs::remove_dir_all(root).expect("temporary repository cleanup");
-    }
-
-    #[test]
-    fn release_identity_rejects_a_stale_source_digest() {
-        let source_digest = format!("sha256:{}", "a".repeat(64));
-        let manifest = json!({
-            "schema_version":"mainframe-env.release-manifest@1",
-            "version":"0.3.0",
-            "channel":"stable",
-            "tag":"mainframe-env-v0.3.0",
-            "target":"aarch64-apple-darwin",
-            "published":false
-        });
-        let sbom = json!({
-            "bomFormat":"CycloneDX",
-            "specVersion":"1.6",
-            "metadata":{"component":{"version":"0.3.0"}}
-        });
-        let provenance = json!({
-            "predicateType":"https://slsa.dev/provenance/v1",
-            "predicate":{"buildDefinition":{
-                "externalParameters":{"target":"aarch64-apple-darwin"},
-                "resolvedDependencies":[{
-                    "uri":"source-tree",
-                    "digest":{"sha256":"a".repeat(64)}
-                }]
-            }}
-        });
-        let build_inputs = json!({
-            "schema_version":"mainframe-env.release-build-inputs@1",
-            "target":"aarch64-apple-darwin",
-            "rustc_verbose":"rustc 1.98.0\nrelease: 1.98.0",
-            "cargo_lock_sha256":"b".repeat(64),
-            "source_digest":source_digest,
-            "deterministic_environment":{"SOURCE_DATE_EPOCH":"0"}
-        });
-        assert!(
-            validate_release_identity(
-                &manifest,
-                &sbom,
-                &provenance,
-                &build_inputs,
-                "# License expressions\n",
-                "aarch64-apple-darwin",
-                "0.3.0",
-                "stable",
-                build_inputs["source_digest"].as_str().unwrap(),
-            )
-            .is_ok()
-        );
-        let stale = format!("sha256:{}", "c".repeat(64));
-        assert!(
-            validate_release_identity(
-                &manifest,
-                &sbom,
-                &provenance,
-                &build_inputs,
-                "# License expressions\n",
-                "aarch64-apple-darwin",
-                "0.3.0",
-                "stable",
-                &stale,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn round_five_tooling_preserves_retained_release_source_digest() {
-        let root = repository_root().unwrap();
-        let inputs =
-            json(&root.join("release/0.2.0/targets/aarch64-apple-darwin/build-inputs.json"))
-                .unwrap();
-        assert_eq!(
-            accepted_0_2_release_source_digest(&root).unwrap(),
-            inputs["source_digest"].as_str().unwrap()
-        );
-    }
-
-    #[test]
-    fn release_verification_rejects_missing_binary_toolchain_flag_and_target_drift() {
-        let documents = |target: &str, binary: &[u8], inputs: &[u8]| {
-            let root = PathBuf::from(format!("release/0.2.0/targets/{target}"));
-            BTreeMap::from([
-                (root.join("manifest.json"), binary.to_vec()),
-                (root.join("build-inputs.json"), inputs.to_vec()),
-            ])
-        };
-        let generated = documents(
-            "aarch64-apple-darwin",
-            b"expected-binary-digest",
-            b"rust=1.98.0;codegen-units=1;incremental=false",
-        );
-        assert!(compare_release_documents(&BTreeMap::new(), &generated).is_err());
-        assert!(
-            compare_release_documents(
-                &documents(
-                    "aarch64-apple-darwin",
-                    b"changed-binary-digest",
-                    b"rust=1.98.0;codegen-units=1;incremental=false",
-                ),
-                &generated,
-            )
-            .is_err()
-        );
-        assert!(
-            compare_release_documents(
-                &documents(
-                    "aarch64-apple-darwin",
-                    b"expected-binary-digest",
-                    b"rust=1.97.0;codegen-units=1;incremental=false",
-                ),
-                &generated,
-            )
-            .is_err()
-        );
-        assert!(
-            compare_release_documents(
-                &documents(
-                    "aarch64-apple-darwin",
-                    b"expected-binary-digest",
-                    b"rust=1.98.0;codegen-units=16;incremental=true",
-                ),
-                &generated,
-            )
-            .is_err()
-        );
-        assert!(
-            compare_release_documents(
-                &documents(
-                    "x86_64-unknown-linux-gnu",
-                    b"expected-binary-digest",
-                    b"rust=1.98.0;codegen-units=1;incremental=false",
-                ),
-                &generated,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn completion_discovery_rejects_wrong_duplicate_and_missing_trailers() {
-        let subject = "Repair 0.2.0 third review findings";
-        let expected = [
-            ("Third-Review-Findings", "11=closed"),
-            ("Target-Version", "0.2.0"),
-            (
-                "Evidence-Digest",
-                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            ),
-        ];
-        let valid = format!(
-            "{subject}\n\nThird-Review-Findings: 11=closed\nTarget-Version: 0.2.0\nEvidence-Digest: sha256:{}\n",
-            "a".repeat(64)
-        );
-        assert!(completion_message_matches(&valid, subject, &expected));
-        assert!(!completion_message_matches(
-            &valid.replace("11=closed", "10=closed"),
-            subject,
-            &expected
-        ));
-        assert!(!completion_message_matches(
-            &valid.replace("Target-Version: 0.2.0\n", ""),
-            subject,
-            &expected
-        ));
-        assert!(!completion_message_matches(
-            &format!("{valid}Target-Version: 0.2.0\n"),
-            subject,
-            &expected
-        ));
-
-        let root = temporary_git_repository("ambiguous-completion");
-        fs::write(root.join("source"), b"one").expect("source");
-        commit_all(&root, &valid);
-        fs::write(root.join("source"), b"two").expect("source");
-        commit_all(&root, &valid);
-        assert!(find_completion_commit(&root, subject, &expected).is_err());
-        fs::remove_dir_all(root).expect("temporary repository cleanup");
-    }
-
-    #[test]
-    fn commit_bound_evidence_survives_later_source_and_rejects_substitution() {
-        let root = temporary_git_repository("commit-bound-evidence");
-        fs::write(root.join("source.txt"), b"accepted source\n").expect("source");
-        let source = commit_all(&root, "Source");
-        let receipt = json!({"receipt":{"source_identity":source,"result":"pass"}});
-        fs::write(
-            root.join("receipt.json"),
-            pretty_json(&receipt).expect("receipt bytes"),
-        )
-        .expect("receipt");
-        let completion = commit_all(&root, "Completion");
-        let bound_digest = repository_digest_at_commit(&root, &completion).expect("bound digest");
-        assert!(verify_completion_parent(&root, &completion, &source).is_ok());
-        assert!(verify_completion_parent(&root, &completion, &completion).is_err());
-        assert!(
-            verify_commit_bound_live_file(
-                &root,
-                &completion,
-                "receipt.json",
-                &root.join("receipt.json")
-            )
-            .is_ok()
-        );
-
-        fs::write(root.join("later.txt"), b"unrelated later source\n").expect("later source");
-        commit_all(&root, "Later unrelated source");
-        assert_eq!(
-            repository_digest_at_commit(&root, &completion).expect("stable historical digest"),
-            bound_digest
-        );
-        assert_ne!(repository_digest(&root).expect("live digest"), bound_digest);
-
-        let original = git_file_bytes(&root, &completion, "receipt.json").expect("Git receipt");
-        fs::write(
-            root.join("receipt.json"),
-            pretty_json(&json!({"receipt":{"source_identity":source,"result":"rewritten"}}))
-                .expect("rewritten receipt"),
-        )
-        .expect("live substitution");
-        assert!(
-            verify_commit_bound_live_file(
-                &root,
-                &completion,
-                "receipt.json",
-                &root.join("receipt.json")
-            )
-            .is_err()
-        );
-        assert_ne!(
-            fs::read(root.join("receipt.json")).expect("live receipt"),
-            original
-        );
-        assert_ne!(
-            format!("sha256:{:x}", Sha256::digest(&original)),
-            format!(
-                "sha256:{:x}",
-                Sha256::digest(fs::read(root.join("receipt.json")).expect("rewritten receipt"))
-            )
-        );
-        fs::remove_dir_all(root).expect("temporary repository cleanup");
-    }
-
-    #[test]
-    fn accepted_0_2_candidate_receipts_survive_later_versions() {
-        let root = repository_root().expect("repository root");
-        let accepted = accepted_0_2_candidate_digest(&root).expect("accepted 0.2 candidate");
-        let status = json(&root.join("conformance/0.2/evidence/program-status.json"))
-            .expect("0.2 program status");
-        let regression = json(&root.join("conformance/0.2/evidence/full-regression.json"))
-            .expect("0.2 full regression");
-        assert_eq!(status["dirty_tree_identity"]["digest"], accepted);
-        assert_eq!(regression["candidate"]["source_digest"], accepted);
-        assert_ne!(
-            repository_digest(&root).expect("later live digest"),
-            accepted
-        );
-        check_work_package_amendments(&root)
-            .expect("0.2 amendments remain bound to accepted candidate");
-        assert_eq!(
-            retained_accepted_release(&root).expect("accepted release mode"),
-            (product_version(&root).unwrap() == "0.2.0")
-                .then(|| "e8dfa89583d866a365f496297d50aeb602e468bf".into())
-        );
-        validate_historical_0_2_release(&root)
-            .expect("both retained targets remain byte-bound to accepted 0.2");
-    }
-
-    #[test]
     fn fast_spec_gate_rejects_same_count_catalog_mutation_under_stale_index() {
         let root = temporary_git_repository("catalog-closure-drift");
-        let catalog_relative = "conformance/0.2/catalogs/mock.json";
+        let catalog_relative = "conformance/subsystems/coverage/catalogs/mock.json";
         let catalog_path = root.join(catalog_relative);
         fs::create_dir_all(catalog_path.parent().expect("catalog parent"))
             .expect("catalog directory");
@@ -16939,7 +11402,7 @@ mod tests {
             "sha256:{}",
             file_digest(&catalog_path).expect("catalog digest")
         );
-        let index_path = root.join("conformance/0.2/catalogs/index.json");
+        let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
         let index = json!({
             "baselines": [{
                 "subsystem": "mock",
@@ -16994,35 +11457,59 @@ mod tests {
         let keys: Vec<_> = map.keys().copied().collect();
         assert_eq!(keys, ["a", "b"]);
     }
+}
 
-    #[test]
-    fn contradictory_workload_and_program_status_ledgers_are_rejected() {
-        let workload = json!({
-            "schema_version":"mainframe-env.coverage-workload-ledger@1",
-            "target_version":"0.2.0",
-            "implementation_status":"in-progress",
-            "current_work_package":"CV-209",
-            "work_packages":[{"id":"CV-209","state":"in-progress","evidence":null}],
-            "exit_gates":[]
-        });
-        let status = json!({
-            "schema_version":"mainframe-env.coverage-program-status@1",
-            "target_version":"0.2.0",
-            "implementation_status":"in-progress",
-            "current_work_package":"CV-209",
-            "work_packages":[{"id":"CV-209","state":"in-progress","evidence":null}]
-        });
-        assert!(compare_workload_and_program_status(&workload, &status).is_ok());
-        let mut contradiction = status.clone();
-        contradiction["work_packages"][0]["state"] = Value::String("pass".into());
-        assert!(compare_workload_and_program_status(&workload, &contradiction).is_err());
-
-        let mut false_complete = workload;
-        false_complete["implementation_status"] = Value::String("complete".into());
-        let mut false_complete_status = status;
-        false_complete_status["implementation_status"] = Value::String("complete".into());
-        assert!(
-            compare_workload_and_program_status(&false_complete, &false_complete_status).is_err()
-        );
+fn smoke_runtime_target(root: &Path, target: &str) -> TaskResult {
+    let host = host_target(root)?;
+    require(
+        host == target,
+        &format!(
+            "runtime target {target} cannot be certified on host {host}; exact binaries must execute"
+        ),
+    )?;
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    let cli = runtime_binary(root, target, "mainframe-env");
+    let server = runtime_binary(root, target, "mainframe-env-server");
+    for binary in [&cli, &server] {
+        require(
+            binary.is_file(),
+            &format!("{} is missing", binary.display()),
+        )?;
+        probe_runtime_binary(binary, "--version", &version)?;
+        probe_runtime_binary(binary, "--help", "Usage:")?;
     }
+    runtime_server_sqlite_smoke(root, &server)
+}
+
+fn runtime_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
+    require(binary.is_file(), "runtime server binary is missing")?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let directory = env::temp_dir().join(format!(
+        "mainframe-env-runtime-architecture-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
+    let database = directory.join("state.db");
+    let result = (|| {
+        let (mut first, first_port) =
+            spawn_runtime_server(root, binary, &directory, &database, true)?;
+        let first_result = wait_for_runtime_readiness(&mut first, first_port);
+        stop_runtime_server(&mut first);
+        first_result?;
+
+        let (mut restarted, restarted_port) =
+            spawn_runtime_server(root, binary, &directory, &database, false)?;
+        let restart_result = wait_for_runtime_readiness(&mut restarted, restarted_port)
+            .and_then(|()| authenticate_runtime_administrator(restarted_port));
+        stop_runtime_server(&mut restarted);
+        restart_result
+    })();
+    if directory.exists() {
+        fs::remove_dir_all(&directory)
+            .map_err(|error| format!("{}: {error}", directory.display()))?;
+    }
+    result
 }

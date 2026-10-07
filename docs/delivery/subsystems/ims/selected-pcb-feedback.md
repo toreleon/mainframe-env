@@ -91,7 +91,7 @@ has no virtual layout, SOURCE alias, reverse ordering, destination KEY/DATA or
 SEGM RULES; this leaf does not supply those missing recipes or raw mask framing.
 No host/canonical/SQL/receipt migration occurs. Inherited ADR-0035 downgrade and
 coherent-backup requirements apply; base rollback restores Unsupported for fresh
-logical calls. Parent v0.14 and official/HUMAN/licensed/participant acceptance
+logical calls. Parent ims.programming and official/HUMAN/licensed/participant acceptance
 remain incomplete.
 
 ## Pinned offline authority
@@ -177,12 +177,12 @@ affected shared architecture/module guards passed. Receipt names are
 `fmt.log` and `shared-guards.log`. The last also retains the additional
 public-API documentation ratchet failure: untouched execution API exceeds
 176 and the existing host surface exceeds 1128. New DTO items are documented;
-that policy is unchanged and full-minor documentation acceptance is pending.
+that policy is unchanged and full-phase documentation acceptance is pending.
 Normal docs/changelog and generated completion seal receipts complete the
 handoff separately. Test/source receipts retain their original input identity;
 the seal is a content check and does not turn them into committed CI evidence.
 
 Compatibility and downgrade procedures are in
 [ADR-0035](../../../decisions/0035-selected-pcb-feedback.md). Parent IMS-1401,
-complete-v0.14, participant, full-minor integration, official/maintainer IR,
+complete-ims.programming, participant, full-phase integration, official/maintainer IR,
 licensed differentials and release acceptance remain open. No push or PR.

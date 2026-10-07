@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **program/execution and MQ maintainers**
 Scope: **explicit typed installed-batch handoff, not MQ public readiness**
-Applies from: **mainframe-env 0.15.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

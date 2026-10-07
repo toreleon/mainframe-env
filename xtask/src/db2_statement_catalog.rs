@@ -1,7 +1,7 @@
 use super::*;
 
-const SOURCE_PATH: &str = "conformance/0.2/catalogs/db2.json";
-const TOPICS_PATH: &str = "conformance/0.2/manifests/db2-topics.json";
+const SOURCE_PATH: &str = "conformance/subsystems/coverage/catalogs/db2.json";
+const TOPICS_PATH: &str = "conformance/subsystems/coverage/manifests/db2-topics.json";
 const GENERATED_PATH: &str =
     "crates/providers/mainframe-env-db2/src/generated_statement_catalog.rs";
 const BASELINE: &str = "ibm-db2-for-zos-13-2026-08-13";

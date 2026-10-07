@@ -3,37 +3,22 @@
 Status: **Accepted by repository owner**
 Owner: **architecture maintainers**
 Scope: **system layers, dependency direction, and maintainability rules**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Architectural style
 
 mainframe-env uses a deterministic functional core surrounded by an
 asynchronous hexagonal shell.
 
-```text
-Gateways
-HTTP | CLI | z/OSMF
-                         |
-                         v
-Application services
-CompilerService | ProgramService | ExecutionCoordinator
-                         |
-              +----------+----------+
-              |                     |
-              v                     v
-Deterministic core              Asynchronous shell
-syntax/semantics/IR             admission/scheduling
-machine transitions             persistence/provider I/O
-explicit effects/outcomes       cancellation/backpressure
-              |                     |
-              +----------+----------+
-                         v
-Owned ports
-host services | stores | artifact store
-                         |
-                         |
-                         v
-               built-in Rust providers
+```mermaid
+flowchart TB
+    gateways["HTTP / CLI / z/OSMF"] --> services["CompilerService / ProgramService / ExecutionCoordinator"]
+    services --> core["Deterministic core: syntax, semantics, IR and machine transitions"]
+    services --> shell["Async shell: admission, scheduling, cancellation and backpressure"]
+    core --> effects["Explicit effects and outcomes"]
+    effects --> shell
+    shell --> ports["Owned host, store and artifact ports"]
+    ports --> adapters["Built-in Rust providers and store adapters"]
 ```
 
 ## Dependency rule
@@ -41,16 +26,26 @@ host services | stores | artifact store
 Dependencies point inward toward stable contracts and deterministic domain
 types.
 
-```text
-applications -> engines + adapters
-engines      -> owned contracts + deterministic core
-adapters     -> owned contracts
-frontends    -> source + diagnostics + IR contracts
-backends     -> IR + semantic contracts + execution contracts
-providers    -> host-service contracts
-contracts    -> foundation only
-foundation   -> standard library and narrowly approved utility crates
+```mermaid
+flowchart TB
+    applications["Applications"] --> engines["Engines"]
+    applications --> adapters["Adapters"]
+    engines --> contracts["Owned contracts"]
+    engines --> core["Deterministic core"]
+    adapters --> contracts
+    frontends["Frontends"] --> frontendContracts["Source / diagnostics / IR contracts"]
+    backends["Backends"] --> backendContracts["IR / semantic / execution contracts"]
+    providers["Providers"] --> host["Host-service contracts"]
+    contracts --> foundation["Foundation"]
+    frontendContracts --> foundation
+    backendContracts --> foundation
+    host --> foundation
+    foundation --> utilities["Standard library and approved utilities"]
 ```
+
+Arrows here mean permitted dependency direction. They describe architectural
+roles, not additional crates; the [package map](PACKAGE-MAP.md) lists the
+current workspace boundaries.
 
 Prohibited edges include:
 
@@ -88,14 +83,14 @@ infrastructure failure remain distinguishable.
 Compiler stages are represented by distinct opaque types and language-owned
 semantic models:
 
-```text
-SourceBundle
-  -> language-specific syntax and semantic model
-  -> language-specific typed HIR
-  -> VerifiedHir proof
-  -> typed executable semantic IR dialects
-  -> LegalizedMir
-  -> versioned PublishedArtifact
+```mermaid
+flowchart LR
+    source["SourceBundle"] --> frontend["Language syntax and semantic model"]
+    frontend --> hir["Language-specific typed HIR"]
+    hir --> proof["VerifiedHir proof"]
+    proof --> ir["Executable semantic IR dialects"]
+    ir --> legal["LegalizedMir"]
+    legal --> artifact["Versioned PublishedArtifact"]
 ```
 
 Frontend parsed and semantic stages remain compiler-private. The public proof
@@ -125,7 +120,7 @@ in-memory models remains a later resource-family slice.
 
 ## Conformance model
 
-From 0.3 onward, official catalog rows are connected to executable behavior
+From cobol.structure onward, official catalog rows are connected to executable behavior
 through the shared typed [Conformance IR](CONFORMANCE-IR.md). Behavioral tests
 emit explicit `(row_id, obligation_id, gate, verdict)` events, and coverage
 ledgers are derived from the complete mandatory-obligation set rather than
@@ -150,23 +145,26 @@ Every mutable or durable object declares one scope:
 Locks do not define scope. An object does not become concurrency-safe merely by
 being placed behind `Arc<Mutex<_>>`.
 
-## 0.1 product profiles
+## Product profiles and initial scope
 
-The first release has one authoritative production profile and one test profile.
+The initial platform.runtime-integration release defined one product profile and one test profile.
 Profiles are explicit dependency and capability closures, not informal sets of
 Cargo features.
 
 - **core-server**: COBOL, CICS, JCL/JES, dataset, RACF/security,
   z/OSMF, configuration, execution/compiler kernels, stores, and required
   observability;
-- **conformance**: 0.1 core plus deterministic fixtures, differential oracle
+- **conformance**: platform.runtime-integration core plus deterministic fixtures, differential oracle
   adapters, fuzz/property/model tests, and evidence generation.
 
 Optional capability absence produces an explicit unavailable/unsupported
 result. It never produces generic success.
 
-Out-of-scope current packages are absent from both closures and need no 0.1
-replacement.
+Later accepted additions extend the workspace through versioned inventories.
+The [current package map](PACKAGE-MAP.md) identifies all 26 packages; subsystem
+[progress records](../delivery/IMPLEMENTATION-STATUS.md) identify their current
+implementation boundaries. These initial profile definitions do not establish
+completion of every later subsystem surface.
 
 ## Maintainability contract
 

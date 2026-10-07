@@ -1,0 +1,14 @@
+{
+  "schema_version": "mainframe-env.coverage-package-additions@1",
+  "target_subsystem": "jes.execution",
+  "packages": [
+    {
+      "name": "mainframe-env-spool",
+      "layer": "provider",
+      "work_package": "JES-803",
+      "justification": "Typed durable JES spool metadata and immutable artifact-chunk authority"
+    }
+  ],
+  "dependency_edges": [],
+  "production_profile_membership": true
+}

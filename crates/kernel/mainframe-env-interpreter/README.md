@@ -13,3 +13,7 @@ COBOL entry arguments bind in `PROCEDURE DIVISION USING` order from the
 `entry_formals_v1` IR config attribute. An empty list leaves declared LINKAGE
 storage unbound. Historical payloads without this attribute reject inbound
 arguments, except batch entry with no LINKAGE roots, where the PARM is ignored.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

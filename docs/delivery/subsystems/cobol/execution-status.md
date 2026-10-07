@@ -2,19 +2,18 @@
 
 Subsystem: **cobol**
 Phase: **execution**
-Target release: **0.4.0**
 
 Status: **CB-401 through CB-406 locally complete — pass-with-licensed-differential-pending**
 
-Candidate branch: `impl/0.4.0`, based on the accepted 0.3.0 merge commit
+Candidate branch: `impl/0.4.0`, based on the accepted cobol.structure merge commit
 `4b82f55d9c23852169e929316ba31cc2c5724785`. The dependency gate is accepted:
 `cargo xtask cobol-exit --check` passes 173 COBOL rows, 346 recognition and
 validation bindings, 529 complete shards, malformed and resource-limit suites,
-recovery publication blockers, and the immutable 0.1.1 artifact fixture.
-Accepted 0.5 security and 0.6 dataset authorities through
+recovery publication blockers, and the immutable profile.carddemo artifact fixture.
+Accepted racf.security security and dataset.data dataset authorities through
 `b4f8fc70d320c52576667a7887312c16f9b22e68` were fetched and normally merged in
 `b0258ebb938b044f5ced4bd318d692e8e5e534d1`; their complete suites pass beside
-0.4. The candidate must fetch and normally merge `origin/main` again if it moves
+cobol.execution. The candidate must fetch and normally merge `origin/main` again if it moves
 before the final push/PR, without rebasing or force-pushing.
 
 ## Work packages
@@ -26,7 +25,7 @@ before the final push/PR, without rebasing or force-pushing.
 | CB-403 | local package pass; licensed boundaries pending | 17/17 data clauses cover representation/alias/table/type behavior and bounded pointer/heap state. The artifact carries `ARITH(COMPAT)` or `ARITH(EXTEND)` into the selected 18- or 34-digit `dec` context; IBM-visible option interactions remain in the licensed campaign |
 | CB-404 | local package pass | 10/10 file clauses execute through typed dataset effects and typed LE selectors. READ lock/wait, CLOSE dispositions, FILE STATUS error mapping, and `USE AFTER STANDARD ERROR` transfer/return are explicit. JSON covers nested groups, OCCURS arrays, name omission/override, suppression, BOOLEAN/null conversion and indication, condition names, null status/ignoring, partial exception mutation, and UTF-8/CP037 encoding. XML covers nested groups, OCCURS elements, escaping, numeric references, attributes, namespace registers/events, empty elements, declarations, and depth-first processing events. Report Writer is precompiler-dependent and outside the pinned language-row denominator |
 | CB-405 | local package pass | Checkpoint schema 10 preserves dynamic extents, implicit registers, SEARCH, SQL cursor, SORT state, allocated/linkage pointer state, out-of-line PERFORM repetition, XML processing-event progress, an active declarative call frame, and RANDOM sequence state; schemas 1–9 remain readable and legacy migration/corruption rejection pass |
-| CB-406 | pass-with-licensed-differential-pending | All 153 executable rows pass generic resource exhaustion, cancellation without mutation, checkpoint identity, and quantum metamorphism; 26 focused condition cases and nine focused recovery cases pass. The approved 16-case GnuCOBOL reference campaign and four comparator mutants pass with zero licensed credit; the real IBM campaign is handed to 0.17 at 0/153 pending |
+| CB-406 | pass-with-licensed-differential-pending | All 153 executable rows pass generic resource exhaustion, cancellation without mutation, checkpoint identity, and quantum metamorphism; 26 focused condition cases and nine focused recovery cases pass. The approved 16-case GnuCOBOL reference campaign and four comparator mutants pass with zero licensed credit; the real IBM campaign is handed to certification.licensed at 0/153 pending |
 
 ## Decisions and risks
 
@@ -38,10 +37,10 @@ before the final push/PR, without rebasing or force-pushing.
   use the accepted execution contracts.
 - The frozen decimal/IEEE spike selected exact `dec = 0.4.11` and deterministic
   software `libm = 0.2.16`; the reviewed gap matrix is recorded in
-  `0.4.0-decimal-ieee-spike.md`. IBM-visible PICTURE, representation,
+  `cobol.execution-decimal-ieee-spike.md`. IBM-visible PICTURE, representation,
   intermediate precision, alias, and SIZE ERROR rules remain owned adapters.
 - Execution, condition, recovery, and differential credit must be emitted as
-  obligation-level verdicts extending the accepted 0.3 row specifications.
+  obligation-level verdicts extending the accepted cobol.structure row specifications.
   Catalog presence and broad workload success grant no credit.
 - Licensed Enterprise COBOL 6.5 oracle work remains honestly pending until a
   version-pinned compiler/runtime receipt is available. This does not block
@@ -49,14 +48,14 @@ before the final push/PR, without rebasing or force-pushing.
 
 The required licensed Enterprise COBOL 6.5 compiler/runtime environment and its
 version-pinned receipt are unavailable, so no differential verdict can honestly
-pass. Under the explicit 2026-09-02 approval, this no longer blocks 0.4 from
+pass. Under the explicit 2026-09-02 approval, this no longer blocks cobol.execution from
 finishing as `pass-with-licensed-differential-pending`: the real 153-row IBM
-campaign remains a hard 0.17 release-certification gate. The frozen local
+campaign remains a hard certification.licensed release-certification gate. The frozen local
 denominator, focused phrase and boundary inventory, condition/recovery suites,
-approved GnuCOBOL reference campaign, and integrated 0.5/0.6 regression are
+approved GnuCOBOL reference campaign, and integrated racf.security/dataset.data regression are
 green.
 
-Focused evidence: after the accepted 0.5/0.6 integration, the checked-in shared
+Focused evidence: after the accepted racf.security/dataset.data integration, the checked-in shared
 spec has 2,273 obligations and 2,621 bindings; the compiled repository IR has
 2,304 obligations and 2,776 bindings after generated catalog bindings are
 included. The COBOL ledgers derive 412/412 executed verdicts (normal execution
@@ -81,13 +80,13 @@ precompiler. Standard Enterprise COBOL emitted by such a tool remains usable
 within the pinned row set; the precompiler itself is not claimed.
 
 The licensed adapter at
-`conformance/0.4/oracles/cobol-licensed-differential.json` remains `pending` and
+`conformance/subsystems/cobol/execution/oracles/cobol-licensed-differential.json` remains `pending` and
 requires an external receipt covering positive, negative, boundary, condition,
 and interaction cohorts for each exact row/fixture pair. Generated or
 historical results cannot satisfy it.
 
 The tooling-only allowlist at
-`conformance/0.4/cobol/gnucobol-reference-allowlist.json` contains 16 explicitly
+`conformance/subsystems/cobol/execution/cobol/gnucobol-reference-allowlist.json` contains 16 explicitly
 portable cases across statement/control, exact small-decimal, MOVE/string, and
 intrinsic cohorts. `cargo xtask cobol-reference --check --receipt
 /absolute/external/path.json` verifies the exact GnuCOBOL 3.2.0 `cobc` and
@@ -99,7 +98,7 @@ closed, no production profile links or packages GnuCOBOL/`libcob`, and the
 receipt grants zero licensed credit, leaving Enterprise COBOL at 0/153.
 
 Formatting, all workspace targets and tests, `cargo xtask spec --check`, `cargo
-xtask cobol-exit --check`, `cargo xtask full-regression --check`, `git diff
+xtask cobol-exit --check`, `historical full-regression gate (retired)`, `git diff
 --check`, and all five non-licensed COBOL gates pass on the integrated
 candidate. The
 licensed gate emits 153/153 explicit failing verdicts and exits nonzero because
@@ -108,4 +107,4 @@ licensed gate emits 153/153 explicit failing verdicts and exits nonzero because
 Next delivery step: fetch and normally merge any newer `origin/main`, rerun the
 complete acceptance floor and candidate-bound GnuCOBOL campaign, push without
 force, open/update the single PR, and wait for terminal CI. The real licensed
-Enterprise COBOL 6.5 campaign remains deferred to 0.17 at 0/153 pending.
+Enterprise COBOL 6.5 campaign remains deferred to certification.licensed at 0/153 pending.

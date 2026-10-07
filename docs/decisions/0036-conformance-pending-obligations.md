@@ -3,7 +3,7 @@
 - Status: Proposed (bounded driver foundation)
 - Owner: Conformance and MQ maintainers
 - Date: 2026-10-03
-- Applies from: mainframe-env 0.15.0
+- Applies from: mainframe-env current subsystem contracts
 - Scope: existing shared Conformance IR v1 only
 
 The shared compiler requires a case for every mandatory obligation/gate. A future

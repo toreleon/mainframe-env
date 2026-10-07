@@ -11,3 +11,7 @@ locks, and idempotency records are bounded; mutations publish through optimistic
 durable provider state; unsupported attributes return an exact capability
 diagnostic. Verify with `cargo test -p mainframe-env-dataset` and
 `cargo xtask dataset-contract --check`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

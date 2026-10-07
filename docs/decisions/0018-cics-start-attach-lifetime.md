@@ -1,9 +1,9 @@
 # ADR-0018: Keep START ATTACH work noncancelable and address-bearing
 
-Status: **Proposed for v0.9 development; FROM route pending**
+Status: **Proposed for cics.application-api development; FROM route pending**
 Owner: **CICS, compiler, and runtime maintainers**
 Scope: **START ATTACH row 0206**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

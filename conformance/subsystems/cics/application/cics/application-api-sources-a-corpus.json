@@ -1,0 +1,525 @@
+{
+  "schema_version": "mainframe-env.cics-source-corpus@1",
+  "target_subsystem": "cics.application-api",
+  "work_package": "CIC-901.sources-a-corpus",
+  "status": "candidate",
+  "semantic_authority": false,
+  "automatic_registration": false,
+  "coverage_credit": 0,
+  "differential_credit": 0,
+  "mapping": {
+    "path": "conformance/subsystems/cics/application/cics/application-api-sources-a-map.json",
+    "sha256": "sha256:f80aa2ebe627b6b5928fd2430bd57a0936252dd2355baaa4a50163d4138b3946"
+  },
+  "topic_manifest": {
+    "path": "conformance/subsystems/cics/application/manifests/cics-application-api-sources-a-topics.json",
+    "file_sha256": "sha256:9a74888a81c32d755e6f3abd73131dd85a12b04f2cbc16b0ea26eb9283a5e152",
+    "topic_manifest_sha256": "sha256:344e912ef28b1d9ba4a1a00b4613865d759c3e337ac809ccb23fd4f4358652d5",
+    "topic_count": 173,
+    "total_bytes": 5207440
+  },
+  "counts": {
+    "mapping_rows": 88,
+    "mapped_command_topics": 109,
+    "linked_context_topics": 58,
+    "manual_topics": 6,
+    "html_topics": 173,
+    "source_gaps_pending_review": 3
+  },
+  "mapped_command_topics": [
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_abend.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_address.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_addressset.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_allocateappc.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_allocatelutype61.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_allocatemro.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_asktime.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_assign.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_bifdeedit.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_bifdigest.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_buildattachlutype61.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_buildattachmro.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_cancel.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_changepassword.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_changephrase.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_changetask.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_connectprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse2260.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse3270logical.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse36003601.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse36003614.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse36503270.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse36503653.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse36503680.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse3650interpreter.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse3767.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse3770.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse37903270display.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converse3790ffinquiry.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converseappc.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converselutype23.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converselutype4.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converselutype61.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_conversemro.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_conversenonvtam.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_conversenonvtamopts.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_conversescs.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_conversevtam.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_conversevtamopts.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_converttime.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_definecounter.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_delay.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_delete.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deletechannel.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deletecontainerchannel.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deletecounter.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deleteqtd.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deleteqts.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_deq.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentcreate.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentdelete.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentinsert.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentretrieve.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_documentset.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_dumptransaction.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_endbr.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_endbrowsecontainerchannel.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_enq.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_entertracenum.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractattachlutype61.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractattachmro.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractattributesappc.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractattributesmro.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractcertificate.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractlogonmsg.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extracttcpip.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extracttct.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_extractweb.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_fetchchild.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_formattime.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_free.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freeappc.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freelutype61.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain64.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemro.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsallocate.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsassign.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsconnectprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsextractattributes.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsextractprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsfree.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getcontainerchannel.html",
+    "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getcounter.html",
+    "SSJL4D_6.x/reference-applications/commands-api/fetchany.html",
+    "SSJL4D_6.x/reference-applications/commands-api/freechild.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4-endbrowsetimer.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_acquire.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_addsubevent.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_cancelbts.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_checkacqprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_checkactivity.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_checktimer.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_defineactivity.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_definecompositeevent.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_defineinputevent.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_defineprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_definetimer.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_deleteactivity.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_deletecontainerbcs.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_deleteevent.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_deletetimer.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_endbrowseactivity.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_endbrowsecontainer.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_endbrowseevent.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_endbrowseprocess.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_forcetimer.html",
+    "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getcontainerbts.html"
+  ],
+  "linked_context_topics": [
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp37p.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_ch20.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_ch_scopeif.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_dcprep.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_doc_symbol_rules.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3ak.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 7
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3m9.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 3
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/assembler/dfhp3_assem_prog.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp907.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp90r.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp90t.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp93t.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp94m.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp622.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 3
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfht121.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfht12v.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/configuring/parallel-sysplex/vsam_rls.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/bts/dfhp902.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/connections/dfht110.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/connections/dfht11f.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 4
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/connections/dfht1c0079.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/connections/dfht1k0.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl25.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_sesstoken.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-abend-codes/abend-codes/dfhg4k3.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 107
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_argumentvalues.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_codesassign.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain64.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_nlscodes.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_translatedcode.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 23
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_movecontainerbts.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_putcontainerbts.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_run.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-connectivity/connections/dfhp637.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 6
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 5
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-management/resources/enqmodel/dfha4_summary.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-management/resources/terminal/dfha4_summary.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-management/resources/typeterm/dfha4_summary.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-management/sit/dfha2_initparm.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-management/transactions/dfha7oa.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireterminal.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_setterminal.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-system-programming/user-exits/dfha3mj.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/security/cics/surrogate-security.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 2
+    },
+    {
+      "topic_path": "SSJL4D_6.x/system-programming/cics/dfha34n.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/system-programming/cics/dfha37q.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs13p.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs148.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs149.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs14a.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs14w.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs1lf.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfhs1lo.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfht2k7.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/request-transaction-dumps.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    },
+    {
+      "topic_path": "SSJL4D_6.x/tuning/connections/dfht17k.html",
+      "role": "one-hop-context-candidate",
+      "referenced_by_command_topics": 1
+    }
+  ],
+  "manual_topics": [
+    {
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00237.html",
+      "role": "execution-context-candidate",
+      "applies_to": "all-sources-a-rows",
+      "reason": "dpl-command-restrictions"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html",
+      "role": "compatibility-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+      ],
+      "reason": "legacy-monitoring-successor"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html",
+      "role": "compatibility-context-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+      ],
+      "reason": "legacy-monitoring-module-context"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html",
+      "role": "execution-context-candidate",
+      "applies_to": "all-sources-a-rows",
+      "reason": "threadsafe-command-list"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+      "role": "gap-classification-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+      ],
+      "reason": "exec-interface-identity-and-availability"
+    },
+    {
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+      "role": "gap-identity-candidate",
+      "applies_to_rows": [
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+        "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
+      ],
+      "reason": "pinned-eibfn-command-table"
+    }
+  ],
+  "excluded_navigation": [
+    {
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_commandsummary.html",
+      "role": "navigation-index",
+      "referenced_by_command_topics": 109,
+      "reason": "pinned-toc-is-navigation-authority"
+    }
+  ],
+  "source_gaps": [
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+      "label": "CICSMESSAGE",
+      "state": "pending-review",
+      "topic_sources": [
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+      "label": "DUMP",
+      "state": "pending-review",
+      "topic_sources": [
+        "SSJL4D_6.x/reference-applications/commands-api/dfhp4_dumptransaction.html",
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html"
+      ]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
+      "label": "ENTER TRACEID",
+      "state": "pending-review",
+      "topic_sources": [
+        "SSJL4D_6.x/reference-applications/commands-api/dfhp4_entertracenum.html",
+        "SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html",
+        "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
+        "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+        "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html"
+      ]
+    }
+  ],
+  "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, and source gaps",
+  "corpus_sha256": "sha256:d7f0a016175b855b8e9231d6a81b97faae16e12ccd060a06f80380df7f02eb31"
+}

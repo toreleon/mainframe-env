@@ -3,16 +3,16 @@
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **current workspace package boundaries and topology changes**
-Applies from: **mainframe-env 0.8.3 development**
+Applies from: **mainframe-env current subsystem contracts**
 Supersedes: **ADR-0005 for current package counts and topology**
 
 ## Context
 
-ADR-0005 reduced the proposed 0.1 workspace to twenty boundary packages. The
-accepted 0.1 inventory ultimately contained twenty-four packages, including
+ADR-0005 reduced the proposed platform.runtime-integration workspace to twenty boundary packages. The
+accepted platform.runtime-integration inventory ultimately contained twenty-four packages, including
 the server and CLI applications plus conformance and xtask tooling. Later
-accepted work added `mainframe-env-coverage` in 0.2 and
-`mainframe-env-spool` in 0.8. The workspace therefore contains twenty-six
+accepted work added `mainframe-env-coverage` in coverage.foundation and
+`mainframe-env-spool` in jes.execution. The workspace therefore contains twenty-six
 packages, while ADR-0005 remains an important but no longer current topology
 record.
 
@@ -43,11 +43,11 @@ and no production package may depend on it. Its presence does not change the
 twenty-six-package machine inventory.
 
 The machine authority is the twenty-four-package base in
-[`conformance/0.1/inventory/packages.json`](../../conformance/0.1/inventory/packages.json),
+[`conformance/subsystems/platform/inventory/packages.json`](../../conformance/subsystems/platform/inventory/packages.json),
 plus the versioned additions in
-[`conformance/0.2/inventory/package-additions.json`](../../conformance/0.2/inventory/package-additions.json)
+[`conformance/subsystems/coverage/inventory/package-additions.json`](../../conformance/subsystems/coverage/inventory/package-additions.json)
 and
-[`conformance/0.8/inventory/package-additions.json`](../../conformance/0.8/inventory/package-additions.json).
+[`conformance/subsystems/jes/inventory/package-additions.json`](../../conformance/subsystems/jes/inventory/package-additions.json).
 Cargo workspace membership and the machine authority must remain equal.
 
 The existing consolidation rule remains in force: a crate is justified only

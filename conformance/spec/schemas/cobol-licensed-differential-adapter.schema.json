@@ -2,10 +2,10 @@
   "$schema":"https://json-schema.org/draft/2020-12/schema",
   "$id":"https://mainframe-env.example/schemas/cobol-licensed-differential-adapter.schema.json",
   "type":"object","additionalProperties":false,
-  "required":["schema_version","target_version","baseline_id","required_product","required_cohorts","compiler_options","runtime_options","receipt_environment_variable","status","licensed_receipt_required_for_pass","generated_or_historical_result_counts_as_pass","oracle_binary_retained"],
+  "required":["schema_version","target_subsystem","baseline_id","required_product","required_cohorts","compiler_options","runtime_options","receipt_environment_variable","status","licensed_receipt_required_for_pass","generated_or_historical_result_counts_as_pass","oracle_binary_retained"],
   "properties":{
     "schema_version":{"const":"mainframe-env.cobol-licensed-differential-adapter@1"},
-    "target_version":{"const":"0.4.0"},
+    "target_subsystem":{"const":"cobol.execution"},
     "baseline_id":{"const":"ibm-enterprise-cobol-6.5-2026-05-31"},
     "required_product":{"const":"IBM Enterprise COBOL for z/OS 6.5 compiler and Language Environment runtime"},
     "required_cohorts":{"const":["positive","negative","boundary","condition","interaction"]},

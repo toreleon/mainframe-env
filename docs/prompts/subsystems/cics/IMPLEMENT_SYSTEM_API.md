@@ -3,7 +3,6 @@
 Subsystem: **cics**
 Phase: **system-api**
 
-Target version: **0.10.0**
 Completion dependencies: cics.application-api
 
 Use this prompt from the repository root. The
@@ -15,15 +14,15 @@ requirements alongside the version-specific boundaries below.
 
 ---
 
-You are implementing **mainframe-env 0.10.0: complete CICS SPI and FEPI** over
-the accepted 0.9 CICS application and resource authorities.
+You are implementing **mainframe-env cics.system-api: complete CICS SPI and FEPI** over
+the accepted cics.application-api CICS application and resource authorities.
 
 ## Read and verify first
 
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/cics/system-api-plan.md`, the pinned/generated SPI and FEPI
-catalogs, resource lifecycle/topology/condition contracts, and accepted 0.9.0
-evidence. Verify the 0.9 command registry, CICS state, SAF, resource, condition,
+catalogs, resource lifecycle/topology/condition contracts, and accepted cics.application-api
+evidence. Verify the cics.application-api command registry, CICS state, SAF, resource, condition,
 effect, and recovery contracts before integration.
 
 ## Implement in this order
@@ -58,7 +57,7 @@ obligations under the shared source-backed gate-applicability rule.
 
 ## Reuse and architecture guardrails
 
-- Extend the exact 0.9 CICS command, condition, resource, registry, package,
+- Extend the exact cics.application-api CICS command, condition, resource, registry, package,
   principal, effect/UOW, state, migration, and evidence authorities. Do not
   create a separate SPI/FEPI dispatcher, resource database, response mapper, or
   recovery engine.
@@ -92,7 +91,7 @@ obligations under the shared source-backed gate-applicability rule.
 Do not finish until 269/269 unique SPI and 39/39 FEPI commands pass all
 applicable gates and mandatory obligations; lifecycle, topology, authorization, audit, concurrency,
 quiesce, timeout, failure, recovery and resource-bound matrices pass; licensed
-CICS TS 6.x SPI/FEPI differentials pass; and all 0.9 API behavior remains green.
+CICS TS 6.x SPI/FEPI differentials pass; and all cics.application-api API behavior remains green.
 
 At handoff, report canonical denominator deduplication, per-family gate counts,
 registry/resource-schema digests, concurrency/recovery results, oracle receipts,

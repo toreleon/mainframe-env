@@ -1,13 +1,13 @@
-# ADR 0005: Enforce 0.1 boundaries with twenty packages
+# ADR 0005: Initial package boundary consolidation
 
 Status: **Superseded by ADR-0009 for current topology**
 Owner: **repository owner**
-Scope: **historical 0.1 package consolidation and split criteria**
-Applies from: **mainframe-env 0.1.0**
+Scope: **historical platform.runtime-integration package consolidation and split criteria**
+Applies from: **mainframe-env current subsystem contracts**
 
 Historical scope note: this ADR records the original consolidation target. The
-accepted 0.1 machine inventory later contained 24 workspace packages, and
-versioned additions in 0.2 and 0.8 bring the current workspace to 26. See the
+accepted platform.runtime-integration machine inventory later contained 24 workspace packages, and
+versioned additions in coverage.foundation and jes.execution bring the current workspace to 26. See the
 [package map](../architecture/PACKAGE-MAP.md) and machine inventories for
 current composition. [ADR-0009](0009-current-package-topology.md) supersedes
 this decision for the current package count and topology.
@@ -23,7 +23,7 @@ publication and dependency overhead without strengthening the architecture.
 
 ## Decision
 
-The 0.1 workspace has 20 packages. The following proposed crates are physical
+The platform.runtime-integration workspace has 20 packages. The following proposed crates are physical
 modules in an owning package:
 
 - `mainframe-env-ir-codec` is `mainframe-env-ir::codec`;
@@ -40,7 +40,7 @@ modules in an owning package:
 - memory, SQL, and artifact adapters share `mainframe-env-store` while
   implementing separate owned store interfaces.
 
-The machine inventory in `conformance/0.1/inventory/packages.json` is the exact
+The machine inventory in `conformance/subsystems/platform/inventory/packages.json` is the exact
 package authority. Logical modules remain separate and may not bypass owned
 contracts merely because they share a crate.
 
@@ -67,4 +67,4 @@ that a module boundary cannot enforce. That change requires a superseding ADR.
 
 The workspace has fewer public surfaces while retaining the original logical
 architecture. In particular, COBOL remains separated by module responsibility,
-but 0.1 does not claim independently versioned syntax or semantic packages.
+but platform.runtime-integration does not claim independently versioned syntax or semantic packages.

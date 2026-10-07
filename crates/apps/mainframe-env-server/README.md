@@ -1,9 +1,16 @@
 # mainframe-env-server
 
-Single-node 0.1 product composition. It constructs the selected store and
+Single-node development product composition. It constructs the selected store and
 provider generation, owns authentication sessions/readiness/lifecycle and the
 bounded console authority, and supplies application services to the thin
-z/OSMF gateway. No excluded subsystem is linked or advertised.
+z/OSMF gateway. Public advertisement follows the selected capability and route
+catalogs; package presence does not imply complete subsystem support.
+
+Start with the [operations runbook](../../../docs/runbooks/OPERATIONS.md) for
+configuration precedence, secret references, first-administrator bootstrap,
+local SQLite smoke startup, and readiness checks. The checked-in default uses
+PostgreSQL with shared artifacts and TLS; it needs provisioned secret inputs
+before it can start.
 
 The selected JES COBOL program accepts its primary source through `SYSIN` and
 ordered copybook members through `SYSLIB*` DDs. `FORMAT=FIXED` selects fixed
@@ -101,3 +108,7 @@ be omitted. Legacy Db2, IMS, MQ, and CICS replay targets require the exact
 verified owner; the CLI never guesses it. A stale version, wrong namespace,
 missing dependency, or provider row that fails its full decoder is rejected
 without changing the source row.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

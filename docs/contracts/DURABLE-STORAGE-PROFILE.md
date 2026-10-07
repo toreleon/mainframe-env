@@ -1,7 +1,7 @@
 # Durable storage profile
 
 - Status: **Implemented**
-- Applies from: mainframe-env 0.8.3 hardening
+- Applies from: mainframe-env current subsystem contracts
 - Owner: store adapters and core-server composition
 - Scope: PostgreSQL quotas, shared immutable artifacts, and local publication durability
 

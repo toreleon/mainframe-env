@@ -1,9 +1,9 @@
 # ADR-0022: Retain and claim an ISSUE PASS target handoff
 
-Status: **Proposed for v0.9 development**
+Status: **Proposed for cics.application-api development**
 Owner: **CICS terminal and Communications Server adapter maintainers**
 Scope: **CIC-905 ISSUE PASS and target CICS EXTRACT LOGONMSG**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

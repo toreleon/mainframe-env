@@ -1,0 +1,28 @@
+{
+  "schema_version": "mainframe-env.common-program-catalog@1",
+  "target_subsystem": "coverage.foundation",
+  "generated_coverage_credit": 0,
+  "programs": [
+    {"name": "CEE3ABD", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": null, "system_service": "cee3abd"},
+    {"name": "CEEDAYS", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": null, "system_service": "ceedays"},
+    {"name": "COBDATFT", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": null, "system_service": "cobdatft"},
+    {"name": "DFSRRC00", "disposition": "ims-controller", "execution": "ims-controller", "builtin": null, "tso_action": null, "system_service": null},
+    {"name": "DSNTEP4", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": "execute-script", "system_service": null},
+    {"name": "DSNTIAD", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": "execute-script", "system_service": null},
+    {"name": "DSNTIAUL", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": "extract", "system_service": null},
+    {"name": "FTP", "disposition": "network-ftp", "execution": "unsupported", "builtin": null, "tso_action": null, "system_service": null},
+    {"name": "IEBCOMPR", "disposition": "implemented", "execution": "program-service", "builtin": "iebcompr", "tso_action": null, "system_service": null},
+    {"name": "IEBCOPY", "disposition": "implemented", "execution": "program-service", "builtin": "iebcopy", "tso_action": null, "system_service": null},
+    {"name": "IEBDG", "disposition": "implemented", "execution": "program-service", "builtin": "iebdg", "tso_action": null, "system_service": null},
+    {"name": "IEBEDIT", "disposition": "implemented", "execution": "program-service", "builtin": "iebedit", "tso_action": null, "system_service": null},
+    {"name": "IEBGENER", "disposition": "implemented", "execution": "program-service", "builtin": "iebgener", "tso_action": null, "system_service": null},
+    {"name": "IEBUPDTE", "disposition": "implemented", "execution": "program-service", "builtin": "iebupdte", "tso_action": null, "system_service": null},
+    {"name": "IEFBR14", "disposition": "implemented", "execution": "program-service", "builtin": "iefbr14", "tso_action": null, "system_service": null},
+    {"name": "IDCAMS", "disposition": "implemented", "execution": "idcams", "builtin": "idcams", "tso_action": null, "system_service": null},
+    {"name": "IKJEFT01", "disposition": "db2-tso", "execution": "db2-tso", "builtin": null, "tso_action": null, "system_service": null},
+    {"name": "IKJEFT1B", "disposition": "report-rexx", "execution": "unsupported", "builtin": null, "tso_action": null, "system_service": null},
+    {"name": "MVSWAIT", "disposition": null, "execution": "unsupported", "builtin": null, "tso_action": null, "system_service": "mvswait"},
+    {"name": "SDSF", "disposition": "cics-file-control", "execution": "sdsf", "builtin": null, "tso_action": null, "system_service": null},
+    {"name": "SORT", "disposition": "implemented", "execution": "program-service", "builtin": "sort", "tso_action": null, "system_service": null}
+  ]
+}

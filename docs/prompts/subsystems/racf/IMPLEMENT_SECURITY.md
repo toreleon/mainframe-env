@@ -3,7 +3,6 @@
 Subsystem: **racf**
 Phase: **security**
 
-Target version: **0.5.0**
 Completion dependencies: coverage.foundation
 
 Use this prompt from the repository root. The
@@ -11,7 +10,7 @@ Use this prompt from the repository root. The
 
 ---
 
-You are implementing **mainframe-env 0.5.0: complete RACF command language and
+You are implementing **mainframe-env racf.security: complete RACF command language and
 SAF**. Deliver one generic security authority for the pinned RACF/SAF surface.
 
 ## Read and verify first
@@ -19,7 +18,7 @@ SAF**. Deliver one generic security authority for the pinned RACF/SAF surface.
 Read `docs/prompts/subsystems/README.md`,
 `docs/delivery/subsystems/racf/security-plan.md`, the official RACF/SAF catalogs,
 security model, principal/capability contracts, audit/redaction policy, store
-schemas, and relevant ADRs. Verify the 0.2 generated identity, package, coverage,
+schemas, and relevant ADRs. Verify the coverage.foundation generated identity, package, coverage,
 and evidence contracts before integrating public commands or SAF calls.
 
 ## Implement in this order
@@ -76,12 +75,12 @@ reusing production implementation. ACEE/token/policy/certificate behavior and
 prior CardDemo security journeys must be exact without application-specific
 branches.
 
-Scoped completion policy approved by the user on 2026-09-01: 0.5 may exit as
+Scoped completion policy approved by the user on 2026-09-01: racf.security may exit as
 `pass-with-licensed-differential-pending` because no licensed z/OS 3.2 RACF/SAF
 receipt is available in this development cycle. Keep the licensed differential
 numerator exactly 0/48, never fabricate or infer a pass, and retain the
 fail-closed campaign adapter. The real licensed 48-row campaign is a hard gate
-of 0.17 `release-certify` and remains mandatory before 1.0/release
+of certification.licensed `release-certify` and remains mandatory before 1.0/release
 certification.
 
 At handoff, include per-family gate counts, deny-path evidence, audit/redaction

@@ -83,7 +83,7 @@ the durable logical clock, and fenced leases. The existing
 protected transitions. `ImsMetadataCatalog` and
 `validate_ims_metadata` expose the additive `mainframe-env.ims-metadata@1`
 contract, described by the Draft 2020-12
-[`metadata schema`](../../../conformance/0.14/schemas/ims-metadata.schema.json).
+[`metadata schema`](../../../conformance/subsystems/ims/schemas/ims-metadata.schema.json).
 
 Package publication retains at most 64 validated metadata generations per
 application in provider-owned versioned rows and atomically advances a separate
@@ -176,3 +176,7 @@ cargo xtask architecture-fast --check
 Cross-provider, restart, authorization, and application-profile behavior is
 also exercised by `mainframe-env-conformance` and the applicable certification
 gates.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

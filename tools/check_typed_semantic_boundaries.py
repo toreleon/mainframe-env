@@ -527,12 +527,10 @@ def check(root: Path) -> None:
         and "ReferenceMachine::from_binary(\n                &record.payload" not in server_product,
         "normal product load or restore bypasses manifest-aware artifact admission",
     )
-    release = tomllib.loads(read(root, "release.toml"))
-    versions = json.loads(read(root, "conformance/0.2/inventory/versions.json"))
+    versions = json.loads(read(root, "conformance/subsystems/platform/inventory/contracts.json"))
     require(
-        release.get("contracts", {}).get("artifact") == "mainframe-env.artifact@3"
-        and versions.get("contracts", {}).get("artifact") == "mainframe-env.artifact@3",
-        "current release and conformance artifact contract authorities must both declare @3",
+        versions.get("contracts", {}).get("artifact") == "mainframe-env.artifact@3",
+        "the subsystem contract inventory must declare artifact @3",
     )
 
     jcl = read(root, "crates/apps/mainframe-env-batch/src/jcl_schema.rs")

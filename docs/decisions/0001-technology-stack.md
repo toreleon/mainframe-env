@@ -1,14 +1,14 @@
-# ADR-0001: 0.1 Technology Stack
+# ADR-0001: Technology stack
 
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **technology stack and deferred framework boundaries**
-Applies from: **mainframe-env 0.1.0**
-Decision scope: **mainframe-env 0.1**
+Applies from: **mainframe-env current subsystem contracts**
+Decision scope: **mainframe-env platform.runtime-integration**
 
 ## Context
 
-0.1 must support COBOL, CICS, JCL/JES, datasets, RACF/security, and z/OSMF with a
+platform.runtime-integration must support COBOL, CICS, JCL/JES, datasets, RACF/security, and z/OSMF with a
 small, supportable dependency surface. Infrastructure frameworks must remain
 replaceable and cannot define mainframe semantics or stable domain contracts.
 
@@ -23,7 +23,7 @@ replaceable and cannot define mainframe semantics or stable domain contracts.
 - One committed application `Cargo.lock`.
 - Workspace dependencies declared centrally with minimal feature sets.
 
-### Adopt for 0.1
+### Adopt for the base profile
 
 | Concern | Technology | Boundary |
 |---|---|---|
@@ -56,9 +56,9 @@ replaceable and cannot define mainframe semantics or stable domain contracts.
 - PostgreSQL-specific queue claims are implementation details behind the work
   store contract.
 
-### Deferred beyond 0.1
+### Deferred beyond the base profile
 
-The following are not 0.1 dependencies or deliverables:
+The following are not platform.runtime-integration dependencies or deliverables:
 
 - Wasmtime/WIT and external Wasm plugins;
 - Tonic/Protobuf process or remote workers;
@@ -93,7 +93,7 @@ recovery, and semantic policy under mainframe-env control.
 - Foundation and contract crates have very small dependency graphs.
 - Applications may depend on infrastructure frameworks but translate at the
   boundary.
-- 0.1 does not pay build, security, or operational cost for speculative plugin,
+- platform.runtime-integration does not pay build, security, or operational cost for speculative plugin,
   broker, native-backend, or distributed frameworks.
 - Framework upgrades cannot change durable or public DTO semantics without an
   explicit contract change.

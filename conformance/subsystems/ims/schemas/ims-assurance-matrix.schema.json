@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/ims-assurance-matrix.schema.json",
+  "title": "Bounded IMS local assurance matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "coverage_credit", "cases", "bindings", "pending"],
+  "properties": {
+    "schema_version": { "const": "mainframe-env.ims-assurance-matrix@1" },
+    "target_subsystem": { "const": "ims.programming" },
+    "coverage_credit": { "const": 0 },
+    "cases": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/case" }
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 25,
+      "maxItems": 25,
+      "items": { "$ref": "#/$defs/binding" }
+    },
+    "pending": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/pending" }
+    }
+  },
+  "$defs": {
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "source_locator", "applicability_profiles", "handler", "local_gates", "expected_observation", "credit_state", "coverage_credit"],
+      "properties": {
+        "row_id": { "type": "string", "pattern": "^ibm-ims-15\\.6-dli-2026-08-31:dli-call-families:[0-9]{4}$" },
+        "source_locator": { "type": "string", "minLength": 20 },
+        "applicability_profiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 2 } },
+        "handler": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "variants"],
+          "properties": {
+            "kind": { "enum": ["ims-operation", "ims-system-call", "recovery-method", "applicability-only"] },
+            "variants": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" } }
+          }
+        },
+        "local_gates": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "$ref": "#/$defs/local_gate" } },
+        "expected_observation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["pcb_status", "position", "mutation", "output"],
+          "properties": {
+            "pcb_status": { "type": "string", "minLength": 2 },
+            "position": { "type": "string", "minLength": 2 },
+            "mutation": { "type": "string", "minLength": 2 },
+            "output": { "type": "string", "minLength": 2 }
+          }
+        },
+        "credit_state": { "enum": ["local-regression-only", "pending-execution"] },
+        "coverage_credit": { "const": 0 }
+      }
+    },
+    "local_gate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["file", "test", "gate"],
+      "properties": {
+        "file": { "type": "string", "pattern": "^crates/.+\\.rs$" },
+        "test": { "type": "string", "pattern": "^[a-z][a-z0-9_]+$" },
+        "gate": { "enum": ["applicability", "local-regression"] }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "foundation", "property", "backend", "test_file", "test_name", "expected", "source_scope", "source_topic", "catalog_rows"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^IMS-A-[0-9]{3}$" },
+        "foundation": { "enum": ["host", "database", "tm", "recovery", "metadata", "utility"] },
+        "property": { "enum": ["saf", "malformed-limit", "cas-conflict", "replay", "reopen-corruption", "scale", "compatibility-rollback", "unknown-outcome"] },
+        "backend": { "enum": ["memory", "sqlite", "deterministic-engine", "memory-and-sqlite"] },
+        "test_file": { "type": "string", "pattern": "^crates/(providers/mainframe-env-ims|apps/mainframe-env-server)/.+\\.rs$" },
+        "test_name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{4,120}$" },
+        "expected": { "type": "string", "minLength": 20, "maxLength": 240 },
+        "source_scope": { "enum": ["ims-programming-contracts", "ims-database-contracts", "ims-tm-contracts", "ims-metadata-contracts", "ims-recovery-utilities-contracts"] },
+        "source_topic": { "type": "string", "pattern": "^SSEPH2_15\\.6\\.0/.+\\.htm$" },
+        "catalog_rows": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^ibm-ims-15\\.6-dli-2026-08-31:dli-call-families:[0-9]{4}$" }
+        }
+      }
+    },
+    "pending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "reason"],
+      "properties": {
+        "id": { "enum": ["carddemo-corpus-package-route", "full-25-family-gates", "licensed-ims-15.6-differential", "mixed-resource-syncpoint"] },
+        "reason": { "type": "string", "minLength": 20, "maxLength": 240 }
+      }
+    }
+  }
+}

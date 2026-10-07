@@ -55,10 +55,7 @@ retrieval-capable tool makes and why it is allowed.
 
 Every projection this file describes carries `coverage_credit: 0` and
 `retained_in_repository: false`. None of the work recorded here moved a coverage
-numerator. `conformance/0.2/evidence/coverage-ledger.json` still reads
-`official_compatibility_numerator: 0<!--f:ledger.official_compatibility_numerator-->`
-and `generated_catalog_credit: 0<!--f:ledger.generated_catalog_credit-->`, and
-the 1,506<!--f:catalog.rows_total--> catalog row identities are unchanged —
+numerator. The 1,506<!--f:catalog.rows_total--> catalog row identities are unchanged —
 `GENERATED_IDENTITY_SET_SHA256` in
 `crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs`
 is `sha256:b659a6e1...` as it was before any of it.
@@ -106,10 +103,10 @@ failure; a figure not quoted is a list entry.
 
 ## The pins are reproducible
 
-`conformance/0.2/catalogs/index.json` records, per baseline, the
+`conformance/subsystems/coverage/catalogs/index.json` records, per baseline, the
 table-of-contents URL and its sha256, the content URL template
 (`?parsebody=true&lang=en` is part of the pin — dropping it moves the MQ topic
-from 10,245 to 8,264 bytes), and a manifest under `conformance/0.2/manifests/`
+from 10,245 to 8,264 bytes), and a manifest under `conformance/subsystems/coverage/manifests/`
 that names every topic the baseline was read from with that topic's own digest.
 The baseline's `sha256` is a digest over that ordered topic list, not over a
 downloaded file. Since commit 60974e2 the manifests are also gated in Rust
@@ -148,11 +145,11 @@ second half will be surprised by the next red run.
 
 4,488<!--f:pins.topics_total--> topics and 61,667,883<!--f:pins.bytes_total-->
 bytes; both totals are the sum of the nine manifests
-in `conformance/0.2/manifests/` and can be recomputed from the tree without
+in `conformance/subsystems/coverage/manifests/` and can be recomputed from the tree without
 asking IBM anything. All nine tables of contents hash to their recorded
 `toc_sha256`. The RACROUTE router-interface topic that RACF pins as a supporting
 source is re-read too, at 161,025<!--f:pins.racroute_bytes--> bytes
-(`conformance/0.2/catalogs/index.json`, the `racri.htm` supporting entry); no
+(`conformance/subsystems/coverage/catalogs/index.json`, the `racri.htm` supporting entry); no
 tool in this repository had ever re-read it, because the old loop read only each
 baseline's primary source.
 
@@ -258,13 +255,13 @@ collapse to one semantic link and the report records both occurrences.
 The remaining 5<!--f:catalog.roadmap_normalization_total-->
 `roadmap-normalization:` rows are not publication-match claims. They are the
 deliberate five-row VSAM organization taxonomy documented in
-`conformance/0.2/catalogs/README.md`, and the verifier reports each as
+`conformance/subsystems/coverage/catalogs/README.md`, and the verifier reports each as
 `skipped:documented-roadmap-normalization`. Thus
 865<!--f:catalog.topic_located_total--> topic rows +
 636<!--f:catalog.embedded_located_total--> embedded rows +
 5<!--f:catalog.roadmap_normalization_total--> documented normalization rows
 accounts for all 1,506<!--f:catalog.rows_total--> rows. Every count in the table
-comes from `source_locator` values in `conformance/0.2/catalogs/*.json` and is
+comes from `source_locator` values in `conformance/subsystems/coverage/catalogs/*.json` and is
 recomputed offline. The live audit found no missing, moved, retitled, or
 ambiguous topic, table row, header cell, or link; an unreachable source remains
 `skipped` rather than becoming a false `missing` finding.
@@ -346,11 +343,11 @@ No publication changed in any of the four; only the source we read it from did.
 
 Each reader reads only pinned topics, at pinned digests. That is checkable
 offline: every topic path and sha256 in
-`conformance/0.3/generated/cobol-topic-manifest.json` (139<!--f:readers.cobol.topics-->),
-`conformance/0.6/generated/ams-topic-manifest.json` (89<!--f:readers.ams.topics-->),
-`conformance/0.5/generated/racf-topic-manifest.json` (60<!--f:readers.racf.topics-->) and
-`conformance/0.7/generated/jcl-topic-manifest.json` (626<!--f:readers.jcl.topics-->)
-appears in the corresponding `conformance/0.2/manifests/` pin at an identical
+`conformance/subsystems/cobol/structure/generated/cobol-topic-manifest.json` (139<!--f:readers.cobol.topics-->),
+`conformance/subsystems/dataset/generated/ams-topic-manifest.json` (89<!--f:readers.ams.topics-->),
+`conformance/subsystems/racf/generated/racf-topic-manifest.json` (60<!--f:readers.racf.topics-->) and
+`conformance/subsystems/jcl/generated/jcl-topic-manifest.json` (626<!--f:readers.jcl.topics-->)
+appears in the corresponding `conformance/subsystems/coverage/manifests/` pin at an identical
 digest — 139/139<!--f:readers.cobol.topics_in_pin-->,
 89/89<!--f:readers.ams.topics_in_pin-->, 60/60<!--f:readers.racf.topics_in_pin-->
 and 626/626<!--f:readers.jcl.topics_in_pin-->.
@@ -384,7 +381,7 @@ another:
   transferred unchanged in either direction: a reader built for `OPTION(kind)`
   operands rejects the bare `syntaxvar` operands COBOL uses.
 - **RACF** has no diagrams. Each command topic carries a `Syntax` section and a
-  `Parameters` section, and `conformance/0.5/tools/extract_racf_html_syntax.py`
+  `Parameters` section, and `conformance/subsystems/racf/tools/extract_racf_html_syntax.py`
   reads structure only. Every claim is scoped to a `<section>` named by its own
   `<h2 class="sectiontitle">`: operands come from the `dl` under `Parameters`
   and the syntax line from the tables under `Syntax`, so a definition list under
@@ -425,9 +422,9 @@ another:
 
 ### JCL — 204 statement parameters, all confirmed
 
-Produced by `conformance/0.7/tools/extract_jcl_html_parameters.py` from the
+Produced by `conformance/subsystems/jcl/tools/extract_jcl_html_parameters.py` from the
 626<!--f:jcl.topics--> pinned topics it records, and emitted to
-`conformance/0.7/generated/jcl-html-parameter-projection.json`. The comparison
+`conformance/subsystems/jcl/generated/jcl-html-parameter-projection.json`. The comparison
 confirms a catalog it does not change.
 
 | Unit | catalog | source | shared | only in catalog | only in source |
@@ -444,12 +441,12 @@ chapter's children, not merely by set. The statement rosters match the same way:
 the chapter that documents it and cross-checked against the two summary tables
 that state the same rosters. 20 + 13 + 74 + 19 + 35 + 76 =
 237<!--f:jcl.catalog_rows-->, which is every row in
-`conformance/0.2/catalogs/jcl-jes2.json`.
+`conformance/subsystems/coverage/catalogs/jcl-jes2.json`.
 
 This is the same result the deleted PDF reader produced, ordered-equal, which is
 the strongest thing that can be said for either reader. That comparison was made
 against what the retired tool actually emitted —
-`438dbc6^:conformance/0.7/generated/jcl-pdf-parameter-projection.json` — not
+`438dbc6^:conformance/subsystems/jcl/generated/jcl-pdf-parameter-projection.json` — not
 against a re-read of a book nothing in the tree can open, so no PDF was involved
 in checking it. On the 3.2 edition the match was exact in every unit. The nine
 differences the earlier V2R2 run reported — `DSKEYLBL`, `NULLOVRD`, `ROACCESS`,
@@ -469,7 +466,7 @@ above.
 All 31<!--f:ams.located--> functional commands are located. The publication
 documents **688<!--f:ams.source_parameters--> parameters**, plus
 **193<!--f:ams.source_values--> values** those parameters accept;
-`conformance/0.6/ams/grammar.json` records `keywords: ["ALLOCATE"]` and nothing
+`conformance/subsystems/dataset/ams/grammar.json` records `keywords: ["ALLOCATE"]` and nothing
 else, so its parameter inventory is **zero<!--f:ams.catalog_parameters--> for
 every command**. The spread is wide: `ALTER` 59<!--f:ams.parameters.alter-->,
 `ALLOCATE` 56<!--f:ams.parameters.allocate-->, `DEFINE CLUSTER`
@@ -494,7 +491,7 @@ dated correction under "What a probe finding may and may not become" below.
 
 ### COBOL — 44 procedure statements
 
-From `conformance/0.3/generated/cobol-grammar-comparison.json`:
+From `conformance/subsystems/cobol/structure/generated/cobol-grammar-comparison.json`:
 
 | | catalog | source |
 |---|---|---|
@@ -506,7 +503,7 @@ From `conformance/0.3/generated/cobol-grammar-comparison.json`:
 
 The form gap this section used to describe is now largely closed. Commit 6223be2
 wrote the publication's own statement formats into
-`conformance/0.3/cobol/language.json`, taking catalog forms from 49 to 81; commit
+`conformance/subsystems/cobol/structure/cobol/language.json`, taking catalog forms from 49 to 81; commit
 397a6b8 then held each form to the diagram its own statement draws and settled it
 at 80<!--f:cobol.catalog_forms-->, against
 83<!--f:cobol.source_formats--> published formats. **Two<!--f:cobol.rows_with_more_source_formats-->
@@ -606,7 +603,7 @@ statement draws and dropped one of `SET`'s.
 
 ### RACF — 34 command families, all located
 
-From `conformance/0.5/generated/racf-html-syntax-projection.json`, built by
+From `conformance/subsystems/racf/generated/racf-html-syntax-projection.json`, built by
 `extract_racf_html_syntax.py` from the 60<!--f:racf.topics--> pinned topics it
 records (34<!--f:racf.command_topics--> command
 topics plus the 26<!--f:racf.racdcert_function_topics--> `RACDCERT` function
@@ -718,11 +715,11 @@ licensed RACF differential match.
 
 ## Known limitations
 
-- COBOL: `conformance/0.3/generated/cobol-topic-manifest.json` records each
+- COBOL: `conformance/subsystems/cobol/structure/generated/cobol-topic-manifest.json` records each
   topic's path and digest so a reviewer can see exactly what was read. All
   139<!--f:readers.cobol.topics-->
   of them are inside the 622<!--f:pins.topics.cobol--> topics
-  `conformance/0.2/manifests/cobol-topics.json`
+  `conformance/subsystems/coverage/manifests/cobol-topics.json`
   pins, at identical digests, so the projection is read from the pinned artifact
   rather than from a same-version stand-in. Inside an optional segment every
   branch is reported optional rather than alternative, because none of them can
@@ -739,11 +736,11 @@ licensed RACF differential match.
   functions; each function's own contribution is kept beside the union so a
   reviewer can tell them apart. All 60<!--f:readers.racf.topics--> topics read are
   inside the 109<!--f:pins.topics.racf_saf--> that
-  `conformance/0.2/manifests/racf-saf-topics.json` pins, at identical digests.
+  `conformance/subsystems/coverage/manifests/racf-saf-topics.json` pins, at identical digests.
 - AMS: like COBOL, all 89<!--f:readers.ams.topics--> topics in
-  `conformance/0.6/generated/ams-topic-manifest.json` are inside the
+  `conformance/subsystems/dataset/generated/ams-topic-manifest.json` are inside the
   516<!--f:pins.topics.dataset_vsam_ams--> that
-  `conformance/0.2/manifests/dataset-vsam-ams-topics.json` pins, at identical
+  `conformance/subsystems/coverage/manifests/dataset-vsam-ams-topics.json` pins, at identical
   digests. A parameter nested under another (`DEFINE PATH` documents `NAME` and
   `PATHENTRY` inside `PATH(...)`) is reported as a value, which is faithful to
   the reference's own nesting but means the parameter count is per level rather
@@ -758,7 +755,7 @@ licensed RACF differential match.
   that also end in the word
   "parameter"). All 626<!--f:readers.jcl.topics--> topics read are inside the
   1,985<!--f:pins.topics.jcl_jes2--> that
-  `conformance/0.2/manifests/jcl-jes2-topics.json` pins, at identical digests.
+  `conformance/subsystems/coverage/manifests/jcl-jes2-topics.json` pins, at identical digests.
 - Locator audit: a heading is never the only discriminator, and it must not
   become one. 52<!--f:catalog.repeated_headings--> of the
   865<!--f:catalog.topic_located_total--> rows carry a heading that repeats inside
@@ -834,14 +831,14 @@ were argued from.
 
 - **"nothing validates parameters" (AMS) is false.**
   `ams_operand_allowed` at
-  `crates/apps/mainframe-env-batch/src/service.rs:6194<!--f:ams.allowlist_line-->`
+  `crates/apps/mainframe-env-batch/src/service.rs:5,625<!--f:ams.allowlist_line-->`
   is a per-command allowlist of **126<!--f:ams.allowlist_names--> distinct
   operand names**, 84<!--f:ams.allowlist_base_names--> of them the
   base set shared by `ALLOCATE`, `DEFINE CLUSTER`, `DEFINE NONVSAM`, `DEFINE
   ALTERNATEINDEX` and `ALTER` and the rest declared per command.
-  `unimplemented_ams_operand` at `:6072<!--f:ams.unimplemented_line-->` scans
+  `unimplemented_ams_operand` at `:5,503<!--f:ams.unimplemented_line-->` scans
   every top-level term and its caller at
-  `:3052<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
+  `:2,515<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
   capability `ams-operand` before any
   effect runs. The ruling — that `grammar.json` stays a recognition inventory and
   should not grow a parameter field — is *strengthened* by this, not weakened:
@@ -850,7 +847,7 @@ were argued from.
   loud `UnsupportedCapability` into a silently accepted operand for every name the
   emulator has no effect for. The contract that does exist is documented in
   `docs/architecture/DATASET-VSAM-AMS.md`, which names both halves of it — the
-  typed effects in `conformance/0.6/inventory/dataset-programming-surface.json`
+  typed effects in `conformance/subsystems/dataset/inventory/dataset-programming-surface.json`
   and the accepted spellings in `ams_operand_allowed` — and says why the accepted
   set is deliberately narrower than the publication's and is not nested inside it
   in either direction.
@@ -862,7 +859,7 @@ were argued from.
   accepting an operand the command processor does not implement is worse than
   rejecting it. The 62<!--f:racf.remaining_catalog_only_names--> are
   dispositioned by name in
-  `conformance/0.5/racf/operand-dispositions.json` and gated by
+  `conformance/subsystems/racf/racf/operand-dispositions.json` and gated by
   `check_operand_dispositions` in `xtask/src/racf_catalog.rs`; six further names
   were corrected outright.
 - **"Closing the 49-against-95 gap means writing 46 forms" is superseded.** The
@@ -884,7 +881,7 @@ were argued from.
 |---|---|
 | Db2 | 832<!--f:pins.topics.db2--> topics pinned and all 174<!--f:catalog.rows.db2--> rows resolve. No syntax reader; statement syntax is published as the same DITA railroad markup COBOL uses, so the COBOL reader is the nearest starting point. |
 | z/OSMF | REST families rather than a command language. All 216<!--f:catalog.rows.zosmf--> rows resolve; a syntax projection does not apply without a different comparison model. |
-| CICS, IMS, MQ | All three pin topics and all three reproduce. The locator audit resolves every `html-table:` and `html-link:` identity exactly: 571<!--f:catalog.rows.cics--> CICS rows, 25<!--f:catalog.rows.ims--> IMS rows and 26<!--f:catalog.rows.mq--> MQ rows. IMS and MQ have no syntax reader. CICS now has a bounded accepted file/UOW pilot under `conformance/0.9`, but it is not a reader or implementation for the complete 263-command application API. The CICS rows cite the EIBFN function-code table in `dfha8mf.html`, which proves the inventory and still says nothing about each command's complete syntax. 0.9.0 remains proposed. |
+| CICS, IMS, MQ | All three pin topics and all three reproduce. The locator audit resolves every `html-table:` and `html-link:` identity exactly: 571<!--f:catalog.rows.cics--> CICS rows, 25<!--f:catalog.rows.ims--> IMS rows and 26<!--f:catalog.rows.mq--> MQ rows. IMS and MQ have no syntax reader. CICS now has a bounded accepted file/UOW pilot under `conformance/subsystems/cics/application`, but it is not a reader or implementation for the complete 263-command application API. The CICS rows cite the EIBFN function-code table in `dfha8mf.html`, which proves the inventory and still says nothing about each command's complete syntax. cics.application-api remains proposed. |
 
 The remaining publication-analysis gaps, in order of size:
 
@@ -917,7 +914,7 @@ revision should stop quoting:
 
 - **The pins are not PDFs, and were never verifiable as three of them claimed.**
   All nine baselines now pin a manifest of IBM Documentation topics under
-  `conformance/0.2/manifests/`, read from the content endpoint
+  `conformance/subsystems/coverage/manifests/`, read from the content endpoint
   (`?parsebody=true&lang=en`). The earlier "The pins are reproducible" section
   carried a six-row table of PDF downloads that no baseline cites any more, and
   said the four HTML pins "need a recorded retrieval method before they can be
@@ -961,7 +958,7 @@ gone.
   values, 950<!--f:racf.source_members--> members,
   62<!--f:racf.catalog_only--> catalog-only, 429<!--f:racf.source_only-->
   source-only, and they are read from
-  `conformance/0.5/generated/racf-html-syntax-projection.json`. The nine
+  `conformance/subsystems/racf/generated/racf-html-syntax-projection.json`. The nine
   "unlocated" commands were a property of the PDF reader. The values and members
   figures read 844 and 957 in this entry until 2026-09-08; commit 0dc3024 moved
   them.
@@ -989,7 +986,7 @@ gone.
 - **A stale CICS sentence is removed.** The revision before this one said "The
   CICS reader does not transfer unchanged" in one section and, in another, that
   no CICS reader exists anywhere in the tree. The second was right. The sentence
-  was a survival from a retracted claim about a "0.9 CICS DITA reader"; commit
+  was a survival from a retracted claim about a "cics.application-api CICS DITA reader"; commit
   3aefd72 took back the claim and missed this sentence. What is true, and is now
   stated where the sentence was, is that a reader built for `OPTION(kind)`
   operands would not read COBOL's bare `syntaxvar` operands — a reason a future
@@ -1014,11 +1011,7 @@ gone.
   benign is the opposite of what it is. A `differs` also stands when the manifest
   digest moves with no topic reporting a mismatch. Nothing is re-pinned.
 - **What did not move.** No coverage claim. Every projection named here carries
-  `coverage_credit: 0`; `conformance/0.2/evidence/coverage-ledger.json` still
-  reads
-  `official_compatibility_numerator: 0<!--f:ledger.official_compatibility_numerator-->`
-  and `generated_catalog_credit: 0<!--f:ledger.generated_catalog_credit-->`;
-  the 1,506<!--f:catalog.rows_total--> row identities and
+  `coverage_credit: 0`; the 1,506<!--f:catalog.rows_total--> row identities and
   `GENERATED_IDENTITY_SET_SHA256` are unchanged.
   Three waves of work deliberately moved no coverage number, and this record must
   not be read as though they did.

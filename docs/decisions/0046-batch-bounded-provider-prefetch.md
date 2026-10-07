@@ -2,8 +2,8 @@
 
 Status: Accepted bounded infrastructure prerequisite; joined admission remains pending.
 Owner: **Store and Batch maintainers**
-Scope: **MQ-1503.batch-bounded-provider-prefetch, target 0.15.0**
-Applies from: **mainframe-env 0.15.0 development**
+Scope: **MQ-1503.batch-bounded-provider-prefetch, target mq.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/generated-route-registries@1",
+  "title": "mainframe-env generated route registry manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_subsystem", "official", "custom", "namespaces_disjoint", "generated_coverage_credit"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.generated-route-registries@1"},
+    "target_subsystem": {"const": "coverage.foundation"},
+    "official": {"$ref": "#/$defs/registry"},
+    "custom": {"$ref": "#/$defs/registry"},
+    "namespaces_disjoint": {"const": true},
+    "generated_coverage_credit": {"const": 0}
+  },
+  "$defs": {
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "catalog", "catalog_sha256", "route_count"],
+      "properties": {
+        "namespace": {"enum": ["official-zosmf", "mainframe-env-custom"]},
+        "catalog": {"type": "string", "minLength": 1},
+        "catalog_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "bindings_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "route_count": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

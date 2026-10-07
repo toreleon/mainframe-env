@@ -10,8 +10,9 @@ const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
 const CAPTURE_CONTRACT: &str = "mainframe-env.cics-oracle-capture@1";
 const FAMILY_CAPTURE_CONTRACT: &str = "mainframe-env.cics-oracle-capture@2";
 const TRUSTED_AUTHORITY: &str = "ibm-cics-protected-runner";
-const CAPTURE_SCHEMA: &str =
-    include_str!("../../../../conformance/0.9/schemas/cics-oracle-capture.schema.json");
+const CAPTURE_SCHEMA: &str = include_str!(
+    "../../../../conformance/subsystems/cics/application/schemas/cics-oracle-capture.schema.json"
+);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

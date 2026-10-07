@@ -16,3 +16,7 @@ rows begin with zero numerators. Verify with
 `cargo test -p mainframe-env-coverage --locked` and
 `cargo xtask coverage --check`. From 0.3 onward also run
 `cargo xtask spec --check`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

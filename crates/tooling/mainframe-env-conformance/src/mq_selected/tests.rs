@@ -136,7 +136,7 @@ fn harness_rejects_missing_generic_saf_mutation_and_byte_evidence() {
 fn registered_fixture_binds_actual_emission_source_not_expectation() {
     let limits = ConformanceLimits::default();
     let catalog: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../../conformance/0.2/catalogs/mq.json"
+        "../../../../../conformance/subsystems/coverage/catalogs/mq.json"
     ))
     .unwrap();
     let rows = catalog["units"][0]["rows"]

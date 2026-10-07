@@ -1,0 +1,44 @@
+{
+  "schema_version": "mainframe-env.contract-inventory@1",
+  "rust": {
+    "pinned": "1.98.0",
+    "msrv": "1.95.0",
+    "edition": "2024"
+  },
+  "profiles": {
+    "core-server": 1,
+    "conformance": 1
+  },
+  "contracts": {
+    "source": "mainframe-env.source@1",
+    "source_libraries": "mainframe-env.source-libraries@1",
+    "host_abi_source_library": "mainframe-env.host-abi-source-library@1",
+    "diagnostics": "mainframe-env.diagnostic@1",
+    "encoding": "mainframe-env.encoding@1",
+    "compiler": "mainframe-env.compiler@1",
+    "ir_object": "mainframe-env.ir@1",
+    "ir_text": "mainframe-env.ir-text@1",
+    "ir_binary": "mainframe-env.ir-binary@1",
+    "ir_envelope": "mainframe-env.ir-envelope@1",
+    "artifact": "mainframe-env.artifact@3",
+    "execution": "mainframe-env.execution@1",
+    "host": "mainframe-env.host@1",
+    "cics": "mainframe-env.cics@1",
+    "store": "mainframe-env.store@1",
+    "checkpoint": "mainframe-env.checkpoint@1",
+    "session": "mainframe-env.session@1",
+    "configuration": "mainframe-env.config@1",
+    "zosmf": "mainframe-env.zosmf@1",
+    "evidence": "mainframe-env.evidence@1",
+    "official_catalog": "mainframe-env.official-catalog@1",
+    "coverage_ledger": "mainframe-env.coverage-ledger@1",
+    "application_package": "mainframe-env.application-package@2",
+    "batch_controller_registry": "mainframe-env.batch-controller-registry@1",
+    "common_program_catalog": "mainframe-env.common-program-catalog@1",
+    "db2_application_catalog": "mainframe-env.db2-application-catalog@1"
+  },
+  "sql_schema": 1,
+  "migration_head": "0001-durable-state",
+  "fixture_schema": "mainframe-env.fixtures@1",
+  "evidence_schema": "mainframe-env.evidence@1"
+}

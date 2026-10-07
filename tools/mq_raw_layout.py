@@ -9,8 +9,8 @@ import sys
 import mq_wire_options as wire
 
 OUTPUT = Path('crates/contracts/mainframe-env-host-api/src/mq_raw_layout/generated.rs')
-PROJECTION_SHA = '2f6d7c679543891ccc768f099963813d981871d2abd35fa7b49aa4e70732ae6a'
-PREVIOUS_PROJECTION_SHA = '5a9d640e8477cad582b85fbf1f64139d33de7558e436da7a16a31105499855c0'
+PROJECTION_SHA = '8f3ca67fe72efe6cd4c6c044086de3e9f5d1feebe4390f8163709a5936cb633e'
+PREVIOUS_PROJECTION_SHA = '328ced5efce5d0ca96f7984d13ad3bb168dcc8518097f4535601a5278ddaae91'
 SCOPES = ('mq-programming-supplements', 'mq-point-layout-sources', 'ibm-mq-9.4-mqi-2026-08-31')
 
 

@@ -1,7 +1,0 @@
-{
-  "schema_version": "mainframe-env.conformance-dependency-additions@1",
-  "target_version": "0.14.0",
-  "edges": [
-    ["mainframe-env-db2", "mainframe-env-encoding"]
-  ]
-}

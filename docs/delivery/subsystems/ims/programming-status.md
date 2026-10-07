@@ -2,7 +2,6 @@
 
 Subsystem: **ims**
 Phase: **programming**
-Target release: **0.14.0**
 
 Status: **Proposed**
 
@@ -43,7 +42,7 @@ already enforce exactly one root segment type; an old generic remaining-root
 phrase is not evidence of a new missing root-count predicate. One-type HSAM
 DBDGEN normalization and full-family proof remain distinct obligations. All 25
 mandatory rows, official/HUMAN0/25, shared ADR0031/0033, raw CALL/TM/participant
-and parent v0.14 remain incomplete. Licensed certification stays excluded;
+and parent ims.programming remain incomplete. Licensed certification stays excluded;
 mandatory OSS license policy stays required.
 
 ## Root DEDB subset-pointer source integration — 2026-10-03
@@ -71,7 +70,7 @@ shared metadata/context/framing/status/lifecycle/recovery choices and remaining
 DEDB classes are not approved or admitted. Root-level pointer ignored semantics
 are not an Unsupported success; prospective histories remain unexecuted. Source
 review earns zero runtime/IR/official/HUMAN/licensed/participant credit. All 25
-mandatory rows, official/HUMAN0/25, shared ADR0031/0033 and parent v0.14 remain
+mandatory rows, official/HUMAN0/25, shared ADR0031/0033 and parent ims.programming remain
 incomplete. Licensed certification is excluded; mandatory OSS policy remains.
 
 ## Root Q/DEQ source integration — 2026-10-03
@@ -91,7 +90,7 @@ coverage, formatting and exact five-path generated/committed seal, then cleans
 this checkout's Cargo target. Unchanged runtime, PostgreSQL, whole-cache and
 known infrastructure exploration is not repeated for this source integration.
 The four-topic registration earns zero runtime/IR/official/HUMAN/licensed or
-participant credit. Q/DEQ runtime, shared ADR0031/0033, raw CALL and parent v0.14
+participant credit. Q/DEQ runtime, shared ADR0031/0033, raw CALL and parent ims.programming
 remain incomplete; all 25 mandatory rows and official/HUMAN0/25 remain unchanged.
 Licensed certification stays excluded; mandatory OSS license policy remains.
 
@@ -114,7 +113,7 @@ No unchanged runtime, PostgreSQL, whole-cache or known CICS infrastructure test
 is repeated. Original source-reader and policy receipts retain their identities.
 The source registration grants zero runtime/IR/official/HUMAN/licensed/participant
 credit; prior-commit TM recovery, shared ADR0031/0033, human rules and parent
-v0.14 remain incomplete. No source refresh or shared-store approval is inferred.
+ims.programming remain incomplete. No source refresh or shared-store approval is inferred.
 
 ## Root primary-level position integration — 2026-10-03
 
@@ -146,7 +145,7 @@ recovery/replay/journal/audit graph, not arbitrary mixed restores or certificati
 Older strict position readers and GE/Valid validators require stop/drain and
 compatible readers or a coherent pre-feature restore. No rolling downgrade is
 claimed. ADR0040 remains Proposed; pending shared ADR0031/0033, HUMAN/official
-0/25, all 25 mandatory rows and broader IMS/v0.14 acceptance remain open.
+0/25, all 25 mandatory rows and broader IMS/ims.programming acceptance remain open.
 Licensed IBM certification stays excluded; mandatory OSS license policy stays.
 
 ## Root SHISAM fixed-layout integration — 2026-10-03
@@ -168,12 +167,12 @@ changelog/check, coverage/check, formatting and the exact nine-path generated
 seal/committed check are required, followed by root Cargo cleanup. No unchanged
 runtime, PostgreSQL or known CICS source-prerequisite exploration is repeated.
 This finite fixed-layout fence does not complete the remaining organization,
-U/V, shared TM/raw CALL, official/HUMAN or parent v0.14 obligations. Licensed IBM
+U/V, shared TM/raw CALL, official/HUMAN or parent ims.programming obligations. Licensed IBM
 certification remains excluded; OSS dependency/license policy remains required.
 
 ## IMS-1401.q-deq-source-registration (source-only declaration, 2026-10-03)
 
-Target **0.14.0**, exact clean base `b5f6c48a49a2c1024bc261257f03a726847cc8d1`,
+Target **ims.programming**, exact clean base `b5f6c48a49a2c1024bc261257f03a726847cc8d1`,
 branch `codex/v014-q-deq-source-registration-20261003`. Register only the four
 previously retained Q/DEQ reference topics as scope `ims-q-deq-contracts`,
 baseline `ibm-ims-15.6-q-deq-contracts-2026-09-11`. Exact archive metadata binds
@@ -187,8 +186,8 @@ complete corpus: the run remains in-progress. HTTP Last-Modified is unrecorded.
 
 Exact maximum allowlist declared before registration:
 
-- `conformance/0.14/manifests/ims-q-deq-contract-topics.json`
-- `conformance/0.14/manifests/index.json`
+- `conformance/subsystems/ims/manifests/ims-q-deq-contract-topics.json`
+- `conformance/subsystems/ims/manifests/index.json`
 - `docs/delivery/subsystems/ims/programming-status.md`
 - `changes/unreleased/ims-q-deq-sources-20261003.toml`
 - `docs/generated/documentation-manifest.json` (normal generator only)
@@ -212,7 +211,7 @@ CardDemo, fuzz, unrelated CICS retry or licensed certification campaign.
 Source/runtime/IR/official/HUMAN/participant/licensed credit is zero; denominator
 25 and official/HUMAN0/25 remain unchanged. ADR0031/0033, HUMAN shared-prerequisite
 permission, raw CALL/TM and participant admission remain unapproved. Parent
-v0.14 stays active/incomplete. Prior source/runtime/design seals are preserved.
+ims.programming stays active/incomplete. Prior source/runtime/design seals are preserved.
 
 Source-only results: importer reports four topics plus one TOC; status verifies
 all five. Four searches match nonzero topics (Q 4, DEQ 4, reserving 3, locking 2).
@@ -245,7 +244,7 @@ acceptance credit and does not complete the Q runtime or parent IMS milestones.
 
 ## IMS-1404.tm-prior-commit-source-registration (source-only declaration, 2026-10-03)
 
-Target **0.14.0**, exact clean base `7cb46bc8f8e25f999bdae5d9d555facbf54c307a`,
+Target **ims.programming**, exact clean base `7cb46bc8f8e25f999bdae5d9d555facbf54c307a`,
 branch `codex/v014-tm-prior-commit-sources-20261003`. Register only the retained
 IMS 15.6 prior-commit backout topic in a separate offline source scope:
 `ims-tm-prior-commit-backout`, baseline
@@ -259,8 +258,8 @@ archive baseline, not a new fetch; Last-Modified was not recorded.
 
 Exact maximum allowlist declared before registration:
 
-- `conformance/0.14/manifests/ims-tm-prior-commit-backout-topics.json`
-- `conformance/0.14/manifests/index.json`
+- `conformance/subsystems/ims/manifests/ims-tm-prior-commit-backout-topics.json`
+- `conformance/subsystems/ims/manifests/index.json`
 - `docs/delivery/subsystems/ims/programming-status.md`
 - `changes/unreleased/ims-tm-prior-commit-sources-20261003.toml`
 - `docs/generated/documentation-manifest.json` (normal generator only)
@@ -276,7 +275,7 @@ External receipts live in `tm-prior-commit-source/` under the shared worker
 receipt root. Previous unregistered reader failure and all completed TM packets
 retain their original identities. This supplement earns zero runtime, IR,
 official, HUMAN, participant or licensed credit. ADR0031/0033 and shared store,
-raw CALL and actual TM recovery admission remain unapproved; parent v0.14 stays
+raw CALL and actual TM recovery admission remain unapproved; parent ims.programming stays
 active/incomplete.
 
 Source review/results: the existing importer imported exactly one topic and one
@@ -302,7 +301,7 @@ runtime/design/fail-first/reader receipts retain their original identities.
 
 ## IMS-1404.tm-output-identity-local-order (finite runtime declaration, 2026-10-03)
 
-Target **0.14.0**, composed base `86bf917e5a20d581a3b5d56b89de86db94ccadf4`.
+Target **ims.programming**, composed base `86bf917e5a20d581a3b5d56b89de86db94ccadf4`.
 The historical fail-first packet remains candidate `87f951c4`, preserved in stash
 `c015e2b8ea26730bccd5806494f484e971cb5297` and its external receipts. Manager
 authorizes only future private IMS outbound identity and same-started-input/work
@@ -351,7 +350,7 @@ No dense/global/cross-incarnation order or mixed-restore guarantee. Coherent
 restore needs catalog/input/session/outbound/replay/work epochs/packages/artifacts/
 clock together. Proposed ADR0042 covers private ownership only. ADR0031/0033,
 raw CALL, participant/shared lease/settlement and actual TM application recovery
-remain unanswered; PostgreSQL/full backup/official/HUMAN and full v0.14 remain
+remain unanswered; PostgreSQL/full backup/official/HUMAN and full ims.programming remain
 unfinished (official/HUMAN 0/25; licensed certification excluded).
 
 Local runtime results: 18 public tests pass (the three fixture entries ignored in
@@ -401,7 +400,7 @@ No runtime, lint or policy result is relabeled or repeated for this docs repair.
 
 Entry `5a7118d94d889de5d670fca953080d712a0a057c` with exactly six reviewed owned
 test-only inputs, empty index/target absent; branch
-`codex/v014-sequential-layout-runtime-20261003`; target **0.14.0**.
+`codex/v014-sequential-layout-runtime-20261003`; target **ims.programming**.
 Manager review is reference evidence, not runtime execution. Original test-only
 packet and prior SHISAM seal/receipts/artifacts/binaries remain immutable.
 
@@ -456,7 +455,7 @@ module/API guards. Each build/test/lint/generator sequence cleans only intended
 target, retaining fresh receipts externally under `sequential-layout-runtime/`.
 No peer production files, schemas/pins/rules/floors/ratchets/dependencies/ADR,
 root integration/push/PR, global CICS retry/full CardDemo/fuzz/licensed campaign.
-Seal only this finite leaf after actual gates; parent v0.14/raw CALL/shared TM/
+Seal only this finite leaf after actual gates; parent ims.programming/raw CALL/shared TM/
 participant/ADR0031/0033 remain unfinished, no human approval inferred.
 
 Runtime results: **Complete, bounded existing-validator leaf only**. All58
@@ -506,12 +505,12 @@ and33 unrelated owner identities remain preserved. Only the approved engine
 all-organization HSAM fixture fixes EVERY level; other organizations' ranges
 and original SHISAM tests remain. External packet: `sequential-layout-runtime/`.
 No literal DBDGEN, physical media, one-type HSAM defaulting, all-context/operation,
-shared approval, official/HUMAN or parent-v0.14 completion credit is claimed.
+shared approval, official/HUMAN or parent-ims.programming completion credit is claimed.
 
 ## IMS-1403.sequential-layout-failfirst — test-only declaration, 2026-10-03
 
 Entry `5a7118d94d889de5d670fca953080d712a0a057c`, clean/target absent;
-branch `codex/v014-sequential-layout-failfirst-20261003`, target **0.14.0**.
+branch `codex/v014-sequential-layout-failfirst-20261003`, target **ims.programming**.
 This phase only adds independent fail-first witnesses for shared SHSAM/SHISAM
 single-segment-type limits, shared HSAM/SHSAM fixed lengths and engine HSAM
 fixed lengths at every level. Two-type fixtures use valid fixed root/dependent
@@ -556,7 +555,7 @@ all HISAM/TM/U/V owners. No production/definition edit, staging/commit/seal,
 changelog/generator/ADR/schema/source/rule/ratchet/dependency or shared authority
 is authorized. No automatic PG/backup/CardDemo/fuzz/global CICS/licensed run.
 Deliver design/handoff for manager decision before any repair. ADR0031/0033,
-raw CALL/shared TM/participant and parent IMS/full v0.14 remain unfinished.
+raw CALL/shared TM/participant and parent IMS/full ims.programming remain unfinished.
 
 Test-only results: **packet complete; runtime repair pending manager review**.
 Across 58 distinct executed cases, 21 reach genuine normative rejection
@@ -597,7 +596,7 @@ proof remain future runtime requirements, unrun here.
 ## IMS-1403.shisam-fixed-layout-admission — runtime leaf declaration, 2026-10-03
 
 Entry `86bf917e5a20d581a3b5d56b89de86db94ccadf4`, branch
-`codex/v014-shisam-fixed-layout-admission-20261003`; target **0.14.0**.
+`codex/v014-shisam-fixed-layout-admission-20261003`; target **ims.programming**.
 Manager reviewed the completed test-only phase and approves only two production
 changes: SHISAM min/max equality after shared metadata numeric bounds, returning
 existing IncompatibleReference; and extending the existing engine fixed-root
@@ -646,7 +645,7 @@ deployment availability may require separately reviewed operator recovery. No
 coercion, automatic migration or re-signing. HISAM/HIDAM ranges remain intact;
 shared single-root and HSAM/SHSAM equality gaps stay separately mandatory. This
 does not certify literal DBDGEN minbytes presence/compression/physical VSAM,
-process restart/backup, participant or parent v0.14 completion. Raw CALL/TM
+process restart/backup, participant or parent ims.programming completion. Raw CALL/TM
 ADR0031/0033 remain unanswered; licensed certification is excluded.
 
 Local runtime leaf results: **Complete** for this finite typed equality fence.
@@ -694,12 +693,12 @@ passing runtime/PG explorations are not rerun or relabeled for prose/commit.
 Old invalid layouts remain readable to old validators, not equivalent safe
 downgrade. Affected deployment availability/operator recovery limits and separate
 shared SHISAM single-root/HSAM/SHSAM layout obligations remain as declared above.
-Parent IMS/full v0.14, all25 and official/HUMAN0/25 remain unchanged/incomplete.
+Parent IMS/full ims.programming, all25 and official/HUMAN0/25 remain unchanged/incomplete.
 
 ## IMS-1403.shisam-fixed-layout-failfirst — test-only phase, 2026-10-03
 
 Entry `86bf917e5a20d581a3b5d56b89de86db94ccadf4` on
-`codex/v014-shisam-fixed-layout-failfirst-20261003`; target **0.14.0**.
+`codex/v014-shisam-fixed-layout-failfirst-20261003`; target **ims.programming**.
 This phase adds independent rejection expectations for a unique named root-only
 SHISAM descriptor changed only from lengths 3/3 to 3/4. Existing shared metadata,
 engine definition, actual public installation and signed installation/publication
@@ -727,7 +726,7 @@ readability consequences require manager review before production edits.
 U/V production owners and HISAM test paths are untouched. All 25 catalog rows
 remain mandatory; accepted official/HUMAN counts remain 0/25. SHSAM/HSAM variable
 layout obligations, physical/operational parity, raw CALL/TM ADR0031/0033 and
-parent IMS/full v0.14 remain incomplete; no commit or feature seal is authorized.
+parent IMS/full ims.programming remain incomplete; no commit or feature seal is authorized.
 
 Test-only results: `failfirst-v1` is compiler/setup failure with zero behavior
 credit. `failfirst-v2` executes all six normative rejection tests: shared host
@@ -762,7 +761,7 @@ for retained invalid images/generations. That runtime phase awaits manager revie
 ## IMS-1401.dedb-subset-pointer-sources — source-only declaration, 2026-10-03
 
 Entry `9dc8a36d7df11f83659b7f973c47950382180b28`, branch
-`codex/v014-dedb-subset-sources-20261003`, target **0.14.0**. Register exactly ten
+`codex/v014-dedb-subset-sources-20261003`, target **ims.programming**. Register exactly ten
 existing IMS 15.6 archive topics as the separate zero-credit scope
 `ims-dedb-subset-pointer-contracts`, baseline
 `ibm-ims-15.6-dedb-subset-pointers-2026-09-11`. Verify retained-topic paths first,
@@ -774,8 +773,8 @@ historical command exits. The original archive run remains in progress.
 Exact maximum five-path allowlist, declared before registration edits:
 
 ```text
-conformance/0.14/manifests/ims-dedb-subset-pointer-contract-topics.json
-conformance/0.14/manifests/index.json
+conformance/subsystems/ims/manifests/ims-dedb-subset-pointer-contract-topics.json
+conformance/subsystems/ims/manifests/index.json
 docs/delivery/subsystems/ims/programming-status.md
 changes/unreleased/ims-dedb-subset-sources-20261003.toml
 docs/generated/documentation-manifest.json
@@ -787,7 +786,7 @@ topics, with `coverage_credit=0`; the additive registry row retains
 runtime/test admission, metadata/schema/ADR/applicability change or new shared
 authority is included. Reconcile W prerequisites in a new external addendum,
 without altering the completed read-only packet. Source review gives zero
-execution/HUMAN/official/licensed credit; all 25 mandatory rows and parent v0.14
+execution/HUMAN/official/licensed credit; all 25 mandatory rows and parent ims.programming
 remain unfinished. Pending ADR0031/0033 and participant approvals stay unanswered.
 
 Required source-only gates: reader unit tests, registered status/search/full
@@ -825,7 +824,7 @@ all prior status sections, sources, catalogs, rules and runtime owners are intac
 ## IMS-1403.primary-level-position-closure — completion declaration, 2026-10-03
 
 Entry `86bf917e5a20d581a3b5d56b89de86db94ccadf4`, branch
-`codex/v014-primary-position-completion-20261003`, target **0.14.0**. Continue the
+`codex/v014-primary-position-completion-20261003`, target **ims.programming**. Continue the
 same reviewed private three-level unique/fixed primary HIDAM producer design and
 original fail-first inputs; ADR0040 remains Proposed. Full completion now owns
 the fresh call-local feedback transport, finite ordinary ISRT/DLET/REPL and
@@ -900,7 +899,7 @@ catalog/assurance/schema/spec/coverage/boundary/API/docs/changelog checks. All
 new receipts go to external `primary-position-completion/`; each Cargo sequence
 cleans only this checkout. Seal only the exact changed subset after all covered
 requirements pass. No push/PR; shared ADR0031/0033, HUMAN/official/licensed and
-participant credit remain zero; IMS-1403, IMS-1401 and v0.14 remain incomplete.
+participant credit remain zero; IMS-1403, IMS-1401 and ims.programming remain incomplete.
 
 Historical transport diagnostic before the manager's two-path amendment: the public primary suite
 executes 25 tests, with 23 passing and the two unchanged literal failed-feedback
@@ -960,7 +959,7 @@ the 31 paths declared above; no unused allowance is padded. Generate the entire
 `Complete IMS-1403.primary-level-position-closure` message and committed check
 only for this bounded local leaf. ADR0040 remains Proposed; broader IMS-1403,
 IMS-1401, mandatory official/HUMAN 0/25, all 25 mandatory rows, pending ADR0031/
-0033, licensed/participant and v0.14 obligations remain open. No push or PR.
+0033, licensed/participant and ims.programming obligations remain open. No push or PR.
 
 ## Root HISAM integration declaration — 2026-10-03
 
@@ -981,7 +980,7 @@ changelog/check, coverage/check, formatting and exact ten-path generated seal/
 committed check are required; receipts remain external and the intended root
 Cargo target is cleaned after the sequence. Source-only pins grant no runtime
 credit, and this finite Batch insertion leaf is not explicit all-context IMS,
-HISAM/SHISAM, PostgreSQL/backup, official/HUMAN/participant or v0.14 completion.
+HISAM/SHISAM, PostgreSQL/backup, official/HUMAN/participant or ims.programming completion.
 After this root seal, execution and mutation-consumer ownership can transfer to
 the same uncommitted U/V CLI lane. Shared raw CALL/TM approvals remain pending.
 
@@ -1041,11 +1040,11 @@ handoff identifies ordering, old receipt/rolling-writer and lifetime obligations
 before implementation. Manager review and an exact implementation declaration
 are required first. Shared stale-lease publication/settlement and actual TM
 application backout remain gated by unanswered Proposed ADR0031; this collision
-proof grants none of their acceptance. Parent IMS/full v0.14 remains incomplete.
+proof grants none of their acceptance. Parent IMS/full ims.programming remains incomplete.
 
 ## IMS-1401.sequential-isrt-position-sources (source-only leaf declared, 2026-10-03)
 
-Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51`; target **0.14.0**. Register only
+Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51`; target **ims.programming**. Register only
 three retained IMS 15.6 HTML pins in scope `ims-sequential-isrt-position`, baseline
 `ibm-ims-15.6-sequential-isrt-position-2026-09-11`. The source registry and existing
 offline reader remain the owners. Preserve the twelve existing manifest bytes
@@ -1053,8 +1052,8 @@ and registry rows, all prior Proposed ADRs and root's F integration fixture repa
 
 Exact five-path allowlist, declared before source registration:
 
-- `conformance/0.14/manifests/ims-sequential-isrt-position-topics.json`
-- `conformance/0.14/manifests/index.json`
+- `conformance/subsystems/ims/manifests/ims-sequential-isrt-position-topics.json`
+- `conformance/subsystems/ims/manifests/index.json`
 - `docs/delivery/subsystems/ims/programming-status.md`
 - `changes/unreleased/ims-sequential-isrt-position-sources-20261003.toml`
 - `docs/generated/documentation-manifest.json` (normal generator only)
@@ -1100,12 +1099,12 @@ no runtime, accepted IR rule or HUMAN authority and earns zero execution,
 IR/HUMAN/official/licensed coverage credit. FIRST/HERE/F/L-on-ISRT, sentinel FF
 and general failed searches remain unfinished runtime classes. Raw CALL/TM
 ADR0031/0033 approvals remain unanswered; licensed certification is excluded.
-Parent IMS/full v0.14 remains active and incomplete.
+Parent IMS/full ims.programming remains active and incomplete.
 
 ## IMS-1403.hisam-nonunique-dependent-last — bounded leaf declaration, 2026-10-03
 
 Entry `3887bb44d334c6408a7a01ddd00ae1fc5361ea51` on
-`codex/v014-hisam-nonunique-dependent-last-20261003`, target 0.14.0. This leaf
+`codex/v014-hisam-nonunique-dependent-last-20261003`, target ims.programming. This leaf
 admits typed public-provider and signed-selected Batch invocation ordinary primary physical
 HISAM with exactly two fixed levels, one terminal child type, unique named root
 sequence key and named nonunique child sequence key. Actual root GU establishes
@@ -1166,9 +1165,9 @@ every build/test/lint/generator sequence ends in this checkout's Cargo clean.
 PostgreSQL parity is explicitly unrun/pending, not a required local backend gate.
 Old readers can read distinct IDs but reject further equal-key insertion with II;
 readable historical bytes do not establish equivalent downgrade semantics.
-Parent IMS/official/HUMAN/participant/full-v0.14 remains incomplete; shared raw
+Parent IMS/official/HUMAN/participant/full-ims.programming remains incomplete; shared raw
 CALL/TM ADR0031/0033 approvals remain unanswered, licensed exclusion earns zero
-credit and mixed-resource closure remains a 0.16 obligation.
+credit and mixed-resource closure remains a integration.transactions obligation.
 
 Runtime verification for this finite leaf passes: repaired independent public and
 signed Memory/file-SQLite fail-first cases originally observe II against literal
@@ -1223,7 +1222,7 @@ finite GN/GHN U/V admission, same-call feedback and selected retained/recovery
 producers. ADR0040 is Proposed. The twenty original literal fail-first failures
 and four controls retain their original receipt identities. Source review and
 local proof grant zero accepted-IR/HUMAN/official/licensed/participant credit.
-IMS-1403, IMS-1401 and v0.14 remain incomplete; no feature seal is authorized.
+IMS-1403, IMS-1401 and ims.programming remain incomplete; no feature seal is authorized.
 
 Exact phase allowlist (no ratchet or shared contract changes):
 
@@ -1296,7 +1295,7 @@ Proportional source/reader/producer proofs retain their exact input identities;
 prior unaffected F/L/null/secondary/logical feedback controls retain their own
 candidate receipts. No feature commit/seal, full
 producer/consumer acceptance, PostgreSQL parity, backup certification, broader
-IMS-1403/IMS-1401 or v0.14 completion is claimed.
+IMS-1403/IMS-1401 or ims.programming completion is claimed.
 
 ## Root F integration declaration — 2026-10-03
 
@@ -1331,13 +1330,13 @@ the integration section preceding required subsystem header metadata; moving
 that unchanged metadata back to the header repairs it, and the failed receipt
 and 6.1 GiB cleanup remain recorded. Only changed documentation/packaging needs
 retry; no runtime suite repeats. The finite F leaf, ADR0041 Proposed status and
-all broader SSA/raw/TM/official/HUMAN/participant/v0.14 limitations remain unchanged.
+all broader SSA/raw/TM/official/HUMAN/participant/ims.programming limitations remain unchanged.
 
 ## IMS-1403.ssa-first-direct-child (bounded runtime leaf declared, 2026-10-03)
 
 Entry: `dd097038e761730f394098b58f01ffca3906eda7` on
-`codex/v014-ssa-first-direct-child-20261003`, target 0.14.0. Parent IMS-1403,
-IMS-1401 and full v0.14 remain incomplete. The manager authorizes only typed
+`codex/v014-ssa-first-direct-child-20261003`, target ims.programming. Parent IMS-1403,
+IMS-1401 and full ims.programming remain incomplete. The manager authorizes only typed
 CALL/public-provider and signed-selected DbBatch GNP/GHNP, primary HIDAM with
 exactly two physical levels and one child type, uniquely named fixed-length
 sequence keys, live root parentage and current root or that root's direct child,
@@ -1446,12 +1445,12 @@ checks earn zero new official credit. Final prose requires only normal docs
 generation/check and exact allowlist seal/check, not another runtime campaign.
 PostgreSQL, full backup/backend acceptance, broader F, U/V witnesses, raw CALL/TM
 approvals, accepted IR/HUMAN/official/licensed/participant and parent IMS-1401/
-IMS-1403/v0.14 remain pending. The unchanged global CICS cache prerequisite is
+IMS-1403/ims.programming remain pending. The unchanged global CICS cache prerequisite is
 not retried or claimed green. ADR-0041 remains Proposed; this is one local leaf.
 
 ## IMS-1401.null-ssa-command-slots (bounded leaf declared, 2026-10-02)
 
-Parent IMS-1401 and v0.14 remain open. Entry candidate is
+Parent IMS-1401 and ims.programming remain open. Entry candidate is
 `a8deb3d8a97be2660cfa0d38327ff246a194a910`; licensed certification is excluded
 with zero credit. This leaf recognizes the literal `-` null slot specified by
 IMS 15.6 `apr/ims_cmdcodref.htm`, SHA-256
@@ -1478,8 +1477,8 @@ ratchets are required. [ADR-0036](../../../decisions/0036-null-ssa-command-slots
 records compatibility. The declaration preceded edits and the final local
 results below; it does not establish parent or official acceptance.
 
-Resolved leaf allowlist: `conformance/0.14/ims/ssa-rules.json`,
-`conformance/0.14/schemas/ims-ssa-rules.schema.json`, `xtask/src/ims_catalog.rs`,
+Resolved leaf allowlist: `conformance/subsystems/ims/ims/ssa-rules.json`,
+`conformance/subsystems/ims/schemas/ims-ssa-rules.schema.json`, `xtask/src/ims_catalog.rs`,
 host `src/ims.rs`, generated `src/generated/ims_ssa_rules.rs`,
 `tests/ims_null_ssa_slots.rs` and README; provider generic `tests/ssa_tests.rs`
 and its new `null_slot_tests.rs`; server `product/tests/ims_package_tests.rs`
@@ -1512,12 +1511,12 @@ Receipts are external under worker-receipts/v014-completion-20261002/null-ssa-*;
 each sequence cleans this checkout's Cargo target. The new grammar byte is
 generated privately; the active seventeen-letter inventory, twenty-five-row
 denominator, accepted IR rules, public DTOs and historical canonical fixtures
-are unchanged. Raw/TM owner approvals and full-minor acceptance remain open.
+are unchanged. Raw/TM owner approvals and full-phase acceptance remain open.
 
 ## IMS-1403.ssa-last-direct-child (verified bounded local runtime leaf)
 
-Parent IMS-1403 and full v0.14 remain incomplete. Entry is the preserved source
-seal `6bca4715d3ebac54aec1d89bc70a8095c6e187b9`, target 0.14.0. Manager review
+Parent IMS-1403 and full ims.programming remain incomplete. Entry is the preserved source
+seal `6bca4715d3ebac54aec1d89bc70a8095c6e187b9`, target ims.programming. Manager review
 authorizes only DbBatch primary HIDAM, exactly two physical levels and one
 direct-child type, uniquely fully keyed fixed-length root/child, valid existing
 primary root parentage, current root/direct child, exactly one unqualified child SSA
@@ -1618,13 +1617,13 @@ rechecks the changed docs and source-credit gate; unchanged runtime receipts kee
 their original identities. No tests return early for a missing PostgreSQL URL.
 PostgreSQL parity, raw CALL/TM, root qualification ambiguity, broader L forms,
 manager integration, accepted IR/HUMAN/official/licensed and full IMS-1403/IMS-1401/
-v0.14 obligations remain pending. ADR-0039 stays Proposed. Source pins, source-only
+ims.programming obligations remain pending. ADR-0039 stays Proposed. Source pins, source-only
 seal and zero source credit are preserved; no null-slot lane is imported.
 
 ## IMS-1401.ssa-last-position-sources (declared source-only leaf)
 
-Parent IMS-1401 and the full v0.14 manager goal remain incomplete. This leaf
-starts from `a8deb3d8a97be2660cfa0d38327ff246a194a910`, target 0.14.0. Its
+Parent IMS-1401 and the full ims.programming manager goal remain incomplete. This leaf
+starts from `a8deb3d8a97be2660cfa0d38327ff246a194a910`, target ims.programming. Its
 scope is registration of exactly three existing IMS 15.6 archived topics:
 L command code, position after a successful call, and position after an
 unsuccessful call. The separate `ims-ssa-last-position` scope uses the existing
@@ -1640,8 +1639,8 @@ docs generation/check, dependency policy, changelog, IMS catalog, schemas/spec,
 affected source registry checks, and exact-path generated leaf seal/check with
 one local commit. No runtime tests are needed for this source-only delta.
 
-Exact product/docs allowlist: `conformance/0.14/manifests/ims-ssa-last-position-topics.json`,
-`conformance/0.14/manifests/index.json`, this status file,
+Exact product/docs allowlist: `conformance/subsystems/ims/manifests/ims-ssa-last-position-topics.json`,
+`conformance/subsystems/ims/manifests/index.json`, this status file,
 `changes/unreleased/ims-ssa-last-position-sources-20261002.toml`, and the normal
 `docs/generated/documentation-manifest.json`. External reports and command
 receipts stay under worker-receipts/v014-completion-20261002/ssa-last-source.
@@ -1663,7 +1662,7 @@ The external disposition proposes finite empty/exhausted GNP-L transitions
 from those sources and existing GNP/hold rules, while preserving the unresolved
 same-PCB hold and parent-level qualification distinctions for manager review.
 This source leaf provides zero behavioral/conformance credit and no runtime
-admission; the manager's full v0.14 and future L semantic leaf remain open.
+admission; the manager's full ims.programming and future L semantic leaf remain open.
 
 Root integration preserves worker seal
 `6bca4715d3ebac54aec1d89bc70a8095c6e187b9` and its original five-file evidence.
@@ -1683,7 +1682,7 @@ Parent IMS-1401 remains open. Clean entry `9e97502604d61440047e4c1643190bb178fef
 is preserved on `codex/v014-gsam-record-formats-20261002`. This branch,
 `codex/v014-cobol-dli-call-20261002`, starts from exact manager
 `56871bf83f38ed86a615b0a29fda298a467289b4`; no format-worker delta is consumed.
-Target is 0.14.0. The accepted dependency identities and pending participant
+Target is ims.programming. The accepted dependency identities and pending participant
 dispositions below remain in force.
 
 Before edits, inspection identifies a genuine shared contract gap. The generic
@@ -1760,7 +1759,7 @@ status/cursor/hold/update/undo/replay/copyout acceptance or parent closure.
 Historical worker clean entry `531f39c137ab5dad00d8db72f28b083aea2b19d3` and its branch are
 preserved. This lane starts directly from manager seal
 `06ed341181151c5e9b526989f7c2ee5f2fb6b9db`, without the old TM gap branch.
-Parent IMS-1405 and target 0.14.0 remain incomplete. Catalog identities are
+Parent IMS-1405 and target ims.programming remain incomplete. Catalog identities are
 `ibm-ims-15.6-dli-2026-08-31:dli-call-families:0002/:0023/:0025`, with
 `:0005/:0008` and hold/update consumers. Execution is signed selected DB-batch
 CALL metadata and existing full-function root-target secondary navigation.
@@ -1876,7 +1875,7 @@ fences remain owned by their existing modules. Unsupported physical/nonunique
 path applicability, nonroot inversion/aliases/DEDB, HDAM missing-boundary resume,
 accepted participant/lease composition, backup/retention exercise, official rule
 acceptance and licensed differentials remain parent obligations. This bounded
-leaf never marks IMS-1405 or v0.14 complete.
+leaf never marks IMS-1405 or ims.programming complete.
 
 The historical worker's required execution/effect/provider-row/storage/participant/generated-participant/
 security/retention/typed/module, offline supply-chain/dependency/license, IMS
@@ -1946,7 +1945,7 @@ manager base; historical worker API-doc failures are not this candidate's result
 Nonunique physical paths, optional fields/aliases/nonroot inversion/DEDB remain
 Unsupported. No acceptance rules, pins, thresholds or denominator change;
 official/human/licensed credit stays zero. Parent IMS-1405, participant/lease,
-coherent backup/retention, root composition and v0.14 acceptance remain open.
+coherent backup/retention, root composition and ims.programming acceptance remain open.
 ## IMS-1401.mixed-ssa-evaluation manager integration (2026-10-02)
 
 The integration branch consumes only manager base
@@ -1989,7 +1988,7 @@ independent SQLite child phases. Mandatory policies and the unchanged public
 API documentation ratchet are required. The older base's three AMS probe
 citations are not repaired or bypassed here; an unchanged failure is recorded
 once for root composition. Content seals grant no official, human, licensed,
-participant, parent IMS-1401 or v0.14 acceptance.
+participant, parent IMS-1401 or ims.programming acceptance.
 
 Integration runtime receipts record 66 passing parent tests: eight new provider
 cases, three signed/coordinator cases and 55 affected regressions, including the
@@ -2380,7 +2379,7 @@ Routine docs generation/check and the exact 17-path leaf seal/check are the fina
 packaging sequence recorded in external handoff.md. All Cargo sequences end
 with cargo clean for this checkout; receipts remain outside disposable targets
 and Git. The local completion commit seals only IMS-1401.secondary-ssa-navigation
-at target 0.14.0, with zero official row/verdict or licensed credit. The next
+at target ims.programming, with zero official row/verdict or licensed credit. The next
 manager action is to integrate this leaf through the preserved common pipeline,
 including integrity-read fences, while retaining the secondary recovery guard.
 
@@ -2590,7 +2589,7 @@ retention/participant/module guards, `cargo xtask docs --check` and
 no whole-cache/global certification run. Clean this checkout's Cargo target
 after each sequence; external receipts live under
 `v014-completion-20261002/IMS-1401.stat-observable-contract`. Seal only this ID
-with exact changed-path allowlist and target `0.14.0`, then `--check`.
+with exact changed-path allowlist and target `ims.programming`, then `--check`.
 Official and licensed credit remains **0/25**, with no parent/release claim.
 
 Bounded implementation outcome: `StatisticsV2` supplies a distinct canonical
@@ -2669,7 +2668,7 @@ No raw IBM binary/EBCDIC layout, AIB/raw operand/status parity, complete printed
 output, DSR ordering, licensed comparison or official IR case credit is claimed.
 Fresh SQLite connection reopen is not process restart or PostgreSQL acceptance;
 coherent rollback, shared participant acceptance and full IMS/release gates remain
-separate. Seal only `IMS-1401.stat-observable-contract` for `0.14.0` with the exact
+separate. Seal only `IMS-1401.stat-observable-contract` for `ims.programming` with the exact
 changed-path allowlist and verify with `--check`; parent IMS-1401 remains open.
 
 ## 2026-10-02 nonlicensed continuation
@@ -2715,7 +2714,7 @@ accepted early IMS participation, independently specified shared IR
 obligations/driver/verdicts, and the applicable restart/compatibility/scale
 matrix. The manager must integrate feature commits before running the complete
 affected-subsystem exit checks on one unchanged candidate. Final mixed-resource
-syncpoint closure stays in 0.16; licensed certification is excluded from this
+syncpoint closure stays in integration.transactions; licensed certification is excluded from this
 run and remains pending rather than silently passed.
 
 Offline cache resolution found the former CICS `dfhp37p.html` blocker at its
@@ -2727,31 +2726,14 @@ failure is not repeatedly rerun. Focused architecture/security/effect/storage/
 retention guards and dependency policy passed on the audited base; their old
 receipts are not relabeled as new-candidate acceptance.
 
-### Consumed dependency acceptance identities
+### Consumed subsystem dependencies
 
-The continuation consumes the released implementation baselines below, not
-the starting-branch SHAs in their historical status paragraphs. The annotated
-tags resolve to these exact commits and Git trees; the published Apple ARM64
-evidence archive SHA-256 values match the GitHub release asset digests. Each
-archive retains `manifest.json` and `provenance.intoto.json`; its source-tree
-digest also matches the annotated tag. This is provenance review of existing
-acceptance, not a rerun or attestation of the current IMS candidate.
-
-| Dependency | Accepted commit / Git tree | Published receipt SHA-256 | Approval / disposition |
-|---|---|---|---|
-| COBOL 0.4 | `4a50a4e66f08b9cb5d293fb276cfbd52424b07fc` / `92ba4ce0855c02b6157d08fedac2cae51977a972` | `df6b835b57ce586927dafc4e1866e030b04f08929a18eca10de13f52738983b8` | [Explicit 2026-09-02 approval](../cobol/execution-status.md), licensed-pending implementation; [published release](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.4.0) |
-| RACF/SAF 0.5 | `bd5e8ecd211b7da4f3e18dfcfc807352d0ebd2e8` / `7e89e90c372a8bb1ca63a7b06c3c744e1a85e8d9` | `c0089130b19d524c7f47a7e3dc301392369ffb0e97d045d5c4b9817c214bfec7` | [User-approved 2026-09-01 policy](../racf/security-status.md), licensed-pending implementation; [published release](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.5.0) |
-| Dataset/VSAM/AMS 0.6 | `ca3c061adaa63af71eefe8ee494b7c523c3e5540` / `a0dbae4c52a0e3aea28a3ea4bf2e1e8297d2d360` | `3665fa112264b470a2c8a09fe3e767d6ca68f7a9f9972df5850855743e9e5cba` | [Approved 2026-09-01 policy](../dataset/data-status.md), [local certification record](../../../../conformance/0.6/evidence/dataset-certification.json); [published release](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.6.0) |
-
-The receipts are the assets named
-`mainframe-env-0.{4,5,6}.0-aarch64-apple-darwin-release-evidence.tar.gz`
-on those releases. Licensed obligations remain respectively **0/153**,
-**0/48** and **0/36**, owned by CER-1702 / 0.17 certification; their scoped
-historical approvals are not a blanket approval of later subsystem claims.
-Affected consumption regressions are the actual COBOL/JCL CardDemo load/unload
-route, SAF denial-before-observation/mutation, and shared provider-row / durable
-Memory and SQLite contracts. The current feature sections identify their exact
-candidate-specific checks; the final integrated exit run is still pending.
+IMS consumes the COBOL, RACF/SAF, and dataset contracts described in their
+owning progress records. Recheck the affected consumption routes against the
+current candidate: COBOL/JCL load/unload, SAF denial before observation or
+mutation, and provider-row durability on memory and SQLite. Licensed obligations
+remain pending: COBOL **0/153**, RACF **0/48**, and datasets **0/36**. The licensed
+certification subsystem owns those campaigns.
 
 ## IMS-1406.verification-lint-repair (verification infrastructure slice)
 
@@ -2806,7 +2788,7 @@ so rollback of the binary does not retain this corrected semantic guarantee.
 ## IMS-1403.organization-logical-closure (implementation candidate)
 
 Parent: IMS-1403. Candidate: `codex/v014-organization-closure`; accepted
-0.4/0.5/0.6 host, security, and storage authorities remain in force. Scope:
+cobol.execution/racf.security/dataset.data host, security, and storage authorities remain in force. Scope:
 the 13 organization identities in `ims-call-applicability-rules.json`, generic
 GU/GN/GNP and hold/update/insert/load routes, and declared logical parent/child
 pairs from `mainframe-env.ims-metadata@1`. INDEX and PSINDEX are typed index
@@ -2901,10 +2883,10 @@ These retained direct topics are reference data, not licensed execution evidence
 
 ## IMS-1406.carddemo-coverage-closure (local slice)
 
-Candidate: `codex/v014-carddemo-closure`, using the accepted 0.4 host ABI,
-0.5 SAF, and 0.6 shared storage contracts. The official denominator remains
+Candidate: `codex/v014-carddemo-closure`, using the accepted cobol.execution host ABI,
+racf.security SAF, and dataset.data shared storage contracts. The official denominator remains
 the 25 `dli-call-families` rows in `ibm-ims-15.6-dli-2026-08-31`.
-`conformance/0.14/ims/assurance-matrix.json` now binds each row to its reviewed
+`conformance/subsystems/ims/ims/assurance-matrix.json` now binds each row to its reviewed
 applicability profiles, a typed runtime handler, executable
 local tests, and explicit PCB status, position, mutation, and output observation
 states. The checker rejects missing, duplicate, stale, name-dispatch, and
@@ -2918,7 +2900,7 @@ This is local regression evidence only. Executable local handler coverage is
 Memory restart/replay regression. Exact licensed per-row observations and full
 CardDemo corpus migration from legacy job definitions remain open. The external
 licensed IMS 15.6 differential is pending, and coverage credit is **0/25**.
-Final mixed-resource syncpoint closure remains in 0.16. The next executable
+Final mixed-resource syncpoint closure remains in integration.transactions. The next executable
 step is to migrate the pinned CardDemo IMS corpus job bindings onto the selected
 generic package route, then run the independent licensed bundle on a sealed
 candidate.
@@ -2963,7 +2945,7 @@ digest pins, and a current clean candidate receipt are mandatory for credit.
 The bounded normalization compares two-byte PCB status, position and state
 digests, mutation, and output. The local generator, verifier, schema gate, and
 mutation tests validate only harness plumbing. Differential credit remains
-**0/25, pending-external-licensed-receipt**; parent IMS-1406 and the 0.14 exit
+**0/25, pending-external-licensed-receipt**; parent IMS-1406 and the ims.programming exit
 gate remain open. No credentials, raw licensed outputs, or receipts are kept in
 Git. Next step: an authorized external IBM IMS 15.6 run against the sealed
 candidate and independently prepared pinned fixture bundle, followed by the
@@ -2990,7 +2972,7 @@ scopes from lost commits `a6c3ad61` and `3b6ce193`.
 ## Recovered identity catalog
 
 The IMS 15.6 baseline `ibm-ims-15.6-dli-2026-08-31` pins 25 mandatory
-`dli-call-families` rows in `conformance/0.2/catalogs/ims.json`.
+`dli-call-families` rows in `conformance/subsystems/coverage/catalogs/ims.json`.
 The comparison topic is
 `SSEPH2_15.6.0/com.ibm.ims156.doc.apg/ims_comparingexecdlicmdsanddlicalls.htm`
 at `sha256:ce4a179eac0f18ed4ff71bed9ca576b31bcbbdb076d305dbcbf942e26ce13e30`.
@@ -3000,7 +2982,7 @@ official rows. The registry does not claim execution or handler readiness.
 
 ## Recovered programming sources
 
-`conformance/0.14/manifests/ims-programming-contracts-topics.json` pins 26
+`conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json` pins 26
 IMS 15.6 programming topics (574,527 bytes) for SSA, command codes,
 PCB/status, get/position, processing options and call-family review. Its
 topic-set digest is
@@ -3015,13 +2997,13 @@ licensed credit.
 
 ## Recovered database and TM sources
 
-`conformance/0.14/manifests/ims-database-contracts-topics.json` pins 20 IMS
+`conformance/subsystems/ims/manifests/ims-database-contracts-topics.json` pins 20 IMS
 15.6 database organization, variable-segment, index, logical-relationship, and
 mutation topics (110,015 bytes). Its baseline is
 `ibm-ims-15.6-database-contracts-2026-09-11` and its topic-set digest is
 `sha256:3b819e69f7ce608d66bf1b8f195556047024333374e6f77413af29822960e38b`.
 
-`conformance/0.14/manifests/ims-tm-contracts-topics.json` separately pins ten
+`conformance/subsystems/ims/manifests/ims-tm-contracts-topics.json` separately pins ten
 IMS 15.6 TM call, I/O PCB result, scheduling, and conversation topics (155,700
 bytes). Its baseline is `ibm-ims-15.6-tm-contracts-2026-09-11` and its
 topic-set digest is
@@ -3042,7 +3024,7 @@ fields, binary field values, and C-code concatenated keys using supplied DBD
 length metadata. Malformed or unsupported forms return explicit errors before
 any IMS execution; this slice adds no execution path. The rules cite seven
 topic paths and hashes and bind five rule groups to individual sources in
-`conformance/0.14/ims/ssa-rules.json`.
+`conformance/subsystems/ims/ims/ssa-rules.json`.
 
 ## Recovered TM call contracts
 
@@ -3052,7 +3034,7 @@ conversation actions, and four exact core TM statuses. Validation rejects
 malformed names, duplicate definitions, limit violations, and reviewed CPI-C and
 Fast Path call restrictions before any TM side effect. The source baseline is
 `ibm-ims-15.6-tm-contracts-2026-09-11` in
-`conformance/0.14/manifests/ims-tm-contracts-topics.json` (topic-set digest
+`conformance/subsystems/ims/manifests/ims-tm-contracts-topics.json` (topic-set digest
 `sha256:dac590371f5b7be6747c7280598ae9db075ea0f7c59473a2fcd8b9c9d8c0cd36`).
 The matching retained HTML was verified by byte count and SHA-256. Source
 mapping by rule group:
@@ -3081,7 +3063,7 @@ IMS side effect. The four existing core TM statuses now validate through the
 same generated message-status registry while retaining their bounded TM API.
 
 The seven rule groups cite their individual topic paths and SHA-256 hashes in
-`conformance/0.14/ims/pcb-status-rules.json`: four mask topics and the database,
+`conformance/subsystems/ims/ims/pcb-status-rules.json`: four mask topics and the database,
 system-service, and message status-table topics. Each cited body matches the
 retained local HTML and the 26-topic programming manifest. The configured
 offline reader still lacks a verified IMS TOC, so its `search` and `read` cannot
@@ -3095,7 +3077,7 @@ official comparison-table rows. Its single reviewed rules file defines 25
 bounded profiles spanning the five execution contexts, four PCB kinds, 13
 pinned organizations, processing-option classes, and SSA/RSA forms. The IMS
 catalog generator derives row-qualified call/command spellings from the
-immutable 0.2 catalog and emits typed descriptors and nine stable diagnostic
+immutable coverage.foundation catalog and emits typed descriptors and nine stable diagnostic
 codes. Repeated INIT, ISRT, CHKP, and XRST spellings cannot select a row by
 themselves. Each candidate must match one whole profile, preventing allowed
 values from separate profiles being combined into an unreviewed call site.
@@ -3145,9 +3127,9 @@ remains an isolated runtime projection; the I6 metadata catalog and existing SSA
 contracts remain the authorities for published metadata and call parsing.
 
 The source basis is `ibm-ims-15.6-dli-2026-08-31` in
-`conformance/0.14/manifests/ims-programming-contracts-topics.json` and
+`conformance/subsystems/ims/manifests/ims-programming-contracts-topics.json` and
 `ibm-ims-15.6-database-contracts-2026-09-11` in
-`conformance/0.14/manifests/ims-database-contracts-topics.json`. Relevant
+`conformance/subsystems/ims/manifests/ims-database-contracts-topics.json`. Relevant
 retained bodies include `ims_gughucall.htm`
 (`sha256:0a9b433d9e38e58c125232a94147acd309e5bbbd7baf3c8cb900a3e8fdf6c8b9`),
 `ims_gnghncall.htm`
@@ -3185,7 +3167,7 @@ its local limit. It does not return QF for queue capacity: the pinned message
 status topic assigns QF to invalid segment length. These adaptations have
 fail-first tests. The source baseline remains
 `ibm-ims-15.6-tm-contracts-2026-09-11` in
-`conformance/0.14/manifests/ims-tm-contracts-topics.json` and the message
+`conformance/subsystems/ims/manifests/ims-tm-contracts-topics.json` and the message
 status table at
 `SSEPH2_15.6.0/com.ibm.ims156.doc.mc/compcodes/ims_dlistatuscodestables_messagecalls.htm`
 (`sha256:c18deaa4db069bc24064071bb2ca50be736dde1ea8a324ca452d546df58d2955`).
@@ -3359,7 +3341,7 @@ names the log data set for a `LogRecovery` plan. Work scheduling, canonical
 effect terminalization and UOW ownership remain with existing authorities.
 The pinned source basis is
 `ibm-ims-15.6-recovery-utilities-2026-09-11` in
-`conformance/0.14/manifests/ims-recovery-utilities-contracts-topics.json`:
+`conformance/subsystems/ims/manifests/ims-recovery-utilities-contracts-topics.json`:
 `ims_dfsurdb0.htm`, `ims_logrecovery.htm`, `ims_reorgutil.htm`, and
 `ims_hdreorgunload.htm`/reload among the 20 verified topics. This isolated
 slice grants no official, differential or licensed gate credit.
@@ -3431,8 +3413,8 @@ requested or performed; that broad gate is not claimed as a pass.
 ## IMS-1406.carddemo-corpus-package-route (implemented local slice)
 
 Parent: IMS-1406. Candidate base: `213ed878`; this checkout consumes the
-accepted host ABI, SAF and shared store/UOW owners recorded in the COBOL 0.4,
-RACF 0.5 and dataset 0.6 progress/evidence authorities. This local integration
+accepted host ABI, SAF and shared store/UOW owners recorded in the COBOL cobol.execution,
+RACF racf.security and dataset dataset.data progress/evidence authorities. This local integration
 profile does not promote those dependencies or claim licensed evidence.
 The exact clean CardDemo input is commit
 `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, tree
@@ -3456,7 +3438,7 @@ and retained data/checkpoint/replay on reopen. Official catalog context is
 (ISRT/LOAD), 0015 (REPL), and 0024 (TERM). These are supplemental profile
 regressions, with no official obligation verdict or row credit: **0/25 pending**.
 Licensed certification is excluded by the user; mixed-resource closure stays
-in v0.16 and release promotion is outside this slice.
+in integration.transactions and release promotion is outside this slice.
 
 Source review: offline `ibm_docs.py search/read` used IMS 15.6 programming,
 database and metadata manifests. Relevant topics are `ims_gughucall.htm`
@@ -3536,7 +3518,7 @@ an additional provider scope exception for the module contract, with no runtime
 change. Neither unrelated finding is represented as a passing gate. The docs
 manifest is regenerated for this appended section. The manager owns integration;
 licensed certification remains excluded and **0/25 pending**, mixed-resource
-closure stays in v0.16, and no release promotion is claimed.
+closure stays in integration.transactions, and no release promotion is claimed.
 
 ## IMS-1403.pcb-sensitivity (local implementation slice, 2026-10-02)
 
@@ -3664,7 +3646,7 @@ exceeds its recorded ceiling. No unrelated cache refresh, ratchet weakening or
 global suite was performed. The shared official IMS conformance selector still
 rejects because its product driver registry is absent; rejection earns no pass.
 This slice does not close those manager-owned aggregate gates, the IMS-1403
-parent, the 0.14 exit gate, licensed certification or mixed-resource recovery.
+parent, the ims.programming exit gate, licensed certification or mixed-resource recovery.
 
 ## IMS-1403.local-uow-isolation (verified bounded local slice)
 
@@ -3757,14 +3739,14 @@ Dependency-inclusive Clippy stopped at unchanged MQ host validation warnings.
 The aggregate architecture gate passed its earlier guards and stopped at the
 unchanged CICS `dfhp37p.html` reader-cache gap; no unrelated cache provisioning
 or audit was performed and that gate is not claimed as passed. The historical
-0.4/0.5/0.6 licensed-pending dispositions remain as recorded; the audit's
+cobol.execution/racf.security/dataset.data licensed-pending dispositions remain as recorded; the audit's
 missing exact acceptance-provenance mapping is not invented by this slice.
 
 Next integration step: merge this exact sealed slice with the manager-owned
 CHKP and participant changes, run the selected public CHKP regression there,
 and resolve aggregate baseline gates in their owners. No official IMS row
 credit, licensed differential, CardDemo certification, mixed-resource closure
-or v0.14 release completion is asserted.
+or ims.programming release completion is asserted.
 
 ## IMS-1405.application-recovery-dispatch (bounded LOG slice)
 
@@ -3831,7 +3813,7 @@ The consumed host/SAF/storage ancestry includes `b0258ebb` (accepted integrated
 COBOL candidate) and `b4f8fc70` (security/dataset authorities), both verified
 ancestors of this candidate. Approval and licensed-pending dispositions remain
 in the COBOL execution, RACF security and dataset data status records and
-`conformance/0.6/evidence/dataset-certification.json`; this worker does not
+execution output stored outside Git; this worker does not
 rerun or relabel those historical receipts. The current pending IMS participant
 preparation at `a130d1ac` remains pending, with no descriptor change.
 
@@ -3983,7 +3965,7 @@ Acceptance: focused selected-provider/engine/index/PCB/security/replay/rollback
 regressions on Memory and SQLite; strict scoped no-deps Clippy, fmt, affected
 metadata/catalog/schema generators, dependency policy, docs/changelog and
 applicable architecture guards. External receipts remain outside Cargo targets.
-Seal only this ID with target 0.14.0. Parent, official and licensed completion
+Seal only this ID with target ims.programming. Parent, official and licensed completion
 remain pending; organization admission alone does not prove its semantics.
 
 Implementation: the existing engine stores source-occurrence pointer identities
@@ -4089,7 +4071,7 @@ remains explicitly unsupported, not a successful primary-order substitute.
 
 Parent: IMS-1406. Entry HEAD: `2f70b82f` (integrated UOW isolation, PCB
 sensitivity, checkpoint and CardDemo repairs). Consumes the recorded released
-0.4/0.5/0.6 dependency identities above and the existing host ABI, SAF,
+cobol.execution/racf.security/dataset.data dependency identities above and the existing host ABI, SAF,
 canonical effect, durable storage, provider-row/CAS and replay authorities.
 Owns a bounded reservation helper and minimal system/generic/isolation/utility
 call-site integration; SSA navigation, secondary-index projection and application
@@ -4244,7 +4226,7 @@ integration. Its entry count was already 2,109 versus the 1,959-line recorded
 ceiling; the manager owns that split, and this slice does not raise the ceiling
 or perform the extraction. New production modules remain below 1,200 lines.
 The routine docs manifest must reflect this appended section. No official row
-passes, IMS-1406 parent completion or full-minor seal is claimed.
+passes, IMS-1406 parent completion or full-phase seal is claimed.
 
 The IMS assurance matrix initially failed because the integrated generic-test
 split left 14 local-gate locators at `service/generic.rs`. This slice corrects
@@ -4277,7 +4259,7 @@ Final documentation/sealing command receipt: `final-docs-seal.log` under the
 external slice receipts directory. The routine generator/check is
 `cargo xtask docs` / `cargo xtask docs --check`. The seal uses the exact staged
 file allowlist with `cargo xtask work-package-seal --id
-IMS-1406.q-reservation-write-fence --target-version 0.14.0` and the same paths
+IMS-1406.q-reservation-write-fence --target-subsystem ims.programming` and the same paths
 with `--check` after local commit. It is a bounded slice seal, not an official
 row or parent seal. `git diff --check` and Cargo cleanup complete each sequence;
 no publication bodies, SQL schema, participant descriptor, LOG adapter, SSA
@@ -4398,7 +4380,7 @@ database/TM backout, atomic concurrent recovery-lease fencing, participant
 admission, official accepted-IR bindings and licensed differential remain pending.
 The inherited accepted shared-contract identities and prior licensed-pending
 dispositions are unchanged. This seals only the verified bounded leaf; IMS-1405,
-the full recovery family and the human's v0.14 goal remain in progress.
+the full recovery family and the human's ims.programming goal remain in progress.
 
 ### Application checkpoint manager integration
 
@@ -4431,7 +4413,7 @@ matched zero tests and earns no credit; the corrected
 Parent: IMS-1406. Clean entry and preserved Q seal:
 `ab085b2c720d3b4964ea31a0e6bddb5e27d30581`; branch
 `codex/v014-integrity-read-visibility-20261002`. Consumes the accepted
-0.4/0.5/0.6 identities above and the shared host/SAF/effect/provider-row/CAS,
+cobol.execution/racf.security/dataset.data identities above and the shared host/SAF/effect/provider-row/CAS,
 storage, UOW, retention and pending participant boundaries. IBM-observable
 visibility remains provider-owned; no private locks, store or coordinator.
 
@@ -4582,7 +4564,7 @@ Receipts: external
 Routine final documentation generation/check uses `cargo xtask docs` and
 `cargo xtask docs --check`. The leaf seal uses the exact staged changed-path
 allowlist with `cargo xtask work-package-seal --id
-IMS-1406.integrity-read-visibility --target-version 0.14.0`, then the same
+IMS-1406.integrity-read-visibility --target-subsystem ims.programming`, then the same
 allowlist with `--check` after local commit. Cargo targets are cleaned after
 each sequence; no publication bodies enter Git. Manager must retain the common
 pipeline fence and existing row-helper names during mechanical module movement,
@@ -4590,7 +4572,7 @@ integrate other worker changes and re-seal changed blobs. The next substantive
 work is source-backed record/read-lock/shared-Q scheduling and pending shared
 participant/context/IR acceptance, not repeating this leaf's successful checks.
 Official/IR credit remains zero and licensed differentials remain 0/25 pending;
-parent IMS-1406 and the 0.14 exit gate remain incomplete.
+parent IMS-1406 and the ims.programming exit gate remain incomplete.
 
 ### Integrity-read manager integration
 
@@ -4773,7 +4755,7 @@ variable/undefined formats, raw RSA layouts, BMP/LAST, authentic root timestamp
 day/region authority, raw framing, participant/lease admission, official IR and
 licensed differential remain parent obligations. Logical ticks are not timestamp
 authority; no source-required physical applicability is labeled fake success.
-Only this bounded logical leaf can complete; IMS-1405 and v0.14 remain open.
+Only this bounded logical leaf can complete; IMS-1405 and ims.programming remain open.
 
 Required execution/effect/provider-row/storage/participant/generated-participant/
 security/retention/typed-boundary/supply-chain and offline dependency-policy gates
@@ -4873,7 +4855,7 @@ Verification: fail-first/pass public host/provider and selected signed routes;
 strict scoped all-target Clippy --no-deps, fmt, affected effect/provider-row/
 storage/participant/security/retention/schema guards, dependency policy,
 IMS catalog/assurance and shared spec integrity, docs/changelog, exact-path
-seal/check with this leaf ID and target 0.14.0, then one feature commit.
+seal/check with this leaf ID and target ims.programming, then one feature commit.
 Receipts remain outside Git and disposable Cargo targets. Required failures
 remain explicit; no lint waiver, lowered acceptance or licensed run is allowed.
 
@@ -4975,7 +4957,7 @@ database-family recovery, official IR acceptance and licensed differential.
 The real TM guard proves DB-only rejection preserves queued output/buffers and
 the WorkStore lease. It does not fence concurrent TM admission or claim full TM
 recovery. Other GSAM, STAT, secondary and integrity-read lanes remain manager-owned.
-The human's v0.14 parent and IMS-1405 remain in progress.
+The human's ims.programming parent and IMS-1405 remain in progress.
 
 ### Manager application-backout integration — 2026-10-02
 
@@ -5151,7 +5133,7 @@ the bounded `ims-status-explanations-cache` under the completion receipt root.
 Mandatory source-reader/policy/schema/spec/dependency/docs/changelog checks and
 exact resealing accompany the manager feature commit. Human source/expectation/
 applicability acceptance, complete applicable classes, participant/lease closure,
-coherent restore/retention and full v0.14 acceptance remain pending. Licensed
+coherent restore/retention and full ims.programming acceptance remain pending. Licensed
 certification is user-excluded, not counted passing. No parent/release credit.
 ## IMS-1405.tm-application-backout (bounded contract gap delivery, 2026-10-02)
 
@@ -5195,7 +5177,7 @@ ROLL/ROLB and generic Batch undo/epoch/incarnation behavior is preserved.
 The older base lacks the manager's extracted `product/ims.rs` owner; the only
 product seam here is test registration in the existing recovery test owner.
 Official, licensed, maintainer, parent and release credit remain zero; mixed
-resource closure remains v0.16. ADR-0031 supplies source identities, the exact
+resource closure remains integration.transactions. ADR-0031 supplies source identities, the exact
 missing guarantees, proposed compatibility/failure rules, and future acceptance
 matrix. Current-candidate receipts and the sealed commit identity belong in
 the external handoff, never a new committed execution ledger.
@@ -5297,14 +5279,14 @@ catalog/schema/assurance, spec and affected architecture/module/participant
 guards pass. The additional public-API documentation ratchet diagnostic is
 blocked by the untouched execution API and existing host surface exceeding
 its policy; new DTO items are documented and no policy ceiling is raised.
-This is not a full-minor documentation/maintainer acceptance claim.
+This is not a full-phase documentation/maintainer acceptance claim.
 
 Receipts remain outside Git/targets under the slice's existing worker receipt
 directory. The existing request module's HostResult declaration was moved
 mechanically behind the stable export and its inventory ceiling lowered from
 1611 to 1592; no frozen or new module ceiling increased. No navigation, index,
 GSAM, recovery, STAT, TM, backout or participant algorithm changed. Parent
-IMS-1401, complete-v0.14, official/maintainer/parent/release and licensed
+IMS-1401, complete-ims.programming, official/maintainer/parent/release and licensed
 acceptance stay open. Next work is the exact owner prerequisites in the class
 review, then manager integration with the separate newer secondary SSA,
 GSAM-checkpoint and backout leaves; none is silently consumed here.
@@ -5343,7 +5325,7 @@ Unsupported secondary/failure/raw ABI classes, official/human/participant/parent
 and release acceptance remain open; licensed certification is excluded.
 ## IMS-1406.api-documentation-ratchet-repair (implemented documentation leaf)
 
-Parent IMS-1406; target 0.14.0. Clean base:
+Parent IMS-1406; target ims.programming. Clean base:
 `86a8774f6e3eae07d2f222d7fd174a000da1b266`; branch
 `codex/v014-api-doc-ratchet-20261002`. Preserve the prior branch and the
 `6f1bd076` official-IR candidate. This nonsemantic infrastructure leaf owns
@@ -5433,7 +5415,7 @@ checks pass. Receipts remain external with actual code-candidate identity.
 No runtime suite is repeated for these comments and no old worker receipt is
 relabeled as this manager candidate. Unchanged dependency/architecture policy
 results retain their original evidence identities. Source/ABI/participant,
-human/official, full-v0.14 and release acceptance remain pending; licensed
+human/official, full-ims.programming and release acceptance remain pending; licensed
 certification stays excluded.
 
 ### Manager compiled-CBLTDLI gap composition (2026-10-02)
@@ -5594,7 +5576,7 @@ bad/truncated controls, memory bounds, device errors, independent PCBs,
 checkpoint/restart and durable replay tests pass through that adapter. This
 leaf supplies an owned application-area projection, not physical equivalence.
 The source-derived followup is detailed in ADR-0030; licensed execution and
-official/maintainer/parent IMS-1403/v0.14/release completion remain pending.
+official/maintainer/parent IMS-1403/ims.programming/release completion remain pending.
 
 Candidate receipts, fail-first Unsupported and exact command/source identities
 are outside Git and disposable targets at
@@ -5650,7 +5632,7 @@ shared TOC were read locally without a refresh. Catalog context remains
 `:0002/:0023/:0016/:0025` checkpoint consumers. Source text stays external and
 grants zero execution credit. Parent IMS-1403/1405, selected-secondary integration,
 root current-main composition, participant/official/human acceptance, licensed
-evidence, full-v0.14 and release promotion remain open.
+evidence, full-ims.programming and release promotion remain open.
 
 ### Root secondary/GSAM/current-main composition — 2026-10-02
 
@@ -5679,7 +5661,7 @@ Idle subprocess helper entries are not independent scenario credit. Receipts
 remain external under `v014-completion-20261002/secondary-root-*`; prior worker
 receipts retain their actual base. Final signed-route/mixed-SSA and aggregate
 policy composition is a separate candidate sequence, not retroactive credit.
-This completes only the bounded secondary restart leaf, not IMS-1405 or v0.14.
+This completes only the bounded secondary restart leaf, not IMS-1405 or ims.programming.
 
 ### Root mixed-SSA composition and continuation repair — 2026-10-02
 
@@ -5743,7 +5725,7 @@ policy results retain their input identities; their relevant unchanged inputs
 are not relabeled as committed-head CI. Root verification receipts and Rust
 identities are external under `boundary-path-*` and `mixed-evaluation-root-*`.
 The initial mixed worker's stale AMS failure is resolved by composing the root's
-probe repair; no acceptance gate was waived. The PR stays draft and v0.14 open.
+probe repair; no acceptance gate was waived. The PR stays draft and ims.programming open.
 ## Historical prerequisite packet imported from bdbca36 (2026-10-02)
 
 The following packet retains its original source and verification disposition.
@@ -5878,14 +5860,14 @@ is installed. Final routine docs generation/check, exact ten-path leaf seal,
 feature commit and committed seal check are packaging commands retained there.
 The seal's pass disposition applies only to this bounded guard and acceptance
 gap packet, not the pending mixed evaluation, any official gate, maintainer
-approval, licensed differential, parent IMS-1401 or v0.14 completion. Next step:
+approval, licensed differential, parent IMS-1401 or ims.programming completion. Next step:
 authorize and review exact pins for the four missing topics, then implement and
 prove independently derived mixed outcomes through the same existing authority.
 ## IMS-1405.private-recovery-retention-fence — bounded implementation declaration
 
 Base: `a8deb3d8a97be2660cfa0d38327ff246a194a910`. Disposition: **Complete**
 for this user-authorized bounded fence and its declared local proof; parent
-IMS-1405 and v0.14 remain incomplete. ADR-0037 stays Proposed; it is the
+IMS-1405 and ims.programming remain incomplete. ADR-0037 stays Proposed; it is the
 authorized leaf decision, not an external approval claim.
 This leaf preserves canonical recovery references by OR-ing conservative presence
 of reserved `ims-recovery-v1-` rows into the existing unowned core fence under
@@ -5959,7 +5941,7 @@ receipts whose ordinary retention planner scan fails closed; this composition
 keeps them intact. Ordinary replay pruning and subsequent canonical private
 replay preservation are separately proved by the two signed LOG tests. The
 bounded composition does not certify arbitrary signed recovery graphs, full
-GSAM/secondary/backout backup matrices, v0.16 mixed restore or PostgreSQL.
+GSAM/secondary/backout backup matrices, integration.transactions mixed restore or PostgreSQL.
 
 Affected regressions pass 69 provider application-recovery cases (six idle
 process helpers excluded), eight store retention/watermark/archive saturation/
@@ -6042,16 +6024,16 @@ feature seal/check; it does not rerun unchanged runtime suites for this prose.
 ## IMS-1406.integration-dependency-inventory — declared metadata repair
 
 Root entry is the clean private-retention seal
-`d800c089d98168775cf43850682807d465bb5ec1`, target 0.14.0. The logical-feedback
+`d800c089d98168775cf43850682807d465bb5ec1`, target ims.programming. The logical-feedback
 worker's actual architecture-fast failure and unchanged-base comparison expose
 the existing `mainframe-env-db2 -> mainframe-env-encoding` normal dependency
 absent from the declared graph. Cargo.toml already owns that dependency; this
 leaf changes no dependency, library, runtime behavior, semantic rule or boundary.
 IBM lookup is not required for this infrastructure inventory correction.
 
-Use one current-release additions artifact under conformance/0.14/inventory and
+Use one current-release additions artifact under conformance/subsystems/ims/inventory and
 the existing shared graph comparator's ordered additions list. Do not rewrite
-the historical 0.1 graph or earlier release additions, suppress graph comparison,
+the historical platform.runtime-integration graph or earlier release additions, suppress graph comparison,
 change Cargo.lock/manifests, or weaken layer/module/API policy. Scope is exactly
 the new dependency-additions.json, one lookup entry in xtask/src/main.rs,
 this status, the unique v014-db2-encoding-dependency-inventory-20261002.toml
@@ -6090,7 +6072,7 @@ the remaining packaging checks, with actual outcomes recorded externally.
 State: local bounded implementation and affected gates passed.
 The generated leaf seal is the completion boundary.
 Base `a8deb3d8a97be2660cfa0d38327ff246a194a910`.
-This leaf alone is authorized; IMS-1403 and the parent v0.14 remain incomplete.
+This leaf alone is authorized; IMS-1403 and the parent ims.programming remain incomplete.
 No official, HUMAN, licensed or participant acceptance credit is claimed.
 
 Applicability: DbBatch typed CALL, primary HIDAM database PCB with G/AP, successful six
@@ -6190,7 +6172,7 @@ required. No global architecture retry for unchanged CICS sources: the separate
 metadata repair already corrects the worker's original graph failure, and its
 actual broader gate remains failed at the missing source prerequisite. Root
 does not refresh sources or waive that gate. Leaf/local proof does not complete
-IMS-1403, HUMAN/official/participant acceptance or full v0.14; licensed work stays
+IMS-1403, HUMAN/official/participant acceptance or full ims.programming; licensed work stays
 excluded. Cargo clean ends each intended-checkout verification sequence.
 
 Root focused outcome: eleven logical provider entries and two signed backend
@@ -6242,12 +6224,12 @@ Strict affected all-target/all-feature Clippy and fmt pass; Cargo clean removes
 6.5 GiB. The three production file hashes match the reviewed worker seal, while
 the revised fence input is separately bound in root runtime-inputs.json. Final
 relevant policy, normal docs and seventeen-path seal/check are packaging gates;
-external root receipts record their actual disposition, not CI or full-minor
+external root receipts record their actual disposition, not CI or full-phase
 acceptance. Original worker/base-only null failures keep their identities.
 
 ## IMS-1401.ssa-position-command-sources — declared source-only leaf
 
-Clean entry `6e3e24d014cfb4a58c6b79efff88e9b999bfc9cc`, target 0.14.0.
+Clean entry `6e3e24d014cfb4a58c6b79efff88e9b999bfc9cc`, target ims.programming.
 The manager authorizes registration of exactly four previously audited IMS 15.6
 F/U/V/W archive topics, not runtime implementation or acceptance. Register scope
 `ims-ssa-position-commands`, baseline
@@ -6259,8 +6241,8 @@ and registry entry; semantic authority remains false and coverage credit zero.
 
 Exact five-path allowlist, declared before source edits:
 
-- `conformance/0.14/manifests/ims-ssa-position-command-topics.json` (new)
-- `conformance/0.14/manifests/index.json`
+- `conformance/subsystems/ims/manifests/ims-ssa-position-command-topics.json` (new)
+- `conformance/subsystems/ims/manifests/index.json`
 - `docs/delivery/subsystems/ims/programming-status.md`
 - `changes/unreleased/ims-ssa-position-command-sources-20261003.toml` (new)
 - `docs/generated/documentation-manifest.json` (normal generator only)
@@ -6280,7 +6262,7 @@ under worker-receipts/v014-completion-20261002/ssa-position-command-sources/.
 
 No runtime/source-reader/checker rewrite, schema, dependency, semantic rule,
 denominator, HUMAN/licensed/certification credit, raw CALL/TM/participant
-extension or full-minor completion is authorized. ADR-0039 belongs to L;
+extension or full-phase completion is authorized. ADR-0039 belongs to L;
 any later private U/V design requires separately reviewed ADR-0040.
 
 Source outcome: the four retained topic paths are absent; matching immutable
@@ -6290,7 +6272,7 @@ mismatched. F/U/V/W are respectively 7,545 / 5,269 / 3,557 / 2,614 bytes,
 18,985 total. Topic-set digest is
 `f99728026ed7f14fcc8e104678bc55939581af2defee68385bc3bf35b170e8b9`;
 manifest-byte digest is
-`6890befdceb5c0209670b26bd665ba10d5f070cb0a8374818431ceea2081f544`.
+`f2be9bb3fd053843336d01c41777a440b80cce7bef1f8d21e077ea1c864444cc`.
 Archive metadata has no recorded HTTP Last-Modified value; the manifest states
 that absence instead of treating the body's Last Updated label as that header.
 All eleven preexisting manifest pins and registry rows remain identical.
@@ -6321,12 +6303,12 @@ Root keeps both logical/L status additions, regenerates the manifest normally,
 and selects the source reader, coverage registry and docs/changelog/policy/seal
 checks for this metadata-only composition. No Rust runtime repeat or CICS cache
 retry is justified by these unchanged semantic inputs. F/U/V/W behavior and the
-proposed private positioning authority remain unfinished; full v0.14 stays open.
+proposed private positioning authority remain unfinished; full ims.programming stays open.
 
 ## IMS-1403.ssa-primary-level-position — fail-first phase only
 
 Declared before test edits on clean manager base
-`dd097038e761730f394098b58f01ffca3906eda7`, target 0.14.0.
+`dd097038e761730f394098b58f01ffca3906eda7`, target ims.programming.
 This bounded phase captures independent expected failures through the real
 public provider and signed-selected coordinator on Memory and file SQLite.
 It authorizes no production implementation, retained wire, matcher, feedback,
@@ -6358,7 +6340,7 @@ primary-position-failfirst/. Selected Cargo sequences always end with cargo
 clean, failures included. No policy/full regression/PostgreSQL/process/backup
 campaign or docs generation is required for this pre-implementation phase.
 Keep the proof inputs uncommitted; no feature completion, official/HUMAN/licensed
-acceptance, shared ADR0031/0033 approval or parent v0.14 completion is inferred.
+acceptance, shared ADR0031/0033 approval or parent ims.programming completion is inferred.
 
 Fail-first outcome: twelve named public tests execute: two setup controls pass
 and ten literal semantic expectations fail. After a signed test-only package-

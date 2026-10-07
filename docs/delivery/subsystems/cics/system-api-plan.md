@@ -2,14 +2,13 @@
 
 Subsystem: **cics**
 Phase: **system-api**
-Target release: **0.10.0**
 
 Status: **Proposed**
-Start gate: 0.9 resource, condition, handler, and CICS state contracts frozen
+Start gate: cics.application-api resource, condition, handler, and CICS state contracts frozen
 Completion dependencies: cics.application-api
 Estimate: 18–30 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -17,7 +16,7 @@ These requirements do not themselves certify implementation or waive an exit gat
 ## Outcome
 
 Complete the pinned CICS system programming and FEPI surfaces: 269 unique SPI
-commands and 39 FEPI commands over the same typed CICS authorities as 0.9.
+commands and 39 FEPI commands over the same typed CICS authorities as cics.application-api.
 
 ## Owned scope
 
@@ -63,7 +62,7 @@ SPI resource-family cohorts and FEPI can run independently after the resource
 and condition schemas freeze. Commands that mutate shared region state must use
 one lifecycle authority and one lock order.
 
-0.10 can run alongside 0.13, 0.14, and 0.15. z/OSMF CICS route adapters may be
+cics.system-api can run alongside db2.programming, ims.programming, and mq.programming. z/OSMF CICS route adapters may be
 prepared concurrently, but their completion waits for the accepted handlers.
 
 ## Exit gate
@@ -75,7 +74,7 @@ prepared concurrently, but their completion waits for the accepted handlers.
 - No administrative route, resource type, or FEPI target is selected through
   application-specific string dispatch.
 - Licensed CICS TS 6.x SPI and FEPI differentials pass.
-- The 0.9 application API remains unchanged and green.
+- The cics.application-api application API remains unchanged and green.
 
 ## Non-goals
 

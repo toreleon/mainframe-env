@@ -2,14 +2,13 @@
 
 Subsystem: **cobol**
 Phase: **structure**
-Target release: **0.3.0**
 
-Status: **CB-306 complete; full-minor acceptance next**
+Status: **CB-306 complete; full-phase acceptance next**
 
 The implementation line starts from `0186231` and includes controller fix
-`eb46db4` as local cherry-pick `2ff53eb`. The accepted 0.2.0 catalog,
+`eb46db4` as local cherry-pick `2ff53eb`. The accepted coverage.foundation catalog,
 generation, package, coverage, source-provenance, and handler-identity
-authorities remain frozen; no 0.2 evidence was regenerated or rewritten.
+authorities remain frozen; no coverage.foundation evidence was regenerated or rewritten.
 
 ## Work packages
 
@@ -71,7 +70,7 @@ mutants are killed; and duplicate shard batches fail before union.
   records typed calls and references with bounded provenance, validates arity,
   classes, homogeneous/variadic overloads, format-literal context and register
   restrictions, infers result types/fixed lengths, and blocks publication when
-  no 0.3 runtime route exists. The shared runner now derives 173/173 COBOL rows
+  no cobol.structure runtime route exists. The shared runner now derives 173/173 COBOL rows
   recognized and 173/173 validated from 346 passing verdict events.
 - CB-306 adds one fast `cargo xtask cobol-exit --check` acceptance entry point.
   It closes all 173 official COBOL rows, 346 exact recognition/validation
@@ -82,7 +81,7 @@ mutants are killed; and duplicate shard batches fail before union.
   the existing bounded parser property test, and representative registry and
   artifact mutants provide the complete compiler/source/IR diagnostic floor.
 - The compatibility fixture is the canonical 955-byte HELLO artifact produced
-  by immutable tag `mainframe-env-v0.1.1` at commit
+  by immutable tag `mainframe-env-vprofile.carddemo` at commit
   `44f3081eb2fdf22d09e1a97725f5a4163431ca70`. CB-306 verifies the tag commit and
   tree, accepted artifact contract inventory, exact payload digest, binary
   decode/re-encode, and successful execution with `HELLO WORLD!` output.
@@ -92,7 +91,7 @@ mutants are killed; and duplicate shard batches fail before union.
   forms remain valid; level-88 conditions may describe a redefining item; and a
   special register nested in reference modification is not mistaken for the
   receiving item. Legacy table execution fixtures now use valid subordinate
-  OCCURS entries without weakening the 0.3 invalid-form boundary.
+  OCCURS entries without weakening the cobol.structure invalid-form boundary.
 - Execution, recovery, and differential gates remain pending. Licensed oracle
   execution is not part of this checkpoint.
 
@@ -106,5 +105,5 @@ and every binding has deterministic replay.
 Blockers: none.
 
 Next executable step: run the tier-3 affected-scope repository validation once
-on the unchanged CB-306 completion candidate, then perform the normal full-minor
+on the unchanged CB-306 completion candidate, then perform the normal full-phase
 push and pull-request handoff.

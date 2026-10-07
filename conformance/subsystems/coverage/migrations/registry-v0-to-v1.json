@@ -1,0 +1,23 @@
+{
+  "schema_version": "mainframe-env.registry-migration@1",
+  "id": "program-and-route-registry-v0-to-v1",
+  "target_subsystem": "coverage.foundation",
+  "from_state": "handwritten utility/system-service name branches and mixed handwritten official/custom route registration",
+  "to_state": "generated typed common-program registry and generated namespace-separated route registries",
+  "destructive": false,
+  "runtime_state_changed": false,
+  "catalog_presence_coverage_credit": 0,
+  "generation": {
+    "deterministic": true,
+    "source_digest_embedded": true,
+    "stale_output_rejected": true,
+    "official_routes_equal_frozen_catalog": true,
+    "custom_routes_disjoint": true
+  },
+  "rollback": {
+    "supported": true,
+    "method": "regenerate from the retained prior reviewed catalog and rebuild the immutable product candidate",
+    "partial_registry_selected": false,
+    "provider_state_restore_required": false
+  }
+}

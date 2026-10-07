@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **IMS provider maintainers**
 Scope: **IMS-1403.primary-level-position-closure, reviewed private design**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The existing primary traversal must distinguish its actual next-search boundary
 from the occurrences that satisfied each SSA level and from the returned/held
@@ -144,5 +144,5 @@ load/backout/reset fences, coherent backup boundary and reserved retention prefi
 are necessary; this field is not a mixed-image certificate or cleanup family.
 Separate-process SQLite reopen proves only selected local durable behavior.
 Scoped PostgreSQL parity and coherent durability are required for this completion
-leaf; wider backup certification and IMS/v0.14 obligations remain separate. Seal
+leaf; wider backup certification and IMS/ims.programming obligations remain separate. Seal
 only after every covered producer/consumer/proof and required gate passes.

@@ -1,0 +1,29 @@
+{
+  "schema_version": "mainframe-env.batch-controller-migration@1",
+  "id": "batch-controller-v0-to-v1",
+  "target_subsystem": "coverage.foundation",
+  "from_state": "application-specific TSO and IMS controller branches in the batch service",
+  "to_state": "typed controller generations derived from a selected signed application package",
+  "destructive": false,
+  "production_branch_fallback_retained": false,
+  "installation": {
+    "bounded": true,
+    "validate_complete_generation_before_publish": true,
+    "selector_bound_to_program_artifact": true,
+    "selector_conflicts_fail_closed": true,
+    "same_generation_same_identity_replays": true,
+    "same_generation_different_identity_rejected": true,
+    "retained_generations_persisted_atomically": true,
+    "selected_generation_reloaded_on_open": true,
+    "empty_generation_removes_all_selectors": true,
+    "signed_program_identity_rechecked_at_execution": true,
+    "aggregate_retained_bounds_checked_before_clone": true
+  },
+  "rollback": {
+    "supported": true,
+    "method": "reselect a retained, identity-equal controller generation after the application installer reselects the matching ready package generation",
+    "partial_generation_selected": false,
+    "unseen_older_generation_accepted": false,
+    "empty_generation_rollback_supported": true
+  }
+}

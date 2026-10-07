@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/ims-pcb-status-rules@1",
+  "title": "Reviewed IMS PCB mask and status rules",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_subsystem",
+    "source_scope",
+    "source_topics",
+    "execution_contexts",
+    "pcb_masks",
+    "status_categories",
+    "status_contexts"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.ims-pcb-status-rules@1"},
+    "target_subsystem": {"const": "ims.programming"},
+    "source_scope": {"const": "ims-programming-contracts"},
+    "source_topics": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/source_topic"}
+    },
+    "execution_contexts": {
+      "const": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]
+    },
+    "pcb_masks": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "source_topic", "allowed_contexts", "fields"],
+        "properties": {
+          "kind": {"enum": ["database", "gsam", "io", "alternate"]},
+          "source_topic": {"$ref": "#/$defs/source_topic"},
+          "allowed_contexts": {"$ref": "#/$defs/contexts"},
+          "fields": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "width",
+                "semantic_value",
+                "applicable_contexts"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+                  "maxLength": 64
+                },
+                "width": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["fixed"],
+                      "properties": {"fixed": {"type": "integer", "minimum": 1, "maximum": 64}}
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["one_of"],
+                      "properties": {
+                        "one_of": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 2,
+                          "uniqueItems": true,
+                          "items": {"type": "integer", "minimum": 1, "maximum": 64}
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["variable"],
+                      "properties": {"variable": {"const": "key-feedback-area"}}
+                    }
+                  ]
+                },
+                "semantic_value": {"enum": ["application", "reserved", "unused"]},
+                "applicable_contexts": {"$ref": "#/$defs/contexts"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "status_categories": {
+      "const": [
+        "exceptional-valid-completed",
+        "warning-with-data-completed",
+        "warning-no-data-completed",
+        "improper-user-specification",
+        "system-io-security-error",
+        "unavailable-data",
+        "lock-timeout"
+      ]
+    },
+    "status_contexts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "source_topic",
+          "pcb_kinds",
+          "status_count",
+          "category_groups",
+          "uncategorized_codes"
+        ],
+        "properties": {
+          "context": {"enum": ["database", "system-service", "message"]},
+          "source_topic": {"$ref": "#/$defs/source_topic"},
+          "pcb_kinds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {"enum": ["database", "gsam", "io", "alternate"]}
+          },
+          "status_count": {"type": "integer", "minimum": 1, "maximum": 256},
+          "category_groups": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 7,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["category", "codes"],
+              "properties": {
+                "category": {"enum": [
+                  "exceptional-valid-completed",
+                  "warning-with-data-completed",
+                  "warning-no-data-completed",
+                  "improper-user-specification",
+                  "system-io-security-error",
+                  "unavailable-data",
+                  "lock-timeout"
+                ]},
+                "codes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "uniqueItems": true,
+                  "items": {"type": "string", "pattern": "^(  |[A-Z0-9]{2})$"}
+                }
+              }
+            }
+          },
+          "uncategorized_codes": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[A-Z0-9]{2}$"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "source_topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topic_path", "sha256"],
+      "properties": {
+        "topic_path": {"type": "string", "minLength": 16, "maxLength": 512},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "contexts": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {"enum": ["db-dc", "dbctl", "dcctl", "db-batch", "tm-batch"]}
+    }
+  }
+}

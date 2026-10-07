@@ -3,7 +3,7 @@
 Status: **Private prerequisite decision; public integration pending**
 Owner: **Db2 provider maintainers**
 Scope: **DB2-1202.finite-decfloat-assignment**
-Applies from: **0.12.0 development**
+Applies from: **db2.core development**
 
 ## Adoption boundary
 

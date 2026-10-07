@@ -1,9 +1,9 @@
 # ADR-0016: Keep CICS TCP/IP and certificate facts in trusted ingress context
 
-Status: **Accepted for v0.9 development; typed EXTRACT routes executable**
+Status: **Accepted for cics.application-api development; typed EXTRACT routes executable**
 Owner: **CICS and network maintainers**
 Scope: **EXTRACT TCPIP and EXTRACT CERTIFICATE task context**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Context
 

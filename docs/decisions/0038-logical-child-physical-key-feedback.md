@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **IMS provider maintainers**
 Scope: **IMS-1403.logical-child-physical-key-feedback**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The selected PCB feedback projection currently rejects every database that
 declares a logical relationship. Its existing physical traversal can already
@@ -63,5 +63,5 @@ save the real source physical path through the existing recovery owner.
 Downgrade to the base merely restores Unsupported for fresh calls; inherited
 strict reader, selected-package, undo and coherent backup restrictions apply.
 ADR Proposed is within this user-authorized leaf, not an external approval.
-Local tests and the leaf seal never complete parent v0.14 or official, HUMAN,
+Local tests and the leaf seal never complete parent ims.programming or official, HUMAN,
 participant or licensed acceptance.

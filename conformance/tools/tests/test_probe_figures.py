@@ -205,7 +205,7 @@ class IndependentFigureTests(unittest.TestCase):
         )
 
     def test_racf_retained_catalog_classifications_recompute_from_named_entries(self):
-        source = REPOSITORY / "conformance/0.5/racf/operand-dispositions.json"
+        source = REPOSITORY / "conformance/subsystems/racf/racf/operand-dispositions.json"
         book = json.loads(source.read_text(encoding="utf-8"))
         retained = [entry for entry in book["dispositions"] if not entry["applied"]]
         counts = {
@@ -231,7 +231,7 @@ class IndependentFigureTests(unittest.TestCase):
             )
 
     def test_racf_publication_classifications_recompute_from_each_named_entry(self):
-        source = REPOSITORY / "conformance/0.5/racf/operand-dispositions.json"
+        source = REPOSITORY / "conformance/subsystems/racf/racf/operand-dispositions.json"
         book = json.loads(source.read_text(encoding="utf-8"))
         populations = (
             (
@@ -265,18 +265,6 @@ class IndependentFigureTests(unittest.TestCase):
                     self.figures[f"racf.{classification}_{population}_names"].value,
                 )
 
-    def test_the_ledger_numerators_are_still_zero(self):
-        # Not an arithmetic identity but the claim the whole record rests on,
-        # so it is asserted rather than merely reported.
-        book = json.loads(
-            (REPOSITORY / "conformance/0.2/evidence/coverage-ledger.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        self.assertEqual(book["official_compatibility_numerator"], 0)
-        self.assertEqual(book["generated_catalog_credit"], 0)
-        self.assertEqual(self.figures["ledger.official_compatibility_numerator"].value, 0)
-        self.assertEqual(self.figures["ledger.generated_catalog_credit"].value, 0)
 
     def test_every_figure_names_the_file_it_was_read_from(self):
         for key, figure in self.figures.items():
@@ -325,8 +313,8 @@ class RecordAgreementTests(unittest.TestCase):
         for key in (
             "catalog.rows_total",
             "catalog.topic_located_total",
-            "ledger.official_compatibility_numerator",
-            "ledger.generated_catalog_credit",
+
+
             "cobol.catalog_forms",
             "cobol.source_formats",
             "racf.source_operands",

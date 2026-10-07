@@ -28,11 +28,11 @@ digest; no publication body is retained in the repository.
 Generate the review projection from external snapshots:
 
 ```text
-python3 conformance/0.9/tools/extract_cobol_move_rules.py \
+python3 conformance/subsystems/cics/application/tools/extract_cobol_move_rules.py \
   --topics /outside/repository/cobol-move-pilot \
-  --manifest conformance/0.9/manifests/cobol-numeric-move-topics.json \
-  --compile-rules conformance/0.9/cobol/move-compile-rules.json \
-  --output conformance/0.9/generated/cobol-move-semantic-candidates.json
+  --manifest conformance/subsystems/cics/application/manifests/cobol-numeric-move-topics.json \
+  --compile-rules conformance/subsystems/cics/application/cobol/move-compile-rules.json \
+  --output conformance/subsystems/cics/application/generated/cobol-move-semantic-candidates.json
 ```
 
 The exercised projection inventories 166 fragments: eight candidates and 158

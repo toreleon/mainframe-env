@@ -3,7 +3,7 @@
 Status: **Proposed; raw execution blocked pending contract-owner decisions**
 Owner: **compiler, interpreter, host-contract and IMS maintainers**
 Scope: **IMS-1401.cobol-dli-call-boundary**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The bounded investigation cannot correctly admit raw `CALL 'CBLTDLI'` even
 for primary full-function DB-batch GU/GHU/GN/REPL. Typed IMS operations already
@@ -75,7 +75,7 @@ secondary checkpoint and feedback algorithms are unchanged.
 
 The separate five-topic zero-credit source supplement is
 `ibm-ims-15.6-cobol-dli-boundary-2026-09-11`, registered as
-`ims-cobol-dli-boundary` in the existing 0.14 manifest registry. It adds no
+`ims-cobol-dli-boundary` in the existing ims.programming manifest registry. It adds no
 official catalog row or rule acceptance and repins no historical baseline.
 All selected bodies were absent at retained topic paths and matched exact
 SHA-archive bytes; they were parsed locally using `ibm_docs.py`. No network

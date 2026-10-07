@@ -2,8 +2,8 @@
 
 Status: Accepted bounded prerequisite; atomic joined admission remains pending.
 Owner: **Batch maintainers**
-Scope: **MQ-1503.batch-prepared-selection-plan, target 0.15.0**
-Applies from: **mainframe-env 0.15.0 development**
+Scope: **MQ-1503.batch-prepared-selection-plan, target mq.programming**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Decision
 

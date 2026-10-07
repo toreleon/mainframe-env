@@ -8,44 +8,22 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 
-const VENDOR: &str = "conformance/0.8/schemas/vendor/modernize-ai";
-const EVIDENCE: &str = "conformance/0.8/evidence/carddemo-readacct-bundle@1.json";
+const VENDOR: &str = "conformance/subsystems/jes/schemas/vendor/modernize-ai";
+const OUTPUT: &str = "carddemo-readacct-bundle.json";
 
-pub(super) fn run(root: &Path, check: bool) -> TaskResult {
+pub(super) fn run(root: &Path, _check: bool) -> TaskResult {
     let bundle = capture_carddemo_readacct_from_env(
-        &root.join("conformance/0.1.1/inventory/carddemo-corpus.json"),
+        &root.join("conformance/profiles/carddemo/inventory/carddemo-corpus.json"),
     )
     .map_err(|error| error.to_string())?;
-    let schema = read_json(&root.join("conformance/0.8/schemas/run-bundle@1.schema.json"))?;
-    validate_schema_instance(&schema, &bundle, &root.join(EVIDENCE))?;
+    let schema =
+        read_json(&root.join("conformance/subsystems/jes/schemas/run-bundle@1.schema.json"))?;
+    validate_schema_instance(&schema, &bundle, &root.join(OUTPUT))?;
     require_replay_digest(&bundle)?;
     verify_vendor(root)?;
     let (manifest, observation) = project(&bundle)?;
     validate_vendor(root, "execution-manifest-1.0.0.schema.json", &manifest)?;
     validate_vendor(root, "observation-3.0.0.schema.json", &observation)?;
-    let path = root.join(EVIDENCE);
-    if check {
-        let recorded = read_json(&path)?;
-        validate_schema_instance(&schema, &recorded, &path)?;
-        require_replay_digest(&recorded)?;
-        if recorded["logical"] != bundle["logical"]
-            || recorded["replay_digest"] != bundle["replay_digest"]
-            || recorded["schema_version"] != bundle["schema_version"]
-            || recorded["provenance"] != bundle["provenance"]
-            || recorded["authority"] != bundle["authority"]
-        {
-            return Err("READACCT logical bundle differs from checked-in evidence".into());
-        }
-    } else {
-        fs::write(
-            &path,
-            format!(
-                "{}\n",
-                serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())?
-            ),
-        )
-        .map_err(|error| format!("{}: {error}", path.display()))?;
-    }
     println!(
         "READACCT rc={} outputs={} replay={} wall={}..{}",
         bundle["logical"]["job"]["return_code"],
@@ -132,6 +110,31 @@ fn verify_vendor(root: &Path) -> TaskResult {
 }
 
 fn validate_vendor(root: &Path, name: &str, instance: &Value) -> TaskResult {
+    vendor_validator(root, name)?
+        .validate(instance)
+        .map_err(|error| format!("{name} projection: {error}"))
+}
+
+pub(super) fn check_vendor_schemas(root: &Path) -> TaskResult {
+    verify_vendor(root)?;
+    let manifest = read_json(&root.join(VENDOR).join("manifest.json"))?;
+    for entry in manifest["files"]
+        .as_array()
+        .ok_or("vendor manifest lacks files")?
+    {
+        let source = entry["source_path"]
+            .as_str()
+            .ok_or("vendor entry lacks source_path")?;
+        let name = Path::new(source)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("vendor entry lacks schema filename")?;
+        vendor_validator(root, name)?;
+    }
+    Ok(())
+}
+
+fn vendor_validator(root: &Path, name: &str) -> TaskResult<jsonschema::Validator> {
     let base = root.join(VENDOR);
     let p4 = read_json(&base.join("p4-common-1.0.0.schema.json"))?;
     let p5 = read_json(&base.join("p5-common-1.0.0.schema.json"))?;
@@ -145,15 +148,12 @@ fn validate_vendor(root: &Path, name: &str, instance: &Value) -> TaskResult {
     let schema = read_json(&base.join(name))?;
     jsonschema::draft202012::meta::validate(&schema)
         .map_err(|error| format!("{name} is not Draft 2020-12: {error}"))?;
-    let validator = jsonschema::draft202012::options()
+    jsonschema::draft202012::options()
         .offline()
         .with_registry(&registry)
         .should_validate_formats(true)
         .build(&schema)
-        .map_err(|error| format!("compile {name}: {error}"))?;
-    validator
-        .validate(instance)
-        .map_err(|error| format!("{name} projection: {error}"))
+        .map_err(|error| format!("compile {name}: {error}"))
 }
 
 fn reference(label: &str, value: &Value) -> TaskResult<Value> {

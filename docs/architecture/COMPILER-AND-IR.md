@@ -3,7 +3,7 @@
 Status: **Accepted by repository owner**
 Owner: **compiler and IR maintainers**
 Scope: **compiler stages, IR contracts, and publication pipeline**
-Applies from: **mainframe-env 0.1.0**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Goals
 
@@ -153,10 +153,12 @@ executable artifact.
 [ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md) makes the
 target boundary explicit:
 
-```text
-language frontend -> language-specific typed HIR
-                  -> executable semantic IR dialects
-                  -> reference machine -> typed host effects
+```mermaid
+flowchart LR
+    frontend["Language frontend"] --> hir["Language-specific typed HIR"]
+    hir --> ir["Executable semantic IR dialects"]
+    ir --> machine["Reference machine"]
+    machine --> effects["Typed host effects"]
 ```
 
 `VerifiedHir` is a common proof-stage wrapper, not a universal language HIR.
@@ -269,7 +271,7 @@ route.
 ## COBOL organization
 
 COBOL is large enough to require separate syntax and semantic/compiler
-responsibilities. ADR 0005 keeps them as private modules in one 0.1 compiler
+responsibilities. ADR 0005 keeps them as private modules in one platform.runtime-integration compiler
 crate because they have no independent consumer or publication boundary.
 
 ```text
@@ -320,9 +322,9 @@ programming-language HIR or execution loop.
 
 ## Reference backend
 
-The deterministic MIR interpreter is the only 0.1 execution backend and the
-semantic oracle. Symbolic, Cranelift, LLVM, and Wasm backends are post-0.1
-decisions and introduce no 0.1 implementation obligation.
+The deterministic MIR interpreter is the only platform.runtime-integration execution backend and the
+semantic oracle. Symbolic, Cranelift, LLVM, and Wasm backends are post-platform.runtime-integration
+decisions and introduce no platform.runtime-integration implementation obligation.
 
 An optimized backend is promoted only when:
 

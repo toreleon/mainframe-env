@@ -21,10 +21,10 @@ import mq_inquiry_local_type as inquiry_local_type
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_LIST_PATH = Path("conformance/0.15/mq/source-call-list.json")
-CONTRACT_CATALOG_PATH = Path("conformance/0.15/mq/structure-status-catalog.json")
-OFFICIAL_CATALOG_PATH = Path("conformance/0.2/catalogs/mq.json")
-TOPIC_MANIFEST_PATH = Path("conformance/0.2/manifests/mq-topics.json")
+SOURCE_LIST_PATH = Path("conformance/subsystems/mq/mq/source-call-list.json")
+CONTRACT_CATALOG_PATH = Path("conformance/subsystems/mq/mq/structure-status-catalog.json")
+OFFICIAL_CATALOG_PATH = Path("conformance/subsystems/coverage/catalogs/mq.json")
+TOPIC_MANIFEST_PATH = Path("conformance/subsystems/coverage/manifests/mq-topics.json")
 OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/mq_mqi_calls.rs"
 )
@@ -164,7 +164,7 @@ def load(root: Path = ROOT) -> list[dict[str, Any]]:
 
     if (
         source.get("schema_version") != SCHEMA_VERSION
-        or source.get("target_version") != "0.15.0"
+        or source.get("target_subsystem") != "mq.programming"
         or source.get("work_package") != "MQ-1501.call-denominator"
         or source.get("baseline_id") != BASELINE
         or source.get("source_row_count") != 27
@@ -292,7 +292,7 @@ def load_contract(root: Path = ROOT) -> list[dict[str, Any]]:
 
     if (
         catalog.get("schema_version") != CONTRACT_SCHEMA_VERSION
-        or catalog.get("target_version") != "0.15.0"
+        or catalog.get("target_subsystem") != "mq.programming"
         or catalog.get("work_package") != "MQ-1501.structure-status-catalog"
         or catalog.get("baseline_id") != BASELINE
         or catalog.get("unique_call_count") != 26

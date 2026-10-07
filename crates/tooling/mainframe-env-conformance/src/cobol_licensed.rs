@@ -168,12 +168,12 @@ impl ConformanceObservation for Exact {
 pub fn licensed_fixture_digest() -> String {
     let mut digest = Sha256::new();
     for bytes in [
-        include_bytes!("../../../../conformance/0.4/cobol/statement-runtime-fixtures.json")
+        include_bytes!("../../../../conformance/subsystems/cobol/execution/cobol/statement-runtime-fixtures.json")
             .as_slice(),
-        include_bytes!("../../../../conformance/0.4/cobol/function-runtime-fixtures.json")
+        include_bytes!("../../../../conformance/subsystems/cobol/execution/cobol/function-runtime-fixtures.json")
             .as_slice(),
-        include_bytes!("../../../../conformance/0.4/cobol/data-runtime-fixtures.json").as_slice(),
-        include_bytes!("../../../../conformance/0.4/cobol/file-runtime-fixtures.json").as_slice(),
+        include_bytes!("../../../../conformance/subsystems/cobol/execution/cobol/data-runtime-fixtures.json").as_slice(),
+        include_bytes!("../../../../conformance/subsystems/cobol/execution/cobol/file-runtime-fixtures.json").as_slice(),
     ] {
         digest.update((bytes.len() as u64).to_be_bytes());
         digest.update(bytes);

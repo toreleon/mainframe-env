@@ -70,10 +70,10 @@ class PropertyProfileTests(unittest.TestCase):
 
     def test_unmounted_sources_still_validate_artifact_closure_and_old_identities(self):
         self.assertEqual(wire.historical_sha(registry.ROOT/wire.CATALOG),
-            '3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448')
+            '7ff640ea64ade031e55848bd6de0788b1d70471ea9a5a34df158e43390eb6332')
         self.assertEqual(registry._contract_digest(registry.load_contract()),
             'sha256:8452faa699ae5ed8431605958196aabf52fc4d550cca7b3d485b26c0beb0c965')
-        self.assertEqual(raw.digest(raw.load(registry.ROOT)),'2f6d7c679543891ccc768f099963813d981871d2abd35fa7b49aa4e70732ae6a')
+        self.assertEqual(raw.digest(raw.load(registry.ROOT)),'8f3ca67fe72efe6cd4c6c044086de3e9f5d1feebe4390f8163709a5936cb633e')
         self.assertEqual(profile.render(registry.ROOT),(registry.ROOT/profile.OUTPUT).read_text())
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);self.fixture(root)

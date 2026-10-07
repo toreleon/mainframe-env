@@ -1,0 +1,93 @@
+{
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "target_subsystem": "mq.programming",
+  "baseline_id": "ibm-mq-9.4-point-layout-sources-2026-09-12",
+  "subsystem": "mq",
+  "product": "SSFKSJ_9.4.0",
+  "book_label": "IBM MQ 9.4 point-to-point layout source-review scope",
+  "book_href": "SSFKSJ_9.4.0/refdev/q092060_.html",
+  "snapshot_date": "2026-09-12",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "topic_count": 12,
+  "total_bytes": 133991,
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topic_manifest_digest": "5f29e97b1930418d018bbdd7834c6cb164ee567dab1a447c4116bff6a993673e",
+  "coverage_credit": 0,
+  "retained_in_repository": false,
+  "topics": [
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q090570_.html",
+      "sha256": "f4e414258cd3de2690afc037ad050e6b9099ca5a3aab5c1fecb72a26e9cd7176",
+      "bytes": 3457,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q091380_.html",
+      "sha256": "0bb5a72b04f5b5dc39cf88c5ac0e51738557bfb6f3303929ea43d771f7c2673a",
+      "bytes": 2145,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q091950_.html",
+      "sha256": "6e2c03bc9d78db9615d8cd510760d8516ab8274f098ff3ccacdf155f192d1fa9",
+      "bytes": 3724,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q091980_.html",
+      "sha256": "963a85249f195e905c6de75b5f81a9e83b287bdfe82dc0943ea3e530e131ab23",
+      "bytes": 4491,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q092060_.html",
+      "sha256": "ddcad734a32bbd1f5ebc502c3875dd321d0bb315622c8f668361332609d469c2",
+      "bytes": 5513,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q092220_.html",
+      "sha256": "cc56d9555ef7332576abc745c2adb7bd84478ceb6067e3a7d6d2477c480a5870",
+      "bytes": 2967,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q093580_.html",
+      "sha256": "1a1331bd92ace9131d7f47dfd9ee20209507d691d3c75fabe56f6cdc0c227fc0",
+      "bytes": 36684,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q093600_.html",
+      "sha256": "9cc92629afb39a917ddbb2ecb5ef418b804a0063f88b712df95f1dfb7e61abd0",
+      "bytes": 15419,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q093630_.html",
+      "sha256": "eccc7e6d5744b26e7cc49eceb3d3628ac5e5263ac8cf5634d69760b0a79856ca",
+      "bytes": 35184,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q093780_.html",
+      "sha256": "724d53380b8e8cb9d5297cabe0fcbbbf526215e22bfc1fc8ef41ffec3e547880",
+      "bytes": 18059,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q103960_.html",
+      "sha256": "3f0c9bc640af526d4329e211ababb6115745e2c95673bd6b0edbadfbb8d12662",
+      "bytes": 2269,
+      "last_modified": "2026-05-18"
+    },
+    {
+      "topic_path": "SSFKSJ_9.4.0/refdev/q104010_.html",
+      "sha256": "1850f980026cfb9df70bae1de0169055f473f921284853f0ca315afbccbcf921",
+      "bytes": 4079,
+      "last_modified": "2026-05-18"
+    }
+  ]
+}

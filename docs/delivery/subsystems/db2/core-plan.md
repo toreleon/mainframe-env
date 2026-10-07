@@ -2,14 +2,13 @@
 
 Subsystem: **db2**
 Phase: **core**
-Target release: **0.12.0**
 
 Status: **Proposed**
-Start gate: 0.2 catalog/handler contracts, 0.4 COBOL host ABI, and 0.5 SAF frozen
+Start gate: coverage.foundation catalog/handler contracts, cobol.execution COBOL host ABI, and racf.security SAF frozen
 Completion dependencies: coverage.foundation, cobol.execution, racf.security
 Estimate: 24–36 engineer-months
 
-The [common release contract](../README.md#common-release-contract) and
+The [common release contract](../README.md#shared-validation-contract) and
 [hardened slice acceptance](../../../prompts/subsystems/README.md#hardened-slice-acceptance)
 apply, including early participant-contract and licensed-harness preparation.
 These requirements do not themselves certify implementation or waive an exit gate.
@@ -58,9 +57,9 @@ prohibited dispatch and a zero-prohibited-dispatch ratchet. Application schemas,
 rows, packages and privileges continue to enter through versioned packages.
 
 Before broad DB2-1203 execution, DB2-1201/DB2-1202 must freeze exact common and
-0.13-deferred row/obligation sets against the pinned 174-row catalog: 158 SQL
+db2.programming-deferred row/obligation sets against the pinned 174-row catalog: 158 SQL
 headings plus 16 SQL PL rows. Preserve every mandatory obligation, source locator
-and owner. Recognition covers the full pinned set; execution credit in 0.12 is
+and owner. Recognition covers the full pinned set; execution credit in db2.core is
 limited to the frozen common subset. A partially implemented row remains partial;
 do not choose the common subset retrospectively from passing tests. Hand every
 remaining obligation to DB2-1301 without reducing the official denominator.
@@ -69,10 +68,10 @@ remaining obligation to DB2-1301 without reducing the official denominator.
 
 The parser, catalog/binder, relational executor, host ABI, and application-data
 migration can run as separate cohorts after AST and diagnostic schemas freeze.
-Parser/catalog preparation may begin after 0.2, while host integration waits
-for 0.4 and authorization integration waits for 0.5.
+Parser/catalog preparation may begin after coverage.foundation, while host integration waits
+for cobol.execution and authorization integration waits for racf.security.
 
-0.12 can run alongside 0.8, 0.9, 0.14, and 0.15. Shared transaction behavior
+db2.core can run alongside jes.execution, cics.application-api, ims.programming, and mq.programming. Shared transaction behavior
 must use the common effect/UOW contract rather than a Db2-private shortcut.
 
 ## Exit gate
@@ -89,4 +88,4 @@ must use the common effect/UOW contract rather than a Db2-private shortcut.
 ## Non-goals
 
 - Completion of every advanced Db2 13 row; advanced SQL, objects, utilities,
-  packages, and distributed behavior finish in 0.13.
+  packages, and distributed behavior finish in db2.programming.

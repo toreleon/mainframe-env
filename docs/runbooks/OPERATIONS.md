@@ -6,6 +6,25 @@ The `core-server` remains a development composition rather than a turnkey
 production service. Its startup inputs and health boundary are nevertheless
 explicit and fail closed.
 
+For local compilation without a server, use [getting started](../guides/GETTING-STARTED.md).
+For hosted execution, select a store/artifact pairing, supply secret references,
+complete first-administrator bootstrap, and inspect readiness before submitting
+work. All Cargo examples below run from the repository root.
+
+```mermaid
+flowchart TB
+    toml["TOML configuration"] --> env["Supported environment overrides"]
+    env --> flags["Named CLI overrides"]
+    flags --> validate["Validate bounds, references and profile pairing"]
+    validate --> store["Open selected state and artifact authorities"]
+    store --> bootstrap["Validate or complete first-administrator bootstrap"]
+    bootstrap --> listener["Start listener and bounded workers"]
+    listener --> info["GET /zosmf/info"]
+    info --> ready{"All readiness components pass?"}
+    ready -->|yes| admission["Ready for admission"]
+    ready -->|no| diagnostics["Inspect reported component failures"]
+```
+
 ## Current operational limitations
 
 - `ProductServer::metrics()` is an in-process API; the standalone binary does
@@ -83,6 +102,11 @@ not resolve it. Password changes use the authenticated RACF path, not bootstrap.
 ## Local SQLite smoke start
 
 Create a protected password file and use the sample configuration's reference:
+
+`/secure/admin-password.bin` is a placeholder for a protected file you provision
+with a credential satisfying the RACF policy. Do not commit it. The checked-in
+default selects PostgreSQL and TLS; the overrides below deliberately select
+local SQLite and loopback HTTP for this development smoke start.
 
 ```bash
 export MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN="$(base64 < /secure/admin-password.bin)"

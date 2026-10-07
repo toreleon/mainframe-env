@@ -52,3 +52,7 @@ and idempotency identity; capability resolution is deterministic; official and
 custom semantic namespaces cannot overlap; and no generated identity installs a
 handler. Verify with `cargo test -p mainframe-env-host-api` and
 `cargo xtask semantic-identities --check`.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

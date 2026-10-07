@@ -6,7 +6,7 @@ Owner: `mainframe-env-host-api` contracts and `mainframe-env-mq` provider
 
 Scope: MQI denominator, source provenance, host context and semantic authority
 
-Applies from: mainframe-env 0.15.0
+Applies from: mainframe-env mq.programming
 
 ## Finite local-type inquiry contract
 
@@ -47,17 +47,17 @@ advanced by contract fixtures. No queue engine or authorization boundary changes
 
 ## Denominator and provenance
 
-The immutable 0.2 official catalog defines 26 unique IBM MQ 9.4 MQI calls.
+The immutable coverage.foundation official catalog defines 26 unique IBM MQ 9.4 MQI calls.
 The pinned source call list displays 27 rows because it lists `MQMHBUF` twice.
 That duplicate is retained as source provenance and never increments coverage.
 
-`conformance/0.15/mq/source-call-list.json` records the 27 positions, their
+`conformance/subsystems/mq/mq/source-call-list.json` records the 27 positions, their
 normalized official rows, and the exact pinned call-list topic. The generated
 `MqMqiCallIdentityDescriptor` registry joins those positions to the per-call
 topic paths and SHA-256 pins in the immutable MQ topic manifest. The registry
 is identity-only: it neither selects a handler nor advertises execution.
 
-`conformance/0.15/mq/structure-status-catalog.json` adds the ordered,
+`conformance/subsystems/mq/mq/structure-status-catalog.json` adds the ordered,
 source-bound signatures for the same 26 calls. The generated host API exposes
 169 parameter descriptors with structure and version symbols, options,
 selectors, completion and reason families, and handle roles. All 26 pinned
@@ -471,7 +471,7 @@ all-26 structure/option/ABI/service integration stays required.
 
 `mq-point-layout-sources` separately registers twelve retained MQ 9.4 topics under
 `ibm-mq-9.4-point-layout-sources-2026-09-12`. Its topic-manifest@1 and the shared
-0.15 registry bind exact bytes, topic-set digest, product and zero-credit scope.
+mq.programming registry bind exact bytes, topic-set digest, product and zero-credit scope.
 MQOD and MQMO constants, CCSID, expiry, message type and priority constants,
 elementary data types, COBOL declarations, structure alignment, COBOL COPY
 conventions and binary/machine encoding references supply missing sources for
@@ -863,7 +863,7 @@ execution, licensed or official-call credit. Native compiled forwarding and all
 remaining parent acceptance remain required.
 
 The MQ-1506 licensed adapter at
-`conformance/0.15/oracles/mq-licensed-differential.json` binds the 26-call
+`conformance/subsystems/mq/oracles/mq-licensed-differential.json` binds the 26-call
 denominator to independent fixture identities and a bounded external receipt.
 Its verifier requires an authorized IBM MQ 9.4 environment, exact service and
 candidate identities, distinct product and oracle runners, normalized

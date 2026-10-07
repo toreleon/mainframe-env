@@ -470,11 +470,21 @@ def check_provider_codecs(root: Path) -> None:
             "CICS_NESTED_EFFECT_ORIGIN_BINDING",
             "CICS_OUTER_EFFECT_ORIGIN_BINDING",
             "fn reject_reserved_nested_origin(",
+            "HostProblem::UnknownOutcome",
+        ),
+        production=True,
+    )
+    require(
+        root / "crates/providers/mainframe-env-cics/src/handlers/host_boundary.rs",
+        (
             "fn invocation_with_nested_origin(",
-            "invocation.bindings.len().saturating_add(2)",
+            "reject_reserved_nested_origin(invocation)?",
+            "saturating_add(2 + usize::from(needs_context))",
+            'bindings.contains_key("cics.execution-context")',
+            '"mainframe-env.cics.execution-context@1"',
+            'b"local".to_vec()',
             "key.as_str().as_bytes().to_vec()",
             "outer_effect_key.as_bytes().to_vec()",
-            "HostProblem::UnknownOutcome",
         ),
         production=True,
     )

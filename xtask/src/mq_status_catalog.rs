@@ -4,8 +4,8 @@ use crate::{TaskResult, json, require, validate_schema_instance};
 use std::path::Path;
 use std::process::Command;
 
-const SCHEMA: &str = "conformance/0.15/schemas/mq-completion-reason-catalog.schema.json";
-const CATALOG: &str = "conformance/0.15/mq/completion-reason-catalog.json";
+const SCHEMA: &str = "conformance/subsystems/mq/schemas/mq-completion-reason-catalog.schema.json";
+const CATALOG: &str = "conformance/subsystems/mq/mq/completion-reason-catalog.json";
 
 pub(super) fn check(root: &Path) -> TaskResult {
     let catalog_path = root.join(CATALOG);

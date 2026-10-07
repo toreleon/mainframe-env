@@ -3,14 +3,14 @@
 Status: **Implemented**
 Owner: **CICS provider maintainers**
 Scope: **source-reviewed application-command contracts, generated registry shapes, and existing provider routes**
-Applies from: **mainframe-env 0.9.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 ## Authorities
 
 The readable identity authority is
-[`command-descriptors.json`](../../conformance/0.9/cics/command-descriptors.json),
+[`command-descriptors.json`](../../conformance/subsystems/cics/application/cics/command-descriptors.json),
 validated by
-[`cics-command-descriptors.schema.json`](../../conformance/0.9/schemas/cics-command-descriptors.schema.json).
+[`cics-command-descriptors.schema.json`](../../conformance/subsystems/cics/application/schemas/cics-command-descriptors.schema.json).
 Its `application_catalog` contains the 263 mandatory `api-commands` row IDs,
 official labels and two-byte EIB function codes. The separate `runtime`
 collection retains 23 API operations and two explicit SPI compatibility
@@ -20,18 +20,18 @@ operations application-registry routes.
 Objective command facts come from digest-pinned IBM CICS TS 6.x HTML, divided
 into three disjoint source authorities:
 
-- `sources-a` covers rows `0001`–`0088`: [map](../../conformance/0.9/cics/application-api-sources-a-map.json),
-  [corpus](../../conformance/0.9/cics/application-api-sources-a-corpus.json),
-  [projection](../../conformance/0.9/generated/cics-application-api-sources-a-candidates.json),
-  and [review](../../conformance/0.9/cics/application-api-sources-a-review.json).
-- `sources-b` covers rows `0089`–`0176`: [map](../../conformance/0.9/cics/application-api-sources-b-map.json),
-  [corpus](../../conformance/0.9/cics/application-api-sources-b-corpus.json),
-  [projection](../../conformance/0.9/generated/cics-application-api-sources-b-candidates.json),
-  and [review](../../conformance/0.9/cics/application-api-sources-b-review.json).
-- `sources-c` covers rows `0177`–`0263`: [map](../../conformance/0.9/cics/application-api-sources-c-map.json),
-  [corpus](../../conformance/0.9/cics/application-api-sources-c-corpus.json),
-  [projection](../../conformance/0.9/generated/cics-application-api-sources-c-candidates.json),
-  and [review](../../conformance/0.9/cics/application-api-sources-c-review.json).
+- `sources-a` covers rows `0001`–`0088`: [map](../../conformance/subsystems/cics/application/cics/application-api-sources-a-map.json),
+  [corpus](../../conformance/subsystems/cics/application/cics/application-api-sources-a-corpus.json),
+  [projection](../../conformance/subsystems/cics/application/generated/cics-application-api-sources-a-candidates.json),
+  and [review](../../conformance/subsystems/cics/application/cics/application-api-sources-a-review.json).
+- `sources-b` covers rows `0089`–`0176`: [map](../../conformance/subsystems/cics/application/cics/application-api-sources-b-map.json),
+  [corpus](../../conformance/subsystems/cics/application/cics/application-api-sources-b-corpus.json),
+  [projection](../../conformance/subsystems/cics/application/generated/cics-application-api-sources-b-candidates.json),
+  and [review](../../conformance/subsystems/cics/application/cics/application-api-sources-b-review.json).
+- `sources-c` covers rows `0177`–`0263`: [map](../../conformance/subsystems/cics/application/cics/application-api-sources-c-map.json),
+  [corpus](../../conformance/subsystems/cics/application/cics/application-api-sources-c-corpus.json),
+  [projection](../../conformance/subsystems/cics/application/generated/cics-application-api-sources-c-candidates.json),
+  and [review](../../conformance/subsystems/cics/application/cics/application-api-sources-c-review.json).
 
 Each batch binds a topic manifest and extraction plan to content-addressed HTML
 bodies in `$MAINFRAME_ENV_IBM_DOCS_CACHE`. Fresh bodies are obtained through the
@@ -44,9 +44,9 @@ human-only approval gate. Source projection and review alone grant no coverage,
 semantic, execution or differential credit.
 
 The semantic authority produced from all three accepted reviews is
-[`cics-application-command-contracts.json`](../../conformance/0.9/generated/cics-application-command-contracts.json),
+[`cics-application-command-contracts.json`](../../conformance/subsystems/cics/application/generated/cics-application-command-contracts.json),
 validated by its
-[`schema`](../../conformance/0.9/schemas/cics-application-command-contracts.schema.json).
+[`schema`](../../conformance/subsystems/cics/application/schemas/cics-application-command-contracts.schema.json).
 It freezes a 263-row contract across grammar, option legality and direction,
 bounds, resource and capability intent, EIB/RESP/RESP2 and conditions,
 applicability, effect, cancellation, audit and recovery. Its status is
@@ -73,9 +73,9 @@ split:
 - 79 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The now-empty raw compatibility set remains owned by the separate versioned
-[`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
+[`legacy-execution-options.json`](../../conformance/subsystems/cics/application/cics/legacy-execution-options.json)
 catalog and its
-[`schema`](../../conformance/0.9/schemas/cics-legacy-execution-options.schema.json).
+[`schema`](../../conformance/subsystems/cics/application/schemas/cics-legacy-execution-options.schema.json).
 It binds the logical 263-row application identity digest, not the physical
 descriptor file, so runtime-readiness edits cannot invalidate frozen IBM
 source receipts. The generator requires its route identities to match the
@@ -581,13 +581,13 @@ pre-existing raw `Inquire` route; it is bound to SPI row `0155`, excluded from
 the 263-row registry and its digest, and does not admit `SET FILE`, other
 `INQUIRE` forms, or unknown options. The two retained SPI compatibility
 operations otherwise remain confined to the separate legacy runtime
-collection; SPI/FEPI completion belongs to 0.10.
+collection; SPI/FEPI completion belongs to cics.system-api.
 
 A second generated, compiler-only compatibility descriptor
 (`toreleon/mainframe-env#177`) admits exactly a bare, non-MAP 3270-logical
 `SEND FROM(...)` -- with optional `LENGTH`, `RESP`, `RESP2` and flags `ERASE`,
 `NOHANDLE`, and no other options -- to the pre-existing raw `SendText` route
-the legacy runtime has executed since 0.1.1. It is bound to application row
+the legacy runtime has executed since profile.carddemo. It is bound to application row
 `0187`, whose own reviewed runtime operation (row `0192`, `SEND TEXT`) is
 `SendText`; every sibling `SEND *` form (`MAP`, `TEXT`, `CONTROL`, `PAGE`,
 `PARTNSET`) is an application discriminator and is excluded. Unlike the
@@ -618,7 +618,7 @@ CIC-901 is therefore an incremental, non-release architecture boundary. It
 freezes source-backed contracts and fail-closed registry shape so CIC-902 and
 later work can implement vertical semantic families on the shared runtime. It
 does not claim that 263 commands execute, satisfy conformance, pass licensed
-differentials, or make 0.9.0 release-ready.
+differentials, or make cics.application-api release-ready.
 
 ## Existing runtime families
 
@@ -746,16 +746,16 @@ their source-bounded semantics are implemented.
 ```bash
 python3 -B tools/generate_cics_descriptors.py --check
 python3 -B tools/generate_cics_source_map.py --batch all --check
-python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
-python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
-python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/fetch_cics_application_sources.py --batch all --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/subsystems/cics/application/tools/review_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/review_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/subsystems/cics/application/tools/review_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
 python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
 cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 cargo xtask architecture-fast --check

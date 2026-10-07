@@ -3,7 +3,7 @@
 Status: **Proposed**
 Owner: **IMS provider maintainers**
 Scope: **IMS-1403.ssa-last-direct-child, bounded local runtime leaf**
-Applies from: **mainframe-env 0.14.0 development**
+Applies from: **mainframe-env current subsystem contracts**
 
 The existing SSA provider rejects L. Admit only DbBatch GNP/GHNP with one
 unqualified terminal direct-child SSA and exactly one active L command. The
@@ -78,4 +78,4 @@ retain an appropriate reader or restore a coherent pre-feature backup of databas
 session, undo, checkpoint, replay, package, journal and audit references. Do not
 rewrite live receipts or fabricate position/history to resume L. Local Memory and
 SQLite proofs, including cold processes and actual CHKP/XRST, grant no PostgreSQL,
-HUMAN, official, licensed, accepted-IR, full IMS-1403/IMS-1401 or v0.14 completion.
+HUMAN, official, licensed, accepted-IR, full IMS-1403/IMS-1401 or ims.programming completion.

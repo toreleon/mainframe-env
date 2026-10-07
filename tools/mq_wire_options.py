@@ -6,12 +6,12 @@ from pathlib import Path
 import re
 import sys
 
-CATALOG = Path('conformance/0.15/mq/structure-status-catalog.json')
-MANIFEST = Path('conformance/0.15/manifests/mq-programming-supplements-topics.json')
+CATALOG = Path('conformance/subsystems/mq/mq/structure-status-catalog.json')
+MANIFEST = Path('conformance/subsystems/mq/manifests/mq-programming-supplements-topics.json')
 OUTPUT = Path('crates/contracts/mainframe-env-host-api/src/mq_wire_options/generated.rs')
-HISTORICAL_SHA = '3dc77d004bd79ad7f6daa99ffb4a3fb958ff1d816cb6c33bc4b6bac794a23448'
+HISTORICAL_SHA = '7ff640ea64ade031e55848bd6de0788b1d70471ea9a5a34df158e43390eb6332'
 # Immutable reviewed projection fixture; numeric authority remains the catalog.
-PROJECTION_SHA = '4d55b1d825762ff4319215185fb240513ab97b0b9b8ff25192b1b0bab12b9d1c'
+PROJECTION_SHA = '6beeeed2df4af4e03edb9e7691bd14ff7b4074ca968201119dee0f320f2668c7'
 
 
 def read_json(path):
@@ -30,7 +30,7 @@ def read_json(path):
 def historical_sha(path):
     raw = path.read_bytes()
     catalog = read_json(path)
-    keys = {'schema_version', 'target_version', 'work_package', 'baseline_id',
+    keys = {'schema_version', 'target_subsystem', 'work_package', 'baseline_id',
             'topic_manifest', 'source_call_list', 'unique_call_count',
             'verified_call_topic_count', 'missing_call_topic_count',
             'identity_authority', 'behavioral_coverage_credit', 'licensed_execution_credit', 'calls'}

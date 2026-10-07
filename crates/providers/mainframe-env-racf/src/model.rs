@@ -1747,7 +1747,7 @@ mod tests {
 
     fn compiled_schema(name: &str) -> jsonschema::Validator {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../conformance/0.5/schemas")
+            .join("../../../conformance/subsystems/racf/schemas")
             .join(name);
         let schema: serde_json::Value =
             serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();

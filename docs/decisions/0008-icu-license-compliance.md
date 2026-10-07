@@ -3,7 +3,7 @@
 Status: **Accepted by repository owner**
 Owner: **repository owner**
 Scope: **locked ICU dependency approval and release license notices**
-Applies from: **mainframe-env 0.8.3 development**
+Applies from: **mainframe-env current subsystem contracts**
 Date: **2026-09-08**
 
 ## Context
@@ -15,7 +15,7 @@ decision, `deny.toml` did not allow ICU, so `cargo deny check` failed, and the
 release receipt generator listed SPDX expressions without shipping complete
 license and notice texts.
 
-The repository owner explicitly requested closure of the pre-0.9 review
+The repository owner explicitly requested closure of the subsystem review
 findings, including retaining and documenting this dependency. This ADR records
 that repository distribution decision. It is not a representation that
 external legal advice was obtained.

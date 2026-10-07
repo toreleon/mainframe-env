@@ -8,3 +8,7 @@ The provider never receives dataset/RACF internals or a UI/rendering authority.
 The package owns the versioned Apache-2.0 DFHAID and DFHBMSCA behavioral
 compatibility source members. Consumers opt into this ABI library explicitly;
 catalog presence grants no CICS semantic coverage credit.
+
+## Documentation
+
+[Documentation portal](../../../docs/README.md) · [Current package map](../../../docs/architecture/PACKAGE-MAP.md) · [Embedding guide](../../../docs/guides/EMBEDDING.md) · [Contribution and verification](../../../CONTRIBUTING.md)

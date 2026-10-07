@@ -121,7 +121,7 @@ class CicsDescriptorTests(unittest.TestCase):
             cics_descriptors.CATALOG_PATH,
             cics_descriptors.LEGACY_EXECUTION_CATALOG_PATH,
             cics_descriptors.TYPED_EXECUTION_REGISTRATIONS_PATH,
-            Path("conformance/0.2/catalogs/cics.json"),
+            Path("conformance/subsystems/coverage/catalogs/cics.json"),
         ]:
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -1803,7 +1803,7 @@ class CicsDescriptorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.fixture(root)
-            official_path = root / "conformance/0.2/catalogs/cics.json"
+            official_path = root / "conformance/subsystems/coverage/catalogs/cics.json"
             official = json.loads(official_path.read_text())
             api = next(unit for unit in official["units"] if unit["id"] == "api-commands")
             api["rows"][192]["source_locator"] = (

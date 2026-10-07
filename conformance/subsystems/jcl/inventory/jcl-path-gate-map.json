@@ -1,0 +1,112 @@
+{
+  "schema_version": "mainframe-env.jcl-path-gate-map@1",
+  "target_subsystem": "jcl.planning",
+  "default_policy": "fail-closed",
+  "mappings": [
+    {
+      "id": "converter-planner",
+      "affected_path_patterns": [
+        "crates/apps/mainframe-env-batch/src/jcl*.rs"
+      ],
+      "contracts": [
+        "lossless-source-and-diagnostic-contracts",
+        "immutable-jcl-job-plan",
+        "bounded-expansion-and-capabilities"
+      ],
+      "required_gates": [
+        "cargo test -p mainframe-env-batch --locked",
+        "cargo xtask jcl-exit --check",
+        "cargo clippy -p mainframe-env-batch --all-targets --all-features --locked -- -D warnings"
+      ]
+    },
+    {
+      "id": "catalog-generation",
+      "affected_path_patterns": [
+        "conformance/subsystems/jcl/catalogs/*.json",
+        "conformance/subsystems/jcl/generated/*",
+        "crates/apps/mainframe-env-batch/src/generated/*",
+        "docs/generated/jcl-*",
+        "xtask/src/jcl_catalog.rs"
+      ],
+      "contracts": [
+        "reviewed-official-catalog",
+        "generated-typed-identities",
+        "planner-closure"
+      ],
+      "required_gates": [
+        "cargo xtask jcl-catalog --check",
+        "cargo xtask schemas --check",
+        "cargo test -p mainframe-env-batch --locked"
+      ]
+    },
+    {
+      "id": "conformance-ir-bindings",
+      "affected_path_patterns": [
+        "conformance/spec/v1/spec.json",
+        "conformance/subsystems/jcl/fixtures/*",
+        "crates/tooling/mainframe-env-conformance/src/jcl.rs",
+        "xtask/src/jcl_conformance.rs"
+      ],
+      "contracts": [
+        "shared-conformance-ir-v1",
+        "typed-runtime-registry",
+        "obligation-verdict-and-derived-ledger"
+      ],
+      "required_gates": [
+        "cargo xtask jcl-conformance --check",
+        "cargo xtask spec --check",
+        "cargo xtask conformance --subsystem jcl-jes2 --check",
+        "cargo test -p mainframe-env-conformance --locked"
+      ]
+    },
+    {
+      "id": "carddemo-compatibility",
+      "affected_path_patterns": [
+        "crates/tooling/mainframe-env-conformance/src/carddemo.rs"
+      ],
+      "contracts": [
+        "pinned-carddemo-corpus",
+        "legacy-semantic-plan-projection"
+      ],
+      "required_gates": [
+        "CARDDEMO_CORPUS_DIR=<pinned-clean-corpus> cargo xtask carddemo-jcl --check",
+        "cargo test -p mainframe-env-conformance --locked"
+      ]
+    },
+    {
+      "id": "schema-oracle-inventory",
+      "affected_path_patterns": [
+        "conformance/subsystems/jcl/schemas/*.json",
+        "conformance/subsystems/jcl/oracles/*.json",
+        "conformance/subsystems/jcl/inventory/*.json"
+      ],
+      "contracts": [
+        "draft-2020-12-artifacts",
+        "licensed-differential-policy",
+        "declared-dependency-graph"
+      ],
+      "required_gates": [
+        "cargo xtask schemas --check",
+        "cargo xtask architecture --check",
+        "cargo xtask jcl-exit --check"
+      ]
+    },
+    {
+      "id": "workspace-integration",
+      "affected_path_patterns": [
+        "Cargo.lock",
+        "crates/tooling/mainframe-env-conformance/Cargo.toml",
+        "xtask/src/main.rs"
+      ],
+      "contracts": [
+        "workspace-dependency-closure",
+        "minor-aggregate-conformance-gate"
+      ],
+      "required_gates": [
+        "cargo test --workspace --all-features --locked --no-fail-fast",
+        "cargo xtask conformance --check",
+        "cargo xtask architecture --check"
+      ]
+    }
+  ]
+}
