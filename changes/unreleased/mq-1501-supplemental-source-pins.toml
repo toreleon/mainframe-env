@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "added"
-summary = "Registered a separate zero-credit offline scope for 80 retained MQ 9.4 programming supplements through the shared 0.15 source registry; immutable call pins and pending status declarations remain unchanged, with independent semantic review still required."
+summary = "Register a separate zero-credit offline scope for 80 retained MQ 9.4 programming supplements through the shared subsystem source registry; immutable call pins and pending status declarations remain unchanged, with independent semantic review still required."

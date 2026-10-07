@@ -3,7 +3,7 @@
 Subsystem: **jcl**
 Phase: **planning**
 
-Status: **JCL-701 through JCL-706 complete; phase exit gate passed**
+Status: **Local converter/planner implementation complete; licensed differential pending**
 
 The isolated implementation lane starts from accepted CI-300 repair commit
 `7d50310381a44878c23c51c38aed841e3a70347f` on branch `impl/0.7.0`. The

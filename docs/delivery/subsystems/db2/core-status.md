@@ -3,7 +3,26 @@
 Subsystem: **db2**
 Phase: **core**
 
-Status: **In progress — second/third-wave pure surfaces sealed; catalog/binder and execution pending**
+Status: **Bounded syntax, type/value and column-default surfaces implemented; generic binder/catalog/execution acceptance pending**
+
+## Current implementation and remaining acceptance
+
+The public provider exports bounded SELECT and common DDL/DML/cursor/dynamic
+syntax, schema qualification, scalar type compatibility, exact numeric/string
+literal and assignment proofs, finite DECFLOAT assignment, arithmetic/result
+metadata, three-valued predicate outcomes, and column-only CREATE TABLE default
+binding. The existing signed static-SQL service remains available. These pure
+surfaces are not connected to a complete generic SQL binder/execution engine.
+See the [provider surface](../../../../crates/providers/mainframe-env-db2/README.md).
+
+DB2-1201 and DB2-1202 are in progress; the old proposed/private-only and
+unimplemented-wave descriptions below refer to earlier producing inputs.
+Whole-row closure, complete catalog/privilege binding, relational execution,
+runtime values/default producers, SQLCA and transaction/backend matrices remain
+incomplete. DB2-1203 through DB2-1206 are pending at that full-scope boundary.
+The [programming phase](programming-status.md) remains blocked on this core
+acceptance dependency. Source/catalog preparation and private harness fixtures
+grant zero whole-row or licensed credit.
 
 This recovery slice starts from `origin/main` commit `26437e2c`. This file is
 program control, not product conformance or licensed execution evidence.
@@ -1220,8 +1239,8 @@ common/deferred freeze remain pending until matching bodies are available.
 
 | Work package | State | Slices / next boundary |
 |---|---|---|
-| DB2-1201 | proposed | Reuse observations, official statement identities, owned lexer, AST primitives, transaction syntax, host references, common dynamic syntax, common expressions, prepared cursor syntax, SELECT core, and common CREATE TABLE syntax recovered; fullselect and inline cursor syntax, full dynamic obligations, catalog freeze, remaining statement parsers and SQLCA diagnostics pending |
-| DB2-1202 | proposed | Common type compatibility and public type surface recovered; binder, names, functions, expression binding, privileges, result-type inference, and remaining limits pending |
+| DB2-1201 | in progress | Bounded public syntax surfaces implemented; complete statement/SQLCA obligations and common/deferred catalog freeze pending |
+| DB2-1202 | in progress | Bounded public type/value, qualification and column-default surfaces implemented; complete names/functions/privileges and expression/catalog binding pending |
 | DB2-1203 | pending | relational IR, generic query/DML/DDL, constraints, indexes, views |
 | DB2-1204 | pending | transaction/isolation, cursor/dynamic/static SQL, COBOL ABI, SQLCA, package/plan |
 | DB2-1205 | pending | common DDL and bounded SQL PL routines/control flow |
@@ -1233,10 +1252,10 @@ common/deferred freeze remain pending until matching bodies are available.
   the resumed source-availability record, rather than the historical 27. This blocks semantic
   changes for those rows and the final common/deferred freeze, not unrelated
   parser/catalog infrastructure.
-- The repinned numeric-constants introduction is available and reviewed, but
-  the recovered lexer/expression fences have not been lifted by a declared
-  numeric slice. Float/decfloat forms remain rejected and integer/decimal tokens
-  carry no numeric semantics here.
+- Numeric literal classification, exact INTEGER/BIGINT/DECIMAL values,
+  assignment and finite DECFLOAT conversion are now implemented through their
+  dedicated public surfaces. These proofs do not lift the general expression
+  parser's floating fences or implement SQL evaluation and runtime cells.
 - No pinned licensed Db2 13 oracle receipt is present. Differential remains
   pending and db2.core cannot pass its exit gate without the required environment.
 - The early shared participant contract must be audited before DB2-1204 mutating

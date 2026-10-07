@@ -56,67 +56,49 @@ Source review and generated case candidates are not licensed execution evidence.
 
 ## Checks and remaining obligations
 
-Original private PROGRAM security preparation produced 11 passing tests/70 fixture
-iterations; SQLite helper preparation produced five passing tests; scoped
-SYNCPOINT consumption produced six passing tests/30 scoped verdicts. These are
-original scoped producers, not a full current-candidate suite. Current integration
-checks must be recorded separately after reconciliation with main.
+Private PROGRAM security and SQLite helper preparation retain their original
+bounded scope. The [PR #389 integration review](https://github.com/toreleon/mainframe-env/pull/389)
+verified 35 focused runtime tests, including 18 LINK attestations, seven transfer
+intents and six compiled SYNCPOINT consumption/ledger cases with a fresh
+same-builder export. The remaining four tests cover retained IMS/MQ behavior.
+These are scoped results on the reviewed integration inputs, not full CICS
+application or SPI/FEPI acceptance.
 
 All public command behavior, complete lifecycle/authorization/concurrency,
 quiesce/drain/restart matrices, broader backend compatibility and required
 licensed differentials remain pending. No licensed runner is configured;
 differential=pending, credit=0. The parent is not sealed from partial children.
 
-## Declared integration ownership
+## Integration status
 
-SPI-1001.origin-main-sync: reconcile PR389 with origin/main
-8acfd9875a25ecc3d10459abd2da9f12a490d1f3. Follow current subsystem paths,
-framework documentation and public package baseline. Do not restore VERSION,
-release/evidence management, version-number conformance directories or retired
-release commands. Source product/API versions and schema wire identities remain
-meaningful and must not be blindly removed.
+PR #389 is merged. The source preparation, existing-authority conflict
+reconciliation, cache tooling and review repairs are present on main. The review
+corrected AMS source citations, removed three unused IMS/MQ implementation/test
+copies and removed two redundant effect-limit conversions. This integration
+preserves upstream MQ/IMS/Db2/CardDemo authorities and the public package baseline;
+it does not complete SPI-1001 or admit public SPI/FEPI execution.
 
-Manager owns docs, tools, xtask, conformance schemas/catalogs/generators and the
-integration index. CLI author 01a0ff99-3347-7380-a417-5b54c817e32e owns Rust
-conflict reconciliation under crates/ only in a separate worktree from the same
-merge inputs. Preserve upstream MQ/IMS/Db2/CardDemo changes and this PR's CICS
-frame/storage/private PROGRAM semantics; compose existing authorities. No import
-of unsealed borrowed-control work, new runtime admission, policy waiver, source
-refresh, license execution, push/PR/merge commit by the author or extra workers.
+Source product/API versions and schema wire identities remain meaningful.
+Current subsystem paths own conformance inputs; release/version history and
+execution receipts remain outside the repository management model.
 
-Author focused compilation/proof and a reviewable whole owned diff precede manager
-import. Manager resolves current-path references, regenerates owner-derived
-files and runs affected tests plus mandatory policy/schema/format/docs/module
-checks. Different CLI review checks the final integration resolution. Preserve
-unrelated worktrees and required receipts externally; clean intended Cargo
-targets after build/test/generator sequences. Only a passing synchronized
-candidate is pushed to update draft PR389; no GitHub merge/release/deployment.
+## Cache provisioning status
 
-
-## Declared cache provisioning ownership
-
-SPI-1001.cache-provisioning adds external snapshot transport for existing pinned
-source bytes; it grants no grammar, runtime, conformance or licensed credit.
-The CLI author owns `conformance/tools/ibm_docs_snapshot.py` and its focused
-Python tests in an isolated worktree from 8c3e91b7400240b45889786ad528f89bbe2f777a.
-Manager owns the bounded snapshot locator, cache runbook, changelog fragment,
-public LFS metadata repository and serial integration. A separate CLI reviewer
-checks the integrated candidate. No IBM refresh, semantic changes, extra
-workers, upstream merge, release or deployment is authorized for this slice.
-Acceptance requires focused corruption/bounds/path/conflict regressions,
-synthetic LFS transport, fresh local snapshot import and shared cache verification, plus applicable
-policy/docs/changelog/format gates. Publication bodies stay outside this code
-repository. Unavailable scopes remain unavailable.
+`conformance/tools/ibm_docs_snapshot.py` implements bounded deterministic external
+snapshot packing/import for existing pinned source bytes. Corruption, bounds,
+path and conflict tests cover the tool. Provisioning grants no grammar, runtime,
+conformance or licensed credit. Publication bodies remain outside this repository;
+unavailable scopes remain unavailable.
 
 The cache repository is public for metadata and a synthetic transport fixture.
 Redistribution authorization for IBM publication bodies is unavailable; no IBM
 archive is uploaded. The real retained snapshot is tested locally with zero
 execution credit. Developers provision bytes they are authorized to use.
 
-The snapshot importer passed 20 focused synthetic regressions and imported
-849 entries into a fresh external cache; the shared reader verified all 848
-topics and one TOC across 18 registered CICS scopes. Public Git LFS transfer
-was reproduced with a project-created 173-byte archive. These are transport
+The original cache producer imported 849 entries and verified 848 topics and
+one TOC across 18 registered CICS scopes. The integration review passed all 20
+focused synthetic snapshot regressions. Public Git LFS transfer was previously
+reproduced with a project-created 173-byte archive. These are scoped transport
 checks, with semantic_authority=false and coverage_credit=0. The public
 metadata revision is d08efcb9849188abd2916aa9e7054eeefc159002; the corresponding
 CICS archive remains local-only. Required CICS behavior gates stay pending.
@@ -124,3 +106,9 @@ CICS archive remains local-only. Required CICS behavior gates stay pending.
 Application review supplements pinned outside the shared registered scopes are
 not included in this snapshot. Existing verified supplement cache entries remain
 required for the architecture/source-review gates.
+
+The current workspace lacks the application-review body
+`SSJL4D_6.x/applications/designing/dfhp37p.html`; source freshness remains
+unavailable here. Supply authorized matching cache bytes through the
+[cache runbook](../../../runbooks/IBM-DOCS-CACHE.md) before claiming that gate
+passed. No ordinary review refresh or source waiver is implied.

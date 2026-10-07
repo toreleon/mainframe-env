@@ -24,7 +24,7 @@ workload-specific inputs live in `conformance/profiles/<name>/`.
 | CICS | SPI and FEPI | [Plan](cics/system-api-plan.md) | [Progress](cics/system-api-status.md) |
 | z/OSMF | REST portfolio | [Plan](zosmf/rest-plan.md) | [Progress](zosmf/rest-status.md) |
 | Db2 | Engine and common SQL | [Plan](db2/core-plan.md) | [Progress](db2/core-status.md) |
-| Db2 | Complete programming surface | [Plan](db2/programming-plan.md) | No progress record |
+| Db2 | Complete programming surface | [Plan](db2/programming-plan.md) | [Progress](db2/programming-status.md) |
 | IMS | DB / TM programming surface | [Plan](ims/programming-plan.md) | [Progress](ims/programming-status.md) |
 | IBM MQ | MQI programming surface | [Plan](mq/programming-plan.md) | [Progress](mq/programming-status.md) |
 | Cross-resource integration | Transactions and recovery | [Plan](integration/transactions-plan.md) | [Progress](integration/transactions-status.md) |

@@ -556,6 +556,10 @@
           "path": "docs/delivery/IMPLEMENTATION-STATUS.md"
         },
         {
+          "label": "Unreleased changes and remaining work",
+          "path": "docs/delivery/UNRELEASED-STATUS.md"
+        },
+        {
           "label": "Verification strategy",
           "path": "docs/delivery/VERIFICATION-STRATEGY.md"
         },
@@ -833,6 +837,7 @@
           "id": "programming",
           "label": "Complete programming surface",
           "plan": "docs/delivery/subsystems/db2/programming-plan.md",
+          "status": "docs/delivery/subsystems/db2/programming-status.md",
           "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md",
           "dependencies": [
             "db2.core"

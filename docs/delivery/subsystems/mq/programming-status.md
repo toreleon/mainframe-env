@@ -3,7 +3,30 @@
 Subsystem: **mq**
 Phase: **programming**
 
-Status: **Implementation active**
+Status: **Bounded selected and installed MQI flows implemented; all 26 complete-call gates pending**
+
+## Current implementation and remaining acceptance
+
+Implemented scope includes the identity/structure/status contracts, pure
+object/delivery/property/pub-sub kernels, selected Memory/SQLite original-effect
+publication and replay, configured installed CONN/DISC and finite native
+OPEN/CLOSE/PUT/PUT1/GET forwarding, and bounded root terminal publication.
+Additional Batch transport, checked-read/replay and RFH2 prerequisites remain
+limited to their declared profiles; they do not enable general MQI dispatch.
+
+All 26 complete-call profiles retain mandatory Pending obligations in the shared
+Conformance IR. Participant admission, full lifecycle/concurrency/recovery,
+remaining structures/options, complete installed/JES composition and broader
+backend acceptance remain incomplete. MQINQ dispatch remains unavailable.
+The licensed oracle is human-skipped with zero credit; every other acceptance
+requirement remains in force.
+
+The configured native-point cold-connect regression
+`physical_reopen_genuine_cold_connect_fences_old_native_points_and_aliases`
+fails on the pre-PR389 main baseline as well as the reviewed PR. It remains a
+known failure, not a passing native recovery claim. Dated component results
+below retain their original scopes and do not establish a current full-suite
+pass. See [unreleased verification limits](../../UNRELEASED-STATUS.md#verification-limits).
 
 ## Authorization capture callback-lock prerequisite
 
@@ -1293,7 +1316,7 @@ review only and grants no conformance or licensed credit.
 | MQ-1503.message-handle-kernel | Complete slice | Registry-owned volatile HMSG lifetime, bounded typed properties and deterministic private buffer conversion |
 | MQ-1503.point-to-point-kernel | Complete slice | Bounded local delivery, browse/cursors, selection, truncation, grouping/segmentation, syncpoint/backout, expiry, uncertainty and strict restart snapshot |
 | MQ-1504.pubsub-kernel | Complete slice | Catalog-backed subscriptions, callback control, retained publication requests, trigger/delivery uncertainty, syncpoint staging and strict durable restart |
-| MQ-1505 recovery and public-route integration | Pending | Shared host request/result boundary, Memory/SQLite service wiring, SAF/status mapping, dead-letter/retry/recovery and licensed execution |
+| MQ-1505 recovery and public-route integration | In progress | Selected Memory/SQLite and configured installed flows implemented; complete dead-letter/retry/recovery, participant and public-route acceptance pending |
 
 Existing typed host routes support only the earlier open, get, put, put-one,
 close, commit and rollback compatibility operations. The remaining catalog

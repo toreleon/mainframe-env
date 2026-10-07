@@ -106,6 +106,7 @@ and every binding has deterministic replay.
 
 Blockers: none.
 
-Next executable step: run the tier-3 affected-scope repository validation once
-on the unchanged CB-306 completion candidate, then perform the normal full-phase
-push and pull-request handoff.
+Next executable step: run `cargo xtask cobol-exit --check` against the intended
+current candidate and evaluate the affected compatibility/diagnostic scope.
+The merged CB-306 implementation does not need another historical branch
+handoff; execution, recovery and licensed acceptance belong to their owning gates.
