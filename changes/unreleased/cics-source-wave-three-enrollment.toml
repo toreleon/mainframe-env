@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Enroll disjoint pinned SPI web and queue/storage source cohorts without administrative admission or execution credit."

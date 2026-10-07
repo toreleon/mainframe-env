@@ -354,14 +354,17 @@ def validate_cics_capabilities(capabilities: dict[str, Any]) -> None:
         },
         "CICS recovery declaration differs",
     )
+    schemas = object_field(capabilities, "schemas")
+    frame_writer = "uow_frame_write" in schemas
     require(
-        object_field(capabilities, "schemas")
+        schemas
         == {
             "request": "mainframe-env.cics.request@1",
             "canonical_effect": "mainframe-env.effect-canonical@1",
             "uow_namespace": "cics-uow",
             "uow_write": "MECU2",
-            "uow_read": ["MECU1", "MECU2"],
+            **({"uow_frame_write": "MECU3"} if frame_writer else {}),
+            "uow_read": ["MECU1", "MECU2", "MECU3"] if frame_writer else ["MECU1", "MECU2"],
             "undo_namespace": "cics-uow-undo",
             "undo_read_write": "MECUNDO1",
             "replay_namespace": "cics-effect-replay-v1",
@@ -484,6 +487,11 @@ def render_capabilities(value: dict[str, Any]) -> str:
     security = value["security_audit"]
     recovery = value["recovery"]
     schemas = value["schemas"]
+    frame_write = (
+        f"Some({rust_string(schemas['uow_frame_write'])})"
+        if "uow_frame_write" in schemas
+        else "None"
+    )
     retention = value["retention"]
     fields = [
         f"transaction_owner: {rust_string(value['transaction_owner'])}",
@@ -539,6 +547,7 @@ def render_capabilities(value: dict[str, Any]) -> str:
             f"canonical_effect: {rust_string(schemas['canonical_effect'])}, "
             f"uow_namespace: {rust_string(schemas['uow_namespace'])}, "
             f"uow_write: {rust_string(schemas['uow_write'])}, "
+            f"uow_frame_write: {frame_write}, "
             f"uow_read: {rust_slice(schemas['uow_read'], rust_string)}, "
             f"undo_namespace: {rust_string(schemas['undo_namespace'])}, "
             f"undo_read_write: {rust_string(schemas['undo_read_write'])}, "

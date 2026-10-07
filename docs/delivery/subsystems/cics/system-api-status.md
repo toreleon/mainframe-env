@@ -3,135 +3,124 @@
 Subsystem: **cics**
 Phase: **system-api**
 
-Status: **SPI-1001 identity foundation sealed; semantic source dependency
-blocked; SPI-1001 and cics.system-api remain Proposed**
+Status: **Source-backed private preparation implemented; public SPI/FEPI execution and licensed acceptance pending**
 
-- Branch: `codex/parallel-cics.system-api-spi1001`
-- Dependency candidate: `5ab706b1dd069e26db7cb9a2b66e921c9001fc39`
-- Dependency disposition: cics.application-api remains Proposed. Its shared CICS authorities are
-  available for private cics.system-api catalog/code-generation preparation, but no cics.system-api
-  runtime integration or public route is permitted.
-- Official baseline: `ibm-cics-ts-6x-2026-08-31`
-- Official catalog SHA-256:
-  `fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba`
-- IBM topic: `SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html`
-- IBM topic SHA-256:
-  `78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25`
-- IBM TOC SHA-256:
-  `f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a`
+## Current scope
 
-## Objective and boundary
+The official denominator is 269 SPI and 39 FEPI command identities. The private,
+non-routing grammar projection covers 266 SPI and 39 FEPI identities, 5,082
+operands, 8,947 case candidates and 62 numeric domains/217 records across 18
+family contracts. Source/projection counts earn no runtime credit: 0/269 SPI,
+0/39 FEPI accepted. SPI-1001 and cics.system-api remain incomplete.
 
-Seal the dependency-safe SPI-1001 identity foundation for all 269 unique SPI
-and 39 FEPI command identities. This slice may establish source identity,
-deduplication, schemas, generated catalogs, and a non-routing Rust registry.
-It must not infer grammar or behavior from command labels or EIBFN values,
-register handlers, advertise routes, mutate CICS state, or claim SPI-1001 or
-cics.system-api complete.
+The application dependency remains incomplete. CICSMESSAGE, GETNEXT TIMER and
+ISSUE COPY stay recorded as deferred/unready, including CICSMESSAGE internal
+execution obligations. Public SPI/FEPI routes are not admitted from preparation.
 
-The cics.application-api application registry, dynamic EIBRESP condition-name authority,
-resource/security policies, canonical effects, durable coordinator,
-persistence, storage, response mapping, and recovery ownership remain the only
-accepted shared authorities. The cics.system-api foundation references those authorities;
-it does not copy or replace them.
+## Implemented private preparation
 
-## Stable slices
+- Pinned SPI and FEPI command-topic maps, command-body manifests, source form
+  locators, family grammar/constraints, operand extents and numeric CVDA domains.
+- Existing shared logical CICS/COBOL program frame, selected-call provenance,
+  scoped storage/member reservation and terminal checkpoint prerequisites.
+- Private named-PROGRAM status observation, configured command/resource security
+  checks and SQLite reopen fixture preparation; source catalog row 0155.
+- Scoped READ/REWRITE/SYNCPOINT application contract consumption and canonical
+  conformance ledger export. This proof is limited to three application rows.
 
-| Slice | State | Dependency | Acceptance boundary |
-|---|---|---|---|
-| `SPI-1001.source-authority` | Pass (`e514061dc320566b735490be7a54c8d11d821ef8`) | Frozen coverage.foundation CICS catalog; exact retained IBM EIBFN topic and TOC | Verified topic/TOC bytes; preserves 273-to-269 SPI label deduplication, all alternate EIBFN identities, 39 FEPI rows, and the exact source normalization; every unproved semantic dimension is blocked with zero coverage credit |
-| `SPI-1001.catalog` | Pass (`789c6079c02a6581533431ceaac2e16c74396a76`) | `SPI-1001.source-authority` | Generated exactly 269 SPI and 39 FEPI identity records from the frozen catalog and reviewed source disposition; schema, freshness, malformed/foreign/duplicate/mutation checks pass; no handlers or routes |
-| `SPI-1001.generated-registry` | Pass | `SPI-1001.catalog` | Generated and compiled a typed non-routing registry; exact denominator and digest checks pass; every entry is identity-only, unadvertised, unregistered, and zero-credit; the cics.application-api registry/runtime surface is unchanged |
+These extend existing authorities; no shadow dispatcher/resource store or generic
+success handler is introduced. Deployed SAF policy, trusted issuer/namespace,
+typed output receiver and propagation of current cancellation/deadlines remain
+prerequisites. Direct helper or component tests do not close public acceptance.
 
-The parent `SPI-1001` remains pending. Its required grammar, options, resource
-schemas, condition mappings, lifecycle/context matrix, authorized intent,
-audit effects, concurrency, lock order, syncpoint, quiesce/drain, restart, and
-recovery bindings cannot be closed from the EIBFN inventory table.
+## Source authority
 
-## Source review
+Official catalog: ibm-cics-ts-6x-2026-08-31, SPI unique rows/FEPI identities.
+Body baselines: ibm-cics-ts-6x-spi-command-bodies-2026-09-12 and
+ibm-cics-ts-6x-fepi-command-bodies-2026-09-12. Retained matching publication
+bodies remain external; committed manifests carry only locators/hashes.
 
-Offline `ibm_docs.py search` and `read` verified the pinned topic and TOC. The
-topic states that EIBFN identifies the most recently issued command and that
-Table 3 lists SPI command names/function codes while Table 4 lists FEPI command
-names/function codes. The retained HTML at
-`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/html/sha256/78/78f90b09987b1a56da7cd9f0a2a36fa43a549966fa7dbeff2ad9608106ef7c25.html`
-is 265,761 bytes and matches the committed SHA-256. The retained TOC at
-`/Users/tore/Library/Caches/mainframe-env/ibm-docs-archive/raw/toc/sha256/f6/f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a.json`
-also matches its committed SHA-256.
+PROGRAM row spi-commands-unique:0155 uses
+SSJL4D_6.x/reference-system-programming/commands-spi/dfha8_inquireprogram.html,
+SHA-256 e3d8ed4c069bd26822c6373b35278ec126591e2efaf020b8fbcf8b811845f20f.
+Security reference uses baseline
+ibm-cics-ts-6x-application-api-sources-b-2026-09-10 and topic
+SSJL4D_6.x/reference-security/command-security-resource-reference.html,
+SHA-256 57539dc40fa06aa78da3b435a22c1955fa750d30a47f865341d9bc6e78417c8d,
+PROGRAM rows 306–310. Deployment classes/access/prefix policy remain configured.
 
-Table 3 has 273 raw rows and 269 unique normalized command labels. The four
-duplicate labels retain both source EIBFN identities: `INQUIRE NETNAME`
-(`5216`, `5206`), `INQUIRE SYSTEM` (`5402`, `5412`), `INQUIRE TERMINAL`
-(`5202`, `5212`), and `SET TERMINAL` (`5204`, `5214`). The frozen denominator
-uses the first table occurrence as its canonical row. Source row
-`spi-commands-unique:0192` prints `70 32`; the accepted catalog normalization
-removes only that embedded whitespace to retain `7032`. Table 4 has 39 raw and
-39 unique command labels. Shared EIBFN values in FEPI remain distinct official
-command identities and are never deduplicated by code.
+Three row/body joins remain unresolved: SPI0201 PERFORM SECURITY, SPI0203
+PERFORM SSL and SPI0204 PERFORM STATISTICS. Bodies exist, but reviewed exact
+label/form association is incomplete. No prefix or EIBFN shortcut resolves them.
+Source review and generated case candidates are not licensed execution evidence.
 
-## Source gaps and blockers
+## Checks and remaining obligations
 
-No reviewed cics.system-api SPI or FEPI row-to-command-topic map or digest-pinned
-command-body manifest exists. Consequently there is no exact command-body
-`topic_path` or SHA-256 authority to read for any of the 269 SPI or 39 FEPI
-rows. These are exact unresolved-locator gaps, recorded as
-`SPI-1001.source-gap.spi-command-bodies` and
-`SPI-1001.source-gap.fepi-command-bodies` in the versioned source authority.
-All dependent semantics remain fail-closed.
+Original private PROGRAM security preparation produced 11 passing tests/70 fixture
+iterations; SQLite helper preparation produced five passing tests; scoped
+SYNCPOINT consumption produced six passing tests/30 scoped verdicts. These are
+original scoped producers, not a full current-candidate suite. Current integration
+checks must be recorded separately after reconciliation with main.
 
-The next external/source action is to review complete SPI and FEPI command-topic
-maps, register exact paths and SHA-256 identities, and reproduce matching
-retained HTML offline. Network refresh, Browser Control, PDFs, substituted
-bodies, and EIBFN-derived semantics are outside this work.
+All public command behavior, complete lifecycle/authorization/concurrency,
+quiesce/drain/restart matrices, broader backend compatibility and required
+licensed differentials remain pending. No licensed runner is configured;
+differential=pending, credit=0. The parent is not sealed from partial children.
 
-## Results
+## Declared integration ownership
 
-`SPI-1001.source-authority` is complete at its identity-only boundary. The
-focused Python suite passes 7/7 positive, negative, and mutation tests. The
-cache-backed verifier passes against the exact retained HTML and TOC paths
-above. `cargo xtask schemas --check` compiled the new Draft 2020-12 schema and
-accepted the mapped authority instance.
+SPI-1001.origin-main-sync: reconcile PR389 with origin/main
+8acfd9875a25ecc3d10459abd2da9f12a490d1f3. Follow current subsystem paths,
+framework documentation and public package baseline. Do not restore VERSION,
+release/evidence management, version-number conformance directories or retired
+release commands. Source product/API versions and schema wire identities remain
+meaningful and must not be blindly removed.
 
-`SPI-1001.catalog` is complete at its identity-only boundary. Its deterministic
-generator emits 308 ordered rows with logical identity digest
-`sha256:5f4867c8a3973c9344e62288ced4c0be6d45356bcc506638e0a6822fdfc333da`;
-the generated JSON file SHA-256 is
-`406295b2bdc284ea9fa1b68ad57a20380e64277a299dc7d5c69d142def59a9ae`.
-The combined focused source/catalog suite passes 15/15 positive, negative, and
-mutation tests. `cargo xtask schemas --check` compiled both new Draft 2020-12
-schemas and accepted both mapped instances, then stopped later on the unchanged
-jes.execution `carddemo-base-batch.json` note exceeding its existing 256-character schema
-cap. This is an inherited, unrelated gate failure and is not relabeled as a
-pass.
+Manager owns docs, tools, xtask, conformance schemas/catalogs/generators and the
+integration index. CLI author 01a0ff99-3347-7380-a417-5b54c817e32e owns Rust
+conflict reconciliation under crates/ only in a separate worktree from the same
+merge inputs. Preserve upstream MQ/IMS/Db2/CardDemo changes and this PR's CICS
+frame/storage/private PROGRAM semantics; compose existing authorities. No import
+of unsealed borrowed-control work, new runtime admission, policy waiver, source
+refresh, license execution, push/PR/merge commit by the author or extra workers.
 
-`SPI-1001.generated-registry` is complete at its non-routing boundary. The
-generated Rust registry carries the same logical identity digest
-`sha256:5f4867c8a3973c9344e62288ced4c0be6d45356bcc506638e0a6822fdfc333da`;
-its file SHA-256 is
-`7a8cf34454f3c97d5c6d282c6e88371f24d14ac3737ea121193c5341cb2f381b`.
-It exposes official-row and ambiguous EIBFN lookup only; there is no label-token
-dispatcher, handler identity, runtime operation, advertisement, automatic
-registration, or public route. The complete `mainframe-env-ir` suite passes
-54/54, including the three new registry tests and the unchanged cics.application-api application
-registry closure. Package Clippy passes with warnings denied. The combined
-source/catalog generator suite passes 17/17, including an advertisement
-mutation that the Rust generator rejects.
+Author focused compilation/proof and a reviewable whole owned diff precede manager
+import. Manager resolves current-path references, regenerates owner-derived
+files and runs affected tests plus mandatory policy/schema/format/docs/module
+checks. Different CLI review checks the final integration resolution. Preserve
+unrelated worktrees and required receipts externally; clean intended Cargo
+targets after build/test/generator sequences. Only a passing synchronized
+candidate is pushed to update draft PR389; no GitHub merge/release/deployment.
 
-The broader architecture checks expose three inherited candidate failures in
-files untouched by SPI-1001: the production hardcode scan finds `CARDDEMO` in
-`crates/providers/mainframe-env-dataset/src/replay_index.rs`; the module budget
-records 1,321 lines for the now-1,345-line
-`crates/tooling/mainframe-env-conformance/src/cics_pilot.rs`; and the public API
-documentation ratchet records 1,129 undocumented host-API items while the
-candidate emits 1,130. The schema gate's inherited jes.execution receipt-length failure
-is recorded above. These unchanged failures are not retried or relabeled as
-SPI-1001 passes.
 
-Coverage, semantic, execution, condition, recovery, and differential credit
-remain **0/269 SPI and 0/39 FEPI**. The cics.application-api public/runtime surface is unchanged.
+## Declared cache provisioning ownership
 
-## Next executable step
+SPI-1001.cache-provisioning adds external snapshot transport for existing pinned
+source bytes; it grants no grammar, runtime, conformance or licensed credit.
+The CLI author owns `conformance/tools/ibm_docs_snapshot.py` and its focused
+Python tests in an isolated worktree from 8c3e91b7400240b45889786ad528f89bbe2f777a.
+Manager owns the bounded snapshot locator, cache runbook, changelog fragment,
+public LFS metadata repository and serial integration. A separate CLI reviewer
+checks the integrated candidate. No IBM refresh, semantic changes, extra
+workers, upstream merge, release or deployment is authorized for this slice.
+Acceptance requires focused corruption/bounds/path/conflict regressions,
+synthetic LFS transport, fresh local snapshot import and shared cache verification, plus applicable
+policy/docs/changelog/format gates. Publication bodies stay outside this code
+repository. Unavailable scopes remain unavailable.
 
-Stop at the verified external source dependency. The next executable semantic
-step requires reviewed SPI and FEPI row-to-topic mappings plus exact registered
-command-body hashes; no runtime work is authorized from the identity table.
+The cache repository is public for metadata and a synthetic transport fixture.
+Redistribution authorization for IBM publication bodies is unavailable; no IBM
+archive is uploaded. The real retained snapshot is tested locally with zero
+execution credit. Developers provision bytes they are authorized to use.
+
+The snapshot importer passed 20 focused synthetic regressions and imported
+849 entries into a fresh external cache; the shared reader verified all 848
+topics and one TOC across 18 registered CICS scopes. Public Git LFS transfer
+was reproduced with a project-created 173-byte archive. These are transport
+checks, with semantic_authority=false and coverage_credit=0. The public
+metadata revision is d08efcb9849188abd2916aa9e7054eeefc159002; the corresponding
+CICS archive remains local-only. Required CICS behavior gates stay pending.
+
+Application review supplements pinned outside the shared registered scopes are
+not included in this snapshot. Existing verified supplement cache entries remain
+required for the architecture/source-review gates.

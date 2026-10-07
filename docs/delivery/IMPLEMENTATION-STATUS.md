@@ -17,7 +17,7 @@ records are not part of the repository's management model.
 | JCL | Converter and planner | [JCL-701 through JCL-706 complete; phase exit gate passed](subsystems/jcl/planning-status.md) |
 | JES2 and utilities | Jobs, spool and utilities | [JES-801 through JES-806 complete — pass-with-licensed-differential-pending](subsystems/jes/execution-status.md) |
 | CICS | Application API | [Implementation in progress; application API acceptance and licensed differential remain incomplete](subsystems/cics/application-api-status.md) |
-| CICS | SPI and FEPI | [SPI-1001 identity foundation sealed; semantic source dependency blocked; SPI-1001 and cics.system-api remain Proposed](subsystems/cics/system-api-status.md) |
+| CICS | SPI and FEPI | [Source-backed private preparation implemented; public SPI/FEPI execution and licensed acceptance pending](subsystems/cics/system-api-status.md) |
 | z/OSMF | REST portfolio | [ZMF-1101 operation-normalization foundation complete; no new routes advertised](subsystems/zosmf/rest-status.md) |
 | Db2 | Engine and common SQL | [In progress — second/third-wave pure surfaces sealed; catalog/binder and execution pending](subsystems/db2/core-status.md) |
 | Db2 | Complete programming surface | [No progress record](subsystems/db2/programming-plan.md) |

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Validate private SPI and FEPI response name/code pairs against the existing pinned common CICS EIBRESP authority, rejecting mismatched names and codes without selecting RESP2 or changing execution acceptance."

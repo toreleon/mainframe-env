@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Propagate validated CICS syncpoint context to the trusted MQ participant action for implicit local tasks."

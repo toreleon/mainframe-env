@@ -1191,6 +1191,7 @@ fn store_error(problem: StoreError) -> HostProblem {
 
 #[cfg(test)]
 mod tests {
+    use super::rows::encode_object_row;
     use super::*;
     use mainframe_env_execution_api::{
         ArtifactRef, ExecutionId, IdempotencyKey, Principal, PrincipalId, RequestId,

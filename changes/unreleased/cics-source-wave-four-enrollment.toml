@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Enroll all remaining reviewed SPI source cohorts while excluding three unresolved identities and preserving private admission gates."

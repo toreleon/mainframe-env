@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 6829,
+      "max_production_lines": 6827,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -36,7 +36,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 5699,
+      "max_production_lines": 5655,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -48,7 +48,7 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 2762,
+      "max_production_lines": 2668,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
@@ -90,7 +90,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 11785,
+      "max_production_lines": 11752,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -168,7 +168,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 12863,
+      "max_production_lines": 12796,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
@@ -479,7 +479,16 @@
       "crates/providers/mainframe-env-cics/src/handlers/web_service_control/invoke.rs",
       "crates/providers/mainframe-env-cics/src/handlers/web_service_control/soap_fault.rs",
       "crates/providers/mainframe-env-cics/src/handlers/web_service_control/state.rs",
-      "crates/providers/mainframe-env-cics/src/handlers/web_service_control/wsa.rs"
+      "crates/providers/mainframe-env-cics/src/handlers/web_service_control/wsa.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry/tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/replacement.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/replacement/tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/security.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control/administrative_status/tests/sqlite_reopen.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/host_boundary/link_entry/call_tests.rs"
     ]
   }
 }

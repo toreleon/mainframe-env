@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reconcile SPI/FEPI preparation with current subsystem paths, public package baseline and upstream execution authorities."

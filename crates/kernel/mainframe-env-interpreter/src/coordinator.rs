@@ -31,6 +31,9 @@ pub use root_terminal::{
 
 const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
 
+mod completion;
+mod handoff;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CoordinatorLimits {
     pub quantum: Quantum,
@@ -420,24 +423,12 @@ impl ExecutionCoordinator {
                     if let Some(progress) = journal.as_mut().and_then(|j| j.native.as_deref_mut()) {
                         progress.completed(&completion);
                     }
-                    if record_step(
+                    if completion::record_completion(
                         &mut journal,
-                        Some(ExecutionState::Completing),
-                        LifecycleEventKind::Completing,
-                        None,
-                        None,
+                        machine,
+                        invocation,
+                        completion.return_code,
                     )
-                    .and_then(|()| {
-                        record_step(
-                            &mut journal,
-                            Some(ExecutionState::Completed),
-                            LifecycleEventKind::Completed {
-                                return_code: completion.return_code,
-                            },
-                            None,
-                            None,
-                        )
-                    })
                     .is_err()
                     {
                         return infrastructure_failure("completion persistence failed");
@@ -795,28 +786,12 @@ where
         let payload = machine
             .checkpoint()
             .ok_or(StoreError::IncompatibleVersion)?;
-        let payload_digest: [u8; 32] = Sha256::digest(payload.bytes()).into();
-        Some(CheckpointRecord {
-            execution_id: invocation.execution_id.clone(),
-            run_unit_id: invocation.run_unit_id.clone(),
+        Some(completion::checkpoint_record(
+            invocation,
+            machine.effect_sequence(),
             session_id,
-            schema_version: 1,
-            machine_schema_version: 1,
-            artifact: invocation.artifact.clone(),
-            provider_generation: crate::INTERPRETER_GENERATION.into(),
-            required_host_interfaces: BTreeMap::from([
-                ("mainframe-env.execution-api".into(), "1".into()),
-                ("mainframe-env.host-api".into(), "1".into()),
-            ]),
-            effect_sequence: machine.effect_sequence(),
-            transaction: None,
-            principal: invocation.principal.id().clone(),
-            security_classification: "application-data".into(),
-            encryption_key_reference: None,
-            payload_size: payload.bytes().len() as u64,
-            payload_digest,
-            payload: payload.bytes().to_vec(),
-        })
+            payload,
+        ))
     } else {
         None
     };

@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 230,
+    "markdown_documents": 234,
     "navigation_groups": 8,
-    "normative_documents": 93,
-    "xtask_commands": 165
+    "normative_documents": 97,
+    "xtask_commands": 164
   },
   "documents": [
     {
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 173,
-      "sha256": "sha256:31556be29381bd7e3dac8fe74e1ae15fe3d6ea7b838ed320057caa1d3bad0e77",
+      "relative_links": 177,
+      "sha256": "sha256:cc56bfe7419efd37264d0ec859bfc7e1517acef0e9042d8173732c521c7037b5",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -583,6 +583,18 @@
       "xtask_commands": 2
     },
     {
+      "applies_from": "mainframe-env development",
+      "normative": true,
+      "owner": "CICS command, ProgramControl, security and storage maintainers",
+      "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md",
+      "relative_links": 0,
+      "scope": "named PROGRAM STATUS for a trusted public, local, non-Java cohort",
+      "sha256": "sha256:3890ae379ffb66ec20f9a798c048f176d71c8f091a7aaaa757be17db97a05fe8",
+      "status": "Proposed private prerequisite",
+      "title": "Private named PROGRAM STATUS consumption boundary",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "store adapters and core-server composition",
@@ -601,7 +613,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 7,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:99213ffb3e3e1071a28c5ac8a8ad562007a3f708d907a1baa31aecbb194c41e3",
+      "sha256": "sha256:c74e55f77ddc7ad6a4a832edcb82bb7c78d2643865a2817beeb9683b76172aef",
       "status": "Frozen contract; implementation deviations tracked before cics.application-api",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -649,7 +661,7 @@
       "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md",
       "relative_links": 0,
       "scope": "provider-neutral transaction participant capabilities and obligations",
-      "sha256": "sha256:a18e0513d452a0e4e76603ba2a0e2a0159d31822ffbf0134c1172ce223978211",
+      "sha256": "sha256:f400dfc8f5052d85f54f8afb95a7655f71e7efe3837d9b03367fb5880eaba805",
       "status": "Frozen early additive INT-1601 prerequisite",
       "title": "Transaction participant contract, version 1",
       "xtask_commands": 0
@@ -949,7 +961,7 @@
       "path": "docs/decisions/0027-cics-logical-program-frames.md",
       "relative_links": 0,
       "scope": "local LINK and INVOKE APPLICATION on an existing task",
-      "sha256": "sha256:5076c9a74ec479e25684966c36e9898734cd2ce2f0065b6a2fe5991e07118db5",
+      "sha256": "sha256:37eff1fed09b50ce3a2e7d211a85df1dd1cde926866b0aba9fc4f51875eff377",
       "status": "Proposed for CIC-902.program-task.frames; acceptance pending",
       "title": "ADR-0027: CICS task ownership across logical program frames",
       "xtask_commands": 0
@@ -964,6 +976,18 @@
       "sha256": "sha256:29799df5dfc0731dda0fc8a1a870de9ecc97a8c12fbcd262b820d340682b4fde",
       "status": "Proposed — implementation boundary, not owner acceptance",
       "title": "ADR-0028: Db2 typed catalog evolution through existing authorities",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env development",
+      "normative": true,
+      "owner": "Interpreter and selected execution maintainers",
+      "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md",
+      "relative_links": 0,
+      "scope": "explicit BTS GET CONTAINER SET in one root machine",
+      "sha256": "sha256:5f10ddfb5baf9cdf1a498e6b6bd2abb129ba76a03c14683285eddb81aa89d9f8",
+      "status": "Proposed; bounded root proofs recorded; parent acceptance pending",
+      "title": "ADR-0028: Explicit BTS SET loans in the checked interpreter",
       "xtask_commands": 0
     },
     {
@@ -991,6 +1015,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env development",
+      "normative": true,
+      "owner": "Selected execution and CICS task maintainers",
+      "path": "docs/decisions/0029-cobol-storage-entry-identity.md",
+      "relative_links": 0,
+      "scope": "language storage identity, before atomic instance admission and close",
+      "sha256": "sha256:cb4bcbcc9152ad6ca8b934e59381ce4524552a2e698778ca869855e3ea12dcb2",
+      "status": "Proposed; private codec prerequisite; runtime writers disabled",
+      "title": "ADR-0029: COBOL storage-entry identity within one CICS task",
+      "xtask_commands": 0
+    },
+    {
       "applies_from": "mainframe-env current subsystem contracts",
       "normative": true,
       "owner": "execution-contract, coordinator and Db2 maintainers",
@@ -1000,6 +1036,18 @@
       "sha256": "sha256:65fff2641d2cb64c91bda22fc22faf310511f188983e882870cd85b6630f4de3",
       "status": "Proposed — prerequisite direction, not capability acceptance",
       "title": "ADR-0029: Versioned Db2 core participant binding before mutating integration",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env development",
+      "normative": true,
+      "owner": "CICS contract and verification maintainers",
+      "path": "docs/decisions/0030-cics-source-condition-authority.md",
+      "relative_links": 0,
+      "scope": "private source-validator dependency and condition identity",
+      "sha256": "sha256:c8ca54a8c06f9d61e5206a8f56a79060a3fccb3a52861d1ae0eb697a243811db",
+      "status": "Proposed; private source-contract validation",
+      "title": "ADR-0030: Common CICS response authority in source validation",
       "xtask_commands": 0
     },
     {
@@ -1389,8 +1437,8 @@
     {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 49,
-      "sha256": "sha256:d8369f7cf5f7bbe15cee537bec4df4fc4fd7b256594f07c68e6e63ea4eeb3b1f",
+      "relative_links": 52,
+      "sha256": "sha256:332280c021b10c687ecc8e0305fd71f2c57ce3fb5032a866fc1ff31b0053c68b",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1422,7 +1470,7 @@
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
       "relative_links": 19,
-      "sha256": "sha256:303e9f5da28c1f25c8cdb81ef172463299162dd5b160a29a343fd0e928916c37",
+      "sha256": "sha256:78ce001e1f108ff0f2973f15bd1bf8dfe0c4aab9d83fef8b06afce78f8819bac",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
@@ -1534,7 +1582,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
       "relative_links": 32,
-      "sha256": "sha256:aeabf8c98ba0e1ff2f607760d3cf22ef56e47c3a07ab2be736c3ec690d0032ce",
+      "sha256": "sha256:2e10b50dcf70b0b31fe354fc735e12018edc26aaea7933236a99d9f813bc4c6a",
       "title": "CICS — Application API progress",
       "xtask_commands": 5
     },
@@ -1558,9 +1606,9 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
       "relative_links": 0,
-      "sha256": "sha256:07e295c7500524c4fe6288f5e21697eb12f511817ed3216ec7a035bd1d0d8893",
+      "sha256": "sha256:0b6e6de8a823924457fc4a3ca70d783bf026eb77440f4f20078dbb9815b98035",
       "title": "CICS — SPI and FEPI progress",
-      "xtask_commands": 2
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -2078,7 +2126,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:633f2c9cece55cd10e8754a048441e714b67b93d30665b5df5a178298b977b9a",
+      "sha256": "sha256:1072431b2e885c84a5a683fd4c4ac55698ad7830f88ca5352595563c9c528112",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -2165,8 +2213,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
-      "relative_links": 3,
-      "sha256": "sha256:64703c7632b385e69ee615e995a08bae0a6d4c5e2d6bd40b1b03b9a31c77f4c0",
+      "relative_links": 4,
+      "sha256": "sha256:253a676b0f958348f41739198b3f8051a0f7c7016f50846e27588e522ab35900",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
@@ -2198,9 +2246,9 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 1,
-      "sha256": "sha256:14f899be268d26adf7b7a7b136748857d640c10d1194c504327e872835f4a18a",
+      "sha256": "sha256:ed0c332c80c2105c2c770f7af68f9101b86af63d644693b4f89d6aeb0ef70df9",
       "title": "Verification workflow",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "normative": false,
@@ -2389,6 +2437,10 @@
         {
           "label": "Transaction participant contract",
           "path": "docs/contracts/TRANSACTION-PARTICIPANT-V1.md"
+        },
+        {
+          "label": "Proposed named PROGRAM STATUS boundary",
+          "path": "docs/contracts/CICS-NAMED-PROGRAM-STATUS-V1.md"
         }
       ],
       "heading": "Architecture and contracts"
@@ -2642,6 +2694,18 @@
         {
           "label": "Executable application sandbox and agent boundary",
           "path": "docs/decisions/0049-executable-agent-sandbox.md"
+        },
+        {
+          "label": "ADR-0028: Explicit BTS SET loan lifetime",
+          "path": "docs/decisions/0028-explicit-bts-set-loan-lifetime.md"
+        },
+        {
+          "label": "ADR-0029: COBOL storage-entry identity",
+          "path": "docs/decisions/0029-cobol-storage-entry-identity.md"
+        },
+        {
+          "label": "ADR-0030: Common CICS source condition authority",
+          "path": "docs/decisions/0030-cics-source-condition-authority.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2860,7 +2924,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:c5cf39519cf94ff86ff7fccdc96237600761450256d3c376fc9e6beb08d42442",
+  "registry_sha256": "sha256:55fa5d7df907b055bdccade57b8edfb69def9a62ec5cdf7b35852fd68da90aa1",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

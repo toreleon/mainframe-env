@@ -3,7 +3,8 @@ use crate::{ClassName, MethodName, ProgramName};
 use mainframe_env_execution_api::{ArtifactRef, BoundedPayload};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Exact immutable program selection; validation requires positive generation and lowercase SHA-256 content identity.
+/// Exact immutable selection attached to a LINK request.
+/// Validation requires a nonzero generation and a lowercase `sha256:` content identity.
 pub struct ProgramLinkSelection {
     /// Exact immutable executable artifact selected by the caller.
     pub artifact: ArtifactRef,
@@ -29,64 +30,66 @@ impl ProgramLinkSelection {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Owned program routing/control request. A name or selection does not install code or grant invocation permission.
+/// Owned program-control operations and explicitly bounded argument payloads.
+/// State-changing variants use the outer effect replay key; no payload-level `Mutation` is carried.
 pub enum ProgramRequest {
-    /// Observe installed program metadata without invoking it.
+    /// Query installed program metadata.
     Inquire {
-        /// Validated target program name; installation and resource admission remain external.
+        /// Validated program name to resolve or invoke.
         program: ProgramName,
     },
-    /// Call a program or explicitly selected runtime service.
+    /// Call a program, optionally selecting an exact runtime-service ABI.
     Call {
-        /// Validated target program name; installation and resource admission remain external.
+        /// Validated program name to resolve or invoke.
         program: ProgramName,
-        /// Owned schema-qualified call/control data, not a raw caller pointer.
+        /// Owned bounded argument bytes tagged with a payload schema identity.
         payload: BoundedPayload,
-        /// Optional explicit runtime-service route with positive ABI version.
+        /// Optional exact namespace/name/ABI selection for a runtime service.
         service: Option<RuntimeServiceSelector>,
     },
-    /// Invoke a method with owned receiver and argument data.
+    /// Invoke a method on an schema-described receiver.
     Invoke {
-        /// Validated class identity for method dispatch.
+        /// Validated class name used for method resolution.
         class: ClassName,
-        /// Validated method identity within the class.
+        /// Validated method name selected on the receiver.
         method: MethodName,
-        /// Owned schema-qualified receiver state.
+        /// Owned bounded receiver bytes tagged with a payload schema identity.
         receiver: BoundedPayload,
-        /// Owned schema-qualified call/control data, not a raw caller pointer.
+        /// Owned bounded argument bytes tagged with a payload schema identity.
         payload: BoundedPayload,
     },
-    /// Invoke a nested program level with optional immutable selection.
+    /// Link to a program, optionally pinning its immutable installed selection.
     Link {
-        /// Validated target program name; installation and resource admission remain external.
+        /// Validated program name to resolve or invoke.
         program: ProgramName,
-        /// Owned schema-qualified call/control data, not a raw caller pointer.
+        /// Owned bounded argument bytes tagged with a payload schema identity.
         payload: BoundedPayload,
-        /// Optional exact immutable generation/content binding checked before LINK dispatch.
+        /// Optional immutable artifact/generation/content selection; `None` leaves resolution to
+        /// the provider.
         selection: Option<ProgramLinkSelection>,
     },
-    /// Transfer program control without inventing a continuation.
+    /// Transfer control to the selected program.
     Xctl {
-        /// Validated target program name; installation and resource admission remain external.
+        /// Validated program name to resolve or invoke.
         program: ProgramName,
-        /// Owned schema-qualified call/control data, not a raw caller pointer.
+        /// Owned bounded argument bytes tagged with a payload schema identity.
         payload: BoundedPayload,
     },
-    /// Return owned output and optional next transaction selection.
+    /// Return with an optional next-transaction selection.
     Return {
-        /// Optional continuation transaction label; scheduling remains router-owned.
+        /// Optional next transaction identity interpreted by the program-control provider.
         next_transaction: Option<String>,
-        /// Owned schema-qualified call/control data, not a raw caller pointer.
+        /// Owned bounded argument bytes tagged with a payload schema identity.
         payload: BoundedPayload,
     },
-    /// Request cancellation/reset of the listed program activations.
+    /// Cancel a nonempty bounded set of program selections.
     Cancel {
-        /// Nonempty bounded list of programs whose activation state is to be cancelled.
+        /// Program names to cancel; host validation requires 1 through `max_fields` entries.
         programs: Vec<ProgramName>,
     },
-    /// Request application abnormal termination, distinct from infrastructure failure.
+    /// Request abnormal termination with an owned code.
     Abend {
-        /// Application abend code retained for router handling.
+        /// Owned abnormal-termination code interpreted by the provider.
         code: String,
     },
 }

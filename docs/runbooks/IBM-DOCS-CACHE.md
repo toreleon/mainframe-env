@@ -2,7 +2,7 @@
 
 Use pinned IBM sources before implementing or reviewing language and subsystem
 semantics. The repository retains manifests, catalog locators and independently
-reviewed rule projections; IBM publication bodies remain outside Git.
+reviewed rule projections; IBM publication bodies remain outside this code repository.
 
 ## Provision a verified scope
 
@@ -37,6 +37,98 @@ commands do not start a runner or perform a release.
 `MAINFRAME_ENV_IBM_DOCS_CACHE` sets the shared default used by the offline
 reader and verification tools. Explicit `--cache` takes precedence, and callers
 retain the legacy temporary-directory default when the variable is unset.
+
+## Provision with Git LFS snapshot metadata
+
+The separate public repository
+`https://github.com/toreleon/mainframe-env-ibm-docs-cache` publishes snapshot
+metadata and a synthetic Git LFS transport example. IBM publication archives
+are not uploaded: redistribution authorization is unavailable. The locally
+prepared CICS snapshot remains external. The code repository commits its
+bounded identity in
+`conformance/ibm-docs-cache-snapshots.json`: an immutable Git revision, archive
+SHA-256/size, registered scope IDs and the fingerprint of their shared pins.
+A Git LFS client is required for LFS transport. The CICS archive identity
+does not imply public download availability. Provisioning is an explicit
+transport operation; ordinary source search/read and CI remain offline and do not clone or install tools.
+
+CICS TS [publication terms](https://www.ibm.com/docs/en/cics-ts/6.x?topic=available-notices)
+require express IBM consent to distribute publications outside the enterprise.
+Developers must obtain source bytes they are authorized to use and import their
+existing cache with the shared importer above. A network/browser source refresh
+requires an explicit request and follows the Chrome workflow below.
+
+The public repository can be cloned by other developers. Its current LFS
+object is a small, project-created transport fixture, not IBM documentation.
+Read `revision` from the committed locator and fetch exactly that revision:
+
+```bash
+export IBM_DOCS_SNAPSHOT_CLONE=/absolute/path/to/cache-metadata-clone
+export IBM_DOCS_SNAPSHOT_REVISION=PINNED_REVISION
+GIT_LFS_SKIP_SMUDGE=1 git clone --no-checkout \
+  https://github.com/toreleon/mainframe-env-ibm-docs-cache.git \
+  "$IBM_DOCS_SNAPSHOT_CLONE"
+git -C "$IBM_DOCS_SNAPSHOT_CLONE" lfs install --local
+git -C "$IBM_DOCS_SNAPSHOT_CLONE" fetch origin "$IBM_DOCS_SNAPSHOT_REVISION"
+GIT_LFS_SKIP_SMUDGE=1 git -C "$IBM_DOCS_SNAPSHOT_CLONE" checkout --detach \
+  "$IBM_DOCS_SNAPSHOT_REVISION"
+git -C "$IBM_DOCS_SNAPSHOT_CLONE" lfs pull --include=snapshots/transport-smoke.tar.gz
+tar -tzf "$IBM_DOCS_SNAPSHOT_CLONE/snapshots/transport-smoke.tar.gz"
+```
+
+Given an authorized local copy of the real archive, import it offline:
+
+```bash
+export MAINFRAME_ENV_IBM_DOCS_CACHE=/absolute/path/to/topic-cache
+python3 -B conformance/tools/ibm_docs_snapshot.py import \
+  --snapshot cics-retained-20261007 \
+  --archive /absolute/path/to/local-snapshots/cics-retained-20261007.tar.gz \
+  --cache "$MAINFRAME_ENV_IBM_DOCS_CACHE"
+```
+
+Replace `PINNED_REVISION` with the exact `revision` from the committed locator.
+The importer checks the compressed archive SHA-256 and size, current registered
+pin fingerprint, complete scope membership and bounded regular-file contents
+before the shared cache import. It refuses changed pins, incomplete or unsafe
+archives and existing conflicting bytes. It never replaces a conflicting
+cache entry. Git LFS pointers left without downloaded objects fail verification.
+The snapshot remains a source transport artifact with
+`semantic_authority=false` and `coverage_credit=0`.
+
+The locally prepared snapshot covers all 18 currently registered CICS scopes,
+including the SPI/FEPI command bodies and application command-body scopes: 848 unique
+topics and one shared TOC. It does not claim completeness for other IBM
+products or prove CICS behavior. Application review gates also consume separately
+pinned cross-product supplements that are outside these shared registered
+scopes. This archive does not contain those supplements and cannot by itself
+provision every architecture/source-review prerequisite. Keep their existing
+hash-matching entries in the external cache when running those gates; the
+application supplement verifier remains their authority. Verify the shared
+scopes relevant to your work:
+
+```bash
+python3 -B conformance/tools/ibm_docs.py status --scope cics-spi-command-bodies
+python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-command-bodies
+```
+
+To prepare a local snapshot, use existing retained bytes and select complete
+registered scopes explicitly. The packer verifies them and produces a
+deterministic gzip/tar archive outside the code checkout:
+
+```bash
+python3 -B conformance/tools/ibm_docs_snapshot.py pack \
+  --id cics-selected-sources --scope cics-spi-command-bodies \
+  --scope cics-fepi-command-bodies --cache "$MAINFRAME_ENV_IBM_DOCS_CACHE" \
+  --archive /absolute/path/to/authorized-cache-clone/snapshots/cics-selected-sources.tar.gz
+```
+
+For an authorized transport repository, track the resulting archive with LFS
+and review the printed row and immutable revision in its locator. Upload bodies
+only where redistribution rights and recipient access permit it.
+The public metadata repository remains body-free.
+A source refresh still requires explicit authorization under the workflow
+below; packaging retained bytes does not authorize a refresh. Rollback selects
+a prior immutable locator and imports into a separate external cache.
 
 ## Use before semantic changes
 
@@ -78,13 +170,47 @@ coverage or licensed execution credit.
 
 The immutable coverage.foundation catalog index remains unchanged. Later zero-credit source
 sets are registered separately in a target-owned
-`conformance/<minor>/manifests/index.json`. The shared offline reader currently
-loads the cics.application-api, ims.programming and mq.programming registries. Each registry row binds the exact manifest
+`conformance/subsystems/.../manifests/index.json`. The shared
+offline reader currently loads the cics.application-api, cics.system-api, ims.programming and mq.programming registries. Each registry row binds the exact manifest
 bytes, topic-set digest, count, baseline, subsystem and scope while fixing
 `semantic_authority=false` and `coverage_credit=0`. The shared registry schema,
 offline reader, and xtask checker reject unregistered, missing, changed or
 cross-version manifests. Adding another target registry requires extending the
 shared bounded registry list; do not create a target-specific reader.
+
+The cics.system-api `cics-spi-command-bodies` and `cics-fepi-command-bodies` scopes
+pin retained CICS TS 6.x command HTML from the 2026-09-12 archive against the
+already pinned CICS TOC. The SPI scope contains 277 command-topic bodies;
+the FEPI scope contains 36. These are topic counts, not the official 269 SPI
+and 39 FEPI command denominators. Shared pages and extra TOC command topics
+cannot alter catalog row identity or grant semantic coverage. Scope registration
+does not certify the archive's overall retrieval, browser reproduction,
+row-to-topic review, grammar, runtime or licensed conformance. Only the bounded
+selected bodies and TOC need an offline import; no refresh is required.
+
+The private `cics-fepi-context-candidates` scope adds exactly nine retained
+FEPI reference topics (135,647 bytes), including programming-reference,
+CVDA/RESP2, data-format, end-condition and overview locators. It uses the same
+shared manifest registry and pinned TOC. These context bodies are disjoint
+from the 36 command pages and add no command identity, semantic authority or
+licensed credit. Registration does not resolve absent fragment links, prove
+all referenced context is available or certify mandatory-context closure.
+
+```bash
+python3 -B conformance/tools/ibm_docs.py status --scope cics-spi-command-bodies
+python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-command-bodies
+python3 -B conformance/tools/ibm_docs.py status --scope cics-fepi-context-candidates
+```
+
+The shared CICS mapper checks the private cics.system-api projections and row-map candidates
+with `python3 -B tools/generate_cics_source_map.py --family spi --check`
+(or `--family fepi`). Add both `--toc <external-pinned-toc>` and
+`--cache <external-topic-cache>` to independently reproduce TOC/body headings
+and the bounded command-form fragment locators. Without those inputs the check
+validates committed bindings and canonical freshness only. Three qualified SPI
+row equivalences remain explicitly unresolved; map presence never grants
+grammar or execution authority. The default cics.application-api batches remain
+owned by the same generator and schema.
 
 The ims.programming IMS programming-contract scope is checked offline with:
 

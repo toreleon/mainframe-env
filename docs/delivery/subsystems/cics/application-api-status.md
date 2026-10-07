@@ -4,6 +4,89 @@ Subsystem: **cics**
 Phase: **application-api**
 Status: **Implementation in progress; application API acceptance and licensed differential remain incomplete**
 
+## Authorized prerequisite completion, 2026-10-02
+
+The SPI/FEPI goal now includes finishing the CICS application API prerequisite
+first, explicitly authorized by the user's “Ok finish v0.9 first” response.
+The isolated integration branch retains the current 260 typed / 0 legacy /
+3 unready registrations. Other subsystem milestones, release publication and
+deployment are not added. The user's licensed-CICS-run waiver applies to this
+implementation and PR handoff: differential remains pending and licensed credit
+remains zero. Local semantic, selected-route, security, concurrency, recovery
+and affected durable-backend gates still apply; no acceptance is inferred from
+readiness or the waiver.
+
+The first bounded wave has these exclusive owners and dependencies:
+
+| Slice | Exact row/obligation scope | Worker ownership | Acceptance and dependencies |
+|---|---|---|---|
+| `CIC-901.remaining-command-authority` | 0027 CICSMESSAGE callable/internal-use disposition; 0093 GETNEXT TIMER receiving-area/cursor transition; 0114 ISSUE COPY CCC interpretation | External source review/proposed dispositions only; no repository writes | Offline pinned search/read, exact body/locator and product boundaries; distinguish internal-only and unresolved behavior; source-backed next implementation scope or exact unavailable prerequisite. No readiness or conformance credit. |
+| `CIC-902.program-task.frames.same-level-admission` | 0097 HANDLE ABEND PROGRAM and 0263 XCTL: immutable staged target proof, same-level child admission and owned source/target instance disposition | Existing server `cobol` installed-call/transfer modules and independent compiled frame tests; CICS frame helper changes proposed to manager first | Existing pending CALL schema 4, coordinator, immutable artifact and CICS logical-frame owners are dependencies. Begin with a focused failing selected-route regression. Revalidate exact target/source proof; preserve unknown outcomes and no automatic redispatch. Applicable SAF/deadline/cancellation, SQLite/PostgreSQL reopen, negative forged/stale proof and existing normal LINK/root PROGRAM regressions must pass. No child SUSPEND or whole-frame completion claim. |
+| `CIC-904.bts-container.task-storage-review` | 0086 BTS GET CONTAINER SET: next task GET SET/task-end lifetime across LINK/return/replacement | External source/task-ABI design review only; no repository writes | Offline BTS/channel/linked-program sources and actual interpreter/executor storage ownership; identify the smallest shared-task ABI change and independent selected-route/restart obligations. A per-machine release cannot certify the task-wide rule. |
+
+The manager exclusively owns status, schemas, generators, registries, shared
+host/execution ABI, participant metadata, Conformance IR/coverage bindings,
+public facades, source registration, sealer and integration. Workers use isolated
+exact-base checkouts, the current CLI account, gpt-6.1-sol/high, fast mode off,
+and cannot spawn workers, refresh IBM sources, run licensed campaigns, push or
+publish. Source-only reviews do not seal behavioral slices. Shared changes are
+serialized before dependent implementation and acceptance.
+
+### Declared `INT-1601.cics-frame-schema-binding`
+
+The manager's serialized prerequisite binds the existing row 0218 SYNCPOINT
+frame UOW codecs to participant metadata. Current root writers emit MECU2;
+distinct effect-actor/task-root writers emit MECU3, and the provider/retention
+reader accepts MECU1/MECU2/MECU3. The older participant declaration lists only
+MECU2 writes and MECU1/MECU2 reads. An additive optional frame-writer declaration
+must describe the existing conditional writer and the complete reader set,
+without changing persisted UOW bytes, syncpoint ownership or context admission.
+Owners are the participant JSON/schema/generator/Rust validation and its existing
+normative contract. Acceptance requires strict generator/schema validation,
+negative missing/wrong frame-codec metadata checks, existing three-generation
+codec/root-byte/forged-metadata tests and the compiled root PROGRAM-exit
+SYNCPOINT regression, plus affected mandatory gates. This is metadata consistency
+for existing frame behavior, not full frame or application API acceptance.
+
+The bounded consistency checks pass: nine Python generator/negative checks,
+four Rust participant checks and two provider three-generation codec checks.
+After the separate MQ-context repair below, the compiled root PROGRAM-exit
+commit/rollback route passes on SQLite physical reopen and on fresh PostgreSQL
+18.6 databases. Schema, architecture, formatting, documentation, changelog and
+dependency policy checks pass. The declaration changes no persisted UOW bytes;
+these receipts close this metadata slice only.
+
+### Declared `CIC-906.syncpoint-mq-context`
+
+The compiled root PROGRAM-exit SYNCPOINT regression fails after SQLite reopen:
+Db2 and IMS complete, but the MQ stage returns Malformed before mutation. MQ's
+existing host-context guard requires an explicit CICS execution-context binding
+when nested/outer CICS effect origins are present. Local CICS tasks can legally
+omit that binding, and the CICS bridge currently forwards the omission. The
+manager owns the narrow recovery bridge correction: materialize its already
+validated syncpoint owner in the trusted nested invocation, preserve any explicit
+context, and check the extra binding capacity before participant dispatch.
+MQ validation and direct application MQCMIT/MQBACK restrictions stay intact.
+Row 0218 authority is sources-C `dfhp4_syncpoint.html`, SHA-256
+`2e1bebaa9ac35c7444eeb63d2e15d1773a5d39e06f0e65f00970e96f411f9b34`.
+Acceptance includes omitted/explicit local and owned-DPL contexts, binding-capacity
+and malformed/subordinate rejection, the failing compiled SQLite regression,
+affected PostgreSQL reopen and focused MQ host-context regressions. This repairs
+trusted context propagation; it does not accept a general mixed-resource 2PC
+participant or the application milestone.
+
+The repaired candidate passes four focused CICS context/attestation tests and
+two existing MQ direct/foreign-owner guard tests. Omitted context at the exact
+binding boundary succeeds, excess capacity rejects before UOW or participant
+mutation, explicit local/owned-DPL context is preserved, and an absent MQ
+participant consumes no extra binding. The compiled root PROGRAM-exit route
+passes both commit and rollback after physical SQLite reopen; the two selected
+PostgreSQL 18.6 reopen tests were explicitly executed and pass rather than
+credited from their ordinary ignored disposition. Required schema, architecture,
+formatting, documentation, changelog and dependency policy checks pass. External
+receipts retain candidate file hashes; the disposable PostgreSQL data and Cargo
+target were cleared. No licensed or full mixed-resource certification is claimed.
+
 Current G5 candidate (#325): **260 typed / 0 legacy / 3 unready** application
 rows. The remaining unready rows are 0027, 0093, and 0114. The historical
 checkpoint counts below describe their named earlier commits.

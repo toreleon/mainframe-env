@@ -1,6 +1,9 @@
 mod call_codec;
 pub use call_codec::encode_cobol_call_result;
 use call_codec::*;
+mod dataset_codec;
+use dataset_codec::{dataset_file_status, decode_dataset_record, encode_dataset_record};
+
 mod date_helpers;
 use date_helpers::*;
 mod xml_helpers;
@@ -40,6 +43,8 @@ use xml_helpers::*;
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
 mod amode64_access;
 mod completion;
+mod normal_return;
+pub use normal_return::{InstalledProgramReturn, InstalledProgramReturnKind};
 mod condition_literals;
 mod corresponding;
 mod decimal_capacity;
@@ -371,7 +376,7 @@ enum PendingKind {
         operation: CicsOperation,
         storage64_intent: Option<typed_cics::Storage64Intent>,
         argument_summary: String,
-        container: Option<(String, Option<String>)>,
+        container: Option<typed_cics::container_set::ContainerIdentity>,
         into: Option<typed_cics::CicsTarget>,
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
         response: Option<typed_cics::CicsTarget>,
@@ -500,6 +505,8 @@ pub struct ReferenceMachine {
     pending: Option<Pending>,
     perform_stack: Vec<usize>,
     deferred_drive: Option<MachineDrive<EffectRequest>>,
+    // Volatile live-drive observation; deliberately absent from every snapshot.
+    normal_return: Option<normal_return::NormalReturnMarker>,
 }
 impl ReferenceMachine {
     pub fn from_binary(
@@ -848,6 +855,7 @@ impl ReferenceMachine {
             pending: None,
             perform_stack: Vec::new(),
             deferred_drive: None,
+            normal_return: None,
         };
         typed_decimal::validate_machine(&machine)?;
         typed_cics::validate_machine(&machine)?;
@@ -1000,6 +1008,7 @@ impl ReferenceMachine {
         if self.mqi.is_some() || snapshot.schema_version == 0 {
             return Err(MachineProblem::IncompatibleSnapshot);
         }
+        self.validate_return_restore(&snapshot)?;
         if !matches!(snapshot.schema_version, 1..=12)
             || snapshot.program_counter > self.operations.len()
             || snapshot.base_storage.iter().map(Vec::len).sum::<usize>()
@@ -1221,6 +1230,7 @@ impl ReferenceMachine {
         self.install_storage64_snapshot(restored_storage64, area_bindings);
         self.pending = None;
         self.deferred_drive = None;
+        self.normal_return = None;
         Ok(())
     }
 
@@ -2040,7 +2050,7 @@ impl ReferenceMachine {
                 let responded = response_target.is_some() || no_handle;
                 let load_base = typed_cics::write_response_state(
                     self,
-                    operation,
+                    (operation, container.as_ref()),
                     storage64_intent,
                     response_target.as_ref(),
                     response2_target.as_ref(),
@@ -8472,23 +8482,16 @@ impl Machine for ReferenceMachine {
         resume: MachineResume<Self::EffectResult>,
         quantum: Quantum,
     ) -> MachineDrive<Self::Effect> {
+        self.normal_return = None;
         let result = (|| -> Result<MachineDrive<Self::Effect>, MachineProblem> {
             match resume {
                 MachineResume::Start if self.pending.is_none() => {}
                 MachineResume::HostResult(result) => self.resume_host(result)?,
                 MachineResume::Cancelled => {
-                    self.release_storage64_task();
-                    return Ok(failure_drive(
-                        FailureCategory::Cancelled,
-                        "execution cancelled",
-                    ));
+                    return Ok(self.interrupted_drive(FailureCategory::Cancelled));
                 }
                 MachineResume::TimedOut => {
-                    self.release_storage64_task();
-                    return Ok(failure_drive(
-                        FailureCategory::TimedOut,
-                        "execution timed out",
-                    ));
+                    return Ok(self.interrupted_drive(FailureCategory::TimedOut));
                 }
                 _ => return Err(MachineProblem::UnexpectedResume),
             }
@@ -8545,7 +8548,7 @@ impl Machine for ReferenceMachine {
                         };
                         return Ok(MachineDrive::HostCall(*effect));
                     }
-                    Step::Complete => return Ok(MachineDrive::Completed(self.complete()?)),
+                    Step::Complete => return self.complete_installed_step(&operation),
                 }
                 steps += 1;
             }
@@ -8561,10 +8564,7 @@ impl Machine for ReferenceMachine {
     }
 
     fn checkpoint(&self) -> Option<BoundedPayload> {
-        if self.pending.is_some() || self.mqi.is_some() {
-            return None;
-        }
-        let bytes = snapshot_codec::encode_snapshot(&self.snapshot())?;
+        let bytes = self.checkpoint_bytes()?;
         BoundedPayload::new(
             "mainframe-env.reference-machine-checkpoint@12",
             bytes,
@@ -8581,6 +8581,9 @@ impl Machine for ReferenceMachine {
             },
         )
         .ok()
+    }
+    fn completion_checkpoint(&self) -> Option<BoundedPayload> {
+        self.scoped_completion_checkpoint()
     }
 
     fn effect_sequence(&self) -> u64 {
@@ -11225,42 +11228,6 @@ fn expanded_picture(picture: &str, limit: usize) -> Result<Vec<u8>, MachineProbl
         output.extend(std::iter::repeat_n(symbol, repeat));
     }
     Ok(output)
-}
-
-fn encode_dataset_record(ccsid: Option<u16>, record: &[u8]) -> Result<Vec<u8>, MachineProblem> {
-    match ccsid {
-        None | Some(1208) => Ok(record.to_vec()),
-        Some(37) => CodePage::Cp037
-            .encode(
-                std::str::from_utf8(record).map_err(|_| MachineProblem::DataException)?,
-                record.len().saturating_mul(4).max(1),
-            )
-            .map_err(|_| MachineProblem::DataException),
-        Some(_) => Err(MachineProblem::UnsupportedForm),
-    }
-}
-
-fn decode_dataset_record(ccsid: Option<u16>, record: &[u8]) -> Result<Vec<u8>, MachineProblem> {
-    match ccsid {
-        None | Some(1208) => Ok(record.to_vec()),
-        Some(37) => CodePage::Cp037
-            .decode(record, record.len().saturating_mul(4).max(1))
-            .map(String::into_bytes)
-            .map_err(|_| MachineProblem::DataException),
-        Some(_) => Err(MachineProblem::UnsupportedForm),
-    }
-}
-
-fn dataset_file_status(name: &str, response: i32) -> String {
-    match (name, response) {
-        ("NOTFND", _) => "23",
-        ("DUPREC" | "DUPKEY", _) => "22",
-        ("ENDFILE", _) => "10",
-        ("LENGERR", _) => "44",
-        ("INVREQ", _) => "39",
-        _ => "30",
-    }
-    .into()
 }
 
 fn write_linage_advance(

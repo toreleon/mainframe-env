@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any
@@ -22,6 +23,33 @@ OUTPUT_PATH = Path("conformance/subsystems/cics/system/generated/cics-spi-fepi-i
 RUST_OUTPUT_PATH = Path(
     "crates/foundation/mainframe-env-ir/src/generated/cics_spi_fepi_registry.rs"
 )
+GRAMMAR_OUTPUT_PATH = Path(
+    "crates/foundation/mainframe-env-ir/src/generated/cics_administrative_grammar.rs"
+)
+GRAMMAR_CHUNK_PATH = GRAMMAR_OUTPUT_PATH.with_suffix("")
+MAX_GRAMMAR_MODULE_LINES = 1000
+FAMILY_PATH = Path("conformance/subsystems/cics/system/cics/families")
+FAMILY_ROWS = {
+    "spi-program": ("spi", ["0026", "0084", "0155", "0241"]),
+    "fepi-pool": ("fepi", ["0001", "0007", "0009", "0018", "0021", "0034"]),
+    "spi-file": ("spi", ["0012", "0072", "0127", "0224"]),
+    "fepi-resources": ("fepi", ["0008", "0010", "0011", "0017", "0019", "0020", "0022", "0023", "0024", "0032", "0033", "0036", "0037"]),
+    "fepi-pool-list": ("fepi", ["0035"]),
+    "spi-csd-definition": ("spi", ["0037", "0038", "0040", "0041", "0042", "0053", "0054", "0055", "0056", "0060", "0061"]),
+    "spi-csd-browse": ("spi", ["0039", "0043", "0044", "0045", "0046", "0047", "0048", "0049", "0050", "0051", "0052", "0057", "0058", "0059"]),
+    "spi-monitoring-control": ("spi", ["0002", "0095", "0116", "0139", "0148", "0159", "0164", "0173", "0174", "0175", "0177", "0195", "0218", "0234", "0238", "0243", "0244", "0253", "0254", "0255", "0257"]),
+    "spi-region-lifecycle": ("spi", ["0004", "0065", "0096", "0100", "0101", "0113", "0157", "0160", "0161", "0163", "0165", "0166", "0183", "0184", "0185", "0186", "0199", "0202", "0205", "0208", "0215", "0245", "0246", "0261", "0262"]),
+    "fepi-session-data": ("fepi", ["0002", "0003", "0004", "0005", "0006", "0012", "0013", "0014", "0015", "0016", "0025", "0026", "0027", "0028", "0029", "0030", "0031", "0038", "0039"]),
+    'spi-web-resources': ("spi", ['0003', '0009', '0023', '0035', '0036', '0063', '0070', '0081', '0091', '0092', '0097', '0114', '0150', '0187', '0190', '0191', '0193', '0198', '0206', '0216', '0239', '0263', '0266', '0267', '0269']),
+    'spi-queue-storage': ("spi", ['0011', '0014', '0017', '0029', '0033', '0071', '0074', '0075', '0086', '0090', '0107', '0117', '0118', '0132', '0133', '0134', '0162', '0170', '0171', '0179', '0180', '0181', '0182', '0219', '0228', '0229', '0250', '0251', '0259', '0260']),
+    'spi-network-connections': ("spi", ['0005', '0013', '0028', '0066', '0073', '0085', '0108', '0112', '0124', '0128', '0129', '0130', '0131', '0168', '0169', '0194', '0196', '0210', '0214', '0225', '0226', '0227', '0248', '0249']),
+    'spi-terminal-sessions': ("spi", ['0001', '0018', '0021', '0022', '0025', '0027', '0030', '0034', '0064', '0080', '0083', '0087', '0098', '0099', '0102', '0138', '0144', '0149', '0154', '0172', '0189', '0207', '0209', '0233', '0237', '0252', '0265']),
+    'spi-database-messaging': ("spi", ['0006', '0007', '0008', '0019', '0020', '0067', '0068', '0069', '0078', '0079', '0109', '0110', '0111', '0140', '0141', '0142', '0211', '0212', '0213', '0235', '0236']),
+    'spi-platform-programs': ("spi", ['0015', '0016', '0062', '0076', '0077', '0093', '0094', '0125', '0135', '0136', '0137', '0143', '0145', '0146', '0147', '0197', '0230', '0231', '0232']),
+    'spi-event-policy': ("spi", ['0103', '0104', '0105', '0106', '0119', '0120', '0121', '0122', '0123', '0126', '0151', '0152', '0158', '0200', '0220', '0221', '0222', '0223', '0242']),
+    'spi-transaction-resources': ("spi", ['0010', '0024', '0031', '0032', '0082', '0088', '0089', '0115', '0153', '0156', '0167', '0176', '0178', '0188', '0192', '0217', '0240', '0247', '0256', '0258', '0264', '0268']),
+}
+GRAMMAR_DOMAIN = b"mainframe-env.cics-administrative-grammar@1\0"
 SCHEMA_VERSION = "mainframe-env.cics-spi-fepi-identity-catalog@1"
 DIGEST_DOMAIN = b"mainframe-env.cics-spi-fepi-identity-catalog@1\0"
 
@@ -288,6 +316,343 @@ def render_rust(root: Path = ROOT) -> bytes:
     return render_rust_from_catalog(final_catalog(root))
 
 
+def cvda_numeric_source(root: Path = ROOT) -> dict[str, str]:
+    """Resolve the registered numeric reference; never read or embed its body."""
+    manifest = json.loads((root / "conformance/subsystems/cics/application/manifests/cics-misc-tail-cvda-topics.json").read_text())
+    topic = next(topic for topic in manifest["topics"] if topic["topic_path"] ==
+                 "SSJL4D_6.x/reference-applications/commands-api/dfha80c.html")
+    return {"baseline": manifest["baseline_id"], "topic_path": topic["topic_path"],
+            "sha256": "sha256:" + topic["sha256"]}
+
+
+def compact_numeric_encoding(domain: dict[str, Any], root: Path) -> dict[str, Any]:
+    encoding = domain["numeric_encoding"]
+    require(isinstance(encoding, dict) and set(encoding) == {"source", "values"},
+            "CVDA numeric encoding fields drifted")
+    pin = encoding["source"]
+    expected = cvda_numeric_source(root)
+    require(isinstance(pin, dict) and set(pin) == set(expected) | {"lines"}
+            and all(pin[key] == value for key, value in expected.items()),
+            "CVDA numeric reference pin drifted")
+    entries = encoding["values"]
+    require(isinstance(entries, list) and 0 < len(entries) <= 256,
+            "CVDA numeric value bound/type drifted")
+    projected = []
+    for entry in entries:
+        require(isinstance(entry, dict) and set(entry) == {"symbol", "number", "source_lines"},
+                "CVDA numeric value fields drifted")
+        require(isinstance(entry["symbol"], str) and entry["symbol"] in domain["values"],
+                "CVDA numeric symbol is not in its scoped domain")
+        require(type(entry["number"]) is int and -(2 ** 31) <= entry["number"] < 2 ** 31,
+                "CVDA numeric value is not a signed fullword")
+        projected.append({"symbol": entry["symbol"], "number": entry["number"]})
+    symbols = [entry["symbol"] for entry in projected]
+    require(symbols == sorted(set(symbols)), "CVDA numeric symbols must be unique and sorted")
+    for lines in [pin["lines"], *(entry["source_lines"] for entry in entries)]:
+        require(isinstance(lines, list) and 0 < len(lines) <= 16
+                and all(type(line) is int and 1 <= line <= 100000 for line in lines)
+                and lines == sorted(set(lines)), "CVDA numeric source lines drifted")
+    return {"source": expected, "values": projected}
+
+
+def compact_grammar(grammar: dict[str, Any], root: Path = ROOT) -> dict[str, Any]:
+    """Select common operand facts; source locators and case metadata stay external."""
+    options = grammar["options"]
+    names = [option["name"] for option in options]
+    require(bool(names) and names == sorted(set(names)), "family options drifted")
+    compact = {
+        "options": [{key: option[key] for key in (
+            "name", "value_shape", "direction", "source_max_value_bytes"
+        )} for option in options],
+        "required": grammar["required"],
+        "exclusive": grammar["exclusive"],
+        "dependencies": grammar["dependencies"],
+        "alternative_groups": grammar.get("alternative_groups", []),
+    }
+    domains = grammar.get("cvda_domains", [])
+    require(isinstance(domains, list) and len(domains) <= 256, "CVDA domain bound/type drifted")
+    require(all(isinstance(domain, dict) and {"option", "values", "source_lines"} <= set(domain)
+                <= {"option", "values", "source_lines", "numeric_encoding"}
+                and isinstance(domain["option"], str)
+                and re.fullmatch(r"[A-Z][A-Z0-9]{0,63}", domain["option"])
+                for domain in domains), "CVDA domain fields drifted")
+    heads = [domain["option"] for domain in domains]
+    require(heads == sorted(set(heads)), "CVDA domain operands drifted")
+    projected = []
+    by_name = {option["name"]: option for option in options}
+    for domain in domains:
+        operand = by_name.get(domain["option"])
+        require(operand is not None and operand["value_shape"] == "value"
+                and operand["direction"] != "none" and operand["source_max_value_bytes"] == 4,
+                "CVDA domain requires a declared valued fullword operand")
+        values = domain["values"]
+        require(isinstance(values, list) and 0 < len(values) <= 256
+                and all(isinstance(value, str) and re.fullmatch(r"[A-Z][A-Z0-9]{0,63}", value) for value in values),
+                "CVDA domain symbols drifted")
+        require(values == sorted(set(values)), "CVDA domain symbols must be unique and sorted")
+        item = {"option": domain["option"], "values": values}
+        if "numeric_encoding" in domain:
+            item["numeric_encoding"] = compact_numeric_encoding(domain, root)
+        projected.append(item)
+    if projected:
+        compact["cvda_domains"] = projected
+    return compact
+
+
+
+def project_family_grammar(
+    family: dict[str, Any], mapping: dict[str, Any], manifest: dict[str, Any], root: Path = ROOT
+) -> list[dict[str, Any]]:
+    """Project product facts only; full instance validation belongs to xtask."""
+    require(
+        family.get("schema_version") == "mainframe-env.cics-system-family@1"
+        and family.get("target_subsystem") == "cics.system-api"
+        and family.get("runtime_binding") == "private-unregistered",
+        "family grammar input is not a private 0.10 product contract",
+    )
+    name = family.get("family")
+    require(name in FAMILY_ROWS, f"unknown family grammar: {name}")
+    interface, suffixes = FAMILY_ROWS[name]
+    unit = "spi-commands-unique" if interface == "spi" else "fepi-commands"
+    expected = [f"ibm-cics-ts-6x-2026-08-31:{unit}:{suffix}" for suffix in suffixes]
+    commands = family.get("commands", [])
+    require(
+        [command["official_row"] for command in commands] == expected,
+        "family grammar row identity/order drifted",
+    )
+    mapped = {row["official_row"]: row for row in mapping["rows"]}
+    pins = {topic["topic_path"]: topic for topic in manifest["topics"]}
+    facts = []
+    for command in commands:
+        row = mapped[command["official_row"]]
+        pin = command["source"]
+        require(
+            row["state"] == "mapped" and row["label"] == command["label"]
+            and pin["topic_path"] == row["topic"]["topic_path"]
+            and pin["sha256"] == row["topic"]["sha256"]
+            and pin["sha256"] == "sha256:" + pins[pin["topic_path"]]["sha256"]
+            and pin["baseline"] == manifest["baseline_id"],
+            "family grammar source identity drifted",
+        )
+        grammar = command["grammar"]
+        compact = compact_grammar(grammar, root)
+        forms = grammar.get("forms", [])
+        require(len(forms) <= 16, "family form bound exceeded")
+        ids = [form["id"] for form in forms]
+        require(ids == sorted(set(ids)), "family form IDs drifted")
+        parent_names = {option["name"] for option in compact["options"]}
+        projected_forms = []
+        for form in forms:
+            shape = compact_grammar(form["grammar"], root)
+            require("forms" not in form["grammar"], "nested family forms are not allowed")
+            known = {option["name"] for option in shape["options"]}
+            require(known <= parent_names, "form options exceed parent union")
+            selectors = form["selector_options"]
+            require(selectors == sorted(set(selectors)) and set(selectors) <= known
+                    and set(selectors) <= set(shape["required"]), "form selectors drifted")
+            projected_forms.append({"id": form["id"], "selector_options": selectors, "grammar": shape})
+        # Absence and an empty optional array retain the earlier fact preimage.
+        if projected_forms:
+            compact["forms"] = projected_forms
+        facts.append({
+            "official_row": command["official_row"],
+            "family": name,
+            "label": command["label"],
+            "source": {key: pin[key] for key in ("topic_path", "sha256", "baseline")},
+            "grammar": compact,
+        })
+    return facts
+
+
+def family_grammar_facts(root: Path = ROOT) -> list[dict[str, Any]]:
+    directory = root / FAMILY_PATH
+    facts: list[dict[str, Any]] = []
+    if not directory.exists():
+        return facts
+    for path in sorted(directory.iterdir()):
+        require(
+            path.is_file() and path.suffix == ".json" and path.stem in FAMILY_ROWS,
+            f"unexpected family grammar input: {path}",
+        )
+        require(path.stat().st_size <= 4 * 1024 * 1024, "family input exceeds byte bound")
+        family = json.loads(path.read_text())
+        require(family["family"] == path.stem, "family filename/identity differs")
+        interface = FAMILY_ROWS[path.stem][0]
+        mapping = json.loads((root / f"conformance/subsystems/cics/system/cics/{interface}-command-source-map.json").read_text())
+        manifest = json.loads((root / f"conformance/subsystems/cics/system/manifests/cics-{interface}-command-topics.json").read_text())
+        facts.extend(project_family_grammar(family, mapping, manifest, root))
+    return sorted(facts, key=lambda fact: fact["official_row"])
+
+
+def render_grammar_facts(facts: list[dict[str, Any]]) -> bytes:
+    shapes = {"flag": "Flag", "value": "Value", "optional-value": "OptionalValue", "unresolved": "BoundedAmbiguity"}
+    directions = {"input": "Input", "output": "Output", "input-output": "InputOutput", "none": "None", "unresolved": "BoundedAmbiguity"}
+    def render_shape(grammar: dict[str, Any], indent: int) -> list[str]:
+        lines: list[str] = []
+        lines.append("        options: &[")
+        for option in grammar["options"]:
+            maximum = option["source_max_value_bytes"]
+            maximum = "None" if maximum is None else f"Some({maximum})"
+            lines.append(
+                "            CicsApplicationOptionDescriptor { "
+                f"name: {rust_string(option['name'])}, "
+                f"value_shape: CicsApplicationOptionValueShape::{shapes[option['value_shape']]}, "
+                f"direction: CicsApplicationOptionDirection::{directions[option['direction']]}, "
+                f"source_max_value_bytes: {maximum} "
+                "},"
+            )
+        lines.append("        ],")
+        lines.append("        cvda_domains: &[")
+        for domain in grammar.get("cvda_domains", []):
+            lines.append("            CicsApplicationCvdaDomain { "
+                         f"option: {rust_string(domain['option'])}, "
+                         f"values: {rust_string_slice(domain['values'])} " + "},")
+        lines.append("        ],")
+        lines.append("        cvda_numeric_domains: &[")
+        for domain in grammar.get("cvda_domains", []):
+            if "numeric_encoding" not in domain:
+                continue
+            encoding = domain["numeric_encoding"]
+            pin = encoding["source"]
+            numbers = ", ".join("CicsApplicationCvdaNumericValue { "
+                                f"symbol: {rust_string(value['symbol'])}, number: {value['number']} "
+                                + "}" for value in encoding["values"])
+            lines.append("            CicsApplicationCvdaNumericDomain { "
+                         f"option: {rust_string(domain['option'])}, "
+                         f"source_baseline: {rust_string(pin['baseline'])}, "
+                         f"source_topic: {rust_string(pin['topic_path'])}, "
+                         f"source_sha256: {rust_string(pin['sha256'])}, values: &[{numbers}] " + "},")
+        lines.append("        ],")
+        lines.append(f"        required_options: {rust_string_slice(grammar['required'])},")
+        lines.append("        alternative_groups: &[")
+        for group in grammar["alternative_groups"]:
+            required = str(group["required"]).lower()
+            require(type(group["required"]) is bool, "alternative requirement is not boolean")
+            lines.append(
+                "            CicsApplicationOptionAlternative { "
+                f"members: {rust_string_slice(group['members'])}, required: {required} "
+                "},"
+            )
+        lines.append("        ],")
+        lines.append("        dependencies: &[")
+        for dependency in grammar["dependencies"]:
+            lines.append(
+                "            CicsApplicationOptionDependency { "
+                f"option: {rust_string(dependency['option'])}, "
+                f"requires: {rust_string_slice(dependency['requires'])} "
+                "},"
+            )
+        lines.append("        ],")
+        exclusions = ", ".join(rust_string_slice(group) for group in grammar["exclusive"])
+        lines.append(f"        mutual_exclusion_groups: &[{exclusions}],")
+        # The shared shape emitter uses one fixed indent internally.
+        return [" " * (indent - 8) + line for line in lines]
+
+    digest = "sha256:" + hashlib.sha256(GRAMMAR_DOMAIN + canonical_bytes(facts)).hexdigest()
+    lines = [
+        "// @generated by `python3 -B conformance/subsystems/cics/system/tools/generate_spi1001_catalog.py`; do not edit.",
+        "",
+        "/// Digest of source-linked product grammar facts; cases and verdicts are excluded.",
+        f"pub const CICS_ADMINISTRATIVE_GRAMMAR_SHA256: &str = {rust_string(digest)};",
+        "",
+        "#[rustfmt::skip]",
+        "/// Partial source-reviewed grammar contracts, with Pending completeness and no routes.",
+        "pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarContract] = &[",
+    ]
+    for fact in facts:
+        grammar = fact["grammar"]
+        lines.append("    CicsAdministrativeGrammarContract {")
+        for field in ("official_row", "family", "label"):
+            lines.append(f"        {field}: {rust_string(fact[field])},")
+        for field, key in (("source_baseline", "baseline"), ("source_topic", "topic_path"), ("source_sha256", "sha256")):
+            lines.append(f"        {field}: {rust_string(fact['source'][key])},")
+        lines.extend(render_shape(grammar, 8))
+        lines.append("        forms: &[")
+        for form in grammar.get("forms", []):
+            lines.append("            CicsAdministrativeGrammarForm {")
+            lines.append(f"                id: {rust_string(form['id'])},")
+            lines.append(f"                selector_options: {rust_string_slice(form['selector_options'])},")
+            lines.extend(render_shape(form["grammar"], 16))
+            lines.append("                constraint_status: CicsApplicationConstraintStatus::Pending,")
+            lines.append("            },")
+        lines.append("        ],")
+        lines.append("        constraint_status: CicsApplicationConstraintStatus::Pending,")
+        lines.append("    },")
+    lines.append("];\n")
+    return "\n".join(lines).encode("utf-8")
+
+
+def render_grammar_outputs(facts: list[dict[str, Any]]) -> dict[Path, bytes]:
+    """Keep one ordered fact projection while bounding each generated Rust module."""
+    digest = "sha256:" + hashlib.sha256(GRAMMAR_DOMAIN + canonical_bytes(facts)).hexdigest()
+    header = "// @generated by `python3 -B conformance/subsystems/cics/system/tools/generate_spi1001_catalog.py`; do not edit."
+    groups: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    line_count = 6
+    for fact in facts:
+        # The sole shape emitter supplies the exact declaration body in every chunk.
+        body_lines = len(render_grammar_facts([fact]).splitlines()) - 9
+        require(body_lines + 6 <= MAX_GRAMMAR_MODULE_LINES,
+                f"one command grammar exceeds generated module bound: {fact['official_row']}")
+        if current and line_count + body_lines > MAX_GRAMMAR_MODULE_LINES:
+            groups.append(current)
+            current = []
+            line_count = 6
+        current.append(fact)
+        line_count += body_lines
+    if current:
+        groups.append(current)
+
+    outputs: dict[Path, bytes] = {}
+    lines = [header, "", "/// Digest of all source-linked product facts, excluding cases and verdicts.",
+             f"pub const CICS_ADMINISTRATIVE_GRAMMAR_SHA256: &str = {rust_string(digest)};", ""]
+    for index, group in enumerate(groups):
+        name = f"chunk_{index:03}"
+        path = GRAMMAR_CHUNK_PATH / f"{name}.rs"
+        chunk = render_grammar_facts(group).decode().splitlines()[5:]
+        chunk[2] = "pub(super) const CONTRACTS: &[CicsAdministrativeGrammarContract] = &["
+        outputs[path] = (header + "\n\n" + "\n".join(chunk) + "\n").encode()
+        lines.extend(["#[rustfmt::skip]",
+                      f'mod cics_administrative_{name} {{ use super::*; include!("cics_administrative_grammar/{name}.rs"); }}'])
+    lines.extend(["", "#[rustfmt::skip]",
+                  "/// Partial source-reviewed contracts, with Pending completeness and no routes.",
+                  "pub const CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS: &[CicsAdministrativeGrammarContract] = &["])
+    for index, group in enumerate(groups):
+        for position in range(len(group)):
+            lines.append(f"    cics_administrative_chunk_{index:03}::CONTRACTS[{position}],")
+    lines.append("];\n")
+    outputs[GRAMMAR_OUTPUT_PATH] = "\n".join(lines).encode()
+    require(all(len(body.splitlines()) <= MAX_GRAMMAR_MODULE_LINES for body in outputs.values()),
+            "generated grammar module line bound exceeded")
+    return outputs
+
+
+def render_grammar(root: Path = ROOT) -> bytes:
+    return render_grammar_outputs(family_grammar_facts(root))[GRAMMAR_OUTPUT_PATH]
+
+
+def grammar_chunk_files(root: Path) -> set[Path]:
+    directory = root / GRAMMAR_CHUNK_PATH
+    if not directory.exists():
+        return set()
+    require(directory.is_dir() and not directory.is_symlink(), "invalid generated grammar directory")
+    files = set()
+    for path in directory.iterdir():
+        require(path.is_file() and not path.is_symlink() and
+                re.fullmatch(r"chunk_[0-9]{3}\.rs", path.name) is not None,
+                f"unexpected generated grammar chunk: {path}")
+        files.add(path.relative_to(root))
+    return files
+
+
+def check_grammar_outputs(root: Path, outputs: dict[Path, bytes]) -> None:
+    expected = set(outputs) - {GRAMMAR_OUTPUT_PATH}
+    require(grammar_chunk_files(root) == expected, "generated grammar chunk inventory is stale")
+    for relative, body in outputs.items():
+        path = root / relative
+        require(path.is_file() and path.read_bytes() == body, f"generated grammar facts stale: {path}")
+
+
 def generate(root: Path = ROOT) -> None:
     path = root / OUTPUT_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -295,6 +660,14 @@ def generate(root: Path = ROOT) -> None:
     rust_path = root / RUST_OUTPUT_PATH
     rust_path.parent.mkdir(parents=True, exist_ok=True)
     rust_path.write_bytes(render_rust(root))
+    outputs = render_grammar_outputs(family_grammar_facts(root))
+    stale = grammar_chunk_files(root) - set(outputs)
+    for relative in stale:
+        (root / relative).unlink()
+    for relative, body in outputs.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
 
 
 def check(root: Path = ROOT) -> None:
@@ -307,6 +680,7 @@ def check(root: Path = ROOT) -> None:
         rust_path.read_bytes() == render_rust(root),
         f"generated Rust identity registry is stale: {rust_path}",
     )
+    check_grammar_outputs(root, render_grammar_outputs(family_grammar_facts(root)))
 
 
 def parse_args() -> argparse.Namespace:
@@ -324,7 +698,7 @@ def main() -> int:
             generate()
         print("SPI-1001 catalog: 269 SPI + 39 FEPI identity rows; semantic credit 0")
         return 0
-    except (CatalogError, source.SourceAuthorityError, OSError) as error:
+    except (CatalogError, source.SourceAuthorityError, OSError, KeyError, TypeError, json.JSONDecodeError) as error:
         print(f"SPI-1001 catalog: {error}")
         return 1
 

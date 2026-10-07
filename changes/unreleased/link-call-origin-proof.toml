@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Expose a read-only exact selected LINK request observation with the original outer CICS effect key, without enabling scoped admission or recovery."

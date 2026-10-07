@@ -1324,6 +1324,8 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod contract_consumption;
     use mainframe_env_cics::{CicsReplayClock, CicsUowState, describe_cics_uow_row};
     use mainframe_env_store_api::{EffectDigestFormat, EffectState, IdempotencyStore};
     use std::process::Command;

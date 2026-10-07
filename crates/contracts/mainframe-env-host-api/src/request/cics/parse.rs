@@ -4,6 +4,9 @@ use super::CicsOperation;
 
 impl CicsOperation {
     #[must_use]
+    /// Resolve a command head from case-insensitive tokens, ignoring EXEC/CICS/END-EXEC wrappers.
+    /// Returns `None` for an unrecognized head; operand validity and operation support are checked
+    /// separately.
     pub fn from_tokens(tokens: &[String]) -> Option<Self> {
         let words: Vec<String> = tokens
             .iter()

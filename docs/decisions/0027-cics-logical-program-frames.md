@@ -417,6 +417,133 @@ relabel a pending row as completed. Artifact removal is not authorized by this
 phase; unavailable immutable artifacts fail closed, not catalog replacement.
 No new coordinator, provider namespace, executable host contract or ledger.
 
+### Same-level synchronous task admission prerequisite
+
+The next bounded manager contract uses the existing task claim and top program
+loan for an attested installed Transfer. The embedding must independently prove
+the retained canonical source command/result, original pending CALL, frozen
+immutable selection, trusted source invocation and live source/target instance
+ownership before requesting admission. A constructor image or integrity digest
+alone is insufficient. Cold busy rows never recreate the synchronous loan.
+
+At admission, the top loan and current task actor must exactly match the source
+on the current executor thread, with no command outstanding. The target has the
+source execution as its durable parent while retaining the same CICS logical
+level and original invoking/return programs. Root task identity and shared
+file/UOW/BTS resources remain owned by the original task. Principal, grants,
+provider generations, live controls, service class and resource/deadline limits
+cannot widen. Frozen program generation/artifact/content identity must match the
+retained immutable definition; no latest-generation or name-only fallback.
+The target's entry COMMAREA/current channel come from the independently attested
+Transfer and admitted invocation. This loan provides no shared virtual memory.
+
+Only the existing top loan actor is rebound. The source cannot reenter commands
+or be restored as the running frame after replacement. The original outer
+program loan still owns caller restoration after known target completion.
+Unknown outcomes and abnormal unwinding retain the existing uncertain-session
+fence; no terminal receipt, source retirement or target redispatch is inferred.
+The separate original-CALL/instance contract must bind exact CAS versions and
+cross-authority handoff proof before this helper can be connected to execution.
+No durable codec number, new namespace, coordinator, routing or full-frame
+acceptance is introduced by this volatile prerequisite.
+
+### Exact-version source core terminalization prerequisite
+
+`complete_suspended_handoff_at_version` uses the existing execution record,
+lifecycle journal and atomic core CAS. Before mutation it requires the exact
+positive, successor-compatible source version; execution/run/principal identity,
+selector, immutable artifact and attempt; Suspended state without terminal age;
+and the matching final Suspended event. The supplied positive terminal tick must
+be monotonic and fit the existing durable integer domain. It never opens generic
+resumable admission, which would create a missing source or relax suspended
+selector/artifact identity. Races or disappearance are rejected by the existing
+CAS; no second coordinator or namespace is introduced.
+
+The Completed/HandoffCompleted step and its event/outbox are atomic through the
+existing owner. Checkpoint deletion remains subsequent cleanup and can fail after
+the terminal step committed. An error does not prove non-execution or authorize a
+retry; the embedding must separately observe the exact terminal record/event.
+This helper grants no provider disposition, target instance lease, CALL reply,
+volatile task loan or redispatch. The existing generic handoff remains unchanged.
+Source snapshot semantics and the original CALL/instance proof chain are separate
+prerequisites before any runtime use.
+
+### Read-only transfer and warm instance attestation prerequisite
+
+The pending schema4 constructor is revalidated against the exact source
+Suspended record/event/checkpoint, canonical completed CICS Transfer effect,
+retained command replay and frozen immutable selection. The restored source
+machine must match the captured checkpoint and effect sequence; the target image
+must equal an independent fresh constructor with the exact inherited invocation
+and COMMAREA. Rehashed executed images or widened context do not gain admission.
+Live controls are checked without writes, target dispatch or fence changes.
+
+The existing warm instance Lease retains its acquiring invocation in memory.
+Read-only token observation requires that exact actor/context, source row CAS and
+payload, current run ownership/membership/active counts and a closed source.
+Only an idle compatible target and validated ordinary last-used target image are
+accepted. It returns observed run/source/target CAS versions without reserving,
+retiring or executing either program. It cannot reconstruct a token from cold
+busy rows, prove a source transfer disposition or create a completed CALL reply.
+This prerequisite preserves the existing schemas and unsupported runtime result;
+source-state snapshot authority and durable CALL/instance phases remain separate.
+
+### Read-only local LINK entry observation
+
+The existing task claim now captures the active canonical CICS operation and
+restores its prior value after nested commands. Each selected program loan also
+captures its actual immutable selection, source actor and entry level. A manual
+or unselected loan has no such observation authority. This volatile bookkeeping
+adds no durable codec or owner namespace.
+
+`attest_local_link_entry(source, target, selection)` observes the current top
+loan without assigning its actor or changing task/provider bytes. It requires
+actual typed LINK origin, original source before entry COMMAREA enrichment,
+exact selected tuple/program/artifact/parent/root run/principal, executor thread,
+lower level and no outstanding command. Known foreign actors, uncertain sessions,
+pending program ABEND, missing/expired loans and nonlocal/malformed CICS context
+fail closed. Target grants, generations, attempt, service/priority, audit and
+live controls agree with the source; deadlines/resource bounds cannot widen.
+Every CICS binding except bounded typed entry COMMAREA remains unchanged.
+
+The token exposes root/source/target invocations, selection and level with
+private fields and no constructor/serde. It is an immutable observation, not a
+retained loan or dispatch, storage-reset, replacement, cleanup, cached-reply or
+recovery permission. The embedding must independently validate exact child
+construction, actual LINK payload and immutable executable, current core/control
+and instance/CALL CAS authority, then revalidate live admission at its write
+boundary. If the provider has a replay clock it checks elapsed target deadline;
+otherwise current time remains the embedding's authority. Other subsystem
+bindings are not attested here. No cold busy row can reconstruct this loan.
+
+The bounded helper requires focused production command/loan-path observation,
+identity/selection/control/thread/command/depth/origin/uncertainty negatives,
+read purity, original source nesting/restoration, known replay without redispatch
+and expired/cold loan rejection. These supplement future compiled selected-product
+scope proofs; storage diagnostics, native CALL/subloan behavior, durable closure,
+backend reopen and full family acceptance remain pending. Earlier exploratory
+Rust 1.98 Clippy checks failed on unchanged host MQ/CICS code outside this slice;
+aggregate lint acceptance remains pending, with no suppression or policy change.
+
+### Executed native-return observation
+
+`InstalledProgramReturn` has private fields and no constructor or serde. The
+live machine sets its volatile marker only after GOBACK or EXIT PROGRAM
+successfully completes. Constructors, checkpoint restore and every subsequent
+drive clear it. Exact opcode, PC, step count, supported retained resources and
+closed cursors must still agree. STOP RUN, CICS RETURN and other exits do not
+attest. Invalid restore validates formerly late-failing checks before mutation,
+preserving machine bytes; accepted snapshot versions and shapes are unchanged.
+
+The marker records execution, not durable terminal state or storage authority.
+The coordinator currently records Completing/Completed without a terminal
+machine checkpoint. A future scope writer must bind the live terminal snapshot
+and exact core Completed event/attempt/version in its existing atomic CALL close;
+it cannot treat a restored prior checkpoint as the terminal snapshot. Installing
+retained bytes is separately validated, and no observation authorizes their
+identity, backend closure, redispatch or cleanup. Old retained tuple1 and BTS
+completion cleanup remain unchanged. Scope writers and recovery remain pending.
+
 ## Source and acceptance
 
 Pinned authority: CICS TS 6.x sources B baseline
@@ -443,3 +570,31 @@ Require compiled handler isolation/caller restoration, shared file update and
 rollback, lower RETURN, identity/depth/concurrency fences, deny/cancel/failure
 and unknown-outcome recovery, SQLite/PostgreSQL reopen and mandatory gates.
 This is neither full program-family closure nor licensed differential evidence.
+
+## Atomic scoped terminal capture
+
+Machine has an optional default-None completion checkpoint observation. A scoped
+ReferenceMachine supplies it only after its actual live GOBACK or EXIT PROGRAM
+return marker; constructors, ordinary unscoped machines, cold restores and
+abnormal exits cannot supply that observation. The exact storage-entry schema
+opts in but its opaque payload does not confer source or admission authority.
+The core coordinator preserves Completing, then publishes a supplied image in
+the same existing journal transaction as Completed, its event and outbox. It
+uses the existing suspended CheckpointRecord identity/metadata contract, including
+valid zero effect sequence; checkpoint codecs and resume eligibility do not change.
+
+An unavailable observation keeps compatibility: default-None leaves an earlier
+checkpoint intact. Therefore a checkpoint beside Completed is insufficient for
+scope close. The serialized consumer must require fresh live captured bytes,
+exact current core event/state/version/attempt, artifact/run/principal/generation/
+interfaces and the current source lease, then atomically publish provider scope
+close and original CALL reply. Publication failure leaves Completing and cannot
+redispatch. No execution or cleanup authority is reconstructed from these bytes.
+
+Kernel tests cover live native returns, unsupported resources and all stale or
+abnormal exclusions. Repository selected-store tests retain real MemoryStore,
+SQLite and explicitly selected isolated PostgreSQL atomicity/reopen regressions;
+ignored PostgreSQL selectors earn zero credit until actually executed. These
+bounded tests do not close the scoped storage or application acceptance gates.
+Source authority remains the pinned calling flow/rules and LINK row0138 cited
+in ADR0029; no publication text or licensed execution receipt enters Git.

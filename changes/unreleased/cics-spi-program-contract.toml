@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Record source-reviewed PROGRAM administration grammar, conditions and lifecycle contracts with explicit unresolved context and zero runtime credit."

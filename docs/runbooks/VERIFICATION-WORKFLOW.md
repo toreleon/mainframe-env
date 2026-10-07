@@ -2,7 +2,7 @@
 
 Use enough evidence to establish the changed behavior and its affected boundaries.
 Avoid turning each edit into a new full certification campaign. Explicit task,
-release, promotion, and conformance acceptance requirements remain mandatory.
+policy, integration, and conformance acceptance requirements remain mandatory.
 Run project commands directly from the intended checkout with the pinned tools.
 
 ## Agent development loop
@@ -55,3 +55,39 @@ pressure; cache and parallelism changes need elapsed-time and peak-storage
 measurements first.
 
 See the [IBM cache guide](IBM-DOCS-CACHE.md).
+
+## Effective Conformance IR inspection
+
+`cargo xtask conformance-spec-export` emits a JSON tooling bundle containing the
+validated effective document used by the existing runner, including admitted
+pilot augmentation, normalized catalog rows and candidate/catalog/spec digests.
+The committed static spec alone does not include every admitted pilot. Consumers
+can reconstruct `OfficialCatalogRow` values and compile `spec_document` with the
+existing `CompiledSpec::compile_json` API, checking the exported spec digest.
+Both export and execution use the same builder and augmentation order.
+
+Retain exports outside Git. They contain metadata and bindings, never execution
+or licensed acceptance; both credit fields are zero. Actual selected product
+route observations and verdict/ledger receipts are still required. An export's
+candidate identity is its exact producing checkout, including relevant dirty
+state, and cannot be relabeled for another candidate.
+
+## Scoped CICS contract-consumption tests
+
+The SYNCPOINT ledger tests consume a fresh same-builder export. Before running
+them or the full workspace tests, export the current checkout into an ignored
+file or an external receipt directory and supply its path explicitly:
+
+```sh
+mkdir -p target/conformance-inputs &&
+cargo run --quiet --locked -p xtask -- conformance-spec-export > target/conformance-inputs/effective-spec.json &&
+MAINFRAME_ENV_CONFORMANCE_SPEC_EXPORT="$PWD/target/conformance-inputs/effective-spec.json" \
+    cargo test --locked -p mainframe-env-conformance cics_pilot::tests::contract_consumption::
+```
+
+Regenerate after changing candidate inputs. Missing, malformed or stale input
+fails the tests; it earns no skipped or successful evidence. The existing Jenkins
+Foundation stage generates the same input before the unchanged workspace test
+command. Retain required receipts outside disposable targets before cleanup.
+The export is metadata with zero execution and licensed credit; the tests still
+have to obtain and evaluate observations from the compiled product path.

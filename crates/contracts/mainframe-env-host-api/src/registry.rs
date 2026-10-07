@@ -3,32 +3,34 @@ use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
-/// Stable installed semantic-handler registry contract identity.
+/// Version identifier for explicit semantic-operation handler registration.
 pub const SUBSYSTEM_HANDLER_REGISTRY_CONTRACT: &str = "mainframe-env.subsystem-handler-registry@1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Provider capability, schema and byte limits; readiness is declared separately from resource authorization.
+/// Provider identity, schemas, readiness and canonical payload budgets for one capability.
+/// Descriptor validation checks identity lengths and nonzero budgets, not schema compatibility.
 pub struct CapabilityDescriptor {
-    /// Exact unique capability key used for registry selection.
+    /// Capability identity used for grants and provider lookup.
     pub capability: CapabilityId,
-    /// Bounded nonempty provider identity, not a principal.
+    /// Nonempty provider identity bounded by `max_identity_bytes`.
     pub provider_id: String,
-    /// Bounded nonempty provider generation identity, distinct from registry generation.
+    /// Nonempty exact provider/handler generation identity bounded by `max_identity_bytes`.
     pub generation: String,
-    /// Exact declared request schema identity, not a decoder or migration procedure.
+    /// Nonempty request schema identity bounded by `max_identity_bytes`.
     pub request_schema: String,
-    /// Exact declared result schema identity, not proof that a reply was validated.
+    /// Nonempty result schema identity bounded by `max_identity_bytes`.
     pub result_schema: String,
-    /// Positive maximum encoded request bytes declared by this provider.
+    /// Positive upper bound on the canonical encoded request size in bytes.
     pub max_request_bytes: usize,
-    /// Positive maximum encoded result bytes declared by this provider.
+    /// Positive upper bound on the canonical encoded result size in bytes.
     pub max_result_bytes: usize,
-    /// Explicit readiness declaration; selecting an unready implementation fails closed.
+    /// Whether selection may return this provider or handler for dispatch.
     pub ready: bool,
 }
 
 impl CapabilityDescriptor {
-    /// Check bounded nonempty identities and positive byte limits; readiness and permission are not inferred.
+    /// Check identity/schema byte lengths and positive canonical payload budgets.
+    /// Returns `InvalidDescriptor` for an empty or oversized identity or a zero byte budget.
     pub fn validate(&self, limits: InvocationLimits) -> Result<(), RegistryProblem> {
         let values = [
             &self.provider_id,
@@ -49,11 +51,13 @@ impl CapabilityDescriptor {
     }
 }
 
-/// Installed provider boundary. Implementations own execution; callers retain the original invocation/effect identity.
+/// Thread-safe owner of one registered host capability.
+/// The scoped service validates authorization, generation and canonical budgets around dispatch.
 pub trait HostProvider: Send + Sync {
-    /// Borrow the installed declaration used for selection; keep it consistent with the implementation lifetime.
+    /// Borrow the provider's capability identity, readiness, schemas and byte budgets.
     fn descriptor(&self) -> &CapabilityDescriptor;
-    /// Handle the original request under the supplied invocation, retaining its sequence and exact failure/uncertainty result; this interface grants no permission by itself.
+    /// Consume one effect request under the supplied invocation and return a sequence-bound reply.
+    /// Report uncertain effects as `UnknownOutcome` so callers can reconcile them.
     fn invoke(&self, invocation: &Invocation, request: EffectRequest) -> EffectResult;
 
     /// Replay-only synchronous transport for the finite checked inquiry shape.
@@ -94,14 +98,17 @@ pub trait HostProvider: Send + Sync {
 }
 
 #[derive(Clone)]
-/// Immutable generation of unique capability-to-provider bindings; held snapshots survive later publication.
+/// Immutable capability-to-provider mapping with a nonzero publication generation.
+/// Provider handles are shared by `Arc`; cloning a snapshot preserves its selected mapping.
 pub struct RegistrySnapshot {
     generation: u64,
     providers: BTreeMap<CapabilityId, Arc<dyn HostProvider>>,
 }
 
 impl RegistrySnapshot {
-    /// Build a positive bounded generation, validating descriptors and rejecting duplicate keys before publishing anything.
+    /// Own a bounded set of shared providers under a nonzero generation.
+    /// Reject invalid descriptors and duplicate capability identities rather than replacing
+    /// entries.
     pub fn new(
         generation: u64,
         providers: Vec<Arc<dyn HostProvider>>,
@@ -125,12 +132,13 @@ impl RegistrySnapshot {
     }
 
     #[must_use]
-    /// Return this immutable registry publication generation, not an individual provider schema/revision.
+    /// Return the snapshot's nonzero publication generation.
     pub const fn generation(&self) -> u64 {
         self.generation
     }
 
-    /// Clone the exact installed binding; absent keys return Unsupported and unready declarations return ProviderFailure. No fallback or invocation occurs.
+    /// Clone the shared provider handle for an exact capability.
+    /// Returns `Unsupported` when absent and `ProviderFailure` when the provider is not ready.
     pub fn select(&self, capability: &CapabilityId) -> Result<Arc<dyn HostProvider>, HostProblem> {
         let provider = self
             .providers
@@ -143,36 +151,39 @@ impl RegistrySnapshot {
     }
 
     #[must_use]
-    /// Iterate exact capability keys in deterministic sorted order.
+    /// Borrow registered capability identities in deterministic sorted order.
     pub fn capabilities(&self) -> impl ExactSizeIterator<Item = &CapabilityId> {
         self.providers.keys()
     }
 }
 
-/// Lock-protected publication of strictly increasing capability generations; existing snapshots remain valid observations.
+/// Lock-protected publisher of monotonically newer capability snapshots.
+/// Previously borrowed snapshots retain their mapping after publication.
 pub struct RegistryPublisher {
     current: RwLock<Arc<RegistrySnapshot>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Semantic handler declaration checked against official subsystem identity when in the official namespace.
+/// Explicit handler selection for one semantic identity and subsystem.
+/// Official identities must belong to the descriptor's subsystem; custom identities have no
+/// official row.
 pub struct SubsystemHandlerDescriptor {
-    /// Exact official/custom identity key selected by the registry.
+    /// Validated official or custom semantic operation identity used for exact lookup.
     pub semantic_id: SemanticOperationId,
-    /// Bounded subsystem label; official identity descriptors must agree exactly.
+    /// Nonempty subsystem name; checked against the catalog for official identities.
     pub subsystem: String,
-    /// Bounded nonempty handler generation identity.
+    /// Nonempty exact provider/handler generation identity bounded by `max_identity_bytes`.
     pub generation: String,
-    /// Exact declared request schema identity, not a decoder or migration procedure.
+    /// Nonempty request schema identity bounded by `max_identity_bytes`.
     pub request_schema: String,
-    /// Exact declared result schema identity, not proof that a reply was validated.
+    /// Nonempty result schema identity bounded by `max_identity_bytes`.
     pub result_schema: String,
-    /// Explicit readiness declaration; selecting an unready implementation fails closed.
+    /// Whether selection may return this provider or handler for dispatch.
     pub ready: bool,
 }
 
 impl SubsystemHandlerDescriptor {
-    /// Check bounded nonempty descriptor identities; semantic official descriptors also require exact subsystem agreement. No handler is invoked.
+    /// Check bounded descriptor strings and official-identity subsystem membership.
     pub fn validate(&self, limits: InvocationLimits) -> Result<(), RegistryProblem> {
         if [
             &self.subsystem,
@@ -197,23 +208,26 @@ impl SubsystemHandlerDescriptor {
     }
 }
 
-/// Installed semantic handler; catalog identity alone does not install an implementation or grant permission.
+/// Thread-safe implementation selected by semantic operation identity.
+/// Generated identity presence alone does not register an implementation.
 pub trait SubsystemHandler: Send + Sync {
-    /// Borrow the installed declaration used for selection; keep it consistent with the implementation lifetime.
+    /// Borrow the handler's semantic identity, subsystem, generation and readiness.
     fn descriptor(&self) -> &SubsystemHandlerDescriptor;
-    /// Handle the original request under the supplied invocation, retaining its sequence and exact failure/uncertainty result; this interface grants no permission by itself.
+    /// Consume an effect request under the supplied invocation and return a sequence-bound reply.
+    /// The returned failure must preserve uncertainty when the effect's disposition is unknown.
     fn invoke(&self, invocation: &Invocation, request: EffectRequest) -> EffectResult;
 }
 
 #[derive(Clone)]
-/// Immutable unique semantic-handler generation, bounded by invocation capability count.
+/// Immutable, ordered mapping from semantic identities to explicitly installed handlers.
 pub struct SubsystemHandlerRegistry {
     generation: u64,
     handlers: BTreeMap<SemanticOperationId, Arc<dyn SubsystemHandler>>,
 }
 
 impl SubsystemHandlerRegistry {
-    /// Build a positive bounded generation, validating descriptors and rejecting duplicate keys before publishing anything.
+    /// Own a bounded set of shared handlers under a nonzero generation.
+    /// Validate descriptors and reject duplicate semantic identities.
     pub fn new(
         generation: u64,
         handlers: Vec<Arc<dyn SubsystemHandler>>,
@@ -237,24 +251,25 @@ impl SubsystemHandlerRegistry {
     }
 
     #[must_use]
-    /// Return this immutable registry publication generation, not an individual provider schema/revision.
+    /// Return the registry's nonzero publication generation.
     pub const fn generation(&self) -> u64 {
         self.generation
     }
 
     #[must_use]
-    /// Return the number of installed bindings, not the generated identity denominator.
+    /// Return the number of explicitly installed handlers.
     pub fn len(&self) -> usize {
         self.handlers.len()
     }
 
     #[must_use]
-    /// Report whether no handler binding is installed.
+    /// Whether no semantic handlers are installed.
     pub fn is_empty(&self) -> bool {
         self.handlers.is_empty()
     }
 
-    /// Clone the exact installed binding; absent keys return Unsupported and unready declarations return ProviderFailure. No fallback or invocation occurs.
+    /// Clone the shared handler for an exact semantic identity.
+    /// Returns `Unsupported` when absent and `ProviderFailure` when it is not ready.
     pub fn select(
         &self,
         identity: &SemanticOperationId,
@@ -269,27 +284,27 @@ impl SubsystemHandlerRegistry {
         Ok(Arc::clone(handler))
     }
 
-    /// Iterate exact semantic keys in deterministic sorted order.
+    /// Borrow installed semantic identities in deterministic sorted order.
     pub fn identities(&self) -> impl ExactSizeIterator<Item = &SemanticOperationId> {
         self.handlers.keys()
     }
 }
 
-/// Monotonic semantic-handler publication with immutable retained snapshots and poison reporting.
+/// Lock-protected publisher of monotonically newer handler registries.
 pub struct SubsystemHandlerPublisher {
     current: RwLock<Arc<SubsystemHandlerRegistry>>,
 }
 
 impl SubsystemHandlerPublisher {
     #[must_use]
-    /// Publish an already validated initial generation; later snapshots share it through Arc.
+    /// Publish the initial validated handler registry under shared ownership.
     pub fn new(initial: SubsystemHandlerRegistry) -> Self {
         Self {
             current: RwLock::new(Arc::new(initial)),
         }
     }
 
-    /// Clone the current immutable Arc under a read lock; poisoned state returns Poisoned instead of recovering silently.
+    /// Clone the current immutable registry handle; returns `Poisoned` on lock failure.
     pub fn snapshot(&self) -> Result<Arc<SubsystemHandlerRegistry>, RegistryProblem> {
         self.current
             .read()
@@ -297,7 +312,8 @@ impl SubsystemHandlerPublisher {
             .map_err(|_| RegistryProblem::Poisoned)
     }
 
-    /// Replace the current Arc only with a strictly newer generation under one write lock; stale/poisoned failures preserve the current publication.
+    /// Replace the current registry only with a strictly newer generation.
+    /// Existing shared registry handles remain valid after replacement.
     pub fn publish(&self, next: SubsystemHandlerRegistry) -> Result<(), RegistryProblem> {
         let mut current = self
             .current
@@ -313,14 +329,14 @@ impl SubsystemHandlerPublisher {
 
 impl RegistryPublisher {
     #[must_use]
-    /// Publish an already validated initial generation; later snapshots share it through Arc.
+    /// Publish the initial validated snapshot under shared ownership.
     pub fn new(initial: RegistrySnapshot) -> Self {
         Self {
             current: RwLock::new(Arc::new(initial)),
         }
     }
 
-    /// Clone the current immutable Arc under a read lock; poisoned state returns Poisoned instead of recovering silently.
+    /// Clone the current immutable snapshot handle; returns `Poisoned` on lock failure.
     pub fn snapshot(&self) -> Result<Arc<RegistrySnapshot>, RegistryProblem> {
         self.current
             .read()
@@ -328,7 +344,9 @@ impl RegistryPublisher {
             .map_err(|_| RegistryProblem::Poisoned)
     }
 
-    /// Replace the current Arc only with a strictly newer generation under one write lock; stale/poisoned failures preserve the current publication.
+    /// Replace the current snapshot only with a strictly newer generation.
+    /// Held snapshots remain valid; stale generation or poisoned lock leaves publication
+    /// unsuccessful.
     pub fn publish(&self, next: RegistrySnapshot) -> Result<(), RegistryProblem> {
         let mut current = self
             .current
@@ -343,21 +361,21 @@ impl RegistryPublisher {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Registry construction/publication failure; rejected generations leave the current snapshot unchanged.
+/// Validation, publication or locking failure from a host registry operation.
 pub enum RegistryProblem {
-    /// Descriptor identities or positive byte bounds are invalid.
+    /// An identity/schema string or canonical byte budget is invalid.
     InvalidDescriptor,
-    /// A capability key occurs more than once.
+    /// More than one provider claims the same capability.
     DuplicateCapability,
-    /// A semantic key occurs more than once.
+    /// More than one handler claims the same semantic identity.
     DuplicateSemanticIdentity,
-    /// An official semantic identity disagrees with the declared subsystem.
+    /// An official semantic identity belongs to a different subsystem.
     WrongSubsystem,
-    /// Generation is zero or binding count exceeds its ceiling.
+    /// The publication generation is zero or the entry count exceeds the configured limit.
     LimitExceeded,
-    /// Publication is not strictly newer than the current generation.
+    /// The replacement generation is not strictly greater than the current generation.
     StaleGeneration,
-    /// The registry lock is poisoned; no silent recovery occurs.
+    /// The registry publication lock was poisoned.
     Poisoned,
 }
 impl std::fmt::Display for RegistryProblem {

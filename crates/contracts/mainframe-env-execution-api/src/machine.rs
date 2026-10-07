@@ -2,14 +2,15 @@ use crate::{ArtifactRef, BoundedPayload, ExecutionId, RunUnitId, Selector};
 use mainframe_env_diagnostics::ExecutionProblem;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-/// Positive machine-local frame identifier, not a durable execution or handle token.
+/// Nonzero machine frame identity constructed from a `u32`.
 pub struct FrameId(u32);
 
 impl FrameId {
-    /// Accept a positive numeric frame identity; uniqueness is the machine owner's responsibility.
+    /// Return a frame identity for a positive value, or `None` for zero.
     pub fn new(value: u32) -> Option<Self> {
         (value > 0).then_some(Self(value))
     }
+    /// Return the nonzero numeric identity.
     #[must_use]
     /// Return the original positive value without changing its scope.
     pub const fn get(self) -> u32 {
@@ -18,19 +19,24 @@ impl FrameId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Application call-frame metadata, separate from durable invocation attribution.
+/// Frame identity, depth, and return metadata carried by machine execution.
+///
+/// Fields are public; depth is checked only when `within_limit` is called.
 pub struct Frame {
-    /// Machine-local identity of this active frame.
+    /// Nonzero identity of the frame.
     pub id: FrameId,
-    /// Positive nesting depth checked against the invocation's frame budget.
+    /// One-based depth tested against the frame budget.
     pub depth: u32,
-    /// Admitted code selector for this frame.
+    /// Entry selector associated with this frame.
     pub selector: Selector,
-    /// Optional machine-owned continuation target used when this frame returns.
+    /// Optional opaque destination for returning control.
     pub return_target: Option<String>,
 }
 
 impl Frame {
+    /// Check that the depth is positive and does not exceed `max_frames`.
+    ///
+    /// No frame-stack membership or selector validity is checked.
     #[must_use]
     /// Check positive depth within the supplied budget; this does not validate frame identity/linkage.
     pub fn within_limit(&self, max_frames: u32) -> bool {
@@ -39,16 +45,19 @@ impl Frame {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Positive per-drive work budget, independent of invocation-wide resource limits.
+/// Step and allocation budgets for one call to [`Machine::drive`].
+///
+/// The constructor rejects zero budgets. Public fields permit direct construction
+/// or mutation; enforcement belongs to the machine implementation.
 pub struct Quantum {
-    /// Maximum deterministic machine steps in this drive.
+    /// Maximum steps requested for this drive call.
     pub max_steps: u32,
-    /// Maximum allocated bytes in this drive, as measured by the machine implementation.
+    /// Maximum allocation bytes requested for this drive call.
     pub max_allocated_bytes: u64,
 }
 
 impl Quantum {
-    /// Reject either zero budget; scheduling and actual accounting remain with the caller/machine.
+    /// Return a quantum only when both step and allocation budgets are positive.
     pub fn new(max_steps: u32, max_allocated_bytes: u64) -> Option<Self> {
         (max_steps > 0 && max_allocated_bytes > 0).then_some(Self {
             max_steps,
@@ -58,24 +67,26 @@ impl Quantum {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Ordinary application completion, not proof of durable publication or provider success.
+/// Application return code and bounded output produced by a completed machine.
 pub struct Completion {
-    /// Signed application return code in the program's own domain.
+    /// Application return code, without a success interpretation imposed here.
     pub return_code: i32,
-    /// Bounded schema-labelled application output.
+    /// Owned output with its schema and construction-time byte bound.
     pub output: BoundedPayload,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Modeled application condition, kept distinct from infrastructure failures.
+/// Modeled application condition with response values and handling status.
+///
+/// These fields are observations; this type performs no condition dispatch.
 pub struct Condition {
-    /// Condition identity interpreted by the originating language/subsystem.
+    /// Condition name reported by the machine.
     pub name: String,
-    /// Primary response in that subsystem's response domain.
+    /// Primary response value accompanying the condition.
     pub response: i32,
-    /// Secondary detail whose meaning depends on the condition and primary response.
+    /// Secondary response value accompanying the condition.
     pub response2: i32,
-    /// Whether application control handled this condition rather than propagating it.
+    /// Whether the condition is reported as handled.
     pub handled: bool,
 }
 
@@ -91,139 +102,169 @@ pub enum AbendDumpDisposition {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Modeled abnormal termination; recording it does not itself create a transaction dump.
+/// Modeled abnormal termination with optional reason and reported dump disposition.
+///
+/// Carrying a dump request does not itself produce a dump.
 pub struct Abend {
-    /// Originating runtime's abnormal-termination code.
+    /// Abnormal termination code reported by the machine.
     pub code: String,
-    /// Optional runtime explanation, distinct from the dump decision.
+    /// Optional explanatory text from the originating runtime.
     pub reason: Option<String>,
     /// Transaction-dump disposition reported by the originating runtime.
     pub dump: AbendDumpDisposition,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Machine suspension observation; restore requires a separately compatible checkpoint.
+/// Suspension metadata describing how a consumer may identify resumable work.
+///
+/// Tokens are opaque strings here; this type does not persist or restore state.
 pub struct Suspension {
-    /// Machine-owned suspension classification.
+    /// Opaque suspension category interpreted by the consumer.
     pub kind: String,
-    /// Opaque continuation identity, not permission to resume an unrelated execution.
+    /// Opaque token identifying continuation or resume information.
     pub resume_token: String,
-    /// Reported retained state size in bytes for bounded checkpoint accounting.
+    /// Reported size of suspended state in bytes.
     pub state_bytes: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Request for an admitted child execution; the coordinator owns child lifecycle and control.
+/// Owned selector, artifact, and bounded input for a requested child execution.
 pub struct ChildInvocation {
-    /// Child program selector to resolve through the existing admission authority.
+    /// Entry selector requested for the child.
     pub selector: Selector,
-    /// Exact child code artifact reference, not a host-native program address.
+    /// Artifact reference requested for the child.
     pub artifact: ArtifactRef,
-    /// Bounded child input, with schema-specific interpretation owned by its receiver.
+    /// Owned bounded input to the child.
     pub payload: BoundedPayload,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Program-control transfer request, not an independently created execution authority.
+/// Owned target and bounded input for a requested control transfer.
 pub struct Transfer {
-    /// Target program selector to admit before execution.
+    /// Entry selector receiving transferred control.
     pub selector: Selector,
-    /// Bounded transferred application input.
+    /// Owned bounded input for the transfer target.
     pub payload: BoundedPayload,
-    /// Whether the machine requests replacing the current frame rather than retaining it.
+    /// Whether the request calls for replacing the current frame.
     pub replace_frame: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// One deterministic drive observation; the caller owns external dispatch and durable publication.
+/// Result of one bounded machine drive, transferring any emitted value to the caller.
+///
+/// `E` is the implementation-defined host effect. The caller handles dispatch,
+/// child execution, suspension, and terminal results.
 pub enum MachineDrive<E> {
-    /// The quantum ended while the machine can continue without external input.
+    /// The machine remains runnable and can be driven again.
     Continue,
-    /// An original typed effect awaits host dispatch and a matching resume result.
+    /// A host effect requiring caller dispatch before supplying a host result.
     HostCall(E),
-    /// Child admission/execution is required before the parent can continue.
+    /// A child execution requested by the machine.
     Invoke(ChildInvocation),
-    /// A program-control transfer needs the caller's admission handling.
+    /// A request to transfer control to another selector.
     Transfer(Transfer),
-    /// Execution yielded with an explicit suspension observation.
+    /// The machine reports suspension metadata to the caller.
     Suspended(Suspension),
-    /// Application computation completed; durable completion remains coordinator-owned.
+    /// The machine produced its application return code and output.
     Completed(Completion),
-    /// A modeled condition is returned without collapsing it into generic failure.
+    /// The machine reports a modeled application condition.
     Condition(Condition),
-    /// A modeled abnormal termination is returned.
+    /// The machine reports modeled abnormal termination.
     Abend(Abend),
-    /// Machine execution failed with a typed execution problem.
+    /// The machine reports a diagnostic failure, retaining any uncertainty.
     Failed(ExecutionProblem),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Input to a machine drive; implementations must match it to their current pending state.
+/// Input supplied when driving a machine, including results of external work.
+///
+/// `R` is the implementation-defined host result. Implementations decide which
+/// resume inputs are valid for their current state.
 pub enum MachineResume<R> {
-    /// Begin or continue ordinary execution without an external result.
+    /// Begin or continue runnable work without an external result.
     Start,
-    /// Return the host observation for the original pending effect.
+    /// Deliver the result of a previously requested host effect.
     HostResult(R),
-    /// Resume the parent after its admitted child completed.
+    /// Deliver a completed child execution result.
     ChildCompleted(Completion),
-    /// The execution owner observed cancellation; no mutation-absence guarantee is implied.
+    /// Notify the machine that cancellation was selected by its caller.
     Cancelled,
-    /// The execution owner observed its deadline; uncertain effects still require reconciliation.
+    /// Notify the machine that its caller selected deadline expiry.
     TimedOut,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Coordinator-facing execution disposition, retaining application/control/failure distinctions.
+/// Coordinator-facing outcome preserving completion, control, and failure categories.
+///
+/// Failure details retain their diagnostic information, including any unknown
+/// outcome; cancellation or timeout is not proof that dispatched work was undone.
 pub enum ExecutionOutcome {
-    /// Ordinary application completion and bounded output.
+    /// Ordinary application completion with return code and output.
     Completed(Completion),
-    /// Modeled application condition and handling status.
+    /// A modeled application condition reported by execution.
     Condition(Condition),
-    /// Explicit suspension requiring compatible retained state to resume.
+    /// Execution yielded suspension metadata.
     Suspended(Suspension),
-    /// Child execution request awaiting admission.
+    /// Execution yielded a request for a child invocation.
     Invoke(ChildInvocation),
-    /// Program-control transfer awaiting admission.
+    /// Execution yielded a request for control transfer.
     Transfer(Transfer),
-    /// Modeled abnormal application termination.
+    /// Execution ended with modeled abnormal termination.
     Abend(Abend),
-    /// Cancellation won execution control; dispatched mutations may still need reconciliation.
+    /// Execution stopped under cancellation control.
     Cancelled,
-    /// The logical deadline won execution control, independently of effect uncertainty.
+    /// Execution stopped under deadline control.
     TimedOut,
-    /// Admission or validation rejected execution.
+    /// Execution was rejected with a diagnostic reason.
     Rejected(ExecutionProblem),
-    /// An owned execution budget was exhausted.
+    /// Execution exhausted a resource budget, with diagnostic details.
     ResourceExhausted(ExecutionProblem),
-    /// A selected provider reported failure.
+    /// A provider failure with diagnostic details and any outcome uncertainty.
     ProviderFailure(ExecutionProblem),
-    /// Execution infrastructure failed, distinct from a modeled application condition.
+    /// An infrastructure failure with diagnostic details and any uncertainty.
     InfrastructureFailure(ExecutionProblem),
 }
 
-/// Deterministic machine port with owned effects and explicit resume observations.
-/// The implementation does not own provider dispatch, journal publication or shared recovery.
+/// Stateful execution boundary advanced by explicit resume input and a quantum.
+///
+/// Effects and results are owned values crossing the caller/machine boundary.
+/// The trait supplies no dispatcher or persistence service. Checkpoint support
+/// and effect sequencing are optional through their default implementations.
 pub trait Machine {
-    /// Typed original host-effect request emitted by this machine.
+    /// Owned host-effect request emitted by this machine.
     type Effect;
-    /// Matching typed host observation consumed on resume.
+    /// Owned host result accepted when resuming this machine.
     type EffectResult;
-    /// Advance within a quantum from the supplied resume state.
-    /// External work is returned as data; the caller decides dispatch and durable transitions.
+    /// Advance mutable machine state using a resume input and per-call budgets.
+    ///
+    /// Return the next runnable, external-work, suspension, or terminal boundary.
+    /// The implementation validates resume/state compatibility and enforces budgets.
     fn drive(
         &mut self,
         resume: MachineResume<Self::EffectResult>,
         quantum: Quantum,
     ) -> MachineDrive<Self::Effect>;
 
-    /// Return compatible bounded resumable state, or `None` when capture is unsupported.
-    /// Absence must not be replaced with a guessed checkpoint; the default refuses capture.
+    /// Return an optional bounded state image for caller-managed persistence.
+    ///
+    /// The default returns `None`; this method does not write durable state.
     fn checkpoint(&self) -> Option<BoundedPayload> {
         None
     }
 
-    /// Last effect occurrence known to the machine, used to bind checkpoint/replay state.
-    /// The default zero reports no sequence tracking; it is not a durable journal lookup.
+    /// Return an optional live terminal state image for atomic completion publication.
+    ///
+    /// The default returns `None`, preserving implementations without terminal capture.
+    /// This observation writes no state and grants no cleanup or resume authority.
+    /// Callers that require a terminal image must fence an absent capture; they must
+    /// publish any supplied image with the exact Completed event in one transaction.
+    fn completion_checkpoint(&self) -> Option<BoundedPayload> {
+        None
+    }
+
+    /// Report the machine's current effect sequence to the caller.
+    ///
+    /// The default reports zero; sequencing semantics belong to the implementation.
     fn effect_sequence(&self) -> u64 {
         0
     }

@@ -214,39 +214,63 @@ impl CicsService {
             return Err(HostProblem::UnknownOutcome);
         }
         let selected = definition(&replay.response)?;
-        if !selected.enabled
-            || selected.remote
-            || selected.entry_offset != 0
-            || selected.java_status != CicsJavaStatus::NotJava
-        {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        let retained = self
-            .store
-            .get_provider_state(
-                PROGRAM_DEFINITION_NAMESPACE,
-                &program_definition_key(&selected.name, selected.generation),
-            )
-            .map_err(|_| HostProblem::UnknownOutcome)?
-            .ok_or(HostProblem::UnknownOutcome)?;
-        if retained.version != 1
-            || retained.payload
-                != encode_program_definition(&selected).map_err(|_| HostProblem::UnknownOutcome)?
-        {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        validate_program_artifact(
-            self.artifacts
-                .get()
-                .ok_or(HostProblem::UnknownOutcome)?
-                .as_ref(),
-            &selected,
-        )
-        .map_err(|_| HostProblem::UnknownOutcome)?;
-        Ok(ProgramLinkSelection {
-            artifact: selected.artifact,
+        let selection = ProgramLinkSelection {
+            artifact: selected.artifact.clone(),
             generation: selected.generation,
-            content_identity: format!("sha256:{:x}", Sha256::digest(&retained.payload)),
-        })
+            content_identity: format!(
+                "sha256:{:x}",
+                Sha256::digest(
+                    encode_program_definition(&selected)
+                        .map_err(|_| HostProblem::UnknownOutcome)?
+                )
+            ),
+        };
+        validate_frozen_selection(self, &selected.name, &selection)?;
+        Ok(selection)
     }
+}
+
+/// Recheck one frozen definition through the existing immutable program owner.
+pub(in crate::service) fn validate_frozen_selection(
+    service: &CicsService,
+    name: &str,
+    selection: &ProgramLinkSelection,
+) -> Result<(), HostProblem> {
+    let definition = service
+        .lock()?
+        .program_definitions
+        .get(name)
+        .and_then(|generations| generations.get(&selection.generation))
+        .cloned()
+        .ok_or(HostProblem::UnknownOutcome)?;
+    let payload =
+        encode_program_definition(&definition).map_err(|_| HostProblem::UnknownOutcome)?;
+    let retained = service
+        .store
+        .get_provider_state(
+            PROGRAM_DEFINITION_NAMESPACE,
+            &program_definition_key(name, selection.generation),
+        )
+        .map_err(|_| HostProblem::UnknownOutcome)?
+        .ok_or(HostProblem::UnknownOutcome)?;
+    if !definition.enabled
+        || definition.remote
+        || definition.entry_offset != 0
+        || definition.java_status != CicsJavaStatus::NotJava
+        || definition.artifact != selection.artifact
+        || selection.content_identity != format!("sha256:{:x}", Sha256::digest(&payload))
+        || retained.version != 1
+        || retained.payload != payload
+    {
+        return Err(HostProblem::UnknownOutcome);
+    }
+    validate_program_artifact(
+        service
+            .artifacts
+            .get()
+            .ok_or(HostProblem::UnknownOutcome)?
+            .as_ref(),
+        &definition,
+    )
+    .map_err(|_| HostProblem::UnknownOutcome)
 }

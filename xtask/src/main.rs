@@ -10,8 +10,10 @@ mod carddemo_host_integration;
 mod carddemo_readacct;
 mod carddemo_serve;
 mod changelog;
+mod cics_system_families;
 mod cobol_differential;
 mod conformance_catalog;
+mod conformance_spec_export;
 mod db2_statement_catalog;
 mod dependency_licenses;
 mod docs;
@@ -32,6 +34,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 #[cfg(test)]
 use conformance_catalog::indexed_catalog_closure;
 use conformance_catalog::official_catalog_rows;
+use conformance_spec_export::compile_shared_spec;
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
     CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
@@ -174,6 +177,14 @@ struct WorkPackageSealArgs {
     check: bool,
 }
 
+#[derive(Debug, Args)]
+struct CicsSystemFamilyArgs {
+    #[arg(long)]
+    family: Option<String>,
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug, Subcommand)]
 enum XtaskCommand {
     ProfileIntake(ProfileIntakeArgs),
@@ -187,6 +198,7 @@ enum XtaskCommand {
     RuntimeArchitecture(CheckArgs),
     Profiles(CheckArgs),
     Schemas(CheckArgs),
+    CicsSystemFamilies(CicsSystemFamilyArgs),
     Inventory(CheckArgs),
     MqMqiRegistry(CheckArgs),
     MqLicensedContract(CheckArgs),
@@ -221,6 +233,7 @@ enum XtaskCommand {
     ImsAssuranceMatrix(CheckArgs),
     RacfCatalog(CheckArgs),
     Spec(CheckArgs),
+    ConformanceSpecExport,
     WorkPackageSeal(WorkPackageSealArgs),
     Conformance(ConformanceArgs),
     Certification(CheckArgs),
@@ -332,6 +345,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         ),
         XtaskCommand::Profiles(args) => checked!("profiles", args, check_profiles(root)),
         XtaskCommand::Schemas(args) => checked!("schemas", args, check_schemas(root)),
+        XtaskCommand::CicsSystemFamilies(args) => checked!(
+            "cics-system-families",
+            args,
+            cics_system_families::check(root, args.family.as_deref())
+        ),
         XtaskCommand::Inventory(args) => checked!("inventory", args, check_inventory(root)),
         XtaskCommand::MqMqiRegistry(args) => {
             checked!("mq-mqi-registry", args, check_mq_mqi_registry(root))
@@ -514,6 +532,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             },
         ),
         XtaskCommand::Spec(args) => checked!("spec", args, check_spec(root)),
+        XtaskCommand::ConformanceSpecExport => (
+            "conformance-spec-export",
+            false,
+            conformance_spec_export::run(root),
+        ),
         XtaskCommand::Conformance(args) => {
             let focused = args.subsystem.is_some()
                 || args.gate.is_some()
@@ -4633,23 +4656,6 @@ fn format_generated_rust(root: &Path, source: Vec<u8>) -> TaskResult<Vec<u8>> {
     Ok(output.stdout)
 }
 
-fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
-    let index_path = root.join("conformance/subsystems/coverage/catalogs/index.json");
-    let catalog_digest = format!("sha256:{}", file_digest(&index_path)?);
-    let spec_path = root.join("conformance/spec/v1/spec.json");
-    let mut spec_value = json(&spec_path)?;
-    augment_ams_spec(root, &mut spec_value)?;
-    augment_docs_driven_pilots(root, &mut spec_value)?;
-    let bytes = serde_json::to_vec(&spec_value).map_err(|error| error.to_string())?;
-    CompiledSpec::compile_json(
-        &catalog_digest,
-        official_catalog_rows(root)?,
-        &bytes,
-        ConformanceLimits::default(),
-    )
-    .map_err(|problem| problem.to_string())
-}
-
 fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
     let fixture_path = root.join("conformance/subsystems/dataset/fixtures/ams-commands.json");
     let fixture = json(&fixture_path)?;
@@ -6912,22 +6918,7 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         cics_source_map.is_file(),
         "CICS sources-a map generator is missing",
     )?;
-    let cics_source_map_schema = root.join(
-        "conformance/subsystems/cics/application/schemas/cics-command-source-map.schema.json",
-    );
-    for relative in [
-        "conformance/subsystems/cics/application/cics/command-summary-topics.json",
-        "conformance/subsystems/cics/application/cics/application-api-sources-a-map.json",
-        "conformance/subsystems/cics/application/cics/application-api-sources-b-map.json",
-        "conformance/subsystems/cics/application/cics/application-api-sources-c-map.json",
-    ] {
-        let artifact = root.join(relative);
-        validate_schema_instance(
-            &json(&cics_source_map_schema)?,
-            &json(&artifact)?,
-            &artifact,
-        )?;
-    }
+    check_cics_source_map_schemas(root)?;
     let status = Command::new("python3")
         .arg("-B")
         .arg(&cics_source_map)
@@ -6937,6 +6928,19 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         .status()
         .map_err(|error| format!("CICS source-map freshness guard: {error}"))?;
     require(status.success(), "CICS source-map freshness guard failed")?;
+    for family in ["spi", "fepi"] {
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(&cics_source_map)
+            .args(["--family", family, "--check"])
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("CICS {family} source-map freshness guard: {error}"))?;
+        require(
+            status.success(),
+            &format!("CICS {family} source-map freshness guard failed"),
+        )?;
+    }
     let cics_source_corpus = root
         .join("conformance/subsystems/cics/application/tools/fetch_cics_application_sources.py");
     require(
@@ -7119,6 +7123,7 @@ fn check_declared_dependency_graph(root: &Path) -> TaskResult {
         root.join("conformance/subsystems/dataset/inventory/dependency-additions.json"),
         root.join("conformance/subsystems/jcl/inventory/dependency-additions.json"),
         root.join("conformance/subsystems/jes/inventory/dependency-additions.json"),
+        root.join("conformance/subsystems/cics/system/inventory/dependency-additions.json"),
         root.join("conformance/subsystems/ims/inventory/dependency-additions.json"),
     ] {
         if !additions_path.is_file() {
@@ -7479,6 +7484,8 @@ fn subsystem_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
 }
 
 fn check_schemas(root: &Path) -> TaskResult {
+    check_cics_source_map_schemas(root)?;
+    cics_system_families::check_present(root)?;
     let files = subsystem_schema_files(root)?;
     require(!files.is_empty(), "no subsystem schemas found")?;
     carddemo_readacct::check_vendor_schemas(root)?;
@@ -7945,6 +7952,27 @@ mod licensed_environment_schema_tests {
         let root = repository_root().expect("repository root");
         check_licensed_harness(&root).expect("CER-1701 synthetic harness");
     }
+}
+
+fn check_cics_source_map_schemas(root: &Path) -> TaskResult {
+    let schema = json(&root.join(
+        "conformance/subsystems/cics/application/schemas/cics-command-source-map.schema.json",
+    ))?;
+    for relative in [
+        "conformance/subsystems/cics/application/cics/command-summary-topics.json",
+        "conformance/subsystems/cics/application/cics/application-api-sources-a-map.json",
+        "conformance/subsystems/cics/application/cics/application-api-sources-b-map.json",
+        "conformance/subsystems/cics/application/cics/application-api-sources-c-map.json",
+        "conformance/subsystems/cics/system/cics/spi-command-topics.json",
+        "conformance/subsystems/cics/system/cics/spi-command-source-map.json",
+        "conformance/subsystems/cics/system/cics/fepi-command-topics.json",
+        "conformance/subsystems/cics/system/cics/fepi-command-source-map.json",
+        "conformance/subsystems/cics/system/cics/command-form-locators.json",
+    ] {
+        let artifact = root.join(relative);
+        validate_schema_instance(&schema, &json(&artifact)?, &artifact)?;
+    }
+    Ok(())
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {

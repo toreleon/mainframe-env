@@ -23,6 +23,8 @@ pub(super) fn clauses(
         if !seen.insert(name.clone()) {
             let exact_bare_flag_repeat = !has_operand
                 && !clauses.contains_key(&name)
+                // SYNCPOINT's frozen admission contract rejects duplicate ROLLBACK.
+                && name != "ROLLBACK"
                 && descriptor.is_some_and(|descriptor| {
                     matches!(
                         command_recognition::option_value_shape(descriptor, &name),

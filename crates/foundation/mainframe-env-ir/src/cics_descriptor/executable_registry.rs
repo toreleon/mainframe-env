@@ -133,6 +133,47 @@ pub struct CicsApplicationOptionDescriptor {
     pub source_max_value_bytes: Option<usize>,
 }
 
+/// Source-reviewed symbolic values for one scoped CVDA operand.
+///
+/// This does not supply numeric codes, implied flag aliases, context predicates,
+/// completeness, or compiler admission. Its enclosing contract owns readiness.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsApplicationCvdaDomain {
+    /// Declared valued operand whose CVDA symbols are reviewed.
+    pub option: &'static str,
+    /// Sorted unique source symbols; numeric encoding is a separate authority.
+    pub values: &'static [&'static str],
+}
+
+/// One explicitly source-reviewed fullword CVDA representation.
+///
+/// Equal numbers do not establish equivalent commands, operands or flag aliases.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsApplicationCvdaNumericValue {
+    /// Exact source symbol, retained independently from other equal encodings.
+    pub symbol: &'static str,
+    /// Reference numeric value, represented as a signed fullword.
+    pub number: i32,
+}
+
+/// Reviewed numeric representations for a subset of a scoped symbolic domain.
+///
+/// Missing symbols remain unresolved. This is immutable source metadata, not a
+/// value mapper, ABI encoder, complete domain or compiler-admission authority.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CicsApplicationCvdaNumericDomain {
+    /// Existing valued fullword operand whose symbolic domain owns these names.
+    pub option: &'static str,
+    /// Exact baseline of the numeric reference, separate from the command body.
+    pub source_baseline: &'static str,
+    /// Pinned numeric-reference topic path.
+    pub source_topic: &'static str,
+    /// Exact numeric-reference SHA-256, with the sha256 prefix.
+    pub source_sha256: &'static str,
+    /// Sorted unique symbols with explicit source representations.
+    pub values: &'static [CicsApplicationCvdaNumericValue],
+}
+
 /// An alternative option group; mutual exclusion is carried separately.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CicsApplicationOptionAlternative {

@@ -24,12 +24,14 @@ pub use catalog::{
     cobol_layout_definition_identity, cobol_layout_definition_schema,
 };
 pub use cics_administrative::{
+    CICS_ADMINISTRATIVE_GRAMMAR_CONTRACTS, CICS_ADMINISTRATIVE_GRAMMAR_SHA256,
     CICS_SPI_FEPI_AUTOMATIC_REGISTRATION, CICS_SPI_FEPI_COVERAGE_CREDIT,
     CICS_SPI_FEPI_IDENTITY_REGISTRY, CICS_SPI_FEPI_IDENTITY_REGISTRY_SHA256,
     CICS_SPI_FEPI_PUBLIC_ROUTES, CICS_SPI_FEPI_RUNTIME_HANDLERS, CICS_SPI_FEPI_SEMANTIC_AUTHORITY,
     CICS_SPI_FEPI_SOURCE_AUTHORITY_SHA256, CICS_SPI_FEPI_SOURCE_TOPIC,
     CICS_SPI_FEPI_SOURCE_TOPIC_SHA256, CicsAdministrativeCommandIdentity,
-    CicsAdministrativeInterface, cics_administrative_identities_for_eibfn,
+    CicsAdministrativeGrammarContract, CicsAdministrativeGrammarForm, CicsAdministrativeInterface,
+    cics_administrative_grammar_for_official_row, cics_administrative_identities_for_eibfn,
     cics_administrative_identity_for_official_row,
 };
 pub use cics_descriptor::{
@@ -38,7 +40,8 @@ pub use cics_descriptor::{
     CICS_APPLICATION_REGISTRY, CICS_APPLICATION_REGISTRY_FROZEN, CICS_APPLICATION_REGISTRY_SHA256,
     CICS_EXECUTABLE_DESCRIPTORS, CICS_RUNTIME_IMPORT, CicsApplicationCobolApplicability,
     CicsApplicationConditionClauseDescriptor, CicsApplicationConditionLabelOperand,
-    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
+    CicsApplicationConstraintStatus, CicsApplicationCvdaDomain, CicsApplicationCvdaNumericDomain,
+    CicsApplicationCvdaNumericValue, CicsApplicationHandlerReadiness,
     CicsApplicationOptionAlternative, CicsApplicationOptionDependency,
     CicsApplicationOptionDescriptor, CicsApplicationOptionDirection,
     CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,

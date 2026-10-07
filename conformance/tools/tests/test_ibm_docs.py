@@ -526,6 +526,43 @@ class CacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "conflicting immutable baseline"):
                 ibm_docs.load_pins(index, registry)
 
+    def test_spi_fepi_body_scopes_preserve_distinct_source_and_catalog_counts(self):
+        pins, tocs = ibm_docs.load_pins()
+        for scope_id, expected in [("cics-spi-command-bodies", 277),
+                                   ("cics-fepi-command-bodies", 36)]:
+            selected, selected_tocs = ibm_docs.select(pins, tocs, scope_id, None)
+            self.assertEqual(len(selected), expected)
+            self.assertEqual(len(selected_tocs), 1)
+            self.assertEqual(selected_tocs[0].sha256,
+                             "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a")
+            self.assertTrue(all(any(scope.target_subsystem == "cics.system-api"
+                                    for scope in pin.scopes) for pin in selected))
+        fepi, _ = ibm_docs.select(pins, tocs, "cics-fepi-command-bodies", None)
+        self.assertTrue(all("/commands-fepi/" in pin.topic for pin in fepi))
+        self.assertEqual(len({pin.topic for pin in fepi}), 36)
+
+    def test_fepi_context_scope_preserves_the_command_denominator(self):
+        pins, tocs = ibm_docs.load_pins()
+        context, context_tocs = ibm_docs.select(pins, tocs, "cics-fepi-context-candidates", None)
+        commands, _ = ibm_docs.select(pins, tocs, "cics-fepi-command-bodies", None)
+        self.assertEqual({pin.topic.rsplit("/", 1)[1] for pin in context}, {
+            "dfhp708.html", "dfhp73i.html", "dfhp73u.html", "dfhp743.html",
+            "dfhp74k.html", "dfhp74l.html", "dfhp74m.html", "dfhp7k4.html", "dfhp7kq.html",
+        })
+        self.assertEqual(sum(pin.size for pin in context), 135647)
+        self.assertEqual(len(context_tocs), 1)
+        self.assertEqual(len(commands), 36)
+        self.assertFalse({pin.topic for pin in context} & {pin.topic for pin in commands})
+
+    def test_later_scope_target_mismatch_is_rejected(self):
+        root, index, registry = self.source_repository()
+        document = json.loads(registry.read_text())
+        document["target_subsystem"] = "cics.system-api"
+        registry.write_text(json.dumps(document))
+        with patch.object(docs_api, "REPOSITORY", root):
+            with self.assertRaisesRegex(ValueError, "manifest identity"):
+                ibm_docs.load_pins(index, registry)
+
     def test_shipped_zero_credit_pins_include_all_registered_later_scopes(self):
         pins, tocs = ibm_docs.load_pins()
         scopes = {scope.scope_id for pin in [*pins, *tocs] for scope in pin.scopes}

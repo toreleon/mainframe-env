@@ -43,6 +43,7 @@ mod mqi;
 mod runtime;
 mod selected_link;
 mod staged_invocation;
+mod storage_scope;
 use artifact::{AdmittedProgram, admit_published_artifact};
 pub use mqi::{
     ConfiguredInstalledMqHost, InstalledBatchAdmission, InstalledMqFrameSession,
@@ -426,6 +427,9 @@ impl CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
+        invocation
+            .audit_correlation
+            .clone_from(&parent.audit_correlation);
         invocation.cancellation_probe = parent.cancellation_probe.clone();
         let mut session = self.admit_batch_mqi(&mut invocation, Some(&admitted), original_call)?;
         let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -650,6 +654,10 @@ impl Program for CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
+        invocation
+            .audit_correlation
+            .clone_from(&parent.audit_correlation);
+        invocation.cancellation_probe = parent.cancellation_probe.clone();
         let mut machine = ReferenceMachine::from_binary(
             executable.payload(),
             invocation.clone(),

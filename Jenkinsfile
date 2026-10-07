@@ -236,6 +236,10 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate cobol -- cargo xtask cobol-exit --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate python-tooling-tests --expect-tests -- "$MAINFRAME_ENV_PYTHON" -B tools/run_tooling_tests.py
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate api-docs -- "$MAINFRAME_ENV_PYTHON" -B tools/check_public_api_docs.py
+                    # Supply the actual effective spec to the scoped contract-consumption tests.
+                    # The output directory is ignored and archived by the existing CI owner.
+                    export MAINFRAME_ENV_CONFORMANCE_SPEC_EXPORT="$out/effective-conformance-spec.json"
+                    cargo run --quiet --locked -p xtask -- conformance-spec-export > "$MAINFRAME_ENV_CONFORMANCE_SPEC_EXPORT"
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
                 '''

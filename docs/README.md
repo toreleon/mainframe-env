@@ -118,6 +118,7 @@ explicitly names that authority as superseded.
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
 - [Durable retention lifecycle](contracts/RETENTION-LIFECYCLE-V1.md)
 - [Transaction participant contract](contracts/TRANSACTION-PARTICIPANT-V1.md)
+- [Proposed named PROGRAM STATUS boundary](contracts/CICS-NAMED-PROGRAM-STATUS-V1.md)
 
 ## Architecture decisions
 
@@ -183,6 +184,9 @@ explicitly names that authority as superseded.
 - [ADR-0047: CardDemo participant ownership and batch completion](decisions/0047-carddemo-participant-completion.md)
 - [ADR-0048: Persistent interactive CardDemo composition](decisions/0048-carddemo-interactive-application.md)
 - [Executable application sandbox and agent boundary](decisions/0049-executable-agent-sandbox.md)
+- [ADR-0028: Explicit BTS SET loan lifetime](decisions/0028-explicit-bts-set-loan-lifetime.md)
+- [ADR-0029: COBOL storage-entry identity](decisions/0029-cobol-storage-entry-identity.md)
+- [ADR-0030: Common CICS source condition authority](decisions/0030-cics-source-condition-authority.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 

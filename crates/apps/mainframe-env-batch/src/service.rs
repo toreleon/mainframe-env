@@ -1,5 +1,6 @@
 mod dd_allocation;
 mod effect_loan;
+mod hex_encoding;
 mod host_dispatch;
 mod ims_controller;
 mod prepared_selection;
@@ -42,6 +43,7 @@ use crate::{
     ProgramExecutionContext, ProgramInput, StepExecution, StepPlan, StepState, StepTermination,
     decode_program_output, parse_jcl, plan_dd_allocations, select_job,
 };
+use hex_encoding::hex_bytes;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
     PrincipalId, RunUnitId,
@@ -6303,10 +6305,6 @@ fn ams_definition_snapshot_digest(core: &str, manifest: &[u8], records: &[Vec<u8
         digest.update(record);
     }
     format!("sha256:{:x}", digest.finalize())
-}
-
-fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02X}")).collect()
 }
 
 fn dataset_resolution_key(dd: &crate::DdPlan, raw: &str) -> String {

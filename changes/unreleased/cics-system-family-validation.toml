@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Validate private CICS SPI and FEPI family contracts against exact source rows, option constraints and independent case references through the existing xtask schema owner."

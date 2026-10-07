@@ -14,7 +14,6 @@ pub use conversation_protocol::{
     ConversationIndicators, GdsExtractAttributesFailure, GdsExtractProcessFailure,
 };
 pub use event_wait::{CicsEventPostMode, CicsEventPurgeMode};
-pub use service::IssuePassTransfer;
 pub use service::bts_browse;
 pub use service::bts_lifecycle;
 pub use service::{
@@ -32,6 +31,7 @@ pub use service::{
     MAX_PIP_BYTES, MAX_PROCESS_BYTES, MAX_RECORDED_OUTBOUND_FRAMES, SignalFacilityRecord,
     SignalLuType, load_conversation_replay, prune_conversation_replays,
 };
+pub use service::{CicsLocalLinkCallAttestation, CicsLocalLinkEntryAttestation, IssuePassTransfer};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

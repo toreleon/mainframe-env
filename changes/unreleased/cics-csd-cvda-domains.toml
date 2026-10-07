@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Add independently reviewed CSD symbolic selector domains to the private typed grammar while preserving output direction gaps and operation-specific restrictions."

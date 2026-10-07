@@ -4,7 +4,7 @@ use super::super::{
 };
 use crate::retention::UowRetentionMetadata;
 use mainframe_env_execution_api::{
-    CapabilityId, ExplicitSyncpoint, InvocationLimits, ParticipantContractProblem,
+    BoundedPayload, CapabilityId, ExplicitSyncpoint, InvocationLimits, ParticipantContractProblem,
     TransactionParticipantDescriptor, transaction_participant_contract_v1,
 };
 use mainframe_env_host_api::{
@@ -45,6 +45,18 @@ fn syncpoint(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     let owner = validate_syncpoint_owner(run)?;
+    // Reserve the trusted MQ context before any participant can mutate its store.
+    let mq_capability = CapabilityId::new("host.mq.write", InvocationLimits::default())
+        .expect("static MQ capability");
+    if service.host.capability_ready(mq_capability.as_str())
+        && run.invocation.principal.has_grant(&mq_capability)
+    {
+        let bindings = &run.current_program.effect_invocation.bindings;
+        let added = 2 + usize::from(!bindings.contains_key(EXECUTION_CONTEXT_BINDING));
+        if bindings.len().saturating_add(added) > InvocationLimits::default().max_bindings {
+            return Err(HostProblem::ResourceExhausted);
+        }
+    }
     let mutation = request
         .mutation
         .as_ref()
@@ -154,7 +166,7 @@ fn syncpoint(
     let uow_deadline = existing_deadline.unwrap_or(retention_tick);
     syncpoint_db2(service, run, outcome)?;
     syncpoint_ims(service, run, outcome)?;
-    syncpoint_mq(service, run, outcome)?;
+    syncpoint_mq(service, run, outcome, owner)?;
     super::bts_lifecycle::BtsLifecycleStore::new(service.store.as_ref()).finish_run_uow(
         run.invocation.run_unit_id.as_str(),
         run.invocation.execution_id.as_str(),
@@ -413,6 +425,7 @@ fn syncpoint_mq(
     service: &CicsService,
     run: &mut Run,
     outcome: CicsUnitOfWorkOutcome,
+    owner: CicsSyncpointOwner,
 ) -> Result<(), HostProblem> {
     let capability = CapabilityId::new("host.mq.write", InvocationLimits::default())
         .expect("static MQ capability");
@@ -426,13 +439,31 @@ fn syncpoint_mq(
         .checked_add(1)
         .ok_or(HostProblem::ResourceExhausted)?;
     let key = nested_key(run, run.host_sequence)?;
-    let nested_invocation = invocation_with_nested_origin(
+    let mut nested_invocation = invocation_with_nested_origin(
         &run.current_program.effect_invocation,
         &key,
         run.outer_effect_key
             .as_deref()
             .ok_or(HostProblem::InfrastructureFailure)?,
     )?;
+    if !nested_invocation
+        .bindings
+        .contains_key(EXECUTION_CONTEXT_BINDING)
+    {
+        let context = match owner {
+            CicsSyncpointOwner::Local => b"local".as_slice(),
+            CicsSyncpointOwner::DplSynconreturn => b"dpl-synconreturn".as_slice(),
+        };
+        nested_invocation.bindings.insert(
+            EXECUTION_CONTEXT_BINDING.into(),
+            BoundedPayload::new(
+                EXECUTION_CONTEXT_SCHEMA,
+                context.to_vec(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
     let result = service.invoke_host(
         &nested_invocation,
         nested_invocation.deadline_tick.saturating_sub(1),

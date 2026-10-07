@@ -54,6 +54,9 @@ impl CobolProgram {
         .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
+        invocation
+            .audit_correlation
+            .clone_from(&parent.audit_correlation);
         invocation.cancellation_probe = parent.cancellation_probe.clone();
         let mut session = self.admit_batch_mqi(&mut invocation, Some(&admitted), original_call)?;
         let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

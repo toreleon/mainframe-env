@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Preserve reviewed private CICS queue and storage source contracts, independent receiver fixtures and ENQ source conflicts; runtime acceptance remains pending."

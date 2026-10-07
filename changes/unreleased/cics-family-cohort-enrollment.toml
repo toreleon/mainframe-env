@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Enroll source-ready SPI FILE and FEPI resource/list cohorts while preserving distinct official identities and pending runtime gates."

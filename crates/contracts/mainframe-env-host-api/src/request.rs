@@ -14,19 +14,20 @@ pub use host_result::HostResult;
 pub use ims::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Host-boundary byte and collection ceilings; these bounds confer no capability or resource permission.
+/// Resource ceilings for host request and result validation.
+/// Byte limits count encoded bytes, not characters; providers may impose tighter limits.
 pub struct HostLimits {
-    /// Maximum name/reference length in bytes, checked without implicit truncation.
+    /// Maximum encoded byte length for bounded names and identifiers.
     pub max_name_bytes: usize,
-    /// Maximum owned record or comparable value size in bytes.
+    /// Maximum bytes in one record, key, message or comparable record payload.
     pub max_record_bytes: usize,
-    /// Maximum records or listing entries accepted at this host boundary.
+    /// Maximum record or bounded listing count admitted by host validation.
     pub max_records: usize,
-    /// Maximum argument, field or qualifier count accepted at this boundary.
+    /// Maximum count of fields, operands or qualifiers where the contract checks a field bound.
     pub max_fields: usize,
-    /// Maximum application audit key/value entries.
+    /// Maximum number of supplemental audit key/value pairs.
     pub max_audit_fields: usize,
-    /// Maximum owned state or aggregate payload size in bytes where checked by the contract.
+    /// Maximum bytes for state values and other payloads checked against the state byte ceiling.
     pub max_state_bytes: usize,
 }
 impl Default for HostLimits {
@@ -44,131 +45,135 @@ impl Default for HostLimits {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-/// Dataset storage organization carried by the contract; provider capability checks determine available behavior.
+/// Storage organization carried by the dataset contract.
+/// A variant identifies the requested layout; provider capabilities determine availability.
 pub enum DatasetOrganization {
-    /// Ordered nonmember records.
+    /// Sequential record dataset.
     Sequential,
-    /// Directory members with direct content.
+    /// Directory of named members in a partitioned dataset.
     Partitioned,
-    /// Extended library members with generations and aliases.
+    /// Extended partitioned dataset with member generations.
     PartitionedExtended,
-    /// Records addressed by declared binary keys.
+    /// Records addressed by an embedded key.
     KeySequenced,
-    /// Records addressed by insertion order and relative byte position.
+    /// Records addressed by entry position or relative byte address.
     EntrySequenced,
-    /// Fixed relative-record slots.
+    /// Records addressed by relative record number.
     Relative,
-    /// Relative slots with variable record framing.
+    /// Relative records with variable-length payloads.
     VariableRelative,
-    /// Logical byte space without record keys.
+    /// Byte-addressed linear dataset.
     Linear,
 }
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-/// Declared logical record framing; this identity does not convert or decode record bytes.
+/// Logical record representation carried in dataset attributes.
+/// These tags do not themselves implement physical blocking or spanning.
 pub enum RecordFormat {
     /// Fixed-length logical records.
     Fixed,
-    /// Blocked fixed-length logical records.
+    /// Fixed-length records grouped into blocks.
     FixedBlocked,
-    /// Standard blocked fixed-length framing.
+    /// Standard blocked fixed-length format tag.
     FixedBlockedStandard,
     /// Variable-length logical records.
     Variable,
-    /// Blocked variable-length records.
+    /// Variable-length records grouped into blocks.
     VariableBlocked,
-    /// Variable records permitted to span blocks.
+    /// Variable-length records that may span blocks.
     VariableSpanned,
-    /// Blocked variable records permitted to span blocks.
+    /// Blocked variable-length format permitting spanning.
     VariableBlockedSpanned,
-    /// No declared record framing, including the linear organization contract.
+    /// Record structure supplied by the access method or caller.
     Undefined,
-    /// Line-oriented record identity; this enum does not translate newlines.
+    /// Line-oriented record representation.
     Line,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Comparison used to position a dataset browse relative to a supplied binary key.
+/// Comparison used to position a keyed dataset browse relative to supplied key bytes.
 pub enum KeyRelation {
-    /// Position at an equal key.
+    /// Select an exact key match.
     Equal,
-    /// Position strictly above the key.
+    /// Select a key strictly greater than the supplied key.
     Greater,
-    /// Position at or above the key.
+    /// Select an equal key or the first greater key.
     GreaterOrEqual,
-    /// Position strictly below the key.
+    /// Select a key strictly less than the supplied key.
     Less,
-    /// Position at or below the key.
+    /// Select an equal key or the first lesser key.
     LessOrEqual,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-/// Requested record-read locking policy; the dataset provider owns lock acquisition and release.
+/// Requested read-lock behavior, subject to the dataset provider and access mode.
 pub enum DatasetReadLockMode {
     #[default]
-    /// Leave locking policy to the selected access contract.
+    /// Use the provider-selected default lock behavior.
     Default,
     /// Request a read lock.
     Lock,
-    /// Request retention beyond the individual read.
+    /// Request a lock retained beyond the read.
     KeptLock,
     /// Request a read without acquiring a lock.
     NoLock,
-    /// Request ignoring conflicting locks; support and legality remain provider-owned.
+    /// Request the provider-supported ignore-lock mode.
     IgnoreLock,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-/// Read-lock and wait selection retained in the request rather than inferred from access intent.
+/// Optional lock and wait controls accompanying a dataset read.
 pub struct DatasetReadControl {
-    /// Requested record lock policy.
+    /// Requested lock behavior for this read.
     pub lock: DatasetReadLockMode,
-    /// Explicit wait/no-wait choice; None leaves the choice unspecified.
+    /// Optional wait choice; `None` leaves selection to the provider.
     pub wait: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Close disposition scope for a reel or device unit; physical handling requires provider support.
+/// Selects the reel or unit form of a dataset close request.
 pub enum DatasetReelUnit {
-    /// Apply close disposition to the current reel.
+    /// Select reel-oriented close handling.
     Reel,
-    /// Apply close disposition to the selected unit.
+    /// Select unit-oriented close handling.
     Unit,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-/// Close controls validated for conflicting lock and reel/removal dispositions before dispatch.
+/// Close options passed to the dataset provider for applicability checks.
 pub struct DatasetCloseControl {
-    /// Optional physical close scope; incompatible with lock disposition.
+    /// Optional reel or unit close form.
     pub reel_or_unit: Option<DatasetReelUnit>,
-    /// Requested no-rewind disposition, rejected when combined with lock.
+    /// Request close without rewinding.
     pub no_rewind: bool,
-    /// Requested removal; requires reel_or_unit and is incompatible with lock.
+    /// Request media removal handling.
     pub removal: bool,
-    /// Lock close disposition; cannot combine with reel/unit, no-rewind or removal.
+    /// Request the provider's close-lock behavior.
     pub lock: bool,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Requested security access level; only the installed security authority can grant it.
+/// Requested access level for a resource authorization decision.
 pub enum AccessIntent {
-    /// Request read access.
+    /// Read resource contents.
     Read,
-    /// Request executable invocation access.
+    /// Execute the named resource.
     Execute,
-    /// Request content update access.
+    /// Update existing resource contents.
     Update,
     /// Request control-level resource access.
     Control,
-    /// Request definition/administrative alteration access.
+    /// Request alter-level resource access.
     Alter,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Bounded reference to an externally held credential, never the credential bytes or proof of authentication.
+/// Owned reference to a credential resolved by the security provider.
+/// The string identifies a secret; callers should not place credential bytes in it.
 pub struct SecretRef(String);
 
 impl SecretRef {
-    /// Reject empty, over-name-limit or whitespace-containing credential locators; no secret is resolved.
+    /// Own a nonempty credential reference within `max_name_bytes`.
+    /// Returns `Malformed` for an empty, oversized or whitespace-containing value.
     pub fn new(value: impl Into<String>, limits: HostLimits) -> Result<Self, HostProblem> {
         let value = value.into();
         if value.is_empty()
@@ -181,31 +186,35 @@ impl SecretRef {
         }
     }
     #[must_use]
-    /// Borrow the exact retained locator without resolving a credential.
+    /// Borrow the retained reference string without resolving the secret.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-/// Logical record metadata; key range, organization, record bound and nonzero CCSID are checked together.
+/// Logical dataset layout and optional character-encoding metadata.
+/// Keyed layouts require a nonempty key wholly within the logical record.
 pub struct DatasetAttributes {
-    /// Storage organization checked against key presence.
+    /// Requested record-addressing organization.
     pub organization: DatasetOrganization,
-    /// Logical record framing identity, retained independently of CCSID.
+    /// Requested logical record representation.
     pub record_format: RecordFormat,
-    /// Positive record length in bytes, bounded by max_record_bytes.
+    /// Nonzero logical record length in bytes, bounded by `max_record_bytes`.
     pub logical_record_length: u32,
-    /// Zero-based byte offset; present exactly when key_length is present and organization is key-sequenced.
+    /// Optional zero-based byte offset of the embedded key.
     pub key_offset: Option<u32>,
-    /// Positive key byte count with checked end no greater than logical_record_length.
+    /// Optional nonzero key length in bytes; supplied together with `key_offset`.
     pub key_length: Option<u32>,
-    /// Optional declared character-set identity; zero is rejected and bytes are not converted here.
+    /// Optional nonzero coded character set identifier; absence carries no explicit encoding
+    /// choice.
     pub ccsid: Option<u16>,
 }
 
 impl DatasetAttributes {
-    /// Check positive bounded record length, paired key fields, key-sequenced applicability, checked key range and nonzero optional CCSID.
+    /// Check record size, paired key bounds and nonzero optional CCSID.
+    /// A key is required exactly for the key-sequenced organization; invalid layouts return
+    /// `Malformed`.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         if self.logical_record_length == 0
             || self.logical_record_length as usize > limits.max_record_bytes
@@ -230,18 +239,20 @@ impl DatasetAttributes {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Original mutation sequence and replay key; transaction naming alone grants no ownership or commit authority.
+/// Replay identity for a host mutation, with an optional transaction association.
+/// The outer effect must carry the same sequence and idempotency key.
 pub struct Mutation {
-    /// Positive original effect sequence used for request/reply and nested-mutation binding.
+    /// Nonzero effect sequence used to correlate and validate replay metadata.
     pub sequence: u64,
-    /// Original replay key; required for mutations and compared against the nested mutation key.
+    /// Stable identity for replay protection of this mutation.
     pub idempotency_key: IdempotencyKey,
-    /// Transaction correlation retained verbatim; naming one does not establish ownership or commit it.
+    /// Optional nonempty transaction identity bounded by `max_name_bytes`.
     pub transaction: Option<String>,
 }
 
 impl Mutation {
-    /// Reject zero sequence or empty/over-name-limit transaction text; no replay lookup or transaction admission is performed.
+    /// Check the nonzero sequence and optional transaction-name bound.
+    /// Outer key/sequence agreement is checked by `EffectRequest::validate`.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         if self.sequence == 0
             || self
@@ -276,21 +287,22 @@ mod program;
 pub use program::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Typed host operation union. Capability selection and bounds are distinct from provider readiness and resource authorization.
+/// Owned request dispatched under a built-in host capability.
+/// Local shape validation does not establish provider support or resource authorization.
 pub enum HostRequest {
-    /// Dataset-owned operation or observation.
+    /// Dataset access and catalog operation.
     Dataset(DatasetRequest),
-    /// Program-routing operation or owned output payload.
+    /// Program control operation.
     Program(ProgramRequest),
-    /// Job-scoped spool operation or observation.
+    /// Job-owned spool operation.
     Spool(SpoolRequest),
-    /// Session-scoped terminal operation or owned output payload.
+    /// Terminal session operation.
     Terminal(TerminalRequest),
-    /// Installed security authority request or decision.
+    /// Security identity, access or audit operation.
     Security(SecurityRequest),
-    /// Explicit clock request or bounded textual observation.
+    /// Clock value selection.
     Clock(ClockRequest),
-    /// Versioned host state request or observation.
+    /// Opaque host state operation.
     State(StateRequest),
     /// Typed CICS command with its command-owned validation and replay identity.
     /// Mutation identity is checked before provider dispatch.
@@ -329,7 +341,8 @@ pub struct EffectRequest {
 }
 
 impl EffectRequest {
-    /// Require positive sequence/deadline and, for mutations, an outer replay key matching nested key/sequence before validating operands.
+    /// Require a nonzero sequence/deadline and validate the typed payload.
+    /// For mutations, require an outer key and reject disagreement with payload replay metadata.
     pub fn validate(&self, limits: HostLimits) -> Result<(), HostProblem> {
         if self.sequence == 0 || self.deadline_tick == 0 {
             return Err(HostProblem::Malformed);
@@ -350,16 +363,17 @@ impl EffectRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Sequence-bound host reply, preserving application results, infrastructure errors and uncertain outcomes distinctly.
+/// Sequence-bound reply that separates successful data from typed host failures.
 pub struct EffectResult {
-    /// Positive original effect sequence used for request/reply and nested-mutation binding.
+    /// Nonzero effect sequence used to correlate and validate replay metadata.
     pub sequence: u64,
-    /// Owned result or exact host failure; uncertainty must not be collapsed into a known result.
+    /// Successful typed reply or failure; uncertainty is preserved as `UnknownOutcome`.
     pub outcome: Result<HostResult, HostProblem>,
 }
 
 impl EffectResult {
-    /// Require the exact positive expected sequence and validate either result shape or bounded error fields; no outcome is recalculated.
+    /// Require the expected nonzero sequence and validate either reply data or structured failure
+    /// fields.
     pub fn validate(&self, expected_sequence: u64, limits: HostLimits) -> Result<(), HostProblem> {
         if self.sequence == 0 || self.sequence != expected_sequence {
             return Err(HostProblem::Malformed);
@@ -965,47 +979,49 @@ fn validate_fields(fields: &[TerminalField], limits: HostLimits) -> Result<(), H
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Host-boundary failures; UnknownOutcome must not be treated as a known rollback or retryable success.
+/// Typed rejection, failure or uncertainty at the host boundary.
+/// `UnknownOutcome` requires reconciliation rather than assuming the effect did not occur.
 pub enum HostProblem {
-    /// Represented shape or identity is invalid.
+    /// The envelope or payload violates its structural contract.
     Malformed,
-    /// The requested form or installed implementation is unavailable.
+    /// No supported implementation is available for the request.
     Unsupported,
-    /// An operand family requires a capability the selected provider lacks.
+    /// A specific provider capability is unavailable, with explanatory detail.
     UnsupportedCapability {
-        /// Nonempty bounded unsupported operand-family identity.
+        /// Bounded nonempty identity of the unsupported capability.
         capability: String,
-        /// Nonempty bounded explanation without private source bodies or secrets.
+        /// Nonempty explanatory text bounded by `max_state_bytes`.
         detail: String,
     },
-    /// The addressed object or state was absent.
+    /// The requested resource was not found.
     NotFound,
-    /// Application condition with exact signed primary/secondary response.
+    /// A named subsystem condition with primary and secondary response codes.
     Condition {
-        /// Bounded application condition identity, separate from numeric responses.
+        /// Nonempty condition name bounded by `max_name_bytes`.
         name: String,
-        /// Primary signed application response value; it is not an infrastructure status.
+        /// Primary signed subsystem response code.
         response: i32,
-        /// Secondary signed application response value preserved without normalization.
+        /// Secondary signed subsystem response code.
         response2: i32,
     },
-    /// Permission admission failed; this is not a transport error.
+    /// The invocation lacks the required authority.
     Unauthorized,
-    /// Cancellation was observed without claiming a rollback receipt.
+    /// Cancellation prevented the requested operation.
     Cancelled,
-    /// Deadline handling failed without inferring whether a mutation was reversed.
+    /// The logical deadline was reached.
     TimedOut,
-    /// A configured byte, count or state budget was exceeded.
+    /// A request, reply or provider resource exceeds an admitted bound.
     ResourceExhausted,
-    /// The selected provider failed; no successful result is fabricated.
+    /// The selected provider is unavailable or fails its contract.
     ProviderFailure,
-    /// Host infrastructure failed, distinct from an application condition.
+    /// Host infrastructure failed while dispatching the effect.
     InfrastructureFailure,
-    /// A mutating request omitted required replay identity.
+    /// A replay-protected operation has no required idempotency identity.
     MissingIdempotency,
-    /// Replay identity disagrees with retained/request-bound mutation identity.
+    /// Replay metadata disagrees with an existing identity or outer envelope.
     IdempotencyConflict,
-    /// Publication may have happened; do not treat this as a known failure or safe duplicate dispatch.
+    /// Whether the effect took place cannot be established.
+    /// Reconcile durable state before deciding whether a retry is safe.
     UnknownOutcome,
 }
 impl fmt::Display for HostProblem {

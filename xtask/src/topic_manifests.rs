@@ -33,6 +33,12 @@ const LATER_REGISTRIES: &[LaterRegistry] = &[
         target_subsystem: "cics.application-api",
     },
     LaterRegistry {
+        registry_path: "conformance/subsystems/cics/system/manifests/index.json",
+        manifest_directory: "conformance/subsystems/cics/system/manifests",
+        manifest_prefix: "conformance/subsystems/cics/system/manifests/",
+        target_subsystem: "cics.system-api",
+    },
+    LaterRegistry {
         registry_path: "conformance/subsystems/ims/manifests/index.json",
         manifest_directory: "conformance/subsystems/ims/manifests",
         manifest_prefix: "conformance/subsystems/ims/manifests/",

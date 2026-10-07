@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Preserve required and optional selector alternatives through existing CICS family schema validation and shared IR types."

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepared nine bounded retained FEPI reference-topic pins for private offline source review, with context closure and behavioral acceptance still pending."

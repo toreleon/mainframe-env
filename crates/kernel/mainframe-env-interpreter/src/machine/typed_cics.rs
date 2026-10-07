@@ -920,9 +920,9 @@ pub(super) fn execute(
     let container_identity = container_set::prepare(
         machine,
         host_operation,
-        &arguments,
+        &mut arguments,
         outputs.contains_key("SET"),
-    );
+    )?;
     machine.effect(
         HostRequest::Cics(CicsRequest {
             operation: host_operation,

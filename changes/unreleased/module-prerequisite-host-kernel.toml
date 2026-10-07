@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "fixed"
+summary = "Restore host and kernel module ceilings by relocating Db2 wire declarations, package preflight bounds, and dataset record codecs into private helpers without changing behavior."

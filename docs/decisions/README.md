@@ -32,6 +32,9 @@ CardDemo participant ownership and batch completion boundary.
 | [0025](0025-licence-and-provenance-policy.md) | licence and provenance policy for IBM oracle evidence | Proposed |
 | [0026](0026-run-bundle.md) | self-recorded CardDemo READACCT run bundle and logical replay digest | Proposed |
 | [0027](0027-cics-logical-program-frames.md) | shared CICS task ownership and bounded logical program frames | Proposed |
+| [0028](0028-explicit-bts-set-loan-lifetime.md) | bounded explicit BTS SET lifetime in existing checked storage | Proposed |
+| [0029](0029-cobol-storage-entry-identity.md) | canonical language storage scopes within one CICS task | Proposed |
+| [0030](0030-cics-source-condition-authority.md) | common CICS response authority for private source validation | Proposed |
 | [0028 (Db2)](0028-db2-typed-catalog-evolution.md) | typed Db2 catalog evolution through signed packages, existing generations and versioned persistence | Proposed |
 | [0028 (MQ)](0028-mq-shared-handle-kernel.md) | one volatile MQ handle authority across properties and pub/sub | Proposed |
 | [0029 (publication)](0029-audited-provider-publication.md) | audited provider publication under one retained core intent | Proposed |

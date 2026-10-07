@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Prepare source-scoped symbolic CVDA domains in common family/form facts without numeric encoding, alias inference or administrative admission."

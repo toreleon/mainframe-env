@@ -27,9 +27,11 @@ The request preimage begins with the ASCII bytes `mainframe-env.effect-request@1
 followed by a zero byte; the result preimage uses `mainframe-env.effect-result@1`
 and a zero byte. SHA-256 hashes that domain prefix and the canonical value.
 `canonical.rs` and its exhaustive `canonical/generated.rs` and
-`canonical/cics.rs` modules are the explicit schema. Public type and variant
-names appearing there are wire identifiers and must remain fixed within version
-1, even if Rust types are renamed later.
+`canonical/cics.rs` modules are the explicit schema. The private
+`canonical/wire/db2.rs` child retains the Db2 encoders relocated from
+`canonical/generated.rs`, preserving the same frozen wire identifiers.
+Public type and variant names appearing there are wire identifiers and must remain
+fixed within version 1, even if Rust types are renamed later.
 
 The additive `HostRequest::MqMqi(MqMqiHostRequest)` and
 `HostResult::MqMqi(MqMqiHostResult)` names are distinct from the retained legacy

@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Add exact-version suspended-source handoff through the existing core journal, rejecting missing, stale and foreign sources before mutation; installed target execution remains pending."

@@ -1,9 +1,13 @@
+mod dataset_helpers;
+use dataset_helpers::{
+    dataset_attributes, dataset_mutation, join_records, member_name, records_for_write,
+};
+mod batch_controller;
+use batch_controller::decode_application_batch_controller;
 mod system_providers;
 use system_providers::*;
-mod batch_controller;
 mod dataset_input;
-use batch_controller::decode_application_batch_controller;
-use dataset_input::{dataset_attributes, join_records, records_for_write, wildcard};
+use dataset_input::wildcard;
 mod cics_security;
 mod ims;
 mod services;
@@ -5409,54 +5413,6 @@ fn hex_digest(bytes: &[u8]) -> String {
     output
 }
 
-fn dataset_mutation(request: &DatasetRequest) -> Option<&Mutation> {
-    match request {
-        DatasetRequest::Create { mutation, .. }
-        | DatasetRequest::Define { mutation, .. }
-        | DatasetRequest::Alter { mutation, .. }
-        | DatasetRequest::SetLifecycle { mutation, .. }
-        | DatasetRequest::RecordBackup { mutation, .. }
-        | DatasetRequest::Restore { mutation, .. }
-        | DatasetRequest::DefineCatalog { mutation, .. }
-        | DatasetRequest::SetCatalogConnection { mutation, .. }
-        | DatasetRequest::DefineAlias { mutation, .. }
-        | DatasetRequest::DefineMemberAlias { mutation, .. }
-        | DatasetRequest::WriteMemberGeneration { mutation, .. }
-        | DatasetRequest::DeleteMemberGeneration { mutation, .. }
-        | DatasetRequest::AcquireLock { mutation, .. }
-        | DatasetRequest::ReleaseLock { mutation, .. }
-        | DatasetRequest::BeginTvs { mutation, .. }
-        | DatasetRequest::StageTvs { mutation, .. }
-        | DatasetRequest::CompleteTvs { mutation, .. }
-        | DatasetRequest::ReconcileTvs { mutation, .. }
-        | DatasetRequest::Write { mutation, .. }
-        | DatasetRequest::Append { mutation, .. }
-        | DatasetRequest::Truncate { mutation, .. }
-        | DatasetRequest::RewriteRecord { mutation, .. }
-        | DatasetRequest::DeleteRecord { mutation, .. }
-        | DatasetRequest::WriteRelative { mutation, .. }
-        | DatasetRequest::DeleteRelative { mutation, .. }
-        | DatasetRequest::WriteRba { mutation, .. }
-        | DatasetRequest::DefineAlternateIndex { mutation, .. }
-        | DatasetRequest::BuildAlternateIndex { mutation, .. }
-        | DatasetRequest::DefinePath { mutation, .. }
-        | DatasetRequest::DefineGenerationGroup { mutation, .. }
-        | DatasetRequest::CreateGeneration { mutation, .. }
-        | DatasetRequest::Rename { mutation, .. }
-        | DatasetRequest::Delete { mutation, .. } => Some(mutation),
-        _ => None,
-    }
-}
-
-fn member_name(value: Option<String>) -> Result<Option<MemberName>, GatewayProblem> {
-    value
-        .map(|value| {
-            MemberName::new(value.to_ascii_uppercase(), 8)
-                .map_err(|_| gateway_problem(HostProblem::Malformed))
-        })
-        .transpose()
-}
-
 pub(crate) fn job_capabilities(
     store: &dyn ProviderStateStore,
     plan: &mainframe_env_batch::JobPlan,
@@ -6484,6 +6440,9 @@ mod tests {
 
     #[path = "program_abend_exit.rs"]
     mod program_abend_exit;
+
+    #[path = "bts_set_lifetime.rs"]
+    mod bts_set_lifetime;
 
     #[path = "program_default_abend.rs"]
     mod program_default_abend;

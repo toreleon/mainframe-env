@@ -49,6 +49,17 @@
       "coverage_credit": 0
     },
     {
+      "baseline_id": "ibm-cics-ts-6x-cobol-calling-context-candidates-2026-09-12",
+      "coverage_credit": 0,
+      "manifest": "conformance/subsystems/cics/application/manifests/cics-cobol-calling-context-topics.json",
+      "manifest_sha256": "sha256:95aa3c144aeae062c83ba6a5d17caddd29dad4b8b670f225d89750920af06ff2",
+      "scope_id": "cics-cobol-calling-context",
+      "semantic_authority": false,
+      "subsystem": "cics",
+      "topic_count": 2,
+      "topic_manifest_sha256": "sha256:1c9b95bc6d18c767a70269828fa36b8f0557e0543c43519c41abf06468e3f008"
+    },
+    {
       "scope_id": "cics-file-uow-pilot",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",
@@ -93,6 +104,17 @@
       "coverage_credit": 0
     },
     {
+      "baseline_id": "ibm-cics-ts-6x-program-storage-context-2026-09-12",
+      "coverage_credit": 0,
+      "manifest": "conformance/subsystems/cics/application/manifests/cics-program-storage-context-topics.json",
+      "manifest_sha256": "sha256:47a972e4e79177fb76250f880798b4e1b9a048168dd0b12d41d97aaa7a62a5fe",
+      "scope_id": "cics-program-storage-context",
+      "semantic_authority": false,
+      "subsystem": "cics",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:2c5520dec7a78d6d2c7f20c62193b99887ed3a5abe477ba5aec4d83f24b05ff3"
+    },
+    {
       "scope_id": "cics-task-association",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-task-association-2026-09-13",
@@ -135,6 +157,17 @@
       "topic_manifest_sha256": "sha256:96b3f6d0d7eb08e90dc8ef465be1cc4549a4e431491d1b32c895cd659dbff067",
       "semantic_authority": false,
       "coverage_credit": 0
+    },
+    {
+      "baseline_id": "ibm-enterprise-cobol-6.5-program-initial-context-2026-09-11",
+      "coverage_credit": 0,
+      "manifest": "conformance/subsystems/cics/application/manifests/cobol-program-initial-context-topics.json",
+      "manifest_sha256": "sha256:775e29abf802bfc2fcf831d24d2e830cda8496bf8ff0a028f90cff40e8937355",
+      "scope_id": "cobol-program-initial-context",
+      "semantic_authority": false,
+      "subsystem": "cobol",
+      "topic_count": 1,
+      "topic_manifest_sha256": "sha256:45b6228ae82d9aeff0be085a35a54a57f8e94c4526ac13725e89488c450d0307"
     }
   ]
 }

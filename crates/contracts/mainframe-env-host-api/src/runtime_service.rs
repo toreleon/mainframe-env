@@ -1,35 +1,36 @@
 use crate::{HostProblem, RuntimeServiceKind, RuntimeServiceName};
 use std::collections::BTreeMap;
 
-/// Versioned identity of the shared runtime-service registry contract.
+/// Version identifier for exact namespace/name/ABI runtime-service registration.
 pub const RUNTIME_SERVICE_REGISTRY_CONTRACT: &str = "mainframe-env.runtime-service-registry@1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Owned service identity and schema labels for one positive ABI version.
+/// Typed runtime-service selection key and its request/response schema identities.
 pub struct RuntimeServiceDescriptor {
-    /// Service family used as part of the exact registry key.
+    /// Namespace distinguishing Language Environment from host extension services.
     pub kind: RuntimeServiceKind,
-    /// Validated service name used as part of the exact registry key.
+    /// Validated service name within the selected namespace.
     pub name: RuntimeServiceName,
-    /// Positive ABI version; registry construction rejects zero.
+    /// Nonzero exact ABI version; resolution has no implicit version fallback.
     pub abi_version: u16,
-    /// Nonempty owned request-schema label, bounded by UTF-8 byte length at construction.
+    /// Nonempty request schema identity, bounded by the constructor's schema byte ceiling.
     pub request_schema: String,
-    /// Nonempty owned response-schema label, bounded by UTF-8 byte length at construction.
+    /// Nonempty response schema identity, bounded by the constructor's schema byte ceiling.
     pub response_schema: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Immutable descriptors keyed by service family, name and exact ABI version.
+/// Bounded immutable runtime-service registry keyed by namespace, name and ABI version.
+/// The registry stores descriptors; resolving one does not execute the service.
 pub struct RuntimeServiceRegistry {
     entries: BTreeMap<(RuntimeServiceKind, RuntimeServiceName, u16), RuntimeServiceDescriptor>,
     max_entries: usize,
 }
 
 impl RuntimeServiceRegistry {
-    /// Build a registry within positive entry-count and per-schema byte ceilings.
-    /// Zero ceilings or duplicate keys are malformed; invalid descriptors or capacity
-    /// overflow return resource exhaustion without publishing a partial registry.
+    /// Own descriptors within positive entry and schema-byte ceilings.
+    /// Returns `Malformed` for zero ceilings or duplicate keys; invalid descriptors or capacity
+    /// overflow return `ResourceExhausted`.
     pub fn new(
         descriptors: impl IntoIterator<Item = RuntimeServiceDescriptor>,
         max_entries: usize,
@@ -65,7 +66,7 @@ impl RuntimeServiceRegistry {
     }
 
     #[must_use]
-    /// Borrow an exact descriptor, or return absence without version or family fallback.
+    /// Borrow the descriptor for an exact namespace/name/ABI tuple, or `None` if absent.
     pub fn resolve(
         &self,
         kind: RuntimeServiceKind,
@@ -76,7 +77,7 @@ impl RuntimeServiceRegistry {
     }
 
     #[must_use]
-    /// Configured descriptor-count ceiling, independent of the current entry count.
+    /// Return the fixed registry capacity chosen at construction.
     pub fn max_entries(&self) -> usize {
         self.max_entries
     }

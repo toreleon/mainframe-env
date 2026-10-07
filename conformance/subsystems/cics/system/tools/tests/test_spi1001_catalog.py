@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 
@@ -118,6 +119,383 @@ class Spi1001CatalogTests(unittest.TestCase):
         catalog["identity_sha256"] = catalog_tool.identity_digest(catalog["commands"])
         with self.assertRaisesRegex(catalog_tool.CatalogError, "executable or credited"):
             catalog_tool.render_rust_from_catalog(catalog)
+
+
+class AdministrativeGrammarTests(unittest.TestCase):
+    def setUp(self) -> None:
+        root = catalog_tool.ROOT
+        self.family = json.loads((root / catalog_tool.FAMILY_PATH / "spi-program.json").read_text())
+        self.mapping = json.loads((root / "conformance/subsystems/cics/system/cics/spi-command-source-map.json").read_text())
+        self.manifest = json.loads((root / "conformance/subsystems/cics/system/manifests/cics-spi-command-topics.json").read_text())
+
+    def test_enrolled_source_cohorts_are_disjoint_pinned_and_schema_declared(self) -> None:
+        root = catalog_tool.ROOT
+        schema = json.loads((root / "conformance/subsystems/cics/system/schemas/cics-system-family-contract.schema.json").read_text())
+        self.assertEqual(set(catalog_tool.FAMILY_ROWS), set(schema["properties"]["family"]["enum"]))
+        seen = set()
+        for _, (interface, suffixes) in catalog_tool.FAMILY_ROWS.items():
+            self.assertTrue(0 < len(suffixes) <= 32)
+            mapping = json.loads((root / f"conformance/subsystems/cics/system/cics/{interface}-command-source-map.json").read_text())
+            manifest = json.loads((root / f"conformance/subsystems/cics/system/manifests/cics-{interface}-command-topics.json").read_text())
+            mapped = {row["official_row"]: row for row in mapping["rows"]}
+            pinned = {topic["topic_path"]: topic for topic in manifest["topics"]}
+            unit = "spi-commands-unique" if interface == "spi" else "fepi-commands"
+            for suffix in suffixes:
+                identity = f"ibm-cics-ts-6x-2026-08-31:{unit}:{suffix}"
+                self.assertNotIn(identity, seen)
+                seen.add(identity)
+                row = mapped[identity]
+                self.assertEqual(row["state"], "mapped")
+                topic = row["topic"]
+                self.assertEqual(topic["sha256"], "sha256:" + pinned[topic["topic_path"]]["sha256"])
+        self.assertEqual(len(seen), 305)
+        all_mapped = set()
+        unresolved = set()
+        for interface in ["spi", "fepi"]:
+            mapping = json.loads((root / f"conformance/subsystems/cics/system/cics/{interface}-command-source-map.json").read_text())
+            for row in mapping["rows"]:
+                (all_mapped if row["state"] == "mapped" else unresolved).add(row["official_row"])
+        self.assertEqual(seen, all_mapped)
+        self.assertEqual({row.rsplit(":", 1)[-1] for row in unresolved}, {"0201", "0203", "0204"})
+        self.assertTrue(seen.isdisjoint(unresolved))
+
+    def form_fixture(self):
+        family = copy.deepcopy(self.family)
+        for command in family["commands"]:
+            command["grammar"].pop("forms", None)
+        grammar = family["commands"][0]["grammar"]
+        shape = copy.deepcopy(grammar)
+        grammar["forms"] = [{"id": "named", "selector_options": ["PROGRAM"],
+                              "grammar": shape, "source_lines": [1]}]
+        return family
+
+    def test_absent_and_empty_forms_retain_the_prior_product_fact_preimage(self) -> None:
+        absent = copy.deepcopy(self.family)
+        for command in absent["commands"]:
+            command["grammar"].pop("forms", None)
+        empty = copy.deepcopy(absent)
+        for command in empty["commands"]:
+            command["grammar"]["forms"] = []
+        self.assertEqual(self.project(absent), self.project(empty))
+        self.assertEqual(catalog_tool.render_grammar_facts(self.project(absent)),
+                         catalog_tool.render_grammar_facts(self.project(empty)))
+
+    def test_form_projection_preserves_direction_and_ignores_source_line_metadata(self) -> None:
+        family = self.form_fixture()
+        before = catalog_tool.render_grammar_facts(self.project(family))
+        form = family["commands"][0]["grammar"]["forms"][0]
+        form["source_lines"] = [2, 3]
+        form["grammar"]["options"][0]["source_lines"] = [4]
+        self.assertEqual(before, catalog_tool.render_grammar_facts(self.project(family)))
+        form["grammar"]["options"][0]["direction"] = "output"
+        after = catalog_tool.render_grammar_facts(self.project(family))
+        self.assertNotEqual(before, after)
+        self.assertIn(b"CicsAdministrativeGrammarForm", after)
+        self.assertIn(b"selector_options: &[\"PROGRAM\"]", after)
+        self.assertEqual(after.count(b"CicsApplicationConstraintStatus::Pending"), 5)
+        self.assertNotIn(b"CicsResponse", after)
+
+    def test_form_projection_rejects_unbound_selectors_duplicate_ids_and_nested_forms(self) -> None:
+        for mutation in range(5):
+            family = self.form_fixture()
+            forms = family["commands"][0]["grammar"]["forms"]
+            if mutation == 0:
+                forms[0]["selector_options"] = ["MISSING"]
+            elif mutation == 1:
+                forms[0]["grammar"]["required"] = []
+            elif mutation == 2:
+                forms.append(copy.deepcopy(forms[0]))
+            elif mutation == 3:
+                forms[0]["grammar"]["forms"] = []
+            else:
+                forms[0]["grammar"]["options"][0]["name"] = "MISSING"
+            with self.assertRaises(catalog_tool.CatalogError):
+                self.project(family)
+
+    def cvda_fixture(self):
+        family = copy.deepcopy(self.family)
+        family["commands"][0]["grammar"]["cvda_domains"] = [
+            {"option": "LOGMESSAGE", "values": ["LOG", "NOLOG"], "source_lines": [74]}]
+        return family
+
+    def test_absent_empty_cvda_domains_preserve_product_fact_digest(self) -> None:
+        absent = copy.deepcopy(self.family)
+        for command in absent["commands"]:
+            command["grammar"].pop("cvda_domains", None)
+            for form in command["grammar"].get("forms", []):
+                form["grammar"].pop("cvda_domains", None)
+        empty = copy.deepcopy(absent)
+        for command in empty["commands"]:
+            command["grammar"]["cvda_domains"] = []
+            for form in command["grammar"].get("forms", []):
+                form["grammar"]["cvda_domains"] = []
+        self.assertEqual(self.project(absent), self.project(empty))
+        self.assertEqual(catalog_tool.render_grammar_facts(self.project(absent)),
+                         catalog_tool.render_grammar_facts(self.project(empty)))
+
+    def test_cvda_symbols_project_in_forms_without_numeric_or_source_line_inference(self) -> None:
+        family = self.cvda_fixture()
+        grammar = family["commands"][0]["grammar"]
+        grammar["forms"][0]["grammar"]["cvda_domains"] = copy.deepcopy(grammar["cvda_domains"])
+        before = catalog_tool.render_grammar_facts(self.project(family))
+        grammar["cvda_domains"][0]["source_lines"] = [75, 76]
+        grammar["forms"][0]["grammar"]["cvda_domains"][0]["source_lines"] = [77]
+        self.assertEqual(before, catalog_tool.render_grammar_facts(self.project(family)))
+        grammar["forms"][0]["grammar"]["cvda_domains"][0]["values"] = ["LOG"]
+        after = catalog_tool.render_grammar_facts(self.project(family))
+        self.assertNotEqual(before, after)
+        self.assertIn(b'CicsApplicationCvdaDomain { option: "LOGMESSAGE", values: &["LOG", "NOLOG"]', after)
+        self.assertNotIn(b"numeric_code", after)
+        self.assertNotIn(b"CicsResponse", after)
+        self.assertEqual(after.count(b"CicsApplicationConstraintStatus::Pending"), 8)
+
+    def test_cvda_projection_rejects_unbound_wrong_shape_duplicate_numeric_and_unsorted(self) -> None:
+        for mutation in range(9):
+            family = self.cvda_fixture()
+            grammar = family["commands"][0]["grammar"]
+            domains = grammar["cvda_domains"]
+            if mutation == 0:
+                domains[0]["option"] = "MISSING"
+            elif mutation == 1:
+                domains[0]["option"] = "LOG"
+            elif mutation == 2:
+                domains[0]["values"] = ["LOG", "LOG"]
+            elif mutation == 3:
+                domains[0]["values"] = ["NOLOG", "LOG"]
+            elif mutation == 4:
+                domains[0]["values"] = []
+            elif mutation == 5:
+                domains[0]["values"] = [23]
+            elif mutation == 6:
+                domains.append(copy.deepcopy(domains[0]))
+            elif mutation == 7:
+                domains[0]["number"] = 23
+            else:
+                domains[0]["values"] = ["bad-symbol"]
+            with self.assertRaises(catalog_tool.CatalogError):
+                self.project(family)
+
+    def project(self, family=None):
+        return catalog_tool.project_family_grammar(
+            self.family if family is None else family, self.mapping, self.manifest
+        )
+
+    def numeric_fixture(self):
+        family = self.cvda_fixture()
+        domain = family["commands"][0]["grammar"]["cvda_domains"][0]
+        domain["numeric_encoding"] = {
+            "source": {**catalog_tool.cvda_numeric_source(), "lines": [1, 3]},
+            "values": [{"symbol": "LOG", "number": 54, "source_lines": [864, 865]},
+                       {"symbol": "NOLOG", "number": 55, "source_lines": [1074, 1075]}],
+        }
+        return family
+
+    def test_numeric_facet_absence_preserves_legacy_product_preimage(self) -> None:
+        legacy = copy.deepcopy(self.family)
+        for command in legacy["commands"]:
+            for grammar in [command["grammar"], *(form["grammar"] for form in command["grammar"].get("forms", []))]:
+                for domain in grammar.get("cvda_domains", []):
+                    domain.pop("numeric_encoding", None)
+        facts = self.project(legacy)
+        for fact in facts:
+            for grammar in [fact["grammar"], *(form["grammar"] for form in fact["grammar"].get("forms", []))]:
+                for domain in grammar.get("cvda_domains", []):
+                    self.assertEqual(set(domain), {"option", "values"})
+        enriched = self.project()
+        stripped = copy.deepcopy(enriched)
+        for fact in stripped:
+            for grammar in [fact["grammar"], *(form["grammar"] for form in fact["grammar"].get("forms", []))]:
+                for domain in grammar.get("cvda_domains", []):
+                    domain.pop("numeric_encoding", None)
+        self.assertEqual(facts, stripped)
+        self.assertEqual(catalog_tool.canonical_bytes(facts), catalog_tool.canonical_bytes(stripped))
+
+    def test_numeric_source_lines_are_metadata_but_numbers_and_symbols_are_product_facts(self) -> None:
+        family = self.numeric_fixture()
+        encoding = family["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"]
+        before = self.project(family)
+        encoding["source"]["lines"] = [1, 3, 4]
+        encoding["values"][0]["source_lines"] = [864]
+        self.assertEqual(before, self.project(family))
+        encoding["values"][1]["number"] = 54
+        same_number = self.project(family)
+        self.assertNotEqual(before, same_number)
+        values = same_number[0]["grammar"]["cvda_domains"][0]["numeric_encoding"]["values"]
+        self.assertEqual(values, [{"symbol": "LOG", "number": 54}, {"symbol": "NOLOG", "number": 54}])
+        output = catalog_tool.render_grammar_facts(same_number)
+        self.assertIn(b'CicsApplicationCvdaNumericValue { symbol: "NOLOG", number: 54 }', output)
+        self.assertEqual(output.count(b"CicsApplicationConstraintStatus::Pending"), 8)
+
+    def test_numeric_projection_rejects_forged_pins_unscoped_symbols_and_invalid_fullwords(self) -> None:
+        for mutation in range(15):
+            family = self.numeric_fixture()
+            encoding = family["commands"][0]["grammar"]["cvda_domains"][0]["numeric_encoding"]
+            if mutation < 3:
+                key = ["baseline", "topic_path", "sha256"][mutation]
+                encoding["source"][key] = "forged"
+            elif mutation == 3:
+                encoding["values"][0]["symbol"] = "ENABLED"
+            elif mutation == 4:
+                encoding["values"][0]["number"] = True
+            elif mutation == 5:
+                encoding["values"][0]["number"] = 2 ** 31
+            elif mutation == 6:
+                encoding["values"][0]["number"] = -(2 ** 31) - 1
+            elif mutation == 7:
+                encoding["values"].append(copy.deepcopy(encoding["values"][0]))
+            elif mutation == 8:
+                encoding["values"].reverse()
+            elif mutation == 9:
+                encoding["values"] = []
+            elif mutation == 10:
+                encoding["values"][0]["source_lines"] = []
+            elif mutation == 11:
+                encoding["source"]["lines"] = [3, 1]
+            elif mutation == 12:
+                encoding["values"][0]["source_lines"] = [864, 864]
+            elif mutation == 13:
+                encoding["values"][0]["source_lines"] = [True]
+            else:
+                encoding["values"][0]["alias"] = "NOLOG"
+            with self.assertRaises(catalog_tool.CatalogError, msg=f"numeric mutation {mutation}"):
+                self.project(family)
+
+    def test_chunked_projection_preserves_every_fact_order_and_digest_at_scale(self) -> None:
+        template = self.project()[-1]
+        facts = []
+        for index in range(305):
+            fact = copy.deepcopy(template)
+            fact["official_row"] = f"synthetic:{index:04}"
+            facts.append(fact)
+        outputs = catalog_tool.render_grammar_outputs(facts)
+        self.assertTrue(all(len(body.splitlines()) <= 1000 for body in outputs.values()))
+        chunks = [body.decode().splitlines()[5:-1] for path, body in outputs.items()
+                  if path != catalog_tool.GRAMMAR_OUTPUT_PATH]
+        monolithic = catalog_tool.render_grammar_facts(facts).decode().splitlines()
+        self.assertEqual([line for chunk in chunks for line in chunk], monolithic[8:-1])
+        facade = outputs[catalog_tool.GRAMMAR_OUTPUT_PATH].decode()
+        self.assertIn(monolithic[3].split(" = ", 1)[1], facade)
+        self.assertEqual(facade.count("::CONTRACTS["), 305)
+        self.assertEqual(outputs, catalog_tool.render_grammar_outputs(facts))
+
+    def test_missing_extra_or_modified_chunks_fail_freshness(self) -> None:
+        outputs = catalog_tool.render_grammar_outputs(self.project())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, body in outputs.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(body)
+            catalog_tool.check_grammar_outputs(root, outputs)
+            chunk = next(path for path in outputs if path != catalog_tool.GRAMMAR_OUTPUT_PATH)
+            original = (root / chunk).read_bytes()
+            (root / chunk).write_bytes(original + b"// changed\n")
+            with self.assertRaisesRegex(catalog_tool.CatalogError, "stale"):
+                catalog_tool.check_grammar_outputs(root, outputs)
+            (root / chunk).write_bytes(original)
+            extra = root / catalog_tool.GRAMMAR_CHUNK_PATH / "chunk_999.rs"
+            extra.write_bytes(original)
+            with self.assertRaisesRegex(catalog_tool.CatalogError, "inventory is stale"):
+                catalog_tool.check_grammar_outputs(root, outputs)
+            extra.unlink()
+            (root / chunk).unlink()
+            with self.assertRaisesRegex(catalog_tool.CatalogError, "inventory is stale"):
+                catalog_tool.check_grammar_outputs(root, outputs)
+
+    def test_exact_program_cohort_uses_shared_operand_types_and_pending_status(self) -> None:
+        facts = self.project()
+        self.assertEqual([fact["official_row"].rsplit(":", 1)[1] for fact in facts],
+                         ["0026", "0084", "0155", "0241"])
+        self.assertEqual(sum(len(fact["grammar"]["options"]) for fact in facts), 97)
+        rendered = catalog_tool.render_grammar_facts(facts).decode()
+        self.assertEqual(sum(len(fact["grammar"].get("forms", [])) for fact in facts), 4)
+        self.assertEqual(sum(len(form["grammar"]["options"])
+                             for fact in facts for form in fact["grammar"]["forms"]), 93)
+        self.assertEqual(rendered.count("CicsApplicationConstraintStatus::Pending"), 8)
+        self.assertIn("CicsApplicationOptionDescriptor", rendered)
+        self.assertNotIn("runtime_operation", rendered)
+        self.assertNotIn("handler_id", rendered)
+        self.assertNotIn("CicsResponse", rendered)
+
+    def test_cases_verdicts_and_lifecycle_prose_cannot_generate_product_behavior(self) -> None:
+        original = catalog_tool.render_grammar_facts(self.project())
+        changed = copy.deepcopy(self.family)
+        command = changed["commands"][0]
+        command["obligations"][0]["cases"][0]["expected"] = "invented pass"
+        command["obligations"][0]["gates"] = []
+        command["lifecycle"]["mutations"] = ["invented mutation"]
+        command["responses"][0]["resp2"] = 999
+        self.assertEqual(original, catalog_tool.render_grammar_facts(self.project(changed)))
+
+    def test_stale_source_pin_label_topic_and_baseline_are_rejected(self) -> None:
+        for field, value in (("sha256", "sha256:" + "0" * 64),
+                             ("topic_path", "wrong.html"), ("baseline", "wrong-baseline")):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(self.family)
+                changed["commands"][0]["source"][field] = value
+                with self.assertRaises((catalog_tool.CatalogError, KeyError)):
+                    self.project(changed)
+        changed = copy.deepcopy(self.family)
+        changed["commands"][0]["label"] = "SET PROGRAM"
+        with self.assertRaisesRegex(catalog_tool.CatalogError, "source identity"):
+            self.project(changed)
+
+    def test_missing_duplicate_and_reordered_rows_are_rejected(self) -> None:
+        for mode in ("missing", "duplicate", "reordered"):
+            with self.subTest(mode=mode):
+                changed = copy.deepcopy(self.family)
+                if mode == "missing":
+                    changed["commands"].pop()
+                elif mode == "duplicate":
+                    changed["commands"][-1] = copy.deepcopy(changed["commands"][0])
+                else:
+                    changed["commands"].reverse()
+                with self.assertRaisesRegex(catalog_tool.CatalogError, "row identity"):
+                    self.project(changed)
+
+    def test_public_binding_and_foreign_family_or_version_are_rejected(self) -> None:
+        for field, value in (("runtime_binding", "public-registered"),
+                             ("target_subsystem", "cics.application-api"), ("family", "spi-everything")):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(self.family)
+                changed[field] = value
+                with self.assertRaises(catalog_tool.CatalogError):
+                    self.project(changed)
+
+    def test_product_fact_digest_is_sensitive_to_shape_direction_and_byte_bound(self) -> None:
+        original = catalog_tool.render_grammar_facts(self.project())
+        for field, value in (("value_shape", "optional-value"),
+                             ("direction", "input-output"), ("source_max_value_bytes", 42)):
+            changed = copy.deepcopy(self.family)
+            changed["commands"][0]["grammar"]["options"][0][field] = value
+            self.assertNotEqual(original, catalog_tool.render_grammar_facts(self.project(changed)))
+
+    def test_emitted_grammar_is_current_and_deterministic(self) -> None:
+        expected = catalog_tool.render_grammar()
+        self.assertEqual(expected, catalog_tool.render_grammar())
+        self.assertEqual(expected, (catalog_tool.ROOT / catalog_tool.GRAMMAR_OUTPUT_PATH).read_bytes())
+
+    def test_optional_alternative_field_is_backward_compatible(self) -> None:
+        original = catalog_tool.render_grammar_facts(self.project())
+        explicit_empty = copy.deepcopy(self.family)
+        for command in explicit_empty["commands"]:
+            command["grammar"]["alternative_groups"] = []
+        self.assertEqual(original, catalog_tool.render_grammar_facts(self.project(explicit_empty)))
+
+    def test_alternatives_preserve_requirement_and_reject_nonboolean(self) -> None:
+        changed = copy.deepcopy(self.family)
+        changed["commands"][0]["grammar"]["alternative_groups"] = [
+            {"members": ["LOG", "NOLOG"], "required": True}
+        ]
+        required = catalog_tool.render_grammar_facts(self.project(changed)).decode()
+        self.assertIn('members: &["LOG", "NOLOG"], required: true', required)
+        changed["commands"][0]["grammar"]["alternative_groups"][0]["required"] = False
+        optional = catalog_tool.render_grammar_facts(self.project(changed)).decode()
+        self.assertIn('members: &["LOG", "NOLOG"], required: false', optional)
+        self.assertNotEqual(required, optional)
+        changed["commands"][0]["grammar"]["alternative_groups"][0]["required"] = "true"
+        with self.assertRaisesRegex(catalog_tool.CatalogError, "not boolean"):
+            catalog_tool.render_grammar_facts(self.project(changed))
 
 
 if __name__ == "__main__":

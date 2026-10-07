@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "added"
+summary = "Retain private source-bounded monitoring, statistics, trace, dump and system-control contracts with isolated pending fixtures and unchanged administrative admission."

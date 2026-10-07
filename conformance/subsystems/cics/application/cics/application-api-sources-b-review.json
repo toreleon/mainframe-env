@@ -722,7 +722,7 @@
   "coverage_credit": 0,
   "differential_credit": 0,
   "execution_authority": false,
-  "independent_verification_sha256": "sha256:e3008ed9b485845dd5da3a323dfc9d1e498eea23abbbd3e8108592ba237f6591",
+  "independent_verification_sha256": "sha256:8833dce2f9c90ff6c95841ed3ee9bf989f4b83b53613f07355fcc3ff5178cf18",
   "inputs": {
     "candidate_projection_sha256": "sha256:ebdcd159d1955d06e7189b62026c949701880669171ea95d8fd32313d3032bab",
     "extraction_plan_sha256": "sha256:2d1016b4e5d872c2b932a6b0c9d21115436e53e5db0dcbbb2ec080d1978a082a",
@@ -770,7 +770,7 @@
       "path": "conformance/subsystems/cics/application/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:72384e2902a27c9e1e2ab07a1c8d8da963365f83fe73dafbdc578392015fb892",
+  "review_sha256": "sha256:fe36741e55a2ba8c2eef45e2c3e7affb2cbce265b9cc249b431068cfc7ef80a6",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,
