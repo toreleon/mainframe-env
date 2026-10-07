@@ -99,7 +99,7 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
     merge_push = event_name == 'push' and event.get('merge_commit', False)
     msrv = build and (full or not merge_push)
     # Dependency and license policy is intentionally unconditional: prose-only
-    # pull requests, scheduled/full runs, and release tags all remain blocked by
+    # pull requests, scheduled/full runs, and tag builds all remain blocked by
     # a red locked dependency policy.
     gates = list(POLICY)
     if build:
@@ -205,10 +205,9 @@ def jenkins_context(root: Path, environ: dict[str, str], requested_event: str = 
     if event == 'auto':
         event = environ.get('MAINFRAME_ENV_CI_EVENT', '')
     if event == 'auto' or not event:
-        branch = environ.get('TAG_NAME') or environ.get('BRANCH_NAME', '')
         if environ.get('CHANGE_ID'):
             event = 'pull_request'
-        elif branch.startswith('mainframe-env-v'):
+        elif environ.get('TAG_NAME'):
             event = 'tag'
         elif environ.get('BUILD_CAUSE') == 'TIMERTRIGGER':
             event = 'schedule'

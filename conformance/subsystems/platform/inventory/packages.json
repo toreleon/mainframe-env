@@ -1,6 +1,6 @@
 {
   "schema_version": "mainframe-env.packages@1",
-  "consolidation_decision": "ADR 0005 consolidates the proposed package map; the additive generic application-package kernel is a distinct content-addressed installation and readiness boundary required by the 0.1.1 profile.",
+  "consolidation_decision": "ADR 0005 consolidates the proposed package map; the additive generic application-package kernel is a distinct content-addressed installation and readiness boundary required by the CardDemo application profiles.",
   "packages": [
     {"name":"mainframe-env-source","layer":"foundation","phase":"ME.V1","justification":"Exact bytes, logical paths, formats, source IDs, and provenance boundary"},
     {"name":"mainframe-env-diagnostics","layer":"foundation","phase":"ME.V1","justification":"Stable problem and diagnostic contract"},

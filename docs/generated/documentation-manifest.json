@@ -3,7 +3,7 @@
     "markdown_documents": 230,
     "navigation_groups": 8,
     "normative_documents": 93,
-    "xtask_commands": 171
+    "xtask_commands": 165
   },
   "documents": [
     {
@@ -18,9 +18,9 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:dd25c4d67f946c3fc648c52586d46b2f6593020e534c1721e34b61fcb808e65c",
+      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
       "title": "Changelog",
-      "xtask_commands": 6
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -757,7 +757,7 @@
       "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md",
       "relative_links": 0,
       "scope": "language HIR, executable semantic IR, host effects, and compatibility boundaries",
-      "sha256": "sha256:340ebca48caa25c63f9540921bcabf7de0f93f999aad92807436d50968597ff1",
+      "sha256": "sha256:acc22c7167f3bc52a4eeac19bbfc68ed31dc3d9f23f0a9d87bd4f10b8a6fd355",
       "status": "Accepted by repository owner",
       "title": "ADR-0011: Adopt language-specific HIR and versioned semantic IR dialects",
       "xtask_commands": 1
@@ -1614,7 +1614,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/structure-status.md",
       "relative_links": 0,
-      "sha256": "sha256:d922632aa94eb9b82522afb1d89bc64016c1374749631d3882c242824d5bed5c",
+      "sha256": "sha256:c11c00bee151de38fc69f6699f5a4649ec0ca97f3a9002af939e2f90cac36566",
       "title": "COBOL — Grammar and types progress",
       "xtask_commands": 1
     },
@@ -1858,7 +1858,7 @@
       "normative": false,
       "path": "docs/guides/DISTRIBUTION.md",
       "relative_links": 5,
-      "sha256": "sha256:4c561e3473546fd9d678eca84c77d2b0d00981f728aba348ff0715aedec21c50",
+      "sha256": "sha256:75505f08186fb55779a4f277444bb1c6595342017671656b70a113df48840f15",
       "title": "Public source distribution",
       "xtask_commands": 6
     },

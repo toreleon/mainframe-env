@@ -327,7 +327,7 @@ impl CobolCompiler {
             effective_options.display_sign().as_str().into(),
         );
         let manifest = ArtifactManifest {
-            compiler_generation: format!("mainframe-env-cobol-{}", env!("CARGO_PKG_VERSION")),
+            compiler_generation: crate::COBOL_COMPILER_GENERATION.into(),
             target: request.target,
             options: CompileOptions::new(manifest_options)?,
             host_interfaces: BTreeSet::from([

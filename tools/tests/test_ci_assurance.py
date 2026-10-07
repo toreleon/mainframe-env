@@ -61,7 +61,7 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaises(ValueError): ci.obligations([path])
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_full_tiers_select_every_obligation(self,_):
-        for event,ref in [('schedule','refs/heads/main'),('manual','refs/heads/main'),('tag','refs/tags/mainframe-env-v0.8.2')]:
+        for event,ref in [('schedule','refs/heads/main'),('manual','refs/heads/main'),('tag','refs/tags/sandbox-checkpoint')]:
             p=ci.make_plan(Path('.'),{},event,ref)
             self.assertTrue(p['full']);self.assertTrue(p['msrv']);self.assertTrue(p['store'])
             self.assertTrue(set(ci.FULL)<=set(p['primary_gates']))
@@ -146,10 +146,11 @@ class SelectionTests(unittest.TestCase):
     def test_jenkins_tag_and_timer_select_full_contexts(self):
         tag=ci.jenkins_context(Path('.'),{
             'JENKINS_HOME':'/capped/jenkins-home',
-            'BRANCH_NAME':'mainframe-env-v0.8.2',
+            'BRANCH_NAME':'sandbox-checkpoint',
+            'TAG_NAME':'sandbox-checkpoint',
         })
         self.assertEqual((tag['event'],tag['ref'],tag['provider']),
-                         ('tag','refs/tags/mainframe-env-v0.8.2','jenkins'))
+                         ('tag','refs/tags/sandbox-checkpoint','jenkins'))
         timer=ci.jenkins_context(Path('.'),{
             'JENKINS_URL':'http://127.0.0.1:8080/',
             'BUILD_CAUSE':'TIMERTRIGGER',

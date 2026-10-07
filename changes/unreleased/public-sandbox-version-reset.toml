@@ -1,0 +1,3 @@
+schema_version = "mainframe-env.changelog-fragment@1"
+category = "changed"
+summary = "Reset first-party Cargo packages to the 0.1.0 public sandbox baseline, cleared historical release tags, changelog, authorization and version-status/receipt records, and separated preserved artifact compatibility identities from package versions; CI tag detection uses provider metadata instead of a release-name prefix."

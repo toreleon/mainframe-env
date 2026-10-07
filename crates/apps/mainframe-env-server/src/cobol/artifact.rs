@@ -1,4 +1,4 @@
-use mainframe_env_compiler::{core_mir_catalog, core_mir_profile};
+use mainframe_env_compiler::{COBOL_COMPILER_GENERATION, core_mir_catalog, core_mir_profile};
 use mainframe_env_compiler_api::{
     ARTIFACT_CONTRACT, ArtifactLimits, ArtifactManifest, ArtifactManifestV2, CompileOptions,
     CompileTarget, LEGACY_ARTIFACT_CONTRACT, PublishedArtifact, ValidatedArtifact,
@@ -16,7 +16,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::CobolProgram;
 
 pub(crate) const COBOL_REFERENCE_COMPATIBILITY_PROFILE: &str = "mainframe-env.cobol.reference@1";
-const COBOL_COMPILER_GENERATION: &str = concat!("mainframe-env-cobol-", env!("CARGO_PKG_VERSION"));
 
 fn supported_host_interfaces() -> BTreeSet<String> {
     ["mainframe-env.host@1", "mainframe-env.cics@1"]

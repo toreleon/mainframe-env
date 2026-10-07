@@ -1,9 +1,7 @@
 {
   "schema_version": "mainframe-env.carddemo-profile@1",
-  "target_product": "0.1.1",
-  "current_product": "0.1.1",
-  "status": "conformance_pass",
-  "owner_decision": "Execute every application workload present in the clean pinned CardDemo repository through additive 0.1.1 profiles without breaking the existing 0.1 core-server surface.",
+  "status": "specified",
+  "objective": "Exercise pinned CardDemo workloads through subsystem-owned profiles and fresh application checks.",
   "corpus": {
     "repository": "https://github.com/aws-samples/aws-mainframe-modernization-carddemo.git",
     "commit": "59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e",
@@ -68,11 +66,6 @@
       "id": "CARDDEMO-ORPHAN-CDV1",
       "detail": "The base CSD defines CDV1 -> COCRDSEC, but the pinned repository and runtime archive contain no corresponding source or program object.",
       "resolution": "Owner-approved accepted-owned-source correction at conformance/profiles/carddemo/fixtures/carddemo/COCRDSEC.cbl."
-    },
-    {
-      "id": "RELEASE-ORDER-0.1.1",
-      "detail": "The repository owner authorized direct promotion from the unreleased alpha identity.",
-      "resolution": "ADR-0007 records the version-line correction and local 0.1.1 release."
     }
   ]
 }
