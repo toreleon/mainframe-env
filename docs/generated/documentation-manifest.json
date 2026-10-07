@@ -25,9 +25,9 @@
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 12,
-      "sha256": "sha256:847348e13fc3b6d36831b8ecd0a3dd3c843bc21758ab10f11756934f3523bf16",
-      "title": "Contributing to mainframe-env",
+      "relative_links": 13,
+      "sha256": "sha256:792147a8afc75d7fb7a2d2fe8b7467b0a7de83be346c796dc24ae9118a183914",
+      "title": "Contributing to Mainframe Sandbox",
       "xtask_commands": 11
     },
     {
@@ -342,7 +342,7 @@
       "normative": false,
       "path": "docs/README.md",
       "relative_links": 173,
-      "sha256": "sha256:d2bb32bf0f2374d0e57f5b4b3973dbc6962bc2312943aa7a429be23e43c2dd70",
+      "sha256": "sha256:31556be29381bd7e3dac8fe74e1ae15fe3d6ea7b838ed320057caa1d3bad0e77",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -533,7 +533,7 @@
       "path": "docs/architecture/PACKAGE-MAP.md",
       "relative_links": 33,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:70c3085c10c2aabd1ce441661420290e40439ca9689d4357823d94ee2390a0e0",
+      "sha256": "sha256:31df37e40c54bd60e348467e72035e1aa8c944e561ca95a5f4920fc7c3bfac2a",
       "status": "Accepted; current topology governed by ADR-0009",
       "title": "Package map",
       "xtask_commands": 0
@@ -1802,7 +1802,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:29d9c51d391e171f5d7dc0f0bfcfaa518298dd5667bfa76267cdc78f02faf7da",
+      "sha256": "sha256:efce89f90b0ddc3406d9648217e828a3a34b61b951de93ebbf80109f8966f213",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -1849,8 +1849,8 @@
     {
       "normative": false,
       "path": "docs/guides/CAPABILITIES.md",
-      "relative_links": 31,
-      "sha256": "sha256:8a424b56e8e4815aebc1c46023b5e0b5b82405d4611bd5a68e6c357cfdaab1ca",
+      "relative_links": 32,
+      "sha256": "sha256:5b9b3986d493c7d5fda28775a057e6284309a38618584cca848fc242d8da0fd7",
       "title": "Capabilities and limitations",
       "xtask_commands": 0
     },
@@ -1858,7 +1858,7 @@
       "normative": false,
       "path": "docs/guides/DISTRIBUTION.md",
       "relative_links": 5,
-      "sha256": "sha256:75505f08186fb55779a4f277444bb1c6595342017671656b70a113df48840f15",
+      "sha256": "sha256:59a1124a1d2f346f775575ca10680c084adc4797d4274284ba57fca1b6960cb1",
       "title": "Public source distribution",
       "xtask_commands": 6
     },
@@ -1893,7 +1893,7 @@
       "path": "docs/guides/MAINFRAME-SANDBOX.md",
       "relative_links": 4,
       "scope": "Executable profiles, lifecycle and agent access",
-      "sha256": "sha256:46170383b2608e6aee237cc4b662fb8d1bc2e7a025599c9cea5866151efe5996",
+      "sha256": "sha256:5d58f6ac9a489cd20e123f26eea4948daaee21f653b4854e9086a4ef3a08f41a",
       "status": "Implemented for native and container execution; Cube VM validation pending",
       "title": "Mainframe Sandbox",
       "xtask_commands": 0
@@ -1901,8 +1901,8 @@
     {
       "normative": false,
       "path": "docs/guides/README.md",
-      "relative_links": 8,
-      "sha256": "sha256:dcba8dd2131cb4ef818cdbda68c8201b5b39c2dd6544a25e51a29a5df4bf3d86",
+      "relative_links": 9,
+      "sha256": "sha256:8fae507f39279bc25000c441cda5eb09ecbf0bfe15707e5b33a458d0a786c720",
       "title": "User and maintainer guides",
       "xtask_commands": 2
     },
@@ -2101,8 +2101,8 @@
     {
       "normative": false,
       "path": "docs/reviews/SUBSYSTEM-REVIEW.md",
-      "relative_links": 9,
-      "sha256": "sha256:d063f1ebb35bde00a5719a6e0c778e442209f74b9be66a8ef913406ace35f64f",
+      "relative_links": 11,
+      "sha256": "sha256:4f3280b6ef2c1c656f7397c59345206d1954e8b95a5c07aaf7a0c3126798d33f",
       "title": "Subsystem engineering review",
       "xtask_commands": 0
     },
@@ -2156,6 +2156,14 @@
     },
     {
       "normative": false,
+      "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md",
+      "relative_links": 0,
+      "sha256": "sha256:cc37d9d36701b84ac494bd5823036dcf691f88b72a21ab9a182bc1b3dcdc87b4",
+      "title": "Incremental conformance-family rollout",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
       "sha256": "sha256:64703c7632b385e69ee615e995a08bae0a6d4c5e2d6bd40b1b03b9a31c77f4c0",
@@ -2182,7 +2190,7 @@
       "normative": false,
       "path": "docs/runbooks/README.md",
       "relative_links": 14,
-      "sha256": "sha256:e62dfbed8af24c030ddbe4476d3fb3b85fe919f63e2557b0d52c2533d0eb651d",
+      "sha256": "sha256:c337551a80365884145015b08091c30c120c2d28875437503233c331be024cc7",
       "title": "Operations and verification runbooks",
       "xtask_commands": 0
     },
@@ -2201,14 +2209,6 @@
       "sha256": "sha256:253370c10f0a116b989e0ecbb8e4bc28bf7ffffddd738587148cead4de54a72d",
       "title": "Licensed CICS file/UOW pilot handoff",
       "xtask_commands": 2
-    },
-    {
-      "normative": false,
-      "path": "docs/runbooks/conformance-family-rollout.md",
-      "relative_links": 0,
-      "sha256": "sha256:cc37d9d36701b84ac494bd5823036dcf691f88b72a21ab9a182bc1b3dcdc87b4",
-      "title": "Incremental conformance-family rollout",
-      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -2794,7 +2794,7 @@
         },
         {
           "label": "Conformance family rollout",
-          "path": "docs/runbooks/conformance-family-rollout.md"
+          "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md"
         }
       ],
       "heading": "Operations"
@@ -2860,7 +2860,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:ec530cec4fc64edefd0aa572906a1460c470407fe06e79d6fa0a22e63e8377be",
+  "registry_sha256": "sha256:c5cf39519cf94ff86ff7fccdc96237600761450256d3c376fc9e6beb08d42442",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

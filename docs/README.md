@@ -229,7 +229,7 @@ Implementation progress is organized by subsystem and phase. Contract revisions 
 - [CardDemo operator guide](runbooks/CARDDEMO-OPERATOR.md)
 - [CardDemo READACCT run bundle](runbooks/CARDDEMO-READACCT-BUNDLE.md)
 - [CICS licensed pilot](runbooks/cics-licensed-pilot.md)
-- [Conformance family rollout](runbooks/conformance-family-rollout.md)
+- [Conformance family rollout](runbooks/CONFORMANCE-FAMILY-ROLLOUT.md)
 
 ## Reviews and research
 

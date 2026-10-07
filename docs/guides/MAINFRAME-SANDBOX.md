@@ -16,7 +16,8 @@ Native execution requires Linux, Python 3.12.13, the pinned Rust 1.98.0 toolchai
 Git 2.50.1 and native build tools. Setup builds a relocatable bundle, includes
 complete target-filtered third-party notices, and checks out the pinned AWS
 CardDemo sample. Runtime startup verifies that reference checkout. Setup clears
-the checkout's Cargo target after preserving its executables and notices.
+the checkout's Cargo target after preserving its executables and notices,
+including on build failure; an inherited shared Cargo target is left untouched.
 
 ```bash
 bin/mainframe-sandbox setup --destination "$PWD/dist/sandbox"
@@ -241,7 +242,8 @@ cached stage. An isolated controller-only comment edit rebuilt the image in
 builds and other daemon/storage configurations will differ. Cargo artifacts are
 cleared after copying binaries and legal notices.
 Git builds without debug symbols, and setup fetches only the pinned CardDemo commit
-without tags; the commit, tree and clean checkout checks remain mandatory.
+without tags; origin, commit, tree and clean checkout checks remain mandatory.
+Setup validates the staged reference before publishing it into the bundle.
 
 ```mermaid
 flowchart LR
@@ -332,7 +334,9 @@ and [storage semantics](https://github.com/TencentCloud/CubeSandbox/blob/master/
 The controller bounds request bodies to 1 MiB and application/compiler responses
 to 2 MiB. Compiler invocations have a 30-second wall deadline and two concurrency
 slots; startup has a 60-second readiness deadline. Source snapshots accept at
-most 10,000 regular files, 16 MiB per file and 256 MiB total. Instances retain at
+most 10,000 entries (files and directories), 16 MiB per file and 256 MiB total.
+Controller clients reject redirects so credentials stay on the configured
+loopback endpoint. Instances retain at
 most 32 generations and controllers own at most 128 terminal handles. Container
 or VM configuration supplies CPU, memory, process and storage quotas for shell
 execution. Dataset reads that exceed the response limit return an error.

@@ -4,9 +4,9 @@ mainframe-env implements bounded language and subsystem surfaces. A recognized
 catalog entry, an analyzable statement, an executable operation, a local test,
 and a licensed differential result represent different levels of evidence.
 
-The [root status table](../../README.md#project-status),
-and
-[subsystem progress](../delivery/IMPLEMENTATION-STATUS.md) identify the current source checkout and implementation phases.
+The [root status table](../../README.md#project-status) and
+[subsystem progress](../delivery/IMPLEMENTATION-STATUS.md) identify the current
+source checkout and implementation phases.
 
 ## Evaluate a workload
 
@@ -49,7 +49,7 @@ See [Conformance IR](../architecture/CONFORMANCE-IR.md).
 
 ## CardDemo workload boundary
 
-The clean pinned upstream corpus supports all 20 owned local journeys across
+The framework's CardDemo conformance composition covers 20 owned local journeys across
 base CICS, the batch cycle, Db2, IMS, and MQ authorization. The complete gate
 also exercises memory isolation and overload, SQLite backup/restore, and
 PostgreSQL restart. Use the optimized runner described in the
@@ -61,6 +61,13 @@ The profile retains its declared substitutions, including the bounded owned
 It does not execute native archives or establish licensed IBM equivalence.
 Run the complete gate against your candidate and follow the
 [profile track](../delivery/subsystems/PROFILE-TRACK.md) for acceptance requirements.
+
+The executable sandbox's `carddemo-online` profile installs the online CICS
+application. It does not install the application batch cycle or Db2, IMS, and MQ
+extensions used by that conformance composition. JES built-in utility submission
+does not imply application batch support. Check
+[sandbox profiles](MAINFRAME-SANDBOX.md#profiles-and-capabilities) before selecting
+agent operations; use the subsystem workload commands for broader acceptance.
 
 ## Operational limits
 

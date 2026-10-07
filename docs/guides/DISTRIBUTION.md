@@ -2,8 +2,8 @@
 
 The public framework is built from the repository. Read
 [capabilities](CAPABILITIES.md) and [subsystem status](../delivery/IMPLEMENTATION-STATUS.md)
-before choosing a workload. There is no maintained release archive or historical
-receipt collection or historical release tags. First-party workspace packages and
+before choosing a workload. Historical release archives, tags, and execution
+receipt collections have been removed. First-party workspace packages and
 the standalone fuzz package start at `0.1.0`. Dependency and toolchain pins remain
 reproducibility inputs; contract schema and artifact compiler-generation identities
 remain compatibility metadata, independent of Cargo package versions.

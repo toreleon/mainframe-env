@@ -58,7 +58,8 @@ TOOLS = [
     tool("datasets_read", "Read a dataset under existing RACF permissions; returns bytes as base64.",
          {"dsn": string(128, pattern=r"[A-Za-z0-9@$#.-]{1,128}")}, ["dsn"], True),
 ]
-ONLINE = {t["name"] for t in TOOLS[7:]}
+COMMON_TOOLS = {"sandbox_status", "workspace_read", "workspace_write", "cobol_inspect",
+                "cobol_compile", "cobol_run", "sandbox_generations"}
 
 
 def validate(value, schema, label="arguments"):
@@ -121,7 +122,8 @@ class Operations:
         self.runtime = runtime
 
     def tools(self):
-        return [t for t in TOOLS if self.runtime.instance.state["profile"] == "carddemo-online" or t["name"] not in ONLINE]
+        return [t for t in TOOLS if self.runtime.instance.state["profile"] == "carddemo-online"
+                or t["name"] in COMMON_TOOLS]
 
     def call(self, name: str, args: dict) -> dict:
         definition = next((t for t in self.tools() if t["name"] == name), None)

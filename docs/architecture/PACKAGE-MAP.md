@@ -304,7 +304,7 @@ adapters, differential reports, protocol tests, and evidence models. It is not a
 production dependency.
 
 `xtask` owns deterministic code generation, architecture/profile checks,
-schema checks, and release evidence orchestration.
+schema checks, and current-candidate verification orchestration.
 
 ## Initial platform.runtime-integration exclusions
 

@@ -1,11 +1,13 @@
 # User and maintainer guides
 
-Practical paths through the framework. Start with one local program, check your workload, then choose an embedding or server composition.
+Practical paths through the sandbox and framework. Start with an executable
+workspace or one local program, then choose an embedding or server composition.
 
 [Documentation portal](../README.md) · [Project status](../../README.md#project-status)
 
 | Guide | Use it to |
 |---|---|
+| [Mainframe Sandbox](MAINFRAME-SANDBOX.md) | Set up an executable agent workspace and use CardDemo through CLI, MCP, or a browser |
 | [Capabilities and limitations](CAPABILITIES.md) | Evaluate supported surfaces and evidence limits |
 | [Embed mainframe-env in Rust](EMBEDDING.md) | Compose compiler, runtime, providers and stores in Rust |
 | [Getting started](GETTING-STARTED.md) | Run and inspect a local COBOL program |

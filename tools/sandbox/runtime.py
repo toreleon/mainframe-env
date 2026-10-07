@@ -16,6 +16,7 @@ from .instance import Instance
 
 MAX_OUTPUT = 2 * 1024 * 1024
 COMPILER_TIMEOUT = 30
+MAX_STARTUP_LOG = 8192
 
 
 def stop_process(process: subprocess.Popen) -> None:
@@ -105,7 +106,10 @@ class Runtime:
                 if self.closing.is_set():
                     raise ValueError("controller is stopping")
                 if process.poll() is not None:
-                    detail = (directory / "application.log").read_bytes()[-8192:].decode("utf-8", "replace")
+                    with (directory / "application.log").open("rb") as log:
+                        log.seek(0, os.SEEK_END)
+                        log.seek(max(0, log.tell() - MAX_STARTUP_LOG))
+                        detail = log.read(MAX_STARTUP_LOG).decode("utf-8", "replace")
                     raise ValueError(f"application startup failed: {detail}")
                 try:
                     status, _, payload = request(port, "GET", "/readyz", timeout=1)
@@ -199,6 +203,8 @@ class Runtime:
                     result = json.loads(payload)
                 except ValueError as error:
                     raise ValueError("compiler did not return structured output") from error
+                if not isinstance(result, dict):
+                    raise ValueError("compiler output must be an object")
                 if process.returncode != 0 or result.get("ok") is not True:
                     raise ValueError(result.get("error", "compiler rejected source"))
                 return result

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import http.client
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import select
@@ -17,10 +18,10 @@ from unittest.mock import patch
 
 from tools.sandbox.client import Client
 from tools.sandbox.instance import Instance, copy_tree, write_json
-from tools.sandbox.operations import decode_fields, validate, TOOLS
+from tools.sandbox.operations import decode_fields, validate, Operations, TOOLS
 from tools.sandbox.server import Server
 from tools.sandbox.runtime import Runtime
-from tools.sandbox.setup import prepare_reference
+from tools.sandbox.setup import prepare_reference, setup
 
 
 class ReferenceSetupTests(unittest.TestCase):
@@ -51,6 +52,50 @@ class ReferenceSetupTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(reference), "checkout", "--", "source"], check=True)
             with self.assertRaisesRegex(ValueError, "commit or tree"):
                 prepare_reference(reference, None, {**identity, "tree": "0" * 40})
+            rejected = root / "rejected/reference"
+            with self.assertRaisesRegex(ValueError, "commit or tree"):
+                prepare_reference(rejected, corpus, {**identity, "tree": "0" * 40})
+            self.assertFalse(rejected.exists(), "invalid checkouts must not be published")
+            self.assertEqual(list(rejected.parent.iterdir()), [])
+            subprocess.run(["git", "-C", str(reference), "remote", "set-url", "origin", str(corpus)], check=True)
+            with self.assertRaisesRegex(ValueError, "origin"):
+                prepare_reference(reference, None, identity)
+
+    def test_reference_symlinks_are_rejected_even_when_dangling(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reference = root / "reference"
+            reference.symlink_to(root / "missing", target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                prepare_reference(reference, None, {})
+            self.assertTrue(reference.is_symlink())
+
+    def test_failed_setup_cleans_only_checkout_target(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkout = root / "checkout"
+            checkout.mkdir()
+            shared = root / "shared-target"
+            shared.mkdir()
+            sentinel = shared / "keep"
+            sentinel.write_text("unrelated artifacts")
+            commands = []
+
+            def run(command, **kwargs):
+                commands.append((command, kwargs))
+                if command[1] == "build":
+                    raise subprocess.CalledProcessError(1, command)
+                self.assertEqual(command, ["cargo", "clean"])
+                self.assertEqual(kwargs["cwd"], checkout)
+                self.assertEqual(kwargs["env"]["CARGO_TARGET_DIR"], str(checkout / "target"))
+
+            with patch("tools.sandbox.setup.ROOT", checkout), patch("tools.sandbox.setup.subprocess.run", side_effect=run):
+                with patch.dict("os.environ", {"CARGO_TARGET_DIR": str(shared)}):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        setup(root / "bundle", None, False)
+            self.assertEqual(len(commands), 2)
+            self.assertEqual(sentinel.read_text(), "unrelated artifacts")
+            self.assertFalse(json.loads((root / "bundle/bundle.json").read_text())["ready"])
 
 
 class CompilerProcessTests(unittest.TestCase):
@@ -82,6 +127,13 @@ class CompilerProcessTests(unittest.TestCase):
             runtime = self.runtime(Path(temporary), 'print(\'{"ok":true,"output":"HELLO"}\')\n')
             result = runtime.compile("run", {"path": "HELLO.cbl"})
             self.assertEqual(result, {"ok": True, "output": "HELLO"})
+            self.assertEqual(runtime.compilers, set())
+
+    def test_non_object_compiler_output_is_rejected_and_reaped(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = self.runtime(Path(temporary), "print('[]')\n")
+            with self.assertRaisesRegex(ValueError, "must be an object"):
+                runtime.compile("run", {"path": "HELLO.cbl"})
             self.assertEqual(runtime.compilers, set())
 
 
@@ -125,6 +177,15 @@ class WorkspaceBoundaryTests(unittest.TestCase):
     def test_oversized_snapshot_leaves_no_generation(self):
         with patch("tools.sandbox.instance.MAX_TREE", 8):
             with self.assertRaises(ValueError):
+                self.instance.snapshot()
+        self.assertEqual(list(self.instance.generations.iterdir()), [])
+
+    def test_directory_only_snapshot_is_bounded(self):
+        self.instance.source_path("HELLO.cbl").unlink()
+        for index in range(4):
+            (self.instance.workspace / f"empty-{index}").mkdir()
+        with patch("tools.sandbox.instance.MAX_ENTRIES", 3):
+            with self.assertRaisesRegex(ValueError, "entry limit"):
                 self.instance.snapshot()
         self.assertEqual(list(self.instance.generations.iterdir()), [])
 
@@ -176,6 +237,50 @@ class WorkspaceBoundaryTests(unittest.TestCase):
 
 
 class ProtocolBoundaryTests(unittest.TestCase):
+    def test_profile_capabilities_do_not_depend_on_tool_order(self):
+        runtime = SimpleNamespace(instance=SimpleNamespace(state={"profile": "cobol"}))
+        with patch("tools.sandbox.operations.TOOLS", list(reversed(TOOLS))):
+            names = {tool["name"] for tool in Operations(runtime).tools()}
+        self.assertEqual(names, {"sandbox_status", "workspace_read", "workspace_write", "cobol_inspect",
+                                 "cobol_compile", "cobol_run", "sandbox_generations"})
+
+    def test_controller_redirects_do_not_forward_credentials(self):
+        received = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == "/redirect":
+                    self.send_response(302)
+                    self.send_header("Location", f"http://127.0.0.1:{self.server.server_port}/target")
+                else:
+                    received.append(self.headers.get("Authorization"))
+                    self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"[]")
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                instance = Path(temporary)
+                write_json(instance / "connection.json", {
+                    "url": f"http://127.0.0.1:{server.server_port}", "token": "secret"})
+                client = Client(instance)
+                with self.assertRaisesRegex(ValueError, "redirects are forbidden"):
+                    client.request("/redirect")
+                self.assertEqual(received, [], "redirect destination must receive no request")
+                with self.assertRaisesRegex(ValueError, "must be an object"):
+                    client.request("/target")
+                self.assertEqual(received, ["Bearer secret"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
     def test_stdio_lifecycle_errors_and_profile_discovery(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

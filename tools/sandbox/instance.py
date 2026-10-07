@@ -11,7 +11,7 @@ import uuid
 SCHEMA = "mainframe-sandbox.instance@1"
 MAX_FILE = 16 * 1024 * 1024
 MAX_TREE = 256 * 1024 * 1024
-MAX_FILES = 10000
+MAX_ENTRIES = 10000
 GENERATION = re.compile(r"[a-f0-9]{32}\Z")
 
 
@@ -47,6 +47,9 @@ def copy_tree(source: Path, destination: Path) -> None:
     for root, directories, files in os.walk(source, followlinks=False):
         relative = Path(root).relative_to(source)
         for name in directories:
+            count += 1
+            if count > MAX_ENTRIES:
+                raise ValueError("workspace snapshot exceeds its entry limit")
             if (Path(root) / name).is_symlink():
                 raise ValueError("workspace contains a directory symlink")
             (destination / relative / name).mkdir(mode=0o700)
@@ -57,8 +60,8 @@ def copy_tree(source: Path, destination: Path) -> None:
             size = item.stat().st_size
             count += 1
             total += size
-            if size > MAX_FILE or total > MAX_TREE or count > MAX_FILES:
-                raise ValueError("workspace snapshot exceeds its file or byte limit")
+            if size > MAX_FILE or total > MAX_TREE or count > MAX_ENTRIES:
+                raise ValueError("workspace snapshot exceeds its entry or byte limit")
             shutil.copyfile(item, destination / relative / name, follow_symlinks=False)
 
 

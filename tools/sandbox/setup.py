@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 from pathlib import Path
 import shutil
@@ -25,8 +24,23 @@ def install_file(source: Path, destination: Path):
         Path(temporary).unlink(missing_ok=True)
 
 
-def prepare_reference(reference: Path, corpus: Path | None, identity: dict):
+def verify_reference(reference: Path, identity: dict) -> None:
+    command = ["git", "-C", str(reference)]
+    if reference.is_symlink():
+        raise ValueError("reference checkout cannot be a symlink")
+    if subprocess.check_output(command + ["remote", "get-url", "origin"], text=True).strip() != identity["repository"]:
+        raise ValueError("reference origin differs from the pinned input")
+    for revision, expected in (("HEAD", identity["commit"]), ("HEAD^{tree}", identity["tree"])):
+        if subprocess.check_output(command + ["rev-parse", revision], text=True).strip() != expected:
+            raise ValueError("reference commit or tree differs from the pinned input")
+    if subprocess.check_output(command + ["status", "--porcelain"], text=True).strip():
+        raise ValueError("reference checkout is dirty")
+
+
+def prepare_reference(reference: Path, corpus: Path | None, identity: dict) -> None:
     """Fetch only the pinned commit, then validate reused or newly prepared checkouts."""
+    if reference.is_symlink():
+        raise ValueError("reference checkout cannot be a symlink")
     if not reference.exists():
         reference.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".carddemo-", dir=reference.parent) as temporary:
@@ -37,13 +51,10 @@ def prepare_reference(reference: Path, corpus: Path | None, identity: dict):
             subprocess.run(command + ["fetch", "--quiet", "--depth=1", "--no-tags", "origin", identity["commit"]], check=True)
             subprocess.run(command + ["checkout", "--quiet", "--detach", identity["commit"]], check=True)
             subprocess.run(command + ["remote", "set-url", "origin", identity["repository"]], check=True)
+            verify_reference(staged, identity)
             os.replace(staged, reference)
-    command = ["git", "-C", str(reference)]
-    for revision, expected in (("HEAD", identity["commit"]), ("HEAD^{tree}", identity["tree"])):
-        if subprocess.check_output(command + ["rev-parse", revision], text=True).strip() != expected:
-            raise ValueError("reference commit or tree differs from the pinned input")
-    if subprocess.check_output(command + ["status", "--porcelain"], text=True).strip():
-        raise ValueError("reference checkout is dirty")
+    else:
+        verify_reference(reference, identity)
 
 
 def setup(destination: Path, corpus: Path | None, no_build: bool):
@@ -62,22 +73,19 @@ def setup(destination: Path, corpus: Path | None, no_build: bool):
     write_json(manifest, {"schema_version": "mainframe-sandbox.bundle@1", "ready": False})
     bins = destination / "bin"
     bins.mkdir(exist_ok=True)
-    if not no_build:
-        try:
+    build_environment = {**os.environ, "CARGO_TARGET_DIR": str(ROOT / "target")}
+    try:
+        if not no_build:
             subprocess.run(["cargo", "build", "--locked", "--release", "-p", "mainframe-env-cli", "-p", "mainframe-env-conformance", "-p", "xtask",
-                            "--bin", "mainframe-env", "--bin", "mainframe-sandbox-runtime", "--bin", "xtask"], cwd=ROOT, check=True)
-            metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"], cwd=ROOT))
-            for name in ("mainframe-env", "mainframe-sandbox-runtime"):
-                install_file(Path(metadata["target_directory"]) / "release" / name, bins / name)
-            subprocess.run([str(Path(metadata["target_directory"]) / "release/xtask"), "license-notices", "--output",
-                            str(destination / "THIRD-PARTY-NOTICES.md")], cwd=ROOT, check=True)
-        finally:
-            subprocess.run(["cargo", "clean"], cwd=ROOT, check=True)
-    else:
+                            "--bin", "mainframe-env", "--bin", "mainframe-sandbox-runtime", "--bin", "xtask"],
+                           cwd=ROOT, env=build_environment, check=True)
         for name in ("mainframe-env", "mainframe-sandbox-runtime"):
             install_file(ROOT / "target" / "release" / name, bins / name)
         subprocess.run([str(ROOT / "target/release/xtask"), "license-notices", "--output",
-                        str(destination / "THIRD-PARTY-NOTICES.md")], cwd=ROOT, check=True)
+                        str(destination / "THIRD-PARTY-NOTICES.md")],
+                       cwd=ROOT, env=build_environment, check=True)
+    finally:
+        subprocess.run(["cargo", "clean"], cwd=ROOT, env=build_environment, check=True)
     install_file(ROOT / "bin/mainframe-sandbox", bins / "mainframe-sandbox")
     shutil.copytree(ROOT / "tools/sandbox", destination / "tools/sandbox", dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
