@@ -1,3 +1,5 @@
+mod inherited;
+
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,7 +9,11 @@ use std::process::Command;
 
 pub(crate) const NOTICE_SCHEMA: &str = "mainframe-env.third-party-license-notices@1";
 
-const PRODUCTION_ROOTS: [&str; 2] = ["mainframe-env-cli", "mainframe-env-server"];
+const PRODUCTION_ROOTS: [&str; 3] = [
+    "mainframe-env-cli",
+    "mainframe-env-server",
+    "mainframe-env-conformance",
+];
 const MAX_PRODUCTION_PACKAGES: usize = 4_096;
 const MAX_LEGAL_FILES_PER_PACKAGE: usize = 32;
 const MAX_PACKAGE_TREE_ENTRIES: usize = 16_384;
@@ -255,6 +261,17 @@ fn generate_from_metadata(
                 )?;
                 text_digests.insert(digest);
                 has_substantive_text = true;
+            } else if let Some((bytes, file_name)) =
+                inherited::legal_text(root, package, &directory)?
+            {
+                text_digests.insert(add_text(
+                    &mut texts,
+                    &mut total_legal_bytes,
+                    bytes,
+                    component_label.clone(),
+                    file_name,
+                )?);
+                has_substantive_text = true;
             } else {
                 return Err(format!(
                     "{component_label} ({expression}) has no complete license or notice text"
@@ -293,7 +310,7 @@ fn generate_from_metadata(
     let lock = read_bounded(&root.join("Cargo.lock"))?;
     let lock_digest = digest(&lock);
     let mut output = format!(
-        "# mainframe-env license and third-party notices\n\nSchema: `{NOTICE_SCHEMA}`\n\nRelease target: `{target}`\n\nCargo.lock SHA-256: `{lock_digest}`\n\nProduction roots: `mainframe-env-cli`, `mainframe-env-server`\n\nDependency scope: target-filtered Cargo normal and build dependencies; development dependencies are excluded.\n\nProduction closure packages: {}\n\nThird-party packages: {}\n\nUnique full license and notice texts: {}\n\nThe mainframe-env workspace is licensed under Apache-2.0. The repository owner approved retaining the locked `decnumber-sys 0.1.6` dependency under its declared ICU license in ADR-0008.\n\n## Third-party production closure\n\n",
+        "# mainframe-env license and third-party notices\n\nSchema: `{NOTICE_SCHEMA}`\n\nRelease target: `{target}`\n\nCargo.lock SHA-256: `{lock_digest}`\n\nProduction roots: `mainframe-env-cli`, `mainframe-env-server`, `mainframe-env-conformance`\n\nDependency scope: target-filtered Cargo normal and build dependencies; development dependencies are excluded.\n\nProduction closure packages: {}\n\nThird-party packages: {}\n\nUnique full license and notice texts: {}\n\nThe mainframe-env workspace is licensed under Apache-2.0. The repository owner approved retaining the locked `decnumber-sys 0.1.6` dependency under its declared ICU license in ADR-0008.\n\n## Third-party production closure\n\n",
         closure.len(),
         components.len(),
         texts.len(),

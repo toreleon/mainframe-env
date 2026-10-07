@@ -1,4 +1,4 @@
-# Contributing to mainframe-env
+# Contributing to Mainframe Sandbox
 
 Status: **Development contribution guide**
 
@@ -44,8 +44,8 @@ flowchart LR
 
 Find the owning phase in the [subsystem progress overview](docs/delivery/IMPLEMENTATION-STATUS.md)
 and read its plan and progress record. Update that record after bounded work;
-Cargo package versions and schema revisions remain build and compatibility metadata. Regenerate subsystem indexes
-and navigation with `cargo xtask docs`.
+Cargo package versions and schema revisions remain build and compatibility
+metadata. Regenerate subsystem indexes and navigation with `cargo xtask docs`.
 
 1. Start from a clean branch and preserve unrelated user changes.
 2. Identify the owning contract, provider, schema, and recovery boundary before
@@ -141,11 +141,43 @@ environment templates such as `.env.example` and shared VS Code settings may
 be committed. Python bytecode, local credentials, and service databases must
 stay untracked.
 
-Preserve both Cargo lockfiles, fuzz seed corpora, conformance fixtures/evidence,
-and subsystem specifications. Avoid broad extension rules that hide these
+Preserve both Cargo lockfiles, fuzz seed corpora, conformance specifications,
+fixtures, schemas, catalogs, and tests. Keep execution logs and evidence receipts
+outside Git. Avoid broad extension rules that hide these
 inputs. Inspect ignored files before cleanup: local audit directories, generated
 bundles, and unsupported offline experiments can contain useful work. Cleanup
 should remove only identified disposable artifacts, not every ignored file.
+
+## Naming and code conventions
+
+Use names that describe the owning subsystem and behavior, rather than a release
+number or temporary implementation stage. The Rust framework keeps its
+`mainframe-env` package and compatibility identities; the executable agent
+workspace is `mainframe-sandbox`.
+
+| Surface | Convention |
+|---|---|
+| Rust modules and Python files/functions | `snake_case`; four-space indentation |
+| Rust types and constants | `UpperCamelCase` and `SCREAMING_SNAKE_CASE` |
+| Cargo packages and shell entry points | Lowercase words separated by hyphens |
+| Guides, architecture, contracts, reviews, and runbooks | `UPPER-KEBAB-CASE.md`; directory indexes use `README.md` |
+| Architecture decisions | `NNNN-lower-kebab-case.md` |
+| Subsystem plans, progress records, and change fragments | `lower-kebab-case` under the owning directory |
+| Fixtures, schemas, and pinned upstream sources | Preserve contract-defined names, case, versions, and digests |
+
+The licensed CICS pilot's `docs/runbooks/cics-licensed-pilot.md` path is a
+schema-pinned handoff identity and remains unchanged. Review contractual paths
+and external consumers before renaming; a cosmetic rename must not silently
+change a compatibility fixture.
+
+Apply `rustfmt` with the repository's 100-column configuration. Keep Python
+imports at module scope unless an optional dependency or import cycle requires
+otherwise. Name public capabilities explicitly rather than deriving them from
+list positions. Bound filesystem entries, bytes, process output, and deadlines
+at agent-facing boundaries, and validate inputs before publishing state.
+Keep subsystem authority in its owning crate; use the
+[engineering review guide](docs/reviews/SUBSYSTEM-REVIEW.md) when assessing
+module size, duplication, state ownership, and cross-subsystem dependencies.
 
 ## Public and durable changes
 

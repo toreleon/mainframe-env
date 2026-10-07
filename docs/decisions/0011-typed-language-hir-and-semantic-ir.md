@@ -313,10 +313,15 @@ exact compatibility profile before installation, execution, or resume:
 | --- | --- | --- |
 | environment profile | `mainframe-env.cobol.reference@1` | Host compatibility is owned by the product environment, not deferred to a provider effect |
 | source artifact contract | `mainframe-env.artifact@2` or `mainframe-env.artifact@3` | `@2` is the retained pre-dialect-manifest reader; writers emit only `@3`; every other version is rejected |
-| compiler generation and target | exactly `mainframe-env-cobol-0.8.3` and `reference` | No cross-generation semantic compatibility is inferred |
+| compiler generation and target | shared `COBOL_COMPILER_GENERATION` (`mainframe-env-cobol-0.8.3`) and `reference` | No cross-generation semantic compatibility is inferred |
 | normalized options | exactly `cobol.effective-arith` (`compatible` or `extended`), `cobol.effective-dispsign` (`compatible` or `separate`), and `cobol.effective-lp` (`32` or `64`) | Unknown, missing, or payload-config-mismatched semantic options are rejected |
 | host ABI set | exactly `mainframe-env.host@1` and `mainframe-env.cics@1` | Capability and resource authorization still occur at dispatch |
 | IR envelope | exactly `mainframe-env.ir-envelope@1` | Canonical bytes and the registered executable profile are revalidated |
+
+The compiler-generation identity is an artifact compatibility contract. The compiler
+and server share this constant independently of the Cargo package version; resetting
+public package metadata to `0.1.0` preserves the accepted artifact bytes, semantic
+identities and admission checks.
 
 For `@2`, the reader derives the missing dialect set only in the admitted
 in-memory view; it preserves the original payload, content digest, source

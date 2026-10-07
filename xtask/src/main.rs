@@ -2,6 +2,8 @@
 
 #![forbid(unsafe_code)]
 
+mod license_notices_cli;
+
 #[cfg(test)]
 mod carddemo_base_batch_provenance;
 mod carddemo_host_integration;
@@ -258,7 +260,7 @@ enum XtaskCommand {
     CarddemoOperatorSubmit(CheckArgs),
     CarddemoOperatorReset(CheckArgs),
     CarddemoFull(CheckArgs),
-    LicenseNotices(CheckArgs),
+    LicenseNotices(license_notices_cli::NoticeArgs),
     Digest(CheckArgs),
 }
 
@@ -659,7 +661,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             checked!("carddemo-full", args, check_carddemo_full(root))
         }
         XtaskCommand::LicenseNotices(args) => {
-            checked!("license-notices", args, check_license_notices(root))
+            checked!(
+                "license-notices",
+                args,
+                license_notices_cli::run(root, &args)
+            )
         }
         XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
         XtaskCommand::WorkPackageSeal(args) => (
@@ -10644,19 +10650,6 @@ fn validate_runtime_target(target: &str) -> TaskResult {
             && RETAINED_RUNTIME_TARGETS.contains(&target),
         "runtime target is invalid",
     )
-}
-
-fn check_license_notices(root: &Path) -> TaskResult {
-    let target = host_target(root)?;
-    let report = dependency_licenses::generate(root, &target)?;
-    println!(
-        "license-notices target={target} production-packages={} third-party-packages={} unique-legal-texts={} bytes={}",
-        report.production_packages,
-        report.third_party_packages,
-        report.unique_legal_texts,
-        report.bytes.len()
-    );
-    Ok(())
 }
 
 fn host_target(root: &Path) -> TaskResult<String> {

@@ -98,12 +98,18 @@
     "docs/delivery/subsystems/mq/inquiry-source-boundary.md",
     "docs/architecture/README.md",
     "docs/contracts/README.md",
-    "docs/decisions/0048-carddemo-interactive-application.md"
+    "docs/decisions/0048-carddemo-interactive-application.md",
+    "docs/guides/MAINFRAME-SANDBOX.md",
+    "docs/decisions/0049-executable-agent-sandbox.md"
   ],
   "navigation": [
     {
       "heading": "User and maintainer guides",
       "entries": [
+        {
+          "label": "Executable sandbox and agent setup",
+          "path": "docs/guides/MAINFRAME-SANDBOX.md"
+        },
         {
           "label": "Capabilities and limitations",
           "path": "docs/guides/CAPABILITIES.md"
@@ -510,6 +516,10 @@
         {
           "label": "ADR-0048: Persistent interactive CardDemo composition",
           "path": "docs/decisions/0048-carddemo-interactive-application.md"
+        },
+        {
+          "label": "Executable application sandbox and agent boundary",
+          "path": "docs/decisions/0049-executable-agent-sandbox.md"
         }
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
@@ -599,7 +609,7 @@
         },
         {
           "label": "Conformance family rollout",
-          "path": "docs/runbooks/conformance-family-rollout.md"
+          "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md"
         }
       ]
     },

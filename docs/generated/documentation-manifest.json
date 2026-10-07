@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 227,
+    "markdown_documents": 230,
     "navigation_groups": 8,
-    "normative_documents": 91,
-    "xtask_commands": 171
+    "normative_documents": 93,
+    "xtask_commands": 165
   },
   "documents": [
     {
@@ -18,24 +18,32 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 0,
-      "sha256": "sha256:dd25c4d67f946c3fc648c52586d46b2f6593020e534c1721e34b61fcb808e65c",
+      "sha256": "sha256:12ab36d5f0dbbbf7d0c243ce7156ca5d537ba55369e2032c76e9265f512966d4",
       "title": "Changelog",
-      "xtask_commands": 6
+      "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 12,
-      "sha256": "sha256:847348e13fc3b6d36831b8ecd0a3dd3c843bc21758ab10f11756934f3523bf16",
-      "title": "Contributing to mainframe-env",
+      "relative_links": 13,
+      "sha256": "sha256:792147a8afc75d7fb7a2d2fe8b7467b0a7de83be346c796dc24ae9118a183914",
+      "title": "Contributing to Mainframe Sandbox",
       "xtask_commands": 11
     },
     {
       "normative": false,
+      "path": "LICENSES/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:a539efc51fc1ff2cc1b6d22192146ac9f0ef9a9c982f0d7733f4f4de3fe0ed5b",
+      "title": "Retained third-party license texts",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "README.md",
-      "relative_links": 22,
-      "sha256": "sha256:94d66070b3b7cce2a44bcd039d6c48bceef81770499dc455cf4ccabe2f135f4e",
-      "title": "mainframe-env",
+      "relative_links": 24,
+      "sha256": "sha256:641fb0564cc7ce1d5c05225f879ad9f11cfd3240df16d79d398ecb1958be247b",
+      "title": "Mainframe Sandbox",
       "xtask_commands": 0
     },
     {
@@ -333,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 171,
-      "sha256": "sha256:50c44c585f3b312717cc3fb28c0c56aba926ab59b6ad1a269a444d20eb8dc347",
+      "relative_links": 173,
+      "sha256": "sha256:31556be29381bd7e3dac8fe74e1ae15fe3d6ea7b838ed320057caa1d3bad0e77",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -525,7 +533,7 @@
       "path": "docs/architecture/PACKAGE-MAP.md",
       "relative_links": 33,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:70c3085c10c2aabd1ce441661420290e40439ca9689d4357823d94ee2390a0e0",
+      "sha256": "sha256:31df37e40c54bd60e348467e72035e1aa8c944e561ca95a5f4920fc7c3bfac2a",
       "status": "Accepted; current topology governed by ADR-0009",
       "title": "Package map",
       "xtask_commands": 0
@@ -749,7 +757,7 @@
       "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md",
       "relative_links": 0,
       "scope": "language HIR, executable semantic IR, host effects, and compatibility boundaries",
-      "sha256": "sha256:340ebca48caa25c63f9540921bcabf7de0f93f999aad92807436d50968597ff1",
+      "sha256": "sha256:acc22c7167f3bc52a4eeac19bbfc68ed31dc3d9f23f0a9d87bd4f10b8a6fd355",
       "status": "Accepted by repository owner",
       "title": "ADR-0011: Adopt language-specific HIR and versioned semantic IR dialects",
       "xtask_commands": 1
@@ -1367,6 +1375,18 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Application and developer tooling maintainers",
+      "path": "docs/decisions/0049-executable-agent-sandbox.md",
+      "relative_links": 1,
+      "scope": "Application profiles, lifecycle, packaging and agent access",
+      "sha256": "sha256:4ec846a61199961a4af42c979270bcd8270aec17803deb348dac466b403535c3",
+      "status": "Implemented for native and container execution; Cube integration pending",
+      "title": "ADR-0049: Executable application sandbox and agent boundary",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
       "relative_links": 49,
@@ -1594,7 +1614,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/structure-status.md",
       "relative_links": 0,
-      "sha256": "sha256:d922632aa94eb9b82522afb1d89bc64016c1374749631d3882c242824d5bed5c",
+      "sha256": "sha256:c11c00bee151de38fc69f6699f5a4649ec0ca97f3a9002af939e2f90cac36566",
       "title": "COBOL — Grammar and types progress",
       "xtask_commands": 1
     },
@@ -1782,7 +1802,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
       "relative_links": 1,
-      "sha256": "sha256:29d9c51d391e171f5d7dc0f0bfcfaa518298dd5667bfa76267cdc78f02faf7da",
+      "sha256": "sha256:efce89f90b0ddc3406d9648217e828a3a34b61b951de93ebbf80109f8966f213",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -1829,16 +1849,16 @@
     {
       "normative": false,
       "path": "docs/guides/CAPABILITIES.md",
-      "relative_links": 31,
-      "sha256": "sha256:8a424b56e8e4815aebc1c46023b5e0b5b82405d4611bd5a68e6c357cfdaab1ca",
+      "relative_links": 32,
+      "sha256": "sha256:5b9b3986d493c7d5fda28775a057e6284309a38618584cca848fc242d8da0fd7",
       "title": "Capabilities and limitations",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/guides/DISTRIBUTION.md",
-      "relative_links": 4,
-      "sha256": "sha256:35c865da3e0de6ee23bba7405daa14a4030a16883db5fd9fa545437a3d61146f",
+      "relative_links": 5,
+      "sha256": "sha256:59a1124a1d2f346f775575ca10680c084adc4797d4274284ba57fca1b6960cb1",
       "title": "Public source distribution",
       "xtask_commands": 6
     },
@@ -1853,8 +1873,8 @@
     {
       "normative": false,
       "path": "docs/guides/GETTING-STARTED.md",
-      "relative_links": 10,
-      "sha256": "sha256:3abfad5b6fcfbbc3e1e8d25cd43b7f3da5708064847d48159b3a2ba6fc51d06a",
+      "relative_links": 11,
+      "sha256": "sha256:d1843f493674bff12b7a74e2d45b7ac4fe07e6e053a9fe97d7399349e7274c4b",
       "title": "Getting started",
       "xtask_commands": 0
     },
@@ -1867,10 +1887,22 @@
       "xtask_commands": 0
     },
     {
+      "applies_from": "mainframe-env current subsystem contracts",
+      "normative": true,
+      "owner": "Application and developer tooling maintainers",
+      "path": "docs/guides/MAINFRAME-SANDBOX.md",
+      "relative_links": 4,
+      "scope": "Executable profiles, lifecycle and agent access",
+      "sha256": "sha256:5d58f6ac9a489cd20e123f26eea4948daaee21f653b4854e9086a4ef3a08f41a",
+      "status": "Implemented for native and container execution; Cube VM validation pending",
+      "title": "Mainframe Sandbox",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/guides/README.md",
-      "relative_links": 8,
-      "sha256": "sha256:dcba8dd2131cb4ef818cdbda68c8201b5b39c2dd6544a25e51a29a5df4bf3d86",
+      "relative_links": 9,
+      "sha256": "sha256:8fae507f39279bc25000c441cda5eb09ecbf0bfe15707e5b33a458d0a786c720",
       "title": "User and maintainer guides",
       "xtask_commands": 2
     },
@@ -2069,8 +2101,8 @@
     {
       "normative": false,
       "path": "docs/reviews/SUBSYSTEM-REVIEW.md",
-      "relative_links": 9,
-      "sha256": "sha256:d063f1ebb35bde00a5719a6e0c778e442209f74b9be66a8ef913406ace35f64f",
+      "relative_links": 11,
+      "sha256": "sha256:4f3280b6ef2c1c656f7397c59345206d1954e8b95a5c07aaf7a0c3126798d33f",
       "title": "Subsystem engineering review",
       "xtask_commands": 0
     },
@@ -2093,8 +2125,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/CARDDEMO-OPERATOR.md",
-      "relative_links": 1,
-      "sha256": "sha256:6ba5f51a88241c6b5ec236d26222ff6a581338747da1dd33ea5dc5f4d8caa748",
+      "relative_links": 2,
+      "sha256": "sha256:23f04110bd69bd50279efbedc4cf3c0da0c76cb3f0a1929670e832ffeb4544a6",
       "title": "CardDemo operator compatibility",
       "xtask_commands": 4
     },
@@ -2110,7 +2142,7 @@
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:83a222f887b9197352c1ab62b100892087122b77c026be8c48063d3485c86c31",
+      "sha256": "sha256:157a880c64008d45b099782a6ec1c5218b15b1224062aa791857ba2e58dcab34",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },
@@ -2121,6 +2153,14 @@
       "sha256": "sha256:ccffa273c310b031cc96a96f59a5e2e15d1464f7346d2d1e08ec0e74d2e2d945",
       "title": "COBOL semantic differential pilot",
       "xtask_commands": 1
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md",
+      "relative_links": 0,
+      "sha256": "sha256:cc37d9d36701b84ac494bd5823036dcf691f88b72a21ab9a182bc1b3dcdc87b4",
+      "title": "Incremental conformance-family rollout",
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -2150,7 +2190,7 @@
       "normative": false,
       "path": "docs/runbooks/README.md",
       "relative_links": 14,
-      "sha256": "sha256:e62dfbed8af24c030ddbe4476d3fb3b85fe919f63e2557b0d52c2533d0eb651d",
+      "sha256": "sha256:c337551a80365884145015b08091c30c120c2d28875437503233c331be024cc7",
       "title": "Operations and verification runbooks",
       "xtask_commands": 0
     },
@@ -2172,14 +2212,6 @@
     },
     {
       "normative": false,
-      "path": "docs/runbooks/conformance-family-rollout.md",
-      "relative_links": 0,
-      "sha256": "sha256:cc37d9d36701b84ac494bd5823036dcf691f88b72a21ab9a182bc1b3dcdc87b4",
-      "title": "Incremental conformance-family rollout",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
       "path": "xtask/README.md",
       "relative_links": 4,
       "sha256": "sha256:cca1268b670a57519b0459a1b8a17c3f94883881ceafc1c2755f714213f1109e",
@@ -2196,6 +2228,10 @@
   "navigation": [
     {
       "entries": [
+        {
+          "label": "Executable sandbox and agent setup",
+          "path": "docs/guides/MAINFRAME-SANDBOX.md"
+        },
         {
           "label": "Capabilities and limitations",
           "path": "docs/guides/CAPABILITIES.md"
@@ -2602,6 +2638,10 @@
         {
           "label": "ADR-0048: Persistent interactive CardDemo composition",
           "path": "docs/decisions/0048-carddemo-interactive-application.md"
+        },
+        {
+          "label": "Executable application sandbox and agent boundary",
+          "path": "docs/decisions/0049-executable-agent-sandbox.md"
         }
       ],
       "heading": "Architecture decisions",
@@ -2754,7 +2794,7 @@
         },
         {
           "label": "Conformance family rollout",
-          "path": "docs/runbooks/conformance-family-rollout.md"
+          "path": "docs/runbooks/CONFORMANCE-FAMILY-ROLLOUT.md"
         }
       ],
       "heading": "Operations"
@@ -2820,7 +2860,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:ca889a4afd85f4b2669998c098a85b8bb25c5cb485e286ea8d666f0bad7e66aa",
+  "registry_sha256": "sha256:c5cf39519cf94ff86ff7fccdc96237600761450256d3c376fc9e6beb08d42442",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {

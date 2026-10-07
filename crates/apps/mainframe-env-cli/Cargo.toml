@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
+serde_json.workspace = true
 mainframe-env-source.workspace = true
 mainframe-env-ir.workspace = true
 mainframe-env-compiler-api.workspace = true

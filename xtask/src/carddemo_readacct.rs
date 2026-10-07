@@ -186,12 +186,12 @@ fn project(bundle: &Value) -> TaskResult<(Value, Value)> {
     );
     let runtime = digest_ref(
         "mainframe-env-server",
-        "0.8.3",
+        env!("CARGO_PKG_VERSION"),
         &source["helper_sources"]["crates/apps/mainframe-env-server/src/cobol.rs"],
     );
     let implementation = digest_ref(
         "mainframe-env-interpreter",
-        "0.8.3",
+        env!("CARGO_PKG_VERSION"),
         &source["helper_sources"]["crates/apps/mainframe-env-server/src/cobol/runtime.rs"],
     );
     let codec = digest_ref("CCSID-37", "1", &initial["records_digest"]);

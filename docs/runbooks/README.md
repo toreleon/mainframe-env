@@ -17,4 +17,4 @@ Procedures for the development server, storage recovery, conformance environment
 - [Core-server operations](OPERATIONS.md)
 - [Verification workflow](VERIFICATION-WORKFLOW.md)
 - [Licensed CICS file/UOW pilot handoff](cics-licensed-pilot.md)
-- [Incremental conformance-family rollout](conformance-family-rollout.md)
+- [Incremental conformance-family rollout](CONFORMANCE-FAMILY-ROLLOUT.md)

@@ -74,6 +74,7 @@ explicitly names that authority as superseded.
 <!-- BEGIN GENERATED DOCUMENTATION NAVIGATION -->
 ## User and maintainer guides
 
+- [Executable sandbox and agent setup](guides/MAINFRAME-SANDBOX.md)
 - [Capabilities and limitations](guides/CAPABILITIES.md)
 - [Embed mainframe-env in Rust](guides/EMBEDDING.md)
 - [Getting started](guides/GETTING-STARTED.md)
@@ -181,6 +182,7 @@ explicitly names that authority as superseded.
 - [ADR-0046: Bounded provider namespace prefetch](decisions/0046-batch-bounded-provider-prefetch.md)
 - [ADR-0047: CardDemo participant ownership and batch completion](decisions/0047-carddemo-participant-completion.md)
 - [ADR-0048: Persistent interactive CardDemo composition](decisions/0048-carddemo-interactive-application.md)
+- [Executable application sandbox and agent boundary](decisions/0049-executable-agent-sandbox.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
@@ -227,7 +229,7 @@ Implementation progress is organized by subsystem and phase. Contract revisions 
 - [CardDemo operator guide](runbooks/CARDDEMO-OPERATOR.md)
 - [CardDemo READACCT run bundle](runbooks/CARDDEMO-READACCT-BUNDLE.md)
 - [CICS licensed pilot](runbooks/cics-licensed-pilot.md)
-- [Conformance family rollout](runbooks/conformance-family-rollout.md)
+- [Conformance family rollout](runbooks/CONFORMANCE-FAMILY-ROLLOUT.md)
 
 ## Reviews and research
 

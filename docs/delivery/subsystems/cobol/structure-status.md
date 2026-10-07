@@ -80,11 +80,13 @@ mutants are killed; and duplicate shard batches fail before union.
   resource limits, four recovery or execution-incomplete publication blockers,
   the existing bounded parser property test, and representative registry and
   artifact mutants provide the complete compiler/source/IR diagnostic floor.
-- The compatibility fixture is the canonical 955-byte HELLO artifact produced
-  by immutable tag `mainframe-env-vprofile.carddemo` at commit
-  `44f3081eb2fdf22d09e1a97725f5a4163431ca70`. CB-306 verifies the tag commit and
-  tree, accepted artifact contract inventory, exact payload digest, binary
-  decode/re-encode, and successful execution with `HELLO WORLD!` output.
+- The retained compatibility fixture is the canonical 1,261-byte artifact-v2
+  from source commit `c029219f0dd647d9255b4334d93167f5524d062d`, stored in
+  `conformance/subsystems/cics/application/cobol/artifact-v2-c029219.*`.
+  CB-306 verifies its exact payload digest, binary decode/re-encode, derived
+  dialect manifest, unchanged payload identity, and execution with `HELLO` output.
+  The compiler-generation compatibility identity remains independent of the
+  reset Cargo package version; fixture provenance uses commits rather than tags.
 - Full-workspace preflight found and repaired compatibility gaps before the
   unchanged-candidate acceptance run. Host-dialect operands no longer become
   COBOL statement options; `ACCEPT FROM` and both official and legacy XML PARSE

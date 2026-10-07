@@ -1,9 +1,14 @@
-# mainframe-env
+# Mainframe Sandbox
 
-A Rust framework for compiling and executing bounded mainframe applications.
-mainframe-env combines a deterministic COBOL compiler and interpreter with
+An executable workspace for compiling, running and modifying supported mainframe
+applications, with CLI, browser and coding-agent access. The `mainframe-env` Rust
+framework powers the sandbox and combines a deterministic COBOL compiler and interpreter with
 owned contracts for CICS, JCL/JES, datasets, RACF/SAF, Db2, IMS, MQ, spool,
 z/OSMF, and durable storage.
+
+Start with the [sandbox setup and agent guide](docs/guides/MAINFRAME-SANDBOX.md)
+for standalone COBOL or a persistent CardDemo application. Native execution owns
+independent application state; a container or Cube MicroVM supplies OS isolation.
 
 Use it to explore application behavior, build integration tools, and contribute
 to mainframe compatibility work. Execution, resource limits, host effects, and
@@ -14,7 +19,7 @@ without moving language semantics into transport or storage adapters.
 
 | Item | Status |
 |---|---|
-| Distribution | Public source checkout; build with the pinned Rust toolchain |
+| Distribution | Public source, relocatable executable bundle and pinned container recipe |
 | Work management | Named subsystems and phases |
 | Implementation progress | [Subsystem progress](docs/delivery/IMPLEMENTATION-STATUS.md) |
 | Production readiness | Not claimed |
@@ -71,6 +76,7 @@ and [current package map](docs/architecture/PACKAGE-MAP.md) explain the boundari
 | Goal | Start here |
 |---|---|
 | Evaluate the framework | [Getting started](docs/guides/GETTING-STARTED.md) and [capabilities](docs/guides/CAPABILITIES.md) |
+| Set up a coding-agent sandbox | [Mainframe Sandbox](docs/guides/MAINFRAME-SANDBOX.md) |
 | Embed it in a Rust application | [Embedding guide](docs/guides/EMBEDDING.md) |
 | Start the development server | [Operations runbook](docs/runbooks/OPERATIONS.md) |
 | Use CardDemo in your browser | [CardDemo application launcher](docs/runbooks/CARDDEMO-OPERATOR.md#run-and-use-the-application) |
@@ -113,6 +119,7 @@ defines the complete assurance boundary.
 | `crates/gateways/` | z/OSMF protocol translation |
 | `crates/stores/` | Memory, SQLite, PostgreSQL, and artifact adapters |
 | `crates/tooling/`, `xtask/` | Conformance, generation, and validation tooling |
+| `bin/mainframe-sandbox`, `tools/sandbox/` | Executable sandbox, lifecycle, agent interfaces and packaging |
 | `conformance/` | Subsystem specifications, schemas, catalogs, fixtures, and tests |
 | `docs/` | Guides, architecture, contracts, runbooks, and subsystem plans |
 

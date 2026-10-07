@@ -1,5 +1,9 @@
 # Getting started
 
+For an executable application workspace with lifecycle, browser and coding-agent
+access, start with [Mainframe Sandbox](MAINFRAME-SANDBOX.md). This guide explains
+the underlying Rust compiler and local execution commands.
+
 This guide uses the current source checkout. Run these commands from the
 repository root unless stated otherwise. See [source distribution](DISTRIBUTION.md)
 for public scope and review checks.

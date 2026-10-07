@@ -33,8 +33,8 @@ class ToolingTestDiscoveryTests(unittest.TestCase):
     def test_nested_tracked_python_and_shell_tests_are_discovered_without_a_directory_list(self):
         files = {
             "tools/tests/test_root.py": "import unittest\n",
-            "conformance/1.7/tools/tests/test_nested.py": "import unittest\n",
-            "conformance/1.8/tools/tests/parser_test.sh": "#!/usr/bin/env bash\ntrue\n",
+            "conformance/subsystems/cobol/language/tools/tests/test_nested.py": "import unittest\n",
+            "conformance/subsystems/jcl/planning/tools/tests/parser_test.sh": "#!/usr/bin/env bash\ntrue\n",
             "tools/jenkins/helper.sh": "#!/usr/bin/env bash\ntrue\n",
             "tests/test_not_tooling.py": "import unittest\n",
             "tools/tests/test_untracked.py": "import unittest\n",
@@ -44,15 +44,15 @@ class ToolingTestDiscoveryTests(unittest.TestCase):
         inventory = RUNNER.discover(root)
         self.assertEqual(
             inventory.python_tests,
-            ("conformance/1.7/tools/tests/test_nested.py", "tools/tests/test_root.py"),
+            ("conformance/subsystems/cobol/language/tools/tests/test_nested.py", "tools/tests/test_root.py"),
         )
         self.assertEqual(
             inventory.shell_tests,
-            ("conformance/1.8/tools/tests/parser_test.sh",),
+            ("conformance/subsystems/jcl/planning/tools/tests/parser_test.sh",),
         )
         self.assertEqual(
             inventory.shell_tools,
-            ("conformance/1.8/tools/tests/parser_test.sh", "tools/jenkins/helper.sh"),
+            ("conformance/subsystems/jcl/planning/tools/tests/parser_test.sh", "tools/jenkins/helper.sh"),
         )
 
     def test_discovered_files_execute_and_report_nonempty_cases(self):
@@ -82,6 +82,13 @@ class ToolingTestDiscoveryTests(unittest.TestCase):
         root = self.repository(files, set(files))
         summary = RUNNER.run_inventory(root, RUNNER.discover(root), io.BytesIO())
         self.assertIn("tools/tests/test_empty.py", summary.failed_files)
+
+    def test_invalid_helper_syntax_fails_before_test_execution(self):
+        files = {"tools/tests/test_ok.py": "import unittest\n",
+                 "tools/unused_helper.py": "try:\n    pass\nfinally:\n    pass\nfinally:\n    pass\n"}
+        root = self.repository(files, set(files))
+        with self.assertRaisesRegex(ValueError, "invalid Python syntax: tools/unused_helper.py:5"):
+            RUNNER.discover(root)
 
 
 if __name__ == "__main__":

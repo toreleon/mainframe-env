@@ -9,7 +9,7 @@ Status: **Implementation active**
 
 `MQ-1503.authorization-callback-lock` releases the private capture collection
 mutex before invoking the mandatory real authorizer. A short-lived reservation
-counts recorded plus in-flight resources against the existing512-resource cap,
+counts recorded plus in-flight resources against the existing 512-resource cap,
 before delegate invocation. Only actual successful authorization is recorded;
 error or panic releases the reserved slot. Final extraction refuses outstanding
 reservations and retains existing typed-resource validation.
@@ -24,8 +24,9 @@ locks or solve native independent-concurrency versus callback-entry ownership.
 The larger unsealed native feature remains blocked on that contract and its
 unchanged concurrent-writer regressions; no partial worker pass is acceptance.
 
-All26 full-call gates remain Pending and fullv0.15 is unfinished. The licensed
-IBM MQ oracle alone is human-skipped0/26 with zero conformance credit; all other
+All 26 full-call gates remain Pending and MQ programming acceptance is unfinished. The
+licensed
+IBM MQ oracle alone is human-skipped 0/26 with zero conformance credit; all other
 acceptance requirements remain unwaived. Helper fixtures are not installed,
 native, SAF, JES or crash evidence.
 
@@ -36,7 +37,7 @@ native, SAF, JES or crash evidence.
 physical namespace page. Before payload materialization, Memory checks borrowed
 records under one lock; SQLite checks byte/type/version metadata and bounded
 UTF-8 keys, then fetches that same page in one read transaction. Positive row
-limits retain the existing262145 ceiling; positive page budgets are at most64MiB.
+limits retain the existing 262145 ceiling; positive page budgets are at most 64 MiB.
 The budget includes namespace bytes per row, key bytes and payload bytes, not
 allocator, metadata or database-engine buffers. Malformed/over-budget pages
 return no partial result; unsupported adapters refuse without legacy fallback.
@@ -63,8 +64,9 @@ total-heap quota, publication permission, physical claim clock or atomic
 Work/Job/absentCore admission. Fixtures and orderly SQLite reopen grant no
 installed/native/SAF/JES/crash/full26 credit. Actual controller ownership,
 supervised handover, late-failure consumption and all other nonlicensed mq.programming
-acceptance remain required. All26 full-call gates stay Pending; fullv0.15 remains
-unfinished. Only the licensed IBM oracle is human-skipped0/26, with zero credit.
+acceptance remain required. All 26 full-call gates stay Pending; MQ programming
+acceptance remains
+unfinished. Only the licensed IBM oracle is human-skipped 0/26, with zero credit.
 
 ## Retained checked replay and refusal prerequisite
 
@@ -103,9 +105,10 @@ Configured MQINQ remains disabled: genuine provider origin, selected frame and
 actual supervised late-failure consumption are still required. No append into an
 old terminal root, successor audit with old identity, lost-ACK retry or public
 Ready observation grants authority. Fixture scalars/tokens and orderly owned
-SQLite are not installed/native/JES/SAF/crash evidence. Source credit0; all26
-full-call gates stay Pending and fullv0.15 incomplete. Only licensed oracle is
-human-skipped0/26; all other parent acceptance requirements remain unwaived.
+SQLite are not installed/native/JES/SAF/crash evidence. Source credit0; all 26
+full-call gates stay Pending and MQ programming acceptance incomplete. Only licensed
+oracle is
+human-skipped 0/26; all other parent acceptance requirements remain unwaived.
 
 ## Private prepared Batch selection prerequisite
 
@@ -138,8 +141,9 @@ freeze, current Work lease/backend decision time, Core-original cursor or JES
 admission. Preflight's existing standalone audit is not physically claim-fenced.
 Those future joins and actual private controller ownership remain required.
 Fixture transport and orderly reopen grant no installed/native/JES/crash or
-official acceptance. All26 full-call gates remain Pending; fullv0.15 unfinished.
-Only the licensed IBM oracle is human-skipped0/26; other parent gates remain.
+official acceptance. All 26 full-call gates remain Pending; MQ programming acceptance
+unfinished.
+Only the licensed IBM oracle is human-skipped 0/26; other parent gates remain.
 
 ## Contained Batch all-effect transport prerequisite
 
@@ -176,8 +180,9 @@ This infrastructure activates no coordinator/JES claim/physical clock/native
 producer, atomic selection/core join, root/UOW terminal or DefaultContext policy.
 Fixture delegates and orderly SQLite reopen earn no installed/native/JES/crash
 or official acceptance. Actual owner/cursor/sequence allocator, physical claim
-fences and all nonlicensed parent gates remain required. All26 full-call gates
-stay Pending; fullv0.15 unfinished. Only licensed oracle human-skipped0/26.
+fences and all nonlicensed parent gates remain required. All 26 full-call gates
+stay Pending; MQ programming acceptance unfinished. Only licensed oracle human-skipped
+0/26.
 
 ## Actual Batch run-owner stop prerequisite
 
@@ -215,8 +220,9 @@ Fixture callbacks/security and orderly SQLite reopen are not genuine compiled,
 native/JES/SAF/core-original or process-crash acceptance. Enclosing actual sole
 coordinator/controller ownership, closed JesClaimRun, after-lock physical Work/Job
 expiry, scheduled root/recovery/terminal policy and DefaultContext remain required.
-Source credit0; all26 full-call gates Pending and fullv0.15 unfinished. Only the
-licensed oracle is human-skipped0/26; every other acceptance obligation remains.
+Source credit0; all 26 full-call gates Pending and MQ programming acceptance unfinished.
+Only the
+licensed oracle is human-skipped 0/26; every other acceptance obligation remains.
 
 ## Atomic checked-read store prerequisite
 
@@ -252,8 +258,8 @@ Infrastructure-only work adds no IBM source or official execution credit. Actual
 MQINQ INQUIRE-open/normal-local definition origin, current frame/handles/SAF,
 original replay failure/denial audit ownership and compiled table ABI remain
 separate required work. No provider/native/installed/JES/full26 activation follows.
-All26 full-call gates remain Pending; only licensed oracle human-skipped0/26.
-Fullv0.15 and every other nonlicensed acceptance gate remain unfinished.
+All 26 full-call gates remain Pending; only licensed oracle human-skipped 0/26.
+MQ programming acceptance and every other nonlicensed acceptance gate remain unfinished.
 
 ## Checked numeric local-type inquiry prerequisite
 
@@ -290,8 +296,9 @@ Actual normal-local catalog origin, live INQUIRE-open HCONN/HOBJ/current frame,
 SAF/original core/physical read+receipt/audit+replay and compiled ten-reference
 table ABI remain required separate work. Otherselectors/kinds/characters/
 warnings/short-buffer rules remain pending. No selected/native/installed/full26
-activation or credit. All26 full-call gates stay Pending; onlylicensed oracle
-human-skipped0/26. Fullv0.15 and allother nonlicensed gates remain unfinished.
+activation or credit. All 26 full-call gates stay Pending; only the licensed oracle
+human-skipped 0/26. MQ programming acceptance and all other nonlicensed gates remain
+unfinished.
 
 ## Private coordinator original-dispatch prerequisite
 
@@ -322,7 +329,7 @@ Genuine enclosing controller ownership/ControllerExit/stop latch, private server
 JesClaimRun, physical Work/Job decision-time expiry, scheduled compiled/root
 terminal policy and DefaultContext/JES/GMT remain required separate work. Fixture
 ports are not installed/native/JES/SAF/crash or full26 evidence. Source credit0;
-only licensed oracle human-skipped0/26. All nonlicensed mq.programming acceptance remains
+only licensed oracle human-skipped 0/26. All nonlicensed mq.programming acceptance remains
 required and unfinished.
 
 ## Initial-root preparation store prerequisite
@@ -353,7 +360,7 @@ strict successor-aware full overlap/history closure and scheduled Work/Job
 decision-time fencing remain separate work. Logical freshness is not physical
 JES expiry after writer-lock wait. No dynamic enrollment, fabricated intent,
 RunningLifecycle bypass, terminal decision, history release or deployed migration
-is supplied. Source credit0; only licensed oracle human-skipped0/26. Native-root,
+is supplied. Source credit0; only licensed oracle human-skipped 0/26. Native-root,
 recovery/participants/full26/CardDemo and all other nonlicensed mq.programming gates remain
 required and unfinished.
 
@@ -387,8 +394,8 @@ q101840_ SHA03e3347bbf16d2f8e3a9061e921dbfca7a3afd0fe3bc13418ebdf47bb652ce1b.
 Output CCSID, empty/unset values, numeric sentinel/length joins, exact short-warning
 definedness and selector-validation ordering remain source gaps. Source presence
 does not grant numeric MQINQ/MQSET forwarding, real SAF/current-frame/core/store
-permission or native/installed/full26 credit. Only licensed oracle human-skipped0/26;
-all other fullv0.15 obligations remain required and unfinished.
+permission or native/installed/full26 credit. Only licensed oracle human-skipped 0/26;
+all other MQ programming acceptance obligations remain required and unfinished.
 
 ## Genuine Running-step neutral Program transport
 
@@ -422,7 +429,7 @@ Real coordinator original Intent/Running ownership, private server claim join,
 decision-time physical Work/Job fences, scheduled compiled-step/root terminal
 policy and genuine JES user/accounting/GMT/DefaultContext remain prerequisites.
 No native/installed/Core/SAF/full26 activation or credit follows. Source credit0;
-only licensed oracle human-skipped0/26. Fullv0.15 remains unfinished.
+only licensed oracle human-skipped 0/26. MQ programming acceptance remains unfinished.
 
 ## Attributed Open-root provider writer prerequisite
 
@@ -452,7 +459,8 @@ remain required. No terminal scope is recycled or historical actor reauthorized.
 The existing physical logical-clock floor is not a decision-time JES lease clock
 after writer-lock wait. Scheduled Work/Job fencing and terminal policy remain
 separate prerequisites. No new schema/table/journal/audit/terminal decision,
-retention release or outbox restriction. Onlylicensed human skip0/26; fullv0.15,
+retention release or outbox restriction. Only the licensed human skip0/26; MQ
+programming acceptance,
 recovery/participants/full26/CardDemo and other nonlicensed acceptance stay open.
 
 ## Shared finite conformance driver and explicit pending obligations
@@ -487,7 +495,7 @@ OPEN0019, PUT0020, reference PUT10021 and call-list q101650_; supplement
 baseline2026-09-12 MD q097390_/q097395_, GMO q096715_ and PMO q098655_.
 Source credit0; no refresh or publication bodies in Git. Historical d8 dependency
 policy is reused only for all32 unchanged inputs. Only the licensed oracle is
-human-skipped0/26; full mq.programming and other nonlicensed acceptance remain unfinished.
+human-skipped 0/26; full mq.programming and other nonlicensed acceptance remain unfinished.
 
 ## Installed supplied zero and binary correlation IDs
 
@@ -518,7 +526,7 @@ No production/compiler/provider/store/schema/default policy changes. Historical
 d8 deny reuse requires all32 unchanged inputs, not fresh deny/CI. Generated IDs,
 genuine JES/DefaultContext, fresh-root succession, recovery/participants/retention,
 shared IR/full26/CardDemo and other nonlicensed acceptance remain mandatory.
-Only the licensed oracle is human-skipped0/26; full mq.programming remains unfinished.
+Only the licensed oracle is human-skipped 0/26; full mq.programming remains unfinished.
 
 ## Compiled supplied correlation IDs
 
@@ -607,7 +615,7 @@ or licensed credit; no browser/network refresh or source bodies enter Git.
 Installed point/property forwarding and sources, generated IDs/defaults/priority/
 expiry, broader RFH2 profiles, genuine compiled pending-PUT root terminal,
 recovery/participants/IR/full26/CardDemo remain required. Parent ACTIVE;
-ONLY the unavailable licensed oracle is human-skipped0/26 with zero credit.
+ONLY the unavailable licensed oracle is human-skipped 0/26 with zero credit.
 
 `MQ-1503.selected-full-put-producer` consumes sealed worker7b9cd2782 after
 independent44path/blob,219stable receipt,54command snapshot,379historical input
@@ -652,7 +660,7 @@ HEADcheck cleans its intended target. Originald8/all32 unchanged dependency inpu
 proof is reused, not fresh deny/CI. Native point/source setup, compiled forwarding,
 actual installed/JES sources, generated IDs/defaults/priority/expiry, root terminal,
 recovery/participants/full26/CardDemo remain required. Parent remains ACTIVE;
-licensed IBM oracle ONLY human-skipped0/26, with zero credit.
+licensed IBM oracle ONLY human-skipped 0/26, with zero credit.
 
 Manager staging preceded completion of the ledger-only documentation sequence,
 so sealed featurec5f731625 retained the previous generated ledger digest while
@@ -687,7 +695,7 @@ feature seal/HEADcheck cleans the intended target. Originald8 dependency policy
 and all32 unchanged Cargo/lock/policy/toolchain inputs are reused, not fresh deny.
 Compiled OPEN/PUT, actual physical point bindings, all-argument writeback and
 M's genuine pending-PUT root-terminal proof remain required. Parent remains
-ACTIVE; licensed oracle alone is human-skipped0/26, with zero credit.
+ACTIVE; licensed oracle alone is human-skipped 0/26, with zero credit.
 
 `MQ-1501.rfh2-source-pins` consumes sealed workerd317512d3 after independent
 eight-path/blob,124historical binding,61command receipt,17external artifact,
@@ -768,7 +776,7 @@ identities; fresh composed checks cover the final registered files.
 This is zero source/execution/official/licensed credit, not native producer
 semantics. Complete PUT/PUT1, trusted physical GMT/JES context, generated IDs,
 defaults/priority/expiry and every other nonlicensed parent gate remain required.
-Only the licensed oracle is human-skipped0/26; the parent remains ACTIVE.
+Only the licensed oracle is human-skipped 0/26; the parent remains ACTIVE.
 
 `MQ-1503.selected-property-family` consumes sealed worker927e8c4ac after full
 production/tests/schema/generator/source review and independent46path/blob/
@@ -839,7 +847,7 @@ Only known physical success adopts; late CAS/controls/quota errors preserve
 pending authority and postpersist Unknown retains/fences without redispatch.
 SQLite committed-counter reopen proves persistence, not HardenGetBackout crash
 accuracy or handle resurrection. Full PUT/PUT1, native/installed complete
-delivery, root/task-end/recovery, participant, CardDemo and all26 remain required.
+delivery, root/task-end/recovery, participant, CardDemo and all 26 remain required.
 
 `MQ-1501.recovery-source-pins` consumes sealed worker `95ad8e9d4` and registers
 exactly one independent zero-credit source: HardenGetBackout `q103230_`, baseline
@@ -855,7 +863,7 @@ receipts, one source pin, six frozen prior files and 32 dependency-policy inputs
 The source archive remains in-progress, without independent browser reproduction
 or freshness/snapshot-equivalence claims. This closes a reference-source gap,
 not crash-accurate BackoutCount, queue defaults, root/task-end/recovery,
-participant, CardDemo or all26 acceptance. Only the licensed oracle is skipped;
+participant, CardDemo or all 26 acceptance. Only the licensed oracle is skipped;
 all other parent requirements remain active.
 
 `MQ-1503.zos-backout-policy` adds an explicit private live delivery candidate for
@@ -893,7 +901,7 @@ compile/test receipts remain failed; their repaired inputs pass separately.
 Dependency policy reuses only original d8 and all 32 unchanged inputs; unchanged
 contract inputs retain the genuine global API-doc pass from `54bcfeae`, not a
 new gate run. Selected retirement/post-persistence age, root task end, recovery,
-actual full delivery, participant/IR/CardDemo/all26 still require implementation.
+actual full delivery, participant/IR/CardDemo/all 26 still require implementation.
 
 `MQ-1506.host-api-doc-repair` composes sealed worker `d3c7b274` with the
 execution/store repair below. The genuine global API-documentation gate now
@@ -969,7 +977,7 @@ Normal nonfinal returns retain prior connection/work; late CAS/audit/control
 failure and cold incarnation fence without redispatch. Drop revokes transport
 only, never deciding a durable UOW. ProductServer defaults remain legacy; no
 startup normalization, operator permission, installed RACF/shared-participant,
-typed checkpoint/task-end/recovery, CardDemo or all26 completion is claimed.
+typed checkpoint/task-end/recovery, CardDemo or all 26 completion is claimed.
 The strict fixture is reproducibly generated by the existing quiescent import
 planner and grants setup credit only. Independent manager checks bind all22
 worker paths,479 tested source inputs,125 receipts and five original source pins.
@@ -2224,7 +2232,7 @@ volatile connection alias storage, not forwarding. HOBJ/HMSG alias families,
 compiled original OPEN/PUT/GET/property writeback, genuine pending-PUT normal/
 native-Abend root terminal, recovery/participants/IR/CardDemo and all applicable
 nonlicensed full26 acceptance remain required. Only the licensed oracle is
-human-skipped0/26 with zero credit; the parent mq.programming goal stays active.
+human-skipped 0/26 with zero credit; the parent mq.programming goal stays active.
 
 ## Complete GET read-only native binding
 
@@ -2260,7 +2268,7 @@ existing FullGot result does not contain it. This feature does not synthesize
 that output from cached queue facts, alter canonical/replay bytes or claim
 native GET writeback readiness. The additive result and installed ABI forwarding
 remain required, alongside full nonlicensed mq.programming acceptance. Only the licensed
-oracle is human-skipped0/26; no other gate is waived.
+oracle is human-skipped 0/26; no other gate is waived.
 
 ## Owned reconciled raw property structures
 
@@ -2303,7 +2311,7 @@ topics and forty exact fragment locators with retained-first SHA/byte checks.
 Declaration/short-name/z/OS availability disagreements remain explicit, and
 source review/raw fixtures earn zero installed native, official or licensed
 execution credit. All nonlicensed parent mq.programming gates remain required; only the
-licensed oracle is human-skipped0/26.
+licensed oracle is human-skipped 0/26.
 
 ## Root publication failure contracts
 
@@ -2323,7 +2331,7 @@ retain their actual candidate identities and failed fixture attempts. There is
 no production, schema, API or IBM semantic change and no new source lookup is
 required. Installed pending PUT/normal/CEE3ABD/removed GET, actual crash/recovery,
 participants, IR, full26, CardDemo and other nonlicensed gates remain required.
-Only the licensed oracle is human-skipped0/26; this feature earns zero such credit.
+Only the licensed oracle is human-skipped 0/26; this feature earns zero such credit.
 
 ## Compiled qualified complete GET forwarding
 
@@ -2345,7 +2353,7 @@ pins from baseline2026-08-31 GET0015/q101830 and supplements2026-09-12 GMO/MD/
 constants were independently reproduced offline. Source credit0. Broader GET
 forms, genuine wrappers/source, removed GET/pending PUT normal/CEE3ABD, owning
 recovery/participants/IR/full26/CardDemo remain required. Only licensed oracle
-is human-skipped0/26; all other acceptance remains open.
+is human-skipped 0/26; all other acceptance remains open.
 
 ## Installed finite native OPEN/CLOSE host
 
@@ -2375,7 +2383,7 @@ were independently reproduced offline; source credit0. PUT1 is explicitly refuse
 at this composed prerequisite until its separate host feature is approved.
 Pending PUT normal/CEE3ABD, removed GET, DefaultContext/JES/GMT, broader forms,
 owning recovery/participants/IR/full26/CardDemo remain required. Only licensed
-oracle is human-skipped0/26; no full native-terminal or official credit is claimed.
+oracle is human-skipped 0/26; no full native-terminal or official credit is claimed.
 
 ## Installed complete PUT and finite pending-work terminal composition
 
@@ -2507,7 +2515,7 @@ reproduced after retained-first hash/byte checks; source review earns zero credi
 Native GMO writeback and the all-argument MD/GMO/body/length/status join remain
 separate work, as do installed forwarding, root/recovery/participants, IR,
 CardDemo and full nonlicensed mq.programming acceptance. Only the licensed oracle is
-human-skipped0/26; the parent goal remains active.
+human-skipped 0/26; the parent goal remains active.
 
 ## Compiled OPEN/CLOSE and root-shared object aliases
 
@@ -2546,7 +2554,7 @@ context/PMO all-argument writer, with actual configured Foundation encoder.
 Genuine installed root-shared allocation and same-service profile wrappers,
 compiled pendingPUT normal/CEE3ABD and removedGET terminal proofs, recovery,
 participants, IR/full26/CardDemo remain required. Parent mq.programming stays active;
-only the unavailable licensed oracle is human-skipped0/26 with zero credit.
+only the unavailable licensed oracle is human-skipped 0/26 with zero credit.
 
 ## Qualified GMO1 result staging
 
@@ -2578,7 +2586,7 @@ production validation was weakened. Source/pure-value fixtures earn zero
 installed native/JES/LE/RACF/root-terminal/official/licensed execution credit.
 Joined compiled GET, actual installed source and native point/root forwarding,
 pendingPUT normal/CEE3ABD/removedGET terminal, recovery/participants/IR/full26/
-CardDemo remain mandatory. Parent active; licensed oracle alone human-skipped0/26.
+CardDemo remain mandatory. Parent active; licensed oracle alone human-skipped 0/26.
 
 ## Compiled complete PUT/PUT1 forwarding
 
@@ -2609,7 +2617,7 @@ all source review earns zero execution credit. Worker snapshots and failed
 attempts retain their actual identities, not new post-commit test labels.
 Genuine installed opaque wrappers/source, pendingPUT normal/CEE3ABD and removedGET,
 joined compiled GET, DefaultContext, recovery/participants/IR/full26/CardDemo
-remain required. Parent active; licensed oracle alone human-skipped0/26.
+remain required. Parent active; licensed oracle alone human-skipped 0/26.
 
 ## Finite synchronous root publication framework
 
@@ -2642,7 +2650,7 @@ reviewed `MQ-1505.root-writer-guards` feature are addressed separately below;
 this prerequisite is not advertised as a complete root delivery contract.
 Genuine installed point/PUT/GET, pendingPUT normal/CEE3ABD/removedGET, failure/
 restart, participants/IR/full26/CardDemo and other nonlicensed gates remain
-required. Parent active; only licensed oracle human-skipped0/26.
+required. Parent active; only licensed oracle human-skipped 0/26.
 
 ## Root ordinary-writer guard parity
 
@@ -2666,4 +2674,4 @@ IBM semantic lookup and supplies zero compiled/native/installed/SAF/JES/LE/
 pendingwork/official/licensed credit. Original pendingPUT normal/CEE3ABD and
 removedGET, installed source, restart/crash/recovery, participants/IR/full26/
 CardDemo and other nonlicensed gates remain required. Parent active; only the
-licensed oracle is human-skipped0/26.
+licensed oracle is human-skipped 0/26.

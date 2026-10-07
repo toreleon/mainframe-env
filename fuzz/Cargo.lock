@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-compiler"
-version = "0.8.3"
+version = "0.1.0"
 dependencies = [
  "mainframe-env-compiler-api",
  "mainframe-env-diagnostics",
@@ -143,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-compiler-api"
-version = "0.8.3"
+version = "0.1.0"
 dependencies = [
  "mainframe-env-diagnostics",
  "mainframe-env-ir",
@@ -153,18 +153,18 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-diagnostics"
-version = "0.8.3"
+version = "0.1.0"
 dependencies = [
  "mainframe-env-source",
 ]
 
 [[package]]
 name = "mainframe-env-encoding"
-version = "0.8.3"
+version = "0.1.0"
 
 [[package]]
 name = "mainframe-env-fuzz"
-version = "0.8.3"
+version = "0.1.0"
 dependencies = [
  "libfuzzer-sys",
  "mainframe-env-compiler",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-ir"
-version = "0.8.3"
+version = "0.1.0"
 dependencies = [
  "mainframe-env-diagnostics",
  "mainframe-env-source",
@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "mainframe-env-source"
-version = "0.8.3"
+version = "0.1.0"
 dependencies = [
  "sha2",
 ]

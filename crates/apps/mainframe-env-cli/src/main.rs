@@ -27,9 +27,12 @@ use std::path::{Path, PathBuf};
 #[command(
     name = "mainframe-env",
     version,
-    about = "mainframe-env 0.1 local tools"
+    about = "Mainframe Sandbox compiler and local execution tools"
 )]
 struct Cli {
+    /// Emit machine-readable results and errors.
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -66,7 +69,12 @@ enum Format {
 }
 
 fn main() {
-    if let Err(problem) = run(Cli::parse()) {
+    let cli = Cli::parse();
+    let json = cli.json;
+    if let Err(problem) = run(cli) {
+        if json {
+            println!("{}", serde_json::json!({"ok":false,"error":problem}));
+        }
         eprintln!("mainframe-env: {problem}");
         std::process::exit(1);
     }
@@ -85,6 +93,17 @@ fn run(cli: Cli) -> Result<(), String> {
                     artifact,
                     diagnostics,
                 } => {
+                    if cli.json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "ok":true,"artifact":artifact.content_id().to_reference(),
+                                "semantic":artifact.semantic_id().to_reference(),
+                                "bytes":artifact.payload().len(),"diagnostics":diagnostics.len()
+                            })
+                        );
+                        return Ok(());
+                    }
                     println!(
                         "artifact {} semantic={} bytes={} diagnostics={}",
                         artifact.content_id().to_reference(),
@@ -104,6 +123,19 @@ fn run(cli: Cli) -> Result<(), String> {
         } => {
             let bundle = bundle(&source, format, &libraries)?;
             let analysis = CobolCompiler::default().analyze(&bundle);
+            if cli.json {
+                let diagnostics = analysis.diagnostics.iter().map(|d|
+                    serde_json::json!({"code":d.code().to_string(),"message":d.public_message()})
+                ).collect::<Vec<_>>();
+                let semantic = analysis.semantic.as_ref().map(|s|
+                    serde_json::json!({"program":s.program_id,"storage":s.storage_bytes,"items":s.layouts.len()})
+                );
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"semantic":semantic,"diagnostics":diagnostics})
+                );
+                return Ok(());
+            }
             if let Some(semantic) = analysis.semantic {
                 println!(
                     "program={} storage={} items={}",
@@ -150,6 +182,13 @@ fn run(cli: Cli) -> Result<(), String> {
                 ExecutionControl::default(),
             ) {
                 ExecutionOutcome::Completed(completion) => {
+                    if cli.json {
+                        println!(
+                            "{}",
+                            serde_json::json!({"ok":true,"output":String::from_utf8_lossy(completion.output.bytes())})
+                        );
+                        return Ok(());
+                    }
                     print!("{}", String::from_utf8_lossy(completion.output.bytes()));
                     Ok(())
                 }

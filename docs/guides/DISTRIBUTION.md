@@ -2,9 +2,26 @@
 
 The public framework is built from the repository. Read
 [capabilities](CAPABILITIES.md) and [subsystem status](../delivery/IMPLEMENTATION-STATUS.md)
-before choosing a workload. There is no maintained release archive or historical
-receipt collection. Cargo package versions and contract schema identities remain
-build and compatibility metadata.
+before choosing a workload. Historical release archives, tags, and execution
+receipt collections have been removed. First-party workspace packages and
+the standalone fuzz package start at `0.1.0`. Dependency and toolchain pins remain
+reproducibility inputs; contract schema and artifact compiler-generation identities
+remain compatibility metadata, independent of Cargo package versions.
+
+Create a fresh sandbox instance when moving from historical builds. Retained batch
+continuation records bind the runtime package identity; the reset does not migrate
+those records. Artifact compatibility fixtures retain their original identities.
+
+Subsystem scope and CardDemo workload requirements retain their specifications
+without old release-status or receipt claims. Content-addressed application-package
+fixtures keep their declared versions and digests as compatibility test inputs.
+
+For agent use, build the [executable sandbox bundle or container](MAINFRAME-SANDBOX.md).
+The bundle includes the compiler, CardDemo runtime, Python controller, pinned
+CardDemo reference, and complete legal notices for their normal dependency closure.
+The container also retains its bundled Git source archive and GPL license.
+Build the container locally from its digest-pinned bases; no published image is
+assumed by these instructions.
 
 ## Review the public source
 

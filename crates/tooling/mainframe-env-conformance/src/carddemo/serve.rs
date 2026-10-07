@@ -19,6 +19,18 @@ pub fn serve_carddemo_from_env(
             "CARDDEMO_CORPUS_DIR is required",
         )
     })?);
+    serve_carddemo_application(inventory_path, &corpus_dir, &corpus_dir, state_dir, listen)
+}
+
+/// Compose an editable application separately from its verified seed/reference corpus.
+/// A changed application requires a fresh state directory; existing generations are immutable.
+pub fn serve_carddemo_application(
+    inventory_path: &Path,
+    corpus_dir: &Path,
+    source_dir: &Path,
+    state_dir: &Path,
+    listen: SocketAddr,
+) -> Result<(), CorpusProblem> {
     verify_carddemo_corpus(&corpus_dir, inventory_path)?;
     fs::create_dir_all(state_dir).map_err(serve_problem)?;
     let state_dir = fs::canonicalize(state_dir).map_err(serve_problem)?;
@@ -41,9 +53,10 @@ pub fn serve_carddemo_from_env(
         ..ServerConfig::default()
     };
     eprintln!("Compiling CardDemo online programs from the pinned upstream checkout...");
-    let definition = carddemo_base_online_definition(&corpus_dir)?;
-    let layouts = browser_layouts(&corpus_dir)?;
+    let definition = carddemo_base_online_definition(source_dir)?;
+    let layouts = browser_layouts(source_dir)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .enable_all()
         .build()
         .map_err(serve_problem)?;
@@ -86,7 +99,15 @@ pub fn serve_carddemo_from_env(
             installed
         };
         server.start_background_workers().map_err(terminal_problem)?;
+        let readiness_server = server.clone();
         let app = server.router()
+            .route("/readyz", get(move || {
+                let ready = readiness_server.readiness().ready();
+                async move {
+                    (if ready { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE },
+                     axum::Json(serde_json::json!({"ready":ready,"profile":"carddemo-online"})))
+                }
+            }))
             .route("/", get(|| async {
                 (
                     [("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"), ("cache-control", "no-store")],
