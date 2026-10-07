@@ -169,7 +169,7 @@ impl CicsService {
             || loan.actor.as_ref().is_some_and(|actor| actor != target)
             || task.current_program.effect_invocation != *loan.actor.as_ref().unwrap_or(source)
             || call.occurrence == 0
-            || call.occurrence > u64::from(source.limits.max_effects)
+            || call.occurrence > source.limits.max_effects
             || call.effect.sequence != call.occurrence
             || call.effect.run_unit != source.run_unit_id
             || call.effect.deadline_tick != source.deadline_tick
