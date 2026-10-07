@@ -14,6 +14,13 @@ Allowed categories are `added`, `changed`, `deprecated`, `removed`, `fixed`,
 and `security`. The summary is one trimmed line of at most 512 bytes and does
 not include the Markdown bullet prefix.
 
+A fragment records an implemented change awaiting changelog integration. Its
+presence does not mean the feature is unimplemented, or that its subsystem has
+passed every acceptance gate. Keep the current implementation scope, remaining
+work, and unavailable checks in the owning progress record. The
+[unreleased status](../docs/delivery/UNRELEASED-STATUS.md) links those records and
+defines their status vocabulary. Do not add status fields to the fragment schema.
+
 Run `cargo xtask changelog --check` in feature worktrees. During release or
 batch integration, run `cargo xtask changelog` once: it inserts all fragments
 into the Unreleased section, removes the consumed fragment files, and

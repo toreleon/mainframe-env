@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "changed"
-summary = "Closed all 25 IMS assurance-matrix rows over executable local handlers while retaining zero licensed differential credit."
+summary = "Bind all 25 IMS assurance-matrix rows to executable local handlers while retaining explicit mandatory acceptance gaps and zero official or licensed credit."

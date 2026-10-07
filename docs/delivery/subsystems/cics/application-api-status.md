@@ -4,6 +4,22 @@ Subsystem: **cics**
 Phase: **application-api**
 Status: **Implementation in progress; application API acceptance and licensed differential remain incomplete**
 
+## Current implementation and remaining acceptance
+
+The application registry contains 260 typed, zero legacy and three unready rows.
+The unready commands are CICSMESSAGE, GETNEXT TIMER and ISSUE COPY. Typed
+registration identifies a bounded route; it does not close all command forms,
+program-frame/storage ownership, security, recovery or licensed obligations.
+
+PR #389's frame/call attestations, scoped storage/member reservation, terminal
+checkpoint and transfer-source preparation are merged. The three-row compiled
+READ/REWRITE/SYNCPOINT pilot and private helper regressions remain scoped proofs.
+Full application acceptance, installed replacement handoff/execution and
+broader lifecycle/backend matrices remain pending. The dated declarations and
+historical registry counts below refer to their producing inputs, rather than
+the current registry. Use the [routing authority](../../../architecture/CICS-COMMAND-ROUTING.md)
+and [system API progress](system-api-status.md) for current admission boundaries.
+
 ## Authorized prerequisite completion, 2026-10-02
 
 The SPI/FEPI goal now includes finishing the CICS application API prerequisite

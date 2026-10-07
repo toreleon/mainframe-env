@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 234,
+    "markdown_documents": 236,
     "navigation_groups": 8,
     "normative_documents": 97,
-    "xtask_commands": 164
+    "xtask_commands": 163
   },
   "documents": [
     {
@@ -57,8 +57,8 @@
     {
       "normative": false,
       "path": "changes/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:5c0f1f281a794938be5599bf79dd8507766a11bf46687c43ac92d3a4e8c9884b",
+      "relative_links": 1,
+      "sha256": "sha256:e78875f95fa92c15c1c278cba6b1e38db82ff412fbbea90f3bbf7bef17bc97a6",
       "title": "Changelog fragments",
       "xtask_commands": 2
     },
@@ -341,8 +341,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 177,
-      "sha256": "sha256:cc56bfe7419efd37264d0ec859bfc7e1517acef0e9042d8173732c521c7037b5",
+      "relative_links": 178,
+      "sha256": "sha256:39a00db95108b48c74d643725323b3e727c89fcc3bbceffc2b3ecb1197e77b34",
       "title": "mainframe-env documentation",
       "xtask_commands": 2
     },
@@ -1469,18 +1469,26 @@
     {
       "normative": false,
       "path": "docs/delivery/IMPLEMENTATION-STATUS.md",
-      "relative_links": 19,
-      "sha256": "sha256:78ce001e1f108ff0f2973f15bd1bf8dfe0c4aab9d83fef8b06afce78f8819bac",
+      "relative_links": 20,
+      "sha256": "sha256:814f15279d3ab30b6140313a8d174f497b7425a770c37772f87346627438786a",
       "title": "Subsystem implementation status",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "docs/delivery/README.md",
-      "relative_links": 8,
-      "sha256": "sha256:f2e8485f9aa34cbd19eec9fd2544577ec024d624aff44505b977d978aedd10e0",
+      "relative_links": 9,
+      "sha256": "sha256:994cf7a2adcf0021eb5fda366d4fe1ae1572808a38d5385eab2ec59d3c2a0b4b",
       "title": "Delivery and verification",
       "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/UNRELEASED-STATUS.md",
+      "relative_links": 19,
+      "sha256": "sha256:c88d8ba3782d6674c6d578968d3a9248c1583abc05356004a3e67e74290fbe36",
+      "title": "Unreleased changes and remaining work",
+      "xtask_commands": 1
     },
     {
       "applies_from": "mainframe-env current subsystem contracts",
@@ -1533,8 +1541,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/README.md",
-      "relative_links": 36,
-      "sha256": "sha256:a78e10e8ffc06845af7c9976b36177d17ffd7931159303e070aa659624f86cae",
+      "relative_links": 37,
+      "sha256": "sha256:9a95dc42e69a07f190555250b8415d98c1927a662be227995f421a404dac9d69",
       "title": "Subsystem delivery plans",
       "xtask_commands": 2
     },
@@ -1549,10 +1557,10 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/certification/licensed-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:d2e36afc2d5cc636a3a418bfebfe563c8a56b668772903587019806364b4c15e",
+      "relative_links": 1,
+      "sha256": "sha256:4be852786fa0ffddb1328a6e5ac06a5adc010d4a46155fd15d2c8f2fe430cac2",
       "title": "Licensed certification — Differential certification progress",
-      "xtask_commands": 6
+      "xtask_commands": 3
     },
     {
       "normative": false,
@@ -1581,8 +1589,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/application-api-status.md",
-      "relative_links": 32,
-      "sha256": "sha256:2e10b50dcf70b0b31fe354fc735e12018edc26aaea7933236a99d9f813bc4c6a",
+      "relative_links": 34,
+      "sha256": "sha256:51c9f1370b50dffd761275f39e6fbbb0f29cd5b4eb8689ab1d904926f72e544f",
       "title": "CICS — Application API progress",
       "xtask_commands": 5
     },
@@ -1605,8 +1613,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/cics/system-api-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:0b6e6de8a823924457fc4a3ca70d783bf026eb77440f4f20078dbb9815b98035",
+      "relative_links": 2,
+      "sha256": "sha256:ab565f44ca349a22e156d13e025294297022a47ffac1f75775d0d55ba8fd1a92",
       "title": "CICS — SPI and FEPI progress",
       "xtask_commands": 0
     },
@@ -1662,9 +1670,9 @@
       "normative": false,
       "path": "docs/delivery/subsystems/cobol/structure-status.md",
       "relative_links": 0,
-      "sha256": "sha256:c11c00bee151de38fc69f6699f5a4649ec0ca97f3a9002af939e2f90cac36566",
+      "sha256": "sha256:2ab8f08dd9950cd0920cb011c922b9de745a2a74d08a76d01a1fc20e28c9fa66",
       "title": "COBOL — Grammar and types progress",
-      "xtask_commands": 1
+      "xtask_commands": 2
     },
     {
       "normative": false,
@@ -1709,8 +1717,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/db2/core-status.md",
-      "relative_links": 3,
-      "sha256": "sha256:4472acf104e7f7755c5441859708732ef52158fb8ba0510770d5dc020c7b2fdf",
+      "relative_links": 5,
+      "sha256": "sha256:e200d08b667a5ee2808679120ef08d81f4e68201aa5c99bb273b8edcd18dc535",
       "title": "Db2 — Engine and common SQL progress",
       "xtask_commands": 0
     },
@@ -1728,6 +1736,14 @@
       "relative_links": 2,
       "sha256": "sha256:d86095ad9ce96cb1426217e5451de37a3649616d89146362497719735a86707e",
       "title": "Db2 — Complete programming surface",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/subsystems/db2/programming-status.md",
+      "relative_links": 3,
+      "sha256": "sha256:c96e9ec03e4311d5cb6ac8a5ddfa55648757347bb40889007eb1eb50dc2bb5d2",
+      "title": "Db2 — Complete programming surface progress",
       "xtask_commands": 0
     },
     {
@@ -1757,8 +1773,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/ims/programming-status.md",
-      "relative_links": 11,
-      "sha256": "sha256:9a225870ee550ce87dac5d490e6abdb7efa63e8a9bfad9c1f8aea34efe029b21",
+      "relative_links": 13,
+      "sha256": "sha256:f8c2f9817502fdfe5f867e63fa6d936e1aea87d4ed39d02c7c50c3c00535c7cc",
       "title": "IMS — DB / TM programming surface progress",
       "xtask_commands": 25
     },
@@ -1798,7 +1814,7 @@
       "normative": false,
       "path": "docs/delivery/subsystems/jcl/planning-status.md",
       "relative_links": 0,
-      "sha256": "sha256:17b0b862838b7b7a2379134d8766cbe4d36182b15fc07b545f6ae24d42d53236",
+      "sha256": "sha256:8d0591b812c1c9f583a88f6d5383dc165082d44f4b9dde294c362ff8eb28ae30",
       "title": "JCL — Converter and planner progress",
       "xtask_commands": 0
     },
@@ -1849,8 +1865,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/mq/programming-status.md",
-      "relative_links": 1,
-      "sha256": "sha256:efce89f90b0ddc3406d9648217e828a3a34b61b951de93ebbf80109f8966f213",
+      "relative_links": 2,
+      "sha256": "sha256:5e7b6dab25e445625bd7f6333ddeaa1160ba7dd7bc69cf71d7b9421975e2f36e",
       "title": "IBM MQ — MQI programming surface progress",
       "xtask_commands": 2
     },
@@ -1881,8 +1897,8 @@
     {
       "normative": false,
       "path": "docs/delivery/subsystems/zosmf/rest-status.md",
-      "relative_links": 0,
-      "sha256": "sha256:5194e22f4f98976da857ce907b7ec505497fceefe5268d3160cba318198895ac",
+      "relative_links": 1,
+      "sha256": "sha256:d1de0ce4ab423f1881f6302cccd48582c319e595e9c6c1f8c782253c2bf1b653",
       "title": "z/OSMF — REST portfolio progress",
       "xtask_commands": 4
     },
@@ -2722,6 +2738,10 @@
           "path": "docs/delivery/IMPLEMENTATION-STATUS.md"
         },
         {
+          "label": "Unreleased changes and remaining work",
+          "path": "docs/delivery/UNRELEASED-STATUS.md"
+        },
+        {
           "label": "Verification strategy",
           "path": "docs/delivery/VERIFICATION-STRATEGY.md"
         },
@@ -2805,7 +2825,7 @@
         },
         {
           "label": "Db2 — Complete programming surface",
-          "path": "docs/delivery/subsystems/db2/programming-plan.md"
+          "path": "docs/delivery/subsystems/db2/programming-status.md"
         },
         {
           "label": "IMS — DB / TM programming surface",
@@ -2924,7 +2944,7 @@
   },
   "portal": "docs/README.md",
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:55fa5d7df907b055bdccade57b8edfb69def9a62ec5cdf7b35852fd68da90aa1",
+  "registry_sha256": "sha256:b8bbac5dd07baab7b80554ade33568ac99c012b4f9d4eefa3e07d9e461a5d1bb",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "subsystems": [
     {
@@ -3103,7 +3123,8 @@
           "id": "programming",
           "label": "Complete programming surface",
           "plan": "docs/delivery/subsystems/db2/programming-plan.md",
-          "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md"
+          "prompt": "docs/prompts/subsystems/db2/IMPLEMENT_PROGRAMMING.md",
+          "status": "docs/delivery/subsystems/db2/programming-status.md"
         }
       ]
     },

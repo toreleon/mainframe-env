@@ -21,9 +21,10 @@ through ZMF-1106, publish a new route, or claim the zosmf.rest exit gate.
 
 The checked-in racf.security, dataset.data, and jes.execution status records identify accepted local
 RACF/SAF, dataset/AMS, and JES/spool implementations, with their licensed
-differentials still explicitly pending. No `cics/system-api-status.md` or accepted
-cics.system-api SPI/FEPI candidate exists at this parent. CICS-backed z/OSMF operations
-therefore cannot be assigned an accepted cics.system-api backend here. The same rule is
+differentials still explicitly pending. The current
+[CICS SPI/FEPI record](../cics/system-api-status.md) documents merged private
+preparation, with public execution still unadmitted. CICS-backed z/OSMF operations
+therefore cannot be assigned an accepted cics.system-api backend. The same rule is
 applied to every other family: an architectural package that might eventually
 host an operation is not recorded as an accepted capability unless the current
 source and evidence expose that typed backend.

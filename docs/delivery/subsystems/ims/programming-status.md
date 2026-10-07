@@ -3,7 +3,32 @@
 Subsystem: **ims**
 Phase: **programming**
 
-Status: **Proposed**
+Status: **Implementation in progress; bounded DB/TM surfaces implemented; full programming acceptance pending**
+
+## Current implementation and remaining acceptance
+
+The provider, signed-package routes, metadata publication, selected-PCB SSA
+navigation, bounded organization/logical-child behavior, local UOW isolation,
+DB-batch LOG/backout/CHKP/XRST and GSAM logical recovery are implemented within
+their declared limits. TM queue/application dispatch exists; complete TM
+application recovery remains unsupported. See the
+[provider surface](../../../../crates/providers/mainframe-env-ims/README.md).
+
+| Work package | Current state | Remaining boundary |
+|---|---|---|
+| IMS-1401 | In progress | Raw COBOL CBLTDLI framing, complete PCB feedback and unimplemented SSA/context classes |
+| IMS-1402 | Bounded package publication implemented | Complete metadata and call-context acceptance |
+| IMS-1403 | Bounded database behavior implemented | Complete organization, positioning and logical/secondary-path matrices |
+| IMS-1404 | Bounded TM dispatch implemented | Shared TM settlement/recovery and broader application acceptance |
+| IMS-1405 | Selected DB-batch recovery implemented | TM recovery, remaining contexts and recovery ownership/lease guarantees |
+| IMS-1406 | Local assurance and harness preparation implemented | Maintainer rule acceptance, full shared-IR closure, backend/failure matrices and licensed differential |
+
+The [assurance matrix](../../../../conformance/subsystems/ims/ims/assurance-matrix.json)
+retains zero official credit for all 25 call families. Local handler closure is
+not whole-family acceptance. Source-only registrations do not enable runtime
+behavior. The dated declarations below describe their original bounded inputs;
+old worker instructions and fail-first states are superseded by this overview
+and each later integrated implementation section.
 
 ## Root sequential-layout admission integration — 2026-10-03
 
@@ -3219,9 +3244,10 @@ existing `jsonschema` dependency; the provider's Rust validation tests remain
 in its crate. The metadata contract does not change the installed-definition
 wire shape.
 
-Database host execution, TM application dispatch, and broader recovery remain
-for later slices. This work grants no conformance, differential, licensed, or
-execution credit.
+The metadata-only slice described here grants no execution credit. Database
+host execution, TM application dispatch and selected DB-batch recovery were
+subsequently integrated in the bounded slices described elsewhere in this
+record; broader recovery and official/licensed acceptance remain pending.
 
 ## IMS metadata package publication
 
@@ -3365,8 +3391,9 @@ The applicable local gates are matrix identity/schema validation, focused
 provider and package regressions, `ims-catalog`, docs, changelog, architecture,
 format and clippy. Source review uses the verified IMS 15.6 database, TM,
 metadata, programming, and recovery topic manifests; offline HTML is reference
-data only. The matrix records pending public database-engine integration,
-licensed IMS differential, mixed-resource closure, and full 25-family gates.
+data only. Public database integration and bounded signed CardDemo job bindings
+are now implemented. The matrix retains pending complete CardDemo-profile
+acceptance, licensed IMS differential, mixed-resource closure and full 25-family gates.
 This slice gives no official row-gate or licensed credit. The next executable
 step is to run these checks on the finished candidate and seal only this slice.
 
@@ -6036,7 +6063,7 @@ the existing shared graph comparator's ordered additions list. Do not rewrite
 the historical platform.runtime-integration graph or earlier release additions, suppress graph comparison,
 change Cargo.lock/manifests, or weaken layer/module/API policy. Scope is exactly
 the new dependency-additions.json, one lookup entry in xtask/src/main.rs,
-this status, the unique v014-db2-encoding-dependency-inventory-20261002.toml
+this status, the unique db2-encoding-dependency-inventory.toml
 fragment and normal generated documentation-manifest.json (five paths).
 
 Required proof: the original missing-edge failure remains external; actual

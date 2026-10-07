@@ -383,7 +383,7 @@
   "pending": [
     {
       "id": "carddemo-corpus-package-route",
-      "reason": "The package-selected generic database route exists; full CardDemo corpus migration from legacy definitions and job bindings remains pending."
+      "reason": "Signed corpus packages, generic database selection and CardDemo job bindings are implemented within the bounded IMS profile; full current-candidate, backend/failure and independent conformance acceptance remain pending."
     },
     {
       "id": "full-25-family-gates",
@@ -395,7 +395,7 @@
     },
     {
       "id": "mixed-resource-syncpoint",
-      "reason": "Final mixed-resource transaction outcome closure belongs to the shared 0.16 participant integration."
+      "reason": "Final mixed-resource transaction outcome closure belongs to the shared integration.transactions participant authority."
     }
   ],
   "bindings": [

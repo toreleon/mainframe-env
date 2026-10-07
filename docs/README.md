@@ -194,6 +194,7 @@ ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immuta
 
 - [Implementation roadmap](delivery/IMPLEMENTATION-ROADMAP.md)
 - [Implementation status](delivery/IMPLEMENTATION-STATUS.md)
+- [Unreleased changes and remaining work](delivery/UNRELEASED-STATUS.md)
 - [Verification strategy](delivery/VERIFICATION-STRATEGY.md)
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
 - [z/OSMF compatibility API](delivery/ZOSMF-API.md)
@@ -218,7 +219,7 @@ Implementation progress is organized by subsystem and phase. Contract revisions 
 - [CICS — SPI and FEPI](delivery/subsystems/cics/system-api-status.md)
 - [z/OSMF — REST portfolio](delivery/subsystems/zosmf/rest-status.md)
 - [Db2 — Engine and common SQL](delivery/subsystems/db2/core-status.md)
-- [Db2 — Complete programming surface](delivery/subsystems/db2/programming-plan.md)
+- [Db2 — Complete programming surface](delivery/subsystems/db2/programming-status.md)
 - [IMS — DB / TM programming surface](delivery/subsystems/ims/programming-status.md)
 - [IBM MQ — MQI programming surface](delivery/subsystems/mq/programming-status.md)
 - [Cross-resource integration — Transactions and recovery](delivery/subsystems/integration/transactions-status.md)

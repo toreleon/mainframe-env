@@ -1,3 +1,3 @@
 schema_version = "mainframe-env.changelog-fragment@1"
 category = "added"
-summary = "Recover bounded prepared DECLARE CURSOR syntax and typed cursor attributes for the proposed Db2 0.12 parser (#344)."
+summary = "Recover bounded prepared DECLARE CURSOR syntax and typed cursor attributes for the Db2 core parser; cursor binding and execution remain pending (#344)."

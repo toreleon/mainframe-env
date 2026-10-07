@@ -3,7 +3,7 @@
 Subsystem: **certification**
 Phase: **licensed**
 
-Status: **CER-1701 shared harness foundation in progress; all licensed differentials pending**
+Status: **Shared harness foundation implemented; licensed environments and campaigns pending**
 
 This lane starts from `origin/main` commit
 `5ab706b1dd069e26db7cb9a2b66e921c9001fc39` on branch
@@ -132,15 +132,16 @@ licensed differential credit.
 
 All ten licensed environments, protected runner identities/attestations, final
 candidate commit/tree, shipped artifacts, and final independent fixtures are
-missing. Db2 retained documentation is incomplete and one MQ source topic is
-missing. The environment schema, pending slot authority, shared registry, and
+missing. Required offline publication bodies must be provisioned and verified
+for each campaign; earlier per-host missing-topic counts do not describe a
+newly configured cache. The environment schema, pending slot authority, shared registry, and
 additive receipt validator pass their focused registry and cross-authority
 tests. RACF and CICS have reviewed exact-observation normalization policies;
 COBOL, dataset, JES2, Db2, IMS, MQ, z/OSMF, and cross-resource normalization
-remains explicitly pending review. The repository-wide
-`cargo xtask schemas --check` reaches the pre-existing jes.execution CardDemo base-batch
-artifact and fails because its `supersession.reason` text exceeds that
-historical schema's 256-character limit; CER-1701 does not modify either file.
+remains explicitly pending review. Current schema and module-boundary checks
+pass; the historical CardDemo receipt-length and CICS module-ceiling failures
+are superseded and are no longer current blockers. Architecture source freshness
+remains unavailable without the required retained CICS application-review body.
 The synthetic environment, CICS v1 capture, and CER-1701 envelope pass both the
 unchanged CICS adapter-contract reader and shared validator at zero credit.
 Mutations of candidate identity, environment bytes, legacy capture bytes, case
@@ -154,7 +155,7 @@ integration must replace no historical receipt; it supplies external captured
 environment facts and a new envelope for the exact candidate. CER-1702 may run
 only after those inputs and the protected licensed runners exist.
 
-## Focused validation
+## Recorded foundation validation
 
 The final CER-1701 foundation ran these affected checks:
 
@@ -171,12 +172,8 @@ The final CER-1701 foundation ran these affected checks:
   manifest;
 - `cargo fmt --all -- --check` and `git diff --check`: pass.
 
-Three broader baseline checks were diagnosed once and not weakened or repaired
-outside CER-1701 scope. `cargo xtask schemas --check` reaches an unchanged jes.execution
-CardDemo artifact whose `supersession.reason` exceeds its schema's
-256-character limit. `cargo xtask architecture --check` reaches an unchanged
-`carddemo-operator-submit` mention in dataset `replay_index.rs`. The standalone
-module-boundary check reaches unchanged CICS pilot growth (1,345 production
-lines versus its recorded 1,321-line ceiling); the new licensed-harness module
-is below the ordinary 1,200-line limit. These failures are not licensed or
-candidate evidence and do not change any pending numerator.
+These foundation results retain their original producing scope. The unreleased
+review separately validates current schemas, module boundaries and shared
+licensed-harness plumbing. The harness still reports `licensed-credit=0` and
+`differential=pending`; a plumbing pass cannot close a licensed campaign. See
+[current verification limits](../../UNRELEASED-STATUS.md#verification-limits).
